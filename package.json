@@ -14,6 +14,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
+    "lint:knowledge": "node scripts/lint-no-specifics.mjs",
+    "test:knowledge-lint": "node --test scripts/lint-no-specifics.test.mjs",
     "web": "pnpm --filter logyourbody dev",
     "db:migrate": "scripts/web/create-migration.sh",
     "db:schema:check": "bash scripts/neon/check-migration-layout.sh",

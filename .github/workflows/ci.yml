@@ -89,6 +89,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint curated knowledge artifacts
+        run: pnpm lint:knowledge
+
+      - name: Test knowledge identity lint
+        run: pnpm test:knowledge-lint
+
       - name: Lint
         run: pnpm lint
 

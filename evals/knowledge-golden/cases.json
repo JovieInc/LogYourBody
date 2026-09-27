@@ -1,0 +1,905 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "topic": "body_fat_maintenance",
+      "question": "Why are body-fat ranges grouped in five-to-ten-percentage-point increments?",
+      "expected_fact_ids": ["k:0cb800da"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "What health concerns are associated with women being in the 10–15% body-fat range?",
+      "expected_fact_ids": ["k:0fbb8021"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "Are there exceptions to the roughly 15% body-fat threshold discussed for women?",
+      "expected_fact_ids": ["k:24f7c31b"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "For men, what is commonly associated with a body-fat level of 10–15%?",
+      "expected_fact_ids": ["k:2f91b094"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "What size body-fat reduction phases are suggested before taking a break?",
+      "expected_fact_ids": ["k:456dba79"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "How do MRI and DEXA compare with visual judgment for assessing body fat?",
+      "expected_fact_ids": ["k:ac7197c3"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "How can water retention affect the way someone looks compared with a DEXA result?",
+      "expected_fact_ids": ["k:b0cc284f"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "What effects may body fat below about 7–8% have for most men?",
+      "expected_fact_ids": ["k:b1669734"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "What menstrual and health effects can very low body fat have in women?",
+      "expected_fact_ids": ["k:b24d68f8"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "Why might a visual body-fat estimate differ between people at the same body-fat percentage?",
+      "expected_fact_ids": ["k:f5b3f212"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "Do body-fat ranges describe every individual precisely, or are they based on averages?",
+      "expected_fact_ids": ["k:b0cc284f", "k:f5b3f212"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "Can reducing water retention change someone's appearance without reducing body fat?",
+      "expected_fact_ids": ["k:b0cc284f"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "At roughly what body-fat level may periods stop for some women?",
+      "expected_fact_ids": ["k:0fbb8021", "k:24f7c31b"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "What is the stated concern about women living below roughly 15% body fat on average?",
+      "expected_fact_ids": ["k:24f7c31b"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "Can men maintain good health below 10% body fat, according to the stated ranges?",
+      "expected_fact_ids": ["k:b1669734"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "What risks are associated with very low body fat for women?",
+      "expected_fact_ids": ["k:0fbb8021", "k:b24d68f8"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "Why should visual body-fat ranges be treated as guides rather than checklists?",
+      "expected_fact_ids": ["k:f5b3f212"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "Which assessment method is described as the most technically accurate for body fat?",
+      "expected_fact_ids": ["k:ac7197c3"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "How does DEXA generally compare with a visual estimate of body fat?",
+      "expected_fact_ids": ["k:ac7197c3"]
+    },
+    {
+      "topic": "body_fat_maintenance",
+      "question": "Besides hormone levels, what areas may be affected for men below about 7–8% body fat?",
+      "expected_fact_ids": ["k:b1669734"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "How can I tell whether a calorie estimate is actually helping me gain weight?",
+      "expected_fact_ids": ["k:2b441949"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "Are calorie tables and equations exact for everyone?",
+      "expected_fact_ids": ["k:2b441949", "k:d6a82f97"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "What should I monitor to check whether my estimated calorie intake is working?",
+      "expected_fact_ids": ["k:2b441949"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "Why might my weight trend be more useful than relying only on a calorie calculator?",
+      "expected_fact_ids": ["k:2b441949"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "How much can an individual's calorie needs vary from an equation's estimate?",
+      "expected_fact_ids": ["k:d6a82f97"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "If someone gains 15 pounds in a week and a half after increasing calories, what might that suggest?",
+      "expected_fact_ids": ["k:5a801f2b"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "What is the concern with a calorie estimate that leads to very rapid weight gain?",
+      "expected_fact_ids": ["k:5a801f2b"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "Does very rapid weight gain indicate that a calorie estimate may be too high?",
+      "expected_fact_ids": ["k:5a801f2b"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "What does hypercaloric intake mean?",
+      "expected_fact_ids": ["k:6d07da3d"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "What would you expect body weight to do over the long term on a hypercaloric intake?",
+      "expected_fact_ids": ["k:6d07da3d"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "How is a calorie surplus defined relative to maintenance needs?",
+      "expected_fact_ids": ["k:6d07da3d"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "What starting adjustment is suggested when estimating calories from a table or equation to create a surplus?",
+      "expected_fact_ids": ["k:9e7bf50a"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "How much above an initial table or equation estimate does the suggested starting approach add?",
+      "expected_fact_ids": ["k:9e7bf50a"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "Can adding 10 percent to an initial calorie estimate be used as a starting estimate for a surplus?",
+      "expected_fact_ids": ["k:9e7bf50a"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "If I use a calorie equation to estimate intake for weight gain, what initial adjustment is described?",
+      "expected_fact_ids": ["k:9e7bf50a"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "Why should a calorie estimate be treated as a starting point rather than a precise requirement?",
+      "expected_fact_ids": ["k:2b441949", "k:d6a82f97"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "How can weight tracking help evaluate whether an estimated calorie intake is above maintenance?",
+      "expected_fact_ids": ["k:2b441949", "k:6d07da3d"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "If body weight is not rising over the long term, what does that indicate about whether intake is hypercaloric?",
+      "expected_fact_ids": ["k:6d07da3d"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "What is the likely issue if a calorie estimate produces excessive fat gain along with very fast weight gain?",
+      "expected_fact_ids": ["k:5a801f2b"]
+    },
+    {
+      "topic": "diet_phases_rates",
+      "question": "How should I interpret differences between my calorie needs and a table's estimate?",
+      "expected_fact_ids": ["k:2b441949", "k:d6a82f97"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "How does full range of motion generally compare with partial range for hypertrophy?",
+      "expected_fact_ids": ["k:0b2b452b"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "What might make loading a muscle in a stretched position useful for hypertrophy?",
+      "expected_fact_ids": ["k:4cbd5bb0"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "When could partial range of motion be considered instead of full range?",
+      "expected_fact_ids": ["k:a42bbf34"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "How could someone assess whether a suspected beneficial partial range is worth keeping?",
+      "expected_fact_ids": ["k:046e30d9"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "What can complementary exercises address if a partial range leaves out part of a muscle’s movement?",
+      "expected_fact_ids": ["k:585b78dc"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "Why might a target muscle get less stimulation during a full-range exercise?",
+      "expected_fact_ids": ["k:b19f5168"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "Does using a full range of motion automatically create an injury risk?",
+      "expected_fact_ids": ["k:d4daf4fe"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "How can full range of motion affect exercise standardization and progress tracking?",
+      "expected_fact_ids": ["k:daec1966"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "What tracking challenge can arise with mid-range partial repetitions?",
+      "expected_fact_ids": ["k:e1490c04"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "How can range of motion be selected when training for specificity to a strength lift?",
+      "expected_fact_ids": ["k:ef2f69da"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "Can a hypertrophy program use partials while retaining full range for most exercises?",
+      "expected_fact_ids": ["k:f363d7a9"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "What criteria might be used to compare partial and full range of motion for an exercise?",
+      "expected_fact_ids": ["k:0b2b452b", "k:a42bbf34"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "Why might a stretched-position exercise contribute something beyond muscle tension alone?",
+      "expected_fact_ids": ["k:4cbd5bb0"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "If a partial range omits some muscle function, how might exercise selection account for that?",
+      "expected_fact_ids": ["k:585b78dc"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "What is a possible reason to evaluate a partial-range variation in a training block?",
+      "expected_fact_ids": ["k:046e30d9"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "How does the identity of the limiting muscle affect stimulation in a full-range movement?",
+      "expected_fact_ids": ["k:b19f5168"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "What condition on connective-tissue tolerance is relevant to the injury risk of full range of motion?",
+      "expected_fact_ids": ["k:d4daf4fe"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "Why might full range of motion be useful when comparing performance across workouts?",
+      "expected_fact_ids": ["k:daec1966"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "What is a potential drawback of using mid-range partials when monitoring progress?",
+      "expected_fact_ids": ["k:e1490c04"]
+    },
+    {
+      "topic": "exercise_selection",
+      "question": "How might range of motion choices differ between hypertrophy goals and specificity to a target strength lift?",
+      "expected_fact_ids": ["k:0b2b452b", "k:ef2f69da"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What body weight corresponds to an FFMI of 24 at about 12% body fat for someone who is 5'6\"?",
+      "expected_fact_ids": ["k:2756c8d6"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "At around 12% body fat, what estimated weight is associated with FFMI 24 at 5'9\"?",
+      "expected_fact_ids": ["k:2756c8d6"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "For a height of 6 feet, what body weight corresponds to FFMI 24 at roughly 12% body fat?",
+      "expected_fact_ids": ["k:2756c8d6"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What estimated weight does the FFMI 24 figure give for a 6'3\" person at around 12% body fat?",
+      "expected_fact_ids": ["k:2756c8d6"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "How is FFMI calculated, and what does a higher value indicate?",
+      "expected_fact_ids": ["k:bdcbff04"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What FFMI range does the estimate give for an average male who trains hard, eats appropriately, and stays consistent?",
+      "expected_fact_ids": ["k:435d59a4"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What higher FFMI does the estimate say might be possible for someone with good genetics who persists long enough?",
+      "expected_fact_ids": ["k:435d59a4"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "How much lean mass does the cited table estimate men may gain in their first year of lifting?",
+      "expected_fact_ids": ["k:545d23b2"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What lean-mass gain range does the table give for the second year of lifting?",
+      "expected_fact_ids": ["k:545d23b2"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What lean-mass gain range does the table give for the third year of lifting?",
+      "expected_fact_ids": ["k:545d23b2"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "According to the cited ranges, what is the total estimated lean-mass gain over the first three lifting years?",
+      "expected_fact_ids": ["k:8c587ac3"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "In the sample of 74 natural lifters, how many had an FFMI above 25?",
+      "expected_fact_ids": ["k:642e4dee"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What average FFMI did the cited study report for Division 1 and Division 2 college football offensive linemen?",
+      "expected_fact_ids": ["k:8aef8198"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What average FFMI was reported for the 431 healthy Italian men who had no training intervention?",
+      "expected_fact_ids": ["k:8ddd7e56"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "Does the speaker describe an FFMI above 25 as impossible to reach naturally?",
+      "expected_fact_ids": ["k:cae4a910"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What examples does the speaker cite when discussing natural FFMI values above 25?",
+      "expected_fact_ids": ["k:cae4a910"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "In the cited biceps study, did participants following the same program have similar growth outcomes?",
+      "expected_fact_ids": ["k:3bc5e192", "k:fb4c9538"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "How many women and men participated in the cited 12-week biceps study?",
+      "expected_fact_ids": ["k:fb4c9538"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "What range of biceps growth outcomes was reported in the 12-week study, including participants who gained no muscle?",
+      "expected_fact_ids": ["k:fb4c9538"]
+    },
+    {
+      "topic": "ffmi_genetic_potential",
+      "question": "How might rapid weight gain after a period of prolonged under-eating be explained in the cited account?",
+      "expected_fact_ids": ["k:459f924b"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What repetition range is given for sets in the summary of training for muscle growth?",
+      "expected_fact_ids": ["k:7263971f", "k:cc4a8cc4"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "How long is each repetition described as taking?",
+      "expected_fact_ids": ["k:d51cb3a6"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What does the summary say about performing multiple sets close to failure?",
+      "expected_fact_ids": ["k:7263971f"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What repetitions-in-reserve example is given for training close to failure?",
+      "expected_fact_ids": ["k:049ae1ff"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What conditions does the summary give for repeating training?",
+      "expected_fact_ids": ["k:7263971f"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "How does the speaker characterize using only one set to failure per muscle group?",
+      "expected_fact_ids": ["k:7b88241b"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "According to the summary, how should workout size and set count relate to spacing between workouts?",
+      "expected_fact_ids": ["k:0c1aa50c"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "When can workouts with fewer sets be performed more frequently, according to the facts?",
+      "expected_fact_ids": ["k:0c1aa50c"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What week-to-week comparison is suggested for judging readiness to train again?",
+      "expected_fact_ids": ["k:b1e1dc5b"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What performance pattern is presented as indicating readiness to train again?",
+      "expected_fact_ids": ["k:b1e1dc5b"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "How is recovery summarized in terms of performance over time?",
+      "expected_fact_ids": ["k:dcd79417"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What bench press performances illustrate the example of underperformance?",
+      "expected_fact_ids": ["k:850ad582"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "Why is the change from 225 pounds for 10 bench press repetitions to 230 pounds for 7 described as not equivalent?",
+      "expected_fact_ids": ["k:850ad582"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What does the summary say about progression details such as adding repetitions or load?",
+      "expected_fact_ids": ["k:140beb31"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What response to exceeding a stated repetition range is mentioned as intuitive?",
+      "expected_fact_ids": ["k:140beb31"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What aspects of program planning does the summary leave unspecified?",
+      "expected_fact_ids": ["k:a0d268d9"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "Does the summary define good technique or explain when different repetition durations are appropriate?",
+      "expected_fact_ids": ["k:c69752f0"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What does the summary say about how to assess recovery?",
+      "expected_fact_ids": ["k:c69752f0"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "How much does the summary explain about the stimulus-to-fatigue ratio?",
+      "expected_fact_ids": ["k:b9d22f33"]
+    },
+    {
+      "topic": "mesocycle_deload",
+      "question": "What may constrain lat pulldown performance if the targeted muscle is not the limiting factor?",
+      "expected_fact_ids": ["k:f3a69a7e"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "How can systemic fatigue affect later workouts?",
+      "expected_fact_ids": ["k:0c039419"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "Could feeling generally worn out make it harder to train intensely in a subsequent session?",
+      "expected_fact_ids": ["k:0c039419"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "What might limit someone’s ability to push hard in later training sessions?",
+      "expected_fact_ids": ["k:0c039419"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "Can fatigue from training carry over and affect performance in a later workout?",
+      "expected_fact_ids": ["k:0c039419"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "Why might someone find it difficult to train hard at their next session after becoming systemically fatigued?",
+      "expected_fact_ids": ["k:0c039419"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "What could post-training muscle weakness suggest about the workout’s effect on that muscle?",
+      "expected_fact_ids": ["k:4f6b57f0"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "Can cramping after exercise indicate that a muscle was substantially affected by the training stimulus?",
+      "expected_fact_ids": ["k:4f6b57f0"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "What might it mean if a muscle feels weak or cramps after a training session?",
+      "expected_fact_ids": ["k:4f6b57f0"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "How can muscle weakness after training relate to the stimulus the muscle received?",
+      "expected_fact_ids": ["k:4f6b57f0"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "Could cramps after a workout be a sign that the targeted muscle was strongly affected?",
+      "expected_fact_ids": ["k:4f6b57f0"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "Is soreness always a sign that training was unproductive?",
+      "expected_fact_ids": ["k:76bf778c"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "What can prolonged muscle soreness after training suggest?",
+      "expected_fact_ids": ["k:76bf778c"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "Can productive training still leave someone sore afterward?",
+      "expected_fact_ids": ["k:76bf778c"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "How does the duration of soreness relate to the possibility of excessive training stimulus or damage?",
+      "expected_fact_ids": ["k:76bf778c"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "What should be considered when soreness lasts a long time after a workout?",
+      "expected_fact_ids": ["k:76bf778c"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "What is the difference between systemic fatigue affecting later sessions and local muscle weakness after training?",
+      "expected_fact_ids": ["k:0c039419", "k:4f6b57f0"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "How might post-training soreness and muscle weakness each relate to the training stimulus?",
+      "expected_fact_ids": ["k:4f6b57f0", "k:76bf778c"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "Could someone have a productive training session yet experience soreness, while also noticing that prolonged soreness may indicate excessive stimulus?",
+      "expected_fact_ids": ["k:76bf778c"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "Which post-training signs may relate to the effect of a workout on a muscle, and which may relate to reduced capacity in later sessions?",
+      "expected_fact_ids": ["k:0c039419", "k:4f6b57f0"]
+    },
+    {
+      "topic": "recovery_signals",
+      "question": "What do these facts suggest about interpreting fatigue, weakness, cramps, and soreness after training?",
+      "expected_fact_ids": ["k:0c039419", "k:4f6b57f0", "k:76bf778c"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "How accurately do people tend to estimate how many reps they have left before failure?",
+      "expected_fact_ids": ["k:053f531a"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "What may happen when someone misjudges their reps in reserve?",
+      "expected_fact_ids": ["k:053f531a"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "When does the described progression call for backing off or taking a deload?",
+      "expected_fact_ids": ["k:0b3ea5bb"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "What signs of fatigue indicate it may be time to reduce training stress in the described approach?",
+      "expected_fact_ids": ["k:0b3ea5bb"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "What rep-in-reserve range does the beginner approach use at the start and near the end before adding load?",
+      "expected_fact_ids": ["k:1795aef0"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "How does the beginner approach recycle its progression after reaching about two reps in reserve?",
+      "expected_fact_ids": ["k:1795aef0"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "What variables are selected at the start of the described training period, and how many reps in reserve are initially left?",
+      "expected_fact_ids": ["k:23b443cd"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "How close to failure does the described progression begin its training period?",
+      "expected_fact_ids": ["k:23b443cd"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "Does the transcript report a clear benefit to routinely taking sets closer than about three reps from failure?",
+      "expected_fact_ids": ["k:27cf4ce2"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "How does stopping roughly three reps short compare with routinely training closer to failure, according to the transcript?",
+      "expected_fact_ids": ["k:27cf4ce2"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "What potential effect can training to absolute failure have on later workouts?",
+      "expected_fact_ids": ["k:7c4ce140"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "Why might training to absolute failure affect subsequent workout performance?",
+      "expected_fact_ids": ["k:7c4ce140"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "Which exercises does the transcript flag as risky to take all the way to failure because the load could fall on the trainee?",
+      "expected_fact_ids": ["k:8407b016"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "What progression options are described for changing load and repetitions across workouts?",
+      "expected_fact_ids": ["k:88ea9e15"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "Can the described progression increase repetitions while keeping load steady?",
+      "expected_fact_ids": ["k:88ea9e15"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "What does the transcript say about effort levels that may benefit advanced trainees?",
+      "expected_fact_ids": ["k:8caf6ad3"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "According to the transcript, what training age counts as intermediate?",
+      "expected_fact_ids": ["k:934b782c"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "How does the advanced progression change reps in reserve over its early weeks, and what may happen in week four?",
+      "expected_fact_ids": ["k:a4fdb88b"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "What does the transcript prioritize for beginners, and does it say very hard training is required for progress?",
+      "expected_fact_ids": ["k:bb8fae33"]
+    },
+    {
+      "topic": "rir_autoregulation",
+      "question": "What reps-in-reserve range does the intermediate progression start around and approach within a training cycle?",
+      "expected_fact_ids": ["k:c654ae16"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "Does adding more weekly training sets generally lead to more muscle growth?",
+      "expected_fact_ids": ["k:64822aea"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "Does the muscle-growth benefit of training volume keep increasing at the same rate as sets are added?",
+      "expected_fact_ids": ["k:17d0690c"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "What did estimates suggest about doubling weekly volume somewhere in the range of about 5 to 35 sets per muscle?",
+      "expected_fact_ids": ["k:1b31bb63"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "Can beginners gain muscle with just a few weekly sets per muscle?",
+      "expected_fact_ids": ["k:248d8110"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "How many weekly sets per muscle may produce detectable gains for someone returning to training?",
+      "expected_fact_ids": ["k:248d8110"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "How did the described volume-accounting model count indirect work from rows toward biceps training?",
+      "expected_fact_ids": ["k:45b5a80f"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "Which approach to counting compound exercises fit the described hypertrophy data better?",
+      "expected_fact_ids": ["k:45b5a80f"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "About how many hard fractional sets per week were described as enough to maintain muscle in relatively untrained groups?",
+      "expected_fact_ids": ["k:5985b36a"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "What weekly fractional-set amount was associated with detectable hypertrophy?",
+      "expected_fact_ids": ["k:81c218db"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "Can findings about high volume for one muscle group establish that similar volume is workable for a full-body program?",
+      "expected_fact_ids": ["k:bc9ce13c"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "What condition was given for gradually increasing training volume?",
+      "expected_fact_ids": ["k:ce092a1e"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "How was a weekly volume above 20 sets per muscle categorized for most people?",
+      "expected_fact_ids": ["k:ed46b889"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "How strong was the research evidence for training more than 30 sets per muscle each week?",
+      "expected_fact_ids": ["k:f1a38a31"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "Did the described research establish that muscle growth plateaus or declines by roughly 30 to 40 weekly sets?",
+      "expected_fact_ids": ["k:f1a38a31"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "What rough share of maximum hypertrophy was estimated at around 10 fractional sets per muscle per week?",
+      "expected_fact_ids": ["k:fb00cc0e"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "Is the estimate for hypertrophy at about 10 fractional sets presented as precise or approximate?",
+      "expected_fact_ids": ["k:fb00cc0e"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "What does the evidence say about the relationship between weekly training volume and muscle growth?",
+      "expected_fact_ids": ["k:17d0690c", "k:64822aea"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "Can one to three sets per muscle per week produce detectable gains even if they may not maximize growth?",
+      "expected_fact_ids": ["k:248d8110"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "What weekly set range was used when describing diminishing returns and the estimated effect of doubling volume?",
+      "expected_fact_ids": ["k:17d0690c", "k:1b31bb63"]
+    },
+    {
+      "topic": "volume_landmarks",
+      "question": "What caveats were given about very high weekly set volumes and applying them across a whole-body routine?",
+      "expected_fact_ids": ["k:bc9ce13c", "k:ed46b889", "k:f1a38a31"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "How should I decide how often to train a muscle after a hard workout?",
+      "expected_fact_ids": ["k:28d02fe6"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What signs can I use to judge whether a muscle is ready for another hard session?",
+      "expected_fact_ids": ["k:5aeb7bcb"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "If a muscle is still sore or my performance has not returned, should I stick to the planned training day?",
+      "expected_fact_ids": ["k:fbce808e"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Why might one weekly training frequency not work equally well for every muscle?",
+      "expected_fact_ids": ["k:a1116bd2"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What is one practical way to group muscles that recover at different rates?",
+      "expected_fact_ids": ["k:5757e834"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "In the example, how often are quads and biceps trained when their recovery times differ?",
+      "expected_fact_ids": ["k:75d40fd0"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What set counts are used as an illustrative way to coordinate biceps and quad recovery at a shared frequency?",
+      "expected_fact_ids": ["k:2beb5da6"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "How can session volume be adjusted when coordinating muscles with different recovery times on the same schedule?",
+      "expected_fact_ids": ["k:be0e4142"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What can happen if I use the same session volume and frequency for muscles that recover at different rates?",
+      "expected_fact_ids": ["k:67089b20"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Why might matching a faster-recovering muscle to a slower muscle's schedule by keeping its volume low be limiting?",
+      "expected_fact_ids": ["k:764e0844"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "If I change per-session volume to align recovery between muscles, what extra scheduling issue might arise?",
+      "expected_fact_ids": ["k:0f907350"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "How do six failure sets compare for biceps and quads in the recovery-time example?",
+      "expected_fact_ids": ["k:ef663446"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Does the evidence suggest that all people can rely on the same categories of fast- and slow-recovering muscles?",
+      "expected_fact_ids": ["k:36f228b3"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "What characteristics are associated with a muscle taking longer to recover from a given training stimulus?",
+      "expected_fact_ids": ["k:8565ddb0"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Can training different muscles at different frequencies let each follow a schedule suited to its recovery?",
+      "expected_fact_ids": ["k:bc55920d"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Is using one frequency for every muscle necessarily ineffective?",
+      "expected_fact_ids": ["k:e7042293"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Around what per-session set volume does the evidence raise a concern about damage interfering with adaptation for many muscles?",
+      "expected_fact_ids": ["k:18af6f5c"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "Why might changing session volume be used to coordinate muscles at a shared frequency?",
+      "expected_fact_ids": ["k:2beb5da6", "k:be0e4142"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "How can using one common schedule create a mismatch for muscles with different recovery times?",
+      "expected_fact_ids": ["k:67089b20", "k:a1116bd2"]
+    },
+    {
+      "topic": "frequency_splits",
+      "question": "In the example, what recovery windows are suggested for six failure sets of biceps versus quads?",
+      "expected_fact_ids": ["k:ef663446"]
+    }
+  ]
+}
