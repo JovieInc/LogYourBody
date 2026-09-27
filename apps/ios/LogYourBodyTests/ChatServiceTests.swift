@@ -71,6 +71,101 @@ final class ChatServiceTests: XCTestCase {
         XCTAssertTrue(TrainingCoachPolicy.isEnabled { $0 == "hypertrophy_coach_v1" })
     }
 
+    func testVoiceCoachVisibilityRequiresItsStatsigGate() {
+        var checkedKey: String?
+        XCTAssertFalse(VoiceCoachPolicy.isEnabled { checkedKey = $0; return false })
+        XCTAssertEqual(checkedKey, "hypertrophy_coach_voice_v1")
+        XCTAssertTrue(VoiceCoachPolicy.isEnabled { $0 == "hypertrophy_coach_voice_v1" })
+    }
+
+    func testPendingSpokenReplyIsBoundToAndConsumedByOneVoiceReply() {
+        var pending = PendingSpokenReply()
+        pending.track(clientMessageId: "voice-turn", shouldSpeakReply: true)
+
+        XCTAssertTrue(pending.shouldSpeakReply(for: "voice-turn"))
+        XCTAssertFalse(pending.shouldSpeakReply(for: "different-turn"))
+        XCTAssertFalse(pending.consumeIfMatching(clientMessageId: "different-turn"))
+        XCTAssertEqual(pending.clientMessageId, "voice-turn")
+        XCTAssertTrue(pending.consumeIfMatching(clientMessageId: "voice-turn"))
+        XCTAssertFalse(pending.consumeIfMatching(clientMessageId: "voice-turn"))
+    }
+
+    func testNonSpokenRequestClearsPendingSpokenReply() {
+        var pending = PendingSpokenReply()
+        pending.track(clientMessageId: "voice-turn", shouldSpeakReply: true)
+        pending.track(clientMessageId: "manual-turn", shouldSpeakReply: false)
+
+        XCTAssertNil(pending.clientMessageId)
+        XCTAssertFalse(pending.consumeIfMatching(clientMessageId: "voice-turn"))
+    }
+
+    func testCancellingPendingSpokenReplyOnlyClearsMatchingTurn() {
+        var pending = PendingSpokenReply()
+        pending.track(clientMessageId: "voice-turn", shouldSpeakReply: true)
+
+        pending.cancel(clientMessageId: "different-turn")
+        XCTAssertEqual(pending.clientMessageId, "voice-turn")
+
+        pending.cancel(clientMessageId: "voice-turn")
+        XCTAssertNil(pending.clientMessageId)
+    }
+
+    func testVoiceTranscriptFixtureLogsASetOnlyAfterExplicitConfirmation() async throws {
+        let response = try JSONDecoder().decode(
+            VoiceIntentResponse.self,
+            from: Data(
+                #"""
+                {
+                  "version": 1,
+                  "kind": "log_set",
+                  "requiresConfirmation": true,
+                  "missingFields": [],
+                  "proposal": {
+                    "sessionId": "11111111-1111-4111-8111-111111111111",
+                    "exerciseId": "bench_press",
+                    "exerciseName": "Bench Press",
+                    "setNumber": 1,
+                    "reps": 8,
+                    "loadKg": 83.91,
+                    "rir": 2
+                  }
+                }
+                """#.utf8
+            )
+        )
+        let proposal = try XCTUnwrap(response.proposal)
+        var loggedRequests: [TrainingSetLogRequest] = []
+
+        try await VoiceSetLogger.commit(
+            proposal,
+            isConfirmed: false,
+            accessToken: "access-token"
+        ) { _, request in loggedRequests.append(request) }
+        XCTAssertTrue(loggedRequests.isEmpty)
+
+        try await VoiceSetLogger.commit(
+            proposal,
+            isConfirmed: true,
+            accessToken: "access-token"
+        ) { token, request in
+            XCTAssertEqual(token, "access-token")
+            loggedRequests.append(request)
+        }
+        XCTAssertEqual(
+            loggedRequests,
+            [
+                TrainingSetLogRequest(
+                    sessionId: "11111111-1111-4111-8111-111111111111",
+                    exerciseId: "bench_press",
+                    setNumber: 1,
+                    reps: 8,
+                    loadKg: 83.91,
+                    rir: 2
+                )
+            ]
+        )
+    }
+
     func testTrainingNextUsesBearerTokenAndDecodesEngineOutput() async throws {
         let session = makeSession()
         ChatURLProtocol.handler = { request in
@@ -205,6 +300,7 @@ final class ChatServiceTests: XCTestCase {
             XCTAssertEqual(json["conversationId"] as? String, "conversation-1")
             XCTAssertEqual(json["clientMessageId"] as? String, "client-1")
             XCTAssertEqual(json["message"] as? String, "How am I doing?")
+            XCTAssertEqual(json["voiceMode"] as? Bool, true)
 
             let body = """
             event: meta
@@ -232,7 +328,8 @@ final class ChatServiceTests: XCTestCase {
             accessToken: "access-token",
             conversationId: "conversation-1",
             clientMessageId: "client-1",
-            message: "How am I doing?"
+            message: "How am I doing?",
+            voiceMode: true
         ) {
             events.append(event)
         }
@@ -285,7 +382,8 @@ final class ChatServiceTests: XCTestCase {
                 accessToken: "access-token",
                 conversationId: "conversation-1",
                 clientMessageId: "client-1",
-                message: "Retry"
+                message: "Retry",
+                voiceMode: false
             ) {}
             XCTFail("Expected rate-limit failure")
         } catch let error as ChatServiceError {

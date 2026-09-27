@@ -145,3 +145,20 @@ describe('isTrainingQuestion', () => {
     expect(isTrainingQuestion('Summarize my body weight trend.')).toBe(false);
   });
 });
+
+describe('voice reply mode', () => {
+  it('adds brief spoken-reply rules only to turns marked for speech', () => {
+    const base = {
+      user: null,
+      metrics: [],
+      conversationMessages: [],
+    };
+    const [normalSystemMessage] = buildChatModelMessages(base);
+    const [voiceSystemMessage] = buildChatModelMessages({ ...base, voiceMode: true });
+
+    expect(normalSystemMessage.content).not.toContain('Voice reply mode is active');
+    expect(voiceSystemMessage.content).toContain('one brief, direct imperative line');
+    expect(voiceSystemMessage.content).toContain('about 12 words');
+    expect(voiceSystemMessage.content).toContain('If the user explicitly asks a question');
+  });
+});

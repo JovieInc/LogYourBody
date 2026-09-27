@@ -95,6 +95,9 @@ jobs:
       - name: Test knowledge identity lint
         run: pnpm test:knowledge-lint
 
+      - name: Check vendor boundaries
+        run: pnpm check:vendor-boundaries
+
       - name: Lint
         run: pnpm lint
 

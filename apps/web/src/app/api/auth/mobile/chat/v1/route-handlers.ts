@@ -19,6 +19,7 @@ const ChatRequestSchema = z
     conversationId: z.string().uuid(),
     clientMessageId: z.string().uuid(),
     message: z.string().trim().min(1).max(2_000),
+    voiceMode: z.boolean().optional().default(false),
   })
   .strict();
 
@@ -206,6 +207,7 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
           metrics,
           conversationMessages: turn.conversation.messages,
           trainingOutput,
+          voiceMode: input.voiceMode,
         });
         model = dependencies.createModel();
       } catch {

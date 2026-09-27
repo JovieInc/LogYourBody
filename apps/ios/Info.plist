@@ -67,6 +67,14 @@
 	<string>LogYourBody needs access to read your weight data from Apple Health to help track your fitness progress.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>LogYourBody needs permission to save your weight data to Apple Health to keep your health records in sync.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Voice input uses the microphone so you can talk to your coach.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition turns your voice into text for your coach.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>API_BASE_URL_DEBUG</key>
 	<string>$(API_BASE_URL_DEBUG)</string>
 	<key>API_BASE_URL_RELEASE</key>

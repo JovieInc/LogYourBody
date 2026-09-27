@@ -36,6 +36,7 @@ const typescriptVendorModules = [
   { name: 'RevenueCat', modules: ['revenuecat', 'react-native-purchases'] },
   { name: 'Sentry', prefixes: ['@sentry/'] },
   { name: 'Statsig', prefixes: ['@statsig/'] },
+  { name: 'AI SDK', modules: ['ai'], prefixes: ['@ai-sdk/'] },
 ];
 
 const swiftAllowedBoundaries = [
@@ -49,6 +50,10 @@ const typescriptAllowedBoundaries = [
   {
     label: 'apps/web/src/lib/adapters/**',
     test: (relativePath) => relativePath.startsWith('apps/web/src/lib/adapters/'),
+  },
+  {
+    label: 'apps/web/src/lib/voice/providers/**',
+    test: (relativePath) => relativePath.startsWith('apps/web/src/lib/voice/providers/'),
   },
   {
     label: 'apps/web/src/lib/ports/**',

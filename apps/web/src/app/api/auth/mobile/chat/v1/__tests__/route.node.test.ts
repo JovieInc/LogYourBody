@@ -296,7 +296,9 @@ describe('/api/auth/mobile/chat/v1', () => {
 
   it('streams, persists, reloads, and scopes authorized body context', async () => {
     const { handlers, model, getUser, listMetrics } = makeHarness();
-    const response = await handlers.POST(request('POST', 'user-a', chatBody()));
+    const response = await handlers.POST(
+      request('POST', 'user-a', { ...chatBody(), voiceMode: true }),
+    );
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     const stream = await response.text();
@@ -308,6 +310,7 @@ describe('/api/auth/mobile/chat/v1', () => {
     expect(listMetrics).toHaveBeenCalledWith('user-a', 30);
 
     const modelContext = model.calls[0].messages as ChatModelMessage[];
+    expect(modelContext[0].content).toContain('Voice reply mode is active');
     expect(modelContext[0].content).toContain('"weight":80');
     expect(modelContext[0].content).not.toContain('must not enter model context');
     expect(modelContext[0].content).not.toContain('example.com');
