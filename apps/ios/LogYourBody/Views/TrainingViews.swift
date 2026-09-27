@@ -3,11 +3,13 @@ import SwiftUI
 enum TrainingPresentation: Identifiable {
     case setup
     case session(TrainingSession)
+    case voiceSetReview(TrainingSession, VoiceHeardIntent)
 
     var id: String {
         switch self {
         case .setup: "setup"
         case .session(let session): "session-\(session.id)"
+        case .voiceSetReview(let session, _): "voice-set-review-\(session.id)"
         }
     }
 }
@@ -458,5 +460,105 @@ struct TrainingLiveSessionView: View {
         } catch {
             errorMessage = "The check-in could not be saved."
         }
+    }
+}
+
+struct VoiceSetReviewView: View {
+    let session: TrainingSession
+    let heard: VoiceHeardIntent
+    let onLogSet: (VoiceSetProposal) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedExerciseID: String?
+    @State private var selectedSetNumber: Int?
+
+    private var selectedExercise: TrainingExercisePrescription? {
+        session.exercises.first(where: { $0.id == selectedExerciseID })
+    }
+
+    private var spokenLoadDescription: String {
+        guard let loadValue = heard.loadValue else { return "Bodyweight" }
+        let unit = heard.weightUnit ?? ""
+        let spoken = "\(loadValue.formatted()) \(unit)".trimmingCharacters(in: .whitespaces)
+        guard let loadKg = heard.loadKg else { return spoken }
+        return "\(spoken) (\(String(format: "%.1f", loadKg)) kg)"
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Check the exercise and set before saving.")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.secondary)
+
+                Picker("Exercise", selection: $selectedExerciseID) {
+                    Text("Choose an exercise").tag(String?.none)
+                    ForEach(session.exercises) { exercise in
+                        Text(exercise.name).tag(Optional(exercise.id))
+                    }
+                }
+                .accessibilityIdentifier("voice_set_exercise_picker")
+
+                Picker("Set number", selection: $selectedSetNumber) {
+                    Text("Choose a set").tag(Int?.none)
+                    if let selectedExercise {
+                        ForEach(1...max(1, selectedExercise.sets), id: \.self) { number in
+                            Text("Set \(number)").tag(Optional(number))
+                        }
+                    }
+                }
+                .disabled(selectedExercise == nil)
+                .accessibilityIdentifier("voice_set_number_picker")
+
+                Text("\(heard.reps) reps · \(spokenLoadDescription) · \(heard.rir) RIR")
+                    .font(.system(size: 15, weight: .semibold))
+                    .accessibilityIdentifier("voice_set_heard_values")
+
+                Spacer(minLength: 0)
+
+                Button(action: confirm) {
+                    Text("Log set")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(Color.primary, in: Capsule())
+                }
+                .disabled(selectedExercise == nil || selectedSetNumber == nil)
+                .accessibilityIdentifier("voice_set_log_confirm")
+            }
+            .padding(20)
+            .navigationTitle("Review set")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .onChange(of: selectedExerciseID) { _, _ in
+                selectedSetNumber = nil
+                guard let selectedExercise,
+                      let setNumber = heard.setNumber,
+                      (1...max(1, selectedExercise.sets)).contains(setNumber)
+                else { return }
+                selectedSetNumber = setNumber
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func confirm() {
+        guard let selectedExercise, let selectedSetNumber else { return }
+        onLogSet(
+            VoiceSetProposal(
+                sessionId: session.id,
+                exerciseId: selectedExercise.id,
+                exerciseName: selectedExercise.name,
+                setNumber: selectedSetNumber,
+                reps: heard.reps,
+                loadKg: heard.loadKg,
+                rir: heard.rir
+            )
+        )
+        dismiss()
     }
 }
