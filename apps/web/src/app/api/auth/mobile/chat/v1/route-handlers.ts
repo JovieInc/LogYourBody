@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
-import { buildChatModelMessages } from '@/lib/chat/context';
+import { buildChatModelMessages, isTrainingQuestion } from '@/lib/chat/context';
+import { hasUnauthorizedTrainingQuantity } from '@/lib/chat/training-number-boundary';
+import type { NextWorkoutResult } from '@/lib/training/service';
 import {
   CHAT_PROTOCOL_VERSION,
   type ChatConversationPort,
@@ -37,9 +39,12 @@ type ChatRouteDependencies = {
   modelName: string;
   createLeaseToken: () => string;
   reportStreamOutcome?: (outcome: ChatStreamOutcome) => void;
+  getTrainingOutput?: (subject: string) => Promise<NextWorkoutResult | null>;
 };
 
 const encoder = new TextEncoder();
+const TRAINING_NUMBER_FALLBACK =
+  'Use the workout shown in your app. I can explain the plan, but I cannot add quantities the engine did not return.';
 
 function event(name: string, payload: Record<string, unknown>): Uint8Array {
   return encoder.encode(`event: ${name}\ndata: ${JSON.stringify(payload)}\n\n`);
@@ -185,15 +190,22 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
 
       let model: ChatModelPort;
       let modelMessages: ChatModelMessage[];
+      const trainingTurn = isTrainingQuestion(input.message);
+      let trainingOutput: NextWorkoutResult | null = null;
       try {
         const [user, metrics] = await Promise.all([
           dependencies.users.getUser(identity.sub),
           dependencies.bodyMetrics.list(identity.sub, 30),
         ]);
+        trainingOutput =
+          trainingTurn && dependencies.getTrainingOutput
+            ? await dependencies.getTrainingOutput(identity.sub)
+            : null;
         modelMessages = buildChatModelMessages({
           user,
           metrics,
           conversationMessages: turn.conversation.messages,
+          trainingOutput,
         });
         model = dependencies.createModel();
       } catch {
@@ -238,12 +250,14 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
               if (modelEvent.type === 'text_delta') {
                 content += modelEvent.text;
                 if (content.length > 12_000) throw new Error('CHAT_RESPONSE_TOO_LONG');
-                controller.enqueue(
-                  event('delta', {
-                    version: CHAT_PROTOCOL_VERSION,
-                    text: modelEvent.text,
-                  }),
-                );
+                if (!trainingTurn) {
+                  controller.enqueue(
+                    event('delta', {
+                      version: CHAT_PROTOCOL_VERSION,
+                      text: modelEvent.text,
+                    }),
+                  );
+                }
               } else {
                 inputTokens = modelEvent.inputTokens;
                 outputTokens = modelEvent.outputTokens;
@@ -251,12 +265,24 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
             }
 
             if (!content.trim()) throw new Error('CHAT_EMPTY_RESPONSE');
+            const deliveredContent =
+              trainingTurn && hasUnauthorizedTrainingQuantity(content, trainingOutput)
+                ? TRAINING_NUMBER_FALLBACK
+                : content;
+            if (trainingTurn) {
+              controller.enqueue(
+                event('delta', {
+                  version: CHAT_PROTOCOL_VERSION,
+                  text: deliveredContent,
+                }),
+              );
+            }
             persistingCompletion = true;
             const stored = await dependencies.conversations.completeTurn({
               subject: identity.sub,
               turnId: turn.turnId,
               leaseToken,
-              content,
+              content: deliveredContent,
               model: dependencies.modelName,
               inputTokens,
               outputTokens,

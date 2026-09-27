@@ -1,4 +1,5 @@
-import { buildChatModelMessages } from './context';
+import { buildChatModelMessages, isTrainingQuestion } from './context';
+import type { NextWorkoutResult } from '@/lib/training/service';
 
 describe('buildChatModelMessages', () => {
   it('limits training guidance to authorized engine output and supplied evidence IDs', () => {
@@ -13,7 +14,7 @@ describe('buildChatModelMessages', () => {
       'narrate only recommendations returned by the deterministic programming engine',
     );
     expect(systemMessage.content).toContain(
-      'cite only opaque evidence IDs supplied with that output',
+      'cite each supporting evidence ID in its exact [k:id] form',
     );
     expect(systemMessage.content).toContain('Never invent, calculate, select, or adjust exercises');
     expect(systemMessage.content).toContain('no authorized training guidance is available');
@@ -88,5 +89,59 @@ describe('buildChatModelMessages', () => {
     expect(systemMessage.content).not.toContain('not-forwarded');
     expect(systemMessage.content).not.toContain('privateNote');
     expect(userMessage).toEqual({ role: 'user', content: 'Summarize the available data.' });
+  });
+
+  it('passes prescription numbers and citations only from a returned engine session', () => {
+    const trainingOutput: NextWorkoutResult = {
+      kind: 'workout',
+      week: 2,
+      weekCount: 2,
+      weeklyFractionalVolume: { chest: 4 },
+      session: {
+        id: 'engine-session',
+        week: 2,
+        slot: 0,
+        pattern: 'A',
+        title: 'Full body A',
+        safetyStop: false,
+        explanation: null,
+        evidenceIds: ['k:81c218db'],
+        exercises: [
+          {
+            id: 'goblet_squat',
+            name: 'Goblet squat',
+            primaryMuscle: 'quads',
+            muscleContribution: { quads: 1 },
+            sets: 2,
+            repRange: { min: 8, max: 12 },
+            targetReps: 9,
+            targetRir: 3,
+            targetLoadKg: null,
+            loadInstruction: null,
+            progression: 'add_reps',
+            evidenceIds: ['k:1795aef0'],
+          },
+        ],
+      },
+    };
+    const [systemMessage] = buildChatModelMessages({
+      user: null,
+      metrics: [],
+      conversationMessages: [],
+      trainingOutput,
+    });
+    expect(systemMessage.content).toContain('"targetReps":9');
+    expect(systemMessage.content).toContain('"sets":2');
+    expect(systemMessage.content).toContain('"evidenceIds":["[k:1795aef0]"]');
+    expect(systemMessage.content).toContain('"targetLoadKg":null');
+    expect(systemMessage.content).not.toContain('targetLoadKg":15');
+  });
+});
+
+describe('isTrainingQuestion', () => {
+  it('recognizes lifting load requests without misclassifying ordinary body-weight questions', () => {
+    expect(isTrainingQuestion('What weight should I use?')).toBe(true);
+    expect(isTrainingQuestion('How much load should I add?')).toBe(true);
+    expect(isTrainingQuestion('Summarize my body weight trend.')).toBe(false);
   });
 });

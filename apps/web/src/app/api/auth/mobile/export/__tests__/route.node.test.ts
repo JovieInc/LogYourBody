@@ -48,6 +48,9 @@ describe('/api/auth/mobile/export', () => {
       glp1_dose_logs: [],
       dexa_results: [],
       progress_photos: [],
+      training_sessions: [],
+      logged_sets: [],
+      training_feedback: [],
     } as never);
 
     const response = await GET(
@@ -73,6 +76,9 @@ describe('/api/auth/mobile/export', () => {
       glp1_dose_logs: [],
       dexa_results: [],
       progress_photos: [],
+      training_sessions: [],
+      logged_sets: [],
+      training_feedback: [],
     } as never);
 
     const response = await POST(request('POST', 'access-a'));

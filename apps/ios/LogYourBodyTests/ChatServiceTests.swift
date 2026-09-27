@@ -64,6 +64,113 @@ final class ChatServiceTests: XCTestCase {
         XCTAssertEqual(conversation?.messages.first?.clientMessageId, "client-1")
     }
 
+    func testTrainingCoachVisibilityRequiresTheStatsigGate() {
+        var checkedKey: String?
+        XCTAssertFalse(TrainingCoachPolicy.isEnabled { checkedKey = $0; return false })
+        XCTAssertEqual(checkedKey, "hypertrophy_coach_v1")
+        XCTAssertTrue(TrainingCoachPolicy.isEnabled { $0 == "hypertrophy_coach_v1" })
+    }
+
+    func testTrainingNextUsesBearerTokenAndDecodesEngineOutput() async throws {
+        let session = makeSession()
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/next")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access-token")
+            let body = """
+            {
+              "version": 1,
+              "week": 1,
+              "weekCount": 2,
+              "weeklyFractionalVolume": {"chest": 4},
+              "session": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "week": 1,
+                "slot": 0,
+                "pattern": "A",
+                "title": "Full body A",
+                "safetyStop": false,
+                "explanation": null,
+                "evidenceIds": ["k:81c218db"],
+                "exercises": [{
+                  "id": "goblet_squat",
+                  "name": "Goblet squat",
+                  "primaryMuscle": "quads",
+                  "muscleContribution": {"quads": 1},
+                  "sets": 2,
+                  "repRange": {"min": 8, "max": 12},
+                  "targetReps": 8,
+                  "targetRir": 4,
+                  "targetLoadKg": null,
+                  "loadInstruction": null,
+                  "progression": "hold",
+                  "evidenceIds": ["k:1795aef0"]
+                }]
+              }
+            }
+            """
+            return (200, ["Content-Type": "application/json"], Data(body.utf8))
+        }
+
+        let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        let output = try await service.loadNext(accessToken: "access-token")
+        XCTAssertEqual(output.session?.exercises.first?.targetReps, 8)
+        XCTAssertEqual(output.session?.exercises.first?.evidenceIds, ["k:1795aef0"])
+        XCTAssertNil(output.session?.exercises.first?.targetLoadKg)
+    }
+
+    func testTrainingEnrollmentSendsExplicitAdultAndSafetyOptIn() async throws {
+        let session = makeSession()
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/enroll")
+            let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
+            XCTAssertEqual(body["adultConfirmed"] as? Bool, true)
+            XCTAssertEqual(body["safetyConfirmed"] as? Bool, true)
+            XCTAssertEqual(body["sessionsPerWeek"] as? Int, 2)
+            XCTAssertEqual(body["equipment"] as? String, "dumbbells")
+            return (201, ["Content-Type": "application/json"], Data("""
+              {"version":1,"program":{
+                "id":"setup-id","consentVersion":"hypertrophy-coach-v1",
+                "sessionsPerWeek":2,"equipment":"dumbbells"
+              }}
+            """.utf8))
+        }
+
+        let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        let output = try await service.enroll(accessToken: "access-token", sessionsPerWeek: 2, equipment: "dumbbells")
+        XCTAssertEqual(output.program.consentVersion, TrainingAPIContract.consentVersion)
+    }
+
+    func testTrainingSetLogUsesTheEngineSessionRouteAndUserValues() async throws {
+        let session = makeSession()
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/log-set")
+            let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
+            XCTAssertEqual(body["sessionId"] as? String, "session-id")
+            XCTAssertEqual(body["exerciseId"] as? String, "goblet_squat")
+            XCTAssertEqual(body["setNumber"] as? Int, 1)
+            XCTAssertEqual(body["reps"] as? Int, 10)
+            XCTAssertEqual(body["loadKg"] as? Double, 15)
+            XCTAssertEqual(body["rir"] as? Int, 3)
+            return (201, ["Content-Type": "application/json"], Data("{\"version\":1,\"sessionComplete\":false}".utf8))
+        }
+
+        let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        try await service.logSet(
+            accessToken: "access-token",
+            request: TrainingSetLogRequest(
+                sessionId: "session-id",
+                exerciseId: "goblet_squat",
+                setNumber: 1,
+                reps: 10,
+                loadKg: 15,
+                rir: 3
+            )
+        )
+    }
+
     func testLoadLatestRejectsAnUnsupportedProtocolVersion() async throws {
         let session = makeSession()
         ChatURLProtocol.handler = { _ in
