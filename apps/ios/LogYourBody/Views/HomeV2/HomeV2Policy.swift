@@ -62,7 +62,7 @@ enum HomeV2Copy {
     static let todayDetails = "Today’s details"
     static let viewProgress = "View progress"
     static let firstCheckInTitle = "Your first check-in"
-    static let firstCheckInBody = "Log your weight to begin. Your trend appears after 7 days."
+    static let firstCheckInBody = "Track weight and body fat to follow changes in your shape over time."
     static let connectHealthInstead = "Connect Apple Health instead"
     static let logSheetTitle = "Log weight"
     static let addDetails = "Add details or photos"
@@ -113,6 +113,8 @@ enum HomeV2Copy {
         return unit.isEmpty ? "\(sign)\(value)" : "\(sign)\(value) \(unit)"
     }
 
+    static let compositionTrackingPrompt = "Track body fat beside weight to follow changes in your shape."
+
     /// C2: "Logged 173.4 lb for today".
     static func loggedSentence(value: String, unit: String) -> String {
         "Logged \(value) \(unit) for today"
@@ -152,6 +154,61 @@ enum HomeV2Copy {
         formatter.timeStyle = .short
         return formatter
     }()
+}
+
+/// Uses recorded body-fat readings only; interpolated estimates stay out of the home headline.
+enum HomeV2CompositionPolicy {
+    static func headline(
+        metrics: [BodyMetrics],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> String {
+        let start = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+        let readings = metrics.filter { metric in
+            guard let value = metric.bodyFatPercentage else { return false }
+            return value.isFinite && metric.date >= start && metric.date <= now
+        }
+
+        guard let latest = readings.max(by: { $0.date < $1.date }),
+              let latestValue = latest.bodyFatPercentage else {
+            return HomeV2Copy.compositionTrackingPrompt
+        }
+
+        let method = methodKey(latest.bodyFatMethod)
+        let label = measurementLabel(for: method)
+        let latestText = String(format: "%.1f", latestValue)
+        let earlier = readings
+            .filter { $0.localDate != latest.localDate && methodKey($0.bodyFatMethod) == method }
+            .max(by: { $0.date < $1.date })
+
+        guard let earlier, let earlierValue = earlier.bodyFatPercentage else {
+            return "\(label) \(latestText)% · trend starts with another check-in"
+        }
+
+        let days = max(1, calendar.dateComponents([.day], from: earlier.date, to: latest.date).day ?? 1)
+        let delta = latestValue - earlierValue
+        let change = abs(delta) < 0.05
+            ? "no change"
+            : "\(delta < 0 ? "Down" : "Up") \(String(format: "%.1f", abs(delta))) pts"
+        return "\(label) \(latestText)% · \(change) in \(days) days"
+    }
+
+    private static func methodKey(_ method: String?) -> String {
+        let normalized = method?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        if normalized.contains("visual_estimate") { return "visual_estimate" }
+        if normalized.contains("inbody") { return "inbody" }
+        if normalized.contains("dexa") { return "dexa" }
+        return normalized
+    }
+
+    private static func measurementLabel(for method: String) -> String {
+        switch method {
+        case "visual_estimate": "Estimated body fat"
+        case "dexa": "DEXA body fat"
+        case "inbody": "InBody body fat"
+        default: "Body fat"
+        }
+    }
 }
 
 /// How long the current phase has run, in whole weeks, for the Home status line.
