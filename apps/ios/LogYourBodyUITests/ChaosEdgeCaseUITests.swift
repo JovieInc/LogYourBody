@@ -479,20 +479,36 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         popToRootIfNeeded(in: app)
     }
 
-    /// A shared dev simulator/device has landed a fresh `launch()` directly
-    /// on `world_class_screen_metricDetail` (observed as a "Weight" push
-    /// with a live Back button) left over from an earlier run instead of
-    /// the fixture's intended root -- the account's own state persists
-    /// across relaunches even though the process itself is fresh. Scoped to
-    /// that one identifier (rather than any visible Back button) so this
-    /// never pops a fixture -- like ChatFirst -- that deliberately starts
-    /// off the timeline root. A fast no-op when already at the
-    /// fixture-driven root.
+    /// A shared dev simulator/device has landed a fresh `launch()` on a
+    /// pushed screen left over from an earlier run (observed as a "Weight"
+    /// metric detail with a live Back button) instead of the fixture's
+    /// intended root -- the account's own state outlives the process. No
+    /// fixture's intended root shows a navigation Back button (the custom
+    /// `photoTimelineRootNavigation` toolbar isn't a pushed screen, and a
+    /// fixture like ChatFirst that deliberately opens off the timeline root
+    /// doesn't push one either), so any Back button present here is stray.
+    /// Records what was actually on screen before popping, so the recovery
+    /// is visible even on an otherwise-passing run. A single fast `.exists`
+    /// check when already at the fixture-driven root.
     private func popToRootIfNeeded(in app: XCUIApplication) {
+        guard app.navigationBars.buttons["Back"].exists else { return }
+
+        // A single lightweight query, not a full-tree `allElementsBoundByIndex`
+        // scan: that raced a screen still mid-transition right after launch
+        // ("Failed to get matching snapshot: No matches found for Element at
+        // index N", a hard XCTest failure, not a catchable Swift error) on
+        // this exact codepath. The nav bar's own identifier already carries
+        // the screen's title (e.g. "Weight") without walking the tree.
+        let screenTitle = app.navigationBars.firstMatch.identifier
+        let found = screenTitle.isEmpty ? "an unidentified pushed screen" : screenTitle
+        let attachment = XCTAttachment(string: "launch did not land on root: \(found)")
+        attachment.name = "launch-stray-navigation"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
         for _ in 0..<5 {
-            guard app.descendants(matching: .any)["world_class_screen_metricDetail"].exists else { return }
             let backButton = app.navigationBars.buttons["Back"]
-            guard backButton.waitForExistence(timeout: 2), backButton.isHittable else { return }
+            guard backButton.exists, backButton.isHittable else { return }
             backButton.tap()
         }
     }
@@ -515,6 +531,25 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
     private func waitForTimelineRoot(in app: XCUIApplication, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if isAtTimelineRoot(app) {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        return isAtTimelineRoot(app)
+    }
+
+    /// True only when a root marker is actually hittable (front-most) and no
+    /// navigation Back button is showing. `.exists` alone on these
+    /// identifiers is not enough: SwiftUI can keep the root mounted --
+    /// still reporting `.exists` -- while a NavigationStack destination is
+    /// pushed on top of it, which previously let this assertion pass on a
+    /// stray `world_class_screen_metricDetail` screen (own simulator run,
+    /// Test-LogYourBody-2026.09.28_14-48-12: "rotate-timeline" showed a
+    /// Weight metric detail with a live Back button, not the timeline root).
+    private func isAtTimelineRoot(_ app: XCUIApplication) -> Bool {
+        guard !app.navigationBars.buttons["Back"].exists else { return false }
         let candidates = [
             app.descendants(matching: .any)["photo_timeline_root_nav"],
             app.descendants(matching: .any)["photo_timeline_root_page_timeline"],
@@ -522,13 +557,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             app.descendants(matching: .any)["dashboard_home_timeline_hero"],
             app.buttons["Open Menu"]
         ]
-        while Date() < deadline {
-            if candidates.contains(where: { $0.exists }) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        return candidates.contains { $0.exists }
+        return candidates.contains { $0.isHittable }
     }
 
     /// Wraps `waitForTimelineRoot` with failure diagnostics: on timeout it
