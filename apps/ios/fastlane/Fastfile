@@ -655,6 +655,7 @@ platform :ios do
       output_directory: logout_ui_output,
       result_bundle: true,
       disable_concurrent_testing: true,
+      reset_simulator: true,
       only_testing: "LogYourBodyUITests/LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail",
       xcargs: "CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO",
       xcodebuild_formatter: ENV["CI"] ? "xcbeautify --renderer github-actions" : "xcbeautify"
