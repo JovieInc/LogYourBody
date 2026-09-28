@@ -121,6 +121,14 @@ private struct StuckDetector {
     }
 }
 
+/// Mutable per-run telemetry threaded through every step, bundled into one
+/// `inout` parameter so `runStep`'s signature doesn't grow every time a new
+/// counter joins the stuck-episode detector.
+private struct StepTelemetry {
+    var stuckDetector = StuckDetector()
+    var slowQueryCount = 0
+}
+
 final class ChaosMonkeyUITests: XCTestCase {
     private static let edgeStrings: [String] = [
         "",
@@ -193,7 +201,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         let app = XCUIApplication()
         var interruptionsDismissed = 0
         var anomalies: [String] = []
-        var stuckDetector = StuckDetector()
+        var telemetry = StepTelemetry()
 
         let monitor = addUIInterruptionMonitor(withDescription: "Chaos monkey system alert") { alert in
             let dismissLabels = ["Don't Allow", "Not Now", "Cancel", "Deny", "No Thanks", "Later", "OK"]
@@ -224,7 +232,7 @@ final class ChaosMonkeyUITests: XCTestCase {
                     app: app,
                     fixture: fixture,
                     rng: &rng,
-                    stuckDetector: &stuckDetector
+                    telemetry: &telemetry
                 )
             } catch {
                 let message = "step \(step): \(error)"
@@ -247,6 +255,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         var summaryLines = [
             "seed=\(seed) steps=\(steps) fixture=\(fixture)",
             "systemAlertsDismissed=\(interruptionsDismissed)",
+            "slowQueries(10-30s)=\(telemetry.slowQueryCount)",
             "anomalies=\(anomalies.count)"
         ]
         summaryLines.append(contentsOf: anomalies)
@@ -270,7 +279,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         app: XCUIApplication,
         fixture: String,
         rng: inout ChaosRNG,
-        stuckDetector: inout StuckDetector
+        telemetry: inout StepTelemetry
     ) throws {
         guard app.state == .runningForeground else {
             throw ChaosStepError.appNotForeground(String(describing: app.state))
@@ -286,21 +295,40 @@ final class ChaosMonkeyUITests: XCTestCase {
         // immediately rather than waiting for the stuck-tree threshold.
         if app.descendants(matching: .any)["world_class_screen_paywall"].exists {
             relaunch(app: app, fixture: fixture)
-            stuckDetector.reset()
+            telemetry.stuckDetector.reset()
             throw ChaosStepError.stuckRecovered("landed on the paywall (world_class_screen_paywall)")
+        }
+
+        // A visible keyboard adds ~45 extra nodes the general element query
+        // below must traverse, which alone can exceed the old 10s
+        // slow-query threshold; worse, that threw *before* any action ran,
+        // so the step that hit it never fixed it either -- a real device
+        // sat typing into chat_composer for 100+ steps in a row this way
+        // (docs/engineering/chaos-testing.md has the incident). Skip the
+        // general query entirely and dismiss the keyboard directly instead.
+        if app.keyboards.element.exists {
+            dismissKeyboardForStep(app: app)
+            return
         }
 
         let queryStart = Date()
         let candidates = interactiveElements(in: app)
         let queryDuration = Date().timeIntervalSince(queryStart)
+        // A merely-slow query (device under load, a larger tree) is a
+        // metric, not a step-ending anomaly on its own -- only a genuine
+        // hang past 30s is. The stuck detector below still observes this
+        // step's fingerprint either way.
         if queryDuration > 10 {
+            telemetry.slowQueryCount += 1
+        }
+        if queryDuration > 30 {
             throw ChaosStepError.slowQuery(queryDuration)
         }
 
         let fingerprint = candidates.isEmpty ? nil : treeFingerprint(candidates)
-        if let stuckReason = stuckDetector.observe(fingerprint: fingerprint) {
+        if let stuckReason = telemetry.stuckDetector.observe(fingerprint: fingerprint) {
             relaunch(app: app, fixture: fixture)
-            stuckDetector.reset()
+            telemetry.stuckDetector.reset()
             throw ChaosStepError.stuckRecovered(stuckReason)
         }
 
@@ -370,7 +398,11 @@ final class ChaosMonkeyUITests: XCTestCase {
 
         let edge = Self.edgeStrings.randomElement(using: &rng) ?? ""
         if !edge.isEmpty {
-            field.typeText(edge)
+            // Cap what actually gets typed (edgeStrings includes a 300-char
+            // entry) so a field like chat_composer never accumulates enough
+            // text to make a later step's keyboard-present handling slower
+            // than it needs to be.
+            field.typeText(String(edge.prefix(24)))
         }
         dismissKeyboard(app: app)
     }
@@ -413,18 +445,33 @@ final class ChaosMonkeyUITests: XCTestCase {
         popToRootIfNeeded(in: app)
     }
 
-    /// A shared dev simulator/device has landed a fresh launch directly on
-    /// `world_class_screen_metricDetail` left over from an earlier run
-    /// instead of the fixture's intended root -- the account's own state
-    /// persists across relaunches even though the process itself is fresh.
-    /// Scoped to that one identifier (rather than any visible Back button)
-    /// so a genuinely denylist-driven screen never gets popped by mistake.
-    /// A fast no-op when already at the fixture-driven root.
+    /// A shared dev simulator/device has landed a fresh launch on a pushed
+    /// screen left over from an earlier run instead of the fixture's
+    /// intended root -- the account's own state outlives the process. No
+    /// fixture's intended root pushes a screen with a navigation Back
+    /// button, so any Back button present here is stray. Records what was
+    /// actually on screen before popping (visible even on an otherwise-
+    /// passing run); a single fast `.exists` check when already at the
+    /// fixture-driven root.
     private func popToRootIfNeeded(in app: XCUIApplication) {
+        guard app.navigationBars.buttons["Back"].exists else { return }
+
+        // A single lightweight query, not a full-tree `allElementsBoundByIndex`
+        // scan: that raced a screen still mid-transition right after launch
+        // ("Failed to get matching snapshot: No matches found for Element at
+        // index N", a hard XCTest failure, not a catchable Swift error) on
+        // this exact codepath. The nav bar's own identifier already carries
+        // the screen's title (e.g. "Weight") without walking the tree.
+        let screenTitle = app.navigationBars.firstMatch.identifier
+        let found = screenTitle.isEmpty ? "an unidentified pushed screen" : screenTitle
+        let attachment = XCTAttachment(string: "launch did not land on root: \(found)")
+        attachment.name = "launch-stray-navigation"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
         for _ in 0..<5 {
-            guard app.descendants(matching: .any)["world_class_screen_metricDetail"].exists else { return }
             let backButton = app.navigationBars.buttons["Back"]
-            guard backButton.waitForExistence(timeout: 2), backButton.isHittable else { return }
+            guard backButton.exists, backButton.isHittable else { return }
             backButton.tap()
         }
     }
@@ -463,6 +510,27 @@ final class ChaosMonkeyUITests: XCTestCase {
         ).tap()
     }
 
+    /// Runs in place of the general element query on any step where a
+    /// keyboard is already up (see `runStep`). Prefers an explicit
+    /// send/return affordance so a chat draft goes somewhere instead of
+    /// sitting half-typed forever, then the composer's own "Close chat"
+    /// exit (`home_chat_collapse`, DashboardViewLiquid+PhotoTimelineHUD.swift),
+    /// then the generic keyboard dismissal as a last resort.
+    private func dismissKeyboardForStep(app: XCUIApplication) {
+        let candidates = [
+            app.buttons["chat_send_button"],
+            app.keyboards.buttons["return"],
+            app.keyboards.buttons["Return"],
+            app.keyboards.buttons["Send"],
+            app.buttons["home_chat_collapse"]
+        ]
+        for candidate in candidates where candidate.exists && candidate.isHittable {
+            candidate.tap()
+            return
+        }
+        dismissKeyboard(app: app)
+    }
+
     // MARK: - Element discovery
 
     private func interactiveElements(in app: XCUIApplication) -> [XCUIElement] {
@@ -475,8 +543,12 @@ final class ChaosMonkeyUITests: XCTestCase {
         elements.append(contentsOf: app.segmentedControls.allElementsBoundByIndex)
         elements.append(contentsOf: app.otherElements.allElementsBoundByIndex.prefix(40))
 
+        // Defense in depth: `runStep` already skips the general query
+        // entirely whenever a keyboard is showing, but exclude individual
+        // key elements from the candidate set too in case one is ever
+        // picked up by a type query above regardless.
         return elements.filter { element in
-            element.isHittable && !isDenylisted(element)
+            element.isHittable && element.elementType != .key && !isDenylisted(element)
         }
     }
 
