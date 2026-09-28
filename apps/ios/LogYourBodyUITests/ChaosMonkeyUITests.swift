@@ -7,6 +7,17 @@
 // crashes, hangs, and blank screens along the way. Every run is deterministic
 // for a given seed, fixture and step count so a failing run can be replayed.
 //
+// Stuck recovery: a real device can leave the monkey wedged on a screen
+// where every element is denylisted or nothing is hittable (a paywall with
+// purchase/restore/log-out all denylisted is the observed trap). Rather than
+// recording an anomaly on every step of a wedged run, `StuckDetector` flags
+// the episode once (no hittable elements, or an identical element tree for
+// five consecutive polls) and the run relaunches with the seeding fixture,
+// counting exactly one anomaly per episode. Landing on the paywall itself
+// (`world_class_screen_paywall`) triggers the same relaunch immediately,
+// since every paywall control is denylisted and the run can never progress
+// from there on its own.
+//
 // Env vars:
 //   LYB_CHAOS_SEED    - RNG seed (default 20260928)
 //   LYB_CHAOS_STEPS   - number of steps to run (default 250)
@@ -44,8 +55,8 @@ private enum ChaosAction: CaseIterable {
 private enum ChaosStepError: Error, CustomStringConvertible {
     case noInteractiveElements
     case appNotForeground(String)
-    case blankScreen
     case slowQuery(TimeInterval)
+    case stuckRecovered(String)
 
     var description: String {
         switch self {
@@ -53,11 +64,60 @@ private enum ChaosStepError: Error, CustomStringConvertible {
             return "no hittable interactive elements found"
         case .appNotForeground(let state):
             return "app left the foreground unexpectedly (state: \(state))"
-        case .blankScreen:
-            return "element tree was empty for two consecutive polls"
         case .slowQuery(let seconds):
             return "element query took \(seconds)s (> 10s hang threshold)"
+        case .stuckRecovered(let reason):
+            return "recovered from a stuck screen (\(reason)); relaunched"
         }
+    }
+}
+
+/// Tracks whether the monkey looks wedged on one screen: either nothing
+/// hittable and non-denylisted is on screen, or the interactive-element
+/// fingerprint hasn't changed for `repeatThreshold` consecutive polls (taps,
+/// swipes, and types are landing but nothing about the screen is changing).
+/// `reset()` after a recovery relaunch so a fresh episode needs its own
+/// `repeatThreshold` streak before it counts again -- this is what keeps a
+/// wedged run to exactly one anomaly per episode instead of one per step.
+private struct StuckDetector {
+    static let repeatThreshold = 5
+    static let blankThreshold = 2
+
+    private var lastFingerprint: Int?
+    private var sameFingerprintStreak = 0
+    private var blankStreak = 0
+
+    /// Feeds one step's element fingerprint (`nil` when there were no
+    /// hittable, non-denylisted candidates at all) and returns a stuck
+    /// reason once a threshold trips, or `nil` if the run still looks live.
+    mutating func observe(fingerprint: Int?) -> String? {
+        guard let fingerprint else {
+            blankStreak += 1
+            sameFingerprintStreak = 0
+            lastFingerprint = nil
+            if blankStreak >= Self.blankThreshold {
+                return "no hittable, non-denylisted elements for \(blankStreak) consecutive polls"
+            }
+            return nil
+        }
+
+        blankStreak = 0
+        if fingerprint == lastFingerprint {
+            sameFingerprintStreak += 1
+        } else {
+            sameFingerprintStreak = 1
+            lastFingerprint = fingerprint
+        }
+        if sameFingerprintStreak >= Self.repeatThreshold {
+            return "identical element tree for \(sameFingerprintStreak) consecutive polls"
+        }
+        return nil
+    }
+
+    mutating func reset() {
+        lastFingerprint = nil
+        sameFingerprintStreak = 0
+        blankStreak = 0
     }
 }
 
@@ -133,7 +193,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         let app = XCUIApplication()
         var interruptionsDismissed = 0
         var anomalies: [String] = []
-        var blankPollStreak = 0
+        var stuckDetector = StuckDetector()
 
         let monitor = addUIInterruptionMonitor(withDescription: "Chaos monkey system alert") { alert in
             let dismissLabels = ["Don't Allow", "Not Now", "Cancel", "Deny", "No Thanks", "Later", "OK"]
@@ -154,6 +214,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         app.launchArguments = [fixture, "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
         app.launch()
         app.tap()
+        popToRootIfNeeded(in: app)
 
         for step in 0..<steps {
             do {
@@ -161,8 +222,9 @@ final class ChaosMonkeyUITests: XCTestCase {
                     step: step,
                     seed: seed,
                     app: app,
+                    fixture: fixture,
                     rng: &rng,
-                    blankPollStreak: &blankPollStreak
+                    stuckDetector: &stuckDetector
                 )
             } catch {
                 let message = "step \(step): \(error)"
@@ -206,11 +268,26 @@ final class ChaosMonkeyUITests: XCTestCase {
         step: Int,
         seed: UInt64,
         app: XCUIApplication,
+        fixture: String,
         rng: inout ChaosRNG,
-        blankPollStreak: inout Int
+        stuckDetector: inout StuckDetector
     ) throws {
         guard app.state == .runningForeground else {
             throw ChaosStepError.appNotForeground(String(describing: app.state))
+        }
+
+        // Notification banners render in SpringBoard, not the app under
+        // test, so the app's own element queries never see them -- they
+        // just silently swallow the next tap. Clear one before acting.
+        dismissNotificationBanner(app: app)
+
+        // Every paywall control is denylisted (purchase/restore/log-out), so
+        // the monkey can never make progress from here on its own; escape
+        // immediately rather than waiting for the stuck-tree threshold.
+        if app.descendants(matching: .any)["world_class_screen_paywall"].exists {
+            relaunch(app: app, fixture: fixture)
+            stuckDetector.reset()
+            throw ChaosStepError.stuckRecovered("landed on the paywall (world_class_screen_paywall)")
         }
 
         let queryStart = Date()
@@ -220,14 +297,11 @@ final class ChaosMonkeyUITests: XCTestCase {
             throw ChaosStepError.slowQuery(queryDuration)
         }
 
-        if candidates.isEmpty {
-            blankPollStreak += 1
-            if blankPollStreak >= 2 {
-                blankPollStreak = 0
-                throw ChaosStepError.blankScreen
-            }
-        } else {
-            blankPollStreak = 0
+        let fingerprint = candidates.isEmpty ? nil : treeFingerprint(candidates)
+        if let stuckReason = stuckDetector.observe(fingerprint: fingerprint) {
+            relaunch(app: app, fixture: fixture)
+            stuckDetector.reset()
+            throw ChaosStepError.stuckRecovered(stuckReason)
         }
 
         switch pickAction(using: &rng) {
@@ -328,6 +402,49 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
     }
 
+    /// Terminates and relaunches with the seeding fixture, mirroring the
+    /// initial launch in `testChaosMonkey`. Used to recover from a wedged
+    /// screen rather than continuing to hammer a state the run can't escape.
+    private func relaunch(app: XCUIApplication, fixture: String) {
+        app.terminate()
+        app.launchArguments = [fixture, "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
+        app.launch()
+        app.tap()
+        popToRootIfNeeded(in: app)
+    }
+
+    /// A shared dev simulator/device has landed a fresh launch directly on
+    /// `world_class_screen_metricDetail` left over from an earlier run
+    /// instead of the fixture's intended root -- the account's own state
+    /// persists across relaunches even though the process itself is fresh.
+    /// Scoped to that one identifier (rather than any visible Back button)
+    /// so a genuinely denylist-driven screen never gets popped by mistake.
+    /// A fast no-op when already at the fixture-driven root.
+    private func popToRootIfNeeded(in app: XCUIApplication) {
+        for _ in 0..<5 {
+            guard app.descendants(matching: .any)["world_class_screen_metricDetail"].exists else { return }
+            let backButton = app.navigationBars.buttons["Back"]
+            guard backButton.waitForExistence(timeout: 2), backButton.isHittable else { return }
+            backButton.tap()
+        }
+    }
+
+    /// System notification banners render in SpringBoard, not the app under
+    /// test, so `app`'s own element tree never sees them and XCTest's
+    /// alert-style interruption monitor doesn't apply to them either (they
+    /// aren't a `UIAlertController`). Reach into SpringBoard directly and
+    /// swipe the banner up and off-screen before acting; a no-op if none is
+    /// showing.
+    private func dismissNotificationBanner(app: XCUIApplication) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let banner = springboard.otherElements["NotificationShortLookView"]
+        guard banner.waitForExistence(timeout: 0.5) else { return }
+        let start = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = banner.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -3))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        _ = banner.waitForNonExistence(timeout: 2)
+    }
+
     private func dismissKeyboard(app: XCUIApplication) {
         let candidates = [
             app.keyboards.buttons["Done"],
@@ -369,6 +486,19 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
         let haystack = (element.identifier + " " + element.label).lowercased()
         return Self.denylistedLabelFragments.contains { haystack.contains($0) }
+    }
+
+    /// A cheap fingerprint of the candidate set `StuckDetector` compares
+    /// across steps: identifier + label + enabled state for each element,
+    /// order-sensitive (the query order is stable for an unchanged tree).
+    private func treeFingerprint(_ elements: [XCUIElement]) -> Int {
+        var hasher = Hasher()
+        for element in elements {
+            hasher.combine(element.identifier)
+            hasher.combine(element.label)
+            hasher.combine(element.isEnabled)
+        }
+        return hasher.finalize()
     }
 
     // MARK: - Diagnostics
