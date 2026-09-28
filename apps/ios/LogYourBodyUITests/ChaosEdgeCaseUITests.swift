@@ -174,8 +174,19 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval: 2)
         app.activate()
+        // `activate()` returns before the state transition is guaranteed to
+        // have landed. A real device under notification pressure can take
+        // noticeably longer than the simulator to report runningForeground,
+        // so poll for up to 15s rather than trusting the state immediately.
+        let foregroundDeadline = Date().addingTimeInterval(15)
+        while app.state != .runningForeground, Date() < foregroundDeadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
 
-        XCTAssertEqual(app.state, .runningForeground, "App must resume cleanly after a mid-save backgrounding.")
+        if app.state != .runningForeground {
+            attachDiagnosticTree(from: app, named: "background-resume-timeout-tree")
+            XCTFail("App did not report runningForeground within 15s of resuming (state: \(app.state.rawValue)).")
+        }
         XCTAssertFalse(app.alerts.firstMatch.waitForExistence(timeout: 3), "No error alert should surface after resuming.")
     }
 
@@ -185,11 +196,11 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        assertTimelineRootAppears(in: app, timeout: 30)
         attachScreenshot(named: "rotate-timeline", from: app)
 
         openPhotoTimelineMenu(in: app)
-        let settings = app.buttons["Settings"]
+        let settings = waitForSettingsMenuEntry(in: app)
         if settings.waitForExistence(timeout: 5) {
             settings.tap()
             XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
@@ -197,7 +208,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             app.buttons["home_v2_settings_back"].tap()
         }
 
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 8))
+        assertTimelineRootAppears(in: app, timeout: 8)
         XCTAssertEqual(app.state, .runningForeground)
     }
 
@@ -210,11 +221,15 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         // other concurrent test runs, so this only asserts the surface renders
         // without crashing and validates recovery copy when the device already
         // happens to be denied/restricted.
+        // Bulk import is gated behind BulkProgressPhotoImportPolicy (either
+        // >=2 seeded progress photos or this fixture flag); without it the
+        // fixture account here has too few photos to reach the entry point
+        // at all (IntegrationsView.swift's isBulkProgressPhotoImportEnabled).
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestBulkPhotoImportEnabledFixture"])
+        assertTimelineRootAppears(in: app, timeout: 30)
         openPhotoTimelineMenu(in: app)
-        let settings = app.buttons["Settings"]
+        let settings = waitForSettingsMenuEntry(in: app)
         guard settings.waitForExistence(timeout: 5) else {
             throw XCTSkip("Settings entry point not reachable from this fixture.")
         }
@@ -226,7 +241,13 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         }
         integrationsLink.tap()
 
-        let bulkImportLink = app.buttons["integrations_bulk_photo_import_link"]
+        // The NavigationLink row concatenates its own identifier with its
+        // children's ("integrations_bulk_photo_import_link-<same>-<same>"
+        // observed on-device), so an exact bracket match on the plain
+        // identifier never hits; match on containment instead.
+        let bulkImportLink = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bulk_photo_import_link'")
+        ).firstMatch
         XCTAssertTrue(bulkImportLink.waitForExistence(timeout: 8))
         bulkImportLink.tap()
 
@@ -255,14 +276,20 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             "-lybUITestChatOfflineFixture"
         ])
 
-        // Wait for the composer itself, not just the timeline root: the chat
-        // surface finishes mounting after the timeline does, and checking only
-        // the timeline root races the offline-copy assertion below.
+        // The ChatFirst fixture opens directly onto the chat surface, so the
+        // usual timeline-root identifiers never appear; wait for the chat
+        // composer itself instead (mirrors LogYourBodyUITests' proven
+        // waitForHomeChatComposer pattern for this exact fixture combo).
         let composer = app.textFields["chat_composer"]
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
-        XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        XCTAssertTrue(composer.waitForExistence(timeout: 12))
 
-        let retry = app.buttons["chat_retry_button"]
+        // MainTabView.swift renders two distinct "Retry" controls: the
+        // fixture here simulates a failed *conversation load* on first open
+        // (no message has been sent yet), which is `chat_reload_button`
+        // (`isConversationLoadRetryAvailable`) -- `chat_retry_button` only
+        // appears after a failed message *send* (`failedTurn != nil`),
+        // which never happens in this scenario.
+        let retry = app.buttons["chat_reload_button"]
         XCTAssertTrue(retry.waitForExistence(timeout: 12), "Offline chat must surface a retryable control.")
         XCTAssertTrue(retry.isHittable)
         attachScreenshot(named: "edge-chat-offline-retry", from: app)
@@ -274,9 +301,9 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        assertTimelineRootAppears(in: app, timeout: 30)
         openPhotoTimelineMenu(in: app)
-        let settings = app.buttons["Settings"]
+        let settings = waitForSettingsMenuEntry(in: app)
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
@@ -310,7 +337,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         }
 
         app.buttons["home_v2_settings_back"].tap()
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 8))
+        assertTimelineRootAppears(in: app, timeout: 8)
     }
 
     // MARK: - 9. Paywall shows both plans and restore, never purchase
@@ -341,9 +368,9 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        assertTimelineRootAppears(in: app, timeout: 30)
         openPhotoTimelineMenu(in: app)
-        let settings = app.buttons["Settings"]
+        let settings = waitForSettingsMenuEntry(in: app)
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
 
@@ -400,9 +427,9 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
 
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        assertTimelineRootAppears(in: app, timeout: 30)
         openPhotoTimelineMenu(in: app)
-        let settings = app.buttons["Settings"]
+        let settings = waitForSettingsMenuEntry(in: app)
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
         settings.tap()
 
@@ -449,6 +476,25 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         // poll, so tap once to give the interruption monitor a chance to run
         // before any waitForExistence-based navigation below.
         app.tap()
+        popToRootIfNeeded(in: app)
+    }
+
+    /// A shared dev simulator/device has landed a fresh `launch()` directly
+    /// on `world_class_screen_metricDetail` (observed as a "Weight" push
+    /// with a live Back button) left over from an earlier run instead of
+    /// the fixture's intended root -- the account's own state persists
+    /// across relaunches even though the process itself is fresh. Scoped to
+    /// that one identifier (rather than any visible Back button) so this
+    /// never pops a fixture -- like ChatFirst -- that deliberately starts
+    /// off the timeline root. A fast no-op when already at the
+    /// fixture-driven root.
+    private func popToRootIfNeeded(in app: XCUIApplication) {
+        for _ in 0..<5 {
+            guard app.descendants(matching: .any)["world_class_screen_metricDetail"].exists else { return }
+            let backButton = app.navigationBars.buttons["Back"]
+            guard backButton.waitForExistence(timeout: 2), backButton.isHittable else { return }
+            backButton.tap()
+        }
     }
 
     private func openMVPWeightEntry(in app: XCUIApplication) throws {
@@ -458,7 +504,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
     }
 
     private func openAddEntrySheetFromHome(in app: XCUIApplication) throws {
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        assertTimelineRootAppears(in: app, timeout: 30)
         let logButton = app.buttons["home_v2_log_weight"]
         guard logButton.waitForExistence(timeout: 8) else {
             throw XCTSkip("home_v2_log_weight entry point is not present under this fixture.")
@@ -485,6 +531,53 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         return candidates.contains { $0.exists }
     }
 
+    /// Wraps `waitForTimelineRoot` with failure diagnostics: on timeout it
+    /// attaches the full element tree and fails with the `world_class_screen_*`
+    /// identifiers actually on screen, so a red run says what was showing
+    /// instead of just "false". Real-device runs have seen the plain
+    /// `waitForTimelineRoot` timeout fire under notification-banner pressure
+    /// with no indication of what was on screen instead; this is the fix.
+    @discardableResult
+    private func assertTimelineRootAppears(
+        in app: XCUIApplication,
+        timeout: TimeInterval,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        if waitForTimelineRoot(in: app, timeout: timeout) {
+            return true
+        }
+
+        attachDiagnosticTree(from: app, named: "timeline-root-timeout-tree")
+        let screenIdentifiers = app.descendants(matching: .any).allElementsBoundByIndex
+            .map(\.identifier)
+            .filter { $0.hasPrefix("world_class_screen_") }
+        let found = screenIdentifiers.isEmpty
+            ? "no world_class_screen_* identifiers were found"
+            : "found: \(screenIdentifiers.joined(separator: ", "))"
+        XCTFail("Timeline root did not appear within \(timeout)s (\(found)).", file: file, line: line)
+        return false
+    }
+
+    /// Finds the Settings entry inside the currently open root menu overlay.
+    /// The overlay differs by surface: the legacy `PhotoTimelineNavigationMenu`
+    /// exposes `photo_timeline_menu_settings`
+    /// (DashboardViewLiquid+PhotoTimelineHUD.swift), the HomeV2 sidebar
+    /// exposes `home_v2_sidebar_settings` (HomeV2SidebarView.swift). Prefer
+    /// the concrete identifier for whichever is active; fall back to a
+    /// label-based lookup only if neither is present yet.
+    private func waitForSettingsMenuEntry(in app: XCUIApplication, timeout: TimeInterval = 5) -> XCUIElement {
+        let deadline = Date().addingTimeInterval(timeout)
+        let legacy = app.buttons["photo_timeline_menu_settings"]
+        let homeV2 = app.buttons["home_v2_sidebar_settings"]
+        while Date() < deadline {
+            if legacy.exists { return legacy }
+            if homeV2.exists { return homeV2 }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return app.buttons["Settings"]
+    }
+
     private func waitForSettingsDetailScreen(in app: XCUIApplication, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
@@ -504,12 +597,33 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         // The menu is a fullScreenCover; its transition is noticeably slower
         // on a real device under Instruments-level automation overhead than
         // in a simulator, so this needs more headroom than a typical wait.
-        if !app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 8) {
+        if !waitForMenuOverlay(in: app, timeout: 8) {
             // A single retry covers the rare case where the first tap lands
             // just as the cover starts presenting and gets swallowed.
             menu.tap()
         }
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 8))
+        XCTAssertTrue(waitForMenuOverlay(in: app, timeout: 8), "Root menu overlay did not appear after tapping Open Menu.")
+    }
+
+    /// Two distinct overlays can render behind `isShowingPhotoTimelineMenu`
+    /// depending on `HomeV2Policy`: the legacy `PhotoTimelineNavigationMenu`,
+    /// wrapped in `photo_timeline_menu` (DashboardViewLiquid+PhotoTimelineHUD.swift),
+    /// or the HomeV2 sidebar, which has no single wrapper identifier but always
+    /// renders its `home_v2_sidebar_settings` row once presented
+    /// (HomeV2SidebarView.swift).
+    private func waitForMenuOverlay(in app: XCUIApplication, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        let candidates = [
+            app.descendants(matching: .any)["photo_timeline_menu"],
+            app.buttons["home_v2_sidebar_settings"]
+        ]
+        while Date() < deadline {
+            if candidates.contains(where: { $0.exists }) {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        return candidates.contains { $0.exists }
     }
 
     private func navigateBack(in app: XCUIApplication) {
@@ -556,6 +670,15 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
     private func attachScreenshot(named name: String, from app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    /// Attaches the full accessibility-element tree so a red run says what
+    /// was actually on screen, not just that a wait timed out.
+    private func attachDiagnosticTree(from app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(string: app.debugDescription)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
