@@ -16,7 +16,16 @@ const BodyMetricSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
   photoUrl: z.string().url().nullable().optional(),
   dataSource: z
-    .enum(['manual', 'healthkit', 'smart_scale', 'bodyspec_dexa', 'caliper', 'photo'])
+    .enum([
+      'manual',
+      'healthkit',
+      'smart_scale',
+      'bodyspec_dexa',
+      'dexa_pdf',
+      'inbody_pdf',
+      'caliper',
+      'photo',
+    ])
     .default('manual'),
   sourceMetadata: z.record(z.string(), z.unknown()).default({}),
 });

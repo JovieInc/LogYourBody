@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct BodySpecIntegrationView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -14,14 +15,17 @@ struct BodySpecIntegrationView: View {
     @State private var isLoadingScans = false
     @State private var recentScans: [DexaResult] = []
     @State private var recentScansError: String?
+    @State private var isSelectingPDF = false
+    @State private var selectedPDF: DexaPDFFileSelection?
 
     private enum RecoveryAction {
         case connect
     }
 
     var body: some View {
-        SettingsDetailScreen(title: "BodySpec") {
+        SettingsDetailScreen(title: "DEXA and InBody") {
             introductionSection
+            pdfImportSection
             connectionSection
             syncSection
             recentScansSection
@@ -35,6 +39,24 @@ struct BodySpecIntegrationView: View {
                 await handleOnAppear()
             }
         }
+        .fileImporter(
+            isPresented: $isSelectingPDF,
+            allowedContentTypes: [.pdf],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    selectedPDF = DexaPDFFileSelection(url: url)
+                }
+            case .failure:
+                errorMessage = "Choose a readable DEXA or InBody PDF and try again."
+            }
+        }
+        .sheet(item: $selectedPDF, onDismiss: reloadRecentScans) { selection in
+            DexaPDFImportSheet(fileURL: selection.url)
+                .environmentObject(authManager)
+        }
     }
 
     private var introductionSection: some View {
@@ -42,18 +64,33 @@ struct BodySpecIntegrationView: View {
             DataInfoRow(
                 icon: "waveform.path.ecg",
                 title: "DEXA scan import",
-                description: "Connect BodySpec to bring your DEXA scan history into LogYourBody.",
+                description: "Import DEXA or InBody reports and keep your dated scan history together.",
                 iconColor: .accentColor
             )
         }
     }
 
+    private var pdfImportSection: some View {
+        SettingsSection(
+            header: "Import from PDF",
+            footer: "Choose a report from Files or use the iOS share sheet to open a PDF in LogYourBody."
+        ) {
+            Button {
+                isSelectingPDF = true
+            } label: {
+                Label("Import DEXA or InBody PDF", systemImage: "doc.badge.plus")
+            }
+            .accessibilityIdentifier("body_spec_pdf_import")
+            .accessibilityHint("Choose a scan report PDF to add its dated measurements to your timeline.")
+        }
+    }
+
     private var connectionSection: some View {
         SettingsSection(
-            header: "Connection",
+            header: "Optional BodySpec sync",
             footer: isConfigured
                 ? "You can disconnect at any time."
-                : "BodySpec is not available in this version of the app."
+                : "Direct BodySpec account sync is not configured in this build. PDF import is available above."
         ) {
             SettingsRow(
                 icon: connectionIcon,
@@ -125,7 +162,7 @@ struct BodySpecIntegrationView: View {
     private var recentScansSection: some View {
         SettingsSection(
             header: "Recent scans",
-            footer: "Your five most recent BodySpec DEXA scans appear here."
+            footer: "Your five most recent DEXA and InBody scans appear here."
         ) {
             if isLoadingScans {
                 DataInfoRow(
@@ -152,8 +189,8 @@ struct BodySpecIntegrationView: View {
                     icon: "doc.text.magnifyingglass",
                     title: "No DEXA scans yet",
                     description: isConnected
-                        ? "New scans from BodySpec will appear here after syncing."
-                        : "Connect BodySpec to see your DEXA scan history.",
+                        ? "New scans appear here after syncing or importing a PDF."
+                        : "Import a DEXA or InBody PDF to start your scan history.",
                     iconColor: .secondary
                 )
             } else {
@@ -161,7 +198,7 @@ struct BodySpecIntegrationView: View {
                     SettingsRow(
                         icon: "calendar",
                         title: formattedDate(scan.acquireTime),
-                        subtitle: scan.locationName?.isEmpty == false ? scan.locationName : "BodySpec DEXA scan"
+                        subtitle: scanSummary(scan)
                     )
                 }
             }
@@ -198,22 +235,22 @@ struct BodySpecIntegrationView: View {
     }
 
     private var connectionTitle: String {
-        if !isConfigured { return "BodySpec isn’t available" }
+        if !isConfigured { return "Direct sync isn’t configured" }
         return isConnected ? "Connected" : "Not connected"
     }
 
     private var connectionDescription: String {
         if !isConfigured {
-            return "This build can’t connect to BodySpec."
+            return "PDF import works without a BodySpec account connection."
         }
         return connectedEmail ?? (isConnected
             ? "Your BodySpec account is ready to sync."
-            : "Connect your account to import DEXA scans.")
+            : "Connect your account to sync DEXA scans automatically.")
     }
 
     private var syncUnavailableDescription: String {
         if !isConfigured {
-            return "BodySpec isn’t available in this build."
+            return "Import a DEXA or InBody PDF instead."
         }
         return "Connect BodySpec before syncing your scans."
     }
@@ -233,9 +270,7 @@ struct BodySpecIntegrationView: View {
 
     @MainActor
     private func loadRecentScansIfNeeded() async {
-        guard isConfigured,
-              isConnected,
-              let userId = authManager.currentUser?.id else {
+        guard let userId = authManager.currentUser?.id else {
             recentScans = []
             recentScansError = nil
             return
@@ -352,6 +387,17 @@ struct BodySpecIntegrationView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+
+    private func scanSummary(_ scan: DexaResult) -> String {
+        var details = [scan.externalSource.replacingOccurrences(of: "_", with: " ").capitalized]
+        if let bodyFat = scan.bodyFatPercentage {
+            details.append("\(bodyFat.formatted(.number.precision(.fractionLength(0...1))))% body fat")
+        }
+        if let muscleMass = scan.muscleMass {
+            details.append("\(muscleMass.formatted(.number.precision(.fractionLength(0...1)))) muscle mass")
+        }
+        return details.joined(separator: " · ")
     }
 }
 

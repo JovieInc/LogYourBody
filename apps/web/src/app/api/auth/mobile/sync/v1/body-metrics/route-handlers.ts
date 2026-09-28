@@ -11,6 +11,8 @@ const DATA_SOURCES = [
   'healthkit',
   'smart_scale',
   'bodyspec_dexa',
+  'dexa_pdf',
+  'inbody_pdf',
   'caliper',
   'photo',
 ] as const;

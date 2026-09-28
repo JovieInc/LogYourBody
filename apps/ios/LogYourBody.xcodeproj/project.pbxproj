@@ -257,6 +257,7 @@
 		ADA6002C2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */; };
 		ADA600302ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */; };
 		ADA600312ED25F6700088042 /* BodySpecIntegrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */; };
+		B3C4D0114A77000100ABCDEF /* DexaPDFImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D0104A77000100ABCDEF /* DexaPDFImportSheet.swift */; };
 		ADA600322ED25F6700088042 /* DashboardViewLiquid+Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */; };
 		ADA600372ED2602F00088042 /* BodySpecDexaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */; };
 		ADA600382ED2602F00088042 /* BodySpecAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600332ED2602F00088042 /* BodySpecAPI.swift */; };
@@ -790,6 +791,7 @@
 		ADA600292ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HeroAndActions.swift"; sourceTree = "<group>"; };
 		ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+CoreAccessors.swift"; sourceTree = "<group>"; };
 		ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecIntegrationView.swift; sourceTree = "<group>"; };
+		B3C4D0104A77000100ABCDEF /* DexaPDFImportSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaPDFImportSheet.swift; sourceTree = "<group>"; };
 		ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+Components.swift"; sourceTree = "<group>"; };
 		ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HeaderAndSync.swift"; sourceTree = "<group>"; };
 		ADA600332ED2602F00088042 /* BodySpecAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecAPI.swift; sourceTree = "<group>"; };
@@ -945,6 +947,8 @@
 		F51C80EB60F2EA0D7AFA62AB /* EditEntrySavePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditEntrySavePolicyTests.swift; sourceTree = "<group>"; };
 		F7A2B3C4D5E6F70809101112 /* LogYourBodyV2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV2.xcdatamodel; sourceTree = "<group>"; };
 		F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV2.xcdatamodel; sourceTree = "<group>"; };
+		F7A2B3C4D5E6F70809101114 /* LogYourBodyV3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV3.xcdatamodel; sourceTree = "<group>"; };
+		F7A2B3C4D5E6F70809101115 /* LogYourBodyV3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV3.xcdatamodel; sourceTree = "<group>"; };
 		F8E9499CD258290C5363D52A /* AuthManagerSessionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthManagerSessionTests.swift; sourceTree = "<group>"; };
 		FA535A0684FDFFAF479F14AB /* HomeV2OnboardingPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2OnboardingPolicyTests.swift; sourceTree = "<group>"; };
 		FB947FE422689993FD02B4F6 /* AuthHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthHeader.swift; path = DesignSystem/Molecules/AuthHeader.swift; sourceTree = "<group>"; };
@@ -1462,6 +1466,7 @@
 				AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */,
 				AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */,
 				ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */,
+				B3C4D0104A77000100ABCDEF /* DexaPDFImportSheet.swift */,
 				ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */,
 				AD3145F12F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift */,
 				AD3145E32F0A030200ABCDEF /* DashboardViewLiquid+Glp1MetricCard.swift */,
@@ -2342,6 +2347,7 @@
 				ADA4B73F2ECFAB0B00F4262A /* TimelineCalculator.swift in Sources */,
 				ADA600302ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift in Sources */,
 				ADA600312ED25F6700088042 /* BodySpecIntegrationView.swift in Sources */,
+				B3C4D0114A77000100ABCDEF /* DexaPDFImportSheet.swift in Sources */,
 				ADA600322ED25F6700088042 /* DashboardViewLiquid+Components.swift in Sources */,
 				AD8872B72EB946BE0041C426 /* AuthConsentCheckbox.swift in Sources */,
 				AD8872B92EB946BE0041C426 /* DSCircularProgress.swift in Sources */,
@@ -2855,8 +2861,9 @@
 			children = (
 				AD723B142E15FA5C002376C6 /* LogYourBody.xcdatamodel */,
 				F7A2B3C4D5E6F70809101112 /* LogYourBodyV2.xcdatamodel */,
+				F7A2B3C4D5E6F70809101114 /* LogYourBodyV3.xcdatamodel */,
 			);
-			currentVersion = F7A2B3C4D5E6F70809101112 /* LogYourBodyV2.xcdatamodel */;
+			currentVersion = F7A2B3C4D5E6F70809101114 /* LogYourBodyV3.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
@@ -2866,8 +2873,9 @@
 			children = (
 				ADDC48652E2D8A33003C97E7 /* LogYourBody.xcdatamodel */,
 				F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */,
+				F7A2B3C4D5E6F70809101115 /* LogYourBodyV3.xcdatamodel */,
 			);
-			currentVersion = F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */;
+			currentVersion = F7A2B3C4D5E6F70809101115 /* LogYourBodyV3.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;

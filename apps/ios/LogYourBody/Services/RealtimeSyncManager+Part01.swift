@@ -416,6 +416,10 @@ nonisolated func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], to
                 }
                 let vatMassValue: Any = result.vatMassKg > 0 ? result.vatMassKg : NSNull()
                 let vatVolumeValue: Any = result.vatVolumeCm3 > 0 ? result.vatVolumeCm3 : NSNull()
+                let scanWeightValue: Any = result.scanWeight ?? NSNull()
+                let bodyFatValue: Any = result.bodyFatPercentage ?? NSNull()
+                let muscleMassValue: Any = result.muscleMass ?? NSNull()
+                let boneMassValue: Any = result.boneMass ?? NSNull()
 
                 return [
                     "id": result.id,
@@ -431,6 +435,11 @@ nonisolated func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], to
                     "analyze_time": analyzeTimeValue,
                     "vat_mass_kg": vatMassValue,
                     "vat_volume_cm3": vatVolumeValue,
+                    "scan_weight": scanWeightValue,
+                    "scan_weight_unit": result.scanWeightUnit as Any,
+                    "body_fat_percentage": bodyFatValue,
+                    "muscle_mass": muscleMassValue,
+                    "bone_mass": boneMassValue,
                     "result_pdf_url": result.resultPdfUrl as Any,
                     "result_pdf_name": result.resultPdfName as Any,
                     "created_at": formatter.string(from: result.createdAt),

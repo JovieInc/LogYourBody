@@ -51,10 +51,7 @@ class MemoryNativeSync implements NativeBodyMetricsSyncPort {
     return { records: records.map(asRecord), rejected_ids: [] };
   }
 
-  async pull(
-    subject: string,
-    input: { since: string; after_id: string | null; limit?: number },
-  ) {
+  async pull(subject: string, input: { since: string; after_id: string | null; limit?: number }) {
     this.pulled.push({ subject, ...input });
     return {
       records: [asRecord(morningInput)],
@@ -69,7 +66,9 @@ class MemoryNativeSync implements NativeBodyMetricsSyncPort {
   }
 }
 
-function makeHarness(users: Record<string, string> = { 'access-a': 'owner-a', 'access-b': 'owner-b' }) {
+function makeHarness(
+  users: Record<string, string> = { 'access-a': 'owner-a', 'access-b': 'owner-b' },
+) {
   const sync = new MemoryNativeSync();
   const handlers = createNativeBodyMetricsSyncHandlers({
     authenticate: async (request) => {
@@ -82,12 +81,7 @@ function makeHarness(users: Record<string, string> = { 'access-a': 'owner-a', 'a
   return { handlers, sync };
 }
 
-function request(
-  method: 'GET' | 'POST' | 'DELETE',
-  token?: string,
-  body?: unknown,
-  query = '',
-) {
+function request(method: 'GET' | 'POST' | 'DELETE', token?: string, body?: unknown, query = '') {
   return new NextRequest(`http://localhost/api/auth/mobile/sync/v1/body-metrics${query}`, {
     method,
     headers: {
@@ -102,9 +96,9 @@ describe('/api/auth/mobile/sync/v1/body-metrics', () => {
   it('rejects missing bearer tokens before touching persistence', async () => {
     const { handlers, sync } = makeHarness();
     expect((await handlers.GET(request('GET'))).status).toBe(401);
-    expect((await handlers.POST(request('POST', undefined, { records: [morningInput] }))).status).toBe(
-      401,
-    );
+    expect(
+      (await handlers.POST(request('POST', undefined, { records: [morningInput] }))).status,
+    ).toBe(401);
     expect((await handlers.DELETE(request('DELETE', undefined, { ids: [morningId] }))).status).toBe(
       401,
     );
@@ -128,10 +122,7 @@ describe('/api/auth/mobile/sync/v1/body-metrics', () => {
 
     const response = await handlers.POST(
       request('POST', 'access-a', {
-        records: [
-          { ...morningInput, user_id: 'client-claimed-other-user' },
-          evening,
-        ],
+        records: [{ ...morningInput, user_id: 'client-claimed-other-user' }, evening],
       }),
     );
 
@@ -146,6 +137,24 @@ describe('/api/auth/mobile/sync/v1/body-metrics', () => {
     expect(sync.pushed[0]?.records.map((record) => record.id)).toEqual([morningId, eveningId]);
     expect(sync.pushed[0]?.records[0]).not.toHaveProperty('user_id');
     expect(sync.pushed[0]?.records[0]?.bone_mass).toBe(3.11);
+  });
+
+  it('accepts DEXA and InBody PDF data sources', async () => {
+    const { handlers, sync } = makeHarness();
+    const response = await handlers.POST(
+      request('POST', 'access-a', {
+        records: [
+          { ...morningInput, data_source: 'dexa_pdf' },
+          { ...morningInput, id: eveningId, data_source: 'inbody_pdf' },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(sync.pushed[0]?.records.map((record) => record.data_source)).toEqual([
+      'dexa_pdf',
+      'inbody_pdf',
+    ]);
   });
 
   it('fails closed when a native field would be silently dropped', async () => {

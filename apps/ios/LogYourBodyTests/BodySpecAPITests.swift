@@ -17,6 +17,7 @@ private final class BodySpecStubURLProtocol: URLProtocol {
 
     static var stub: Stub = .http(statusCode: 200, body: Data())
     static var recordedRequests: [URLRequest] = []
+    static var recordedRequestBody: Data?
 
     // swiftlint:disable:next static_over_final_class
     override class func canInit(with request: URLRequest) -> Bool {
@@ -34,6 +35,7 @@ private final class BodySpecStubURLProtocol: URLProtocol {
         }
 
         Self.recordedRequests.append(request)
+        Self.recordedRequestBody = request.httpBody ?? request.httpBodyStream.flatMap(Self.readBody)
 
         switch Self.stub {
         case .http(let statusCode, let body):
@@ -65,6 +67,21 @@ private final class BodySpecStubURLProtocol: URLProtocol {
     static func reset() {
         stub = .http(statusCode: 200, body: Data())
         recordedRequests = []
+        recordedRequestBody = nil
+    }
+
+    private static func readBody(_ stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+
+        var body = Data()
+        var buffer = [UInt8](repeating: 0, count: 8_192)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else { break }
+            body.append(buffer, count: count)
+        }
+        return body
     }
 }
 
@@ -371,6 +388,49 @@ final class BodySpecAPITests: XCTestCase {
             return
         }
         XCTAssertEqual(urlError.code, .notConnectedToInternet)
+    }
+
+    func testDexaPDFImportPostsAuthenticatedMultipartAndDecodesFixture() async throws {
+        stubJSON("""
+        {
+          "success": true,
+          "data": {
+            "scans": [{
+              "date": "2026-09-20",
+              "weight": 82.4,
+              "weight_unit": "kg",
+              "body_fat_percentage": 21.2,
+              "muscle_mass": 61.8,
+              "source": "InBody 770"
+            }]
+          }
+        }
+        """)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BodySpecStubURLProtocol.self]
+        let coordinator = DexaPDFImportCoordinator(
+            session: URLSession(configuration: configuration)
+        )
+
+        let scans = try await coordinator.parse(
+            fileData: Data("%PDF fixture".utf8),
+            fileName: "scan.pdf",
+            accessToken: accessToken
+        )
+
+        let request = try recordedRequest()
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/parse-pdf")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(accessToken)")
+        XCTAssertTrue(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
+        let multipartBody = try XCTUnwrap(
+            String(data: try XCTUnwrap(BodySpecStubURLProtocol.recordedRequestBody), encoding: .utf8)
+        )
+        XCTAssertTrue(multipartBody.contains("name=\"file\""))
+        XCTAssertEqual(scans.count, 1)
+        XCTAssertEqual(scans[0].date, "2026-09-20")
+        XCTAssertEqual(scans[0].source, "InBody 770")
+        XCTAssertEqual(scans[0].bodyFatPercentage, 21.2)
     }
 
     // MARK: - Helpers

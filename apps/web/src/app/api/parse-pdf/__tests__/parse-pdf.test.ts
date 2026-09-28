@@ -29,6 +29,11 @@ jest.mock('next/server', () => ({
       url,
       method: init?.method || 'GET',
       body: init?.body,
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === 'authorization' ? 'Bearer test-token' : null,
+      },
+      cookies: { get: () => undefined },
       formData: async () => init?.body,
     };
   }),
@@ -38,6 +43,10 @@ jest.mock('next/server', () => ({
       status: init?.status ?? 200,
     }),
   },
+}));
+
+jest.mock('@/lib/auth/jovie-oauth', () => ({
+  fetchUserInfo: jest.fn(async () => ({ sub: 'fixture-user' })),
 }));
 
 // Mock OpenAI
@@ -127,6 +136,7 @@ describe('PDF Parsing API', () => {
 
       const { NextRequest } = require('next/server');
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -178,6 +188,7 @@ describe('PDF Parsing API', () => {
 
       const { NextRequest } = require('next/server');
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -219,6 +230,7 @@ describe('PDF Parsing API', () => {
 
       const { NextRequest } = require('next/server');
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -252,6 +264,7 @@ describe('PDF Parsing API', () => {
 
       const { NextRequest } = require('next/server');
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -278,6 +291,7 @@ describe('PDF Parsing API', () => {
 
       const { NextRequest } = require('next/server');
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -301,6 +315,7 @@ describe('PDF Parsing API', () => {
 
       const { NextRequest } = require('next/server');
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -319,6 +334,7 @@ describe('PDF Parsing API', () => {
 
       const { NextRequest } = require('next/server');
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });
@@ -343,6 +359,7 @@ describe('PDF Parsing API', () => {
 
       const { NextRequest } = require('next/server');
       const request = new NextRequest('http://localhost:3000/api/parse-pdf', {
+        headers: { authorization: 'Bearer test-token' },
         method: 'POST',
         body: formData,
       });

@@ -292,6 +292,11 @@ func saveDexaResults(
                 cached.analyzeTime = result.analyzeTime
                 cached.vatMassKg = result.vatMassKg ?? 0
                 cached.vatVolumeCm3 = result.vatVolumeCm3 ?? 0
+                cached.scanWeight = result.scanWeight ?? 0
+                cached.scanWeightUnit = result.scanWeightUnit
+                cached.bodyFatPercentage = result.bodyFatPercentage ?? 0
+                cached.muscleMass = result.muscleMass ?? 0
+                cached.boneMass = result.boneMass ?? 0
                 cached.resultPdfUrl = result.resultPdfUrl
                 cached.resultPdfName = result.resultPdfName
                 cached.updatedAt = result.updatedAt

@@ -82,6 +82,7 @@ struct ContentView: View {
     @State private var showWhatsNew = false
     @State private var releaseReviewItems: [ReleaseReviewItem] = []
     @State private var releaseReviewDestination: ReleaseReviewDestination?
+    @State private var pendingDexaPDF: DexaPDFFileSelection?
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     private let releaseReviewStateStore = ReleaseReviewStateStore()
 
@@ -182,6 +183,14 @@ struct ContentView: View {
                 onSeen: markReleaseReviewSeen,
                 onReview: reviewReleaseItem
             )
+        }
+        .sheet(item: unlockedDexaPDFSelection) { selection in
+            DexaPDFImportSheet(fileURL: selection.url)
+                .environmentObject(authManager)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dexaPDFReceived)) { notification in
+            guard let url = notification.object as? URL else { return }
+            pendingDexaPDF = DexaPDFFileSelection(url: url)
         }
         .onAppear {
             // Initialize onboarding status
@@ -328,6 +337,13 @@ struct ContentView: View {
                     .transition(AnyTransition.opacity)
             }
         }
+    }
+
+    private var unlockedDexaPDFSelection: Binding<DexaPDFFileSelection?> {
+        Binding(
+            get: { biometricLockEnabled && !isUnlocked ? nil : pendingDexaPDF },
+            set: { if $0 == nil { pendingDexaPDF = nil } }
+        )
     }
 
     private var loadingOverlay: some View {
