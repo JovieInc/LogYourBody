@@ -1,6 +1,15 @@
 import SwiftUI
 
 extension AddEntrySheet {
+func stepWeight(by direction: Int) {
+        let current = Double(weight) ?? HomeV2WeightStepPolicy.defaultValue(unit: resolvedWeightUnit)
+        weight = HomeV2WeightStepPolicy.text(
+            HomeV2WeightStepPolicy.stepped(current, by: direction, unit: resolvedWeightUnit)
+        )
+        validateWeight(weight)
+        HapticManager.shared.selection()
+}
+
 // MARK: - Photo Entry View
     var photoEntryView: some View {
         VStack(spacing: 16) {
@@ -158,7 +167,7 @@ func saveWeight(userId: String) {
                 defer { isSavingEntry = false }
 
                 do {
-                    _ = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                    let savedMetric = try await PhotoMetadataService.shared.createOrUpdateMetrics(
                         for: selectedDate,
                         weight: weightInKg,
                         userId: userId
@@ -175,6 +184,7 @@ func saveWeight(userId: String) {
                         ]
                     )
                     HapticManager.shared.successAction()
+                    onWeightSaved?(savedMetric)
 
                     dismiss()
                 } catch {

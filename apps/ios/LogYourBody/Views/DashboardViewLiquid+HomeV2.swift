@@ -99,41 +99,43 @@ extension DashboardViewLiquid {
 
     func presentHomeV2LogSheet(for date: Date = Date()) {
         homeV2LogSheetDate = date
-        HapticManager.shared.selection()
-        isHomeV2LogSheetPresented = true
-    }
-
-    /// Presented from `photoTimelineRoot` like the viewer, so the sheet's
-    /// presentation context is the HUD's own.
-    var homeV2LogWeightSheet: some View {
-        let system = currentMeasurementSystem
-        let unit = homeV2DisplayUnit
-        let date = homeV2LogSheetDate
-        let isToday = Calendar.current.isDateInToday(date)
         let existing = homeV2Metric(on: date)
         let latestKilograms = existing?.weight
             ?? bodyMetrics.filter { $0.weight != nil && $0.date <= date }.max { $0.date < $1.date }?.weight
-        let initial = latestKilograms.map { convertWeight($0, to: system) ?? $0 }
-            ?? HomeV2WeightStepPolicy.defaultValue(unit: unit)
-
-        return HomeV2LogWeightSheet(
-            unit: unit,
-            initialValue: initial,
-            initialBodyFat: existing?.bodyFatPercentage,
-            dateText: isToday ? HomeV2Copy.todayDateText(Date()) : HomeV2ContextCopy.entryDateText(date),
-            onSave: { value, bodyFat in
-                await saveHomeV2Weight(value: value, bodyFat: bodyFat, on: date)
-            },
-            onAddPhoto: { _ in
-                // ponytail: the pose-guided camera (Pencil L2) lands in the photo slice; until then the
-                // existing attach sheet takes the photo for today.
-                isHomeV2LogSheetPresented = false
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(450))
-                    presentProgressPhotoAttach(for: homeV2Metric(on: date))
-                }
-            }
+        let initial = latestKilograms.map { convertWeight($0, to: currentMeasurementSystem) ?? $0 }
+            ?? HomeV2WeightStepPolicy.defaultValue(unit: homeV2DisplayUnit)
+        homeV2LogHadExistingEntry = existing != nil
+        homeV2LogPreviousWeightKilograms = existing?.weight
+        homeV2LogPreviousBodyFat = existing?.bodyFatPercentage
+        HapticManager.shared.selection()
+        presentAddEntrySheet(
+            date: date,
+            weight: HomeV2WeightStepPolicy.text(initial),
+            bodyFat: existing?.bodyFatPercentage,
+            isHomeV2LoggingWeight: true
         )
+    }
+
+    @MainActor
+    func handleHomeV2WeightEntrySaved(_ saved: BodyMetrics) {
+        guard isHomeV2LoggingWeight else { return }
+        if Calendar.current.isDateInToday(homeV2LogSheetDate), let userId = authManager.currentUser?.id {
+            let value = saved.weight.map { convertWeight($0, to: currentMeasurementSystem) ?? $0 } ?? 0
+            homeV2Logged = HomeV2LoggedEntry(
+                metricId: saved.id,
+                date: saved.date,
+                existedBefore: homeV2LogHadExistingEntry,
+                previousWeightKilograms: homeV2LogPreviousWeightKilograms,
+                previousBodyFat: homeV2LogPreviousBodyFat,
+                valueText: HomeV2WeightStepPolicy.text(value),
+                unit: homeV2DisplayUnit
+            )
+            BodyScoreCache.shared.invalidate(for: userId)
+        }
+
+        Task { @MainActor in
+            await refreshHomeV2AfterWrite(selecting: saved.id)
+        }
     }
 
     /// Saves a weight (and optional body fat) for a day. Today gets the C2

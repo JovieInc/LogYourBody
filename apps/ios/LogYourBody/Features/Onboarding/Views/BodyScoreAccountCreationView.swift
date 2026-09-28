@@ -4,7 +4,6 @@ struct BodyScoreAccountCreationView: View {
     @Environment(\.theme)
     private var theme
 
-    @EnvironmentObject var authManager: AuthManager
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @AccessibilityFocusState private var accountCreationErrorFocused: Bool
 
@@ -41,32 +40,34 @@ struct BodyScoreAccountCreationView: View {
                 }
             },
             footer: {
-                Button(action: submit) {
-                    HStack(spacing: 8) {
-                        if viewModel.isCreatingAccount {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.background))
-                        } else {
-                            Image(systemName: "apple.logo")
+                AppleSignInActionButton(
+                    isLoading: $viewModel.isCreatingAccount,
+                    identifier: "onboarding_verify_account_apple",
+                    isEnabled: viewModel.canContinueAccountCreation,
+                    onAttempt: viewModel.beginAccountCreation,
+                    onSignedIn: { viewModel.completeAccountCreation(didSignIn: true) },
+                    onAlreadySignedIn: { viewModel.completeAccountCreation(didSignIn: false) },
+                    onCancelled: viewModel.cancelAccountCreation,
+                    onFailure: viewModel.failAccountCreation,
+                    label: { isCreatingAccount in
+                        HStack(spacing: 8) {
+                            if isCreatingAccount {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.background))
+                            } else {
+                                Image(systemName: "apple.logo")
+                            }
+                            Text(isCreatingAccount ? "Opening Apple…" : "Continue with Apple")
                         }
-                        Text(viewModel.isCreatingAccount ? "Opening Apple…" : "Continue with Apple")
                     }
-                }
+                )
                 .buttonStyle(OnboardingPrimaryButtonStyle())
-                .disabled(!viewModel.canContinueAccountCreation || viewModel.isCreatingAccount)
                 .jovieTouchTarget()
                 .accessibilityValue(viewModel.isCreatingAccount ? "Creating account" : "")
             }
         )
         .onChange(of: viewModel.accountCreationError) { _, error in
             accountCreationErrorFocused = error != nil
-        }
-    }
-
-    private func submit() {
-        guard !viewModel.isCreatingAccount else { return }
-        Task {
-            await viewModel.createAccount(authManager: authManager)
         }
     }
 }
