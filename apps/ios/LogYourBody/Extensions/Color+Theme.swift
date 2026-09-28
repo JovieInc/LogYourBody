@@ -63,8 +63,10 @@ public extension Color {
     static let metricAccentSteps = Color(hex: "#FF9F0A")
     static let metricAccentWeight = Color(hex: "#AF52DE")
     static let metricAccentBodyFat = Color(hex: "#FF2D55")
-    static let metricAccentFFMI = Color.purple
-    static let metricAccentWaist = Color.blue
+    // Explicit values keep chart/icon accents above the non-text contrast
+    // floor on the canonical metric card surface in light and dark contexts.
+    static let metricAccentFFMI = Color(hex: "#54D9CE")
+    static let metricAccentWaist = Color(hex: "#6EA8FF")
 
     // MARK: - State Colors
     static let linearDisabled = Color(hex: "#3A3A3A")
