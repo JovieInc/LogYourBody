@@ -266,6 +266,10 @@ run_ui_test_group \
   "testLaunchQualityGateCapturesOnboardingFirstPhotoCTA" \
   "testLaunchQualityGateCapturesTimelineSurfaces"
 
+run_ui_test_group \
+  "launch-quality-ui-logout-hierarchy" \
+  "testProfileLogoutSignsOutFromPushedDetail"
+
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
     bash "$ROOT_DIR/scripts/ios/xcresult-runtime-audit.sh" \
