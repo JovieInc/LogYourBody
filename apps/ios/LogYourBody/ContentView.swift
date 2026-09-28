@@ -296,15 +296,9 @@ struct ContentView: View {
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
             } else if !subscriptionManager.isSubscribed {
-                if HomeV2Policy.isOnboardingV2Enabled() {
-                    HomeV2PaywallView()
-                        .environmentObject(authManager)
-                        .environmentObject(subscriptionManager)
-                } else {
-                    PaywallView()
-                        .environmentObject(authManager)
-                        .environmentObject(subscriptionManager)
-                }
+                PaywallView()
+                    .environmentObject(authManager)
+                    .environmentObject(subscriptionManager)
             } else if shouldShowDailyReminderPrompt {
                 DailyWeighInReminderPromptView(notificationManager: notificationManager)
             } else {
