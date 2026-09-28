@@ -96,7 +96,10 @@ final class ChaosMonkeyUITests: XCTestCase {
         "integrations_health_sync_all_button",
         "continueWithAppleButton",
         "body_spec_pdf_import",
-        "bulk_photo_import_start_scanning"
+        "bulk_photo_import_start_scanning",
+        "body_score_hero_share_button",
+        "launch_timeline_add_photo",
+        "home_v2_connect_health"
     ]
 
     private static let denylistedLabelFragments: [String] = [
@@ -110,7 +113,8 @@ final class ChaosMonkeyUITests: XCTestCase {
         "manage subscription",
         "connect apple health",
         "camera",
-        "continue with apple"
+        "continue with apple",
+        "open settings"
     ]
 
     override func setUpWithError() throws {
@@ -147,7 +151,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
         defer { removeUIInterruptionMonitor(monitor) }
 
-        app.launchArguments = [fixture, "-lybUITestSuppressWhatsNew"]
+        app.launchArguments = [fixture, "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
         app.launch()
         app.tap()
 

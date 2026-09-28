@@ -442,7 +442,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         if app.state != .notRunning {
             app.terminate()
         }
-        app.launchArguments = arguments + ["-lybUITestSuppressWhatsNew"]
+        app.launchArguments = arguments + ["-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
         app.launch()
         // XCTest only checks for an interruption (e.g. a fresh-install system
         // permission prompt) on a synthesized event, not a plain existence
