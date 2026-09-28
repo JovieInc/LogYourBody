@@ -47,7 +47,7 @@ extension PreferencesView {
         SettingsNavigationLink(
             icon: "square.stack.3d.up.fill",
             title: "Integrations",
-            subtitle: "Apple Health and body-composition imports",
+            subtitle: "Apple Health, imports, and export",
             accessibilityIdentifier: "settings_integrations_link",
             titleAccessibilityIdentifier: "home_v2_settings_health"
         ) {

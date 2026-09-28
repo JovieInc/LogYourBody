@@ -5,6 +5,20 @@
 import SwiftUI
 
 extension PreferencesView {
+    var privacyExportSection: some View {
+        SettingsSection(header: "Your data") {
+            SettingsNavigationLink(
+                icon: "square.and.arrow.down",
+                title: "Export data",
+                subtitle: "Download a copy of your account data.",
+                accessibilityIdentifier: "home_v2_settings_export"
+            ) {
+                ExportDataView()
+                    .environmentObject(authManager)
+            }
+        }
+    }
+
     var photosSection: some View {
         SettingsSection(header: "Photos") {
             SettingsToggleRow(
