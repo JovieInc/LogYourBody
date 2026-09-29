@@ -90,6 +90,10 @@ struct ContentView: View {
         ProcessInfo.processInfo.arguments.contains("-lybUITestSuppressWhatsNew")
     }
 
+    private var disableBiometricLockForUITests: Bool {
+        ProcessInfo.processInfo.arguments.contains("-lybUITestDisableBiometricLock")
+    }
+
     init() {
         // We need to initialize LoadingManager with a temporary AuthManager
         // The actual authManager will be injected from environment
@@ -332,7 +336,8 @@ struct ContentView: View {
 
     private var biometricLockOverlay: some View {
         Group {
-            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked {
+            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked
+                && !disableBiometricLockForUITests {
                 BiometricLockView(isUnlocked: $isUnlocked)
                     .transition(AnyTransition.opacity)
             }
@@ -341,7 +346,11 @@ struct ContentView: View {
 
     private var unlockedDexaPDFSelection: Binding<DexaPDFFileSelection?> {
         Binding(
-            get: { biometricLockEnabled && !isUnlocked ? nil : pendingDexaPDF },
+            get: {
+                biometricLockEnabled && !isUnlocked && !disableBiometricLockForUITests
+                    ? nil
+                    : pendingDexaPDF
+            },
             set: { if $0 == nil { pendingDexaPDF = nil } }
         )
     }
