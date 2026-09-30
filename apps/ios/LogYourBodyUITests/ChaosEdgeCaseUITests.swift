@@ -528,25 +528,23 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         assertNoLayoutAnomalies(in: app, context: "settings root")
 
         let profileLink = app.buttons["settings_profile_link"]
-        XCTAssertTrue(profileLink.waitForExistence(timeout: 8))
         let window = app.windows.firstMatch.frame
         let navigationBottom = app.navigationBars.firstMatch.frame.maxY
         let visibleViewport = CGRect(x: window.minX, y: navigationBottom, width: window.width,
                                      height: window.maxY - navigationBottom)
         let settingsList = app.collectionViews["home_v2_settings"]
         XCTAssertTrue(settingsList.exists)
+        attachDiagnosticTree(from: app, named: "xxxl-profile-before-bounded-scroll")
         for _ in 0..<6 {
-            guard profileLink.exists else {
-                attachDiagnosticTree(from: app, named: "xxxl-profile-row-not-materialized")
-                XCTFail("Bounded settings scroll must preserve the native profile row.")
-                return
-            }
-            if visibleViewport.contains(profileLink.frame) && profileLink.isHittable { break }
+            // A native lazy list does not materialize the Profile row while the
+            // XXXL account header fills the viewport. Scroll before requiring it.
+            if profileLink.exists && visibleViewport.contains(profileLink.frame) && profileLink.isHittable { break }
             let start = settingsList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
             let end = settingsList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
             start.press(forDuration: 0.05, thenDragTo: end)
         }
         attachDiagnosticTree(from: app, named: "xxxl-profile-row-before-tap")
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 8), "Bounded native scrolling must materialize the Profile row.")
         XCTAssertTrue(visibleViewport.contains(profileLink.frame), "Scroll the whole profile row into view before tapping.")
         XCTAssertTrue(profileLink.isHittable)
         profileLink.tap()
