@@ -539,9 +539,12 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             // A native lazy list does not materialize the Profile row while the
             // XXXL account header fills the viewport. Scroll before requiring it.
             if profileLink.exists && visibleViewport.contains(profileLink.frame) && profileLink.isHittable { break }
-            let start = settingsList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
-            let end = settingsList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
-            start.press(forDuration: 0.05, thenDragTo: end)
+            let moveDown = profileLink.exists && profileLink.frame.minY < visibleViewport.minY
+            let start = settingsList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: moveDown ? 0.4 : 0.65))
+            let end = settingsList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: moveDown ? 0.65 : 0.4))
+            // Finish the bounded pan at rest so list inertia cannot skip a
+            // virtualized row between existence checks.
+            start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.1)
         }
         attachDiagnosticTree(from: app, named: "xxxl-profile-row-before-tap")
         XCTAssertTrue(profileLink.waitForExistence(timeout: 8), "Bounded native scrolling must materialize the Profile row.")
