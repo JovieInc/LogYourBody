@@ -91,7 +91,11 @@ struct ContentView: View {
     }
 
     private var disableBiometricLockForUITests: Bool {
-        ProcessInfo.processInfo.arguments.contains("-lybUITestDisableBiometricLock")
+        BiometricLockPolicy.shouldDisableForUITests(
+            arguments: ProcessInfo.processInfo.arguments,
+            environment: ProcessInfo.processInfo.environment,
+            userId: authManager.currentUser?.id
+        )
     }
 
     init() {

@@ -96,6 +96,46 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://github.com/ChatPRD/lennys-podcast-transcripts',
+      reason: 'Podcast transcript citation in docs/research; not a dependency.',
+    },
+    {
+      value: 'https://threadreaderapp.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://www.lennysnewsletter.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://techcrunch.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://m.ebrun.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://app.dealroom.co',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://x.com',
+      reason: 'Public post citations in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://www.skillsdirectory.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://techiegamers.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://docs.developer.apple.com',
+      reason: 'Apple developer documentation links in docs/research.',
+    },
+    {
       value: 'https://edpb.europa.eu',
       reason: 'Legal-doc link (EDPB) referenced by privacy copy.',
     },
