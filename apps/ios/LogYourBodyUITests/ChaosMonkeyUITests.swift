@@ -143,12 +143,41 @@ struct ChaosRNG: RandomNumberGenerator {
     }
 }
 
-private enum ChaosAction: CaseIterable {
+private enum ChaosAction: CaseIterable, Equatable {
     case tap
     case swipe
     case type
     case dismiss
     case background
+}
+
+private enum ChaosStepOutcome: Equatable {
+    case executed(ChaosAction)
+    case skipped(String)
+}
+
+private struct ChaosStepAccounting {
+    let requested: Int
+    var maximumAttempts: Int { requested * 4 }
+    var shouldAttempt: Bool { completed < requested && attempted < maximumAttempts }
+
+    private(set) var attempted = 0
+    private(set) var completed = 0
+    private(set) var skipped = 0
+    private(set) var failed = 0
+
+    mutating func record(_ outcome: ChaosStepOutcome) {
+        attempted += 1
+        switch outcome {
+        case .executed: completed += 1
+        case .skipped: skipped += 1
+        }
+    }
+
+    mutating func recordFailure() {
+        attempted += 1
+        failed += 1
+    }
 }
 
 private enum ChaosStepError: Error, CustomStringConvertible {
@@ -245,6 +274,71 @@ private struct LaunchConfig {
 }
 
 final class ChaosMonkeyUITests: XCTestCase {
+    func testMissingActionTargetsDoNotCompleteMonkeySteps() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        XCTAssertTrue(app.buttons["Open Menu"].waitForExistence(timeout: 30))
+        XCTAssertEqual(dismissKeyboardForStep(app: app), .skipped("keyboard was not present"))
+        var rng = ChaosRNG(seed: 42)
+        var accounting = ChaosStepAccounting(requested: 1)
+        accounting.record(performTap(app: app, candidates: [], rng: &rng))
+        accounting.record(performSwipe(app: app, rng: &rng, targets: []))
+        accounting.record(performType(app: app, rng: &rng, fields: []))
+        accounting.record(performDismiss(app: app, buttons: []))
+        XCTAssertEqual(accounting.attempted, 4)
+        XCTAssertEqual(accounting.completed, 0, "Returning without an action must never count toward the requested budget.")
+        XCTAssertEqual(accounting.skipped, 4)
+        XCTAssertEqual(accounting.failed, 0)
+        XCTAssertFalse(
+            accounting.shouldAttempt,
+            "The bounded attempt budget must fail incomplete instead of converting no-ops into successes."
+        )
+    }
+
+    func testExecutedNativeActionsCompleteOnlyTheirOwnBudget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestChatFirstFixture", "-lybUITestChatOfflineFixture",
+            "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 12))
+        var rng = ChaosRNG(seed: 42)
+        var accounting = ChaosStepAccounting(requested: 4)
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.exists)
+        accounting.record(performTap(app: app, candidates: [menu], rng: &rng))
+        let closeMenu = app.buttons["Close Menu"]
+        XCTAssertTrue(closeMenu.waitForExistence(timeout: 5))
+        accounting.record(performDismiss(app: app, buttons: [closeMenu]))
+        XCTAssertTrue(closeMenu.waitForNonExistence(timeout: 5))
+        accounting.record(performSwipe(app: app, rng: &rng, targets: [app.windows.firstMatch]))
+        accounting.record(performType(app: app, rng: &rng, fields: [composer]))
+        XCTAssertEqual(accounting.attempted, 4)
+        XCTAssertEqual(accounting.completed, 4)
+        XCTAssertEqual(accounting.skipped, 0)
+        XCTAssertFalse(accounting.shouldAttempt)
+        XCTAssertFalse(app.keyboards.element.exists)
+        XCTAssertNotEqual(composer.value as? String, "", "Actual typing must leave a local draft without sending it.")
+    }
+
+    func testFailedActionsExhaustAttemptsWithoutCompletion() {
+        var accounting = ChaosStepAccounting(requested: 1)
+        while accounting.shouldAttempt { accounting.recordFailure() }
+        XCTAssertEqual(accounting.attempted, 4)
+        XCTAssertEqual(accounting.failed, 4)
+        XCTAssertEqual(accounting.completed, 0)
+        XCTAssertEqual(accounting.skipped, 0)
+    }
+
     func testProfilePhotoImportIsExcludedFromMonkeyCandidates() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -293,7 +387,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         let draft = "local chaos draft"
         composer.typeText(draft)
         XCTAssertTrue(app.keyboards.element.exists)
-        dismissKeyboardForStep(app: app)
+        XCTAssertEqual(dismissKeyboardForStep(app: app), .executed(.dismiss))
         let tree = XCTAttachment(string: app.debugDescription)
         tree.name = "Keyboard dismissal draft preservation"
         tree.lifetime = .keepAlways
@@ -524,13 +618,17 @@ final class ChaosMonkeyUITests: XCTestCase {
         app.tap()
         popToRootIfNeeded(in: app)
 
-        var attemptedSteps = 0
-        var completedSteps = 0
-        for step in 0..<steps {
+        guard steps > 0, steps <= Int.max / 4 else {
+            XCTFail("Requested action count must be positive and have a bounded attempt budget.")
+            return
+        }
+        var accounting = ChaosStepAccounting(requested: steps)
+        var actionTrace: [String] = []
+        while accounting.shouldAttempt {
+            let step = accounting.attempted
             guard !unexpectedSystemAlert else { break }
-            attemptedSteps += 1
             do {
-                try runStep(
+                let outcome = try runStep(
                     step: step,
                     seed: seed,
                     app: app,
@@ -538,8 +636,10 @@ final class ChaosMonkeyUITests: XCTestCase {
                     rng: &rng,
                     telemetry: &telemetry
                 )
-                completedSteps += 1
+                accounting.record(outcome)
+                actionTrace.append("attempt \(step): \(outcome)")
             } catch {
+                accounting.recordFailure()
                 let message = "step \(step): \(error)"
                 anomalies.append(message)
                 attachDiagnostics(app: app, name: "chaos-\(seed)-step-\(step)-anomaly")
@@ -560,13 +660,15 @@ final class ChaosMonkeyUITests: XCTestCase {
 
         var summaryLines = [
             "seed=\(seed) steps=\(steps) fixture=\(fixture) extraArgs=\(extraArgs.joined(separator: " "))",
-            "attemptedSteps=\(attemptedSteps) completedSteps=\(completedSteps)",
+            "attemptedSteps=\(accounting.attempted) completedSteps=\(accounting.completed) " +
+                "skippedSteps=\(accounting.skipped) failedSteps=\(accounting.failed) maxAttempts=\(accounting.maximumAttempts)",
             "systemAlertsDismissed=\(interruptionsDismissed)",
             "slowQueries(10-30s)=\(telemetry.slowQueryCount)",
             "layoutAnomalies=\(telemetry.layoutAnomalyMessages.count)",
             "expectedScrollClipping=\(telemetry.expectedScrollClipping.count)",
             "anomalies=\(anomalies.count)"
         ]
+        summaryLines.append(contentsOf: actionTrace)
         summaryLines.append(contentsOf: anomalies)
         summaryLines.append(contentsOf: telemetry.expectedScrollClipping)
         let summary = XCTAttachment(string: summaryLines.joined(separator: "\n"))
@@ -574,7 +676,10 @@ final class ChaosMonkeyUITests: XCTestCase {
         summary.lifetime = .keepAlways
         add(summary)
 
-        XCTAssertEqual(completedSteps, steps, "Every requested monkey step must complete; see retained telemetry.")
+        XCTAssertEqual(
+            accounting.completed, steps,
+            "Requested executed actions were not reached within the bounded attempt budget; see retained telemetry."
+        )
         XCTAssertTrue(anomalies.isEmpty, "Untriaged anomalies under fixture \(fixture): \(anomalies.count); see attachments.")
     }
 
@@ -587,7 +692,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         config: LaunchConfig,
         rng: inout ChaosRNG,
         telemetry: inout StepTelemetry
-    ) throws {
+    ) throws -> ChaosStepOutcome {
         guard app.state == .runningForeground else {
             throw ChaosStepError.appNotForeground(String(describing: app.state))
         }
@@ -614,8 +719,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         // (docs/engineering/chaos-testing.md has the incident). Skip the
         // general query entirely and dismiss the keyboard directly instead.
         if app.keyboards.element.exists {
-            dismissKeyboardForStep(app: app)
-            return
+            return dismissKeyboardForStep(app: app)
         }
 
         let queryStart = Date()
@@ -657,15 +761,15 @@ final class ChaosMonkeyUITests: XCTestCase {
         let candidates = snapshot.interactive
         switch pickAction(using: &rng) {
         case .tap:
-            performTap(app: app, candidates: candidates, rng: &rng)
+            return performTap(app: app, candidates: candidates, rng: &rng)
         case .swipe:
-            performSwipe(app: app, rng: &rng)
+            return performSwipe(app: app, rng: &rng)
         case .type:
-            performType(app: app, rng: &rng)
+            return performType(app: app, rng: &rng)
         case .dismiss:
-            performDismiss(app: app)
+            return performDismiss(app: app)
         case .background:
-            performBackground(app: app)
+            return try performBackground(app: app)
         }
     }
 
@@ -682,69 +786,60 @@ final class ChaosMonkeyUITests: XCTestCase {
 
     // MARK: - Actions
 
-    private func performTap(app: XCUIApplication, candidates: [XCUIElement], rng: inout ChaosRNG) {
-        guard let target = candidates.randomElement(using: &rng), target.exists, target.isHittable else {
-            return
+    private func performTap(app: XCUIApplication, candidates: [XCUIElement], rng: inout ChaosRNG) -> ChaosStepOutcome {
+        guard let target = candidates.randomElement(using: &rng), target.exists, target.isHittable, !isDenylisted(target) else {
+            return .skipped("no safe tappable target")
         }
         target.tap()
+        return .executed(.tap)
     }
 
-    private func performSwipe(app: XCUIApplication, rng: inout ChaosRNG) {
-        let scrollable = (
+    private func performSwipe(app: XCUIApplication, rng: inout ChaosRNG, targets: [XCUIElement]? = nil) -> ChaosStepOutcome {
+        let scrollable = targets ?? (
             app.scrollViews.allElementsBoundByIndex
                 + app.collectionViews.allElementsBoundByIndex
                 + app.tables.allElementsBoundByIndex
+                + [app.windows.firstMatch]
         ).filter(\.isHittable)
-        let target = scrollable.randomElement(using: &rng) ?? app.windows.firstMatch
-        guard target.exists else { return }
-
+        guard let target = scrollable.randomElement(using: &rng), target.exists, target.isHittable,
+              hasFiniteNonZeroFrame(target) else { return .skipped("no hittable swipe target") }
         switch Int.random(in: 0..<4, using: &rng) {
         case 0: target.swipeUp()
         case 1: target.swipeDown()
         case 2: target.swipeLeft()
         default: target.swipeRight()
         }
+        return .executed(.swipe)
     }
 
-    private func performType(app: XCUIApplication, rng: inout ChaosRNG) {
-        let fields = (app.textFields.allElementsBoundByIndex + app.searchFields.allElementsBoundByIndex)
+    private func performType(app: XCUIApplication, rng: inout ChaosRNG, fields: [XCUIElement]? = nil) -> ChaosStepOutcome {
+        let available = (fields ?? (app.textFields.allElementsBoundByIndex + app.searchFields.allElementsBoundByIndex))
             .filter { $0.isHittable && !isDenylisted($0) }
-        guard let field = fields.first else { return }
-
+        guard let field = available.first else { return .skipped("no safe text field") }
         field.tap()
-        // A tap does not always land focus in time on a real device; typing
-        // into an unfocused field raises a hard XCTest event synthesis error
-        // rather than a catchable Swift error. XCUIElement has no public
-        // focus query, so wait for the keyboard itself as a focus proxy, and
-        // skip typing this step (not the whole run) if it never appears.
-        guard app.keyboards.element.waitForExistence(timeout: 1.5) else { return }
-
+        guard app.keyboards.element.waitForExistence(timeout: 1.5) else {
+            return .skipped("text field did not gain keyboard focus")
+        }
         let edge = Self.edgeStrings.randomElement(using: &rng) ?? ""
-        if !edge.isEmpty {
-            // Cap what actually gets typed (edgeStrings includes a 300-char
-            // entry) so a field like chat_composer never accumulates enough
-            // text to make a later step's keyboard-present handling slower
-            // than it needs to be.
-            field.typeText(String(edge.prefix(24)))
+        guard !edge.isEmpty else { return .skipped("seeded text was empty") }
+        field.typeText(String(edge.prefix(24)))
+        guard dismissKeyboardForStep(app: app) == .executed(.dismiss) else {
+            return .skipped("typing finished but keyboard dismissal was not verified")
         }
-        dismissKeyboard(app: app)
+        return .executed(.type)
     }
 
-    private func performDismiss(app: XCUIApplication) {
-        for label in ["Back", "Close", "Cancel", "Done"] {
-            let button = app.buttons[label]
-            if button.exists, button.isHittable, !isDenylisted(button) {
-                button.tap()
-                return
-            }
+    private func performDismiss(app: XCUIApplication, buttons: [XCUIElement]? = nil) -> ChaosStepOutcome {
+        let candidates = buttons ?? ["Back", "Close", "Cancel", "Done"].map { app.buttons[$0] }
+            + [app.navigationBars.buttons.element(boundBy: 0)]
+        for button in candidates where button.exists && button.isHittable && !isDenylisted(button) {
+            button.tap()
+            return .executed(.dismiss)
         }
-        let navBack = app.navigationBars.buttons.element(boundBy: 0)
-        if navBack.exists, navBack.isHittable, !isDenylisted(navBack) {
-            navBack.tap()
-        }
+        return .skipped("no safe dismissal control")
     }
 
-    private func performBackground(app: XCUIApplication) {
+    private func performBackground(app: XCUIApplication) throws -> ChaosStepOutcome {
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval: 2)
         app.activate()
@@ -755,6 +850,10 @@ final class ChaosMonkeyUITests: XCTestCase {
         while app.state != .runningForeground, Date() < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
+        guard app.state == .runningForeground else {
+            throw ChaosStepError.appNotForeground(String(describing: app.state))
+        }
+        return .executed(.background)
     }
 
     /// Terminates and relaunches with the seeding fixture, mirroring the
@@ -816,50 +915,41 @@ final class ChaosMonkeyUITests: XCTestCase {
         _ = banner.waitForNonExistence(timeout: 2)
     }
 
-    private func dismissKeyboard(app: XCUIApplication) {
+    private func dismissKeyboard(app: XCUIApplication) -> Bool {
         let candidates = [
             app.keyboards.buttons["Done"],
             app.buttons["mvp_keyboard_done_button"],
             app.buttons["mvp_keyboard_bottom_done_button"],
             app.toolbars.buttons["Done"]
         ]
-        for candidate in candidates where candidate.exists {
+        for candidate in candidates where candidate.exists && candidate.isHittable && !isDenylisted(candidate) {
             candidate.tap()
-            return
+            if app.keyboards.element.waitForNonExistence(timeout: 2) { return true }
         }
-        // Fall back to a tap near the top of the screen, which dismisses the
-        // keyboard on most screens without hitting a destructive control.
-        app.windows.firstMatch.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.02)
-        ).tap()
+        return false
     }
 
-    /// Dismiss keyboard state without submitting a draft or triggering a send.
-    private func dismissKeyboardForStep(app: XCUIApplication) {
+    /// Count a dismissal only when a previously visible keyboard disappears.
+    private func dismissKeyboardForStep(app: XCUIApplication) -> ChaosStepOutcome {
+        guard app.keyboards.element.exists else { return .skipped("keyboard was not present") }
         let scroll = app.scrollViews.firstMatch
         if scroll.exists && hasFiniteNonZeroFrame(scroll) && scroll.isHittable {
-            // The existing chat/weight ScrollView uses interactive keyboard dismissal.
             scroll.swipeDown()
-            if app.keyboards.element.waitForNonExistence(timeout: 2) { return }
+            if app.keyboards.element.waitForNonExistence(timeout: 2) { return .executed(.dismiss) }
         }
         let closeChat = app.buttons["home_chat_collapse"]
         if closeChat.exists && closeChat.isHittable {
             closeChat.tap()
-            return
+            if app.keyboards.element.waitForNonExistence(timeout: 2) { return .executed(.dismiss) }
         }
-        // The compact Home composer has no message ScrollView or Close chat
-        // control. Present its existing navigation cover without submitting
-        // the local draft. Closing it immediately restores composer focus;
-        // leave the menu available for the next seeded navigation action.
+        // Leave the existing navigation cover open; closing it restores composer focus.
         let menu = app.buttons["photo_timeline_root_menu"]
         if menu.exists && menu.isHittable {
             menu.tap()
             attachDiagnostics(app: app, name: "keyboard-dismissal-navigation-cover")
-            XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 2),
-                          "Keyboard dismissal navigation cover must hide the keyboard.")
-            return
+            if app.keyboards.element.waitForNonExistence(timeout: 2) { return .executed(.dismiss) }
         }
-        dismissKeyboard(app: app)
+        return dismissKeyboard(app: app) ? .executed(.dismiss) : .skipped("keyboard remained visible")
     }
 
     // MARK: - Element discovery

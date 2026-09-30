@@ -56,13 +56,13 @@ def validate_cases(payload, expected):
 
 
 
-def validate_function_coverage(payload, requirements):
+def validate_function_coverage(payload, requirements, target_name="LogYourBody.app", source_root="LogYourBody"):
     """Require executed native app functions, not import-only or aggregate coverage."""
     results = []
     for filename, names in requirements.items():
-        files = [file for target in payload.get('targets', []) if target.get('name') == 'LogYourBody.app'
+        files = [file for target in payload.get('targets', []) if target.get('name') == target_name
                  for file in target.get('files', []) if file.get('name') == Path(filename).name
-                 and file.get('path', '').endswith('/apps/ios/LogYourBody/' + filename)]
+                 and file.get('path', '').endswith('/apps/ios/' + source_root + '/' + filename)]
         if len(files) != 1:
             raise ValueError(f'Missing or ambiguous native app coverage file: {filename}')
         for name in names:
@@ -122,6 +122,7 @@ def main():
     parser.add_argument('--critical-captures', action='store_true')
     parser.add_argument('--require-settings-row-coverage', action='store_true')
     parser.add_argument('--require-biometric-coverage', action='store_true')
+    parser.add_argument('--require-chaos-accounting-coverage', action='store_true')
     parser.add_argument('--started-at', type=float, required=True)
     args = parser.parse_args()
     output = args.bundle.with_suffix('.evidence.json')
@@ -185,10 +186,16 @@ def main():
         if args.require_biometric_coverage:
             requirements['Views/BiometricLockView.swift'] = [
                 'static BiometricLockPolicy.shouldDisableForUITests(arguments:environment:userId:)']
-        if requirements:
+        if requirements or args.require_chaos_accounting_coverage:
             coverage = json.loads(subprocess.check_output(
                 ['xcrun', 'xccov', 'view', '--report', '--json', str(args.bundle)], text=True))
             receipt['requiredFunctionCoverage'] = validate_function_coverage(coverage, requirements)
+            if args.require_chaos_accounting_coverage:
+                receipt['requiredFunctionCoverage'] += validate_function_coverage(coverage, {
+                    'ChaosMonkeyUITests.swift': [
+                        'ChaosStepAccounting.maximumAttempts.getter', 'ChaosStepAccounting.shouldAttempt.getter',
+                        'ChaosStepAccounting.record(_:)', 'ChaosStepAccounting.recordFailure()'
+                    ]}, target_name='LogYourBodyUITests.xctest', source_root='LogYourBodyUITests')
             coverage_path = args.bundle.with_suffix('.coverage.json')
             coverage_path.write_text(json.dumps(coverage, indent=2) + '\n')
             receipt['coverageSha256'] = digest(coverage_path)

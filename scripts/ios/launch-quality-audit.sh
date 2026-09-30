@@ -283,6 +283,9 @@ CHAOS_REGRESSIONS=(
   "ChaosMonkeyUITests/testSystemAlertsRequireKnownDenyOnlyAction"
   "ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending"
   "ChaosMonkeyUITests/testProfilePhotoImportIsExcludedFromMonkeyCandidates"
+  "ChaosMonkeyUITests/testMissingActionTargetsDoNotCompleteMonkeySteps"
+  "ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget"
+  "ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion"
 )
 CHAOS_SELECTORS=()
 CHAOS_EVIDENCE_ARGS=()
@@ -297,7 +300,7 @@ run_xcodebuild_test \
   "$CHAOS_RESULT_BUNDLE" \
   "$ARTIFACT_DIR/launch-quality-ui-chaos-regressions.log" \
   "${CHAOS_SELECTORS[@]}"
-assert_xcresult_evidence "$CHAOS_RESULT_BUNDLE" "${CHAOS_EVIDENCE_ARGS[@]}" --require-settings-row-coverage
+assert_xcresult_evidence "$CHAOS_RESULT_BUNDLE" "${CHAOS_EVIDENCE_ARGS[@]}" --require-settings-row-coverage --require-chaos-accounting-coverage
 
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
@@ -320,8 +323,8 @@ fi
   printf -- '- Required passing test IDs and seven screenshot hashes: `launch-quality-ui-critical-surfaces.evidence.json`. First failed attempt bundles are retained.\n'
   printf -- '- Source: `source-revision.txt` plus `source-working-tree.patch`; this is not exact deployed-build certification.\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
-  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, four independent screenshot selectors, logout hierarchy, and eight bounded chaos regressions with simulator parallelism disabled\n'
-  printf -- '- Required native function coverage: biometric policy in unit execution and SettingsRow body, leading content, and value inset in the chaos UI regressions\n'
+  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, four independent screenshot selectors, logout hierarchy, and eleven bounded chaos regressions with simulator parallelism disabled\n'
+  printf -- '- Required native function coverage: biometric policy in unit execution and SettingsRow body, leading content, and value inset and action accounting in the chaos UI regressions\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"

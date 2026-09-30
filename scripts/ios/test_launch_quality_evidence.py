@@ -83,6 +83,34 @@ class EvidenceTests(unittest.TestCase):
             with self.subTest(item=item), self.assertRaises(ValueError):
                 evidence.validate_function_coverage(item, required)
 
+    def test_chaos_accounting_coverage_rejects_wrong_target_source_and_partial_execution(self):
+        required = {'ChaosMonkeyUITests.swift': ['ChaosStepAccounting.record(_:)']}
+        function = {'name': 'ChaosStepAccounting.record(_:)', 'coveredLines': 7, 'executableLines': 7}
+        source = {'name': 'ChaosMonkeyUITests.swift',
+                  'path': '/checkout/apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift',
+                  'functions': [function]}
+        payload = {'targets': [{'name': 'LogYourBodyUITests.xctest', 'files': [source]}]}
+        def validate(item):
+            return evidence.validate_function_coverage(item, required,
+                target_name='LogYourBodyUITests.xctest', source_root='LogYourBodyUITests')
+        self.assertEqual(validate(payload)[0]['coveredLines'], 7)
+        for mutation in ('partial', 'empty', 'wrong_target', 'wrong_source', 'duplicate'):
+            item = copy.deepcopy(payload)
+            target = item['targets'][0]
+            file = target['files'][0]
+            if mutation == 'partial':
+                file['functions'][0]['coveredLines'] = 6
+            elif mutation == 'empty':
+                file['functions'][0].update(coveredLines=0, executableLines=0)
+            elif mutation == 'wrong_target':
+                target['name'] = 'LogYourBody.app'
+            elif mutation == 'wrong_source':
+                file['path'] = '/checkout/apps/ios/LogYourBody/ChaosMonkeyUITests.swift'
+            else:
+                file['functions'].append(copy.deepcopy(function))
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                validate(item)
+
     def test_passed_expected_case_and_all_seven_capture_hashes(self):
         self.assertEqual(self.validate()[0]['result'], 'Passed')
         captures = self.captures()
