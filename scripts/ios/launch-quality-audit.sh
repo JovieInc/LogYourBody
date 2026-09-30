@@ -247,7 +247,7 @@ else
   echo "Skipping optical grid audit" | tee "$ARTIFACT_DIR/optical-grid-audit.log"
 fi
 
-python3 -m unittest "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
+python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
 build_for_testing_once
 
 # The whole unit target is the gate: every journey test in docs/USER_JOURNEYS.md
