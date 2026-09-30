@@ -55,6 +55,34 @@ class EvidenceTests(unittest.TestCase):
     def captures(self):
         return evidence.validate_captures(self.manifest, self.root, 100)
 
+    def test_native_function_coverage_rejects_missing_duplicate_unexecuted_partial_or_wrong_source(self):
+        required = {'SettingsComponents.swift': ['SettingsRow.leadingContent.getter']}
+        function = {'name': 'SettingsRow.leadingContent.getter', 'coveredLines': 35, 'executableLines': 35}
+        source = {'name': 'SettingsComponents.swift', 'path': '/checkout/apps/ios/LogYourBody/SettingsComponents.swift',
+                  'functions': [function]}
+        payload = {'targets': [{'name': 'LogYourBody.app', 'files': [source]}]}
+        self.assertEqual(evidence.validate_function_coverage(payload, required)[0]['coveredLines'], 35)
+        variants = []
+        for executed, total in [(0, 35), (34, 35), (0, 0), (None, 35), (35, None)]:
+            item = copy.deepcopy(payload)
+            item['targets'][0]['files'][0]['functions'][0].update(coveredLines=executed, executableLines=total)
+            variants.append(item)
+        missing = copy.deepcopy(payload)
+        missing['targets'][0]['files'][0]['functions'] = []
+        variants.append(missing)
+        duplicate = copy.deepcopy(payload)
+        duplicate['targets'][0]['files'][0]['functions'].append(copy.deepcopy(function))
+        variants.append(duplicate)
+        shadow = copy.deepcopy(payload)
+        shadow['targets'][0]['files'][0]['path'] = '/tests/SettingsComponents.swift'
+        variants.append(shadow)
+        wrong_target = copy.deepcopy(payload)
+        wrong_target['targets'][0]['name'] = 'LogYourBodyTests.xctest'
+        variants.append(wrong_target)
+        for item in variants:
+            with self.subTest(item=item), self.assertRaises(ValueError):
+                evidence.validate_function_coverage(item, required)
+
     def test_passed_expected_case_and_all_seven_capture_hashes(self):
         self.assertEqual(self.validate()[0]['result'], 'Passed')
         captures = self.captures()

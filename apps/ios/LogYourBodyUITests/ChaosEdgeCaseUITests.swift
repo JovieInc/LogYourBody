@@ -19,15 +19,20 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         // it, every subsequent element query in the test times out against
         // a covered screen. Mirrors ChaosMonkeyUITests' monitor.
         systemAlertMonitor = addUIInterruptionMonitor(withDescription: "Edge case system alert") { alert in
-            let dismissLabels = ["Don't Allow", "Not Now", "Cancel", "Deny", "No Thanks", "Later", "OK"]
-            for label in dismissLabels where alert.buttons[label].exists {
+            let labels = alert.buttons.allElementsBoundByIndex.map(\.label)
+            if let label = ChaosSystemAlertPolicy.denialLabel(availableLabels: labels) {
                 alert.buttons[label].tap()
                 return true
             }
-            if let firstButton = alert.buttons.allElementsBoundByIndex.first, firstButton.exists {
-                firstButton.tap()
-                return true
-            }
+            let tree = XCTAttachment(string: alert.debugDescription)
+            tree.name = "Unexpected system alert; no button tapped"
+            tree.lifetime = .keepAlways
+            self.add(tree)
+            let screenshot = XCTAttachment(screenshot: alert.screenshot())
+            screenshot.name = "Unexpected system alert"
+            screenshot.lifetime = .keepAlways
+            self.add(screenshot)
+            XCTFail("Unexpected system alert has no known deny-only action; see retained evidence.")
             return false
         }
     }
@@ -37,6 +42,30 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             removeUIInterruptionMonitor(systemAlertMonitor)
         }
         systemAlertMonitor = nil
+    }
+
+    func testChaosLaunchForwardsActualXCTestConfiguration() throws {
+        let markerKeys = ["XCTestConfigurationFilePath", "XCTestSessionIdentifier", "XCTestBundlePath"]
+        let markers = markerKeys.map { "\($0)=\(ProcessInfo.processInfo.environment[$0] ?? "<absent>")" }
+        let markerAttachment = XCTAttachment(string: markers.joined(separator: "\n"))
+        markerAttachment.name = "Actual XCTest runner markers"
+        markerAttachment.lifetime = .keepAlways
+        add(markerAttachment)
+        let session = try XCTUnwrap(ProcessInfo.processInfo.environment["XCTestSessionIdentifier"])
+        XCTAssertNotNil(UUID(uuidString: session))
+        let bundle = try XCTUnwrap(ProcessInfo.processInfo.environment["XCTestBundlePath"])
+        XCTAssertTrue(bundle.hasSuffix("/LogYourBodyUITests.xctest"))
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+        XCTAssertEqual(app.launchEnvironment["XCTestSessionIdentifier"], session)
+        XCTAssertEqual(app.launchEnvironment["XCTestBundlePath"], bundle)
+        let configuration = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"]
+        if let configuration, !configuration.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            XCTAssertEqual(app.launchEnvironment["XCTestConfigurationFilePath"], configuration)
+        } else {
+            XCTAssertNil(app.launchEnvironment["XCTestConfigurationFilePath"])
+        }
+        XCTAssertEqual(app.state, .runningForeground)
     }
 
     // MARK: - 1. Weight entry boundaries
@@ -405,17 +434,33 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
     func testAddEntryAccepts300CharacterNote() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2EmptyFixture"])
-        try openAddEntrySheetFromHome(in: app)
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestGlp1WeeklyCheckInFixture"])
+        assertTimelineRootAppears(in: app, timeout: 30)
+        openPhotoTimelineMenu(in: app)
+        let stats = app.buttons["Stats"]
+        XCTAssertTrue(stats.waitForExistence(timeout: 5))
+        stats.tap()
+        let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
+        for _ in 0..<8 {
+            if prompt.exists && prompt.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        XCTAssertTrue(prompt.isHittable)
+        prompt.tap()
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
 
         let notesField = app.textFields["GLP-1 dose notes"]
         guard notesField.waitForExistence(timeout: 5) else {
-            throw XCTSkip("GLP-1 notes field is not reachable from this fixture.")
+            attachDiagnosticTree(from: app, named: "notes-field-unreachable-tree")
+            XCTFail("GLP-1 notes field is not reachable from this fixture.")
+            return
         }
         notesField.tap()
         XCTAssertTrue(waitForKeyboard(in: app), "Keyboard did not appear after tapping the field.")
         let longNote = String(repeating: "n", count: 300)
         notesField.typeText(longNote)
+        XCTAssertEqual(notesField.value as? String, longNote)
         dismissKeyboardIfNeeded(in: app)
 
         XCTAssertEqual(app.state, .runningForeground, "A 300-character note must not crash the entry sheet.")
@@ -463,6 +508,104 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    // MARK: - 13. Accessibility XXXL round trip has no layout anomalies
+
+    func testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+
+        assertTimelineRootAppears(in: app, timeout: 30)
+        assertNoLayoutAnomalies(in: app, context: "timeline root")
+
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+        assertNoLayoutAnomalies(in: app, context: "settings root")
+
+        let profileLink = app.buttons["settings_profile_link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 8))
+        let window = app.windows.firstMatch.frame
+        let navigationBottom = app.navigationBars.firstMatch.frame.maxY
+        let visibleViewport = CGRect(x: window.minX, y: navigationBottom, width: window.width,
+                                     height: window.maxY - navigationBottom)
+        let settingsList = app.collectionViews["home_v2_settings"]
+        XCTAssertTrue(settingsList.exists)
+        for _ in 0..<6 {
+            guard profileLink.exists else {
+                attachDiagnosticTree(from: app, named: "xxxl-profile-row-not-materialized")
+                XCTFail("Bounded settings scroll must preserve the native profile row.")
+                return
+            }
+            if visibleViewport.contains(profileLink.frame) && profileLink.isHittable { break }
+            let start = settingsList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
+            let end = settingsList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+        attachDiagnosticTree(from: app, named: "xxxl-profile-row-before-tap")
+        XCTAssertTrue(visibleViewport.contains(profileLink.frame), "Scroll the whole profile row into view before tapping.")
+        XCTAssertTrue(profileLink.isHittable)
+        profileLink.tap()
+        XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Email"].waitForExistence(timeout: 8))
+        attachDiagnosticTree(from: app, named: "xxxl-profile-after-tap")
+        attachScreenshot(named: "xxxl-profile-after-tap", from: app)
+        let emailIcon = app.images["envelope.fill"]
+        let emailTitle = app.staticTexts["Email"]
+        XCTAssertTrue(emailIcon.exists)
+        XCTAssertTrue(emailTitle.exists)
+        let iconGeometry = XCTAttachment(string: "icon=\(emailIcon.frame) title=\(emailTitle.frame)")
+        iconGeometry.name = "XXXL Profile Email icon and title geometry"
+        iconGeometry.lifetime = .keepAlways
+        add(iconGeometry)
+        XCTAssertLessThanOrEqual(emailIcon.frame.maxX, emailTitle.frame.minX, "The scaled Email icon must not overlap its title.")
+        assertNoLayoutAnomalies(in: app, context: "profile")
+        let nameRow = app.buttons["settings_profile_name_row"]
+        let profileList = app.collectionViews.firstMatch
+        for _ in 0..<8 {
+            if nameRow.exists { break }
+            let start = profileList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.65))
+            let end = profileList.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+        XCTAssertTrue(nameRow.exists, "The profile name control must remain reachable at XXXL.")
+        assertNoLayoutAnomalies(in: app, context: "profile name row")
+
+        navigateBack(in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8),
+            "Profile must return cleanly to the settings root."
+        )
+        app.buttons["home_v2_settings_back"].tap()
+        assertTimelineRootAppears(in: app, timeout: 8)
+        assertNoLayoutAnomalies(in: app, context: "timeline root after round trip")
+    }
+
+    // MARK: - 14. Arabic locale renders the root with a hittable composer
+
+    func testArabicLocaleRootRendersAndComposerIsHittable() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-AppleLanguages", "(ar)",
+            "-AppleLocale", "ar_SA"
+        ])
+
+        assertTimelineRootAppears(in: app, timeout: 30)
+
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(
+            composer.waitForExistence(timeout: 12),
+            "The docked chat composer (home_chat_composer_dock, MainTabView.swift) must render under Arabic/RTL."
+        )
+        XCTAssertTrue(composer.isHittable)
+        attachScreenshot(named: "edge-arabic-locale-root", from: app)
+    }
+
     // MARK: - Shared helpers
 
     private func launch(_ app: XCUIApplication, with arguments: [String]) {
@@ -470,6 +613,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             app.terminate()
         }
         app.launchArguments = arguments + ["-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
+        app.forwardActualXCTestContext()
         app.launch()
         // XCTest only checks for an interruption (e.g. a fresh-install system
         // permission prompt) on a synthesized event, not a plain existence
@@ -711,5 +855,102 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    // MARK: - Layout defect detection
+
+    /// Fails with a screenshot if `layoutAnomalies` finds anything at this
+    /// checkpoint. Unlike the chaos monkey's soft per-step recording, these
+    /// are dedicated, deterministic checkpoints under an extreme text size,
+    /// so a genuine defect should fail the test outright.
+    private func assertNoLayoutAnomalies(
+        in app: XCUIApplication,
+        context: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        attachDiagnosticTree(from: app, named: "layout-scan-\(context)-tree")
+        attachScreenshot(named: "layout-scan-\(context)", from: app)
+        let window = app.windows.firstMatch.frame
+        let elements = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
+        let geometry = elements.map { "\($0.identifier) \($0.label): \($0.frame)" }
+        let attachment = XCTAttachment(string: "window=\(window)\n" + geometry.joined(separator: "\n"))
+        attachment.name = "layout-scan-\(context)-geometry"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        var observations: [String] = []
+        let findings = layoutAnomalies(in: app, observations: &observations)
+        let clipping = XCTAttachment(string: observations.joined(separator: "\n"))
+        clipping.name = "layout-scan-\(context)-expected-native-scroll-clipping"
+        clipping.lifetime = .keepAlways
+        add(clipping)
+        guard !findings.isEmpty else { return }
+        attachScreenshot(named: "layout-anomaly-\(context)", from: app)
+        XCTFail("Layout anomalies at \(context): \(findings.joined(separator: "; "))", file: file, line: line)
+    }
+
+    /// Scans every hittable button and static text for three classes of
+    /// layout defect: a frame extending outside the app window, a
+    /// zero-size frame while the element still reports as hittable, or a
+    /// label clipped down to a single ellipsis. The keyboard and system
+    /// alerts are excluded -- neither is the app's layout to fix.
+    private func layoutAnomalies(in app: XCUIApplication, observations: inout [String]) -> [String] {
+        guard !app.keyboards.element.exists, !app.alerts.firstMatch.exists else { return [] }
+        let windowFrame = app.windows.firstMatch.frame
+        guard windowFrame.width > 0, windowFrame.height > 0 else { return [] }
+
+        let candidates = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
+
+        let scrollGeometry = ChaosScrollGeometry(app: app)
+        var findings: [String] = []
+        for element in candidates {
+            guard element.exists else { continue }
+            let frame = element.frame
+
+            // `.isHittable` itself can hard-fail ("Failed to determine
+            // hittability ...: Activation point invalid and no suggested
+            // hit points based on element frame") for a degenerate frame
+            // instead of returning false, so geometry is checked -- and a
+            // non-finite/zero-size frame reported directly -- before ever
+            // calling it (own simulator evidence: a "What changed
+            // recently?" button crashed the whole scan this way under
+            // AccessibilityXXXL, before this reordering).
+            guard frame.width.isFinite, frame.height.isFinite,
+                frame.origin.x.isFinite, frame.origin.y.isFinite else {
+                findings.append("non-finite frame: \(describeLayoutElement(element))")
+                continue
+            }
+            if frame.width <= 0 || frame.height <= 0 {
+                findings.append("zero-size frame: \(describeLayoutElement(element))")
+                continue
+            }
+
+            let overflowsWindow = frame.minX < windowFrame.minX - 1 || frame.maxX > windowFrame.maxX + 1
+                || frame.minY < windowFrame.minY - 1 || frame.maxY > windowFrame.maxY + 1
+            if overflowsWindow && scrollGeometry.isExpectedScrollClipping(element, window: windowFrame) {
+                observations.append("native scroll clipping: \(describeLayoutElement(element))")
+                continue
+            }
+            // Fully offscreen frames must never reach XCTest's activation-point query.
+            guard frame.intersects(windowFrame) else {
+                findings.append("non-scroll frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                continue
+            }
+            guard element.isHittable else { continue }
+            if overflowsWindow {
+                findings.append("frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                continue
+            }
+            if element.label == "\u{2026}" {
+                findings.append("label clipped to a single ellipsis: \(describeLayoutElement(element))")
+            }
+        }
+        return findings
+    }
+
+    private func describeLayoutElement(_ element: XCUIElement) -> String {
+        let identifier = element.identifier.isEmpty ? "(no identifier)" : element.identifier
+        let label = element.label.isEmpty ? "(no label)" : element.label
+        return "\(String(describing: element.elementType)) id=\(identifier) label=\"\(label)\" frame=\(element.frame)"
     }
 }

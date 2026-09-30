@@ -19,12 +19,111 @@
 // from there on its own.
 //
 // Env vars:
-//   LYB_CHAOS_SEED    - RNG seed (default 20260928)
-//   LYB_CHAOS_STEPS   - number of steps to run (default 250)
-//   LYB_CHAOS_FIXTURE - launch argument that seeds app state (default
-//                        "-lybUITestPhotoTimelineHUDFixture")
+//   LYB_CHAOS_SEED       - RNG seed (default 20260928)
+//   LYB_CHAOS_STEPS      - number of steps to run (default 250)
+//   LYB_CHAOS_FIXTURE    - launch argument that seeds app state (default
+//                          "-lybUITestPhotoTimelineHUDFixture")
+//   LYB_CHAOS_EXTRA_ARGS - space-separated extra launch arguments, appended
+//                          after the fixture and preserved across a
+//                          stuck-recovery relaunch. Widens the harness past
+//                          the default text size/locale, e.g.:
+//                            "-UIPreferredContentSizeCategoryName UICTContentSizeCategoryAccessibilityXXXL"
+//                            "-AppleLanguages (ar) -AppleLocale ar_SA"
+//                            "-AppleLanguages (de)"
+//                            "-NSDoubleLocalizedStrings YES"
+//                            "-UIAccessibilityIsBoldTextEnabled YES"
 //
 import XCTest
+
+extension XCUIApplication {
+    /// Forward native XCTest context without inventing a marker for ordinary launches.
+    func forwardActualXCTestContext() {
+        for key in ["XCTestConfigurationFilePath", "XCTestSessionIdentifier", "XCTestBundlePath"] {
+            if let value = ProcessInfo.processInfo.environment[key],
+               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                launchEnvironment[key] = value
+            } else {
+                launchEnvironment.removeValue(forKey: key)
+            }
+        }
+    }
+}
+
+enum ChaosSystemAlertPolicy {
+    static func denialLabel(availableLabels: [String]) -> String? {
+        let denied = ["Don't Allow", "Not Now", "Cancel", "Deny", "No Thanks", "Later"]
+        return denied.first { availableLabels.contains($0) }
+    }
+}
+
+/// Native snapshot ancestry is the evidence for expected scroll clipping.
+/// Missing or ambiguous snapshot matches remain layout findings.
+struct ChaosScrollGeometry {
+    private struct Record {
+        let type: XCUIElement.ElementType
+        let identifier: String
+        let label: String
+        let frame: CGRect
+        let scrollFrames: [CGRect]
+    }
+
+    private var records: [Record] = []
+
+    init(app: XCUIApplication) {
+        if let snapshot = try? app.snapshot() {
+            collect(snapshot, scrollFrames: [])
+        }
+    }
+
+    private mutating func collect(_ snapshot: XCUIElementSnapshot, scrollFrames: [CGRect]) {
+        records.append(Record(type: snapshot.elementType, identifier: snapshot.identifier,
+                              label: snapshot.label, frame: snapshot.frame, scrollFrames: scrollFrames))
+        // SwiftUI's settings list exposes UICollectionView, a UIScrollView subclass.
+        let isScrollContainer = snapshot.elementType == .scrollView || snapshot.elementType == .collectionView
+        let ancestors = isScrollContainer ? scrollFrames + [snapshot.frame] : scrollFrames
+        for child in snapshot.children {
+            collect(child, scrollFrames: ancestors)
+        }
+    }
+
+    var diagnosticDescription: String {
+        records.map { "\($0.type) \($0.identifier) \($0.label): \($0.frame), nativeScrollAncestors=\($0.scrollFrames)" }
+            .joined(separator: "\n")
+    }
+
+    /// CGRect snapshots can derive widths by subtraction, changing their last
+    /// floating-point bits. Compare edges within four ULPs for record identity;
+    /// the one-point layout overflow threshold remains unchanged.
+    private static func sameNativeFrame(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
+        let edges = [(lhs.minX, rhs.minX), (lhs.minY, rhs.minY),
+                     (lhs.maxX, rhs.maxX), (lhs.maxY, rhs.maxY)]
+        return edges.allSatisfy { abs($0.0 - $0.1) <= max($0.0.ulp, $0.1.ulp) * 4 }
+    }
+
+    func isExpectedScrollClipping(_ element: XCUIElement, window: CGRect) -> Bool {
+        let type = element.elementType
+        let identifier = element.identifier
+        let label = element.label
+        let elementFrame = element.frame
+        let matches = records.filter {
+            $0.type == type && $0.identifier == identifier
+                && $0.label == label && Self.sameNativeFrame($0.frame, elementFrame)
+        }
+        guard matches.count == 1, let record = matches.first else { return false }
+        let frame = record.frame
+        return record.scrollFrames.contains { viewport in
+            guard viewport.width > 0, viewport.height > 0,
+                  viewport.minX >= window.minX - 1, viewport.maxX <= window.maxX + 1,
+                  viewport.minY >= window.minY - 1, viewport.maxY <= window.maxY + 1 else { return false }
+            // Every overflowing edge must be clipped by the native scroll viewport.
+            return (frame.minX >= window.minX - 1 || frame.minX < viewport.minX)
+                && (frame.maxX <= window.maxX + 1 || frame.maxX > viewport.maxX)
+                && (frame.minY >= window.minY - 1 || frame.minY < viewport.minY)
+                && (frame.maxY <= window.maxY + 1 || frame.maxY > viewport.maxY)
+                && !viewport.contains(frame)
+        }
+    }
+}
 
 /// Deterministic SplitMix64 generator so a chaos run is fully reproducible
 /// from its seed, independent of the platform's default `Random`.
@@ -127,9 +226,177 @@ private struct StuckDetector {
 private struct StepTelemetry {
     var stuckDetector = StuckDetector()
     var slowQueryCount = 0
+    var layoutAnomalyMessages: [String] = []
+    var expectedScrollClipping: [String] = []
+}
+
+/// What every launch/relaunch needs: the fixture argument plus any extra
+/// launch arguments passed through `LYB_CHAOS_EXTRA_ARGS` (Dynamic Type
+/// size, locale, bold text, etc.), kept together so a stuck-recovery
+/// relaunch preserves the same conditions the run started under instead of
+/// silently dropping back to defaults.
+private struct LaunchConfig {
+    let fixture: String
+    let extraArgs: [String]
+
+    var launchArguments: [String] {
+        [fixture] + extraArgs + ["-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
+    }
 }
 
 final class ChaosMonkeyUITests: XCTestCase {
+    func testProfilePhotoImportIsExcludedFromMonkeyCandidates() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        let menu = app.buttons["Open Menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        let settings = app.buttons["Settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        let profile = app.buttons["settings_profile_link"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 8))
+        profile.tap()
+        XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 8))
+        let photo = app.buttons["Change profile photo"]
+        XCTAssertTrue(photo.exists)
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "Profile photo picker candidate safety"
+        tree.lifetime = .keepAlways
+        add(tree)
+        let candidates = snapshotElements(in: app).interactive
+        XCTAssertFalse(candidates.contains { $0.label.contains("Change profile photo") })
+        for candidate in candidates where candidate.elementType == .other || candidate.elementType == .cell {
+            XCTAssertFalse(candidate.frame.intersects(photo.frame), "Generic parent must not activate profile photo import.")
+        }
+    }
+
+    func testKeyboardDismissalPreservesDraftWithoutSending() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        // Existing DEBUG FixtureChatService.offline guarantees this red probe
+        // cannot call a real chat provider or send a server message.
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestChatFirstFixture", "-lybUITestChatOfflineFixture",
+            "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 12))
+        composer.tap()
+        let draft = "local chaos draft"
+        composer.typeText(draft)
+        XCTAssertTrue(app.keyboards.element.exists)
+        dismissKeyboardForStep(app: app)
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "Keyboard dismissal draft preservation"
+        tree.lifetime = .keepAlways
+        add(tree)
+        XCTAssertEqual(composer.value as? String, draft, "Keyboard dismissal must not submit or clear a draft.")
+        XCTAssertFalse(app.keyboards.element.exists)
+    }
+
+    func testSystemAlertsRequireKnownDenyOnlyAction() {
+        for label in ["Don't Allow", "Not Now", "Cancel", "Deny", "No Thanks", "Later"] {
+            XCTAssertEqual(ChaosSystemAlertPolicy.denialLabel(availableLabels: [label]), label)
+        }
+        for labels in [["Allow", "OK"], ["Continue"], ["السماح"], []] {
+            XCTAssertNil(ChaosSystemAlertPolicy.denialLabel(availableLabels: labels))
+        }
+    }
+
+    func testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        popToRootIfNeeded(in: app)
+        let contextButton = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(contextButton.waitForExistence(timeout: 30))
+        contextButton.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context"].waitForExistence(timeout: 8))
+        let addPhoto = app.buttons["home_v2_context_add_photo"]
+        XCTAssertTrue(addPhoto.exists)
+        let contextCandidates = snapshotElements(in: app).interactive
+        XCTAssertFalse(contextCandidates.map(\.identifier).contains(addPhoto.identifier),
+                       "Monkey must not open the personal photo picker from Context.")
+        let edit = app.buttons["home_v2_edit_entry"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        edit.tap()
+        let sheet = app.descendants(matching: .any)["home_v2_log_sheet"]
+        XCTAssertTrue(sheet.waitForExistence(timeout: 8))
+        XCTAssertEqual(sheet.label, "Edit entry")
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "Photo import control scanner tree"
+        tree.lifetime = .keepAlways
+        add(tree)
+        let photoControls = ["front", "side", "back"].map { "home_v2_log_sheet_photo_\($0)" }
+        for identifier in photoControls {
+            XCTAssertTrue(app.buttons[identifier].waitForExistence(timeout: 5))
+        }
+        let candidates = snapshotElements(in: app).interactive
+        let identifiers = candidates.map(\.identifier)
+        for identifier in photoControls {
+            let protectedFrame = app.buttons[identifier].frame
+            XCTAssertFalse(identifiers.contains(identifier), "Monkey must not open personal photo import: \(identifier)")
+            for candidate in candidates where candidate.elementType == .other || candidate.elementType == .cell {
+                let center = CGPoint(x: candidate.frame.midX, y: candidate.frame.midY)
+                XCTAssertFalse(protectedFrame.contains(center),
+                               "Generic parent activation center enters protected photo control: \(candidate.identifier) \(candidate.frame)")
+            }
+        }
+    }
+
+    func testNativeScrollClippingRequiresActualScrollAncestor() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock", "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        let prompt = app.buttons["Summarize my trend"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 30))
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(prompt.frame.maxX, window.maxX)
+        XCTAssertTrue(prompt.frame.intersects(window))
+        let geometry = ChaosScrollGeometry(app: app)
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "Native scroll ancestry regression tree"
+        tree.lifetime = .keepAlways
+        add(tree)
+        let snapshot = XCTAttachment(string: geometry.diagnosticDescription)
+        snapshot.name = "Native immutable geometry and ancestry"
+        snapshot.lifetime = .keepAlways
+        add(snapshot)
+        XCTAssertTrue(geometry.isExpectedScrollClipping(prompt, window: window))
+        let offscreen = app.buttons["What changed recently?"]
+        XCTAssertTrue(offscreen.exists)
+        XCTAssertFalse(offscreen.frame.intersects(window))
+        XCTAssertTrue(geometry.isExpectedScrollClipping(offscreen, window: window))
+        let send = app.buttons["chat_send_button"]
+        XCTAssertTrue(send.exists)
+        // Exercise overflow classification with a real non-scroll element and
+        // a deliberately cropped viewport. This is a scanner regression,
+        // not a claim that the rendered Send button overflows the app.
+        let croppedWindow = CGRect(x: send.frame.minX, y: send.frame.minY,
+                                   width: send.frame.width / 2, height: send.frame.height)
+        XCTAssertGreaterThan(send.frame.maxX, croppedWindow.maxX)
+        XCTAssertFalse(geometry.isExpectedScrollClipping(send, window: croppedWindow))
+    }
+
     private static let edgeStrings: [String] = [
         "",
         "0",
@@ -167,7 +434,16 @@ final class ChaosMonkeyUITests: XCTestCase {
         "bulk_photo_import_start_scanning",
         "body_score_hero_share_button",
         "launch_timeline_add_photo",
-        "home_v2_connect_health"
+        "home_v2_connect_health",
+        "home_v2_context_add_photo",
+        "home_v2_log_sheet_photo_front",
+        "home_v2_log_sheet_photo_side",
+        "home_v2_log_sheet_photo_back",
+        "chat_send_button",
+        "export_data_action",
+        "body_score_quick_share_button",
+        "home_v2_compare_share",
+        "home_v2_share_action"
     ]
 
     private static let denylistedLabelFragments: [String] = [
@@ -181,6 +457,20 @@ final class ChaosMonkeyUITests: XCTestCase {
         "manage subscription",
         "connect apple health",
         "camera",
+        "add photo",
+        "add progress photo",
+        "change profile photo",
+        "retake",
+        "import photos",
+        "choose from library",
+        "share",
+        "send",
+        "email support",
+        "email secure link",
+        "submit",
+        "how am i doing?",
+        "summarize my trend",
+        "what changed recently?",
         "continue with apple",
         "open settings"
     ]
@@ -196,44 +486,59 @@ final class ChaosMonkeyUITests: XCTestCase {
         let steps = Int(ProcessInfo.processInfo.environment["LYB_CHAOS_STEPS"] ?? "") ?? 250
         let rawFixture = ProcessInfo.processInfo.environment["LYB_CHAOS_FIXTURE"] ?? ""
         let fixture = rawFixture.isEmpty ? "-lybUITestPhotoTimelineHUDFixture" : rawFixture
+        let rawExtraArgs = ProcessInfo.processInfo.environment["LYB_CHAOS_EXTRA_ARGS"] ?? ""
+        let extraArgs = rawExtraArgs.split(separator: " ").map(String.init)
+        let config = LaunchConfig(fixture: fixture, extraArgs: extraArgs)
 
         var rng = ChaosRNG(seed: seed)
         let app = XCUIApplication()
         var interruptionsDismissed = 0
+        var unexpectedSystemAlert = false
         var anomalies: [String] = []
         var telemetry = StepTelemetry()
 
         let monitor = addUIInterruptionMonitor(withDescription: "Chaos monkey system alert") { alert in
-            let dismissLabels = ["Don't Allow", "Not Now", "Cancel", "Deny", "No Thanks", "Later", "OK"]
-            for label in dismissLabels where alert.buttons[label].exists {
+            let labels = alert.buttons.allElementsBoundByIndex.map(\.label)
+            if let label = ChaosSystemAlertPolicy.denialLabel(availableLabels: labels) {
                 alert.buttons[label].tap()
                 interruptionsDismissed += 1
                 return true
             }
-            if let firstButton = alert.buttons.allElementsBoundByIndex.first, firstButton.exists {
-                firstButton.tap()
-                interruptionsDismissed += 1
-                return true
-            }
+            let tree = XCTAttachment(string: alert.debugDescription)
+            tree.name = "Unexpected system alert; no button tapped"
+            tree.lifetime = .keepAlways
+            self.add(tree)
+            let screenshot = XCTAttachment(screenshot: alert.screenshot())
+            screenshot.name = "Unexpected system alert"
+            screenshot.lifetime = .keepAlways
+            self.add(screenshot)
+            unexpectedSystemAlert = true
+            XCTFail("Unexpected system alert has no known deny-only action; see retained evidence.")
             return false
         }
         defer { removeUIInterruptionMonitor(monitor) }
 
-        app.launchArguments = [fixture, "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
+        app.launchArguments = config.launchArguments
+        app.forwardActualXCTestContext()
         app.launch()
         app.tap()
         popToRootIfNeeded(in: app)
 
+        var attemptedSteps = 0
+        var completedSteps = 0
         for step in 0..<steps {
+            guard !unexpectedSystemAlert else { break }
+            attemptedSteps += 1
             do {
                 try runStep(
                     step: step,
                     seed: seed,
                     app: app,
-                    fixture: fixture,
+                    config: config,
                     rng: &rng,
                     telemetry: &telemetry
                 )
+                completedSteps += 1
             } catch {
                 let message = "step \(step): \(error)"
                 anomalies.append(message)
@@ -251,24 +556,26 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
 
         attachDiagnostics(app: app, name: "chaos-\(seed)-step-final")
+        anomalies.append(contentsOf: telemetry.layoutAnomalyMessages)
 
         var summaryLines = [
-            "seed=\(seed) steps=\(steps) fixture=\(fixture)",
+            "seed=\(seed) steps=\(steps) fixture=\(fixture) extraArgs=\(extraArgs.joined(separator: " "))",
+            "attemptedSteps=\(attemptedSteps) completedSteps=\(completedSteps)",
             "systemAlertsDismissed=\(interruptionsDismissed)",
             "slowQueries(10-30s)=\(telemetry.slowQueryCount)",
+            "layoutAnomalies=\(telemetry.layoutAnomalyMessages.count)",
+            "expectedScrollClipping=\(telemetry.expectedScrollClipping.count)",
             "anomalies=\(anomalies.count)"
         ]
         summaryLines.append(contentsOf: anomalies)
+        summaryLines.append(contentsOf: telemetry.expectedScrollClipping)
         let summary = XCTAttachment(string: summaryLines.joined(separator: "\n"))
         summary.name = "chaos-\(seed)-summary"
         summary.lifetime = .keepAlways
         add(summary)
 
-        XCTAssertLessThan(
-            anomalies.count,
-            max(steps / 4, 1),
-            "Too many anomalies (\(anomalies.count)/\(steps)) under fixture \(fixture); see attachments."
-        )
+        XCTAssertEqual(completedSteps, steps, "Every requested monkey step must complete; see retained telemetry.")
+        XCTAssertTrue(anomalies.isEmpty, "Untriaged anomalies under fixture \(fixture): \(anomalies.count); see attachments.")
     }
 
     // MARK: - Step execution
@@ -277,7 +584,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         step: Int,
         seed: UInt64,
         app: XCUIApplication,
-        fixture: String,
+        config: LaunchConfig,
         rng: inout ChaosRNG,
         telemetry: inout StepTelemetry
     ) throws {
@@ -294,7 +601,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         // the monkey can never make progress from here on its own; escape
         // immediately rather than waiting for the stuck-tree threshold.
         if app.descendants(matching: .any)["world_class_screen_paywall"].exists {
-            relaunch(app: app, fixture: fixture)
+            relaunch(app: app, config: config)
             telemetry.stuckDetector.reset()
             throw ChaosStepError.stuckRecovered("landed on the paywall (world_class_screen_paywall)")
         }
@@ -312,7 +619,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
 
         let queryStart = Date()
-        let candidates = interactiveElements(in: app)
+        let snapshot = snapshotElements(in: app)
         let queryDuration = Date().timeIntervalSince(queryStart)
         // A merely-slow query (device under load, a larger tree) is a
         // metric, not a step-ending anomaly on its own -- only a genuine
@@ -325,13 +632,29 @@ final class ChaosMonkeyUITests: XCTestCase {
             throw ChaosStepError.slowQuery(queryDuration)
         }
 
-        let fingerprint = candidates.isEmpty ? nil : treeFingerprint(candidates)
+        // Reuses snapshot.layoutCandidates (already fetched above) rather
+        // than a second tree query. Recorded, not thrown: a layout defect
+        // shouldn't block this step's normal action the way a stuck screen
+        // does, but it's exactly the kind of finding a Dynamic Type or RTL
+        // round (LYB_CHAOS_EXTRA_ARGS) exists to surface.
+        var clipping: [String] = []
+        let layoutFindings = layoutAnomalies(candidates: snapshot.layoutCandidates, in: app, observations: &clipping)
+        telemetry.expectedScrollClipping.append(contentsOf: clipping.map { "step \(step): \($0)" })
+        if !layoutFindings.isEmpty {
+            for finding in layoutFindings {
+                telemetry.layoutAnomalyMessages.append("step \(step): layout defect: \(finding)")
+            }
+            attachDiagnostics(app: app, name: "chaos-\(seed)-step-\(step)-layout")
+        }
+
+        let fingerprint = snapshot.interactive.isEmpty ? nil : treeFingerprint(snapshot.interactive)
         if let stuckReason = telemetry.stuckDetector.observe(fingerprint: fingerprint) {
-            relaunch(app: app, fixture: fixture)
+            relaunch(app: app, config: config)
             telemetry.stuckDetector.reset()
             throw ChaosStepError.stuckRecovered(stuckReason)
         }
 
+        let candidates = snapshot.interactive
         switch pickAction(using: &rng) {
         case .tap:
             performTap(app: app, candidates: candidates, rng: &rng)
@@ -437,9 +760,10 @@ final class ChaosMonkeyUITests: XCTestCase {
     /// Terminates and relaunches with the seeding fixture, mirroring the
     /// initial launch in `testChaosMonkey`. Used to recover from a wedged
     /// screen rather than continuing to hammer a state the run can't escape.
-    private func relaunch(app: XCUIApplication, fixture: String) {
+    private func relaunch(app: XCUIApplication, config: LaunchConfig) {
         app.terminate()
-        app.launchArguments = [fixture, "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
+        app.launchArguments = config.launchArguments
+        app.forwardActualXCTestContext()
         app.launch()
         app.tap()
         popToRootIfNeeded(in: app)
@@ -510,22 +834,29 @@ final class ChaosMonkeyUITests: XCTestCase {
         ).tap()
     }
 
-    /// Runs in place of the general element query on any step where a
-    /// keyboard is already up (see `runStep`). Prefers an explicit
-    /// send/return affordance so a chat draft goes somewhere instead of
-    /// sitting half-typed forever, then the composer's own "Close chat"
-    /// exit (`home_chat_collapse`, DashboardViewLiquid+PhotoTimelineHUD.swift),
-    /// then the generic keyboard dismissal as a last resort.
+    /// Dismiss keyboard state without submitting a draft or triggering a send.
     private func dismissKeyboardForStep(app: XCUIApplication) {
-        let candidates = [
-            app.buttons["chat_send_button"],
-            app.keyboards.buttons["return"],
-            app.keyboards.buttons["Return"],
-            app.keyboards.buttons["Send"],
-            app.buttons["home_chat_collapse"]
-        ]
-        for candidate in candidates where candidate.exists && candidate.isHittable {
-            candidate.tap()
+        let scroll = app.scrollViews.firstMatch
+        if scroll.exists && hasFiniteNonZeroFrame(scroll) && scroll.isHittable {
+            // The existing chat/weight ScrollView uses interactive keyboard dismissal.
+            scroll.swipeDown()
+            if app.keyboards.element.waitForNonExistence(timeout: 2) { return }
+        }
+        let closeChat = app.buttons["home_chat_collapse"]
+        if closeChat.exists && closeChat.isHittable {
+            closeChat.tap()
+            return
+        }
+        // The compact Home composer has no message ScrollView or Close chat
+        // control. Present its existing navigation cover without submitting
+        // the local draft. Closing it immediately restores composer focus;
+        // leave the menu available for the next seeded navigation action.
+        let menu = app.buttons["photo_timeline_root_menu"]
+        if menu.exists && menu.isHittable {
+            menu.tap()
+            attachDiagnostics(app: app, name: "keyboard-dismissal-navigation-cover")
+            XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 2),
+                          "Keyboard dismissal navigation cover must hide the keyboard.")
             return
         }
         dismissKeyboard(app: app)
@@ -533,9 +864,22 @@ final class ChaosMonkeyUITests: XCTestCase {
 
     // MARK: - Element discovery
 
-    private func interactiveElements(in app: XCUIApplication) -> [XCUIElement] {
-        var elements: [XCUIElement] = []
-        elements.append(contentsOf: app.buttons.allElementsBoundByIndex)
+    /// One round of element queries feeding two different views: the
+    /// denylist-aware `interactive` candidates the monkey acts on (as
+    /// `interactiveElements` always returned), and the broader, unfiltered
+    /// `layoutCandidates` (every hittable button and static text)
+    /// `layoutAnomalies` scans -- buttons are queried once and reused
+    /// rather than fetched twice per step.
+    private struct StepSnapshot {
+        let interactive: [XCUIElement]
+        let layoutCandidates: [XCUIElement]
+    }
+
+    private func snapshotElements(in app: XCUIApplication) -> StepSnapshot {
+        let buttons = app.buttons.allElementsBoundByIndex
+        let staticTexts = app.staticTexts.allElementsBoundByIndex
+
+        var elements: [XCUIElement] = buttons
         elements.append(contentsOf: app.cells.allElementsBoundByIndex)
         elements.append(contentsOf: app.textFields.allElementsBoundByIndex)
         elements.append(contentsOf: app.switches.allElementsBoundByIndex)
@@ -546,10 +890,43 @@ final class ChaosMonkeyUITests: XCTestCase {
         // Defense in depth: `runStep` already skips the general query
         // entirely whenever a keyboard is showing, but exclude individual
         // key elements from the candidate set too in case one is ever
-        // picked up by a type query above regardless.
-        return elements.filter { element in
-            element.isHittable && element.elementType != .key && !isDenylisted(element)
+        // picked up by a type query above regardless. hasFiniteNonZeroFrame
+        // guards `.isHittable`, which can hard-fail XCTest for a degenerate
+        // frame under an extreme text size or locale instead of returning
+        // false -- see layoutAnomalies below for the evidence.
+        let windowFrame = app.windows.firstMatch.frame
+        let protectedFrames = buttons.filter { isDenylisted($0) && hasFiniteNonZeroFrame($0) }
+            .map(\.frame).filter { $0.intersects(windowFrame) }
+        let interactive = elements.filter { element in
+            guard hasFiniteNonZeroFrame(element), element.frame.intersects(windowFrame),
+                  !isDenylisted(element), element.elementType != .key else { return false }
+            // A generic parent can delegate its activation point to a protected
+            // child. Keep such parents out of random taps; direct safe controls
+            // and the existing app-level swipe actions remain available.
+            if element.elementType == .other || element.elementType == .cell {
+                let frame = element.frame
+                if protectedFrames.contains(where: { $0.intersects(frame) }) { return false }
+            }
+            return element.isHittable
         }
+        // Not pre-filtered by .isHittable: layoutAnomalies needs to see a
+        // degenerate frame (including one .isHittable can't safely judge)
+        // to report it as a finding rather than skip it.
+        let layoutCandidates = buttons + staticTexts
+        return StepSnapshot(interactive: interactive, layoutCandidates: layoutCandidates)
+    }
+
+    /// `.isHittable` can hard-fail XCTest for a degenerate frame instead of
+    /// returning false ("Failed to determine hittability ...: Activation
+    /// point invalid and no suggested hit points based on element frame"),
+    /// so geometry is checked before ever calling it -- own simulator
+    /// evidence: a "What changed recently?" button crashed a layout scan
+    /// this way under AccessibilityXXXL.
+    private func hasFiniteNonZeroFrame(_ element: XCUIElement) -> Bool {
+        let frame = element.frame
+        return frame.width.isFinite && frame.height.isFinite
+            && frame.origin.x.isFinite && frame.origin.y.isFinite
+            && frame.width > 0 && frame.height > 0
     }
 
     private func isDenylisted(_ element: XCUIElement) -> Bool {
@@ -571,6 +948,71 @@ final class ChaosMonkeyUITests: XCTestCase {
             hasher.combine(element.isEnabled)
         }
         return hasher.finalize()
+    }
+
+    // MARK: - Layout defect detection
+
+    /// Scans the given candidates (buttons + static texts `snapshotElements`
+    /// already fetched this step) for three classes of layout defect: a
+    /// frame extending outside the app window, a zero-size frame while the
+    /// element still reports as hittable, or a label clipped down to a
+    /// single ellipsis. System alerts are excluded -- their layout isn't
+    /// the app's to fix, and the keyboard never reaches this point at all
+    /// (runStep returns before fetching `candidates` whenever one is up).
+    private func layoutAnomalies(
+        candidates: [XCUIElement], in app: XCUIApplication, observations: inout [String]
+    ) -> [String] {
+        guard !app.alerts.firstMatch.exists else { return [] }
+        let windowFrame = app.windows.firstMatch.frame
+        guard windowFrame.width > 0, windowFrame.height > 0 else { return [] }
+
+        let scrollGeometry = ChaosScrollGeometry(app: app)
+        var findings: [String] = []
+        for element in candidates {
+            guard element.exists else { continue }
+            let frame = element.frame
+
+            // `.isHittable` itself can hard-fail instead of returning false
+            // for a degenerate frame (see hasFiniteNonZeroFrame above), so
+            // geometry is checked -- and a bad frame reported directly --
+            // before ever calling it.
+            guard frame.width.isFinite, frame.height.isFinite,
+                frame.origin.x.isFinite, frame.origin.y.isFinite else {
+                findings.append("non-finite frame: \(describeLayoutElement(element))")
+                continue
+            }
+            if frame.width <= 0 || frame.height <= 0 {
+                findings.append("zero-size frame: \(describeLayoutElement(element))")
+                continue
+            }
+
+            let overflowsWindow = frame.minX < windowFrame.minX - 1 || frame.maxX > windowFrame.maxX + 1
+                || frame.minY < windowFrame.minY - 1 || frame.maxY > windowFrame.maxY + 1
+            if overflowsWindow && scrollGeometry.isExpectedScrollClipping(element, window: windowFrame) {
+                observations.append("native scroll clipping: \(describeLayoutElement(element))")
+                continue
+            }
+            // Fully offscreen frames must never reach XCTest's activation-point query.
+            guard frame.intersects(windowFrame) else {
+                findings.append("non-scroll frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                continue
+            }
+            guard element.isHittable else { continue }
+            if overflowsWindow {
+                findings.append("frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                continue
+            }
+            if element.label == "\u{2026}" {
+                findings.append("label clipped to a single ellipsis: \(describeLayoutElement(element))")
+            }
+        }
+        return findings
+    }
+
+    private func describeLayoutElement(_ element: XCUIElement) -> String {
+        let identifier = element.identifier.isEmpty ? "(no identifier)" : element.identifier
+        let label = element.label.isEmpty ? "(no label)" : element.label
+        return "\(String(describing: element.elementType)) id=\(identifier) label=\"\(label)\" frame=\(element.frame)"
     }
 
     // MARK: - Diagnostics

@@ -142,6 +142,8 @@ def monkey_summary_text(test_identifier, manifest, attachments_dir):
 
 def classify_anomaly(reason):
     lowered = reason.lower()
+    if "layout defect" in lowered:
+        return "layout"
     if "stuck screen" in lowered:
         return "stuck-recovered"
     if "paywall" in lowered:

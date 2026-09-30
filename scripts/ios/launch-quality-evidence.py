@@ -55,6 +55,27 @@ def validate_cases(payload, expected):
     return [{'identifier': case.get('nodeIdentifier'), 'result': case['result']} for case in cases]
 
 
+
+def validate_function_coverage(payload, requirements):
+    """Require executed native app functions, not import-only or aggregate coverage."""
+    results = []
+    for filename, names in requirements.items():
+        files = [file for target in payload.get('targets', []) if target.get('name') == 'LogYourBody.app'
+                 for file in target.get('files', []) if file.get('name') == Path(filename).name
+                 and file.get('path', '').endswith('/apps/ios/LogYourBody/' + filename)]
+        if len(files) != 1:
+            raise ValueError(f'Missing or ambiguous native app coverage file: {filename}')
+        for name in names:
+            matches = [function for function in files[0].get('functions', []) if function.get('name') == name]
+            if len(matches) != 1:
+                raise ValueError(f'Missing or ambiguous native coverage function: {name}')
+            function = matches[0]
+            executed, total = function.get('coveredLines'), function.get('executableLines')
+            if type(total) is not int or total <= 0 or type(executed) is not int or executed != total:
+                raise ValueError(f'Incomplete native function coverage: {name} ({executed}/{total})')
+            results.append({'file': filename, 'function': name, 'coveredLines': executed, 'executableLines': total})
+    return results
+
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -99,6 +120,8 @@ def main():
     parser.add_argument('--bundle', type=Path, required=True)
     parser.add_argument('--expected-test', action='append', default=[])
     parser.add_argument('--critical-captures', action='store_true')
+    parser.add_argument('--require-settings-row-coverage', action='store_true')
+    parser.add_argument('--require-biometric-coverage', action='store_true')
     parser.add_argument('--started-at', type=float, required=True)
     args = parser.parse_args()
     output = args.bundle.with_suffix('.evidence.json')
@@ -155,6 +178,20 @@ def main():
             receipt['captures'] = validate_captures(json.loads(manifest_path.read_text()),
                                                    directory, args.started_at)
             receipt['attachmentManifestSha256'] = digest(manifest_path)
+        requirements = {}
+        if args.require_settings_row_coverage:
+            requirements['SettingsComponents.swift'] = [
+                'SettingsRow.body.getter', 'SettingsRow.valueLeadingInset.getter', 'SettingsRow.leadingContent.getter']
+        if args.require_biometric_coverage:
+            requirements['Views/BiometricLockView.swift'] = [
+                'static BiometricLockPolicy.shouldDisableForUITests(arguments:environment:userId:)']
+        if requirements:
+            coverage = json.loads(subprocess.check_output(
+                ['xcrun', 'xccov', 'view', '--report', '--json', str(args.bundle)], text=True))
+            receipt['requiredFunctionCoverage'] = validate_function_coverage(coverage, requirements)
+            coverage_path = args.bundle.with_suffix('.coverage.json')
+            coverage_path.write_text(json.dumps(coverage, indent=2) + '\n')
+            receipt['coverageSha256'] = digest(coverage_path)
         output.write_text(json.dumps(receipt, indent=2) + '\n')
         print(f"Verified {len(cases)} XCTest cases; evidence: {output}")
         return 0

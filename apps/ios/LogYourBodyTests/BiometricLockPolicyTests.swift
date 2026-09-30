@@ -93,6 +93,50 @@ final class BiometricLockPolicyTests: XCTestCase {
         ))
     }
 
+    func testActualUITestSessionAndBundleCanUnlockOnlyADebugFixture() {
+        let environment = [
+            "XCTestConfigurationFilePath": "",
+            "XCTestSessionIdentifier": "764EB4F3-8932-4A26-8394-F86B83FCD5BF",
+            "XCTestBundlePath": "PlugIns/LogYourBodyUITests.xctest"
+        ]
+        let allowed = BiometricLockPolicy.shouldDisableForUITests(
+            arguments: ["-lybUITestDisableBiometricLock", "-lybUITestPaidMVPFixture"],
+            environment: environment,
+            userId: "ui_test_paid_mvp_user_123"
+        )
+        #if DEBUG
+        XCTAssertTrue(allowed)
+        #else
+        XCTAssertFalse(allowed)
+        #endif
+        XCTAssertFalse(BiometricLockPolicy.shouldDisableForUITests(
+            arguments: ["-lybUITestDisableBiometricLock", "-lybUITestPaidMVPFixture"],
+            environment: environment,
+            userId: "personal-user"
+        ))
+    }
+
+    func testUITestSessionMarkerRequiresAValidSessionAndTheKnownBundle() {
+        let session = "764EB4F3-8932-4A26-8394-F86B83FCD5BF"
+        let bundle = "PlugIns/LogYourBodyUITests.xctest"
+        let rejectedEnvironments = [
+            ["XCTestSessionIdentifier": session],
+            ["XCTestBundlePath": bundle],
+            ["XCTestSessionIdentifier": "", "XCTestBundlePath": bundle],
+            ["XCTestSessionIdentifier": "not-a-uuid", "XCTestBundlePath": bundle],
+            ["XCTestSessionIdentifier": session, "XCTestBundlePath": ""],
+            ["XCTestSessionIdentifier": session, "XCTestBundlePath": "PlugIns/OtherUITests.xctest"],
+            ["XCTestSessionIdentifier": session, "XCTestBundlePath": "PlugIns/LogYourBodyTests.xctest"]
+        ]
+        for environment in rejectedEnvironments {
+            XCTAssertFalse(BiometricLockPolicy.shouldDisableForUITests(
+                arguments: ["-lybUITestDisableBiometricLock", "-lybUITestPaidMVPFixture"],
+                environment: environment,
+                userId: "ui_test_paid_mvp_user_123"
+            ))
+        }
+    }
+
     func testBiometricLockUsesTheShippedEntryScreenIdentifier() {
         XCTAssertEqual(WorldClassScreen.biometricLock.flow, .entry)
         XCTAssertEqual(

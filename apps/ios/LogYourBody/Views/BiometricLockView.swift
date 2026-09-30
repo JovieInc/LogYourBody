@@ -11,9 +11,12 @@ enum BiometricLockPolicy {
         userId: String?
     ) -> Bool {
         #if DEBUG
+        let hasConfiguration = environment["XCTestConfigurationFilePath"]
+            .map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
+        let hasUITestSession = UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil &&
+            (environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") ?? false)
         guard arguments.contains("-lybUITestDisableBiometricLock"),
-              let configuration = environment["XCTestConfigurationFilePath"],
-              !configuration.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              hasConfiguration || hasUITestSession,
               let userId else {
             return false
         }
