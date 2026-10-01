@@ -57,76 +57,35 @@ case "$STATUS_STATE" in
     ;;
 esac
 
-CHECK_RUNS_TSV="$(mktemp)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUNS_JSON="$(mktemp)"
+JOBS_JSON="$(mktemp)"
 cleanup() {
-  rm -f "$CHECK_RUNS_TSV"
+  rm -f "$RUNS_JSON" "$JOBS_JSON"
 }
 trap cleanup EXIT
 
-IFS=',' read -r -a required_checks <<< "$REQUIRED_CHECKS"
-
-load_check_runs() {
-  gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100" \
-    --paginate \
-    --jq '.check_runs[] | [.name, .status, (.conclusion // ""), (.completed_at // .started_at // ""), (.id | tostring)] | @tsv' \
-    > "$CHECK_RUNS_TSV"
-}
-
 validate_required_checks_once() {
-  found_required=0
-  missing_required=()
-  pending_required=()
-
-  for check_name in "${required_checks[@]}"; do
-    check_name="$(printf '%s' "$check_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    [ -n "$check_name" ] || continue
-
-    matches="$(awk -F '\t' -v wanted="$check_name" '$1 == wanted { print }' "$CHECK_RUNS_TSV" | LC_ALL=C sort -t $'\t' -k4,4)"
-
-    if [ -z "$matches" ]; then
-      missing_required+=("$check_name")
-      continue
-    fi
-
-    found_required=1
-    latest="$(printf '%s\n' "$matches" | tail -n 1)"
-    status="$(printf '%s' "$latest" | cut -f2)"
-    conclusion="$(printf '%s' "$latest" | cut -f3)"
-
-    if [ "$status" != "completed" ]; then
-      pending_required+=("$check_name:$status")
-      continue
-    fi
-
-    if [ "$conclusion" != "success" ] && [ "$conclusion" != "skipped" ]; then
-      fail "Required check '$check_name' concluded $conclusion."
-    fi
-
-    echo "Required check '$check_name' concluded $conclusion."
-  done
-
-  if [ "$found_required" -eq 0 ]; then
-    echo "No required CI check runs found yet on ref $REF_NAME for $SHA."
-    return 1
+  gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$SHA&per_page=100" \
+    --paginate --slurp > "$RUNS_JSON" || fail "Unable to read CI workflow runs."
+  run_id="$(node "$SCRIPT_DIR/validate-release-checks.mjs" select "$SHA" "$REPO" "$EVENT_NAME" "$RUNS_JSON")" || fail "Invalid CI workflow run metadata."
+  printf '[{"jobs":[]}]\n' > "$JOBS_JSON"
+  if [ -n "$run_id" ]; then
+    gh api "repos/$REPO/actions/runs/$run_id/jobs?filter=latest&per_page=100" \
+      --paginate --slurp > "$JOBS_JSON" || fail "Unable to read selected CI jobs."
   fi
-
-  if [ "${#missing_required[@]}" -gt 0 ]; then
-    echo "Required CI checks missing so far: ${missing_required[*]}"
-    return 1
-  fi
-
-  if [ "${#pending_required[@]}" -gt 0 ]; then
-    echo "Required CI checks pending so far: ${pending_required[*]}"
-    return 1
-  fi
-
-  return 0
+  result=0
+  node "$SCRIPT_DIR/validate-release-checks.mjs" validate "$SHA" "$REPO" "$EVENT_NAME" "$RUNS_JSON" "$REQUIRED_CHECKS" \
+    < "$JOBS_JSON" || result=$?
+  case "$result" in
+    0) return 0 ;;
+    2) return 1 ;;
+    *) fail "Required CI run evidence did not pass." ;;
+  esac
 }
 
 deadline=$((SECONDS + RELEASE_CHECK_TIMEOUT_SECONDS))
 while true; do
-  load_check_runs
-
   if validate_required_checks_once; then
     break
   fi

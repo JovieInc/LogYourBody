@@ -107,6 +107,13 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
+      - name: Test release source validation
+        run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-include=.github/scripts/validate-release-checks.mjs
+          --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90
+          .github/scripts/validate-release-source.test.mjs
+
       - name: Test
         run: pnpm test:ci
 
