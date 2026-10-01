@@ -110,6 +110,9 @@ struct SettingsRow: View {
     @Environment(\.dynamicTypeSize)
     private var dynamicTypeSize
 
+    @ScaledMetric(relativeTo: .body)
+    private var iconFrame = SettingsLayout.iconFrame
+
     let icon: String?
     let title: String
     var titleAccessibilityIdentifier: String?
@@ -184,7 +187,7 @@ struct SettingsRow: View {
     }
 
     private var valueLeadingInset: CGFloat {
-        icon == nil ? 0 : SettingsLayout.iconFrame + 12
+        icon == nil ? 0 : iconFrame + 12
     }
 
     private var leadingContent: some View {
@@ -193,7 +196,7 @@ struct SettingsRow: View {
                 Image(systemName: icon)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(resolvedTint)
-                    .frame(width: SettingsLayout.iconFrame)
+                    .frame(width: iconFrame)
                     .accessibilityHidden(true)
             }
 

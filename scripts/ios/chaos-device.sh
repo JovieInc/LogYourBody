@@ -27,9 +27,14 @@ RESULT_BUNDLE="${RESULT_BUNDLE:-$RESULTS_DIR/chaos-$STAMP.xcresult}"
 LYB_CHAOS_SEED="${LYB_CHAOS_SEED:-20260928}"
 LYB_CHAOS_STEPS="${LYB_CHAOS_STEPS:-250}"
 LYB_CHAOS_FIXTURE="${LYB_CHAOS_FIXTURE:--lybUITestPhotoTimelineHUDFixture}"
+# Space-separated extra launch arguments appended after the fixture, e.g.
+# LYB_CHAOS_EXTRA_ARGS="-UIPreferredContentSizeCategoryName UICTContentSizeCategoryAccessibilityXXXL"
+# or LYB_CHAOS_EXTRA_ARGS="-AppleLanguages (ar) -AppleLocale ar_SA" for RTL.
+LYB_CHAOS_EXTRA_ARGS="${LYB_CHAOS_EXTRA_ARGS:-}"
 export TEST_RUNNER_LYB_CHAOS_SEED="$LYB_CHAOS_SEED"
 export TEST_RUNNER_LYB_CHAOS_STEPS="$LYB_CHAOS_STEPS"
 export TEST_RUNNER_LYB_CHAOS_FIXTURE="$LYB_CHAOS_FIXTURE"
+export TEST_RUNNER_LYB_CHAOS_EXTRA_ARGS="$LYB_CHAOS_EXTRA_ARGS"
 
 mkdir -p "$RESULTS_DIR"
 cd "$IOS_DIR"

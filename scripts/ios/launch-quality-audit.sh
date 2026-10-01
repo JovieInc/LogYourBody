@@ -86,6 +86,7 @@ COMMON_XCODEBUILD_ARGS=(
   -scheme "$SCHEME"
   -destination "$DESTINATION"
   -parallel-testing-enabled NO
+  -enableCodeCoverage YES
   -maximum-concurrent-test-simulator-destinations 1
   -test-timeouts-enabled "$TEST_TIMEOUTS_ENABLED"
   -default-test-execution-time-allowance "$DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE"
@@ -246,6 +247,7 @@ else
   echo "Skipping optical grid audit" | tee "$ARTIFACT_DIR/optical-grid-audit.log"
 fi
 
+python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
 build_for_testing_once
 
 # The whole unit target is the gate: every journey test in docs/USER_JOURNEYS.md
@@ -256,7 +258,7 @@ run_xcodebuild_test \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
   -only-testing:LogYourBodyTests
 assert_xcresult_evidence \
-  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult"
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage
 
 UI_RESULT_BUNDLES=()
 run_ui_test_group \
@@ -269,6 +271,36 @@ run_ui_test_group \
 run_ui_test_group \
   "launch-quality-ui-logout-hierarchy" \
   "testProfileLogoutSignsOutFromPushedDetail"
+
+# Security-sensitive chaos regressions use the same native execution and
+# exact-test evidence validator as the existing launch quality checks.
+CHAOS_REGRESSIONS=(
+  "ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration"
+  "ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote"
+  "ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies"
+  "ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor"
+  "ChaosMonkeyUITests/testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates"
+  "ChaosMonkeyUITests/testSystemAlertsRequireKnownDenyOnlyAction"
+  "ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending"
+  "ChaosMonkeyUITests/testProfilePhotoImportIsExcludedFromMonkeyCandidates"
+  "ChaosMonkeyUITests/testMissingActionTargetsDoNotCompleteMonkeySteps"
+  "ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget"
+  "ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion"
+)
+CHAOS_SELECTORS=()
+CHAOS_EVIDENCE_ARGS=()
+for test_id in "${CHAOS_REGRESSIONS[@]}"; do
+  CHAOS_SELECTORS+=("-only-testing:LogYourBodyUITests/$test_id")
+  CHAOS_EVIDENCE_ARGS+=(--expected-test "$test_id()")
+done
+CHAOS_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui-chaos-regressions.xcresult"
+UI_RESULT_BUNDLES+=("$CHAOS_RESULT_BUNDLE")
+run_xcodebuild_test \
+  "launch-quality-ui-chaos-regressions" \
+  "$CHAOS_RESULT_BUNDLE" \
+  "$ARTIFACT_DIR/launch-quality-ui-chaos-regressions.log" \
+  "${CHAOS_SELECTORS[@]}"
+assert_xcresult_evidence "$CHAOS_RESULT_BUNDLE" "${CHAOS_EVIDENCE_ARGS[@]}" --require-settings-row-coverage --require-chaos-accounting-coverage
 
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
@@ -291,7 +323,8 @@ fi
   printf -- '- Required passing test IDs and seven screenshot hashes: `launch-quality-ui-critical-surfaces.evidence.json`. First failed attempt bundles are retained.\n'
   printf -- '- Source: `source-revision.txt` plus `source-working-tree.patch`; this is not exact deployed-build certification.\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
-  printf -- '- Build strategy: one `build-for-testing`, unit selectors in one `test-without-building` run, and four independently timed launch-quality UI selectors that capture all required screenshot surfaces with simulator parallelism disabled\n'
+  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, four independent screenshot selectors, logout hierarchy, and eleven bounded chaos regressions with simulator parallelism disabled\n'
+  printf -- '- Required native function coverage: biometric policy in unit execution and SettingsRow body, leading content, and value inset and action accounting in the chaos UI regressions\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"

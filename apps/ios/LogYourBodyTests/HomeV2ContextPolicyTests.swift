@@ -14,10 +14,11 @@ final class HomeV2ContextPolicyTests: XCTestCase {
         sourceName: String? = nil,
         photo: String? = nil,
         hour: Int = 0,
-        minute: Int = 0
+        minute: Int = 0,
+        now: Date = Date(),
+        calendar: Calendar = .current
     ) -> BodyMetrics {
-        let calendar = Calendar.current
-        let day = calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: Date())) ?? Date()
+        let day = calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: now)) ?? now
         let date = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day
         return BodyMetrics(
             id: "m\(daysAgo)",
@@ -72,19 +73,29 @@ final class HomeV2ContextPolicyTests: XCTestCase {
         XCTAssertNil(HomeV2ContextCopy.monthDelta(first: nil, last: 80, unit: "kg"))
     }
 
-    func testEntriesGroupByMonthNewestFirstWithTheMonthsChange() {
+    private func fixedCalendar() throws -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        return calendar
+    }
+
+    func testEntriesGroupByMonthNewestFirstWithTheMonthsChange() throws {
+        let calendar = try fixedCalendar()
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2_026, month: 9, day: 25)))
         let metrics = [
-            metric(daysAgo: 0, weight: 79.0, source: "healthkit"),
-            metric(daysAgo: 1, weight: 79.4, source: "healthkit"),
-            metric(daysAgo: 2, weight: nil, photo: "file:///photo.jpg"),
-            metric(daysAgo: 2, weight: nil),
-            metric(daysAgo: 45, weight: 81.0)
+            metric(daysAgo: 0, weight: 79.0, source: "healthkit", now: now, calendar: calendar),
+            metric(daysAgo: 1, weight: 79.4, source: "healthkit", now: now, calendar: calendar),
+            metric(daysAgo: 2, weight: nil, photo: "file:///photo.jpg", now: now, calendar: calendar),
+            metric(daysAgo: 2, weight: nil, now: now, calendar: calendar),
+            metric(daysAgo: 45, weight: 81.0, now: now, calendar: calendar)
         ]
         let sections = HomeV2EntriesPolicy.sections(
             metrics: metrics,
             unit: "kg",
             weightValue: { $0.weight },
-            hasPhoto: { $0.photoUrl != nil }
+            hasPhoto: { $0.photoUrl != nil },
+            calendar: calendar,
+            now: now
         )
         XCTAssertEqual(sections.count, 2)
         XCTAssertEqual(sections[0].rows.count, 3, "Weight-only, weight+photo and photo-only days all list; empty days do not")
@@ -93,5 +104,57 @@ final class HomeV2ContextPolicyTests: XCTestCase {
         XCTAssertEqual(sections[0].delta, "Down 0.4 kg")
         XCTAssertNil(sections[1].delta, "One weight is not a change")
         XCTAssertEqual(sections[1].rows.first?.source, "Typed")
+    }
+
+    func testEntriesOrderSeptemberAndOctoberChronologicallyAtMonthBoundary() throws {
+        let calendar = try fixedCalendar()
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2_026, month: 10, day: 1)))
+        let sections = HomeV2EntriesPolicy.sections(
+            metrics: [
+                metric(daysAgo: 0, weight: 79.0, now: now, calendar: calendar),
+                metric(daysAgo: 1, weight: 79.4, now: now, calendar: calendar),
+                metric(daysAgo: 2, weight: nil, photo: "file:///photo.jpg", now: now, calendar: calendar),
+                metric(daysAgo: 2, weight: nil, now: now, calendar: calendar),
+                metric(daysAgo: 45, weight: 81.0, now: now, calendar: calendar)
+            ],
+            unit: "kg",
+            weightValue: { $0.weight },
+            hasPhoto: { $0.photoUrl != nil },
+            calendar: calendar,
+            now: now
+        )
+
+        XCTAssertEqual(sections.map(\.id), ["2026-10", "2026-9", "2026-8"])
+        XCTAssertEqual(sections.map { $0.rows.count }, [1, 2, 1])
+        XCTAssertEqual(sections[0].rows.first?.valueText, "79.0 kg")
+        XCTAssertEqual(sections[1].rows.first?.valueText, "79.4 kg")
+        XCTAssertEqual(sections[1].rows.last?.valueText, "—")
+        XCTAssertTrue(sections.allSatisfy { $0.delta == nil }, "Month changes must not cross month boundaries")
+    }
+
+    func testEntriesOrderDecemberAndJanuaryAcrossYearBoundary() throws {
+        let calendar = try fixedCalendar()
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2_027, month: 1, day: 1)))
+        let sections = HomeV2EntriesPolicy.sections(
+            metrics: [
+                metric(daysAgo: 0, weight: 79.0, now: now, calendar: calendar),
+                metric(daysAgo: 1, weight: 79.4, now: now, calendar: calendar),
+                metric(daysAgo: 2, weight: 79.8, now: now, calendar: calendar),
+                metric(daysAgo: 45, weight: 81.0, now: now, calendar: calendar)
+            ],
+            unit: "kg",
+            weightValue: { $0.weight },
+            hasPhoto: { $0.photoUrl != nil },
+            calendar: calendar,
+            now: now
+        )
+
+        XCTAssertEqual(sections.map(\.id), ["2027-1", "2026-12", "2026-11"])
+        XCTAssertEqual(sections.map { $0.rows.count }, [1, 2, 1])
+        XCTAssertEqual(sections[0].rows.first?.valueText, "79.0 kg")
+        XCTAssertEqual(sections[1].rows.first?.valueText, "79.4 kg")
+        XCTAssertEqual(sections[1].delta, "Down 0.4 kg")
+        XCTAssertNil(sections[0].delta)
+        XCTAssertNil(sections[2].delta)
     }
 }
