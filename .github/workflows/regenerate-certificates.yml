@@ -94,11 +94,12 @@ jobs:
         run: |
           echo "🗑️ Cleaning certificates repository..."
           
-          # Extract the auth token from base64
-          AUTH_HEADER=$(echo $MATCH_GIT_BASIC_AUTHORIZATION | base64 -d)
-          
-          # Clone with authentication
-          git clone https://${AUTH_HEADER}@github.com/JovieInc/certificates.git certificates-temp
+          # Clone the configured Match repository with its Basic auth header.
+          # Use MATCH_GIT_URL so this workflow follows the same repository
+          # configuration as fastlane match and does not expose credentials in
+          # the clone URL.
+          git -c "http.extraheader=Authorization: Basic ${MATCH_GIT_BASIC_AUTHORIZATION}" \
+            clone "$MATCH_GIT_URL" certificates-temp
           cd certificates-temp
           git checkout $MATCH_GIT_BRANCH || git checkout -b $MATCH_GIT_BRANCH
           
