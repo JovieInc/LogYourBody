@@ -1,40 +1,38 @@
 name: Regenerate Certificates
 
-# Off by default. The monthly schedule was removed: the run failed at
-# "Clean certificates repository" because JovieInc/certificates is not
-# reachable, and the nuke lane calls match_nuke for distribution and
-# development certificates while swallowing errors.
+# Manual only. There is no schedule. LYB-74: a monthly cron failed every month
+# since at least March at "Clean certificates repository" (JovieInc/certificates
+# is not reachable), and the first lane runs match_nuke on distribution and
+# development certificates while swallowing errors. A repository variable must
+# not be enough to turn that back on.
+# https://linear.app/jovie/issue/LYB-74
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "REGENERATE" to confirm certificate regeneration'
+        description: 'Type NUKE-AND-REGENERATE to destroy and recreate certificates'
         required: true
         type: string
 
-jobs:
-  guard:
-    name: Certificate regeneration guard
-    runs-on: ubuntu-latest
-    steps:
-      - name: Report whether regeneration will run
-        env:
-          ENABLED: ${{ vars.LYB_CERT_REGEN_ENABLED }}
-          CONFIRM: ${{ github.event.inputs.confirm }}
-        run: |
-          set -euo pipefail
-          if [ "$ENABLED" = "1" ] && [ "$CONFIRM" = "REGENERATE" ]; then
-            echo "LYB_CERT_REGEN_ENABLED=1 and confirm=REGENERATE. Regeneration will run."
-            exit 0
-          fi
-          echo "::notice::Certificate regeneration is off. It runs only when repository variable LYB_CERT_REGEN_ENABLED is 1 and this dispatch confirm is REGENERATE. The monthly schedule has been removed."
+concurrency:
+  group: regenerate-certificates
+  cancel-in-progress: false
 
+jobs:
   regenerate-certificates:
     name: Regenerate Match Certificates
     runs-on: macos-14
-    if: vars.LYB_CERT_REGEN_ENABLED == '1' && github.event.inputs.confirm == 'REGENERATE'
-    
     steps:
+      - name: Require NUKE-AND-REGENERATE
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM" != "NUKE-AND-REGENERATE" ]; then
+            echo "::error::Refusing to nuke certificates. Dispatch confirm must be NUKE-AND-REGENERATE."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -198,7 +196,7 @@ jobs:
 
       - name: Detect Slack webhook
         id: slack
-        if: always()
+        if: always() && vars.CERT_REGEN_SLACK_ENABLED == 'true'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
@@ -207,11 +205,11 @@ jobs:
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::SLACK_WEBHOOK_URL is unset; skipping Slack notifications."
+            echo "::notice::CERT_REGEN_SLACK_ENABLED is true but SLACK_WEBHOOK_URL is unset; skipping Slack."
           fi
 
       - name: Send notification on failure
-        if: failure() && steps.slack.outputs.enabled == 'true'
+        if: failure() && vars.CERT_REGEN_SLACK_ENABLED == 'true' && steps.slack.outputs.enabled == 'true'
         uses: 8398a7/action-slack@v3
         with:
           status: failure
@@ -221,7 +219,7 @@ jobs:
         continue-on-error: true
 
       - name: Send notification on success
-        if: success() && steps.slack.outputs.enabled == 'true'
+        if: success() && vars.CERT_REGEN_SLACK_ENABLED == 'true' && steps.slack.outputs.enabled == 'true'
         uses: 8398a7/action-slack@v3
         with:
           status: success
