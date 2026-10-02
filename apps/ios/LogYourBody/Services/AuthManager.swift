@@ -270,6 +270,31 @@ final class AuthManager: NSObject, ObservableObject {
     private var webAuthenticationSession: ASWebAuthenticationSession?
     private var bootstrappedProfileSessionIds = Set<String>()
 
+    private final class AuthorizationContinuation<T>: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<T, Error>?
+
+        init(_ continuation: CheckedContinuation<T, Error>) {
+            self.continuation = continuation
+        }
+
+        func resume(returning value: T) {
+            take()?.resume(returning: value)
+        }
+
+        func resume(throwing error: Error) {
+            take()?.resume(throwing: error)
+        }
+
+        private func take() -> CheckedContinuation<T, Error>? {
+            lock.lock()
+            defer { lock.unlock() }
+            let continuation = continuation
+            self.continuation = nil
+            return continuation
+        }
+    }
+
     init(
         userDefaults: UserDefaults = .standard,
         keychain: KeychainManager = .shared,
@@ -456,6 +481,7 @@ final class AuthManager: NSObject, ObservableObject {
 
     private func openAuthorizationSession(url: URL) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
+            let authorizationContinuation = AuthorizationContinuation(continuation)
             let session = ASWebAuthenticationSession(
                 url: url,
                 callbackURLScheme: Configuration.authCallbackScheme
@@ -463,13 +489,13 @@ final class AuthManager: NSObject, ObservableObject {
                 Task { @MainActor in self?.webAuthenticationSession = nil }
                 if let authError = error as? ASWebAuthenticationSessionError,
                    authError.code == .canceledLogin {
-                    continuation.resume(throwing: AuthError.cancelled)
+                    authorizationContinuation.resume(throwing: AuthError.cancelled)
                 } else if error != nil {
-                    continuation.resume(throwing: AuthError.networkError)
+                    authorizationContinuation.resume(throwing: AuthError.networkError)
                 } else if let callbackURL {
-                    continuation.resume(returning: callbackURL)
+                    authorizationContinuation.resume(returning: callbackURL)
                 } else {
-                    continuation.resume(throwing: AuthError.invalidCallback)
+                    authorizationContinuation.resume(throwing: AuthError.invalidCallback)
                 }
             }
             session.presentationContextProvider = self
@@ -477,7 +503,7 @@ final class AuthManager: NSObject, ObservableObject {
             webAuthenticationSession = session
             guard session.start() else {
                 webAuthenticationSession = nil
-                continuation.resume(throwing: AuthError.providerNotReady)
+                authorizationContinuation.resume(throwing: AuthError.providerNotReady)
                 return
             }
         }
