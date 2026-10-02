@@ -17,7 +17,10 @@ XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNIN
 TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
 DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
 MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180}"
-XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-420}"
+# 720s covers one chaos group: ~2m of xcodebuild startup plus the slowest
+# passing tests (about 100s) without cutting off the last case. A command
+# timeout is not retried; see is_simulator_infra_failure.
+XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-720}"
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
@@ -101,8 +104,11 @@ cleanup_booted_simulator_apps() {
 is_simulator_infra_failure() {
   local log_file="$1"
 
+  # Command-timeout is intentionally absent. Merge-group run 36947770736
+  # reached it on the last chaos test while that test was still scanning, then
+  # this matcher retried the whole group and the 26-minute step died mid-retry.
   grep -Eq \
-    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Restarting after unexpected exit|unexpected exit, crash, or test timeout|xcodebuild command timed out' \
+    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Restarting after unexpected exit|unexpected exit, crash, or test timeout' \
     "$log_file"
 }
 
