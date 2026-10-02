@@ -293,6 +293,11 @@ export const endpoints = {
       reason: 'Linear GraphQL API used by CI remediation intake.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-74',
+      reason:
+        'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.',
+    },
+    {
       value: 'jov.ie',
       reason: 'First-party Jovie identity host (issuer contract is endpoints.auth).',
     },

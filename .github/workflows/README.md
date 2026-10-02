@@ -103,7 +103,7 @@ Attempts to auto-merge Dependabot patch/minor updates after CI passes.
 
 ### `regenerate-certificates.yml`
 
-Manual iOS certificate regeneration. Off unless repository variable `LYB_CERT_REGEN_ENABLED` is `1` and the dispatch confirm is `REGENERATE`. No schedule. Slack notifications are skipped when `SLACK_WEBHOOK_URL` is unset.
+Manual iOS certificate regeneration. No schedule. The job fails immediately unless the dispatch confirm is `NUKE-AND-REGENERATE` (LYB-74). Slack runs only when repository variable `CERT_REGEN_SLACK_ENABLED` is `true`.
 
 ## Blocking vs Advisory
 
