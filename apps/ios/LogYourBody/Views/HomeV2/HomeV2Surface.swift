@@ -4,10 +4,11 @@
 //
 import SwiftUI
 
-/// Home on the focus contract (Pencil H1/H2/C2): one check-in action, the
-/// number, a fixed 30-day trend, and quiet disclosures. Shows the metric-first
-/// layout (H1) until the selected day has a photo. Nothing is drawn over the
-/// person: the number sits below the photo.
+/// Home is the body timeline (JOV-6016): a full-width 4:5 visual for the
+/// selected day — the photo when one exists, the editorial plate when it does
+/// not — with the day's numbers below and the scrubber above the dock.
+/// Swiping the stage and dragging the scrubber resolve to the same
+/// `selectedIndex`, so photo, date and metrics always move together.
 struct HomeV2Surface: View {
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
@@ -16,12 +17,12 @@ struct HomeV2Surface: View {
     let weightUnit: String
     let changeSentence: String
     let compositionSentence: String
+    /// Display-formatted body fat for the selected day ("15.8"), nil when none.
+    let bodyFatText: String?
+    let dateText: (BodyMetrics) -> String
     let phaseSentence: String?
     let loggedSentence: String?
-    let latestPhotoCaption: String?
     var systemState: HomeV2SystemState?
-    let chartDaily: [MetricChartDataPoint]
-    let chartTrend: [MetricChartDataPoint]
     let onOpenPhoto: () -> Void
     let onViewProgress: () -> Void
     let onTodayDetails: () -> Void
@@ -31,34 +32,46 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
 
+    @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
+    @State private var hasAppeared = false
+
     private var isLogged: Bool { loggedSentence != nil }
     private var isHealthOff: Bool { systemState == .healthOff }
+    private var hasAnyPhoto: Bool {
+        bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
+    }
 
     var body: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 0) {
-                let hasPhoto = PhotoTimelineHUDPolicy.hasUsablePhoto(metric)
                 if systemState == .offline {
                     HomeV2OfflineBanner()
                 } else if isHealthOff {
                     HomeV2HealthOffRow()
                 }
-                if hasPhoto, let photoURL = metric.photoUrl {
-                    photoStage(photoURL: photoURL, size: geometry.size)
-                    photoNumberBlock
-                } else {
-                    metricFirst
+
+                timelinePager(size: geometry.size)
+                photoNumberBlock
+                if isHealthOff {
+                    todayDetailsRow
                 }
+                rangeRow
 
-                Spacer(minLength: 0)
-
-                if hasPhoto {
+                if hasAnyPhoto {
                     HomeV2DisclosureLink(
                         title: HomeV2PhotoCopy.allPhotos,
                         identifier: "home_v2_all_photos_row",
                         action: onAllPhotos
                     )
                     .frame(maxWidth: .infinity)
+                }
+
+                Spacer(minLength: 0)
+
+                timelineScrubber
+
+                if !coachDismissed {
+                    HomeV2TimelineCoachMark(onDismiss: { coachDismissed = true })
                 }
 
                 if isHealthOff, !isLogged {
@@ -76,31 +89,49 @@ struct HomeV2Surface: View {
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+            .onAppear { hasAppeared = true }
+            .onChange(of: selectedIndex) { _, _ in
+                // The first successful swipe or scrub means the lesson landed.
+                if hasAppeared { coachDismissed = true }
+            }
         }
     }
 
-    private func photoStage(photoURL: String, size: CGSize) -> some View {
-        Button(action: onOpenPhoto) {
-            SubjectPlateView(
-                urlString: photoURL,
-                size: CGSize(width: size.width, height: HomeV2Layout.stageHeight(width: size.width, height: size.height))
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Progress photo")
-        .accessibilityHint("Opens the photo")
-        .accessibilityIdentifier("home_v2_photo_stage")
+    private func timelinePager(size: CGSize) -> some View {
+        HomeV2TimelinePager(
+            bodyMetrics: bodyMetrics,
+            selectedIndex: $selectedIndex,
+            size: CGSize(
+                width: size.width,
+                height: HomeV2Layout.homeStageHeight(width: size.width, height: size.height)
+            ),
+            dateText: dateText,
+            onOpenPhoto: onOpenPhoto
+        )
+    }
+
+    /// The scrubber is the same selection the pager drives: chronological days,
+    /// one tick per day, the selected day tallest.
+    private var timelineScrubber: some View {
+        HomeV2PhotoTimelineRuler(
+            dates: HomeV2TimelinePolicy.chronologicalIndices(in: bodyMetrics).map { bodyMetrics[$0].date },
+            selected: HomeV2TimelinePolicy.chronologicalPosition(of: selectedIndex, in: bodyMetrics),
+            onSelect: { position in
+                if let index = HomeV2TimelinePolicy.index(at: position, in: bodyMetrics) {
+                    selectedIndex = index
+                }
+            },
+            accessibilityId: "home_v2_timeline_scrubber"
+        )
+        .padding(.bottom, HomeV2Tokens.Space.tight)
     }
 
     private var photoNumberBlock: some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-            if let latestPhotoCaption {
-                Text(latestPhotoCaption)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .accessibilityIdentifier("home_v2_photo_caption")
-            }
+            Text(HomeV2Copy.dayCaption(date: dateText(metric), source: HomeV2Provenance.label(for: metric)))
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .accessibilityIdentifier("home_v2_photo_caption")
 
             numberRow(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .semibold, kerning: -1.2)
 
@@ -109,7 +140,9 @@ struct HomeV2Surface: View {
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .accessibilityIdentifier("home_v2_change_sentence")
 
-            compositionLine
+            detailLine
+
+            statusLine
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
@@ -131,47 +164,20 @@ struct HomeV2Surface: View {
         }
     }
 
-    private var metricFirst: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .topLeading) {
-                Color.clear
-                    .frame(height: 1)
-                    .accessibilityElement()
-                    .accessibilityLabel(HomeV2Copy.title)
-                    .accessibilityIdentifier("home_v2_metric_first")
-
-                VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-                    numberRow(size: HomeV2Tokens.TypeSize.heroMetricFirst, weight: .bold, kerning: -2.5)
-
-                    Text(changeSentence)
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                        .accessibilityIdentifier("home_v2_change_sentence")
-
-                    compositionLine
-
-                    statusLine
-                }
-                .padding(.top, HomeV2Tokens.Space.heroTop)
-            }
-            .padding(.horizontal, HomeV2Tokens.Space.margin)
-
-            HomeV2TrendChart(
-                daily: chartDaily,
-                trend: chartTrend,
-                accent: HomeV2Tokens.Metric.weight,
-                range: .constant(.month1),
-                showsRangeTabs: false
+    /// The selected day's body fat with provenance, or the 30-day composition
+    /// headline when the day has no body fat of its own.
+    private var detailSentence: String {
+        if let bodyFatText {
+            return HomeV2Copy.dayBodyFatLine(
+                value: bodyFatText,
+                source: HomeV2Provenance.bodyFatSubline(for: metric)
             )
-            .padding(.top, HomeV2Tokens.Space.margin)
-
-            rangeRow
-            todayDetailsRow
         }
+        return compositionSentence
     }
 
-    private var compositionLine: some View {
-        Text(compositionSentence)
+    private var detailLine: some View {
+        Text(detailSentence)
             .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
             .foregroundStyle(HomeV2Tokens.Colors.secondary)
             .fixedSize(horizontal: false, vertical: true)

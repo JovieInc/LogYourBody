@@ -13,6 +13,7 @@ struct HomeV2PhotoTimelineRuler: View {
     let onSelect: (Int) -> Void
     var showsMonthLabels = true
     var calendar = Calendar.current
+    var accessibilityId = "home_v2_photo_ruler"
 
     private static let monthFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -40,7 +41,7 @@ struct HomeV2PhotoTimelineRuler: View {
             @unknown default: break
             }
         }
-        .accessibilityIdentifier("home_v2_photo_ruler")
+        .accessibilityIdentifier(accessibilityId)
     }
 
     private var monthLabels: some View {
