@@ -26,18 +26,13 @@ function loadCases(): KnowledgeCase[] {
 
 export function knowledgeEvalFixtureModel() {
   const cases = new Map(loadCases().map((row) => [row.question, row]));
-  let activeQuestion: string | undefined;
-  let loadRequested = false;
+  const loadRequested = new Set<string>();
   return mockModel(({ lastUserMessage, toolResults }) => {
     const row = cases.get(lastUserMessage);
     if (!row) return 'No matching knowledge eval case.';
 
-    if (activeQuestion !== lastUserMessage) {
-      activeQuestion = lastUserMessage;
-      loadRequested = false;
-    }
-    if (!loadRequested) {
-      loadRequested = true;
+    if (!loadRequested.has(lastUserMessage)) {
+      loadRequested.add(lastUserMessage);
       return { toolCalls: [{ name: 'load_skill', input: { skill: row.topic } }] };
     }
 
