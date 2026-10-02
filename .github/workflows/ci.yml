@@ -135,7 +135,7 @@ jobs:
           create-config-files: 'true'
 
       - name: Cache Swift packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             apps/ios/.build
@@ -185,7 +185,7 @@ jobs:
           create-config-files: 'true'
 
       - name: Cache Swift packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             apps/ios/.build
