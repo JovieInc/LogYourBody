@@ -65,6 +65,17 @@
     "node": "22.x",
     "pnpm": ">=10.34.1"
   },
+  "pnpm": {
+    "overrides": {
+      "js-yaml": "4.3.2",
+      "prismjs": "1.30.0",
+      "@xmldom/xmldom": ">=0.8.15",
+      "fflate": ">=0.8.3",
+      "postcss": ">=8.5.23",
+      "vite": "7.3.6",
+      "undici": "^8.10.2"
+    }
+  },
   "lint-staged": {
     "apps/web/**/*.{js,jsx,ts,tsx}": [
       "bash -c 'if [[ \"$0\" != *\"__tests__\"* ]] && [[ \"$0\" != *\".test.\"* ]] && [[ \"$0\" != *\".spec.\"* ]]; then eslint --fix \"$0\"; fi'",
