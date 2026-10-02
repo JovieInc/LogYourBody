@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import {
   addLinearIssueComment,
   missingLinearKeyWarning,
-  upsertLinearIssueByTitleFingerprint,
+  upsertLinearIssue,
 } from './lib/linear-issue-intake.mjs';
 
 export const NO_REVIEWER_FINGERPRINT = 'remediation:lyb-pr-no-reviewer';
@@ -172,7 +172,7 @@ async function main() {
     console.log(formatNoReviewerDryRun(selected, runUrl));
     return;
   }
-  const upserted = await upsertLinearIssueByTitleFingerprint({ ...plan, apiKey: process.env.LINEAR_API_KEY });
+  const upserted = await upsertLinearIssue({ ...plan, apiKey: process.env.LINEAR_API_KEY });
   if (!upserted.ok) {
     console.error(upserted.reason || 'linear_upsert_failed');
     process.exit(1);

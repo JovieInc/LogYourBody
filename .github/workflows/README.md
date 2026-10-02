@@ -27,6 +27,10 @@ Primary pull request workflow for `main`.
 
 ## Advisory Automation
 
+### `codeowners-check.yml`
+
+Weekly and manual CODEOWNERS drift check. Upserts JOV-7549 (`remediation:codeowners-drift`) with a comment for this repository when the file is missing or an owner is invalid. Live filing requires repository variable `REMEDIATION_TRIGGERS_ENABLED` to be `true` and `LINEAR_API_KEY`. Otherwise the job dry-runs.
+
 ### `advisory-ai-review.yml`
 
 Non-blocking internal AI review for pull requests after the `CI` workflow completes.

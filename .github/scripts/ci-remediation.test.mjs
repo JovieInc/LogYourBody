@@ -10,6 +10,16 @@ import {
   shouldAddRunComment,
 } from './asc-agreements-remediation.mjs';
 import {
+  CODEOWNERS_ISSUE,
+  CODEOWNERS_LABEL,
+  classifyCodeowners,
+  codeownersFilingEnabled,
+  formatCodeownersDryRun,
+  planCodeownersIssue,
+  shouldAddRepoComment,
+} from './codeowners-check.mjs';
+import { linearIssueLookupFilter, upsertLinearIssue } from './lib/linear-issue-intake.mjs';
+import {
   NO_REVIEWER_FINGERPRINT,
   NO_REVIEWER_WAIT_MS,
   buildNoReviewerIssue,
@@ -146,6 +156,171 @@ test('ASC comment is skipped when this run or a recent fingerprint comment alrea
     ),
     true,
   );
+});
+
+test('CODEOWNERS drift is missing file or invalid owner, and stays a dry-run unless the gate is on', () => {
+  assert.equal(classifyCodeowners({ status: 404, body: { message: 'Not Found' } }).kind, 'missing');
+  assert.equal(
+    classifyCodeowners({
+      status: 200,
+      body: { errors: [{ kind: 'Invalid pattern', message: 'Invalid pattern on line 1' }] },
+    }).kind,
+    'ok',
+  );
+  const invalid = classifyCodeowners({
+    status: 200,
+    body: {
+      errors: [
+        {
+          kind: 'Invalid owner',
+          path: '.github/CODEOWNERS',
+          line: 1,
+          source: '* @not-a-user',
+          message: 'Invalid owner on line 1',
+        },
+      ],
+    },
+  });
+  assert.equal(invalid.kind, 'invalid_owner');
+  assert.equal(classifyCodeowners({ status: 500, body: {} }).kind, 'http_error');
+
+  const missing = planCodeownersIssue({
+    repo: 'JovieInc/LogYourBody',
+    classification: { kind: 'missing', errors: [] },
+    runUrl: 'https://github.com/JovieInc/LogYourBody/actions/runs/9',
+  });
+  assert.equal(missing.label, CODEOWNERS_LABEL);
+  assert.equal(missing.label, 'remediation:codeowners-drift');
+  assert.equal(missing.identifier, CODEOWNERS_ISSUE);
+  assert.equal(missing.identifier, 'JOV-7549');
+  assert.equal(missing.createStateName, 'Todo');
+  assert.equal(missing.reopenTerminal, true);
+  assert.match(missing.comment, /repo: JovieInc\/LogYourBody/);
+  assert.match(missing.comment, /CODEOWNERS is missing/);
+  assert.equal(
+    planCodeownersIssue({
+      repo: 'JovieInc/LogYourBody',
+      classification: { kind: 'ok', errors: [] },
+      runUrl: '',
+    }),
+    null,
+  );
+  const ownerPlan = planCodeownersIssue({
+    repo: 'JovieInc/LogYourBody',
+    classification: invalid,
+    runUrl: 'https://github.com/JovieInc/LogYourBody/actions/runs/9',
+  });
+  assert.match(ownerPlan.description, /@not-a-user/);
+  assert.equal(shouldAddRepoComment([{ body: ownerPlan.comment }], ownerPlan.comment), false);
+  assert.equal(shouldAddRepoComment([{ body: 'repo: JovieInc/Other' }], ownerPlan.comment), true);
+
+  assert.equal(codeownersFilingEnabled({}), false);
+  assert.equal(codeownersFilingEnabled({ REMEDIATION_TRIGGERS_ENABLED: 'true' }), false);
+  assert.equal(codeownersFilingEnabled({ LINEAR_API_KEY: 'secret' }), false);
+  assert.equal(
+    codeownersFilingEnabled({ REMEDIATION_TRIGGERS_ENABLED: 'true', LINEAR_API_KEY: 'secret' }),
+    true,
+  );
+  const dryRun = formatCodeownersDryRun(missing, {
+    reason: 'REMEDIATION_TRIGGERS_ENABLED is not true or LINEAR_API_KEY is unset',
+  });
+  assert.match(dryRun, /would upsert Linear issue/);
+  assert.match(dryRun, /JOV-7549/);
+  assert.match(formatCodeownersDryRun(null, { reason: 'ok' }), /No Linear issue filed/);
+
+  const workflow = readFileSync(resolve(root, '.github/workflows/codeowners-check.yml'), 'utf8');
+  assert.match(workflow, /cron: '41 16 \* \* 1'/);
+  assert.match(workflow, /workflow_dispatch/);
+  assert.match(workflow, /vars\.REMEDIATION_TRIGGERS_ENABLED/);
+  assert.match(workflow, /secrets\.LINEAR_API_KEY/);
+  assert.match(workflow, /remediation:codeowners-drift|codeowners-check\.mjs/);
+  assert.doesNotMatch(workflow, /schedule:[\s\S]*schedule:/);
+
+  assert.deepEqual(linearIssueLookupFilter({ fingerprint: 'remediation:asc-agreements' }).title, {
+    contains: 'remediation:asc-agreements',
+  });
+  const byLabel = linearIssueLookupFilter({
+    fingerprint: 'ignored',
+    label: 'remediation:codeowners-drift',
+  });
+  assert.equal(byLabel.labels.some.name.eq, 'remediation:codeowners-drift');
+  assert.equal(byLabel.title, undefined);
+});
+
+test('one Linear upsert helper matches a title fingerprint or a label', async () => {
+  const calls = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push(body);
+    const query = body.query;
+    if (query.includes('FindRemediationIssue')) {
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            data: {
+              team: {
+                states: {
+                  nodes: [
+                    { id: 'todo', name: 'Todo', type: 'unstarted' },
+                    { id: 'backlog', name: 'Backlog', type: 'backlog' },
+                  ],
+                },
+                labels: { nodes: [{ id: 'label-1', name: 'remediation:codeowners-drift' }] },
+              },
+              issues: { nodes: [] },
+            },
+          }),
+      };
+    }
+    if (query.includes('RemediationIssueByIdentifier')) {
+      return { ok: true, text: async () => JSON.stringify({ data: { issue: null } }) };
+    }
+    if (query.includes('CreateDedupedLinearIssue')) {
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            data: {
+              issueCreate: {
+                success: true,
+                issue: { id: 'issue-1', identifier: 'JOV-1', url: 'https://example.com/issue-1' },
+              },
+            },
+          }),
+      };
+    }
+    return { ok: false, status: 500, text: async () => '' };
+  };
+
+  const byTitle = await upsertLinearIssue({
+    fingerprint: 'remediation:asc-agreements',
+    title: 'asc',
+    description: 'd',
+    priority: 1,
+    createStateName: 'Todo',
+    apiKey: 'test-key',
+    fetchImpl,
+  });
+  assert.equal(byTitle.action, 'created');
+  assert.equal(calls[0].variables.filter.title.contains, 'remediation:asc-agreements');
+
+  calls.length = 0;
+  const byLabel = await upsertLinearIssue({
+    label: 'remediation:codeowners-drift',
+    identifier: 'JOV-7549',
+    title: 'drift',
+    description: 'd',
+    createStateName: 'Todo',
+    reopenTerminal: true,
+    apiKey: 'test-key',
+    fetchImpl,
+  });
+  assert.equal(byLabel.action, 'created');
+  assert.equal(calls[0].variables.filter.labels.some.name.eq, 'remediation:codeowners-drift');
+  assert.equal(calls[1].variables.id, 'JOV-7549');
+  assert.deepEqual(calls[2].variables.labelIds, ['label-1']);
+  assert.equal(calls[2].variables.priority, undefined);
 });
 
 test('failed iOS release workflows are the ASC log source', () => {

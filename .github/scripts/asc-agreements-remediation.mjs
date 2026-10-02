@@ -9,7 +9,7 @@ import {
   addLinearIssueComment,
   listLinearIssueComments,
   missingLinearKeyWarning,
-  upsertLinearIssueByTitleFingerprint,
+  upsertLinearIssue,
 } from './lib/linear-issue-intake.mjs';
 
 export const ASC_LOG_FINGERPRINT = 'REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED';
@@ -54,7 +54,7 @@ export function shouldAddRunComment(comments, { runUrl, nowMs, windowMs = COMMEN
 }
 
 async function filePlan(plan, { apiKey, runUrl, nowMs = Date.now() }) {
-  const upserted = await upsertLinearIssueByTitleFingerprint({
+  const upserted = await upsertLinearIssue({
     ...plan,
     apiKey,
   });

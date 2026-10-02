@@ -18,7 +18,9 @@
         "$TURBO_ROOT$/.github/scripts/asc-agreements-remediation.mjs",
         "$TURBO_ROOT$/.github/scripts/pr-no-reviewer-intake.mjs",
         "$TURBO_ROOT$/.github/scripts/lib/linear-issue-intake.mjs",
+        "$TURBO_ROOT$/.github/scripts/codeowners-check.mjs",
         "$TURBO_ROOT$/.github/workflows/linear-remediation.yml",
+        "$TURBO_ROOT$/.github/workflows/codeowners-check.yml",
         "$TURBO_ROOT$/.github/workflows/ios-app-store-approved-release.yml",
         "$TURBO_ROOT$/.github/workflows/ios-release-loop.yml",
         "$TURBO_ROOT$/.github/workflows/ios-testflight-deploy.yml"
