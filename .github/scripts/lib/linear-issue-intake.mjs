@@ -1,6 +1,7 @@
 // Vendored from JovieInc/Jovie scripts/lib/linear-issue-intake.mjs.
-// Minimal copy: upsert by title fingerprint, plus the comment helpers the
-// remediation jobs use. JOV team id is the Jovie team.
+// One upsert helper for the remediation jobs: match an existing JOV issue by
+// title fingerprint or by label, then create or update it. Comment helpers
+// sit next to it. JOV team id is the Jovie team.
 
 const LINEAR_API = 'https://api.linear.app/graphql';
 const LINEAR_REQUEST_TIMEOUT_MS = 15_000;
@@ -129,12 +130,24 @@ export async function listLinearIssueComments({
   };
 }
 
-// Dedup by fingerprint in the title. Linear removed issueSearch.
-export async function upsertLinearIssueByTitleFingerprint({
-  fingerprint,
+// Title contains, or label name. Linear removed issueSearch.
+export function linearIssueLookupFilter({ teamId = JOVIE_TEAM_ID, fingerprint = null, label = null }) {
+  const filter = { team: { id: { eq: teamId } } };
+  if (typeof label === 'string' && label.trim().length > 0) {
+    filter.labels = { some: { name: { eq: label.trim() } } };
+  } else {
+    filter.title = { contains: fingerprint };
+  }
+  return filter;
+}
+
+export async function upsertLinearIssue({
+  fingerprint = null,
+  label = null,
+  identifier = null,
   title,
   description,
-  priority = 1,
+  priority,
   // Optional state name (e.g. 'Todo') resolved from the team's workflow so a
   // newly created issue can skip the default intake state (JOV-5966).
   createStateName = null,
@@ -147,50 +160,100 @@ export async function upsertLinearIssueByTitleFingerprint({
   if (!apiKey) {
     return { ok: false, reason: 'missing_linear_api_key' };
   }
-  if (typeof fingerprint !== 'string' || fingerprint.trim().length === 0) {
+  const labelName = typeof label === 'string' ? label.trim() : '';
+  const titleFingerprint = typeof fingerprint === 'string' ? fingerprint.trim() : '';
+  if (!labelName && !titleFingerprint && !identifier) {
     return { ok: false, reason: 'missing_fingerprint' };
   }
 
+  const lookup =
+    labelName || titleFingerprint
+      ? linearIssueLookupFilter({
+          fingerprint: titleFingerprint,
+          label: labelName || null,
+        })
+      : null;
   const found = await linearGraphql(
-    {
-      query: `
-        query FindIssueByFingerprint(
-          $teamId: String!
-          $teamFilterId: ID!
-          $fingerprint: String!
-        ) {
-          team(id: $teamId) { states { nodes { id name type } } }
-          issues(
-            filter: {
-              team: { id: { eq: $teamFilterId } }
-              title: { contains: $fingerprint }
+    lookup
+      ? {
+          query: `
+            query FindRemediationIssue($teamId: String!, $filter: IssueFilter!) {
+              team(id: $teamId) {
+                states { nodes { id name type } }
+                labels { nodes { id name } }
+              }
+              issues(filter: $filter, first: 25) {
+                nodes {
+                  id identifier url title description
+                  state { id name type }
+                  labels { nodes { id name } }
+                }
+              }
             }
-            first: 25
-          ) {
-            nodes { id identifier url title description state { id name type } }
-          }
+          `,
+          variables: { teamId: JOVIE_TEAM_ID, filter: lookup },
+          apiKey,
+          fetchImpl,
         }
-      `,
-      variables: {
-        teamId: JOVIE_TEAM_ID,
-        teamFilterId: JOVIE_TEAM_ID,
-        fingerprint,
-      },
-      apiKey,
-      fetchImpl,
-    },
+      : {
+          query: `
+            query RemediationTeam($teamId: String!) {
+              team(id: $teamId) {
+                states { nodes { id name type } }
+                labels { nodes { id name } }
+              }
+            }
+          `,
+          variables: { teamId: JOVIE_TEAM_ID },
+          apiKey,
+          fetchImpl,
+        },
     'linear_search',
   );
   if (!found.ok) return found;
 
-  const matches = (found.data?.issues?.nodes ?? []).filter((node) =>
-    String(node?.title ?? '').includes(fingerprint),
-  );
+  const teamLabels = found.data?.team?.labels?.nodes ?? [];
+  const nodes = found.data?.issues?.nodes ?? [];
+  const matches = labelName
+    ? nodes.filter((node) =>
+        (node?.labels?.nodes ?? []).some((item) => item?.name === labelName),
+      )
+    : nodes.filter((node) => String(node?.title ?? '').includes(titleFingerprint));
   // Prefer a live issue over terminal duplicates so the canonical survivor
   // keeps accumulating reports instead of reopening a marked dupe.
   const terminalTypes = ['completed', 'canceled'];
-  const match =
+  let match =
     matches.find((node) => !terminalTypes.includes(node?.state?.type)) ?? matches[0] ?? null;
+
+  if (!match && identifier) {
+    const byIdentifier = await linearGraphql(
+      {
+        query: `
+          query RemediationIssueByIdentifier($id: String!) {
+            issue(id: $id) {
+              id identifier url title description
+              team { id }
+              state { id name type }
+              labels { nodes { id name } }
+            }
+          }
+        `,
+        variables: { id: identifier },
+        apiKey,
+        fetchImpl,
+      },
+      'linear_issue_by_identifier',
+    );
+    if (!byIdentifier.ok) return byIdentifier;
+    const issue = byIdentifier.data?.issue ?? null;
+    if (issue && issue.team?.id === JOVIE_TEAM_ID) match = issue;
+  }
+
+  const labelIdResult = labelName
+    ? await ensureTeamLabelId({ label: labelName, labels: teamLabels, apiKey, fetchImpl })
+    : { ok: true, id: null };
+  if (!labelIdResult.ok) return labelIdResult;
+  const labelIds = [...createLabelIds, labelIdResult.id].filter(Boolean);
 
   if (!match) {
     const states = found.data?.team?.states?.nodes ?? [];
@@ -206,7 +269,7 @@ export async function upsertLinearIssueByTitleFingerprint({
           mutation CreateDedupedLinearIssue(
             $title: String!
             $description: String!
-            $priority: Int
+            ${typeof priority === 'number' ? '$priority: Int' : ''}
             $stateId: String
             $labelIds: [String!]
           ) {
@@ -214,7 +277,7 @@ export async function upsertLinearIssueByTitleFingerprint({
               teamId: "${JOVIE_TEAM_ID}"
               title: $title
               description: $description
-              priority: $priority
+              ${typeof priority === 'number' ? 'priority: $priority' : ''}
               stateId: $stateId
               labelIds: $labelIds
             }) {
@@ -226,9 +289,9 @@ export async function upsertLinearIssueByTitleFingerprint({
         variables: {
           title,
           description,
-          priority,
+          ...(typeof priority === 'number' ? { priority } : {}),
           ...(createStateId ? { stateId: createStateId } : {}),
-          ...(createLabelIds.length > 0 ? { labelIds: createLabelIds } : {}),
+          ...(labelIds.length > 0 ? { labelIds } : {}),
         },
         apiKey,
         fetchImpl,
@@ -263,10 +326,14 @@ export async function upsertLinearIssueByTitleFingerprint({
   if (terminal && reopenTerminal && !backlogState) {
     return { ok: false, reason: 'linear_backlog_state_missing' };
   }
-  // Priority is part of the upsert so an existing JOV issue stays Urgent.
+  const alreadyLabeled =
+    !labelName || (match.labels?.nodes ?? []).some((item) => item?.name === labelName);
+  // Priority is part of the upsert when the caller sets it, so an existing
+  // Urgent JOV issue stays Urgent. Callers that omit it leave priority alone.
   const input = {
     description,
-    priority,
+    ...(typeof priority === 'number' ? { priority } : {}),
+    ...(!alreadyLabeled && labelIdResult.id ? { addedLabelIds: [labelIdResult.id] } : {}),
     ...(terminal && reopenTerminal
       ? {
           stateId: createStateName === 'Todo' && todoState ? todoState.id : backlogState.id,
@@ -305,4 +372,33 @@ export async function upsertLinearIssueByTitleFingerprint({
     identifier: match.identifier,
     url: match.url,
   };
+}
+
+export const upsertLinearIssueByTitleFingerprint = upsertLinearIssue;
+
+async function ensureTeamLabelId({ label, labels, apiKey, fetchImpl }) {
+  const existing = labels.find((item) => item?.name === label);
+  if (existing?.id) return { ok: true, id: existing.id };
+  const created = await linearGraphql(
+    {
+      query: `
+        mutation CreateTeamLabel($name: String!, $teamId: String!) {
+          issueLabelCreate(input: { name: $name, teamId: $teamId }) {
+            success
+            issueLabel { id }
+          }
+        }
+      `,
+      variables: { name: label, teamId: JOVIE_TEAM_ID },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_label_create',
+  );
+  if (!created.ok) return created;
+  const id = created.data?.issueLabelCreate?.issueLabel?.id ?? null;
+  if (!created.data?.issueLabelCreate?.success || !id) {
+    return { ok: false, reason: 'linear_label_create_unsuccessful', body: created.raw };
+  }
+  return { ok: true, id };
 }

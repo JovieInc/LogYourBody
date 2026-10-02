@@ -1,0 +1,54 @@
+name: CODEOWNERS check
+
+# Weekly check for a missing CODEOWNERS file or an invalid owner.
+# Upserts JOV-7549 (label remediation:codeowners-drift) and comments with this
+# repository. Files only when REMEDIATION_TRIGGERS_ENABLED is true and
+# LINEAR_API_KEY is set. Otherwise it prints the upsert and does not call Linear.
+
+on:
+  schedule:
+    - cron: '41 16 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/codeowners-check.yml'
+      - '.github/scripts/codeowners-check.mjs'
+      - '.github/scripts/ci-remediation.test.mjs'
+      - '.github/scripts/lib/linear-issue-intake.mjs'
+      - '.github/scripts/asc-agreements-remediation.mjs'
+      - '.github/scripts/pr-no-reviewer-intake.mjs'
+      - 'packages/shared-lib/package.json'
+      - 'packages/shared-lib/turbo.json'
+
+permissions: {}
+
+concurrency:
+  group: codeowners-check-${{ github.workflow }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: CODEOWNERS drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit tests
+        if: github.event_name == 'pull_request'
+        run: node --test .github/scripts/ci-remediation.test.mjs
+
+      - name: Upsert JOV-7549 when CODEOWNERS drifts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_ENABLED: ${{ vars.REMEDIATION_TRIGGERS_ENABLED }}
+          DRY_RUN: ${{ github.event_name == 'pull_request' && 'true' || '' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/codeowners-check.mjs
