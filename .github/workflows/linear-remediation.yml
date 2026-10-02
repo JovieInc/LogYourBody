@@ -1,0 +1,111 @@
+name: Linear remediation
+
+# Reads failed iOS release logs and files JOV remediation:asc-agreements.
+# The release workflows themselves are unchanged, including any LYB-68 [ci] filing.
+# The weekly job only upserts JOV remediation:lyb-pr-no-reviewer. It never edits PRs.
+
+on:
+  workflow_run:
+    workflows:
+      - iOS App Store Approved Release
+      - iOS Release Loop
+      - iOS TestFlight Deploy
+    types: [completed]
+  schedule:
+    - cron: '17 15 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print the no-reviewer Linear issue instead of filing it'
+        required: false
+        type: boolean
+        default: true
+  pull_request:
+    paths:
+      - '.github/scripts/asc-agreements-remediation.mjs'
+      - '.github/scripts/pr-no-reviewer-intake.mjs'
+      - '.github/scripts/ci-remediation.test.mjs'
+      - '.github/scripts/lib/linear-issue-intake.mjs'
+      - '.github/workflows/linear-remediation.yml'
+      - 'packages/shared-lib/package.json'
+      - 'packages/shared-lib/turbo.json'
+
+permissions: {}
+
+concurrency:
+  group: linear-remediation-${{ github.workflow }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Remediation unit tests
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit test log matcher and reviewer selection
+        run: node --test .github/scripts/ci-remediation.test.mjs
+
+  asc-agreements:
+    name: File ASC agreements issue
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Upsert remediation:asc-agreements when the log matches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          log_path="$RUNNER_TEMP/failed-release.log"
+          if ! gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log-failed >"$log_path"; then
+            echo "::warning::Could not download failed logs for run ${RUN_ID}"
+            exit 0
+          fi
+          node .github/scripts/asc-agreements-remediation.mjs "$log_path"
+
+  pr-no-reviewer:
+    name: File PRs with no reviewer
+    needs: test
+    if: always() && needs.test.result == 'success' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      checks: read
+      contents: read
+      pull-requests: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Upsert remediation:lyb-pr-no-reviewer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/pr-no-reviewer-intake.mjs

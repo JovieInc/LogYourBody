@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.70.1",

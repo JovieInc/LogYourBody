@@ -159,6 +159,7 @@ export const logYourBody = {
       { value: 'https://instagram.com/logyourbody', reason: 'Product social profile.' },
       { value: 'https://youtube.com/@logyourbody', reason: 'Product social profile.' },
       { value: 'https://api.github.com', reason: 'GitHub REST API used by CI scripts.' },
+      { value: 'https://api.linear.app', reason: 'Linear GraphQL API used by CI remediation intake.' },
       { value: 'jov.ie', reason: 'First-party Jovie identity host (issuer contract is endpoints.auth).' },
       { value: 'https://github.com/JovieInc', reason: 'GitHub org page.' },
       { value: 'https://github.com/itstimwhite', reason: 'Pre-rename repo owner; URLs redirect to JovieInc.' },

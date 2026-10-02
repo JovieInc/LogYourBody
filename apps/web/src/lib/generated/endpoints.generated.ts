@@ -289,6 +289,10 @@ export const endpoints = {
       reason: 'GitHub REST API used by CI scripts.',
     },
     {
+      value: 'https://api.linear.app',
+      reason: 'Linear GraphQL API used by CI remediation intake.',
+    },
+    {
       value: 'jov.ie',
       reason: 'First-party Jovie identity host (issuer contract is endpoints.auth).',
     },
