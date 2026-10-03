@@ -408,6 +408,9 @@ struct LogYourBodyApp: App {
         if arguments.contains("-lybUITestResetWhatsNewReviewState") {
             ReleaseReviewStateStore().reset()
         }
+        if arguments.contains("-lybUITestResetHomeV2TimelineCoach") {
+            UserDefaults.standard.removeObject(forKey: HomeV2Copy.coachDismissedDefaultsKey)
+        }
         let usesPaidFixture = arguments.contains("-lybUITestPaidMVPFixture")
         let usesWeightLoggerFixture = arguments.contains("-lybUITestWeightLoggerMVPFixture")
         let usesPaywallFixture = arguments.contains("-lybUITestPaywallFixture")

@@ -23,12 +23,6 @@ extension DashboardViewLiquid {
         bodyMetrics.first { Calendar.current.isDateInToday($0.date) }
     }
 
-    var homeV2LatestPhotoMetric: BodyMetrics? {
-        bodyMetrics
-            .filter { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
-            .max { $0.date < $1.date }
-    }
-
     /// Photo-first Home behind `HomeV2Policy`; the legacy `LaunchTimelineSurface`
     /// keeps serving when the gate is off.
     func homeV2Surface(for metric: BodyMetrics) -> some View {
@@ -44,10 +38,9 @@ extension DashboardViewLiquid {
             compositionSentence: HomeV2CompositionPolicy.headline(metrics: bodyMetrics),
             phaseSentence: homeV2PhaseSentence,
             loggedSentence: homeV2Logged.map { HomeV2Copy.loggedSentence(value: $0.valueText, unit: $0.unit) },
-            latestPhotoCaption: homeV2LatestPhotoMetric.map { HomeV2Copy.latestPhotoCaption(date: formatHUDDate($0.date)) },
+            bodyFatText: metric.bodyFatPercentage.map { String(format: "%.1f", $0) },
+            dateText: { formatHUDDate($0.date) },
             systemState: homeV2SystemState,
-            chartDaily: fullChartCache[.weight] ?? [],
-            chartTrend: fullTrendChartCache[.weight] ?? [],
             onOpenPhoto: { isHomeV2ViewerPresented = true },
             onViewProgress: { openHomeV2Progress(metric: .weight) },
             onTodayDetails: { openHomeV2Context() },

@@ -69,6 +69,8 @@
 		542F8AAE22D916390F4ACA2D /* ChaosMonkeyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93D52CE5E90CEAADACDADD54 /* ChaosMonkeyUITests.swift */; };
 		57EE5D3DE35D32DFC0A60E02 /* KeychainManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA91A028C261AEBF383794D0 /* KeychainManagerTests.swift */; };
 		5803E674F4ACA15635334F15 /* HomeV2Surface.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC9C445A5BBDAD9BB34C8E55 /* HomeV2Surface.swift */; };
+		FF6016AA00000000000000B1 /* HomeV2TimelineHero.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6016AA00000000000000F1 /* HomeV2TimelineHero.swift */; };
+		FF6016BB00000000000000B1 /* HomeV2TimelinePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6016BB00000000000000F1 /* HomeV2TimelinePolicyTests.swift */; };
 		5952A0969501ACC7277BE893 /* View+Styles.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BF04D15583E3AE1CA4A836 /* View+Styles.swift */; };
 		5A5834631DA85239D455F320 /* AccountDeletionCleanupServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB992727D1333B365F93F30E /* AccountDeletionCleanupServiceTests.swift */; };
 		5B2F64647650AAF5937280BD /* DSDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2465B2ED058FAFC5389161E /* DSDivider.swift */; };
@@ -517,6 +519,7 @@
 		4590E4EDF067461157CAE028 /* ErrorStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ErrorStateView.swift; path = DesignSystem/Molecules/ErrorStateView.swift; sourceTree = "<group>"; };
 		45999DF3001C2F424CBB44DB /* SyncIntegrationTestDoubles.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncIntegrationTestDoubles.swift; sourceTree = "<group>"; };
 		4877512DEE0F7236151A15AA /* HomeV2PolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PolicyTests.swift; sourceTree = "<group>"; };
+		FF6016BB00000000000000F1 /* HomeV2TimelinePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2TimelinePolicyTests.swift; sourceTree = "<group>"; };
 		492B105B3BA25B5B5864B9BA /* MobileProfileNamePayloadTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileProfileNamePayloadTests.swift; sourceTree = "<group>"; };
 		4C3BCDDCDB314367722653A8 /* ValidationServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ValidationServiceTests.swift; sourceTree = "<group>"; };
 		4C87F359CE5509C2457AB583 /* PaywallSavingsPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PaywallSavingsPolicyTests.swift; sourceTree = "<group>"; };
@@ -958,6 +961,7 @@
 		FB947FE422689993FD02B4F6 /* AuthHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthHeader.swift; path = DesignSystem/Molecules/AuthHeader.swift; sourceTree = "<group>"; };
 		FBDA30F8A24DC3754F3CD216 /* AuthProfileBootstrapPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthProfileBootstrapPolicyTests.swift; sourceTree = "<group>"; };
 		FC9C445A5BBDAD9BB34C8E55 /* HomeV2Surface.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2Surface.swift; sourceTree = "<group>"; };
+		FF6016AA00000000000000F1 /* HomeV2TimelineHero.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2TimelineHero.swift; sourceTree = "<group>"; };
 		FD8E482BE1E84E0DEAF9819D /* LegalSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LegalSection.swift; path = DesignSystem/Organisms/LegalSection.swift; sourceTree = "<group>"; };
 		FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineDataProviderScrubTests.swift; sourceTree = "<group>"; };
 		FE02A2A200000000000000F2 /* DashboardMetricFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricFormattingTests.swift; sourceTree = "<group>"; };
@@ -1118,6 +1122,7 @@
 				E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */,
 				AB22C3A99D0B42B73AAAD00E /* HomeV2Tokens.swift */,
 				FC9C445A5BBDAD9BB34C8E55 /* HomeV2Surface.swift */,
+				FF6016AA00000000000000F1 /* HomeV2TimelineHero.swift */,
 				CA50D84A24CA405046D5EAFA /* HomeV2PhotoViewer.swift */,
 				BA9844F348C4675E22E4592F /* HomeV2TrendChart.swift */,
 				ACBA870282ED5F613A82213D /* HomeV2PrimaryButton.swift */,
@@ -1302,6 +1307,7 @@
 				492B105B3BA25B5B5864B9BA /* MobileProfileNamePayloadTests.swift */,
 				EC326F70438A47EBD30E41A7 /* TimelineScrollJankRegressionTests.swift */,
 				4877512DEE0F7236151A15AA /* HomeV2PolicyTests.swift */,
+				FF6016BB00000000000000F1 /* HomeV2TimelinePolicyTests.swift */,
 				AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */,
 				A42DAD978808FA956C842F52 /* HealthKitStepCountPolicyTests.swift */,
 				3FDA4E2154B359271C66879D /* HomeV2TrendPolicyTests.swift */,
@@ -2140,6 +2146,7 @@
 				6BA8148A3E9FDCC11517BE7F /* MobileProfileNamePayloadTests.swift in Sources */,
 				F80E7F3EED8BA23533A7C1D0 /* TimelineScrollJankRegressionTests.swift in Sources */,
 				CB2DAC6AFD2CCDD76F568339 /* HomeV2PolicyTests.swift in Sources */,
+				FF6016BB00000000000000B1 /* HomeV2TimelinePolicyTests.swift in Sources */,
 				A3B2D419E2AED6266506624B /* SubjectPlateRendererTests.swift in Sources */,
 				69FE1F8757E6B0643B73F39E /* HealthKitStepCountPolicyTests.swift in Sources */,
 				3D1AFA818E06FB9D3FFDA1C6 /* HomeV2TrendPolicyTests.swift in Sources */,
@@ -2423,6 +2430,7 @@
 				8C7414EAC6711493183196F3 /* HomeV2Policy.swift in Sources */,
 				C150A3B01D604864A2ECEDF6 /* HomeV2Tokens.swift in Sources */,
 				5803E674F4ACA15635334F15 /* HomeV2Surface.swift in Sources */,
+				FF6016AA00000000000000B1 /* HomeV2TimelineHero.swift in Sources */,
 				F38F981DE886318E350B7CF8 /* DashboardViewLiquid+HomeV2.swift in Sources */,
 				87977666693C1FD6C5DDAA8B /* SubjectPlateRenderer.swift in Sources */,
 				9F1405CB5B2F4A0563C3C4A1 /* HomeV2PhotoViewer.swift in Sources */,
