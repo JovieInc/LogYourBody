@@ -25,6 +25,8 @@ Pull requests into `main` should be small and focused. The required merge signal
 
 Admission to the native merge queue is exact-head. `.github/workflows/native-merge-queue.yml` enqueues an open, non-draft, same-repository pull request whose head still matches the successful CI run. It does not require a certification label. Dependabot patch and minor updates still receive `machine-certified` from the shared `JovieInc/ci` auto-merge workflow, because this repository's caller passes `certification_labels: machine-certified` instead of the shared default (`merge-queue`, `tim-approved`).
 
+`main` does not require approving reviews, code-owner review, or conversation resolution. `.github/scripts/update-branch-protection.sh` and the api and cli variants document that current review setting. CI does not run them. A maintainer applies them only when rewriting branch protection.
+
 `CI Summary` fails only when changed-path deterministic validation fails:
 
 - Web/package changes: `pnpm install`, `pnpm lint`, `pnpm typecheck`, `pnpm test:ci`.
