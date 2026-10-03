@@ -6,10 +6,12 @@ import {
   smokeReply,
 } from './lib/account-connection';
 import { knowledgeEvalFixtureModel } from './lib/knowledge-eval-fixture';
+import { providerZeroRetentionModelOptions } from './lib/provider-zero-retention';
 import { trainingToolGate } from './lib/training-tools';
 
 const isLocalSmokeEval = process.env.LYB_EVE_LOCAL_SMOKE === '1';
 const isKnowledgeSkillEval = process.env.LYB_EVE_KNOWLEDGE_EVAL === '1';
+const zeroRetentionModelOptions = providerZeroRetentionModelOptions();
 
 /**
  * The external eve.dev runtime for LogYourBody's core agent chat. Product data
@@ -67,6 +69,9 @@ export default defineAgent({
         return smokeReply(state, userMessageCount);
       })
     : 'openai/gpt-5.4-mini',
+  ...(zeroRetentionModelOptions && !isLocalSmokeEval && !isKnowledgeSkillEval
+    ? { modelOptions: zeroRetentionModelOptions }
+    : {}),
   ...(isLocalSmokeEval || isKnowledgeSkillEval
     ? {
         modelContextWindowTokens: 16_384,
