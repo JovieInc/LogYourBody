@@ -2,6 +2,7 @@
 
 import { NextRequest } from 'next/server';
 import { createChatRouteHandlers } from '../route-handlers';
+import { COACH_PERSONA_GUARDRAILS_FLAG } from '@/lib/flags/coach-persona';
 import type {
   BeginChatTurnInput,
   ChatConversationPort,
@@ -427,6 +428,29 @@ describe('/api/auth/mobile/chat/v1', () => {
     expect([...store.turns.values()][0]?.assistantMessage?.content).toContain(
       'I cannot add quantities the engine did not return.',
     );
+  });
+
+  it('withholds diagnosis and drug direction before streaming when the persona gate is on', async () => {
+    const previous = process.env[COACH_PERSONA_GUARDRAILS_FLAG];
+    process.env[COACH_PERSONA_GUARDRAILS_FLAG] = '1';
+    try {
+      const { handlers, model, store } = makeHarness();
+      model.chunks = ['You have diabetes. ', 'Increase your semaglutide to 1 mg.'];
+      const stream = await (
+        await handlers.POST(request('POST', 'user-a', chatBody('What is wrong with me?')))
+      ).text();
+      expect(stream).not.toContain('You have diabetes');
+      expect(stream).not.toContain('semaglutide');
+      expect(stream).toContain("I can't diagnose a condition or prescribe medication");
+      expect(model.calls[0]?.messages[0]?.content).toContain('Never diagnose a condition');
+      expect(model.calls[0]?.messages[0]?.content).not.toContain('must not enter model context');
+      expect([...store.turns.values()][0]?.assistantMessage?.content).toContain(
+        "I can't diagnose a condition or prescribe medication",
+      );
+    } finally {
+      if (previous === undefined) delete process.env[COACH_PERSONA_GUARDRAILS_FLAG];
+      else process.env[COACH_PERSONA_GUARDRAILS_FLAG] = previous;
+    }
   });
 
   it('streams engine-returned training quantities when the answer stays within the result', async () => {
