@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
+import type { VoiceCoachAccess } from '@/lib/voice/access';
 import type { VoiceProvider } from '@/lib/voice/provider';
 import { parseVoiceIntent, type VoiceWeightUnit } from '@/lib/voice/intent-parser';
 
@@ -38,8 +39,8 @@ const IntentRequestSchema = z
 
 type VoiceRouteDependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
-  enabled: () => boolean;
-  provider: () => VoiceProvider | null;
+  access: (user: JovieUserInfo) => VoiceCoachAccess;
+  provider: (user: JovieUserInfo) => VoiceProvider | null;
   voiceId: () => string;
   reserveRequest: (subject: string) => Promise<ChatRateLimitResult>;
   createRequestId: () => string;
@@ -66,7 +67,9 @@ export function createVoiceRouteHandlers(dependencies: VoiceRouteDependencies) {
   async function authorize(request: NextRequest) {
     const user = await dependencies.authenticate(request);
     if (!user) return { error: jsonError('unauthorized', 401) } as const;
-    if (!dependencies.enabled()) return { error: jsonError('not_found', 404) } as const;
+    const access = dependencies.access(user);
+    if (access === 'forbidden') return { error: jsonError('forbidden', 403) } as const;
+    if (access !== 'ok') return { error: jsonError('not_found', 404) } as const;
     const limit = await dependencies.reserveRequest(user.sub);
     if (!limit.allowed) return { error: rateLimited(limit) } as const;
     return { user } as const;
@@ -79,7 +82,7 @@ export function createVoiceRouteHandlers(dependencies: VoiceRouteDependencies) {
       const parsed = SpeakRequestSchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) return jsonError('invalid_request', 400);
 
-      const provider = dependencies.provider();
+      const provider = dependencies.provider(authorized.user);
       if (!provider) return jsonError('provider_unavailable', 503);
       const requestId = dependencies.createRequestId();
       try {
