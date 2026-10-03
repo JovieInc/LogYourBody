@@ -98,6 +98,54 @@ cleanup_booted_simulator_apps() {
   xcrun simctl terminate booted com.logyourbody.app.xctrunner >/dev/null 2>&1 || true
 }
 
+# Diagnostics are independent of XCTest results and use the existing artifact upload.
+OBSERVABILITY_HELPER="$ROOT_DIR/scripts/ios/launch-quality-observability.py"
+OBSERVER_PID=""
+OBSERVATION_DIR=""
+
+stop_launch_observer() {
+  if [[ -n "$OBSERVER_PID" ]]; then
+    # Bash still owns this child; never select a simulator or shared process group.
+    if jobs -pr | grep -Fxq "$OBSERVER_PID"; then
+      kill -TERM "$OBSERVER_PID" 2>/dev/null || true
+    fi
+    wait "$OBSERVER_PID" 2>/dev/null || true
+    OBSERVER_PID=""
+  fi
+}
+
+start_launch_observer() {
+  local label="$1" attempt="$2" timeout_seconds="$3"
+  OBSERVATION_DIR=""
+  local directory="$ARTIFACT_DIR/observability/$label/attempt-$attempt"
+  if python3 "$OBSERVABILITY_HELPER" init --directory "$directory" \
+      --stage "$label" --attempt "$attempt" --destination "$DESTINATION" \
+      --source "$ARTIFACT_DIR/source-revision.txt" \
+      --patch "$ARTIFACT_DIR/source-working-tree.patch" --timeout "$timeout_seconds" \
+      >/dev/null 2>&1; then
+    OBSERVATION_DIR="$directory"
+    python3 "$OBSERVABILITY_HELPER" collect --directory "$directory" >/dev/null 2>&1 &
+    OBSERVER_PID="$!"
+    python3 "$OBSERVABILITY_HELPER" mark --directory "$directory" \
+      --event command_start >/dev/null 2>&1 || true
+  else
+    echo "Launch diagnostics unavailable; native status is independent." >&2
+  fi
+}
+
+finish_launch_observer() {
+  local native_status="$1"
+  if [[ -n "$OBSERVATION_DIR" ]]; then
+    python3 "$OBSERVABILITY_HELPER" mark --directory "$OBSERVATION_DIR" \
+      --event command_end --status "$native_status" >/dev/null 2>&1 || true
+  fi
+  stop_launch_observer
+}
+
+trap 'audit_exit_status=$?; stop_launch_observer; exit "$audit_exit_status"' EXIT
+trap 'stop_launch_observer; exit 130' INT
+trap 'stop_launch_observer; exit 143' TERM
+
 is_simulator_infra_failure() {
   local log_file="$1"
 
@@ -133,12 +181,14 @@ run_xcodebuild_test() {
       test-without-building
     )
 
+    start_launch_observer "$label" "$attempt" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
     set +e
     run_with_timeout \
       "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS" \
       "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
     status="${PIPESTATUS[0]}"
     set -e
+    finish_launch_observer "$status"
 
     if [[ "$status" -eq 124 ]]; then
       echo "xcodebuild command timed out after ${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" | tee -a "$log_file"
@@ -181,12 +231,14 @@ build_for_testing_once() {
     build-for-testing
   )
 
+  start_launch_observer "launch-quality-build-for-testing" 1 "$BUILD_FOR_TESTING_TIMEOUT_SECONDS"
   set +e
   run_with_timeout \
     "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" \
     "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
   status="${PIPESTATUS[0]}"
   set -e
+  finish_launch_observer "$status"
 
   if [[ "$status" -eq 124 ]]; then
     echo "build-for-testing timed out after ${BUILD_FOR_TESTING_TIMEOUT_SECONDS}s" | tee -a "$log_file"
