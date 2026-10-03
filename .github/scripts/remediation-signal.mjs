@@ -51,6 +51,88 @@ export function decideHttpStatus(status) {
   return { action: 'red', detail: `https://logyourbody.com returned HTTP ${shown}` };
 }
 
+export const HOMEPAGE_PROBE_ATTEMPTS = 3;
+export const HOMEPAGE_PROBE_BACKOFF_MS = [0, 2_000, 5_000];
+export const HOMEPAGE_URL = 'https://logyourbody.com';
+
+export function classifyProbeStatuses(statuses) {
+  const codes = (Array.isArray(statuses) ? statuses : []).map((status) => Number(status));
+  if (codes.some((code) => code === 200)) return { action: 'green', attempts: codes.length };
+  const last = codes.at(-1);
+  const shown = Number.isFinite(last) ? last : 0;
+  return {
+    action: 'red',
+    attempts: codes.length,
+    detail: `${HOMEPAGE_URL} returned HTTP ${shown} on ${codes.length} attempts`,
+  };
+}
+
+/** Stop on the first 200. A single blip that recovers inside the run is green. */
+export async function probeHomepage({
+  attempts = HOMEPAGE_PROBE_ATTEMPTS,
+  backoffMs = HOMEPAGE_PROBE_BACKOFF_MS,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  request,
+} = {}) {
+  const statuses = [];
+  const limit = Math.max(1, attempts);
+  for (let index = 0; index < limit; index += 1) {
+    const wait = backoffMs[index] ?? 0;
+    if (index > 0 && wait > 0) await sleep(wait);
+    statuses.push(await request());
+    if (Number(statuses.at(-1)) === 200) break;
+  }
+  return classifyProbeStatuses(statuses);
+}
+
+export async function requestHomepage(fetchImpl = fetch) {
+  try {
+    const response = await fetchImpl(HOMEPAGE_URL, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(20_000),
+    });
+    return response.status;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Homepage filing waits for two consecutive confirmed reds.
+ * `held` is a red that did not file. Recovery from `held` does not call Linear.
+ */
+export function applySyntheticGuard(decision, previous) {
+  if (decision?.fingerprint !== 'synthetic-monitoring') return { decision, persist: null };
+  if (decision.action === 'red' && previous !== 'red' && previous !== 'held') {
+    return {
+      decision: { action: 'hold', reason: 'need_second_red', fingerprint: decision.fingerprint },
+      persist: 'held',
+    };
+  }
+  if (decision.action === 'green' && previous === 'held') {
+    return {
+      decision: { action: 'skip', reason: 'recovered_before_filing', fingerprint: decision.fingerprint },
+      persist: 'green',
+    };
+  }
+  if (decision.action === 'red') {
+    return {
+      decision: {
+        ...decision,
+        detail: `${decision.detail || 'Homepage probe failed.'} Confirmed on two consecutive runs.`,
+      },
+      persist: null,
+    };
+  }
+  return { decision, persist: null };
+}
+
+export function skippedFilingMessage(reason) {
+  const detail = reason === 'missing_linear_api_key' ? 'LINEAR_API_KEY is missing' : reason || 'linear_error';
+  return `Filing was SKIPPED (${detail}).`;
+}
+
 /** Steady green skips Linear. The first green after a recorded red still resolves. */
 export function gateSteadyGreen(decision, previous) {
   if (decision?.action !== 'green') return decision;
@@ -129,14 +211,33 @@ export async function runRemediationIntake({
   previous = '',
   httpStatus = null,
   fetchImpl = fetch,
+  request = null,
+  sleep,
 }) {
   if (remediationIntakeDisabled(env)) return { ok: true, action: 'disabled', state: null };
   const detector = detectorFromGithubEvent(eventName, event);
   if (!detector) return { ok: true, action: 'skip', reason: 'no_detector', state: null };
-  const decision =
-    detector.mode === 'http'
-      ? { ...decideHttpStatus(httpStatus), fingerprint: detector.fingerprint }
-      : { ...decideMonitorSignal({ conclusion: detector.conclusion }), fingerprint: detector.fingerprint };
+  let decision;
+  if (detector.mode === 'http') {
+    const probed =
+      httpStatus === null || httpStatus === undefined || httpStatus === ''
+        ? await probeHomepage({ request: request ?? (() => requestHomepage(fetchImpl)), sleep })
+        : decideHttpStatus(httpStatus);
+    decision = { ...probed, fingerprint: detector.fingerprint };
+  } else {
+    decision = { ...decideMonitorSignal({ conclusion: detector.conclusion }), fingerprint: detector.fingerprint };
+  }
+  const guarded = applySyntheticGuard(decision, previous);
+  if (guarded.persist) {
+    return {
+      ok: true,
+      action: guarded.decision.action,
+      reason: guarded.decision.reason,
+      fingerprint: detector.fingerprint,
+      state: guarded.persist,
+    };
+  }
+  decision = guarded.decision;
   const gated = gateSteadyGreen(decision, previous);
   if (gated.action === 'skip') {
     return { ok: true, action: 'skip', reason: gated.reason || 'skip', fingerprint: detector.fingerprint, state: null };

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /** File Symphony remediation issues unless REMEDIATION_INTAKE_DISABLED=1. Linear failures exit 0. */
-import { readFileSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { missingLinearKeyWarning } from './lib/linear-issue-intake.mjs';
-import { runRemediationIntake } from './remediation-signal.mjs';
+import { runRemediationIntake, skippedFilingMessage } from './remediation-signal.mjs';
 
 function readText(path) {
   if (!path) return '';
@@ -13,6 +13,13 @@ function readText(path) {
   } catch {
     return '';
   }
+}
+
+export function noteFilingSkipped(reason, { summaryPath, warn = console.warn } = {}) {
+  const line = skippedFilingMessage(reason);
+  warn(`::warning::${line}`);
+  if (summaryPath) appendFileSync(summaryPath, `${line}\n`);
+  return line;
 }
 
 export function readGithubEvent(env = process.env) {
@@ -45,14 +52,17 @@ async function main() {
   }
   if (!result.ok) {
     const reason = result.reason === 'missing_linear_api_key' ? missingLinearKeyWarning() : result.reason;
-    console.warn(`::warning::Linear intake failed open (${reason}).`);
+    noteFilingSkipped(result.reason, { summaryPath: env.GITHUB_STEP_SUMMARY });
+    if (reason && reason !== result.reason) console.warn(reason);
   }
 }
 
 const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectRun) {
   main().catch((error) => {
-    console.warn(`::warning::Linear intake failed open (${error instanceof Error ? error.message : error}).`);
+    noteFilingSkipped(error instanceof Error ? error.message : String(error), {
+      summaryPath: process.env.GITHUB_STEP_SUMMARY,
+    });
     process.exit(0);
   });
 }

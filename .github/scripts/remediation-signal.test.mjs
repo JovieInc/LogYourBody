@@ -1,17 +1,22 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { JOVIE_TEAM_ID, remediationKey, upsertLinearIssue } from './lib/linear-issue-intake.mjs';
 import {
+  applySyntheticGuard,
+  classifyProbeStatuses,
   decideHttpStatus,
   decideMonitorSignal,
   detectorFromGithubEvent,
   gateSteadyGreen,
+  probeHomepage,
   remediationIntakeDisabled,
   runRemediationIntake,
 } from './remediation-signal.mjs';
+import { noteFilingSkipped } from './remediation-signal-intake.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -176,13 +181,107 @@ test('the first green after red resolves and a Linear failure does not record st
     env: { LINEAR_API_KEY: 'key' },
     eventName: 'schedule',
     event: {},
-    previous: '',
+    previous: 'held',
     httpStatus: '500',
     fetchImpl: async () => jsonResponse({ errors: [{ message: 'down' }] }, false),
   });
   assert.equal(down.ok, false);
   assert.equal(down.state, null);
   assert.equal(down.fingerprint, 'synthetic-monitoring');
+});
+
+test('a homepage blip does not file, and two confirmed reds do', async () => {
+  let sleeps = 0;
+  const recovered = await probeHomepage({
+    request: (() => {
+      const codes = [503, 503, 200];
+      return async () => codes.shift();
+    })(),
+    sleep: async () => {
+      sleeps += 1;
+    },
+  });
+  assert.equal(recovered.action, 'green');
+  assert.equal(recovered.attempts, 3);
+  assert.equal(sleeps, 2);
+  assert.equal(classifyProbeStatuses([500, 500, 500]).action, 'red');
+
+  const fetchImpl = async () => {
+    throw new Error('linear called');
+  };
+  const first = await runRemediationIntake({
+    env: { LINEAR_API_KEY: 'key' },
+    eventName: 'schedule',
+    event: {},
+    previous: '',
+    httpStatus: '503',
+    fetchImpl,
+  });
+  assert.equal(first.action, 'hold');
+  assert.equal(first.state, 'held');
+  assert.equal(applySyntheticGuard({ action: 'red', fingerprint: 'synthetic-monitoring' }, 'green').persist, 'held');
+
+  const recoveredNight = await runRemediationIntake({
+    env: { LINEAR_API_KEY: 'key' },
+    eventName: 'schedule',
+    event: {},
+    previous: 'held',
+    httpStatus: '200',
+    fetchImpl,
+  });
+  assert.equal(recoveredNight.action, 'skip');
+  assert.equal(recoveredNight.reason, 'recovered_before_filing');
+  assert.equal(recoveredNight.state, 'green');
+
+  const calls = [];
+  const second = await runRemediationIntake({
+    env: { LINEAR_API_KEY: 'key' },
+    eventName: 'workflow_dispatch',
+    event: {},
+    previous: 'held',
+    httpStatus: '503',
+    fetchImpl: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      calls.push(body);
+      if (body.query.includes('TeamByKey')) {
+        return jsonResponse({ data: { teams: { nodes: [{ id: 'lyb-team', key: 'LYB' }] } } });
+      }
+      if (body.query.includes('FindRemediationIssue')) {
+        return jsonResponse({
+          data: {
+            team: { states: { nodes: [{ id: 'todo', name: 'Todo', type: 'unstarted' }] }, labels: { nodes: [] } },
+            issues: { nodes: [] },
+          },
+        });
+      }
+      if (body.query.includes('CreateTeamLabel')) {
+        return jsonResponse({ data: { issueLabelCreate: { success: true, issueLabel: { id: 'label-syn' } } } });
+      }
+      if (body.query.includes('CreateDedupedLinearIssue')) {
+        return jsonResponse({
+          data: { issueCreate: { success: true, issue: { id: 'issue-2', identifier: 'LYB-2', url: 'https://example.com/issue-2' } } },
+        });
+      }
+      return jsonResponse({}, false);
+    },
+  });
+  assert.equal(second.action, 'created');
+  assert.equal(second.label, 'remediation:synthetic-monitoring');
+  assert.match(calls.at(-1).variables.description, /two consecutive runs/);
+  assert.equal(calls.length > 0, true);
+});
+
+test('a missing Linear key is a visible skip', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lyb-skip-'));
+  const summary = join(dir, 'summary.md');
+  const warnings = [];
+  const line = noteFilingSkipped('missing_linear_api_key', {
+    summaryPath: summary,
+    warn: (message) => warnings.push(message),
+  });
+  assert.match(line, /Filing was SKIPPED/);
+  assert.match(warnings[0], /::warning::Filing was SKIPPED \(LINEAR_API_KEY is missing\)/);
+  assert.match(readFileSync(summary, 'utf8'), /Filing was SKIPPED/);
 });
 
 test('existing JOV callers keep the default team and the workflow stays off iOS', async () => {
@@ -222,4 +321,8 @@ test('existing JOV callers keep the default team and the workflow stays off iOS'
   assert.match(workflow, /REMEDIATION_INTAKE_DISABLED/);
   assert.doesNotMatch(workflow, /REMEDIATION_TRIGGERS_ENABLED/);
   assert.match(workflow, /remediation:synthetic-monitoring/);
+  assert.match(workflow, /remediation-continuity-state-/);
+  assert.match(workflow, /upload-artifact@v4/);
+  assert.match(workflow, /retention-days: 90/);
+  assert.doesNotMatch(workflow, /actions\/cache/);
 });

@@ -5,9 +5,14 @@ name: Remediation signal
 #   CI push to main        -> remediation:red-checks
 #   Deploy push to main    -> remediation:web-deploy
 #   nightly homepage probe -> remediation:synthetic-monitoring
-# Filing is on unless repository variable REMEDIATION_INTAKE_DISABLED is exactly 1.
-# An unset variable does not dry-run. Steady greens do not call Linear.
-# A missing LINEAR_API_KEY or a Linear error warns and exits 0.
+# The probe tries 3 times with backoff. One confirmed red is held. Linear is
+# called only when the next run is red too. Filing is on unless repository
+# variable REMEDIATION_INTAKE_DISABLED is exactly 1. An unset variable does not
+# dry-run. Steady greens do not call Linear. A missing LINEAR_API_KEY or a
+# Linear error writes a warning and a step summary that filing was SKIPPED,
+# then exits 0. Red/green state is the remediation-continuity-state artifact
+# (90 days), one artifact per detector. A missing artifact starts the count
+# over, so the next homepage red is held instead of filed.
 #
 # Known gap, not edited here: ios-release-loop.yml has no cron and no re-run
 # after a failed release (push to main on iOS paths, workflow_dispatch, and
@@ -78,42 +83,49 @@ jobs:
         with:
           node-version: 22
 
-      - name: Probe homepage on the nightly schedule
-        id: probe
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: |
-          set +e
-          status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 https://logyourbody.com)"
-          code=$?
-          set -e
-          if [ "$code" -ne 0 ] || [ -z "$status" ]; then
-            status=000
-          fi
-          echo "status=$status" >> "$GITHUB_OUTPUT"
-
-      - name: Restore prior red/green marker
+      - name: Restore continuity state
+        id: restore
         continue-on-error: true
-        uses: actions/cache/restore@v4
-        with:
-          path: .remediation
-          key: remediation-signal-${{ github.event.workflow_run.name || 'synthetic' }}-${{ github.run_id }}
-          restore-keys: |
-            remediation-signal-${{ github.event.workflow_run.name || 'synthetic' }}-
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_RUN_NAME: ${{ github.event.workflow_run.name }}
+        run: |
+          set -euo pipefail
+          mkdir -p .remediation
+          name="remediation-continuity-state-web-deploy"
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            name="remediation-continuity-state-synthetic-monitoring"
+          elif [ "$WORKFLOW_RUN_NAME" = "CI" ]; then
+            name="remediation-continuity-state-red-checks"
+          fi
+          echo "artifact=$name" >> "$GITHUB_OUTPUT"
+          id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${name}&per_page=100" --jq '([(.artifacts // [])[] | select(.expired|not)] | sort_by(.created_at) | last | .id) // empty' || true)"
+          if [ -z "$id" ]; then
+            exit 0
+          fi
+          if ! gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > .remediation/prior.zip; then
+            exit 0
+          fi
+          entry="$(unzip -Z1 .remediation/prior.zip 2>/dev/null | head -1 || true)"
+          if [ -n "$entry" ]; then
+            unzip -p .remediation/prior.zip "$entry" > .remediation/state || true
+          fi
 
       - name: Upsert or resolve the labeled issue
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
-          REMEDIATION_HTTP_STATUS: ${{ steps.probe.outputs.status }}
           REMEDIATION_RUN_URL: ${{ github.event.workflow_run.html_url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
           REMEDIATION_PREVIOUS_FILE: .remediation/state
           REMEDIATION_STATE_FILE: .remediation/state
         run: node .github/scripts/remediation-signal-intake.mjs
 
-      - name: Remember red or the green that resolved it
+      - name: Save continuity state
         if: hashFiles('.remediation/state.dirty') != ''
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/upload-artifact@v4
         with:
-          path: .remediation
-          key: remediation-signal-${{ github.event.workflow_run.name || 'synthetic' }}-${{ github.run_id }}
+          name: ${{ steps.restore.outputs.artifact }}
+          path: .remediation/state
+          if-no-files-found: ignore
+          retention-days: 90
