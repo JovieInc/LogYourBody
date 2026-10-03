@@ -18,7 +18,7 @@ struct OptimizedProgressPhotoView: View {
             if let image = loadedImage {
                 Image(uiImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
                     .frame(maxHeight: maxHeight)
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             } else if isLoading {
