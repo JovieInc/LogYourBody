@@ -19,10 +19,19 @@
 // from there on its own.
 //
 // Env vars:
-//   LYB_CHAOS_SEED    - RNG seed (default 20260928)
-//   LYB_CHAOS_STEPS   - number of steps to run (default 250)
-//   LYB_CHAOS_FIXTURE - launch argument that seeds app state (default
-//                        "-lybUITestPhotoTimelineHUDFixture")
+//   LYB_CHAOS_SEED       - RNG seed (default 20260928)
+//   LYB_CHAOS_STEPS      - number of steps to run (default 250)
+//   LYB_CHAOS_FIXTURE    - launch argument that seeds app state (default
+//                          "-lybUITestPhotoTimelineHUDFixture")
+//   LYB_CHAOS_EXTRA_ARGS - space-separated extra launch arguments, appended
+//                          after the fixture and preserved across a
+//                          stuck-recovery relaunch. Widens the harness past
+//                          the default text size/locale, e.g.:
+//                            "-UIPreferredContentSizeCategoryName UICTContentSizeCategoryAccessibilityXXXL"
+//                            "-AppleLanguages (ar) -AppleLocale ar_SA"
+//                            "-AppleLanguages (de)"
+//                            "-NSDoubleLocalizedStrings YES"
+//                            "-UIAccessibilityIsBoldTextEnabled YES"
 //
 import XCTest
 
@@ -127,6 +136,21 @@ private struct StuckDetector {
 private struct StepTelemetry {
     var stuckDetector = StuckDetector()
     var slowQueryCount = 0
+    var layoutAnomalyMessages: [String] = []
+}
+
+/// What every launch/relaunch needs: the fixture argument plus any extra
+/// launch arguments passed through `LYB_CHAOS_EXTRA_ARGS` (Dynamic Type
+/// size, locale, bold text, etc.), kept together so a stuck-recovery
+/// relaunch preserves the same conditions the run started under instead of
+/// silently dropping back to defaults.
+private struct LaunchConfig {
+    let fixture: String
+    let extraArgs: [String]
+
+    var launchArguments: [String] {
+        [fixture] + extraArgs + ["-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
+    }
 }
 
 final class ChaosMonkeyUITests: XCTestCase {
@@ -196,6 +220,9 @@ final class ChaosMonkeyUITests: XCTestCase {
         let steps = Int(ProcessInfo.processInfo.environment["LYB_CHAOS_STEPS"] ?? "") ?? 250
         let rawFixture = ProcessInfo.processInfo.environment["LYB_CHAOS_FIXTURE"] ?? ""
         let fixture = rawFixture.isEmpty ? "-lybUITestPhotoTimelineHUDFixture" : rawFixture
+        let rawExtraArgs = ProcessInfo.processInfo.environment["LYB_CHAOS_EXTRA_ARGS"] ?? ""
+        let extraArgs = rawExtraArgs.split(separator: " ").map(String.init)
+        let config = LaunchConfig(fixture: fixture, extraArgs: extraArgs)
 
         var rng = ChaosRNG(seed: seed)
         let app = XCUIApplication()
@@ -219,7 +246,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
         defer { removeUIInterruptionMonitor(monitor) }
 
-        app.launchArguments = [fixture, "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
+        app.launchArguments = config.launchArguments
         app.launch()
         app.tap()
         popToRootIfNeeded(in: app)
@@ -230,7 +257,7 @@ final class ChaosMonkeyUITests: XCTestCase {
                     step: step,
                     seed: seed,
                     app: app,
-                    fixture: fixture,
+                    config: config,
                     rng: &rng,
                     telemetry: &telemetry
                 )
@@ -251,11 +278,13 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
 
         attachDiagnostics(app: app, name: "chaos-\(seed)-step-final")
+        anomalies.append(contentsOf: telemetry.layoutAnomalyMessages)
 
         var summaryLines = [
-            "seed=\(seed) steps=\(steps) fixture=\(fixture)",
+            "seed=\(seed) steps=\(steps) fixture=\(fixture) extraArgs=\(extraArgs.joined(separator: " "))",
             "systemAlertsDismissed=\(interruptionsDismissed)",
             "slowQueries(10-30s)=\(telemetry.slowQueryCount)",
+            "layoutAnomalies=\(telemetry.layoutAnomalyMessages.count)",
             "anomalies=\(anomalies.count)"
         ]
         summaryLines.append(contentsOf: anomalies)
@@ -277,7 +306,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         step: Int,
         seed: UInt64,
         app: XCUIApplication,
-        fixture: String,
+        config: LaunchConfig,
         rng: inout ChaosRNG,
         telemetry: inout StepTelemetry
     ) throws {
@@ -294,7 +323,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         // the monkey can never make progress from here on its own; escape
         // immediately rather than waiting for the stuck-tree threshold.
         if app.descendants(matching: .any)["world_class_screen_paywall"].exists {
-            relaunch(app: app, fixture: fixture)
+            relaunch(app: app, config: config)
             telemetry.stuckDetector.reset()
             throw ChaosStepError.stuckRecovered("landed on the paywall (world_class_screen_paywall)")
         }
@@ -312,7 +341,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
 
         let queryStart = Date()
-        let candidates = interactiveElements(in: app)
+        let snapshot = snapshotElements(in: app)
         let queryDuration = Date().timeIntervalSince(queryStart)
         // A merely-slow query (device under load, a larger tree) is a
         // metric, not a step-ending anomaly on its own -- only a genuine
@@ -325,13 +354,27 @@ final class ChaosMonkeyUITests: XCTestCase {
             throw ChaosStepError.slowQuery(queryDuration)
         }
 
-        let fingerprint = candidates.isEmpty ? nil : treeFingerprint(candidates)
+        // Reuses snapshot.layoutCandidates (already fetched above) rather
+        // than a second tree query. Recorded, not thrown: a layout defect
+        // shouldn't block this step's normal action the way a stuck screen
+        // does, but it's exactly the kind of finding a Dynamic Type or RTL
+        // round (LYB_CHAOS_EXTRA_ARGS) exists to surface.
+        let layoutFindings = layoutAnomalies(candidates: snapshot.layoutCandidates, in: app)
+        if !layoutFindings.isEmpty {
+            for finding in layoutFindings {
+                telemetry.layoutAnomalyMessages.append("step \(step): layout defect: \(finding)")
+            }
+            attachDiagnostics(app: app, name: "chaos-\(seed)-step-\(step)-layout")
+        }
+
+        let fingerprint = snapshot.interactive.isEmpty ? nil : treeFingerprint(snapshot.interactive)
         if let stuckReason = telemetry.stuckDetector.observe(fingerprint: fingerprint) {
-            relaunch(app: app, fixture: fixture)
+            relaunch(app: app, config: config)
             telemetry.stuckDetector.reset()
             throw ChaosStepError.stuckRecovered(stuckReason)
         }
 
+        let candidates = snapshot.interactive
         switch pickAction(using: &rng) {
         case .tap:
             performTap(app: app, candidates: candidates, rng: &rng)
@@ -437,9 +480,9 @@ final class ChaosMonkeyUITests: XCTestCase {
     /// Terminates and relaunches with the seeding fixture, mirroring the
     /// initial launch in `testChaosMonkey`. Used to recover from a wedged
     /// screen rather than continuing to hammer a state the run can't escape.
-    private func relaunch(app: XCUIApplication, fixture: String) {
+    private func relaunch(app: XCUIApplication, config: LaunchConfig) {
         app.terminate()
-        app.launchArguments = [fixture, "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"]
+        app.launchArguments = config.launchArguments
         app.launch()
         app.tap()
         popToRootIfNeeded(in: app)
@@ -533,9 +576,22 @@ final class ChaosMonkeyUITests: XCTestCase {
 
     // MARK: - Element discovery
 
-    private func interactiveElements(in app: XCUIApplication) -> [XCUIElement] {
-        var elements: [XCUIElement] = []
-        elements.append(contentsOf: app.buttons.allElementsBoundByIndex)
+    /// One round of element queries feeding two different views: the
+    /// denylist-aware `interactive` candidates the monkey acts on (as
+    /// `interactiveElements` always returned), and the broader, unfiltered
+    /// `layoutCandidates` (every hittable button and static text)
+    /// `layoutAnomalies` scans -- buttons are queried once and reused
+    /// rather than fetched twice per step.
+    private struct StepSnapshot {
+        let interactive: [XCUIElement]
+        let layoutCandidates: [XCUIElement]
+    }
+
+    private func snapshotElements(in app: XCUIApplication) -> StepSnapshot {
+        let buttons = app.buttons.allElementsBoundByIndex
+        let staticTexts = app.staticTexts.allElementsBoundByIndex
+
+        var elements: [XCUIElement] = buttons
         elements.append(contentsOf: app.cells.allElementsBoundByIndex)
         elements.append(contentsOf: app.textFields.allElementsBoundByIndex)
         elements.append(contentsOf: app.switches.allElementsBoundByIndex)
@@ -546,10 +602,32 @@ final class ChaosMonkeyUITests: XCTestCase {
         // Defense in depth: `runStep` already skips the general query
         // entirely whenever a keyboard is showing, but exclude individual
         // key elements from the candidate set too in case one is ever
-        // picked up by a type query above regardless.
-        return elements.filter { element in
-            element.isHittable && element.elementType != .key && !isDenylisted(element)
+        // picked up by a type query above regardless. hasFiniteNonZeroFrame
+        // guards `.isHittable`, which can hard-fail XCTest for a degenerate
+        // frame under an extreme text size or locale instead of returning
+        // false -- see layoutAnomalies below for the evidence.
+        let interactive = elements.filter { element in
+            hasFiniteNonZeroFrame(element) && element.isHittable
+                && element.elementType != .key && !isDenylisted(element)
         }
+        // Not pre-filtered by .isHittable: layoutAnomalies needs to see a
+        // degenerate frame (including one .isHittable can't safely judge)
+        // to report it as a finding rather than skip it.
+        let layoutCandidates = buttons + staticTexts
+        return StepSnapshot(interactive: interactive, layoutCandidates: layoutCandidates)
+    }
+
+    /// `.isHittable` can hard-fail XCTest for a degenerate frame instead of
+    /// returning false ("Failed to determine hittability ...: Activation
+    /// point invalid and no suggested hit points based on element frame"),
+    /// so geometry is checked before ever calling it -- own simulator
+    /// evidence: a "What changed recently?" button crashed a layout scan
+    /// this way under AccessibilityXXXL.
+    private func hasFiniteNonZeroFrame(_ element: XCUIElement) -> Bool {
+        let frame = element.frame
+        return frame.width.isFinite && frame.height.isFinite
+            && frame.origin.x.isFinite && frame.origin.y.isFinite
+            && frame.width > 0 && frame.height > 0
     }
 
     private func isDenylisted(_ element: XCUIElement) -> Bool {
@@ -571,6 +649,59 @@ final class ChaosMonkeyUITests: XCTestCase {
             hasher.combine(element.isEnabled)
         }
         return hasher.finalize()
+    }
+
+    // MARK: - Layout defect detection
+
+    /// Scans the given candidates (buttons + static texts `snapshotElements`
+    /// already fetched this step) for three classes of layout defect: a
+    /// frame extending outside the app window, a zero-size frame while the
+    /// element still reports as hittable, or a label clipped down to a
+    /// single ellipsis. System alerts are excluded -- their layout isn't
+    /// the app's to fix, and the keyboard never reaches this point at all
+    /// (runStep returns before fetching `candidates` whenever one is up).
+    private func layoutAnomalies(candidates: [XCUIElement], in app: XCUIApplication) -> [String] {
+        guard !app.alerts.firstMatch.exists else { return [] }
+        let windowFrame = app.windows.firstMatch.frame
+        guard windowFrame.width > 0, windowFrame.height > 0 else { return [] }
+
+        var findings: [String] = []
+        for element in candidates {
+            guard element.exists else { continue }
+            let frame = element.frame
+
+            // `.isHittable` itself can hard-fail instead of returning false
+            // for a degenerate frame (see hasFiniteNonZeroFrame above), so
+            // geometry is checked -- and a bad frame reported directly --
+            // before ever calling it.
+            guard frame.width.isFinite, frame.height.isFinite,
+                frame.origin.x.isFinite, frame.origin.y.isFinite else {
+                findings.append("non-finite frame: \(describeLayoutElement(element))")
+                continue
+            }
+            if frame.width <= 0 || frame.height <= 0 {
+                findings.append("zero-size frame: \(describeLayoutElement(element))")
+                continue
+            }
+
+            guard element.isHittable else { continue }
+
+            if frame.minX < windowFrame.minX - 1 || frame.maxX > windowFrame.maxX + 1
+                || frame.minY < windowFrame.minY - 1 || frame.maxY > windowFrame.maxY + 1 {
+                findings.append("frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                continue
+            }
+            if element.label == "\u{2026}" {
+                findings.append("label clipped to a single ellipsis: \(describeLayoutElement(element))")
+            }
+        }
+        return findings
+    }
+
+    private func describeLayoutElement(_ element: XCUIElement) -> String {
+        let identifier = element.identifier.isEmpty ? "(no identifier)" : element.identifier
+        let label = element.label.isEmpty ? "(no label)" : element.label
+        return "\(String(describing: element.elementType)) id=\(identifier) label=\"\(label)\" frame=\(element.frame)"
     }
 
     // MARK: - Diagnostics

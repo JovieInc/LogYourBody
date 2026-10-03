@@ -463,6 +463,64 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    // MARK: - 13. Accessibility XXXL round trip has no layout anomalies
+
+    func testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+
+        assertTimelineRootAppears(in: app, timeout: 30)
+        assertNoLayoutAnomalies(in: app, context: "timeline root")
+
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+        assertNoLayoutAnomalies(in: app, context: "settings root")
+
+        let profileLink = app.buttons["settings_profile_link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 8))
+        profileLink.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_editProfile"].waitForExistence(timeout: 8)
+        )
+        assertNoLayoutAnomalies(in: app, context: "profile")
+
+        navigateBack(in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8),
+            "Profile must return cleanly to the settings root."
+        )
+        app.buttons["home_v2_settings_back"].tap()
+        assertTimelineRootAppears(in: app, timeout: 8)
+        assertNoLayoutAnomalies(in: app, context: "timeline root after round trip")
+    }
+
+    // MARK: - 14. Arabic locale renders the root with a hittable composer
+
+    func testArabicLocaleRootRendersAndComposerIsHittable() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-AppleLanguages", "(ar)",
+            "-AppleLocale", "ar_SA"
+        ])
+
+        assertTimelineRootAppears(in: app, timeout: 30)
+
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(
+            composer.waitForExistence(timeout: 12),
+            "The docked chat composer (home_chat_composer_dock, MainTabView.swift) must render under Arabic/RTL."
+        )
+        XCTAssertTrue(composer.isHittable)
+        attachScreenshot(named: "edge-arabic-locale-root", from: app)
+    }
+
     // MARK: - Shared helpers
 
     private func launch(_ app: XCUIApplication, with arguments: [String]) {
@@ -711,5 +769,78 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    // MARK: - Layout defect detection
+
+    /// Fails with a screenshot if `layoutAnomalies` finds anything at this
+    /// checkpoint. Unlike the chaos monkey's soft per-step recording, these
+    /// are dedicated, deterministic checkpoints under an extreme text size,
+    /// so a genuine defect should fail the test outright.
+    private func assertNoLayoutAnomalies(
+        in app: XCUIApplication,
+        context: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let findings = layoutAnomalies(in: app)
+        guard !findings.isEmpty else { return }
+        attachScreenshot(named: "layout-anomaly-\(context)", from: app)
+        XCTFail("Layout anomalies at \(context): \(findings.joined(separator: "; "))", file: file, line: line)
+    }
+
+    /// Scans every hittable button and static text for three classes of
+    /// layout defect: a frame extending outside the app window, a
+    /// zero-size frame while the element still reports as hittable, or a
+    /// label clipped down to a single ellipsis. The keyboard and system
+    /// alerts are excluded -- neither is the app's layout to fix.
+    private func layoutAnomalies(in app: XCUIApplication) -> [String] {
+        guard !app.keyboards.element.exists, !app.alerts.firstMatch.exists else { return [] }
+        let windowFrame = app.windows.firstMatch.frame
+        guard windowFrame.width > 0, windowFrame.height > 0 else { return [] }
+
+        let candidates = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
+
+        var findings: [String] = []
+        for element in candidates {
+            guard element.exists else { continue }
+            let frame = element.frame
+
+            // `.isHittable` itself can hard-fail ("Failed to determine
+            // hittability ...: Activation point invalid and no suggested
+            // hit points based on element frame") for a degenerate frame
+            // instead of returning false, so geometry is checked -- and a
+            // non-finite/zero-size frame reported directly -- before ever
+            // calling it (own simulator evidence: a "What changed
+            // recently?" button crashed the whole scan this way under
+            // AccessibilityXXXL, before this reordering).
+            guard frame.width.isFinite, frame.height.isFinite,
+                frame.origin.x.isFinite, frame.origin.y.isFinite else {
+                findings.append("non-finite frame: \(describeLayoutElement(element))")
+                continue
+            }
+            if frame.width <= 0 || frame.height <= 0 {
+                findings.append("zero-size frame: \(describeLayoutElement(element))")
+                continue
+            }
+
+            guard element.isHittable else { continue }
+
+            if frame.minX < windowFrame.minX - 1 || frame.maxX > windowFrame.maxX + 1
+                || frame.minY < windowFrame.minY - 1 || frame.maxY > windowFrame.maxY + 1 {
+                findings.append("frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                continue
+            }
+            if element.label == "\u{2026}" {
+                findings.append("label clipped to a single ellipsis: \(describeLayoutElement(element))")
+            }
+        }
+        return findings
+    }
+
+    private func describeLayoutElement(_ element: XCUIElement) -> String {
+        let identifier = element.identifier.isEmpty ? "(no identifier)" : element.identifier
+        let label = element.label.isEmpty ? "(no label)" : element.label
+        return "\(String(describing: element.elementType)) id=\(identifier) label=\"\(label)\" frame=\(element.frame)"
     }
 }
