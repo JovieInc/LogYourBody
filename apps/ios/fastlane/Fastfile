@@ -322,12 +322,14 @@ platform :ios do
     test_scheme = options[:scheme] || scheme
     test_device = options[:device] || "iPhone 16"
     test_configuration = options[:configuration] || "Debug"
+    test_plan = options[:testplan] || "UITests"
     output_dir = options[:output_directory] || "./test_output"
     
     # Run UI tests specifically
     run_tests(
       project: proj_path,
       scheme: test_scheme,
+      testplan: test_plan,
       device: test_device,
       configuration: test_configuration,
       clean: options[:clean] != false,
