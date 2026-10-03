@@ -105,7 +105,7 @@ test('a red main CI check files remediation:red-checks on the LYB team', async (
     }
     if (body.query.includes('CreateDedupedLinearIssue')) {
       return jsonResponse({
-        data: { issueCreate: { success: true, issue: { id: 'issue-1', identifier: 'LYB-1', url: 'https://linear.app/i' } } },
+        data: { issueCreate: { success: true, issue: { id: 'issue-1', identifier: 'LYB-1', url: 'https://example.com/issue-1' } } },
       });
     }
     return jsonResponse({ errors: [{ message: 'unexpected' }] }, false);
@@ -157,7 +157,7 @@ test('the first green after red resolves and a Linear failure does not record st
     }
     if (body.query.includes('ResolveRemediation')) {
       return jsonResponse({
-        data: { issueUpdate: { success: true, issue: { id: 'issue-1', identifier: 'LYB-1', url: 'https://linear.app/i' } } },
+        data: { issueUpdate: { success: true, issue: { id: 'issue-1', identifier: 'LYB-1', url: 'https://example.com/issue-1' } } },
       });
     }
     return jsonResponse({}, false);
