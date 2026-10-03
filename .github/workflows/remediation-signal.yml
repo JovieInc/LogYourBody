@@ -1,0 +1,119 @@
+name: Remediation signal
+
+# Files non-iOS failures into the Symphony remediation router (JOV-7540 / LYB-94).
+# Labels are remediation:<detector-key> on Linear team LYB:
+#   CI push to main        -> remediation:red-checks
+#   Deploy push to main    -> remediation:web-deploy
+#   nightly homepage probe -> remediation:synthetic-monitoring
+# Filing is on unless repository variable REMEDIATION_INTAKE_DISABLED is exactly 1.
+# An unset variable does not dry-run. Steady greens do not call Linear.
+# A missing LINEAR_API_KEY or a Linear error warns and exits 0.
+#
+# Known gap, not edited here: ios-release-loop.yml has no cron and no re-run
+# after a failed release (push to main on iOS paths, workflow_dispatch, and
+# workflow_call only). Golden-path filing waits with the Fastfile and ios-*.yml
+# workflows. There is no scheduled iOS golden-path job to attach to.
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - Deploy
+    types: [completed]
+  schedule:
+    - cron: '23 7 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/scripts/remediation-signal.mjs'
+      - '.github/scripts/remediation-signal-intake.mjs'
+      - '.github/scripts/remediation-signal.test.mjs'
+      - '.github/scripts/lib/linear-issue-intake.mjs'
+      - '.github/workflows/remediation-signal.yml'
+      - 'packages/shared-lib/package.json'
+      - 'packages/shared-lib/turbo.json'
+
+permissions: {}
+
+concurrency:
+  group: remediation-signal-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Remediation signal tests
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit tests
+        run: node --test .github/scripts/remediation-signal.test.mjs .github/scripts/ci-remediation.test.mjs
+
+  signal:
+    name: File remediation signal
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event == 'push' &&
+       (github.event.workflow_run.name == 'CI' || github.event.workflow_run.name == 'Deploy'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Probe homepage on the nightly schedule
+        id: probe
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          set +e
+          status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 https://logyourbody.com)"
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ] || [ -z "$status" ]; then
+            status=000
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Restore prior red/green marker
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: .remediation
+          key: remediation-signal-${{ github.event.workflow_run.name || 'synthetic' }}-${{ github.run_id }}
+          restore-keys: |
+            remediation-signal-${{ github.event.workflow_run.name || 'synthetic' }}-
+
+      - name: Upsert or resolve the labeled issue
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_INTAKE_DISABLED: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+          REMEDIATION_HTTP_STATUS: ${{ steps.probe.outputs.status }}
+          REMEDIATION_RUN_URL: ${{ github.event.workflow_run.html_url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
+          REMEDIATION_PREVIOUS_FILE: .remediation/state
+          REMEDIATION_STATE_FILE: .remediation/state
+        run: node .github/scripts/remediation-signal-intake.mjs
+
+      - name: Remember red or the green that resolved it
+        if: hashFiles('.remediation/state.dirty') != ''
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: .remediation
+          key: remediation-signal-${{ github.event.workflow_run.name || 'synthetic' }}-${{ github.run_id }}

@@ -1,11 +1,19 @@
 // Vendored from JovieInc/Jovie scripts/lib/linear-issue-intake.mjs.
-// One upsert helper for the remediation jobs: match an existing JOV issue by
+// One upsert helper for the remediation jobs: match an existing issue by
 // title fingerprint or by label, then create or update it. Comment helpers
-// sit next to it. JOV team id is the Jovie team.
+// sit next to it. Existing callers stay on the JOV team. Symphony intake
+// passes the LYB team id from findTeamIdByKey.
 
 const LINEAR_API = 'https://api.linear.app/graphql';
 const LINEAR_REQUEST_TIMEOUT_MS = 15_000;
 export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
+export const LYB_TEAM_KEY = 'LYB';
+
+/** Router label. A fingerprint that already starts with the prefix is kept. */
+export function remediationKey(fingerprint) {
+  const name = String(fingerprint ?? '').trim();
+  return name.startsWith('remediation:') ? name : `remediation:${name}`;
+}
 
 export function missingLinearKeyWarning() {
   return 'LINEAR_API_KEY is missing from LogYourBody Actions secrets. Skipping Linear upsert. Tim must add LINEAR_API_KEY.';
@@ -154,6 +162,7 @@ export async function upsertLinearIssue({
   // Optional label ids applied only when a new issue is created.
   createLabelIds = [],
   reopenTerminal = false,
+  teamId = JOVIE_TEAM_ID,
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
 }) {
@@ -169,6 +178,7 @@ export async function upsertLinearIssue({
   const lookup =
     labelName || titleFingerprint
       ? linearIssueLookupFilter({
+          teamId,
           fingerprint: titleFingerprint,
           label: labelName || null,
         })
@@ -191,7 +201,7 @@ export async function upsertLinearIssue({
               }
             }
           `,
-          variables: { teamId: JOVIE_TEAM_ID, filter: lookup },
+          variables: { teamId, filter: lookup },
           apiKey,
           fetchImpl,
         }
@@ -204,7 +214,7 @@ export async function upsertLinearIssue({
               }
             }
           `,
-          variables: { teamId: JOVIE_TEAM_ID },
+          variables: { teamId },
           apiKey,
           fetchImpl,
         },
@@ -246,11 +256,11 @@ export async function upsertLinearIssue({
     );
     if (!byIdentifier.ok) return byIdentifier;
     const issue = byIdentifier.data?.issue ?? null;
-    if (issue && issue.team?.id === JOVIE_TEAM_ID) match = issue;
+    if (issue && issue.team?.id === teamId) match = issue;
   }
 
   const labelIdResult = labelName
-    ? await ensureTeamLabelId({ label: labelName, labels: teamLabels, apiKey, fetchImpl })
+    ? await ensureTeamLabelId({ label: labelName, labels: teamLabels, teamId, apiKey, fetchImpl })
     : { ok: true, id: null };
   if (!labelIdResult.ok) return labelIdResult;
   const labelIds = [...createLabelIds, labelIdResult.id].filter(Boolean);
@@ -267,6 +277,7 @@ export async function upsertLinearIssue({
       {
         query: `
           mutation CreateDedupedLinearIssue(
+            $teamId: String!
             $title: String!
             $description: String!
             ${typeof priority === 'number' ? '$priority: Int' : ''}
@@ -274,7 +285,7 @@ export async function upsertLinearIssue({
             $labelIds: [String!]
           ) {
             issueCreate(input: {
-              teamId: "${JOVIE_TEAM_ID}"
+              teamId: $teamId
               title: $title
               description: $description
               ${typeof priority === 'number' ? 'priority: $priority' : ''}
@@ -287,6 +298,7 @@ export async function upsertLinearIssue({
           }
         `,
         variables: {
+          teamId,
           title,
           description,
           ...(typeof priority === 'number' ? { priority } : {}),
@@ -376,7 +388,7 @@ export async function upsertLinearIssue({
 
 export const upsertLinearIssueByTitleFingerprint = upsertLinearIssue;
 
-async function ensureTeamLabelId({ label, labels, apiKey, fetchImpl }) {
+async function ensureTeamLabelId({ label, labels, teamId = JOVIE_TEAM_ID, apiKey, fetchImpl }) {
   const existing = labels.find((item) => item?.name === label);
   if (existing?.id) return { ok: true, id: existing.id };
   const created = await linearGraphql(
@@ -389,7 +401,7 @@ async function ensureTeamLabelId({ label, labels, apiKey, fetchImpl }) {
           }
         }
       `,
-      variables: { name: label, teamId: JOVIE_TEAM_ID },
+      variables: { name: label, teamId },
       apiKey,
       fetchImpl,
     },
@@ -401,4 +413,125 @@ async function ensureTeamLabelId({ label, labels, apiKey, fetchImpl }) {
     return { ok: false, reason: 'linear_label_create_unsuccessful', body: created.raw };
   }
   return { ok: true, id };
+}
+
+export async function findTeamIdByKey({
+  teamKey = LYB_TEAM_KEY,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  const key = String(teamKey ?? '').trim();
+  if (!key) return { ok: false, reason: 'missing_team_key' };
+  const result = await linearGraphql(
+    {
+      query: `
+        query TeamByKey($key: String!) {
+          teams(filter: { key: { eq: $key } }) { nodes { id key } }
+        }
+      `,
+      variables: { key },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_team_by_key',
+  );
+  if (!result.ok) return result;
+  const id = result.data?.teams?.nodes?.[0]?.id ?? null;
+  if (!id) return { ok: false, reason: 'linear_team_missing' };
+  return { ok: true, id };
+}
+
+/** Close the open labeled issue when its description names this source. */
+export async function noteFingerprintedIssueGreen({
+  fingerprint,
+  source,
+  comment,
+  teamId = JOVIE_TEAM_ID,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  const labelName = remediationKey(fingerprint);
+  if (!labelName || labelName === 'remediation:') {
+    return { ok: false, reason: 'missing_fingerprint' };
+  }
+  const found = await linearGraphql(
+    {
+      query: `
+        query FindRemediationForGreen($teamId: String!, $filter: IssueFilter!) {
+          team(id: $teamId) { states { nodes { id name type } } }
+          issues(filter: $filter, first: 25) {
+            nodes {
+              id identifier url title description
+              state { id name type }
+              labels { nodes { id name } }
+            }
+          }
+        }
+      `,
+      variables: {
+        teamId,
+        filter: linearIssueLookupFilter({ teamId, label: labelName }),
+      },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_label_search',
+  );
+  if (!found.ok) return found;
+  const nodes = found.data?.issues?.nodes ?? [];
+  const terminalTypes = ['completed', 'canceled'];
+  const matches = nodes.filter((node) =>
+    (node?.labels?.nodes ?? []).some((item) => item?.name === labelName),
+  );
+  const match =
+    matches.find((node) => !terminalTypes.includes(node?.state?.type)) ?? matches[0] ?? null;
+  if (!match) return { ok: true, action: 'none' };
+  if (terminalTypes.includes(match.state?.type)) {
+    return { ok: true, action: 'already_closed', id: match.id, identifier: match.identifier };
+  }
+  const sourceLine = source ? `Source-workflow: ${source}` : '';
+  if (sourceLine && !String(match.description ?? '').includes(sourceLine)) {
+    return { ok: true, action: 'source_mismatch', id: match.id, identifier: match.identifier ?? null };
+  }
+  const posted = await addLinearIssueComment({
+    issueId: match.id,
+    body: comment || `<!-- remediation-green -->\n${sourceLine} is green.`,
+    apiKey,
+    fetchImpl,
+  });
+  if (!posted.ok) return posted;
+  const states = found.data?.team?.states?.nodes ?? [];
+  const done =
+    states.find((state) => state?.name === 'Done') ??
+    states.find((state) => state?.type === 'completed');
+  if (!done?.id) return { ok: false, reason: 'linear_done_state_missing' };
+  const updated = await linearGraphql(
+    {
+      query: `
+        mutation ResolveRemediation($id: String!, $stateId: String!) {
+          issueUpdate(id: $id, input: { stateId: $stateId }) {
+            success
+            issue { id identifier url }
+          }
+        }
+      `,
+      variables: { id: match.id, stateId: done.id },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_resolve',
+  );
+  if (!updated.ok) return updated;
+  if (!updated.data?.issueUpdate?.success) {
+    return { ok: false, reason: 'linear_update_unsuccessful', body: updated.raw };
+  }
+  return {
+    ok: true,
+    action: 'resolved',
+    id: match.id,
+    identifier: updated.data.issueUpdate.issue?.identifier ?? match.identifier,
+    url: updated.data.issueUpdate.issue?.url ?? match.url,
+  };
 }
