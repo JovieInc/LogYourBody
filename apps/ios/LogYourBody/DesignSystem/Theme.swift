@@ -430,8 +430,8 @@ struct DefaultTheme: Theme {
         primarySubtle: .jovieAction.opacity(0.12),
 
         // Accents
-        accentViolet: Color(hex: "#8b1eff"),
-        accentPink: Color(hex: "#d61a7f"),
+        accentViolet: Color(hex: "#A873FF"),
+        accentPink: Color(hex: "#FF5FA2"),
         accentTeal: Color(hex: "#0f9b8e"),
         accentOrange: Color(hex: "#ff9800"),
         accentGreen: Color(hex: "#2f9e44"),
@@ -439,7 +439,7 @@ struct DefaultTheme: Theme {
         // Text
         text: Color(hex: "#F7F8F8"),
         textSecondary: Color(hex: "#9CA0A8"),
-        textTertiary: Color(hex: "#6E7178"),
+        textTertiary: Color(hex: "#8B909B"),
         textQuaternary: Color(hex: "#4A4D52"),
 
         // Borders
@@ -450,7 +450,7 @@ struct DefaultTheme: Theme {
         // States
         success: Color(hex: "#2F9E44"),
         warning: Color(hex: "#ff9800"),
-        error: Color(hex: "#F3122D"),
+        error: Color(hex: "#FF4556"),
         info: .jovieMetricAccent,
 
         // Interactive
