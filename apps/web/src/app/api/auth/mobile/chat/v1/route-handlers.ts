@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
+import { applyClinicalGuardrail, holdCoachReplyForReview } from '@/lib/chat/coach-scaffold';
 import { buildChatModelMessages, isTrainingQuestion } from '@/lib/chat/context';
 import { hasUnauthorizedTrainingQuantity } from '@/lib/chat/training-number-boundary';
+import { coachPersonaGuardrailsEnabled } from '@/lib/flags/coach-persona';
 import type { NextWorkoutResult } from '@/lib/training/service';
 import {
   CHAT_PROTOCOL_VERSION,
@@ -192,6 +194,8 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
       let model: ChatModelPort;
       let modelMessages: ChatModelMessage[];
       const trainingTurn = isTrainingQuestion(input.message);
+      const guardrailsEnabled = coachPersonaGuardrailsEnabled();
+      const holdForReview = holdCoachReplyForReview(trainingTurn, guardrailsEnabled);
       let trainingOutput: NextWorkoutResult | null = null;
       try {
         const [user, metrics] = await Promise.all([
@@ -252,7 +256,7 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
               if (modelEvent.type === 'text_delta') {
                 content += modelEvent.text;
                 if (content.length > 12_000) throw new Error('CHAT_RESPONSE_TOO_LONG');
-                if (!trainingTurn) {
+                if (!holdForReview) {
                   controller.enqueue(
                     event('delta', {
                       version: CHAT_PROTOCOL_VERSION,
@@ -267,11 +271,12 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
             }
 
             if (!content.trim()) throw new Error('CHAT_EMPTY_RESPONSE');
-            const deliveredContent =
+            const trainingSafe =
               trainingTurn && hasUnauthorizedTrainingQuantity(content, trainingOutput)
                 ? TRAINING_NUMBER_FALLBACK
                 : content;
-            if (trainingTurn) {
+            const deliveredContent = applyClinicalGuardrail(trainingSafe, guardrailsEnabled);
+            if (holdForReview) {
               controller.enqueue(
                 event('delta', {
                   version: CHAT_PROTOCOL_VERSION,
