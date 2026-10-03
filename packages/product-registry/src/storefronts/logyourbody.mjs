@@ -38,7 +38,7 @@ LogYourBody is built for consistent body-composition tracking without noisy coac
 
 LogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.`,
         releaseNotes:
-          'Private body-composition timeline with a single time-weighted photo scrubber, weight and body-fat logging, optional Apple Health context, Stats, restore purchases, data export, and account deletion.',
+          'LogYourBody Pro is a monthly or annual subscription, and each plan includes a 3-day free trial. This update also fixes a crash that could happen when sign-in resumed more than once.',
         supportUrl: 'https://logyourbody.com/support',
         marketingUrl: 'https://logyourbody.com',
         privacyUrl: 'https://logyourbody.com/privacy',
