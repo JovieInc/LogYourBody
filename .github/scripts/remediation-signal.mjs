@@ -85,11 +85,12 @@ export async function probeHomepage({
   return classifyProbeStatuses(statuses);
 }
 
+/** Follow redirects. Apex 307s to www; a final 200 is up. */
 export async function requestHomepage(fetchImpl = fetch) {
   try {
     const response = await fetchImpl(HOMEPAGE_URL, {
       method: 'GET',
-      redirect: 'manual',
+      redirect: 'follow',
       signal: AbortSignal.timeout(20_000),
     });
     return response.status;

@@ -5,7 +5,8 @@ name: Remediation signal
 #   CI push to main        -> remediation:red-checks
 #   Deploy push to main    -> remediation:web-deploy
 #   nightly homepage probe -> remediation:synthetic-monitoring
-# The probe tries 3 times with backoff. One confirmed red is held. Linear is
+# The probe tries 3 times with backoff and follows redirects. Apex 307s to
+# www, and a final 200 is green. One confirmed red is held. Linear is
 # called only when the next run is red too. Filing is on unless repository
 # variable REMEDIATION_INTAKE_DISABLED is exactly 1. An unset variable does not
 # dry-run. Steady greens do not call Linear. A missing LINEAR_API_KEY or a

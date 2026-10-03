@@ -14,6 +14,7 @@ import {
   gateSteadyGreen,
   probeHomepage,
   remediationIntakeDisabled,
+  requestHomepage,
   runRemediationIntake,
 } from './remediation-signal.mjs';
 import { noteFilingSkipped } from './remediation-signal-intake.mjs';
@@ -188,6 +189,21 @@ test('the first green after red resolves and a Linear failure does not record st
   assert.equal(down.ok, false);
   assert.equal(down.state, null);
   assert.equal(down.fingerprint, 'synthetic-monitoring');
+});
+
+test('the homepage probe follows redirects and stops on the first 200', async () => {
+  let init;
+  const status = await requestHomepage(async (_url, options) => {
+    init = options;
+    return { status: 200 };
+  });
+  assert.equal(status, 200);
+  assert.equal(init.redirect, 'follow');
+  assert.equal(init.method, 'GET');
+  const failed = await requestHomepage(async () => {
+    throw new Error('network');
+  });
+  assert.equal(failed, 0);
 });
 
 test('a homepage blip does not file, and two confirmed reds do', async () => {
