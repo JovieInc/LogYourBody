@@ -174,7 +174,7 @@ Not read.
 - No `APP_STORE_CONNECT_API_KEY`, key id, issuer, or `APP_STORE_CONNECT_API_KEY_PATH` in this environment.
 - Doppler token is unset. Secrets were not fetched.
 - `https://itunes.apple.com/lookup?id=6755209876&country=us` returned `resultCount: 0`.
-- Linear LYB-97 and LYB-33 were not opened. The Linear connection needs Cursor desktop authentication, and GitHub search in `JovieInc/LogYourBody` returned no issues with those IDs.
+- Linear pages [LYB-97](https://linear.app/jovie/issue/LYB-97) and [LYB-33](https://linear.app/jovie/issue/LYB-33) exist. Their bodies did not load here (Linear needs Cursor desktop authentication). GitHub search in `JovieInc/LogYourBody` returned no issues with those IDs.
 
 ## Self-review
 
@@ -190,7 +190,7 @@ Not read.
 
 - LYB-33's 3-day trials are the 1.2.0 products. Changing them before submit changes the build under review.
 - Open PR [#1197](https://github.com/JovieInc/LogYourBody/pull/1197) (`cursor/testflight-whats-new-a4e6`) edits `apps/ios/fastlane/metadata/en-US/release_notes.txt`, `apps/ios/fastlane/storefront-manifest.generated.json`, and `packages/product-registry/src/storefronts/logyourbody.mjs` to say each plan includes a 3-day free trial. That is the What's New text for the submit. This audit does not edit those lines.
-- Other open PRs are dependency bumps, CI, settings, and unrelated iOS fixes. None of them edit `LogYourBody.storekit` or `plans[].trialDays` on `main`.
+- Open PR titles matching paywall, trial, registry, StoreKit, or subscription returned only #1197. That is a title scan, not a diff of every open PR. `main` at this commit still has the free-trial StoreKit config above.
 - Any follow-up that touches `apps/ios/**` before 1.2.0 is submitted will trigger TestFlight via the iOS workflows.
 
 ### 3. Adjacent issues
