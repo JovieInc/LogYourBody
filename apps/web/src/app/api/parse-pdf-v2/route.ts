@@ -37,7 +37,7 @@ async function extractTextFromPDF(buffer: ArrayBuffer): Promise<string> {
 
     return fullText;
   } catch (error) {
-    console.error('Error extracting text with PDF.js:', error);
+    console.error('PDF.js text extraction failed');
     throw error;
   }
 }
@@ -70,8 +70,8 @@ export async function POST(request: NextRequest) {
     try {
       // Extract text using PDF.js
       pdfText = await extractTextFromPDF(arrayBuffer);
-    } catch (error) {
-      console.error('Failed to extract text from PDF:', error);
+    } catch {
+      console.error('Failed to extract text from PDF');
 
       // If text extraction fails, we could try OCR or other methods
       return NextResponse.json(
@@ -94,9 +94,6 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-
-    console.log('Extracted text length:', pdfText.length);
-    console.log('Text preview:', pdfText.substring(0, 200) + '...');
 
     // Use OpenAI to extract body composition data with strict instructions
     const completionContent = await openAICompletion.createJsonObjectCompletion({
@@ -146,7 +143,7 @@ export async function POST(request: NextRequest) {
       textLength: pdfText.length,
     });
   } catch (error) {
-    console.error('Error parsing PDF:', error);
+    console.error('PDF scan extraction failed');
 
     return NextResponse.json(
       {

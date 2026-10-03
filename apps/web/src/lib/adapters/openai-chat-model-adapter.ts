@@ -15,7 +15,8 @@ export class OpenAIChatModelAdapter implements ChatModelPort {
     apiKey: string,
     private readonly model = process.env.LYB_CHAT_MODEL || 'gpt-4o-mini',
   ) {
-    this.client = new OpenAI({ apiKey });
+    // logLevel off: the SDK debug logger prints request bodies, including health prompts.
+    this.client = new OpenAI({ apiKey, logLevel: 'off' });
   }
 
   async *streamText({
@@ -31,6 +32,7 @@ export class OpenAIChatModelAdapter implements ChatModelPort {
         temperature: 0.2,
         stream: true,
         stream_options: { include_usage: true },
+        store: false,
       },
       { signal },
     );
