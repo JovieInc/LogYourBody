@@ -1,0 +1,56 @@
+name: Preview Evidence
+
+on:
+  pull_request:
+    branches: [main]
+  merge_group:
+    branches: [main]
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-evidence-${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  tests:
+    name: Preview Evidence tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.20.2'
+      - run: node --test --experimental-test-coverage --test-reporter=./.github/scripts/preview-coverage-reporter.mjs .github/scripts/preview-evidence.test.mjs
+
+  evidence:
+    name: Preview Evidence
+    needs: tests
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - name: Require checker tests and coverage
+        env:
+          TEST_RESULT: ${{ needs.tests.result }}
+        run: test "$TEST_RESULT" = success
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.20.2'
+      - name: Verify canonical Preview for the exact event SHA
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: node .github/scripts/preview-evidence.mjs verify "$GITHUB_EVENT_NAME" "$GITHUB_EVENT_PATH"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-evidence-${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          path: preview-evidence.json
+          if-no-files-found: error
