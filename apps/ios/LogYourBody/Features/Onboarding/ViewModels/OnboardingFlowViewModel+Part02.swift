@@ -45,6 +45,7 @@ func hydrateProfileDetailsDraftIfNeeded(from user: User?) {
             }
 
             profileShouldAskSex = profileBiologicalSex == nil
+            planProfileDetailsFromEarlierAnswers(knownDateOfBirth: nil, knownHeightCentimeters: nil)
             recomputeProfileDetailsActiveSubstep()
             isRestoringProgress = false
             persistProgress()
@@ -73,6 +74,10 @@ func hydrateProfileDetailsDraftIfNeeded(from user: User?) {
         }
 
         profileShouldAskSex = profileBiologicalSex == nil
+        planProfileDetailsFromEarlierAnswers(
+            knownDateOfBirth: user.profile?.dateOfBirth,
+            knownHeightCentimeters: user.profile?.height
+        )
         recomputeProfileDetailsActiveSubstep()
         hasHydratedProfileDetailsDraft = true
 
@@ -437,7 +442,44 @@ var profileHeightUnitStorageValue: String {
         }
     }
 
+/// Carries the birth year and height given earlier in onboarding into the
+/// profile draft, then plans only the substeps that are still unanswered.
+func planProfileDetailsFromEarlierAnswers(knownDateOfBirth: Date?, knownHeightCentimeters: Double?) {
+        var hasDateOfBirth = knownDateOfBirth != nil
+        if !hasDateOfBirth,
+           let birthYear = bodyScoreInput.birthYear,
+           let dateOfBirth = Calendar.current.date(from: DateComponents(year: birthYear, month: 1, day: 1)) {
+            profileDateOfBirth = dateOfBirth
+            hasDateOfBirth = true
+        }
+
+        if (knownHeightCentimeters ?? 0) <= 0, let centimeters = bodyScoreInput.height.inCentimeters {
+            hydrateProfileHeight(centimeters: centimeters, storedUnit: heightUnit == .inches ? "in" : "cm")
+        }
+
+        let heightInput = ProfileDetailsValidationPolicy.ProfileHeightInput(
+            unit: profileHeightUnit,
+            centimetersText: profileHeightCentimetersText,
+            feet: profileHeightFeet,
+            inches: profileHeightInches
+        )
+
+        profileDetailsPlan = ProfileDetailsSubstepPlanPolicy.substeps(
+            askFirstName: !ProfileDetailsValidationPolicy.isNameValid(profileFirstName),
+            askLastName: !ProfileDetailsValidationPolicy.isNameValid(profileLastName),
+            askDateOfBirth: !hasDateOfBirth ||
+                !ProfileDetailsValidationPolicy.isDateOfBirthWithinValidRange(profileDateOfBirth),
+            askSex: profileShouldAskSex,
+            askHeight: !ProfileDetailsValidationPolicy.isHeightValid(heightInput)
+        )
+    }
+
 func recomputeProfileDetailsActiveSubstep() {
+        if let firstPlannedSubstep = profileDetailsPlan?.first {
+            profileDetailsActiveSubstep = firstPlannedSubstep
+            return
+        }
+
         let trimmedFirstName = profileFirstName.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedLastName = profileLastName.trimmingCharacters(in: .whitespacesAndNewlines)
         let age = Calendar.current.dateComponents([.year], from: profileDateOfBirth, to: Date()).year
