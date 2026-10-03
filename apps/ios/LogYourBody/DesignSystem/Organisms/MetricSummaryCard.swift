@@ -146,15 +146,17 @@ public struct MetricSummaryCard: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            // Small icon + title in accent color (Apple Health-style label)
+            // Keep the metric accent on the non-text icon, but use the semantic
+            // text role for the small label so every metric has a readable
+            // foreground independent of its accent hue.
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: headerIconSize, weight: .semibold))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(accentColor)
 
                 Text(titleText)
                     .font(.system(size: 15, weight: .semibold, design: .default))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
             }
 
@@ -167,7 +169,7 @@ public struct MetricSummaryCard: View {
                 if isButtonContext && hasActionableState {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(secondaryTextColor.opacity(0.7))
+                        .foregroundStyle(secondaryTextColor)
                 }
             }
         }
@@ -215,7 +217,7 @@ public struct MetricSummaryCard: View {
                 if let time = content.timestamp {
                     Text(time)
                         .font(.system(.footnote, design: .rounded))
-                        .foregroundStyle(secondaryTextColor.opacity(0.8))
+                        .foregroundStyle(secondaryTextColor)
                         .transition(.opacity)
                 }
             default:
@@ -324,7 +326,7 @@ public struct MetricSummaryCard: View {
                     .foregroundStyle(
                         isToday
                             ? lineColor
-                            : lineColor.opacity(0.55)
+                            : lineColor
                     )
                 }
             } else {
@@ -353,7 +355,7 @@ public struct MetricSummaryCard: View {
                         y: .value("Value", minPoint.value)
                     )
                     .symbolSize(6)
-                    .foregroundStyle(lineColor.opacity(0.7))
+                    .foregroundStyle(lineColor)
                 }
 
                 if let maxPoint {
@@ -362,7 +364,7 @@ public struct MetricSummaryCard: View {
                         y: .value("Value", maxPoint.value)
                     )
                     .symbolSize(6)
-                    .foregroundStyle(lineColor.opacity(0.9))
+                    .foregroundStyle(lineColor)
                 }
             }
         }
