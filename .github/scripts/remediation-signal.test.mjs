@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -16,6 +17,7 @@ import {
   remediationIntakeDisabled,
   requestHomepage,
   runRemediationIntake,
+  skippedFilingMessage,
 } from './remediation-signal.mjs';
 import { noteFilingSkipped } from './remediation-signal-intake.mjs';
 
@@ -287,17 +289,96 @@ test('a homepage blip does not file, and two confirmed reds do', async () => {
   assert.equal(calls.length > 0, true);
 });
 
-test('a missing Linear key is a visible skip', () => {
+function assertVisibleSkip(reason, detail) {
   const dir = mkdtempSync(join(tmpdir(), 'lyb-skip-'));
   const summary = join(dir, 'summary.md');
   const warnings = [];
-  const line = noteFilingSkipped('missing_linear_api_key', {
+  const line = noteFilingSkipped(reason, {
     summaryPath: summary,
     warn: (message) => warnings.push(message),
   });
-  assert.match(line, /Filing was SKIPPED/);
-  assert.match(warnings[0], /::warning::Filing was SKIPPED \(LINEAR_API_KEY is missing\)/);
-  assert.match(readFileSync(summary, 'utf8'), /Filing was SKIPPED/);
+  const expected = `Remediation intake did NOT file: ${detail} (LYB-99)`;
+  assert.equal(line, expected);
+  assert.equal(skippedFilingMessage(reason), expected);
+  assert.equal(warnings[0], `::warning::${expected}`);
+  assert.equal(readFileSync(summary, 'utf8'), `${expected}\n`);
+}
+
+test('missing key, missing LYB team, and Linear API errors do not file', async () => {
+  const missing = await runRemediationIntake({
+    env: {},
+    eventName: 'workflow_run',
+    event: mainRun('CI', 'failure'),
+    previous: '',
+    fetchImpl: async () => {
+      throw new Error('linear called');
+    },
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.reason, 'missing_linear_api_key');
+  assert.equal(missing.state, null);
+  assertVisibleSkip('missing_linear_api_key', 'LINEAR_API_KEY missing');
+
+  const noTeam = await runRemediationIntake({
+    env: { LINEAR_API_KEY: 'key' },
+    eventName: 'workflow_run',
+    event: mainRun('Deploy', 'failure'),
+    previous: '',
+    fetchImpl: async () => jsonResponse({ data: { teams: { nodes: [] } } }),
+  });
+  assert.equal(noTeam.ok, false);
+  assert.equal(noTeam.reason, 'linear_team_missing');
+  assert.equal(noTeam.state, null);
+  assertVisibleSkip('linear_team_missing', 'LYB team not found');
+
+  const apiDown = await runRemediationIntake({
+    env: { LINEAR_API_KEY: 'key' },
+    eventName: 'workflow_run',
+    event: mainRun('CI', 'failure'),
+    previous: 'red',
+    fetchImpl: async () => jsonResponse({ errors: [{ message: 'down' }] }, false),
+  });
+  assert.equal(apiDown.ok, false);
+  assert.equal(apiDown.state, null);
+  assert.equal(apiDown.reason, 'linear_team_by_key_500');
+  assertVisibleSkip('linear_team_by_key_500', 'Linear API error: linear_team_by_key_500');
+
+  const graphqlDown = await runRemediationIntake({
+    env: { LINEAR_API_KEY: 'key' },
+    eventName: 'workflow_run',
+    event: mainRun('CI', 'failure'),
+    previous: '',
+    fetchImpl: async () => jsonResponse({ errors: [{ message: 'down' }] }),
+  });
+  assert.equal(graphqlDown.ok, false);
+  assert.equal(graphqlDown.reason, 'linear_team_by_key_graphql_error');
+  assertVisibleSkip(
+    'linear_team_by_key_graphql_error',
+    'Linear API error: linear_team_by_key_graphql_error',
+  );
+});
+
+test('a missing Linear key warns, records the summary, and exits 0', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lyb-intake-'));
+  const summary = join(dir, 'summary.md');
+  const eventPath = join(dir, 'event.json');
+  writeFileSync(eventPath, JSON.stringify(mainRun('CI', 'failure')));
+  const intake = resolve(root, '.github/scripts/remediation-signal-intake.mjs');
+  const result = spawnSync(process.execPath, [intake], {
+    env: {
+      ...process.env,
+      LINEAR_API_KEY: '',
+      GITHUB_EVENT_NAME: 'workflow_run',
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_STEP_SUMMARY: summary,
+      REMEDIATION_INTAKE_DISABLED: '',
+    },
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0);
+  const expected = 'Remediation intake did NOT file: LINEAR_API_KEY missing (LYB-99)';
+  assert.match(result.stderr, new RegExp(`::warning::${expected.replace(/[()]/g, '\\$&')}`));
+  assert.match(readFileSync(summary, 'utf8'), /Remediation intake did NOT file: LINEAR_API_KEY missing \(LYB-99\)/);
 });
 
 test('existing JOV callers keep the default team and the workflow stays off iOS', async () => {

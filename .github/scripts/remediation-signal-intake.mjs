@@ -54,6 +54,8 @@ async function main() {
     const reason = result.reason === 'missing_linear_api_key' ? missingLinearKeyWarning() : result.reason;
     noteFilingSkipped(result.reason, { summaryPath: env.GITHUB_STEP_SUMMARY });
     if (reason && reason !== result.reason) console.warn(reason);
+    // A missing key, a missing LYB team, or a Linear error must not fail the job.
+    process.exitCode = 0;
   }
 }
 

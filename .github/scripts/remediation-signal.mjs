@@ -129,9 +129,13 @@ export function applySyntheticGuard(decision, previous) {
   return { decision, persist: null };
 }
 
+/** Visible fail-open copy for LYB-99. The job still exits 0. */
 export function skippedFilingMessage(reason) {
-  const detail = reason === 'missing_linear_api_key' ? 'LINEAR_API_KEY is missing' : reason || 'linear_error';
-  return `Filing was SKIPPED (${detail}).`;
+  let detail = 'Linear API error';
+  if (reason === 'missing_linear_api_key') detail = 'LINEAR_API_KEY missing';
+  else if (reason === 'linear_team_missing' || reason === 'missing_team_key') detail = 'LYB team not found';
+  else if (reason) detail = `Linear API error: ${reason}`;
+  return `Remediation intake did NOT file: ${detail} (LYB-99)`;
 }
 
 /** Steady green skips Linear. The first green after a recorded red still resolves. */

@@ -9,9 +9,10 @@ name: Remediation signal
 # www, and a final 200 is green. One confirmed red is held. Linear is
 # called only when the next run is red too. Filing is on unless repository
 # variable REMEDIATION_INTAKE_DISABLED is exactly 1. An unset variable does not
-# dry-run. Steady greens do not call Linear. A missing LINEAR_API_KEY or a
-# Linear error writes a warning and a step summary that filing was SKIPPED,
-# then exits 0. Red/green state is the remediation-continuity-state artifact
+# dry-run. Steady greens do not call Linear. A missing LINEAR_API_KEY, a
+# missing LYB team, or a Linear API error writes a ::warning:: and a step
+# summary that remediation intake did NOT file (LYB-99), then exits 0.
+# Red/green state is the remediation-continuity-state artifact
 # (90 days), one artifact per detector. A missing artifact starts the count
 # over, so the next homepage red is held instead of filed.
 #
