@@ -654,10 +654,14 @@ All external services (feature flags, analytics, email/notifications, payments, 
 
 ### Secrets Management
 
-- Never commit secrets or API keys
-- Use `.xcconfig` files for iOS configuration (not in git)
-- Use environment variables for web configuration
-- All secrets are stored in GitHub Secrets for CI/CD
+Doppler remains the secrets manager. Operating rules are in [docs/engineering/secrets-policy.md](docs/engineering/secrets-policy.md) ([LYB-95](https://linear.app/jovie/issue/LYB-95)).
+
+- Never commit secrets or API keys, and never print secret values.
+- Use `.xcconfig` files for iOS configuration (not in git).
+- Use environment variables for web configuration.
+- Add new secrets directly to GitHub Actions and Vercel. Grok Bot performs the add after Tim supplies the value through a secure input.
+- Leave Doppler sync changes and Doppler billing to Tim.
+- Keep existing Doppler reads, including gbrain setup against `jovie-web/dev`.
 
 ### Code Security
 

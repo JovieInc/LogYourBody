@@ -10,6 +10,7 @@ Product truth starts in the typed product registry, not in a page component or a
 - [Golden path](GOLDEN_PATH.md): the paid iOS product loop.
 - [User journeys](USER_JOURNEYS.md): current tested user-facing paths.
 - [eve.dev core-chat migration](architecture/eve-core-chat-migration.md): external runtime boundary, shared identity/account connection, authorization, privacy, rollback, and cutover gates.
+- [Secrets policy](engineering/secrets-policy.md): Doppler stays the secrets manager; new secrets go directly to GitHub Actions and Vercel.
 
 ## Editing product truth
 
