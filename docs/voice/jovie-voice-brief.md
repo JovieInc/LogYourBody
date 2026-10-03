@@ -24,7 +24,7 @@ Rejected preview IDs and audio files are intentionally not stored in the public 
 
 ## Credential handling
 
-The ElevenLabs API key is configured as a sensitive Vercel environment variable for Preview and Production. For authorized local CLI work, retrieve only this key from Doppler and never print or commit it:
+The ElevenLabs API key is configured as a sensitive Vercel environment variable for Preview and Production. For authorized local CLI work, retrieve only this existing key from Doppler and never print or commit it. New secrets follow the [secrets policy](../engineering/secrets-policy.md): Doppler stays the secrets manager, and new values are added directly to GitHub Actions and Vercel.
 
 ```sh
 export ELEVENLABS_API_KEY="$(doppler secrets get ELEVENLABS_API_KEY --project jovie-web --config prd_agent_ops --plain)"
