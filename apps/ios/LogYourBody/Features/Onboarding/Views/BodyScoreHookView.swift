@@ -6,8 +6,8 @@ struct BodyScoreHookView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "See what’s changing.",
-            subtitle: "Weight, body fat, and height build your first Body Score in about a minute.",
+            title: "Are you losing fat or muscle?",
+            subtitle: "Your weight and body fat show the split in about a minute.",
             showsBackButton: false,
             progress: viewModel.progress(for: .hook),
             screen: .bodyScoreIntro
@@ -19,7 +19,7 @@ struct BodyScoreHookView: View {
                 Button {
                     viewModel.goToNextStep()
                 } label: {
-                    Text("Build my Body Score")
+                    Text("Find out")
                 }
                 .accessibilityIdentifier("body_score_onboarding_start_button")
                 .buttonStyle(OnboardingPrimaryButtonStyle())

@@ -64,9 +64,7 @@ enum ProfileDetailsValidationPolicy {
         case .lastName:
             return isNameValid(lastName)
         case .dateOfBirth:
-            return isNameValid(firstName) &&
-                isNameValid(lastName) &&
-                isDateOfBirthWithinValidRange(dateOfBirth)
+            return isNameValid(firstName) && isDateOfBirthWithinValidRange(dateOfBirth)
         case .sex:
             return biologicalSex != nil
         case .height:
@@ -76,20 +74,19 @@ enum ProfileDetailsValidationPolicy {
 }
 
 /// Which profile-details substeps to show. Answers already given earlier in
-/// onboarding (or by Apple Health) are not asked again.
+/// onboarding (or by Apple Health) are not asked again, and the last name is
+/// never asked: nothing in the app needs it.
 enum ProfileDetailsSubstepPlanPolicy {
     typealias Substep = OnboardingFlowViewModel.ProfileDetailsSubstep
 
     static func substeps(
         askFirstName: Bool,
-        askLastName: Bool,
         askDateOfBirth: Bool,
         askSex: Bool,
         askHeight: Bool
     ) -> [Substep] {
         var plan: [Substep] = []
         if askFirstName { plan.append(.firstName) }
-        if askLastName { plan.append(.lastName) }
         if askDateOfBirth { plan.append(.dateOfBirth) }
         if askSex { plan.append(.sex) }
         if askHeight { plan.append(.height) }
@@ -99,7 +96,7 @@ enum ProfileDetailsSubstepPlanPolicy {
 
     /// The order used before a plan exists (for example a restored draft).
     static func fullOrder(askSex: Bool) -> [Substep] {
-        askSex ? [.firstName, .lastName, .dateOfBirth, .sex, .height] : [.firstName, .lastName, .dateOfBirth, .height]
+        askSex ? [.firstName, .dateOfBirth, .sex, .height] : [.firstName, .dateOfBirth, .height]
     }
 
     static func next(after substep: Substep, in plan: [Substep]) -> Substep? {
