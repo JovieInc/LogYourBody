@@ -135,7 +135,10 @@ export async function getOrCreateNextWorkout(input: {
   records: NativeProductRecordsPort;
   subject: string;
   now: Date;
+  /** false returns the same prescription without starting or updating a session record. */
+  persist?: boolean;
 }): Promise<NextWorkoutResult> {
+  const persist = input.persist ?? true;
   const snapshot = await loadTrainingRecords(input.records, input.subject);
   const setup = snapshot.setup;
   if (!setup) return { kind: 'not_enrolled' };
@@ -193,13 +196,14 @@ export async function getOrCreateNextWorkout(input: {
       logs: programLogs,
       feedback: programFeedback,
     });
-    await input.records.push(input.subject, 'training_sessions', [
-      {
-        ...activeRecord,
-        prescription: adjusted,
-        status: adjusted.safetyStop ? 'paused' : 'in_progress',
-      },
-    ]);
+    if (persist)
+      await input.records.push(input.subject, 'training_sessions', [
+        {
+          ...activeRecord,
+          prescription: adjusted,
+          status: adjusted.safetyStop ? 'paused' : 'in_progress',
+        },
+      ]);
     return {
       kind: 'workout',
       session: adjusted,
@@ -236,8 +240,10 @@ export async function getOrCreateNextWorkout(input: {
     prescription: session,
     startedAt: input.now.toISOString(),
   };
-  const saved = await input.records.push(input.subject, 'training_sessions', [sessionRecord]);
-  if (saved.rejected_ids.includes(session.id)) throw new Error('training_session_owner_conflict');
+  if (persist) {
+    const saved = await input.records.push(input.subject, 'training_sessions', [sessionRecord]);
+    if (saved.rejected_ids.includes(session.id)) throw new Error('training_session_owner_conflict');
+  }
   return {
     kind: 'workout',
     session,

@@ -140,6 +140,11 @@ export const endpoints = {
       reason: 'Legal-doc link (EDPB) referenced by privacy copy.',
     },
     {
+      value: 'https://chatgpt.com',
+      reason:
+        'ChatGPT OAuth redirect for the LogYourBody MCP connector (docs/integrations/chatgpt-app).',
+    },
+    {
       value: 'https://apps.apple.com',
       reason: 'Apple storefront links.',
     },
@@ -296,6 +301,26 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-74',
       reason:
         'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-95',
+      reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-97',
+      reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-33',
+      reason: 'LYB-33, related issue cited by the LYB-97 trial audit.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/JOV-7237',
+      reason: 'JOV-7237, Doppler to GitHub sync capacity work cited by the secrets policy.',
+    },
+    {
+      value: 'https://itunes.apple.com',
+      reason: 'iTunes lookup API cited by the LYB-97 storefront audit.',
     },
     {
       value: 'jov.ie',
