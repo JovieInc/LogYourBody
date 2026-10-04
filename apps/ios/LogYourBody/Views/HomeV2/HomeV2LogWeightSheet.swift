@@ -368,6 +368,7 @@ struct HomeV2LogWeightSheet: View {
             let saved = await onSave(value, bodyFat)
             isSaving = false
             if saved {
+                NotificationManager.shared.recordWeighInLogged()
                 dismiss()
             } else {
                 errorText = HomeV2Copy.saveFailed

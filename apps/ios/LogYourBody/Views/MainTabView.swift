@@ -582,6 +582,7 @@ private struct PaidWeightLoggerMVPView: View {
             realtimeSyncManager.updatePendingSyncCount()
             realtimeSyncManager.syncIfNeeded()
             AppServicePorts.analyticsTracker.track(event: "mvp_weight_logged")
+            NotificationManager.shared.recordWeighInLogged()
 
             isWeightFieldFocused = false
             weightText = ""

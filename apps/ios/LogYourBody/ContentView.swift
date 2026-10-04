@@ -81,6 +81,7 @@ struct ContentView: View {
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
     @State private var showWhatsNew = false
+    @State private var showDailyReminderOffer = false
     @State private var releaseReviewItems: [ReleaseReviewItem] = []
     @State private var releaseReviewDestination: ReleaseReviewDestination?
     @State private var pendingDexaPDF: DexaPDFFileSelection?
@@ -317,13 +318,31 @@ struct ContentView: View {
                 PaywallView()
                     .environmentObject(authManager)
                     .environmentObject(subscriptionManager)
-            } else if shouldShowDailyReminderPrompt {
-                DailyWeighInReminderPromptView(notificationManager: notificationManager)
             } else {
                 MainTabView(releaseReviewDestination: $releaseReviewDestination)
                     .onAppear {
                         AppServicePorts.analyticsTracker.track(event: "dashboard_view")
+                        showDailyReminderOffer = shouldShowDailyReminderPrompt
                     }
+                    .onChange(of: shouldShowDailyReminderPrompt) { _, shouldShow in
+                        guard shouldShow else { return }
+                        // Let the log sheet finish dismissing and the "Logged" line land first.
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(900))
+                            showDailyReminderOffer = shouldShowDailyReminderPrompt
+                        }
+                    }
+                    // Offered over Today once a first weigh-in is logged; a swipe-away
+                    // counts as "Not now" so it is asked once.
+                    .sheet(isPresented: $showDailyReminderOffer, onDismiss: {
+                        if !notificationManager.hasCompletedDailyWeighInPrompt {
+                            notificationManager.skipDailyWeighInPrompt()
+                        }
+                    }, content: {
+                        DailyWeighInReminderPromptView(notificationManager: notificationManager) {
+                            showDailyReminderOffer = false
+                        }
+                    })
             }
         }
     }

@@ -1678,6 +1678,42 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-ask", from: app)
     }
 
+    func testDailyReminderIsOfferedAfterTheFirstLoggedWeighInNotBeforeToday() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestDailyReminderPromptFixture"
+        ])
+
+        // Home's dock appears once the fixture has seeded.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 45),
+            "A new subscriber lands on Today"
+        )
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].exists, "No reminder ask before Today")
+
+        logWeight.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 10),
+            "The first logged weigh-in is when a reminder has a job"
+        )
+        attachScreenshot(named: "daily-reminder-after-first-weigh-in", from: app)
+        let notNow = app.buttons["daily_reminder_skip_button"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 3))
+        notNow.tap()
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].waitForExistence(timeout: 5))
+    }
+
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])

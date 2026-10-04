@@ -496,6 +496,8 @@ struct LogYourBodyApp: App {
         UserDefaults.standard.set(isSubscribed, forKey: Constants.revenueCatIsSubscribedKey)
         if isSubscribed && !usesDailyReminderPromptFixture {
             NotificationManager.shared.skipDailyWeighInPrompt()
+        } else if usesDailyReminderPromptFixture {
+            NotificationManager.shared.resetDailyWeighInPromptForUITests()
         }
 
         UserDefaults.standard.set(
