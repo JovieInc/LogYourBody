@@ -113,7 +113,18 @@ describe('deterministic training engine', () => {
       logs,
       feedback: [],
     });
-    expect(held.exercises[0]?.progression).toBe('hold');
+    expect(held.exercises[0]).toMatchObject({ progression: 'hold', targetLoadKg: 15 });
+
+    logs[1]!.loadKg = null;
+    const bodyweight = buildSession({
+      setup,
+      block,
+      sessionId: 'bodyweight-session',
+      slot: 0,
+      logs,
+      feedback: [],
+    });
+    expect(bodyweight.exercises[0]?.targetLoadKg).toBeNull();
   });
 
   it('does not escalate set volume because of a single good session', () => {
