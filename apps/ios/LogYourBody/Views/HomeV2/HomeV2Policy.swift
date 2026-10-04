@@ -14,8 +14,8 @@ enum HomeV2Policy {
     static let photoFixtureArgument = "-lybUITestHomeV2PhotoFixture"
     /// Signed in, nothing logged yet: the H0 day-zero state.
     static let emptyFixtureArgument = "-lybUITestHomeV2EmptyFixture"
-    /// The first run (Pencil O1–O4) has its own gate so sign-in and the
-    /// paywall can roll out apart from Home.
+    /// Picks the v2 sign-in screen (Pencil O1). The first run after sign-in is
+    /// the same fat-vs-muscle flow whatever this gate says.
     static let onboardingGateKey = "onboarding_v2_focus"
     static let onboardingFixtureArgument = "-lybUITestOnboardingV2Fixture"
 

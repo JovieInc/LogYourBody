@@ -35,8 +35,5 @@ final class HomeV2OnboardingPolicyTests: XCTestCase {
         for line in HomeV2OnboardingCopy.included {
             XCTAssertFalse(line.contains("$"), "Prices come from the store, never from copy")
         }
-        XCTAssertEqual(HomeV2OnboardingCopy.targetNote, "Weight from Apple Health is measured. Body fat is estimated.")
-        XCTAssertEqual(HomeV2OnboardingCopy.targetRangeError(unit: "kg"), "Enter a weight between 20 and 500 kg.")
-        XCTAssertEqual(HomeV2OnboardingCopy.stepsCount, 3)
     }
 }

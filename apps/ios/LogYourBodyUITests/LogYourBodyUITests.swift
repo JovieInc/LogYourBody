@@ -1638,19 +1638,12 @@ final class LogYourBodyUITests: XCTestCase {
 
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture", "-lybUITestOnboardingV2Fixture"])
         XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_first_run_health"].waitForExistence(timeout: 30),
-            "First run starts with Apple Health"
+            app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 30),
+            "The gate no longer forks the first run: everyone starts at Your data"
         )
-        XCTAssertTrue(app.buttons["home_v2_first_run_connect"].exists)
-        attachScreenshot(named: "onboarding-v2-health", from: app)
-        app.buttons["home_v2_first_run_not_now"].tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_first_run_target"].waitForExistence(timeout: 8),
-            "Not now moves on to the optional target"
-        )
-        XCTAssertTrue(app.buttons["home_v2_first_run_save_target"].exists)
-        XCTAssertTrue(app.buttons["home_v2_first_run_skip"].exists, "Skip stays quiet but visible")
-        attachScreenshot(named: "onboarding-v2-target", from: app)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_first_run_health"].exists)
+        XCTAssertTrue(app.buttons["body_score_onboarding_import_scan_button"].exists)
+        attachScreenshot(named: "onboarding-v2-first-run", from: app)
 
         launch(app, with: ["-lybUITestPaywallFixture", "-lybUITestOnboardingV2Fixture"])
         XCTAssertTrue(
