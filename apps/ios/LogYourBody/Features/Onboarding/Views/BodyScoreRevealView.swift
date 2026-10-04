@@ -76,6 +76,56 @@ enum BodyScoreRevealPolicy {
     }
 }
 
+/// The first-run answer to "am I losing fat or muscle?": weight split into
+/// fat mass and lean mass, with the body-fat source named so an estimate is
+/// never presented as a measurement.
+struct FatVsMuscleSummary: Equatable {
+    let fatText: String
+    let leanText: String
+    let unitText: String
+    let bodyFatPercentText: String
+    let fatFraction: Double
+    let sourceText: String
+
+    init?(input: BodyScoreInput) {
+        guard let weightKg = input.weight.inKilograms, weightKg > 0,
+              let bodyFat = input.bodyFat.percentage, bodyFat > 0, bodyFat < 100 else {
+            return nil
+        }
+        let fraction = bodyFat / 100
+        let displayWeight: Double
+        switch input.measurementPreference {
+        case .metric:
+            displayWeight = weightKg
+            unitText = "kg"
+        case .imperial:
+            displayWeight = weightKg * 2.20462
+            unitText = "lb"
+        }
+        let fat = (displayWeight * fraction).rounded()
+        fatText = String(format: "%.0f", fat)
+        leanText = String(format: "%.0f", displayWeight.rounded() - fat)
+        bodyFatPercentText = String(format: "%.0f%%", bodyFat)
+        fatFraction = fraction
+        sourceText = Self.sourceText(for: input.bodyFat.source)
+    }
+
+    static func sourceText(for source: BodyFatInputSource) -> String {
+        switch source {
+        case .healthKit:
+            return "Body fat from Apple Health"
+        case .manualValue:
+            return "Body fat you entered"
+        case .visualEstimate, .unspecified:
+            return "Body fat is a visual estimate"
+        }
+    }
+
+    var accessibilityLabel: String {
+        "Fat \(fatText) \(unitText). Lean mass \(leanText) \(unitText). Body fat \(bodyFatPercentText). \(sourceText)."
+    }
+}
+
 struct BodyScoreRevealView: View {
     @Environment(\.theme)
     private var theme
@@ -84,62 +134,44 @@ struct BodyScoreRevealView: View {
     private var reduceMotion
 
     @ObservedObject var viewModel: OnboardingFlowViewModel
-    @State private var animateScore = false
-    @State private var isSharePresented = false
-    @State private var sharePayload: BodyScoreSharePayload?
-    @AccessibilityFocusState private var scoreFocused: Bool
-
-    private var percentileGroupLabel: String {
-        BodyScoreRevealPolicy.percentileGroupLabel(for: viewModel.bodyScoreInput.sex)
-    }
+    @State private var isRevealed = false
+    @AccessibilityFocusState private var summaryFocused: Bool
 
     var body: some View {
         Group {
-            if let result = viewModel.bodyScoreResult {
+            if viewModel.bodyScoreResult != nil, let summary = FatVsMuscleSummary(input: viewModel.bodyScoreInput) {
                 OnboardingPageTemplate(
-                    title: "You’re building from a strong base.",
-                    subtitle: "Your score is a starting point, with source quality and context kept visible.",
+                    title: "Here’s your fat vs muscle.",
+                    subtitle: "Log again and LogYourBody shows which one is changing.",
                     showsBackButton: false,
                     progress: viewModel.progress(for: .bodyScore),
                     screen: .bodyScoreReveal
                 ) {
                     VStack(spacing: 20) {
-                        scoreHero(result: result)
-                            .scaleEffect(animateScore ? 1 : 0.9)
-                            .opacity(animateScore ? 1 : 0)
-                            .animation(reduceMotion ? nil : theme.animation.spring, value: animateScore)
-                            .accessibilityFocused($scoreFocused)
+                        massRow(summary: summary)
+                            .scaleEffect(isRevealed ? 1 : 0.94)
+                            .opacity(isRevealed ? 1 : 0)
+                            .animation(reduceMotion ? nil : theme.animation.spring, value: isRevealed)
+                            .accessibilityFocused($summaryFocused)
 
-                        statRow(result: result, groupLabel: percentileGroupLabel)
-                            .opacity(animateScore ? 1 : 0)
-                            .offset(y: animateScore ? 0 : 12)
-                            .animation(
-                                reduceMotion ? nil : theme.animation.fast.delay(0.1),
-                                value: animateScore
-                            )
+                        compositionBar(summary: summary)
+                            .opacity(isRevealed ? 1 : 0)
+                            .animation(reduceMotion ? nil : theme.animation.fast.delay(0.1), value: isRevealed)
 
-                        referencePill(result: result)
-                            .opacity(animateScore ? 1 : 0)
-                            .offset(y: animateScore ? 0 : 16)
-                            .animation(
-                                reduceMotion ? nil : theme.animation.fast.delay(0.15),
-                                value: animateScore
-                            )
+                        sourceLine(summary: summary)
+                            .opacity(isRevealed ? 1 : 0)
+                            .animation(reduceMotion ? nil : theme.animation.fast.delay(0.15), value: isRevealed)
                     }
                 } footer: {
                     VStack(spacing: 12) {
-                        Button("See my plan") {
+                        Button("Continue") {
                             viewModel.goToNextStep()
                         }
                         .buttonStyle(OnboardingPrimaryButtonStyle())
+                        .accessibilityIdentifier("body_score_reveal_continue_button")
 
-                        OnboardingTextButton(title: "Retake inputs") {
+                        OnboardingTextButton(title: "Edit my numbers") {
                             viewModel.goBack()
-                        }
-
-                        OnboardingTextButton(title: "Share my score") {
-                            sharePayload = makeSharePayload(from: result)
-                            isSharePresented = sharePayload != nil
                         }
                     }
                 }
@@ -155,125 +187,95 @@ struct BodyScoreRevealView: View {
             if newValue != nil {
                 triggerRevealFeedback()
             } else {
-                animateScore = false
-            }
-        }
-        .sheet(isPresented: $isSharePresented) {
-            if let payload = sharePayload {
-                BodyScoreShareSheet(payload: payload)
+                isRevealed = false
             }
         }
     }
 
-    private func scoreHero(result: BodyScoreResult) -> some View {
-        VStack(spacing: 8) {
-            Text("\(result.score)")
-                .font(theme.typography.displayLarge)
-                .monospacedDigit()
-                .foregroundStyle(theme.colors.text)
-
-            Text("Starting point")
-                .font(theme.typography.labelMedium)
-                .foregroundStyle(theme.colors.textSecondary)
-
-            Text("Based on FFMI, body fat %, and trends.")
-                .font(OnboardingTypography.caption)
-                .foregroundStyle(theme.colors.textSecondary)
+    private func massRow(summary: FatVsMuscleSummary) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            massColumn(label: "Fat", value: summary.fatText, unit: summary.unitText, tint: theme.colors.accentPink)
+            massColumn(label: "Lean mass", value: summary.leanText, unit: summary.unitText, tint: theme.colors.info)
         }
         .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Body Score \(result.score). \(result.statusTagline)")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(summary.accessibilityLabel)
+        .accessibilityIdentifier("body_score_reveal_fat_vs_muscle")
     }
 
-    private func statRow(result: BodyScoreResult, groupLabel: String) -> some View {
-        OnboardingCard {
-            VStack(alignment: .leading, spacing: 8) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 16) {
-                        ffmiLabel(result: result)
-                        Spacer()
-                        percentileLabel(result: result)
-                    }
+    private func massColumn(label: String, value: String, unit: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label {
+                Text(label)
+            } icon: {
+                Circle().fill(tint).frame(width: 8, height: 8)
+            }
+            .font(theme.typography.labelMedium)
+            .foregroundStyle(theme.colors.textSecondary)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        ffmiLabel(result: result)
-                        percentileLabel(result: result)
-                    }
-                }
-
-                Text("Compared with \(groupLabel).")
-                    .font(OnboardingTypography.caption)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(theme.typography.displayLarge)
+                    .monospacedDigit()
+                    .foregroundStyle(theme.colors.text)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                Text(unit)
+                    .font(theme.typography.labelLarge)
                     .foregroundStyle(theme.colors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func referencePill(result: BodyScoreResult) -> some View {
+    private func compositionBar(summary: FatVsMuscleSummary) -> some View {
+        GeometryReader { proxy in
+            HStack(spacing: 2) {
+                Capsule(style: .continuous)
+                    .fill(theme.colors.accentPink)
+                    .frame(width: max(proxy.size.width * summary.fatFraction - 1, 4))
+                Capsule(style: .continuous)
+                    .fill(theme.colors.info)
+            }
+        }
+        .frame(height: 10)
+        .accessibilityHidden(true)
+    }
+
+    private func sourceLine(summary: FatVsMuscleSummary) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "info.circle")
-                .font(.system(.body, design: .default).weight(.semibold))
-                .foregroundStyle(theme.colors.primary)
-
-            Text(referenceText(result: result))
+                .foregroundStyle(theme.colors.textSecondary)
+            Text("\(summary.bodyFatPercentText) body fat. \(summary.sourceText).")
                 .font(OnboardingTypography.caption)
                 .foregroundStyle(theme.colors.textSecondary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            theme.colors.surface,
-            in: Capsule(style: .continuous)
-        )
-        .overlay {
-            Capsule(style: .continuous)
-                .stroke(theme.colors.border.opacity(JovieTokens.hairlineOpacity), lineWidth: 1)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(referenceAccessibilityText(result: result))
-    }
-
-    private func referenceText(result: BodyScoreResult) -> String {
-        BodyScoreRevealPolicy.referenceText(range: result.bodyFatReferenceRange)
-    }
-
-    private func referenceAccessibilityText(result: BodyScoreResult) -> String {
-        BodyScoreRevealPolicy.referenceAccessibilityText(range: result.bodyFatReferenceRange)
-    }
-
-    private func makeSharePayload(from result: BodyScoreResult) -> BodyScoreSharePayload? {
-        BodyScoreRevealPolicy.makeSharePayload(input: viewModel.bodyScoreInput, result: result)
+        .accessibilityIdentifier("body_score_reveal_source")
     }
 
     private func triggerRevealFeedback() {
         if reduceMotion {
-            animateScore = true
+            isRevealed = true
         } else {
             withAnimation(theme.animation.spring) {
-                animateScore = true
+                isRevealed = true
             }
         }
         DispatchQueue.main.async {
-            scoreFocused = true
+            summaryFocused = true
         }
         HapticManager.shared.successAction()
-    }
-
-    private func ffmiLabel(result: BodyScoreResult) -> some View {
-        Text("FFMI \(String(format: "%.1f", result.ffmi)) — \(result.ffmiStatus)")
-            .font(OnboardingTypography.body)
-            .foregroundStyle(theme.colors.text)
-    }
-
-    private func percentileLabel(result: BodyScoreResult) -> some View {
-        Text("Lean percentile \(String(format: "%.0f", result.leanPercentile))")
-            .font(OnboardingTypography.body)
-            .foregroundStyle(theme.colors.textSecondary)
     }
 }
 
 #Preview {
-    let result = BodyScoreResult(
+    let vm = OnboardingFlowViewModel()
+    vm.bodyScoreInput.weight = WeightValue(value: 182, unit: .pounds)
+    vm.bodyScoreInput.bodyFat = BodyFatValue(percentage: 18, source: .manualValue)
+    vm.bodyScoreResult = BodyScoreResult(
         score: 82,
         ffmi: 21.4,
         leanPercentile: 78,
@@ -281,8 +283,6 @@ struct BodyScoreRevealView: View {
         bodyFatReferenceRange: .init(lowerBound: 10, upperBound: 15, label: "Lean"),
         statusTagline: "Solid base. Room to tighten up."
     )
-    let vm = OnboardingFlowViewModel()
-    vm.bodyScoreResult = result
     return BodyScoreRevealView(viewModel: vm)
         .preferredColorScheme(.dark)
 }
