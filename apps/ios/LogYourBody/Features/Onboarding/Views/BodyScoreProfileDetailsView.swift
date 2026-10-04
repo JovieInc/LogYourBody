@@ -75,6 +75,44 @@ enum ProfileDetailsValidationPolicy {
     }
 }
 
+/// Which profile-details substeps to show. Answers already given earlier in
+/// onboarding (or by Apple Health) are not asked again.
+enum ProfileDetailsSubstepPlanPolicy {
+    typealias Substep = OnboardingFlowViewModel.ProfileDetailsSubstep
+
+    static func substeps(
+        askFirstName: Bool,
+        askLastName: Bool,
+        askDateOfBirth: Bool,
+        askSex: Bool,
+        askHeight: Bool
+    ) -> [Substep] {
+        var plan: [Substep] = []
+        if askFirstName { plan.append(.firstName) }
+        if askLastName { plan.append(.lastName) }
+        if askDateOfBirth { plan.append(.dateOfBirth) }
+        if askSex { plan.append(.sex) }
+        if askHeight { plan.append(.height) }
+        // The step still needs one screen that saves the profile.
+        return plan.isEmpty ? [.height] : plan
+    }
+
+    /// The order used before a plan exists (for example a restored draft).
+    static func fullOrder(askSex: Bool) -> [Substep] {
+        askSex ? [.firstName, .lastName, .dateOfBirth, .sex, .height] : [.firstName, .lastName, .dateOfBirth, .height]
+    }
+
+    static func next(after substep: Substep, in plan: [Substep]) -> Substep? {
+        guard let index = plan.firstIndex(of: substep), index + 1 < plan.count else { return nil }
+        return plan[index + 1]
+    }
+
+    static func previous(before substep: Substep, in plan: [Substep]) -> Substep? {
+        guard let index = plan.firstIndex(of: substep), index > 0 else { return nil }
+        return plan[index - 1]
+    }
+}
+
 struct BodyScoreProfileDetailsView: View {
     @Environment(\.theme)
     private var theme
@@ -170,13 +208,15 @@ struct BodyScoreProfileDetailsView: View {
         }
     }
 
+    private var nextSubstep: OnboardingFlowViewModel.ProfileDetailsSubstep? {
+        ProfileDetailsSubstepPlanPolicy.next(
+            after: viewModel.profileDetailsActiveSubstep,
+            in: viewModel.profileDetailsSubsteps
+        )
+    }
+
     private var primaryButtonTitle: String {
-        switch viewModel.profileDetailsActiveSubstep {
-        case .firstName, .lastName, .dateOfBirth, .sex:
-            return "Continue"
-        case .height:
-            return "Finish setup"
-        }
+        nextSubstep == nil ? "Finish setup" : "Continue"
     }
 
     var body: some View {
@@ -184,17 +224,13 @@ struct BodyScoreProfileDetailsView: View {
             title: currentTitle,
             subtitle: currentSubtitle,
             onBack: {
-                switch viewModel.profileDetailsActiveSubstep {
-                case .firstName:
+                if let previous = ProfileDetailsSubstepPlanPolicy.previous(
+                    before: viewModel.profileDetailsActiveSubstep,
+                    in: viewModel.profileDetailsSubsteps
+                ) {
+                    transition(to: previous)
+                } else {
                     viewModel.goBack()
-                case .lastName:
-                    transition(to: .firstName)
-                case .dateOfBirth:
-                    transition(to: .lastName)
-                case .sex:
-                    transition(to: .dateOfBirth)
-                case .height:
-                    transition(to: viewModel.profileShouldAskSex ? .sex : .dateOfBirth)
                 }
             },
             progress: viewModel.progress(for: .profileDetails),
@@ -288,7 +324,7 @@ struct BodyScoreProfileDetailsView: View {
                         )
                         .clipShape(Capsule(style: .continuous))
                         .onSubmit {
-                            handleFirstNameContinue()
+                            handlePrimaryAction()
                         }
 
                 case .lastName:
@@ -322,7 +358,7 @@ struct BodyScoreProfileDetailsView: View {
                         )
                         .clipShape(Capsule(style: .continuous))
                         .onSubmit {
-                            handleLastNameContinue()
+                            handlePrimaryAction()
                         }
 
                 case .dateOfBirth, .sex, .height:
@@ -516,28 +552,20 @@ private extension BodyScoreProfileDetailsView {
     func handlePrimaryAction() {
         switch viewModel.profileDetailsActiveSubstep {
         case .firstName:
-            handleFirstNameContinue()
+            guard isFirstNameValid else { return }
+            HapticManager.shared.selection()
         case .lastName:
-            handleLastNameContinue()
-        case .dateOfBirth:
-            transition(to: viewModel.profileShouldAskSex ? .sex : .height)
-        case .sex:
-            transition(to: .height)
-        case .height:
+            guard isLastNameValid else { return }
+            HapticManager.shared.selection()
+        case .dateOfBirth, .sex, .height:
+            break
+        }
+
+        if let nextSubstep {
+            transition(to: nextSubstep)
+        } else {
             submit()
         }
-    }
-
-    func handleFirstNameContinue() {
-        guard isFirstNameValid else { return }
-        HapticManager.shared.selection()
-        transition(to: .lastName)
-    }
-
-    func handleLastNameContinue() {
-        guard isLastNameValid else { return }
-        HapticManager.shared.selection()
-        transition(to: .dateOfBirth)
     }
 
     func focusNameFieldIfNeeded(_ step: OnboardingFlowViewModel.ProfileDetailsSubstep? = nil) {

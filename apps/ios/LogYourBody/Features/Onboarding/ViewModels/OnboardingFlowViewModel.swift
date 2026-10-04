@@ -189,6 +189,13 @@ final class OnboardingFlowViewModel: ObservableObject {
     @Published var profileShouldAskSex: Bool = false {
         didSet { persistProgress() }
     }
+    /// Profile-details substeps decided at hydration; nil falls back to the full order.
+    var profileDetailsPlan: [ProfileDetailsSubstep]?
+
+    var profileDetailsSubsteps: [ProfileDetailsSubstep] {
+        profileDetailsPlan ?? ProfileDetailsSubstepPlanPolicy.fullOrder(askSex: profileShouldAskSex)
+    }
+
     @Published var hasHydratedProfileDetailsDraft = false {
         didSet { persistProgress() }
     }

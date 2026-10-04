@@ -9,6 +9,26 @@ extension Notification.Name {
     static let dexaPDFReceived = Notification.Name("dexaPDFReceived")
 }
 
+/// What the import sheet says after reading and saving a report.
+enum DexaPDFImportMessagePolicy {
+    static let noScansFound =
+        "No scan results were found in this PDF. Try the full report from your provider, or add the numbers in Add Entry."
+    static let unusableScans = "These scans were missing a date or weight, so nothing was added."
+
+    static func readErrorMessage(for scans: [DexaPDFScan]) -> String? {
+        scans.isEmpty ? noScansFound : nil
+    }
+
+    static func savedSummary(resultCount: Int, metricCount: Int, skippedDuplicateCount: Int) -> String {
+        guard resultCount > 0 else {
+            return skippedDuplicateCount > 0 ? "These scans were already imported." : unusableScans
+        }
+        let scanWord = resultCount == 1 ? "scan" : "scans"
+        let timelineWord = metricCount == 1 ? "dated timeline entry" : "dated timeline entries"
+        return "Added \(resultCount) \(scanWord) and \(metricCount) new \(timelineWord)."
+    }
+}
+
 struct DexaPDFImportSheet: View {
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.dismiss) private var dismiss
@@ -120,6 +140,7 @@ struct DexaPDFImportSheet: View {
                 fileName: fileURL.lastPathComponent,
                 accessToken: accessToken
             )
+            errorMessage = DexaPDFImportMessagePolicy.readErrorMessage(for: scans)
             isReading = false
         } catch {
             errorMessage = error.localizedDescription
@@ -137,12 +158,11 @@ struct DexaPDFImportSheet: View {
         Task { @MainActor in
             do {
                 let plan = try await DexaPDFImportCoordinator.shared.save(scans: scans, userId: userId)
-                let count = plan.results.count
-                let scanWord = count == 1 ? "scan" : "scans"
-                let timelineWord = plan.metrics.count == 1 ? "dated timeline entry" : "dated timeline entries"
-                savedSummary = count == 0
-                    ? "These scans were already imported."
-                    : "Added \(count) \(scanWord) and \(plan.metrics.count) new \(timelineWord)."
+                savedSummary = DexaPDFImportMessagePolicy.savedSummary(
+                    resultCount: plan.results.count,
+                    metricCount: plan.metrics.count,
+                    skippedDuplicateCount: plan.skippedDuplicateCount
+                )
             } catch {
                 errorMessage = error.localizedDescription
             }

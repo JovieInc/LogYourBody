@@ -667,6 +667,66 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertEqual(updates["heightUnit"] as? String, "in")
     }
 
+    func testProfileDetailsSkipsHeightAndSexAnsweredEarlierInOnboarding() throws {
+        let userId = "onboarding-profile-plan-\(UUID().uuidString)"
+        defer { OnboardingProgressStore.shared.clearProgress(for: userId) }
+
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.updateSex(.male)
+        viewModel.setHeightUnit(.centimeters)
+        viewModel.bodyScoreInput.height = HeightValue(value: 178, unit: .centimeters)
+
+        // Sign in with Apple supplied the name; nothing has supplied a birthday.
+        let user = User(id: userId, email: "plan@example.com", name: "Avery Stone")
+        viewModel.hydrateProfileDetailsDraftIfNeeded(from: user)
+
+        XCTAssertEqual(viewModel.profileDetailsSubsteps, [.dateOfBirth])
+        XCTAssertEqual(viewModel.profileDetailsActiveSubstep, .dateOfBirth)
+        XCTAssertEqual(viewModel.profileHeightCentimetersText, "178")
+        XCTAssertEqual(viewModel.profileBiologicalSex, .male)
+    }
+
+    func testProfileDetailsAsksBirthdayInsteadOfSavingTheDefault() {
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.updateSex(.female)
+        viewModel.bodyScoreInput.height = HeightValue(value: 165, unit: .centimeters)
+
+        let user = User(id: "plan-\(UUID().uuidString)", email: "dob@example.com", name: "Sam Lee")
+        viewModel.hydrateProfileDetailsDraftIfNeeded(from: user)
+
+        XCTAssertTrue(viewModel.profileDetailsSubsteps.contains(.dateOfBirth))
+        XCTAssertFalse(viewModel.profileDetailsSubsteps.contains(.height))
+    }
+
+    func testProfileDetailsUsesBirthYearFromEarlierAnswers() throws {
+        let viewModel = OnboardingFlowViewModel()
+        viewModel.updateSex(.male)
+        viewModel.updateBirthYear(1_988)
+        viewModel.bodyScoreInput.height = HeightValue(value: 180, unit: .centimeters)
+
+        viewModel.hydrateProfileDetailsDraftIfNeeded(from: User(id: "plan-\(UUID().uuidString)", email: "y@example.com", name: "Kai"))
+
+        XCTAssertEqual(viewModel.profileDetailsSubsteps, [.lastName])
+        XCTAssertEqual(Calendar.current.component(.year, from: viewModel.profileDateOfBirth), 1_988)
+    }
+
+    func testProfileDetailsPlanNavigation() {
+        let plan: [OnboardingFlowViewModel.ProfileDetailsSubstep] = [.lastName, .dateOfBirth]
+        XCTAssertEqual(ProfileDetailsSubstepPlanPolicy.next(after: .lastName, in: plan), .dateOfBirth)
+        XCTAssertNil(ProfileDetailsSubstepPlanPolicy.next(after: .dateOfBirth, in: plan))
+        XCTAssertNil(ProfileDetailsSubstepPlanPolicy.previous(before: .lastName, in: plan))
+        XCTAssertEqual(
+            ProfileDetailsSubstepPlanPolicy.substeps(
+                askFirstName: false, askLastName: false, askDateOfBirth: false, askSex: false, askHeight: false
+            ),
+            [.height]
+        )
+        XCTAssertEqual(
+            ProfileDetailsSubstepPlanPolicy.fullOrder(askSex: true),
+            [.firstName, .lastName, .dateOfBirth, .sex, .height]
+        )
+    }
+
     func testBuildOnboardingProfileUpdatesPrefersPersistedProfileDetailsDraft() throws {
         let userId = "onboarding-profile-update-draft-\(UUID().uuidString)"
         let previousUser = AuthManager.shared.currentUser
