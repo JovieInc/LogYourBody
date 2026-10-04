@@ -172,8 +172,8 @@ jobs:
     runs-on: macos-15
     needs: detect-changes
     if: needs.detect-changes.outputs.ios == 'true'
-    # Setup plus one 34-minute audit plus the 8-minute performance cap.
-    timeout-minutes: 46
+    # Setup plus one 40-minute audit plus the 8-minute performance cap.
+    timeout-minutes: 52
     steps:
       - uses: actions/checkout@v4
 
@@ -198,9 +198,9 @@ jobs:
             ${{ runner.os }}-spm-
 
       - name: Run launch quality audit
-        # Slow prefix (~16m) plus one 720s chaos xcodebuild. The script does not
+        # Slow prefix plus the full chaos regression suite. The script does not
         # retry a command timeout, so this budget is for a single attempt.
-        timeout-minutes: 34
+        timeout-minutes: 40
         env:
           DESTINATION: auto
           ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality
