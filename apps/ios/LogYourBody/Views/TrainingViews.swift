@@ -259,6 +259,20 @@ struct TrainingEnrollmentView: View {
     }
 }
 
+/// The engine carries last session's final-set load forward on hold and
+/// add-reps weeks; the load field starts there, like reps start at the target.
+enum TrainingLoadPrefillPolicy {
+    static func text(for targetLoadKg: Double?) -> String {
+        guard let targetLoadKg, targetLoadKg > 0 else { return "" }
+        let rounded = (targetLoadKg * 100).rounded() / 100
+        let style = FloatingPointFormatStyle<Double>.number
+            .precision(.fractionLength(0...2))
+            .grouping(.never)
+            .locale(Locale(identifier: "en_US_POSIX"))
+        return rounded.formatted(style)
+    }
+}
+
 struct TrainingLiveSessionView: View {
     let session: TrainingSession
     let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
@@ -418,7 +432,10 @@ struct TrainingLiveSessionView: View {
 
     private func loadBinding(for exercise: TrainingExercisePrescription, setNumber: Int) -> Binding<String> {
         let key = setKey(exercise, setNumber: setNumber)
-        return Binding(get: { loadByKey[key] ?? "" }, set: { loadByKey[key] = $0 })
+        return Binding(
+            get: { loadByKey[key] ?? TrainingLoadPrefillPolicy.text(for: exercise.targetLoadKg) },
+            set: { loadByKey[key] = $0 }
+        )
     }
 
     private func rirBinding(for exercise: TrainingExercisePrescription, setNumber: Int) -> Binding<Int> {

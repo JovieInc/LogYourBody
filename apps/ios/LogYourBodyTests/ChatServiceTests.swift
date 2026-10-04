@@ -64,6 +64,15 @@ final class ChatServiceTests: XCTestCase {
         XCTAssertEqual(conversation?.messages.first?.clientMessageId, "client-1")
     }
 
+    func testTrainingLoadFieldStartsAtTheEngineLoad() {
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 60), "60")
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 62.5), "62.5")
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 22.6796), "22.68")
+        XCTAssertEqual(Double(TrainingLoadPrefillPolicy.text(for: 1_002.5)), 1_002.5, "Parses back when the set is logged")
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: nil), "", "increase_load keeps the field empty")
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 0), "")
+    }
+
     func testTrainingCoachVisibilityRequiresTheStatsigGate() {
         var checkedKey: String?
         XCTAssertFalse(TrainingCoachPolicy.isEnabled { checkedKey = $0; return false })
