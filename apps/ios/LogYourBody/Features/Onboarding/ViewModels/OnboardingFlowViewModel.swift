@@ -38,6 +38,7 @@ final class OnboardingFlowViewModel: ObservableObject {
         case bodyFatVisual
         case loading
         case bodyScore
+        /// Retired: kept so saved drafts decode; restore moves them to `.bodyScore`.
         case defaultHomeMode
         case emailCapture
         case account
@@ -86,7 +87,6 @@ final class OnboardingFlowViewModel: ObservableObject {
         case basics
         case measurements
         case score
-        case home
         case profile
         case photo
 
@@ -95,8 +95,7 @@ final class OnboardingFlowViewModel: ObservableObject {
             case .welcome: return "Welcome"
             case .basics: return "Basics"
             case .measurements: return "Measurements"
-            case .score: return "Your Score"
-            case .home: return "Home"
+            case .score: return "Fat vs Muscle"
             case .profile: return "Profile"
             case .photo: return "Photo"
             }
@@ -259,7 +258,6 @@ extension OnboardingFlowViewModel.Step {
             .bodyFatNumeric,
             .bodyFatVisual,
             .bodyScore,
-            .defaultHomeMode,
             .emailCapture,
             .account,
             .profileDetails,
@@ -276,8 +274,7 @@ extension OnboardingFlowViewModel.Step {
         case .healthConfirmation: return "Review"
         case .manualWeight: return "Weight"
         case .bodyFatChoice, .bodyFatNumeric, .bodyFatVisual: return "Body Fat"
-        case .bodyScore: return "Your Score"
-        case .defaultHomeMode: return "Default View"
+        case .bodyScore, .defaultHomeMode: return "Fat vs Muscle"
         case .emailCapture: return "Save Progress"
         case .account: return "Account"
         case .profileDetails: return "Profile"

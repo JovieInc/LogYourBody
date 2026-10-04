@@ -44,7 +44,7 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.currentStep, .loading)
     }
 
-    func testPersistedProgressRestoresDefaultHomeModeChoice() {
+    func testDraftParkedOnRetiredHomeModeStepResumesAtTheReveal() {
         let userId = "onboarding-default-mode-\(UUID().uuidString)"
         let previousUser = AuthManager.shared.currentUser
         let previousSession = AuthManager.shared.authSession
@@ -84,7 +84,7 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         UserDefaults.standard.set(DefaultHomeMode.avatar.rawValue, forKey: Constants.defaultHomeModeKey)
         let restoredViewModel = OnboardingFlowViewModel()
 
-        XCTAssertEqual(restoredViewModel.currentStep, .defaultHomeMode)
+        XCTAssertEqual(restoredViewModel.currentStep, .bodyScore)
         XCTAssertEqual(restoredViewModel.defaultHomeMode, .photo)
     }
 
@@ -596,6 +596,65 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.currentStep, .firstPhoto)
     }
 
+    func testRevealGoesStraightToProfileWithoutTheHomeModeQuestion() {
+        let userId = "onboarding-reveal-next-\(UUID().uuidString)"
+        let previousUser = AuthManager.shared.currentUser
+        let previousSession = AuthManager.shared.authSession
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.authSession = previousSession
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+        }
+        AuthManager.shared.currentUser = User(id: userId, email: "reveal@example.com", name: "Reveal")
+        AuthManager.shared.authSession = .localFixture(subject: userId, email: "reveal@example.com", name: "Reveal")
+
+        let viewModel = OnboardingFlowViewModel(includesFirstPhotoStep: false)
+        viewModel.currentStep = .bodyScore
+        viewModel.goToNextStep()
+        XCTAssertEqual(viewModel.currentStep, .profileDetails)
+
+        viewModel.goBack()
+        XCTAssertEqual(viewModel.currentStep, .bodyScore)
+        XCTAssertEqual(viewModel.progress(for: .bodyScore)?.label, "Fat vs Muscle")
+        XCTAssertEqual(viewModel.progressMilestonePlan.count, 5, "Welcome, Basics, Measurements, Fat vs Muscle, Profile")
+    }
+
+    func testFatVsMuscleSummarySplitsWeightInTheUsersUnits() throws {
+        let imperial = try XCTUnwrap(FatVsMuscleSummary(input: BodyScoreInput(
+            weight: WeightValue(value: 182, unit: .pounds),
+            bodyFat: BodyFatValue(percentage: 18, source: .manualValue),
+            measurementPreference: .imperial
+        )))
+        XCTAssertEqual(imperial.fatText, "33")
+        XCTAssertEqual(imperial.leanText, "149")
+        XCTAssertEqual(imperial.unitText, "lb")
+        XCTAssertEqual(imperial.bodyFatPercentText, "18%")
+        XCTAssertEqual(imperial.sourceText, "Body fat you entered")
+        XCTAssertEqual(imperial.fatFraction, 0.18, accuracy: 0.0001)
+
+        let metric = try XCTUnwrap(FatVsMuscleSummary(input: BodyScoreInput(
+            weight: WeightValue(value: 80, unit: .kilograms),
+            bodyFat: BodyFatValue(percentage: 25, source: .healthKit),
+            measurementPreference: .metric
+        )))
+        XCTAssertEqual(metric.fatText, "20")
+        XCTAssertEqual(metric.leanText, "60")
+        XCTAssertEqual(metric.unitText, "kg")
+        XCTAssertEqual(metric.sourceText, "Body fat from Apple Health")
+        XCTAssertTrue(metric.accessibilityLabel.contains("Lean mass 60 kg"))
+
+        XCTAssertEqual(FatVsMuscleSummary.sourceText(for: .visualEstimate), "Body fat is a visual estimate")
+    }
+
+    func testFatVsMuscleSummaryNeedsWeightAndBodyFat() {
+        XCTAssertNil(FatVsMuscleSummary(input: BodyScoreInput(
+            weight: WeightValue(value: 80, unit: .kilograms)
+        )))
+        XCTAssertNil(FatVsMuscleSummary(input: BodyScoreInput(
+            bodyFat: BodyFatValue(percentage: 20, source: .manualValue)
+        )))
+    }
+
     func testFirstPhotoProgressOnlyAppearsWhenEnabled() {
         let enabledViewModel = OnboardingFlowViewModel(includesFirstPhotoStep: true)
         let disabledViewModel = OnboardingFlowViewModel(includesFirstPhotoStep: false)
@@ -706,25 +765,27 @@ final class OnboardingFlowViewModelTests: XCTestCase {
 
         viewModel.hydrateProfileDetailsDraftIfNeeded(from: User(id: "plan-\(UUID().uuidString)", email: "y@example.com", name: "Kai"))
 
-        XCTAssertEqual(viewModel.profileDetailsSubsteps, [.lastName])
+        // Everything is known, so the step is one confirmation screen with no last-name ask.
+        XCTAssertEqual(viewModel.profileDetailsSubsteps, [.height])
         XCTAssertEqual(Calendar.current.component(.year, from: viewModel.profileDateOfBirth), 1_988)
     }
 
     func testProfileDetailsPlanNavigation() {
-        let plan: [OnboardingFlowViewModel.ProfileDetailsSubstep] = [.lastName, .dateOfBirth]
-        XCTAssertEqual(ProfileDetailsSubstepPlanPolicy.next(after: .lastName, in: plan), .dateOfBirth)
+        let plan: [OnboardingFlowViewModel.ProfileDetailsSubstep] = [.firstName, .dateOfBirth]
+        XCTAssertEqual(ProfileDetailsSubstepPlanPolicy.next(after: .firstName, in: plan), .dateOfBirth)
         XCTAssertNil(ProfileDetailsSubstepPlanPolicy.next(after: .dateOfBirth, in: plan))
-        XCTAssertNil(ProfileDetailsSubstepPlanPolicy.previous(before: .lastName, in: plan))
+        XCTAssertNil(ProfileDetailsSubstepPlanPolicy.previous(before: .firstName, in: plan))
         XCTAssertEqual(
             ProfileDetailsSubstepPlanPolicy.substeps(
-                askFirstName: false, askLastName: false, askDateOfBirth: false, askSex: false, askHeight: false
+                askFirstName: false, askDateOfBirth: false, askSex: false, askHeight: false
             ),
             [.height]
         )
         XCTAssertEqual(
             ProfileDetailsSubstepPlanPolicy.fullOrder(askSex: true),
-            [.firstName, .lastName, .dateOfBirth, .sex, .height]
+            [.firstName, .dateOfBirth, .sex, .height]
         )
+        XCTAssertFalse(ProfileDetailsSubstepPlanPolicy.fullOrder(askSex: false).contains(.lastName))
     }
 
     func testBuildOnboardingProfileUpdatesPrefersPersistedProfileDetailsDraft() throws {

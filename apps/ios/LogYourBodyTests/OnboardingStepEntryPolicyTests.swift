@@ -154,7 +154,7 @@ final class OnboardingStepEntryPolicyTests: XCTestCase {
         XCTAssertTrue(canContinue(.firstName))
         XCTAssertFalse(canContinue(.lastName, lastName: ""))
         XCTAssertTrue(canContinue(.lastName))
-        XCTAssertFalse(canContinue(.dateOfBirth, lastName: ""))
+        XCTAssertTrue(canContinue(.dateOfBirth, lastName: ""), "The last name is never required")
         XCTAssertFalse(canContinue(.dateOfBirth, yearsAgo: 15))
         XCTAssertTrue(canContinue(.dateOfBirth))
         XCTAssertFalse(canContinue(.sex, sex: nil))

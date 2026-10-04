@@ -466,7 +466,6 @@ func planProfileDetailsFromEarlierAnswers(knownDateOfBirth: Date?, knownHeightCe
 
         profileDetailsPlan = ProfileDetailsSubstepPlanPolicy.substeps(
             askFirstName: !ProfileDetailsValidationPolicy.isNameValid(profileFirstName),
-            askLastName: !ProfileDetailsValidationPolicy.isNameValid(profileLastName),
             askDateOfBirth: !hasDateOfBirth ||
                 !ProfileDetailsValidationPolicy.isDateOfBirthWithinValidRange(profileDateOfBirth),
             askSex: profileShouldAskSex,
@@ -481,13 +480,10 @@ func recomputeProfileDetailsActiveSubstep() {
         }
 
         let trimmedFirstName = profileFirstName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedLastName = profileLastName.trimmingCharacters(in: .whitespacesAndNewlines)
         let age = Calendar.current.dateComponents([.year], from: profileDateOfBirth, to: Date()).year
 
         if trimmedFirstName.isEmpty {
             profileDetailsActiveSubstep = .firstName
-        } else if trimmedLastName.isEmpty {
-            profileDetailsActiveSubstep = .lastName
         } else if (age ?? 0) < 16 || (age ?? 0) > 80 {
             profileDetailsActiveSubstep = .dateOfBirth
         } else if profileShouldAskSex && profileBiologicalSex == nil {
@@ -655,9 +651,16 @@ func restore(_ snapshot: OnboardingProgressSnapshot) {
         profileHeightCentimetersText = snapshot.profileHeightCentimetersText
         profileHeightFeet = snapshot.profileHeightFeet
         profileHeightInches = snapshot.profileHeightInches
-        profileDetailsActiveSubstep = snapshot.profileDetailsActiveSubstep
+        // Drafts saved before the last name was dropped resume at the birthday.
+        profileDetailsActiveSubstep = snapshot.profileDetailsActiveSubstep == .lastName
+            ? .dateOfBirth
+            : snapshot.profileDetailsActiveSubstep
         profileShouldAskSex = snapshot.profileShouldAskSex
         hasHydratedProfileDetailsDraft = snapshot.hasHydratedProfileDetailsDraft
+        // The Home-mode question was removed; drafts parked on it resume at the reveal.
+        if currentStep == .defaultHomeMode {
+            currentStep = .bodyScore
+        }
         if hasAuthenticatedAccountEmail,
            currentStep == .emailCapture || currentStep == .account {
             currentStep = .profileDetails
