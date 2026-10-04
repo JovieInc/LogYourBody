@@ -9,9 +9,10 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// Golden path through the Body Score onboarding flow: hook → basics →
-    /// height → health connect (manual entry) → manual weight → body fat
-    /// choice → body fat numeric → loading → reveal. The launch fixture
+    /// Golden path through the first run: hook → basics → height → health
+    /// connect (manual entry) → manual weight → body fat choice → body fat
+    /// numeric → loading → fat-vs-muscle reveal → profile (no Home-mode
+    /// question, no last name). The launch fixture
     /// provisions an authenticated, subscribed user with
     /// `onboardingCompleted: false`, so the app lands on the hook step with a
     /// fresh progress store (unique userId per launch).
@@ -28,12 +29,13 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         completeBodyFatChoiceStep(in: app)
         completeBodyFatNumericStep(in: app)
         assertRevealStep(in: app)
+        continueFromRevealToProfile(in: app)
     }
 
     // MARK: - Steps
 
     private func assertHookStep(in app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["See what’s changing."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyScoreIntro"].exists)
 
         let startButton = app.buttons["body_score_onboarding_start_button"]
@@ -150,26 +152,37 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     }
 
     private func assertRevealStep(in app: XCUIApplication) {
-        // The loading step ("Calculating your Body Score") runs a fully local
-        // score calculation; waiting for the reveal is the deterministic way
-        // to observe that transition without racing the spinner.
-        XCTAssertTrue(app.staticTexts["You’re building from a strong base."].waitForExistence(timeout: 15))
+        // The loading step runs a fully local calculation; waiting for the
+        // reveal is the deterministic way to observe that transition.
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs muscle."].waitForExistence(timeout: 15))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyScoreReveal"].exists)
-        XCTAssertFalse(app.staticTexts["Building your Body Score"].exists)
+        XCTAssertFalse(app.staticTexts["Splitting fat from muscle"].exists)
 
-        // The score hero is a combined accessibility element labelled
-        // "Body Score <score>. <tagline>". Only the numeric structure is
-        // asserted — never the Statsig-gated Target/Reference copy.
-        let scoreElement = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label MATCHES %@", "Body Score [0-9]+\\..*"))
-            .firstMatch
-        XCTAssertTrue(scoreElement.waitForExistence(timeout: 5))
+        // 182 lb at 18% body fat: 33 lb fat, 149 lb lean, labeled as an entered value.
+        let summary = app.descendants(matching: .any)["body_score_reveal_fat_vs_muscle"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 5))
+        XCTAssertEqual(summary.label, "Fat 33 lb. Lean mass 149 lb. Body fat 18%. Body fat you entered.")
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label BEGINSWITH %@", "Body Score"))
+                .firstMatch.exists,
+            "The reveal answers fat vs muscle, not a 0-100 score"
+        )
+        XCTAssertFalse(app.buttons["Share my score"].exists, "One primary action")
+    }
 
-        XCTAssertTrue(app.staticTexts["Starting point"].waitForExistence(timeout: 3))
+    private func continueFromRevealToProfile(in app: XCUIApplication) {
+        let continueButton = app.buttons["body_score_reveal_continue_button"]
+        XCTAssertTrue(continueButton.waitForExistence(timeout: 3))
+        XCTAssertTrue(continueButton.isHittable)
+        continueButton.tap()
 
-        let nextStepsButton = app.buttons["See my plan"]
-        XCTAssertTrue(nextStepsButton.waitForExistence(timeout: 3))
-        XCTAssertTrue(nextStepsButton.isHittable)
+        XCTAssertFalse(
+            app.staticTexts["What should Home answer first?"].waitForExistence(timeout: 2),
+            "The Home-mode question is gone"
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_completeProfile"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.textFields["Last name"].exists)
     }
 
     // MARK: - Field helpers

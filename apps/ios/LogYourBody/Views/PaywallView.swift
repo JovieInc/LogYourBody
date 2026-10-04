@@ -64,6 +64,7 @@ struct PaywallView: View {
                             showLogoutConfirmation = true
                         }
                         .disabled(subscriptionManager.isPurchasing)
+                        .accessibilityIdentifier("paywall_logout_button")
 
                         Button("Terms of Service", systemImage: "doc.text") {
                             showTermsSheet = true
@@ -76,6 +77,7 @@ struct PaywallView: View {
                         Label("More", systemImage: "ellipsis.circle")
                     }
                     .accessibilityLabel("Paywall account and legal actions")
+                    .accessibilityIdentifier("paywall_more_menu")
                 }
             }
         }
@@ -373,23 +375,6 @@ struct PaywallView: View {
             .disabled(subscriptionManager.isPurchasing)
             .accessibilityIdentifier("paywall_restore_purchases_button")
             .worldClassScreen(.restorePurchases)
-
-            Button(role: .destructive) {
-                showLogoutConfirmation = true
-            } label: {
-                Label {
-                    Text("Log out")
-                        .accessibilityIdentifier("home_v2_paywall_log_out")
-                } icon: {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                }
-                .font(theme.typography.labelMedium)
-                .foregroundStyle(theme.colors.error)
-                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
-            }
-            .buttonStyle(.plain)
-            .disabled(subscriptionManager.isPurchasing)
-            .accessibilityIdentifier("paywall_logout_button")
         }
     }
 

@@ -149,6 +149,12 @@ final class LogYourBodyUITests: XCTestCase {
             "The canonical paywall exposes one restore action"
         )
 
+        // Log out lives in the ••• menu, not as a red button under Restore.
+        XCTAssertFalse(app.buttons["paywall_logout_button"].exists)
+        let moreMenu = app.buttons["paywall_more_menu"]
+        XCTAssertTrue(moreMenu.waitForExistence(timeout: 3))
+        XCTAssertTrue(moreMenu.isHittable)
+        moreMenu.tap()
         let logoutButton = app.buttons["paywall_logout_button"]
         XCTAssertTrue(logoutButton.waitForExistence(timeout: 3))
         XCTAssertTrue(logoutButton.isHittable)
@@ -1652,7 +1658,7 @@ final class LogYourBodyUITests: XCTestCase {
             "The paywall keeps the timeline"
         )
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall_restore"].exists, "Restore stays visible")
-        XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall_log_out"].exists, "A way out stays visible")
+        XCTAssertTrue(app.buttons["paywall_more_menu"].exists, "A way out stays in the ••• menu")
         attachScreenshot(named: "onboarding-v2-paywall", from: app)
     }
 
@@ -1748,9 +1754,9 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func assertAndCaptureOnboardingFixedCTA(in app: XCUIApplication) throws {
-        XCTAssertTrue(app.staticTexts["See what’s changing."].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 10))
 
-        let startButton = app.buttons["Build my Body Score"]
+        let startButton = app.buttons["Find out"]
         XCTAssertTrue(startButton.waitForExistence(timeout: 5))
         XCTAssertTrue(startButton.isHittable)
 
