@@ -1756,7 +1756,7 @@ final class LogYourBodyUITests: XCTestCase {
     private func assertAndCaptureOnboardingFixedCTA(in app: XCUIApplication) throws {
         XCTAssertTrue(app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 10))
 
-        let startButton = app.buttons["Find out"]
+        let startButton = app.buttons["Enter my numbers"]
         XCTAssertTrue(startButton.waitForExistence(timeout: 5))
         XCTAssertTrue(startButton.isHittable)
 

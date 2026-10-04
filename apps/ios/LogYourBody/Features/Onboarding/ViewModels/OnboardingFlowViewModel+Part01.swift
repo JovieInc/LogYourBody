@@ -41,7 +41,7 @@ func goToNextStep() {
 
         switch currentStep {
         case .hook:
-            currentStep = .basics
+            currentStep = .manualWeight
         case .basics:
             currentStep = .height
         case .height:
@@ -105,9 +105,9 @@ func goBack() {
         case .hook: break
         case .basics: currentStep = .hook
         case .height: currentStep = .basics
-        case .healthConnect: currentStep = .height
+        case .healthConnect: currentStep = .hook
         case .healthConfirmation: currentStep = .healthConnect
-        case .manualWeight: currentStep = .healthConnect
+        case .manualWeight: currentStep = .hook
         case .bodyFatChoice: decideManualWeightBack()
         case .bodyFatNumeric, .bodyFatVisual: currentStep = .bodyFatChoice
         case .loading:
@@ -119,7 +119,7 @@ func goBack() {
             bodyScoreResult = nil
             isLoading = false
             errorMessage = nil
-            currentStep = .bodyFatChoice
+            currentStep = scanImport == nil ? .bodyFatChoice : .hook
         case .defaultHomeMode:
             currentStep = .bodyScore
         case .emailCapture:
@@ -193,15 +193,9 @@ func advanceAfterHealthConfirmation() {
         }
     }
 
+/// The reveal needs only weight and body fat; sex, birthday and height are
+/// asked after it, and only when nothing supplied them.
 func firstMissingInputStep() -> Step {
-        if bodyScoreInput.sex == nil {
-            return .basics
-        }
-
-        if bodyScoreInput.height.inCentimeters == nil {
-            return .height
-        }
-
         if bodyScoreInput.weight.inKilograms == nil {
             return healthKitManager.isAuthorized ? .healthConfirmation : .manualWeight
         }
@@ -214,7 +208,9 @@ func firstMissingInputStep() -> Step {
     }
 
 func decideManualWeightBack() {
-        if bodyScoreInput.weight.value == nil {
+        if scanImport != nil {
+            currentStep = .hook
+        } else if bodyScoreInput.weight.value == nil {
             currentStep = .manualWeight
         } else if healthKitManager.isAuthorized {
             currentStep = .healthConfirmation
@@ -344,12 +340,70 @@ func fetchHealthMetrics() async {
         } catch {
             // Fail gracefully; user can continue manually
         }
+
+        applyHealthCharacteristics()
+    }
+
+/// Sex and birth year from Apple Health spare the profile step those questions.
+func applyHealthCharacteristics() {
+        if bodyScoreInput.sex == nil,
+           let sex = healthKitManager.fetchBiologicalSex().flatMap(Self.biologicalSex(from:)) {
+            bodyScoreInput.sex = sex
+        }
+        if bodyScoreInput.birthYear == nil, let dateOfBirth = healthKitManager.fetchDateOfBirth() {
+            bodyScoreInput.birthYear = Calendar.current.component(.year, from: dateOfBirth)
+        }
+    }
+
+// MARK: - First screen paths
+
+func chooseHealthPath() {
+        let previousStep = currentStep
+        currentStep = .healthConnect
+        trackStepTransition(from: previousStep, to: currentStep)
+    }
+
+func chooseManualPath() {
+        let previousStep = currentStep
+        scanImport = nil
+        currentStep = .manualWeight
+        trackStepTransition(from: previousStep, to: currentStep)
+    }
+
+/// Fills weight and body fat from the newest imported scan. A scan without
+/// body fat still saves its weight and asks for body fat next.
+func applyImportedScans(_ scans: [DexaPDFScan]) {
+        guard let imported = OnboardingScanImport(scans: scans) else { return }
+        let previousStep = currentStep
+        scanImport = imported
+
+        let weightValue = weightUnit == .kilograms ? imported.latest.weightKg : imported.latest.weightKg / 0.45359237
+        bodyScoreInput.weight = WeightValue(value: weightValue, unit: weightUnit)
+        manualWeightText = Self.formatNumber(weightValue)
+
+        AppServicePorts.analyticsTracker.track(
+            event: "onboarding_scan_imported",
+            properties: [
+                "scan_count": "\(scans.count)",
+                "has_body_fat": imported.latest.bodyFatPercentage == nil ? "false" : "true",
+                "has_previous": imported.previous == nil ? "false" : "true"
+            ]
+        )
+
+        if let bodyFat = imported.latest.bodyFatPercentage {
+            bodyScoreInput.bodyFat = BodyFatValue(percentage: bodyFat, source: .scan)
+            bodyFatPercentageText = Self.formatNumber(bodyFat)
+            currentStep = .loading
+        } else {
+            currentStep = .bodyFatChoice
+        }
+        trackStepTransition(from: previousStep, to: currentStep)
     }
 
 // MARK: - Calculation
 
     func calculateScore() async {
-        guard bodyScoreInput.isReadyForCalculation else {
+        guard FatVsMuscleSummary(input: bodyScoreInput) != nil else {
             errorMessage = "Missing inputs for score calculation."
             isLoading = false
             currentStep = firstMissingInputStep()
@@ -365,6 +419,16 @@ func fetchHealthMetrics() async {
 
         isLoading = true
         currentStep = .loading
+
+        // The fat-vs-muscle reveal needs only weight and body fat. The score
+        // also needs sex and height, which may come later in the profile step.
+        guard bodyScoreInput.isReadyForCalculation else {
+            bodyScoreResult = nil
+            currentStep = .bodyScore
+            isLoading = false
+            errorMessage = nil
+            return
+        }
 
         do {
             let context = BodyScoreCalculationContext(input: bodyScoreInput)
@@ -392,10 +456,12 @@ func fetchHealthMetrics() async {
                 ]
             )
 
+            // A failed score never blocks the reveal; it only drops the cache.
             await MainActor.run {
-                self.errorMessage = error.localizedDescription
+                self.bodyScoreResult = nil
                 self.isLoading = false
-                self.currentStep = .bodyFatChoice
+                self.errorMessage = nil
+                self.currentStep = .bodyScore
             }
         }
     }

@@ -413,6 +413,7 @@ struct OnboardingPageTemplate<Content: View, Footer: View>: View {
                 })
                 .buttonStyle(.plain)
                 .jovieTouchTarget()
+                .accessibilityLabel("Back")
             }
 
             if let progress {

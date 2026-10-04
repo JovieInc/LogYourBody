@@ -333,15 +333,10 @@ final class OnboardingFlowValidationTests: XCTestCase {
         XCTAssertEqual(skippedViewModel.currentStep, .bodyFatChoice)
     }
 
-    func testFirstMissingInputStepRoutesToEarliestGap() {
+    func testFirstMissingInputStepAsksOnlyWhatTheRevealNeeds() {
         let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
 
-        XCTAssertEqual(viewModel.firstMissingInputStep(), .basics)
-
-        viewModel.updateSex(.female)
-        XCTAssertEqual(viewModel.firstMissingInputStep(), .height)
-
-        viewModel.bodyScoreInput.height = HeightValue(value: 170, unit: .centimeters)
+        // Sex and height are asked after the reveal, in the profile step.
         XCTAssertEqual(viewModel.firstMissingInputStep(), .manualWeight)
 
         viewModel.bodyScoreInput.weight = WeightValue(value: 150, unit: .pounds)
@@ -349,8 +344,6 @@ final class OnboardingFlowValidationTests: XCTestCase {
 
         let authorizedViewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
         authorizedViewModel.healthKitManager.isAuthorized = true
-        authorizedViewModel.updateSex(.female)
-        authorizedViewModel.bodyScoreInput.height = HeightValue(value: 170, unit: .centimeters)
         XCTAssertEqual(authorizedViewModel.firstMissingInputStep(), .healthConfirmation)
     }
 
@@ -359,9 +352,22 @@ final class OnboardingFlowValidationTests: XCTestCase {
 
         await viewModel.calculateScoreIfNeeded()
 
-        XCTAssertEqual(viewModel.currentStep, .basics)
+        XCTAssertEqual(viewModel.currentStep, .manualWeight)
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertEqual(viewModel.errorMessage, "Missing inputs for score calculation.")
+    }
+
+    func testRevealDoesNotWaitForSexOrHeight() async {
+        let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+        viewModel.bodyScoreInput.weight = WeightValue(value: 80, unit: .kilograms)
+        viewModel.bodyScoreInput.bodyFat = BodyFatValue(percentage: 20, source: .manualValue)
+
+        await viewModel.calculateScoreIfNeeded()
+
+        XCTAssertEqual(viewModel.currentStep, .bodyScore)
+        XCTAssertNil(viewModel.bodyScoreResult, "The score waits for sex and height; the reveal does not")
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertFalse(viewModel.isLoading)
     }
 
     // MARK: - Profile details draft logic

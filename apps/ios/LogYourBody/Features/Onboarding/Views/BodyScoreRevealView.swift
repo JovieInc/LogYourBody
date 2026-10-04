@@ -112,6 +112,8 @@ struct FatVsMuscleSummary: Equatable {
 
     static func sourceText(for source: BodyFatInputSource) -> String {
         switch source {
+        case .scan:
+            return "Body fat measured by your scan"
         case .healthKit:
             return "Body fat from Apple Health"
         case .manualValue:
@@ -139,10 +141,12 @@ struct BodyScoreRevealView: View {
 
     var body: some View {
         Group {
-            if viewModel.bodyScoreResult != nil, let summary = FatVsMuscleSummary(input: viewModel.bodyScoreInput) {
+            if let summary = FatVsMuscleSummary(input: viewModel.bodyScoreInput) {
                 OnboardingPageTemplate(
                     title: "Here’s your fat vs muscle.",
-                    subtitle: "Log again and LogYourBody shows which one is changing.",
+                    subtitle: changeText == nil
+                        ? "Log again and LogYourBody shows which one is changing."
+                        : "Every scan and weigh-in from here shows which one is changing.",
                     showsBackButton: false,
                     progress: viewModel.progress(for: .bodyScore),
                     screen: .bodyScoreReveal
@@ -157,6 +161,12 @@ struct BodyScoreRevealView: View {
                         compositionBar(summary: summary)
                             .opacity(isRevealed ? 1 : 0)
                             .animation(reduceMotion ? nil : theme.animation.fast.delay(0.1), value: isRevealed)
+
+                        if let changeText {
+                            changeLine(changeText)
+                                .opacity(isRevealed ? 1 : 0)
+                                .animation(reduceMotion ? nil : theme.animation.fast.delay(0.12), value: isRevealed)
+                        }
 
                         sourceLine(summary: summary)
                             .opacity(isRevealed ? 1 : 0)
@@ -180,16 +190,26 @@ struct BodyScoreRevealView: View {
             }
         }
         .onAppear {
-            guard viewModel.bodyScoreResult != nil else { return }
+            guard FatVsMuscleSummary(input: viewModel.bodyScoreInput) != nil else { return }
             triggerRevealFeedback()
         }
-        .onChange(of: viewModel.bodyScoreResult) { _, newValue in
-            if newValue != nil {
-                triggerRevealFeedback()
-            } else {
-                isRevealed = false
-            }
+    }
+
+    private var changeText: String? {
+        viewModel.scanImport.flatMap {
+            ScanChangePolicy.changeText(for: $0, system: viewModel.bodyScoreInput.measurementPreference)
         }
+    }
+
+    private func changeLine(_ text: String) -> some View {
+        OnboardingCard {
+            Text(text)
+                .font(OnboardingTypography.body)
+                .foregroundStyle(theme.colors.text)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("body_score_reveal_scan_change")
     }
 
     private func massRow(summary: FatVsMuscleSummary) -> some View {
