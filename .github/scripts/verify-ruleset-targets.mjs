@@ -18,7 +18,11 @@ export const REPOSITORY = 'JovieInc/LogYourBody';
 export const REQUIRED_STATUS_CHECK = 'CI Summary';
 export const PROTECTED_BRANCHES = ['main', 'production'];
 
-const COVERING_PATTERNS = branch => new Set([`refs/heads/${branch}`, '~ALL', '~DEFAULT_BRANCH']);
+const COVERING_PATTERNS = (branch, defaultBranch) => new Set([
+  `refs/heads/${branch}`,
+  '~ALL',
+  ...(branch === defaultBranch ? ['~DEFAULT_BRANCH'] : []),
+]);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -37,7 +41,7 @@ function refTargets(ruleset) {
 export function findQuotedRefTargets(rulesets) {
   const violations = [];
   for (const ruleset of rulesets ?? []) {
-    if (!ruleset || ruleset.target !== 'branch' || ruleset.enforcement === 'disabled') {
+    if (!ruleset || ruleset.target !== 'branch' || ruleset.enforcement !== 'active') {
       continue;
     }
     for (const list of ['include', 'exclude']) {
@@ -56,10 +60,10 @@ export function findQuotedRefTargets(rulesets) {
   return violations;
 }
 
-function isCoveredBy(ruleset, branch) {
-  if (ruleset.enforcement === 'disabled') return false;
+function isCoveredBy(ruleset, branch, defaultBranch) {
+  if (ruleset.enforcement !== 'active') return false;
   const { include, exclude } = refTargets(ruleset);
-  const covering = COVERING_PATTERNS(branch);
+  const covering = COVERING_PATTERNS(branch, defaultBranch);
   if (!include.some(entry => covering.has(entry))) return false;
   return !exclude.some(entry => covering.has(entry));
 }
@@ -79,7 +83,10 @@ function requiredCheckContexts(ruleset) {
 // rulesets: array of GET /repos/{o}/{r}/rulesets/{id} payloads (branch rulesets).
 // Asserts: no quoted ref targets; each protected branch is covered by an active
 // ruleset that requires the aggregate CI Summary status check.
-export function verifyRulesetTargets(rulesets, { protectedBranches = PROTECTED_BRANCHES } = {}) {
+export function verifyRulesetTargets(
+  rulesets,
+  { protectedBranches = PROTECTED_BRANCHES, defaultBranch } = {},
+) {
   const violations = findQuotedRefTargets(rulesets);
   assert(
     violations.length === 0,
@@ -89,11 +96,20 @@ export function verifyRulesetTargets(rulesets, { protectedBranches = PROTECTED_B
   );
 
   const branchRulesets = (rulesets ?? []).filter(
-    ruleset => ruleset?.target === 'branch' && ruleset.enforcement !== 'disabled',
+    ruleset => ruleset?.target === 'branch' && ruleset.enforcement === 'active',
+  );
+
+  const usesDefaultBranch = branchRulesets.some(ruleset => {
+    const { include, exclude } = refTargets(ruleset);
+    return [...include, ...exclude].includes('~DEFAULT_BRANCH');
+  });
+  assert(
+    !usesDefaultBranch || (typeof defaultBranch === 'string' && defaultBranch.trim() !== ''),
+    '~DEFAULT_BRANCH requires the actual repository default branch',
   );
 
   for (const branch of protectedBranches) {
-    const covering = branchRulesets.filter(ruleset => isCoveredBy(ruleset, branch));
+    const covering = branchRulesets.filter(ruleset => isCoveredBy(ruleset, branch, defaultBranch));
     assert(
       covering.length > 0,
       `refs/heads/${branch} is not covered by any active branch ruleset`,
@@ -141,7 +157,8 @@ const isMainModule =
   process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 if (isMainModule) {
   const rulesets = fetchLiveRulesets();
-  verifyRulesetTargets(rulesets);
+  const { default_branch: defaultBranch } = ghApi(`repos/${REPOSITORY}`);
+  verifyRulesetTargets(rulesets, { defaultBranch });
   verifyBranchProtected();
   for (const ruleset of rulesets) {
     if (ruleset.target !== 'branch') continue;

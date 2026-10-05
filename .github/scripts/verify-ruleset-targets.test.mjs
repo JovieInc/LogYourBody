@@ -91,10 +91,96 @@ test('disabled rulesets neither violate nor cover', () => {
   );
 });
 
-test('~ALL and ~DEFAULT_BRANCH count as coverage', () => {
+test('~ALL covers both protected branches', () => {
   const rulesets = [
     branchRuleset(1, 'All branches', ['~ALL']),
     liveShape[1],
   ];
   assert.equal(verifyRulesetTargets(rulesets), true);
+});
+
+test('deliberate red: evaluate-only rulesets cannot cover protected branches', () => {
+  assert.throws(
+    () => verifyRulesetTargets([
+      { ...liveShape[0], enforcement: 'evaluate' },
+      liveShape[1],
+    ]),
+    /refs\/heads\/main is not covered by any active branch ruleset/,
+  );
+});
+
+test('deliberate red: the default branch token cannot also cover production', () => {
+  assert.throws(
+    () => verifyRulesetTargets([
+      branchRuleset(1, 'Default branch', ['~DEFAULT_BRANCH']),
+    ], { defaultBranch: 'main' }),
+    /refs\/heads\/production is not covered by any active branch ruleset/,
+  );
+});
+
+test('default branch token plus explicit production covers both branches', () => {
+  assert.equal(verifyRulesetTargets([
+    branchRuleset(1, 'Default branch', ['~DEFAULT_BRANCH']),
+    liveShape[1],
+  ], { defaultBranch: 'main' }), true);
+});
+
+test('default branch token follows a renamed repository default', () => {
+  assert.equal(verifyRulesetTargets([
+    branchRuleset(1, 'Default branch', ['~DEFAULT_BRANCH']),
+    liveShape[1],
+  ], { protectedBranches: ['trunk', 'production'], defaultBranch: 'trunk' }), true);
+});
+
+
+test('only active enforcement can satisfy protected branch coverage', () => {
+  for (const enforcement of [undefined, null, 'unknown']) {
+    assert.throws(
+      () => verifyRulesetTargets([{ ...liveShape[0], enforcement }, liveShape[1]]),
+      /refs\/heads\/main is not covered/,
+    );
+  }
+});
+
+test('default branch token can refer to production without covering main', () => {
+  assert.equal(verifyRulesetTargets([
+    liveShape[0],
+    branchRuleset(1, 'Default branch', ['~DEFAULT_BRANCH']),
+  ], { defaultBranch: 'production' }), true);
+});
+
+test('exact and all-branch exclusions still remove coverage', () => {
+  for (const exclude of [['refs/heads/production'], ['~ALL']]) {
+    const ruleset = branchRuleset(1, 'All branches with exclusions', ['~ALL'], {
+      conditions: { ref_name: { include: ['~ALL'], exclude } },
+    });
+    assert.throws(() => verifyRulesetTargets([ruleset]), /is not covered/);
+  }
+});
+
+test('default branch exclusion removes only the actual default branch', () => {
+  const exceptDefault = branchRuleset(1, 'Other branches', ['~ALL'], {
+    conditions: { ref_name: { include: ['~ALL'], exclude: ['~DEFAULT_BRANCH'] } },
+  });
+  assert.equal(verifyRulesetTargets([exceptDefault, liveShape[0]], {
+    defaultBranch: 'main',
+  }), true);
+  assert.throws(() => verifyRulesetTargets([exceptDefault], {
+    defaultBranch: 'main',
+  }), /refs\/heads\/main is not covered/);
+});
+
+test('default branch include and exclude require actual repository metadata', () => {
+  for (const refName of [
+    { include: ['~DEFAULT_BRANCH'], exclude: [] },
+    { include: ['~ALL'], exclude: ['~DEFAULT_BRANCH'] },
+  ]) {
+    const ruleset = branchRuleset(1, 'Default-aware branches', [], {
+      conditions: { ref_name: refName },
+    });
+    for (const defaultBranch of [undefined, null, '']) {
+      assert.throws(() => verifyRulesetTargets([ruleset], { defaultBranch }),
+        /requires the actual repository default branch/);
+    }
+  }
 });
