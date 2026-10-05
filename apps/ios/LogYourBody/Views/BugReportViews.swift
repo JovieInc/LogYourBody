@@ -153,7 +153,7 @@ struct BugReportFormView: View {
                let image = UIImage(data: data) {
                 Image(uiImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .accessibilityLabel("Screenshot included in report")
