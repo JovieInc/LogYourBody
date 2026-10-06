@@ -28,6 +28,90 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["login_email_field"].exists)
     }
 
+    func testTrainingManualLoadAndAcknowledgedSetSurviveRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        let open = app.buttons["training_fixture_open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.tap()
+        let load = app.textFields["training_load_fixture_press_1"]
+        XCTAssertTrue(load.waitForExistence(timeout: 5))
+        XCTAssertEqual(load.value as? String, "60")
+        load.tap()
+        load.press(forDuration: 1.1)
+        if app.menuItems["Select All"].waitForExistence(timeout: 2) { app.menuItems["Select All"].tap() }
+        load.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "22,5")
+        app.buttons["training_log_set_fixture_press_1"].tap()
+        XCTAssertTrue(app.buttons["Set logged"].waitForExistence(timeout: 5))
+        app.buttons["Close"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_saved_load"].label, "Saved load: 22.5")
+        attachScreenshot(named: "training-acknowledged-manual-load", from: app)
+        app.terminate()
+        app.launchArguments = ["-lybUITestTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.tap()
+        XCTAssertTrue(load.waitForExistence(timeout: 5))
+        XCTAssertEqual(load.value as? String, "22.5")
+        let logged = app.buttons["training_log_set_fixture_press_1"]
+        XCTAssertEqual(logged.label, "Set logged")
+        XCTAssertFalse(logged.isEnabled)
+        attachScreenshot(named: "training-restored-after-relaunch", from: app)
+    }
+
+    func testTrainingOfflineFailureRetainsLoadAndReconnectRetrySavesOnce() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        let offlineSwitch = app.switches["training_fixture_offline"]
+        offlineSwitch.switches.firstMatch.tap()
+        XCTAssertEqual(offlineSwitch.value as? String, "1")
+        app.buttons["training_fixture_open"].tap()
+        let load = app.textFields["training_load_fixture_press_1"]
+        XCTAssertTrue(load.waitForExistence(timeout: 5))
+        app.buttons["training_log_set_fixture_press_1"].tap()
+        XCTAssertTrue(app.staticTexts["The set could not be saved."].waitForExistence(timeout: 5))
+        XCTAssertEqual(load.value as? String, "60")
+        XCTAssertEqual(app.buttons["training_log_set_fixture_press_1"].label, "Log set")
+        app.buttons["Close"].tap()
+        offlineSwitch.switches.firstMatch.tap()
+        XCTAssertEqual(offlineSwitch.value as? String, "0")
+        app.buttons["training_fixture_open"].tap()
+        app.buttons["training_log_set_fixture_press_1"].tap()
+        XCTAssertTrue(app.buttons["Set logged"].waitForExistence(timeout: 5))
+        app.buttons["Close"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_count"].label, "Acknowledged sets: 1")
+        XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 2")
+        attachScreenshot(named: "training-retry-after-offline", from: app)
+    }
+
+    func testTrainingBlankLoadIsBodyweightAndInvalidLoadCannotSubmit() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingBlankLoad"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let load = app.textFields["training_load_fixture_press_1"]
+        XCTAssertTrue(load.waitForExistence(timeout: 5))
+        XCTAssertEqual(load.value as? String, "Load kg")
+        load.tap()
+        load.typeText("501")
+        let log = app.buttons["training_log_set_fixture_press_1"]
+        XCTAssertFalse(log.isEnabled)
+        XCTAssertTrue(app.staticTexts["training_load_error_fixture_press_1"].exists)
+        load.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3))
+        XCTAssertTrue(log.isEnabled)
+        log.tap()
+        XCTAssertTrue(app.buttons["Set logged"].waitForExistence(timeout: 5))
+        XCTAssertFalse(log.isEnabled)
+        app.buttons["Close"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_saved_load"].label, "Saved load: bodyweight")
+        XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 1")
+        attachScreenshot(named: "training-explicit-bodyweight", from: app)
+    }
+
     func testWhatsNewFixtureRendersTheRedesignedReleaseSurface() throws {
         let app = XCUIApplication()
         app.launchArguments = [
