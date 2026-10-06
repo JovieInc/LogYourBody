@@ -248,7 +248,16 @@ final class AuthManager: NSObject, ObservableObject {
     static let shared = AuthManager()
 
     @Published var currentUser: LocalUser?
-    @Published var authSession: ProductAuthSession?
+    @Published var authSession: ProductAuthSession? {
+        didSet {
+            // Every replacement invalidates work, including A → B → A and logout
+            // during a cold restore, when no session has been applied yet.
+            authGeneration &+= 1
+            refreshTask?.cancel()
+            refreshTask = nil
+            refreshTaskID = nil
+        }
+    }
 
     /// Signed-in means a first-party Jovie access token is present.
     /// This is not Clerk in-memory session state and is not stored in UserDefaults.
@@ -266,7 +275,10 @@ final class AuthManager: NSObject, ObservableObject {
 
     private let storedSessionKey = "productAuth.jovieOAuthSession"
     private var initializationTask: Task<Void, Never>?
-    private var refreshTask: Task<String?, Never>?
+    private typealias RefreshedToken = (accessToken: String, generation: UInt64)
+    private var refreshTask: Task<RefreshedToken?, Never>?
+    private var refreshTaskID: UUID?
+    private var authGeneration: UInt64 = 0
     private var webAuthenticationSession: ASWebAuthenticationSession?
     private var bootstrappedProfileSessionIds = Set<String>()
 
@@ -362,12 +374,16 @@ final class AuthManager: NSObject, ObservableObject {
             if let stored: ProductAuthSession = try keychain.get(
                 forKey: storedSessionKey,
                 as: ProductAuthSession.self
-            ) {
+            ), authSession == nil {
                 if stored.expiresAt.timeIntervalSinceNow > 60 {
-                    if await validateStoredSession(stored) {
-                        applyAuthenticatedSession(stored)
-                    } else {
-                        await performLogout(exitReason: .sessionExpired)
+                    let generation = authGeneration
+                    let isValid = await validateStoredSession(stored)
+                    if generation == authGeneration, !Task.isCancelled {
+                        if isValid {
+                            applyAuthenticatedSession(stored)
+                        } else {
+                            await performLogout(exitReason: .sessionExpired)
+                        }
                     }
                 } else {
                     _ = await refreshAccessToken(using: stored)
@@ -620,16 +636,24 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     private func refreshAccessToken(using session: ProductAuthSession? = nil) async -> String? {
-        if let refreshTask { return await refreshTask.value }
+        if let refreshTask { return currentRefreshToken(await refreshTask.value) }
         guard let current = session ?? authSession else {
             await performLogout(exitReason: .sessionExpired)
             return nil
         }
 
-        let task = Task<String?, Never> { @MainActor [weak self] in
+        let generation = authGeneration
+        let taskID = UUID()
+        let task = Task<RefreshedToken?, Never> { @MainActor [weak self] in
             guard let self else { return nil }
-            defer { self.refreshTask = nil }
+            defer {
+                if self.refreshTaskID == taskID {
+                    self.refreshTask = nil
+                    self.refreshTaskID = nil
+                }
+            }
             do {
+                guard self.authGeneration == generation, !Task.isCancelled else { return nil }
                 let response = try await self.exchangeOAuthToken(
                     parameters: [
                         "grant_type": "refresh_token",
@@ -637,32 +661,48 @@ final class AuthManager: NSObject, ObservableObject {
                         "refresh_token": current.refreshToken
                     ]
                 )
+                guard self.authGeneration == generation, !Task.isCancelled else { return nil }
                 let userInfo = try await self.fetchOAuthUserInfo(accessToken: response.accessToken)
+                guard self.authGeneration == generation, !Task.isCancelled else { return nil }
+                guard userInfo.subject == current.subject else { throw AuthError.invalidToken }
                 try self.persist(
                     tokenResponse: response,
                     userInfo: userInfo,
                     fallbackRefreshToken: current.refreshToken
                 )
-                return self.authSession?.accessToken
+                return self.authSession.map { ($0.accessToken, self.authGeneration) }
             } catch {
+                guard self.authGeneration == generation, !Task.isCancelled else { return nil }
                 await self.performLogout(exitReason: .sessionExpired)
                 return nil
             }
         }
         refreshTask = task
-        return await task.value
+        refreshTaskID = taskID
+        return currentRefreshToken(await task.value)
+    }
+
+    private func currentRefreshToken(_ result: RefreshedToken?) -> String? {
+        // The account can change after the refresh finishes but before its
+        // waiter resumes. Use the generation after persist, which replaces it.
+        guard let result, result.generation == authGeneration, !Task.isCancelled else { return nil }
+        return result.accessToken
     }
 
     func logout() async {
-        if let token = authSession?.accessToken {
+        let token = authSession?.accessToken
+        await performLogout(exitReason: .userInitiated)
+        if let token {
             try? await requestBetterAuth(path: "sign-out", method: "POST", accessToken: token)
         }
-        await performLogout(exitReason: .userInitiated)
     }
 
     func handleProductAPIUnauthorized() async {
         guard isAuthenticated else { return }
-        if await refreshAccessToken() == nil {
+        let generation = authGeneration
+        if await refreshAccessToken() == nil,
+           generation == authGeneration,
+           !Task.isCancelled {
             await performLogout(exitReason: .sessionExpired)
         }
     }
