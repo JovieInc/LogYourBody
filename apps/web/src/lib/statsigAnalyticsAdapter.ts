@@ -1,13 +1,17 @@
 'use client';
 
 import { StatsigClient } from '@statsig/js-client';
+import {
+  isAnalyticsEvent,
+  sanitizeAnalyticsPrincipal,
+  sanitizeAnalyticsProperties,
+  sanitizeAnalyticsTraits,
+} from './analytics-schema';
 
 export interface StatsigAnalyticsConfig {
   clientKey: string;
   environmentTier?: string;
 }
-
-export type AnalyticsProperties = Record<string, string | number | boolean | null | undefined>;
 
 let client: StatsigClient | null = null;
 let initialized = false;
@@ -58,10 +62,7 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
   };
 
   return {
-    identify(
-      userId: string | null,
-      traits?: Record<string, string | number | boolean | null | undefined>,
-    ): void {
+    identify(userId: string | null, traits?: object): void {
       const c = getOrInitClient(safeConfig);
       if (!c) {
         return;
@@ -69,53 +70,28 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
 
       const user: { userID?: string; custom?: Record<string, string | number | boolean> } = {};
 
-      if (userId && userId.trim().length > 0) {
-        user.userID = userId;
-      }
+      user.userID = sanitizeAnalyticsPrincipal(userId);
 
-      if (traits && Object.keys(traits).length > 0) {
-        // Filter out null and undefined values as Statsig doesn't accept them
-        const filteredTraits = Object.entries(traits).reduce(
-          (acc, [key, value]) => {
-            if (value !== null && value !== undefined) {
-              acc[key] = value;
-            }
-            return acc;
-          },
-          {} as Record<string, string | number | boolean>,
-        );
-
-        if (Object.keys(filteredTraits).length > 0) {
-          user.custom = filteredTraits;
-        }
-      }
+      const safeTraits = sanitizeAnalyticsTraits(traits);
+      if (safeTraits.platform) user.custom = { platform: safeTraits.platform };
 
       void c.updateUserAsync(user).catch(() => {
         // Ignore user update errors.
       });
     },
 
-    track(event: string, properties?: AnalyticsProperties): void {
+    track(event: string, properties?: object): void {
+      if (!isAnalyticsEvent(event)) return;
       const c = getOrInitClient(safeConfig);
       if (!c) {
         return;
       }
 
-      if (!properties || Object.keys(properties).length === 0) {
+      const metadata = sanitizeAnalyticsProperties(event, properties);
+      if (Object.keys(metadata).length === 0) {
         c.logEvent(String(event));
         return;
       }
-
-      // Filter and convert properties to match Statsig's expected type
-      const metadata = Object.entries(properties).reduce(
-        (acc, [key, value]) => {
-          if (value !== null && value !== undefined) {
-            acc[key] = String(value);
-          }
-          return acc;
-        },
-        {} as Record<string, string>,
-      );
 
       c.logEvent({
         eventName: String(event),
