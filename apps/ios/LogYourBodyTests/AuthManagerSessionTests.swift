@@ -15,7 +15,9 @@ private final class AuthStubURLProtocol: URLProtocol {
     }
 
     static var requestHandler: ((URLRequest) -> StubbedResponse)?
+    static var deferredHandler: ((AuthStubURLProtocol) -> Bool)?
     static var recordedRequests: [URLRequest] = []
+    static var activeFixture: String?
 
     // swiftlint:disable:next static_over_final_class
     override class func canInit(with request: URLRequest) -> Bool {
@@ -28,15 +30,20 @@ private final class AuthStubURLProtocol: URLProtocol {
     }
 
     override func startLoading() {
-        guard let handler = Self.requestHandler,
-              let url = request.url,
-              let client else {
+        guard request.value(forHTTPHeaderField: "X-LYB-Test-Fixture") == Self.activeFixture,
+              let handler = Self.requestHandler else {
             client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
             return
         }
 
         Self.recordedRequests.append(request)
+        if Self.deferredHandler?(self) == true { return }
         let stub = handler(request)
+        respond(with: stub)
+    }
+
+    func respond(with stub: StubbedResponse) {
+        guard let url = request.url, let client else { return }
         let response = HTTPURLResponse(
             url: url,
             statusCode: stub.statusCode,
@@ -52,7 +59,54 @@ private final class AuthStubURLProtocol: URLProtocol {
 
     static func reset() {
         requestHandler = nil
+        deferredHandler = nil
         recordedRequests = []
+        activeFixture = nil
+    }
+
+    static func requestBody(_ request: URLRequest) -> Data {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return Data() }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 1_024)
+        while stream.hasBytesAvailable {
+            let bytesRead = stream.read(&buffer, maxLength: buffer.count)
+            guard bytesRead > 0 else { break }
+            data.append(buffer, count: bytesRead)
+        }
+        return data
+    }
+}
+
+private final class HeldAuthResponse: @unchecked Sendable {
+    let started = XCTestExpectation(description: "Auth response is held")
+    private let lock = NSLock()
+    private var pending: [AuthStubURLProtocol] = []
+
+    var request: URLRequest? {
+        lock.lock()
+        defer { lock.unlock() }
+        return pending.first?.request
+    }
+
+    func capture(_ request: AuthStubURLProtocol) {
+        lock.lock()
+        let isFirst = pending.isEmpty
+        pending.append(request)
+        lock.unlock()
+        if isFirst { started.fulfill() }
+    }
+
+    func complete(status: Int, body: String) {
+        lock.lock()
+        let requests = pending
+        pending = []
+        lock.unlock()
+        for request in requests {
+            request.respond(with: .init(statusCode: status, body: Data(body.utf8)))
+        }
     }
 }
 
@@ -74,6 +128,7 @@ final class AuthManagerSessionTests: XCTestCase {
         suiteName = "AuthManagerSessionTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
         AuthStubURLProtocol.reset()
+        AuthStubURLProtocol.activeFixture = suiteName
         try? keychain.delete(forKey: storedSessionKey)
     }
 
@@ -92,6 +147,7 @@ final class AuthManagerSessionTests: XCTestCase {
     private func makeManager() -> AuthManager {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [AuthStubURLProtocol.self]
+        configuration.httpAdditionalHeaders = ["X-LYB-Test-Fixture": suiteName]
         return AuthManager(
             userDefaults: defaults,
             keychain: keychain,
@@ -173,6 +229,36 @@ final class AuthManagerSessionTests: XCTestCase {
 
         XCTAssertEqual(token, "cached-access")
         XCTAssertTrue(AuthStubURLProtocol.recordedRequests.isEmpty)
+    }
+
+    func testInitializeRefreshesExpiredStoredSessionWithoutAnAppliedSession() async throws {
+        try keychain.save(makeSession(expiresAt: Date().addingTimeInterval(-5)), forKey: storedSessionKey)
+        stubSessionSuccess()
+        let manager = makeManager()
+        XCTAssertNil(manager.authSession)
+
+        await manager.initialize()
+
+        XCTAssertTrue(manager.isAuthProviderReady)
+        XCTAssertEqual(manager.authSession?.accessToken, "new-access")
+        XCTAssertEqual(manager.currentUser?.id, "user-123")
+        XCTAssertEqual(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self), manager.authSession)
+    }
+
+    func testStoredSessionValidationAfterLogoutCannotRestoreCredentials() async throws {
+        try keychain.save(makeSession(expiresAt: Date().addingTimeInterval(3_600)), forKey: storedSessionKey)
+        let held = holdResponse(path: "/get-session")
+        let manager = makeManager()
+        let initialization = Task { await manager.initialize() }
+        await fulfillment(of: [held.started], timeout: 3)
+        await manager.performLogout(exitReason: .userInitiated)
+        held.complete(status: 200, body: #"{"user":{"id":"user-123","email":"user@example.com"}}"#)
+        await initialization.value
+
+        XCTAssertNil(manager.authSession)
+        XCTAssertNil(manager.currentUser)
+        XCTAssertEqual(manager.lastExitReason, .userInitiated)
+        XCTAssertNil(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self))
     }
 
     func testExpiredSessionRefreshesAndPersistsRotatedTokens() async throws {
@@ -279,5 +365,165 @@ final class AuthManagerSessionTests: XCTestCase {
         XCTAssertFalse(manager.needsLegalConsent)
         XCTAssertNil(manager.memberSinceDate)
         XCTAssertEqual(manager.lastExitReason, .userInitiated)
+    }
+
+    private func holdResponse(path: String) -> HeldAuthResponse {
+        stubSessionSuccess()
+        let held = HeldAuthResponse()
+        AuthStubURLProtocol.deferredHandler = { request in
+            guard request.request.url?.path.hasSuffix(path) == true else { return false }
+            held.capture(request)
+            return true
+        }
+        return held
+    }
+
+    func testRefreshSuccessAfterLogoutCannotRestoreCredentials() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        let held = holdResponse(path: "/oauth2/userinfo")
+        let refresh = Task { await manager.getAccessToken() }
+        await fulfillment(of: [held.started], timeout: 3)
+        await manager.performLogout(exitReason: .userInitiated)
+        held.complete(status: 200, body: #"{"sub":"user-123","email":"user@example.com"}"#)
+        let token = await refresh.value
+        XCTAssertNil(token)
+        XCTAssertNil(manager.authSession)
+        XCTAssertNil(manager.currentUser)
+        XCTAssertEqual(manager.lastExitReason, .userInitiated)
+        XCTAssertNil(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self))
+    }
+
+    func testRefreshSuccessAfterAToBToACannotOverwriteReplacementSession() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        let held = holdResponse(path: "/oauth2/userinfo")
+        let refresh = Task { await manager.getAccessToken() }
+        await fulfillment(of: [held.started], timeout: 3)
+        manager.authSession = .localFixture(subject: "user-b", email: "b@example.invalid")
+        let replacement = makeSession(accessToken: "replacement-a", expiresAt: Date().addingTimeInterval(3_600))
+        manager.authSession = replacement
+        try keychain.save(replacement, forKey: storedSessionKey)
+        held.complete(status: 200, body: #"{"sub":"user-123","email":"user@example.com"}"#)
+        let token = await refresh.value
+        XCTAssertNil(token)
+        XCTAssertEqual(manager.authSession, replacement)
+        XCTAssertEqual(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self), replacement)
+    }
+
+    func testRefreshFailureFromADoesNotSignOutB() async throws {
+        try await assertLateFailurePreservesB(throughUnauthorized: false)
+    }
+
+    func testPendingUnauthorizedRefreshFromADoesNotSignOutB() async throws {
+        try await assertLateFailurePreservesB(throughUnauthorized: true)
+    }
+
+    private func assertLateFailurePreservesB(throughUnauthorized: Bool) async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        let held = holdResponse(path: "/oauth2/token")
+        let refresh = Task { () -> String? in
+            if throughUnauthorized {
+                await manager.handleProductAPIUnauthorized()
+                return nil
+            }
+            return await manager.getAccessToken()
+        }
+        await fulfillment(of: [held.started], timeout: 3)
+        let replacement = ProductAuthSession.localFixture(
+            subject: "user-b", email: "b@example.invalid", accessToken: "replacement-b"
+        )
+        manager.authSession = replacement
+        manager.currentUser = LocalUser(
+            id: "user-b", email: "b@example.invalid", name: "User B", avatarUrl: nil, profile: nil
+        )
+        try keychain.save(replacement, forKey: storedSessionKey)
+        held.complete(status: 400, body: #"{"error":"invalid_grant"}"#)
+        let token = await refresh.value
+        XCTAssertNil(token)
+        XCTAssertEqual(manager.authSession, replacement)
+        XCTAssertEqual(manager.currentUser?.id, "user-b")
+        XCTAssertEqual(manager.lastExitReason, .none)
+        XCTAssertEqual(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self), replacement)
+    }
+
+    func testLogoutClearsLocallyBeforeTheServerRespondsAndDoesNotClearB() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(3_600))
+        let held = holdResponse(path: "/sign-out")
+        let logout = Task { await manager.logout() }
+        await fulfillment(of: [held.started], timeout: 3)
+        XCTAssertEqual(held.request?.value(forHTTPHeaderField: "Authorization"), "Bearer cached-access")
+        XCTAssertNil(manager.authSession)
+        XCTAssertEqual(manager.lastExitReason, .userInitiated)
+        let replacement = ProductAuthSession.localFixture(subject: "user-b", email: "b@example.invalid")
+        manager.authSession = replacement
+        try keychain.save(replacement, forKey: storedSessionKey)
+        held.complete(status: 200, body: "{}")
+        await logout.value
+        XCTAssertEqual(manager.authSession, replacement)
+        XCTAssertEqual(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self), replacement)
+    }
+
+    func testReplacementAccountRefreshRemainsSharedWhenOldRefreshFinishes() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        stubSessionSuccess()
+        let heldA = HeldAuthResponse()
+        let heldB = HeldAuthResponse()
+        AuthStubURLProtocol.deferredHandler = { request in
+            guard request.request.url?.path.hasSuffix("/oauth2/token") == true else { return false }
+            let form = String(data: AuthStubURLProtocol.requestBody(request.request), encoding: .utf8) ?? ""
+            (form.contains("refresh_token=b-refresh") ? heldB : heldA).capture(request)
+            return true
+        }
+        let refreshA = Task { await manager.getAccessToken() }
+        await fulfillment(of: [heldA.started], timeout: 3)
+        manager.authSession = .localFixture(
+            subject: "user-b", email: "b@example.invalid", refreshToken: "b-refresh",
+            expiresAt: Date().addingTimeInterval(-5)
+        )
+        let refreshB = Task { await manager.getAccessToken() }
+        await fulfillment(of: [heldB.started], timeout: 3)
+        heldA.complete(status: 400, body: #"{"error":"invalid_grant"}"#)
+        let tokenA = await refreshA.value
+        XCTAssertNil(tokenA)
+
+        let joined = expectation(description: "Second B caller joins the refresh")
+        let secondB = Task {
+            joined.fulfill()
+            return await manager.getAccessToken()
+        }
+        await fulfillment(of: [joined], timeout: 3)
+        AuthStubURLProtocol.requestHandler = { request in
+            let body = request.url?.path.hasSuffix("/oauth2/userinfo") == true
+                ? #"{"sub":"user-b","email":"b@example.invalid"}"# : "{}"
+            return .init(statusCode: 200, body: Data(body.utf8))
+        }
+        heldB.complete(status: 200, body: #"{"access_token":"new-b","refresh_token":"rotated-b","expires_in":3600}"#)
+        let tokenB = await refreshB.value
+        let secondTokenB = await secondB.value
+        XCTAssertEqual(tokenB, "new-b")
+        XCTAssertEqual(secondTokenB, "new-b")
+        XCTAssertEqual(manager.authSession?.subject, "user-b")
+        XCTAssertEqual(AuthStubURLProtocol.recordedRequests.filter {
+            $0.url?.path.hasSuffix("/oauth2/token") == true
+        }.count, 2)
+    }
+
+    func testRefreshRejectsUserInfoForAnotherSubject() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        let held = holdResponse(path: "/oauth2/userinfo")
+        let refresh = Task { await manager.getAccessToken() }
+        await fulfillment(of: [held.started], timeout: 3)
+        held.complete(status: 200, body: #"{"sub":"user-b","email":"b@example.invalid"}"#)
+        let token = await refresh.value
+
+        XCTAssertNil(token)
+        XCTAssertNil(manager.authSession)
+        XCTAssertEqual(manager.lastExitReason, .sessionExpired)
+        XCTAssertNil(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self))
     }
 }
