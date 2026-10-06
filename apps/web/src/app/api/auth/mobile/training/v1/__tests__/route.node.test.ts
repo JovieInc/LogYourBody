@@ -328,6 +328,43 @@ describe('authenticated training API', () => {
     expect(changed.status).toBe(409);
   });
 
+  it.each(['in_progress', 'completed'])(
+    'rejects a replay of a deleted %s session without recreating records',
+    async (status) => {
+      const { handlers, records } = makeHarness();
+      await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+      const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+      const sets = session.exercises.flatMap((exercise: { id: string; sets: number }) =>
+        Array.from({ length: exercise.sets }, (_, index) => ({
+          sessionId: session.id,
+          exerciseId: exercise.id,
+          setNumber: index + 1,
+          reps: 10,
+          loadKg: 15,
+          rir: 3,
+        })),
+      );
+      for (const set of status === 'completed' ? sets : sets.slice(0, 1)) {
+        expect((await handlers.logSet(request('POST', 'log-set', 'token-a', set))).status).toBe(
+          201,
+        );
+      }
+      expect((await records.pull('subject-a', 'training_sessions')).records[0].status).toBe(status);
+      const originalLogs = (await records.pull('subject-a', 'logged_sets')).records;
+      // Revocation can stop after deleting sessions, before removing logs and setup.
+      await records.remove('subject-a', 'training_sessions', [session.id]);
+      const tombstone = (await records.pull('subject-a', 'training_sessions')).records[0];
+      expect(tombstone.deleted_at).not.toBeNull();
+      const push = jest.spyOn(records, 'push');
+      expect((await handlers.logSet(request('POST', 'log-set', 'token-a', sets[0]))).status).toBe(
+        404,
+      );
+      expect(push).not.toHaveBeenCalled();
+      expect((await records.pull('subject-a', 'training_sessions')).records).toEqual([tombstone]);
+      expect((await records.pull('subject-a', 'logged_sets')).records).toEqual(originalLogs);
+    },
+  );
+
   it('reconciles a saved final set after interruption before reopening the next session', async () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));

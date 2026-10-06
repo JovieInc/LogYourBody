@@ -18,6 +18,8 @@ Completed sessions accept an exact replay of an existing set, including all
 numeric values, so a lost response can be retried. A changed value or a new set
 in a completed session remains rejected. Set IDs are deterministic and scoped
 to the subject, session, exercise, and set number.
+Deleted sessions reject retries without writes, including partial revocation
+where the session is deleted but its logs and setup remain.
 
 Load input accepts a decimal point or comma. Blank means bodyweight; explicit
 zero remains zero. Invalid, nonfinite, negative, or above-500-kg input cannot be
@@ -29,7 +31,8 @@ precision.
 
 - Training route tests cover subject isolation, restored set values, rejected
   feedback/completion writes, retry after partial persistence, exact final-set
-  replay, and advancement after reopening a fully logged session.
+  replay, deleted-session rejection without mutation, and advancement after
+  reopening a fully logged session.
 - `ChatServiceTests` covers load parsing and restoration formatting alongside
   the existing training service and carried-forward load cases.
 - Three live-view UI tests cover carried-forward load and decimal override,

@@ -48,6 +48,7 @@ export async function logTrainingSet(input: {
   const sessionRecord = sessions.find((record) => record.id === set.sessionId);
   if (
     !sessionRecord ||
+    sessionRecord.deleted_at !== null ||
     !isWorkoutSessionRecord(sessionRecord) ||
     sessionRecord.programSetupId !== snapshot.setup.id
   ) {
