@@ -48,18 +48,41 @@ export async function logTrainingSet(input: {
   const sessionRecord = sessions.find((record) => record.id === set.sessionId);
   if (
     !sessionRecord ||
+    sessionRecord.deleted_at !== null ||
     !isWorkoutSessionRecord(sessionRecord) ||
     sessionRecord.programSetupId !== snapshot.setup.id
   ) {
     return { kind: 'session_not_found' };
   }
-  if (sessionRecord.status !== 'in_progress') return { kind: 'session_not_active' };
   const session = sessionRecord.prescription;
+  const logId = stableTrainingUuid(
+    subject,
+    sessionRecord.id,
+    set.exerciseId,
+    String(set.setNumber),
+  );
+  if (sessionRecord.status !== 'in_progress') {
+    // The final write may have succeeded even when its response was interrupted.
+    // A completed session permits an exact replay, never an edit or a new set.
+    const prior = snapshot.logs.find((log) => log.id === logId);
+    if (
+      sessionRecord.status === 'completed' &&
+      prior &&
+      prior.sessionId === set.sessionId &&
+      prior.exerciseId === set.exerciseId &&
+      prior.setNumber === set.setNumber &&
+      prior.reps === set.reps &&
+      prior.loadKg === set.loadKg &&
+      prior.rir === set.rir
+    ) {
+      return { kind: 'logged', log: { ...prior, record_type: 'set_log' }, sessionComplete: true };
+    }
+    return { kind: 'session_not_active' };
+  }
   const completedAt = input.now.toISOString();
   if (!session || !validateSetLog({ id: 'server-generated', ...set, completedAt }, session))
     return { kind: 'set_not_in_session' };
 
-  const logId = stableTrainingUuid(subject, session.id, set.exerciseId, String(set.setNumber));
   const log: SetLog & { record_type: string } = {
     id: logId,
     record_type: 'set_log',
@@ -85,9 +108,10 @@ export async function logTrainingSet(input: {
     ),
   );
   if (sessionComplete) {
-    await records.push(subject, 'training_sessions', [
+    const completion = await records.push(subject, 'training_sessions', [
       { ...sessionRecord, status: 'completed', completedAt },
     ]);
+    if (completion.rejected_ids.includes(session.id)) return { kind: 'rejected' };
   }
   return { kind: 'logged', log: saved.records[0] ?? log, sessionComplete };
 }
@@ -101,6 +125,7 @@ export type FeedbackResult =
   | { kind: 'recorded'; feedback: TrainingFeedback & { record_type: string } }
   | { kind: 'program_not_enrolled' }
   | { kind: 'session_not_found' }
+  | { kind: 'rejected' }
   | { kind: 'invalid' };
 
 /** Stores a post-session check-in. Shared by the mobile API and MCP. */
@@ -132,6 +157,7 @@ export async function recordTrainingFeedback(input: {
     createdAt,
   };
   if (!validTrainingFeedback(feedback)) return { kind: 'invalid' };
-  await input.records.push(input.subject, 'training_feedback', [feedback]);
+  const saved = await input.records.push(input.subject, 'training_feedback', [feedback]);
+  if (saved.rejected_ids.includes(feedback.id)) return { kind: 'rejected' };
   return { kind: 'recorded', feedback };
 }

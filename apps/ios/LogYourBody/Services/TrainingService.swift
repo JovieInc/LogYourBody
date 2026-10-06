@@ -44,6 +44,16 @@ struct TrainingSession: Decodable, Equatable, Identifiable, Sendable {
     let safetyStop: Bool
     let explanation: String?
     let evidenceIds: [String]
+    let loggedSets: [TrainingSavedSet]?
+}
+
+struct TrainingSavedSet: Codable, Equatable, Sendable {
+    let sessionId: String
+    let exerciseId: String
+    let setNumber: Int
+    let reps: Int
+    let loadKg: Double?
+    let rir: Int
 }
 
 struct TrainingNextResponse: Decodable, Equatable, Sendable {

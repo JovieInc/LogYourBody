@@ -273,6 +273,40 @@ enum TrainingLoadPrefillPolicy {
     }
 }
 
+enum TrainingLoadInputPolicy {
+    static let invalidMessage = "Enter a load from 0 to 500 kg, or leave it blank for bodyweight."
+
+    static func loadKg(from text: String) throws -> Double? {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty { return nil }
+        guard value.range(of: #"^([0-9]+([.,][0-9]*)?|[.,][0-9]+)$"#, options: .regularExpression) != nil,
+              let load = Double(value.replacingOccurrences(of: ",", with: ".")),
+              load.isFinite, (0...500).contains(load)
+        else { throw InputError.invalidLoad }
+        return load
+    }
+
+    static func isValid(_ text: String) -> Bool {
+        do {
+            _ = try loadKg(from: text)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    static func savedText(for load: Double?) -> String {
+        guard let load else { return "" }
+        let text = String(load)
+        return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
+    }
+
+    enum InputError: LocalizedError {
+        case invalidLoad
+        var errorDescription: String? { TrainingLoadInputPolicy.invalidMessage }
+    }
+}
+
 struct TrainingLiveSessionView: View {
     let session: TrainingSession
     let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
@@ -291,6 +325,35 @@ struct TrainingLiveSessionView: View {
     @State private var feedbackSaved = false
     @State private var isSaving = false
     @State private var errorMessage: String?
+
+    init(
+        session: TrainingSession,
+        onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
+        onFeedback: @escaping (Int, Int, String, Int) async throws -> Void
+    ) {
+        self.session = session
+        self.onLogSet = onLogSet
+        self.onFeedback = onFeedback
+        var reps: [String: String] = [:]
+        var loads: [String: String] = [:]
+        var rir: [String: Int] = [:]
+        for saved in session.loggedSets ?? [] {
+            guard saved.sessionId == session.id,
+                  let exercise = session.exercises.first(where: { $0.id == saved.exerciseId }),
+                  (1...max(1, exercise.sets)).contains(saved.setNumber),
+                  (1...50).contains(saved.reps), (0...6).contains(saved.rir),
+                  saved.loadKg.map({ $0.isFinite && (0...500).contains($0) }) ?? true
+            else { continue }
+            let key = "\(saved.exerciseId)-\(saved.setNumber)"
+            reps[key] = String(saved.reps)
+            loads[key] = TrainingLoadInputPolicy.savedText(for: saved.loadKg)
+            rir[key] = saved.rir
+        }
+        _repsByKey = State(initialValue: reps)
+        _loadByKey = State(initialValue: loads)
+        _rirByKey = State(initialValue: rir)
+        _loggedSets = State(initialValue: Set(reps.keys))
+    }
 
     var body: some View {
         NavigationStack {
@@ -330,9 +393,11 @@ struct TrainingLiveSessionView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
+                        .disabled(isSaving)
                 }
             }
         }
+        .interactiveDismissDisabled(isSaving)
     }
 
     private func exerciseCard(_ exercise: TrainingExercisePrescription) -> some View {
@@ -379,15 +444,24 @@ struct TrainingLiveSessionView: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("training_load_\(exercise.id)_\(setNumber)")
             }
+            .disabled(isSaving || loggedSets.contains(key))
+            if !TrainingLoadInputPolicy.isValid(loadBinding(for: exercise, setNumber: setNumber).wrappedValue) {
+                Text(TrainingLoadInputPolicy.invalidMessage)
+                    .font(.footnote)
+                    .foregroundStyle(Color.appWarning)
+                    .accessibilityIdentifier("training_load_error_\(exercise.id)_\(setNumber)")
+            }
             Stepper("\(rirBinding(for: exercise, setNumber: setNumber).wrappedValue) reps in reserve", value: rirBinding(for: exercise, setNumber: setNumber), in: 0...6)
                 .font(.system(size: 13))
+                .disabled(isSaving || loggedSets.contains(key))
                 .accessibilityIdentifier("training_rir_\(exercise.id)_\(setNumber)")
             Button(loggedSets.contains(key) ? "Set logged" : "Log set") {
                 Task { await log(exercise, setNumber: setNumber) }
             }
             .disabled(
                 loggedSets.contains(key) || isSaving ||
-                    Int(repsBinding(for: exercise, setNumber: setNumber).wrappedValue) == nil
+                    !(1...50).contains(Int(repsBinding(for: exercise, setNumber: setNumber).wrappedValue) ?? 0) ||
+                    !TrainingLoadInputPolicy.isValid(loadBinding(for: exercise, setNumber: setNumber).wrappedValue)
             )
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.colors.text)
@@ -444,7 +518,10 @@ struct TrainingLiveSessionView: View {
     }
 
     private func log(_ exercise: TrainingExercisePrescription, setNumber: Int) async {
-        guard let reps = Int(repsBinding(for: exercise, setNumber: setNumber).wrappedValue) else { return }
+        guard !isSaving, !loggedSets.contains(setKey(exercise, setNumber: setNumber)),
+              let reps = Int(repsBinding(for: exercise, setNumber: setNumber).wrappedValue),
+              (1...50).contains(reps)
+        else { return }
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -454,7 +531,7 @@ struct TrainingLiveSessionView: View {
                 exercise,
                 setNumber,
                 reps,
-                Double(loadText),
+                try TrainingLoadInputPolicy.loadKg(from: loadText),
                 rirBinding(for: exercise, setNumber: setNumber).wrappedValue
             )
             loggedSets.insert(setKey(exercise, setNumber: setNumber))
@@ -466,6 +543,7 @@ struct TrainingLiveSessionView: View {
     }
 
     private func saveFeedback() async {
+        guard !isSaving, !feedbackSaved else { return }
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -579,3 +657,70 @@ struct VoiceSetReviewView: View {
         dismiss()
     }
 }
+
+#if DEBUG
+/// Uses the production live view with isolated synthetic acknowledgments; never contacts a service.
+struct TrainingLiveSessionFixtureView: View {
+    private static let defaults = UserDefaults(suiteName: "lyb.training.ui-fixture")!
+    @State private var savedSets: [TrainingSavedSet]
+    @State private var presented = false
+    @State private var offline = false
+    @State private var submissionCount = 0
+
+    init() {
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestResetTrainingFixture") {
+            Self.defaults.removeObject(forKey: "savedSets")
+        }
+        let data = Self.defaults.data(forKey: "savedSets") ?? Data("[]".utf8)
+        _savedSets = State(initialValue: (try? JSONDecoder().decode([TrainingSavedSet].self, from: data)) ?? [])
+    }
+
+    private var session: TrainingSession {
+        TrainingSession(
+            id: "fixture-training-session", week: 2, slot: 0, pattern: "A", title: "Fixture training",
+            exercises: [
+                TrainingExercisePrescription(
+                    id: "fixture_press", name: "Fixture press", primaryMuscle: "chest",
+                    muscleContribution: ["chest": 1], sets: 2, repRange: .init(min: 8, max: 12),
+                    targetReps: 10, targetRir: 3,
+                    targetLoadKg: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingBlankLoad") ? nil : 60,
+                    loadInstruction: "Repeat last session’s load.", progression: "hold", evidenceIds: []
+                )
+            ], safetyStop: false, explanation: nil, evidenceIds: [], loggedSets: savedSets
+        )
+    }
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Button("Open fixture session") { presented = true }
+                .accessibilityIdentifier("training_fixture_open")
+            Toggle("Offline fixture", isOn: $offline)
+                .accessibilityIdentifier("training_fixture_offline")
+            Text("Acknowledged sets: \(savedSets.count)")
+                .accessibilityIdentifier("training_fixture_count")
+            Text("Submissions: \(submissionCount)")
+                .accessibilityIdentifier("training_fixture_submissions")
+            if let saved = savedSets.first {
+                Text("Saved load: \(saved.loadKg.map { TrainingLoadInputPolicy.savedText(for: $0) } ?? "bodyweight")")
+                    .accessibilityIdentifier("training_fixture_saved_load")
+            }
+        }
+        .padding(20)
+        .sheet(isPresented: $presented) {
+            TrainingLiveSessionView(session: session, onLogSet: { exercise, number, reps, load, rir in
+                submissionCount += 1
+                guard !offline else { throw URLError(.notConnectedToInternet) }
+                let saved = TrainingSavedSet(
+                    sessionId: session.id, exerciseId: exercise.id, setNumber: number,
+                    reps: reps, loadKg: load, rir: rir
+                )
+                savedSets.removeAll { $0.exerciseId == exercise.id && $0.setNumber == number }
+                savedSets.append(saved)
+                Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
+            }, onFeedback: { _, _, _, _ in
+                guard !offline else { throw URLError(.notConnectedToInternet) }
+            })
+        }
+    }
+}
+#endif

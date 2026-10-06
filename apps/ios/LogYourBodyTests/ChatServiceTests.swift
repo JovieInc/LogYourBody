@@ -73,6 +73,22 @@ final class ChatServiceTests: XCTestCase {
         XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 0), "")
     }
 
+    func testTrainingLoadInputPreservesDecimalOverridesAndRejectsInvalidLoads() throws {
+        for text in ["22.5", "22,5", " 22,5 "] {
+            XCTAssertEqual(try TrainingLoadInputPolicy.loadKg(from: text), 22.5)
+        }
+        XCTAssertNil(try TrainingLoadInputPolicy.loadKg(from: "  "))
+        XCTAssertEqual(try TrainingLoadInputPolicy.loadKg(from: "0"), 0)
+        XCTAssertEqual(try TrainingLoadInputPolicy.loadKg(from: "500"), 500)
+        XCTAssertEqual(TrainingLoadInputPolicy.savedText(for: 22.6796), "22.6796")
+        XCTAssertEqual(TrainingLoadInputPolicy.savedText(for: 0), "0")
+        XCTAssertEqual(TrainingLoadInputPolicy.savedText(for: nil), "")
+        for text in ["-1", "501", "abc", "1,000.5", "NaN", "inf", "22,,5"] {
+            XCTAssertThrowsError(try TrainingLoadInputPolicy.loadKg(from: text), text)
+            XCTAssertFalse(TrainingLoadInputPolicy.isValid(text), text)
+        }
+    }
+
     func testTrainingCoachVisibilityRequiresTheStatsigGate() {
         var checkedKey: String?
         XCTAssertFalse(TrainingCoachPolicy.isEnabled { checkedKey = $0; return false })
@@ -415,10 +431,10 @@ final class ChatServiceTests: XCTestCase {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 1_024)
         while stream.hasBytesAvailable {
-            let count = stream.read(&buffer, maxLength: buffer.count)
-            if count < 0 { throw try XCTUnwrap(stream.streamError) }
-            if count == 0 { break }
-            data.append(buffer, count: count)
+            let bytesRead = stream.read(&buffer, maxLength: buffer.count)
+            if bytesRead < 0 { throw try XCTUnwrap(stream.streamError) }
+            if bytesRead == 0 { break }
+            data.append(buffer, count: bytesRead)
         }
         return data
     }
