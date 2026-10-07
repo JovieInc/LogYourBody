@@ -253,14 +253,14 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
             importStatus = "Starting import..."
             importedCount = 0
             totalToImport = 0
+            // The vendor can lazily read UIApplication while creating its first breadcrumb.
+            ErrorTrackingService.shared.addBreadcrumb(
+                message: "Starting HealthKit full history import", category: "healthKit",
+                data: ["operation": "syncAllHistoricalHealthKitData"]
+            )
             return true
         }
         guard admitted else { return false }
-
-        ErrorTrackingService.shared.addBreadcrumb(
-            message: "Starting HealthKit full history import", category: "healthKit",
-            data: ["operation": "syncAllHistoricalHealthKitData"]
-        )
 
         do {
             let defaultHistoricalRange = TimeInterval(10 * 365 * 24 * 60 * 60)
@@ -275,6 +275,13 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
                 guard self.ownsHistoricalImport(ownership, operation: operation) else { return false }
                 importProgress = 1.0
                 importStatus = "Import complete! Imported \(totalImported) entries"
+                ErrorTrackingService.shared.addBreadcrumb(
+                    message: "HealthKit full history import complete", category: "healthKit",
+                    data: [
+                        "operation": "syncAllHistoricalHealthKitData",
+                        "imported": String(totalImported), "skipped": String(totalSkipped)
+                    ]
+                )
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                     guard self.ownsHistoricalImport(ownership, operation: operation) else { return }
@@ -285,15 +292,6 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
                 return true
             }
             if !completed { await clearHistoricalImport(ownership, operation: operation) }
-            if completed {
-                ErrorTrackingService.shared.addBreadcrumb(
-                    message: "HealthKit full history import complete", category: "healthKit",
-                    data: [
-                        "operation": "syncAllHistoricalHealthKitData",
-                        "imported": String(totalImported), "skipped": String(totalSkipped)
-                    ]
-                )
-            }
             return completed
         } catch {
             // Cancellation must release its own UI, but never an import that started later.
@@ -304,11 +302,14 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
                     contextDescription: "syncAllHistoricalHealthKitData", userIdOverride: ownership.subject
                 )
                 failureStatus = "Import failed: \(error.localizedDescription)"
-                ErrorTrackingService.shared.addBreadcrumb(
-                    message: "HealthKit full history import failed: \(error.localizedDescription)",
-                    category: "healthKit", level: .error,
-                    data: ["operation": "syncAllHistoricalHealthKitData"]
-                )
+                await MainActor.run {
+                    guard self.ownsHistoricalImport(ownership, operation: operation) else { return }
+                    ErrorTrackingService.shared.addBreadcrumb(
+                        message: "HealthKit full history import failed: \(error.localizedDescription)",
+                        category: "healthKit", level: .error,
+                        data: ["operation": "syncAllHistoricalHealthKitData"]
+                    )
+                }
             }
             await clearHistoricalImport(ownership, operation: operation, status: failureStatus)
             return false
