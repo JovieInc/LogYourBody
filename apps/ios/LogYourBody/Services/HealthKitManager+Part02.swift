@@ -2,6 +2,23 @@ import Foundation
 import HealthKit
 
 extension HealthKitManager {
+    func captureImportOwnership(
+        _ ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async -> AuthManager.ProfileSessionOwnership? {
+        if let ownership { return ownership }
+        return await MainActor.run { (self.importAuthManager ?? .shared).captureAccountSession() }
+    }
+
+    func ownsImport(_ ownership: AuthManager.ProfileSessionOwnership) async -> Bool {
+        guard !Task.isCancelled else { return false }
+        return await MainActor.run { (self.importAuthManager ?? .shared).ownsAccountSession(ownership) }
+    }
+
+    func requireImportOwnership(_ ownership: AuthManager.ProfileSessionOwnership) async throws {
+        if Task.isCancelled { throw CancellationError() }
+        guard await ownsImport(ownership) else { throw HealthKitError.notAuthorized }
+    }
+
 func fetchTodayStepCount() async throws -> Int {
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
@@ -85,6 +102,8 @@ func fetchStepCount(for date: Date) async throws -> Int {
     }
 
 func syncWeightFromHealthKit() async throws {
+        guard let ownership = await captureImportOwnership() else { throw HealthKitError.notAuthorized }
+        try await requireImportOwnership(ownership)
         // Prevent concurrent syncs
         guard beginWeightSyncIfPossible() else {
             // print("⚠️ Weight sync already in progress, skipping")
@@ -100,7 +119,10 @@ func syncWeightFromHealthKit() async throws {
         // First, do a quick sync of recent data (last 30 days) for immediate UI update
         // print("📅 Phase 1: Fetching recent data (30 days)")
 
-        let (recentWeightHistory, recentBodyFatHistory) = try await fetchRecentWeightAndBodyFatHistory()
+        let (recentWeightHistory, recentBodyFatHistory) = try await fetchRecentWeightAndBodyFatHistory(
+            ownership: ownership
+        )
+        try await requireImportOwnership(ownership)
 
         // print("📈 Found \(recentWeightHistory.count) weight entries and \(recentBodyFatHistory.count) body fat entries")
 
@@ -116,67 +138,63 @@ func syncWeightFromHealthKit() async throws {
         // Process recent data for immediate UI update
         let (imported, _) = await processBatchHealthKitData(
             weightHistory: recentWeightHistory,
-            bodyFatHistory: recentBodyFatHistory
+            bodyFatHistory: recentBodyFatHistory, ownership: ownership
         )
 
         // print("📊 Recent sync: \(imported) imported, \(skipped) skipped")
 
         // Only trigger full historical sync if this is truly the first time and we have very little data
-        await triggerFullHealthKitSyncIfNeeded(imported: imported)
+        try await requireImportOwnership(ownership)
+        await triggerFullHealthKitSyncIfNeeded(imported: imported, ownership: ownership)
     }
 
-func fetchRecentWeightAndBodyFatHistory() async throws
+func fetchRecentWeightAndBodyFatHistory(ownership: AuthManager.ProfileSessionOwnership? = nil) async throws
     -> (
         weightHistory: [HealthKitWeightImportSample],
         bodyFatHistory: [HealthKitBodyFatImportSample]
     ) {
+        let ownership = await captureImportOwnership(ownership)
         let endDate = Date()
         let recentStartDate = Calendar.current.date(byAdding: .day, value: -30, to: endDate)!
 
         // Fetch recent weight and body fat data
         let recentWeightHistory = try await fetchWeightImportSamplesInRange(
             startDate: recentStartDate,
-            endDate: endDate
+            endDate: endDate, ownership: ownership
         )
-        let recentBodyFatHistory = try await fetchBodyFatImportSamples(startDate: recentStartDate)
+        let recentBodyFatHistory = try await fetchBodyFatImportSamples(
+            startDate: recentStartDate, ownership: ownership
+        )
 
         return (weightHistory: recentWeightHistory, bodyFatHistory: recentBodyFatHistory)
     }
 
-func triggerFullHealthKitSyncIfNeeded(imported: Int) async {
-        let currentUserId = await MainActor.run { AuthManager.shared.currentUser?.id }
-        guard currentUserId != nil else { return }
-        let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: currentUserId)
+@discardableResult
+func triggerFullHealthKitSyncIfNeeded(
+        imported: Int, ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async -> Task<Void, Never>? {
+        guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else { return nil }
+        let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: ownership.subject)
         let hasPerformedFullSync = userDefaults.bool(forKey: fullSyncKey)
-
-        let totalCachedEntries: Int
-        if let userId = currentUserId {
-            totalCachedEntries = await CoreDataManager.shared.fetchBodyMetrics(for: userId).count
-        } else {
-            totalCachedEntries = 0
-        }
-
-        if !hasPerformedFullSync {
-            // print("📊 First time sync detected, scheduling full historical sync...")
-            // print("📊 Current cached entries: \(totalCachedEntries)")
-            Task.detached(priority: .background) { [weak self] in
-                guard let self else { return }
-                let importSucceeded = await self.syncAllHistoricalHealthKitData()
-                if HealthKitFullSyncCompletionPolicy.shouldMarkCompleted(importSucceeded: importSucceeded) {
-                    self.userDefaults.set(true, forKey: fullSyncKey)
+        let totalCachedEntries = await (importCoreDataManager ?? .shared).fetchBodyMetrics(for: ownership.subject).count
+        guard await ownsImport(ownership) else { return nil }
+        guard !hasPerformedFullSync || (totalCachedEntries < 50 && imported > 0) else { return nil }
+        return Task.detached(priority: .background) { [weak self] in
+            guard let self else { return }
+            let importSucceeded = await self.syncAllHistoricalHealthKitData(ownership: ownership)
+            await MainActor.run {
+                guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership),
+                      HealthKitFullSyncCompletionPolicy.shouldMarkCompleted(importSucceeded: importSucceeded) else {
+                    return
                 }
-            }
-        } else if totalCachedEntries < 50 && imported > 0 {
-            // Also trigger if we have very few entries despite having done a sync before
-            // print("📊 Low entry count detected (\(totalCachedEntries)), triggering full sync...")
-            Task.detached(priority: .background) { [weak self] in
-                guard let self else { return }
-                await self.syncAllHistoricalHealthKitData()
+                self.userDefaults.set(true, forKey: fullSyncKey)
             }
         }
     }
 
 func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) async throws {
+        guard let ownership = await captureImportOwnership() else { throw HealthKitError.notAuthorized }
+        try await requireImportOwnership(ownership)
         // Prevent concurrent syncs
         guard beginWeightSyncIfPossible() else {
             // print("⚠️ Weight sync already in progress, skipping incremental sync")
@@ -197,11 +215,12 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
         // Fetch weight and body fat data for the specified period
         let weightHistory = try await fetchWeightImportSamplesInRange(
             startDate: batchStartDate,
-            endDate: endDate
+            endDate: endDate, ownership: ownership
         )
             .filter { $0.date >= batchStartDate && $0.date <= endDate }
-        let bodyFatHistory = try await fetchBodyFatImportSamples(startDate: batchStartDate)
+        let bodyFatHistory = try await fetchBodyFatImportSamples(startDate: batchStartDate, ownership: ownership)
             .filter { $0.date <= endDate }
+        try await requireImportOwnership(ownership)
 
         // print("📈 Found \(weightHistory.count) weight entries and \(bodyFatHistory.count) body fat entries")
 
@@ -217,97 +236,117 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
         // Process weight and body fat entries using shared batch logic
         _ = await processBatchHealthKitData(
             weightHistory: weightHistory,
-            bodyFatHistory: bodyFatHistory
+            bodyFatHistory: bodyFatHistory, ownership: ownership
         )
+        try await requireImportOwnership(ownership)
     }
 
 @discardableResult
-    func syncAllHistoricalHealthKitData() async -> Bool {
-        await MainActor.run {
+    func syncAllHistoricalHealthKitData(ownership: AuthManager.ProfileSessionOwnership? = nil) async -> Bool {
+        guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else { return false }
+        let operation = UUID()
+        let admitted = await MainActor.run {
+            guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return false }
+            historicalImportOperation = operation
             isImporting = true
             importProgress = 0.0
             importStatus = "Starting import..."
             importedCount = 0
             totalToImport = 0
-        }
-
-        ErrorTrackingService.shared.addBreadcrumb(
-            message: "Starting HealthKit full history import",
-            category: "healthKit",
-            data: [
-                "operation": "syncAllHistoricalHealthKitData"
-            ]
-        )
-
-        do {
-            // Get the earliest available weight data date
-            let defaultHistoricalRange = TimeInterval(10 * 365 * 24 * 60 * 60)
-            let earliestDate = try await getEarliestWeightDate()
-                ?? Date().addingTimeInterval(-defaultHistoricalRange) // Default to 10 years ago
-            let endDate = Date()
-
-            let (totalImported, totalSkipped) = try await processHistoricalHealthKitBatches(
-                earliestDate: earliestDate,
-                endDate: endDate
-            )
-
-            // Complete
-            await MainActor.run {
-                importProgress = 1.0
-                importStatus = "Import complete! Imported \(totalImported) entries"
-                // Reset after a delay
-                Task {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-                    await MainActor.run {
-                        isImporting = false
-                        importStatus = ""
-                    }
-                }
-            }
-
+            // The vendor can lazily read UIApplication while creating its first breadcrumb.
             ErrorTrackingService.shared.addBreadcrumb(
-                message: "HealthKit full history import complete",
-                category: "healthKit",
-                data: [
-                    "operation": "syncAllHistoricalHealthKitData",
-                    "imported": String(totalImported),
-                    "skipped": String(totalSkipped)
-                ]
+                message: "Starting HealthKit full history import", category: "healthKit",
+                data: ["operation": "syncAllHistoricalHealthKitData"]
             )
             return true
-        } catch {
-            await captureHealthKitError(
-                error,
-                operation: "syncAllHistoricalHealthKitData",
-                contextDescription: "syncAllHistoricalHealthKitData"
-            )
+        }
+        guard admitted else { return false }
 
-            ErrorTrackingService.shared.addBreadcrumb(
-                message: "HealthKit full history import failed: \(error.localizedDescription)",
-                category: "healthKit",
-                level: .error,
-                data: [
-                    "operation": "syncAllHistoricalHealthKitData"
-                ]
+        do {
+            let defaultHistoricalRange = TimeInterval(10 * 365 * 24 * 60 * 60)
+            let earliestDate = try await getEarliestWeightDate()
+                ?? Date().addingTimeInterval(-defaultHistoricalRange)
+            try await requireImportOwnership(ownership)
+            let (totalImported, totalSkipped) = try await processHistoricalHealthKitBatches(
+                earliestDate: earliestDate, endDate: Date(), ownership: ownership, operation: operation
             )
-            await MainActor.run {
-                importProgress = 0.0
-                importStatus = "Import failed: \(error.localizedDescription)"
-                isImporting = false
+            try await requireImportOwnership(ownership)
+            let completed = await MainActor.run {
+                guard self.ownsHistoricalImport(ownership, operation: operation) else { return false }
+                importProgress = 1.0
+                importStatus = "Import complete! Imported \(totalImported) entries"
+                ErrorTrackingService.shared.addBreadcrumb(
+                    message: "HealthKit full history import complete", category: "healthKit",
+                    data: [
+                        "operation": "syncAllHistoricalHealthKitData",
+                        "imported": String(totalImported), "skipped": String(totalSkipped)
+                    ]
+                )
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    guard self.ownsHistoricalImport(ownership, operation: operation) else { return }
+                    historicalImportOperation = nil
+                    isImporting = false
+                    importStatus = ""
+                }
+                return true
             }
+            if !completed { await clearHistoricalImport(ownership, operation: operation) }
+            return completed
+        } catch {
+            // Cancellation must release its own UI, but never an import that started later.
+            var failureStatus = ""
+            if !Task.isCancelled, await ownsImport(ownership) {
+                await captureHealthKitError(
+                    error, operation: "syncAllHistoricalHealthKitData",
+                    contextDescription: "syncAllHistoricalHealthKitData", userIdOverride: ownership.subject
+                )
+                failureStatus = "Import failed: \(error.localizedDescription)"
+                await MainActor.run {
+                    guard self.ownsHistoricalImport(ownership, operation: operation) else { return }
+                    ErrorTrackingService.shared.addBreadcrumb(
+                        message: "HealthKit full history import failed: \(error.localizedDescription)",
+                        category: "healthKit", level: .error,
+                        data: ["operation": "syncAllHistoricalHealthKitData"]
+                    )
+                }
+            }
+            await clearHistoricalImport(ownership, operation: operation, status: failureStatus)
             return false
         }
     }
 
+    @MainActor
+    private func ownsHistoricalImport(_ ownership: AuthManager.ProfileSessionOwnership, operation: UUID) -> Bool {
+        historicalImportOperation == operation && (importAuthManager ?? .shared).ownsAccountSession(ownership)
+    }
+
+    @MainActor
+    private func clearHistoricalImport(
+        _ ownership: AuthManager.ProfileSessionOwnership, operation: UUID, status: String = ""
+    ) {
+        // Compare lifetime directly so a cancelled task can still clean up its own state.
+        guard historicalImportOperation == operation,
+              (importAuthManager ?? .shared).captureAccountSession() == ownership else { return }
+        historicalImportOperation = nil
+        importProgress = 0.0
+        importStatus = status
+        isImporting = false
+    }
+
 func processHistoricalHealthKitBatches(
-        earliestDate: Date,
-        endDate: Date
+        earliestDate: Date, endDate: Date, ownership: AuthManager.ProfileSessionOwnership? = nil,
+        operation: UUID? = nil
     ) async throws -> (imported: Int, skipped: Int) {
+        guard let ownership = await captureImportOwnership(ownership) else { throw HealthKitError.notAuthorized }
+        try await requireImportOwnership(ownership)
         let calendar = Calendar.current
         let components = calendar.dateComponents([.month], from: earliestDate, to: endDate)
         let totalMonths = Double(components.month ?? 0)
 
         await MainActor.run {
+            guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership),
+                  operation == nil || self.historicalImportOperation == operation else { return }
             importStatus = "Preparing to import \(Int(totalMonths)) months of data..."
         }
 
@@ -318,6 +357,7 @@ func processHistoricalHealthKitBatches(
         let batchSizeMonths = 3  // Process 3 months at a time
 
         while currentDate < endDate {
+            try await requireImportOwnership(ownership)
             let batchEndDate = calendar.date(byAdding: .month, value: batchSizeMonths, to: currentDate) ?? endDate
             let actualBatchEndDate = min(batchEndDate, endDate)
 
@@ -325,23 +365,26 @@ func processHistoricalHealthKitBatches(
             let year = calendar.component(.year, from: currentDate)
             let month = calendar.component(.month, from: currentDate)
             await MainActor.run {
+            guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership),
+                  operation == nil || self.historicalImportOperation == operation else { return }
                 importStatus = "Importing \(year)/\(month)..."
             }
 
             // Fetch weight and body fat data for this batch
             let weightBatch = try await fetchWeightImportSamplesInRange(
                 startDate: currentDate,
-                endDate: actualBatchEndDate
+                endDate: actualBatchEndDate, ownership: ownership
             )
-            let bodyFatBatch = try await fetchBodyFatImportSamples(startDate: currentDate)
+            let bodyFatBatch = try await fetchBodyFatImportSamples(startDate: currentDate, ownership: ownership)
                 .filter { $0.date < actualBatchEndDate }
 
             // Process this batch
             let (imported, skipped) = await processBatchHealthKitData(
                 weightHistory: weightBatch,
-                bodyFatHistory: bodyFatBatch
+                bodyFatHistory: bodyFatBatch, ownership: ownership
             )
 
+            try await requireImportOwnership(ownership)
             totalImported += imported
             totalSkipped += skipped
 
@@ -351,6 +394,8 @@ func processHistoricalHealthKitBatches(
             let importedCountSnapshot = totalImported
             let processedMonthsSnapshot = processedMonths
             await MainActor.run {
+            guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership),
+                  operation == nil || self.historicalImportOperation == operation else { return }
                 importProgress = progress
                 importedCount = importedCountSnapshot
                 if totalMonths > 0 {
@@ -374,6 +419,7 @@ func forceFullHealthKitSync() async -> Bool {
     }
 
 func getEarliestWeightDate() async throws -> Date? {
+        if let earliestImportDateQuery { return try await earliestImportDateQuery() }
         return try await withCheckedThrowingContinuation { continuation in
             let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
 
@@ -415,8 +461,12 @@ func processBatchHealthKitData(
 
 func processBatchHealthKitData(
         weightHistory: [HealthKitWeightImportSample],
-        bodyFatHistory: [HealthKitBodyFatImportSample]
+        bodyFatHistory: [HealthKitBodyFatImportSample],
+        ownership: AuthManager.ProfileSessionOwnership? = nil
     ) async -> (imported: Int, skipped: Int) {
+        guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else {
+            return (0, 0)
+        }
         var imported = 0
         var skipped = 0
 
@@ -427,9 +477,7 @@ func processBatchHealthKitData(
         }
 
         // Get existing entries for this date range to check for duplicates
-        guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else {
-            return (0, 0)
-        }
+        let userId = ownership.subject
 
         let dateRange = weightHistory.map { $0.date } + bodyFatHistory.map { $0.date }
         let minDate = dateRange.min() ?? Date()
@@ -438,11 +486,12 @@ func processBatchHealthKitData(
         let fetchStartDate = calendar.date(byAdding: .day, value: -1, to: minDate) ?? minDate
         let fetchEndDate = calendar.date(byAdding: .day, value: 1, to: maxDate) ?? maxDate
 
-        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
+        let existingMetrics = await (importCoreDataManager ?? .shared).fetchBodyMetrics(
             for: userId,
             from: fetchStartDate,
             to: fetchEndDate
         )
+        guard await ownsImport(ownership) else { return (0, 0) }
 
         // Create a set of existing entries by original logged local day and hour for efficient lookup
         var existingEntriesByHour = Set<String>()
@@ -455,6 +504,7 @@ func processBatchHealthKitData(
         }
 
         for sample in weightHistory {
+            guard await ownsImport(ownership) else { return (imported, skipped) }
             // Check if entry exists within the same hour
             let localDate = BodyMetricLocalDate.key(for: sample.date)
             let hourKey = "\(localDate)-\(BodyMetricLocalDate.hourKey(for: sample.date))"
@@ -486,10 +536,11 @@ func processBatchHealthKitData(
                 )
 
                 do {
-                    try await saveBodyMetrics(metrics)
+                    try await saveBodyMetrics(metrics, ownership: ownership)
                     imported += 1
                     existingEntriesByHour.insert(hourKey) // Add to set to prevent duplicates in same batch
                 } catch {
+                    guard await ownsImport(ownership) else { return (imported, skipped) }
                     await captureHealthKitError(
                         error,
                         operation: "processBatchHealthKitData",
@@ -505,41 +556,54 @@ func processBatchHealthKitData(
 
         if imported > 0 {
             // Trigger a background body score recalculation now that metrics have changed.
-            BodyScoreCache.shared.invalidate(for: userId)
-            BodyScoreRecalculationService.shared.scheduleRecalculation()
+            await MainActor.run {
+                guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return }
+                if let importCompletion = self.importCompletion {
+                    importCompletion(userId)
+                } else {
+                    BodyScoreCache.shared.invalidate(for: userId)
+                    BodyScoreRecalculationService.shared.scheduleRecalculation()
+                }
+            }
         }
 
         return (imported, skipped)
     }
 
-func saveBodyMetrics(_ metrics: BodyMetrics) async throws {
-        guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else {
+func saveBodyMetrics(
+        _ metrics: BodyMetrics, ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async throws {
+        guard let ownership = await captureImportOwnership(ownership), metrics.userId == ownership.subject else {
             throw HealthKitError.notAuthorized
         }
-
-        // Create a new metrics instance with the correct user ID
-        let metricsWithUserId = BodyMetrics(
-            id: metrics.id,
-            userId: userId,
-            date: metrics.date,
-            localDate: metrics.localDate,
-            weight: metrics.weight,
-            weightUnit: metrics.weightUnit,
-            bodyFatPercentage: metrics.bodyFatPercentage,
-            bodyFatMethod: metrics.bodyFatMethod,
-            muscleMass: metrics.muscleMass,
-            boneMass: metrics.boneMass,
-            notes: metrics.notes,
-            photoUrl: metrics.photoUrl,
-            dataSource: metrics.dataSource,
-            sourceMetadata: metrics.sourceMetadata,
-            createdAt: metrics.createdAt,
-            updatedAt: metrics.updatedAt
-        )
-
-        // Save to CoreData and trigger realtime sync to ProductAPI
-        try await CoreDataManager.shared.saveBodyMetricsAndWait(metricsWithUserId, userId: userId, markAsSynced: false)
-        await RealtimeSyncManager.shared.syncIfNeeded()
+        try await requireImportOwnership(ownership)
+        let cancellation = HealthKitImportCancellation()
+        let admission: CoreDataManager.WriteAdmission = { [self] in
+            guard !cancellation.isCancelled,
+                  (importAuthManager ?? .shared).ownsAccountSession(ownership) else {
+                throw HealthKitError.notAuthorized
+            }
+        }
+        try await withTaskCancellationHandler {
+            if let metricImportStore {
+                try await metricImportStore(metrics, admission)
+            } else {
+                try await (importCoreDataManager ?? .shared).saveBodyMetricsAndWait(
+                    metrics, userId: ownership.subject, markAsSynced: false, writeAdmission: admission
+                )
+            }
+        } onCancel: {
+            cancellation.cancel()
+        }
+        guard !Task.isCancelled else { return }
+        await MainActor.run {
+            guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return }
+            if let importSyncTrigger = self.importSyncTrigger {
+                importSyncTrigger()
+            } else {
+                RealtimeSyncManager.shared.syncIfNeeded()
+            }
+        }
     }
 
 func syncStepsFromHealthKit() async throws {

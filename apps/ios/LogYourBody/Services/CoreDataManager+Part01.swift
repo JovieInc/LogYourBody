@@ -251,7 +251,7 @@ func fetchDexaResults(for userId: String, limit: Int) async -> [DexaResult] {
         }
     }
 
-func saveDexaResults(
+    func saveDexaResults(
         _ results: [DexaResult],
         userId: String,
         markAsSynced: Bool = false,
@@ -433,12 +433,23 @@ func saveAndWait() {
         _ metrics: BodyMetrics,
         userId: String,
         markAsSynced: Bool = false,
+        writeAdmission: WriteAdmission? = nil,
         completion: ((Result<Void, Error>) -> Void)? = nil
     ) {
         let context = viewContext
 
         // Ensure all Core Data operations happen on the context's queue
         context.perform {
+            // viewContext is the container's main-queue context. Admission and
+            // this synchronous write share the executor with auth replacement.
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?(.failure(error))
+                    return
+                }
+            }
             // Check if entry already exists
             let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "id == %@", metrics.id)
@@ -509,9 +520,14 @@ func saveAndWait() {
         }
     }
 
-func saveBodyMetricsAndWait(_ metrics: BodyMetrics, userId: String, markAsSynced: Bool = false) async throws {
+func saveBodyMetricsAndWait(
+        _ metrics: BodyMetrics, userId: String, markAsSynced: Bool = false,
+        writeAdmission: WriteAdmission? = nil
+    ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            saveBodyMetrics(metrics, userId: userId, markAsSynced: markAsSynced) { result in
+            saveBodyMetrics(
+                metrics, userId: userId, markAsSynced: markAsSynced, writeAdmission: writeAdmission
+            ) { result in
                 continuation.resume(with: result)
             }
         }

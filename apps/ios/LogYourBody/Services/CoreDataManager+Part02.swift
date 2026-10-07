@@ -161,7 +161,7 @@ func saveHKSamples(_ samples: [HKRawSample]) async {
         await context.perform {
             for sample in samples {
                 let request: NSFetchRequest<CachedHKSample> = CachedHKSample.fetchRequest()
-                request.predicate = NSPredicate(format: "hkUUID == %@", sample.hkUUID)
+                request.predicate = NSPredicate(format: "hkUUID == %@ AND userId == %@", sample.hkUUID, sample.userId)
                 request.fetchLimit = 1
 
                 let cached: CachedHKSample

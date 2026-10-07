@@ -3,6 +3,7 @@
 // LogYourBodyTests
 //
 import XCTest
+import CoreData
 @testable import LogYourBody
 
 /// Stubs the OAuth/HTTP boundary for AuthManager session tests.
@@ -299,6 +300,42 @@ final class AuthManagerSessionTests: XCTestCase {
         let refreshed = try XCTUnwrap(authorization?.ownership)
         XCTAssertTrue(manager.ownsRequestSession(refreshed))
         XCTAssertFalse(manager.ownsRequestSession(original))
+    }
+
+    func testValidatedTokenRotationKeepsHeldHealthImportInSameAccountLifetime() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        manager.currentUser = LocalUser(
+            id: "user-123", email: "user@example.com", name: "Synthetic Health",
+            avatarUrl: nil, profile: nil, onboardingCompleted: true
+        )
+        let ownership = try XCTUnwrap(manager.captureAccountSession())
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        description.shouldAddStoreAsynchronously = false
+        let store = CoreDataManager(persistentStoreDescriptions: [description])
+        let query = HeldWeightImportQuery()
+        let health = HealthKitManager(
+            userDefaults: defaults, authManager: manager, coreDataManager: store,
+            weightImportQuery: { _, _ in await query.fetch() }, bodyFatImportQuery: { _ in [] },
+            syncTrigger: {}, importCompletion: { _ in },
+            rawImportStore: { _ in XCTFail("Synthetic query cannot dispatch raw samples") }
+        )
+        health.isAuthorized = true
+        let sample = HealthKitWeightImportSample(weight: 70, date: Date())
+        let work = Task { try await health.syncWeightFromHealthKitIncremental(days: 30) }
+        defer { query.complete([]) }
+        await fulfillment(of: [query.started], timeout: 3)
+        stubSessionSuccess()
+        let token = await manager.getAccessToken()
+        XCTAssertEqual(token, "new-access")
+        XCTAssertTrue(manager.ownsAccountSession(ownership))
+        query.complete([sample])
+        try await work.value
+        let records = await store.fetchAllBodyMetrics(for: "user-123")
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.first?.userId, "user-123")
+        XCTAssertEqual(records.first?.weight, 70)
     }
 
     func testRefreshKeepsExistingRefreshTokenWhenRotationOmitsIt() async throws {

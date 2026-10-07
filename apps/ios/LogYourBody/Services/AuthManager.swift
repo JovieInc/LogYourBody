@@ -286,7 +286,7 @@ final class AuthManager: NSObject, ObservableObject {
     private var authGeneration: UInt64 = 0
     // Token rotation keeps this account lifetime; a login/logout/replacement,
     // including the same subject, starts a new one and invalidates profile work.
-    private struct ProfileSessionOwnership: Hashable {
+    struct ProfileSessionOwnership: Hashable, Sendable {
         let subject: String
         let generation: UInt64
     }
@@ -973,6 +973,15 @@ final class AuthManager: NSObject, ObservableObject {
     private func currentProfileSession() -> ProfileSessionOwnership? {
         guard let subject = authSession?.subject, currentUser?.id == subject else { return nil }
         return ProfileSessionOwnership(subject: subject, generation: profileGeneration)
+    }
+
+    /// Read-only account lifetime shared with local imports; token rotation keeps it valid.
+    func captureAccountSession() -> ProfileSessionOwnership? {
+        currentProfileSession()
+    }
+
+    func ownsAccountSession(_ ownership: ProfileSessionOwnership) -> Bool {
+        isCurrentProfileSession(ownership)
     }
 
     private func isCurrentProfileSession(_ ownership: ProfileSessionOwnership) -> Bool {

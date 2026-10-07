@@ -96,12 +96,16 @@ func fetchLatestHeight() async throws -> (value: Double?, date: Date?) {
         }
     }
 
-func persistHealthKitSamples(_ samples: [HKQuantitySample], unit: HKUnit) {
-        guard !samples.isEmpty else { return }
+@discardableResult
+func persistHealthKitSamples(
+        _ samples: [HKQuantitySample], unit: HKUnit, ownership: AuthManager.ProfileSessionOwnership?
+    ) -> Task<Void, Never>? {
+        guard !samples.isEmpty, let ownership else { return nil }
 
-        Task.detached(priority: .background) { [weak self] in
+        return Task.detached(priority: .background) { [weak self] in
             guard let self = self else { return }
-            guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else { return }
+            guard await self.ownsImport(ownership) else { return }
+            let userId = ownership.subject
             var rawSamples: [HKRawSample] = []
 
             for sample in samples {
@@ -132,7 +136,12 @@ func persistHealthKitSamples(_ samples: [HKQuantitySample], unit: HKUnit) {
                 rawSamples.append(hkSample)
             }
 
-            await CoreDataManager.shared.saveHKSamples(rawSamples)
+            guard await self.ownsImport(ownership) else { return }
+            if let store = self.rawImportStore {
+                await store(rawSamples)
+            } else {
+                await (self.importCoreDataManager ?? .shared).saveHKSamples(rawSamples)
+            }
         }
     }
 
@@ -337,53 +346,35 @@ func fetchWeightHistoryInRange(startDate: Date, endDate: Date) async throws -> [
     }
 
 func fetchWeightImportSamplesInRange(
-        startDate: Date,
-        endDate: Date
+        startDate: Date, endDate: Date, ownership: AuthManager.ProfileSessionOwnership? = nil
     ) async throws -> [HealthKitWeightImportSample] {
-        guard isAuthorized else {
-            throw HealthKitError.notAuthorized
+        guard isAuthorized else { throw HealthKitError.notAuthorized }
+        let ownership = await captureImportOwnership(ownership)
+        if let ownership { try await requireImportOwnership(ownership) }
+        if let weightImportQuery {
+            let results = try await weightImportQuery(startDate, endDate)
+            if let ownership { try await requireImportOwnership(ownership) }
+            return results
         }
-
-        let predicate = HKQuery.predicateForSamples(
-            withStart: startDate,
-            end: endDate,
-            options: .strictStartDate
-        )
-
-        return try await withCheckedThrowingContinuation { [weak self] continuation in
-            guard let self else {
-                continuation.resume(returning: [])
-                return
-            }
-            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
-
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        let samples: [HKQuantitySample] = try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
-                sampleType: weightType,
-                predicate: predicate,
-                limit: HKObjectQueryNoLimit,
-                sortDescriptors: [sortDescriptor]
+                sampleType: weightType, predicate: predicate, limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
             ) { _, samples, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
+                if let error { continuation.resume(throwing: error) } else {
+                    continuation.resume(returning: samples as? [HKQuantitySample] ?? [])
                 }
-
-                let hkSamples = samples as? [HKQuantitySample] ?? []
-                self.persistHealthKitSamples(hkSamples, unit: HKUnit.gramUnit(with: .kilo))
-
-                let results = hkSamples.map { sample in
-                    let weightInKg = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
-                    return HealthKitWeightImportSample(
-                        weight: weightInKg,
-                        date: sample.startDate,
-                        sourceMetadata: self.sourceMetadata(from: sample)
-                    )
-                }
-
-                continuation.resume(returning: results)
             }
-
             healthStore.execute(query)
+        }
+        if let ownership { try await requireImportOwnership(ownership) }
+        persistHealthKitSamples(samples, unit: HKUnit.gramUnit(with: .kilo), ownership: ownership)
+        return samples.map { sample in
+            HealthKitWeightImportSample(
+                weight: sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo)),
+                date: sample.startDate, sourceMetadata: sourceMetadata(from: sample)
+            )
         }
     }
 
@@ -391,6 +382,7 @@ func fetchLatestBodyFatPercentage() async throws -> (percentage: Double?, date: 
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }
+        let ownership = await captureImportOwnership()
 
         return try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self else {
@@ -411,7 +403,7 @@ func fetchLatestBodyFatPercentage() async throws -> (percentage: Double?, date: 
                 }
 
                 if let sample = samples?.first as? HKQuantitySample {
-                    self.persistHealthKitSamples([sample], unit: HKUnit.percent())
+                    self.persistHealthKitSamples([sample], unit: HKUnit.percent(), ownership: ownership)
                     let percentage = sample.quantity.doubleValue(for: HKUnit.percent()) * 100 // Convert to percentage
                     continuation.resume(returning: (percentage, sample.startDate))
                 } else {
@@ -428,51 +420,36 @@ func fetchBodyFatHistory(startDate: Date) async throws -> [(percentage: Double, 
         return samples.map { (percentage: $0.percentage, date: $0.date) }
     }
 
-func fetchBodyFatImportSamples(startDate: Date) async throws -> [HealthKitBodyFatImportSample] {
-        guard isAuthorized else {
-            throw HealthKitError.notAuthorized
+func fetchBodyFatImportSamples(
+        startDate: Date, ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async throws -> [HealthKitBodyFatImportSample] {
+        guard isAuthorized else { throw HealthKitError.notAuthorized }
+        let ownership = await captureImportOwnership(ownership)
+        if let ownership { try await requireImportOwnership(ownership) }
+        if let bodyFatImportQuery {
+            let results = try await bodyFatImportQuery(startDate)
+            if let ownership { try await requireImportOwnership(ownership) }
+            return results
         }
-
-        let predicate = HKQuery.predicateForSamples(
-            withStart: startDate,
-            end: Date(),
-            options: .strictStartDate
-        )
-
-        return try await withCheckedThrowingContinuation { [weak self] continuation in
-            guard let self else {
-                continuation.resume(returning: [])
-                return
-            }
-            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
-
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: Date(), options: .strictStartDate)
+        let samples: [HKQuantitySample] = try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
-                sampleType: bodyFatType,
-                predicate: predicate,
-                limit: HKObjectQueryNoLimit,
-                sortDescriptors: [sortDescriptor]
+                sampleType: bodyFatType, predicate: predicate, limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
             ) { _, samples, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
+                if let error { continuation.resume(throwing: error) } else {
+                    continuation.resume(returning: samples as? [HKQuantitySample] ?? [])
                 }
-
-                let hkSamples = samples as? [HKQuantitySample] ?? []
-                self.persistHealthKitSamples(hkSamples, unit: HKUnit.percent())
-
-                let results = hkSamples.map { sample in
-                    let percentage = sample.quantity.doubleValue(for: HKUnit.percent()) * 100
-                    return HealthKitBodyFatImportSample(
-                        percentage: percentage,
-                        date: sample.startDate,
-                        sourceMetadata: self.sourceMetadata(from: sample)
-                    )
-                }
-
-                continuation.resume(returning: results)
             }
-
             healthStore.execute(query)
+        }
+        if let ownership { try await requireImportOwnership(ownership) }
+        persistHealthKitSamples(samples, unit: HKUnit.percent(), ownership: ownership)
+        return samples.map { sample in
+            HealthKitBodyFatImportSample(
+                percentage: sample.quantity.doubleValue(for: HKUnit.percent()) * 100,
+                date: sample.startDate, sourceMetadata: sourceMetadata(from: sample)
+            )
         }
     }
 

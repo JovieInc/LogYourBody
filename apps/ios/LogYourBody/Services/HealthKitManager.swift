@@ -61,7 +61,40 @@ class HealthKitManager: ObservableObject {
     static let shared = HealthKitManager()
 
     let healthStore = HKHealthStore()
-    let userDefaults = UserDefaults.standard
+    let userDefaults: UserDefaults
+    let importAuthManager: AuthManager?
+    let importCoreDataManager: CoreDataManager?
+    let weightImportQuery: ((Date, Date) async throws -> [HealthKitWeightImportSample])?
+    let bodyFatImportQuery: ((Date) async throws -> [HealthKitBodyFatImportSample])?
+    let earliestImportDateQuery: (() async throws -> Date?)?
+    let importSyncTrigger: (@MainActor () -> Void)?
+    let importCompletion: (@MainActor (String) -> Void)?
+    let metricImportStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)?
+    let rawImportStore: (([HKRawSample]) async -> Void)?
+
+    init(
+        userDefaults: UserDefaults = .standard,
+        authManager: AuthManager? = nil,
+        coreDataManager: CoreDataManager? = nil,
+        weightImportQuery: ((Date, Date) async throws -> [HealthKitWeightImportSample])? = nil,
+        bodyFatImportQuery: ((Date) async throws -> [HealthKitBodyFatImportSample])? = nil,
+        earliestImportDateQuery: (() async throws -> Date?)? = nil,
+        syncTrigger: (@MainActor () -> Void)? = nil,
+        importCompletion: (@MainActor (String) -> Void)? = nil,
+        metricImportStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil,
+        rawImportStore: (([HKRawSample]) async -> Void)? = nil
+    ) {
+        self.userDefaults = userDefaults
+        importAuthManager = authManager
+        importCoreDataManager = coreDataManager
+        self.weightImportQuery = weightImportQuery
+        self.bodyFatImportQuery = bodyFatImportQuery
+        self.earliestImportDateQuery = earliestImportDateQuery
+        importSyncTrigger = syncTrigger
+        self.importCompletion = importCompletion
+        self.metricImportStore = metricImportStore
+        self.rawImportStore = rawImportStore
+    }
 
     @Published var isAuthorized = false
     @Published var latestWeight: Double?
@@ -78,6 +111,7 @@ class HealthKitManager: ObservableObject {
     @Published var importStatus: String = ""
     @Published var importedCount: Int = 0
     @Published var totalToImport: Int = 0
+    @MainActor var historicalImportOperation: UUID?
 
     // Health types - using computed properties to avoid crashes if HealthKit types fail to initialize
 
@@ -167,6 +201,15 @@ class HealthKitManager: ObservableObject {
 
 
     // Sync historical step data
+}
+
+/// The queued CoreData block has no originating Swift task. Carry cancellation explicitly.
+final class HealthKitImportCancellation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool { lock.withLock { cancelled } }
+    func cancel() { lock.withLock { cancelled = true } }
 }
 
 // MARK: - GLP-1 HealthKit Mapping
