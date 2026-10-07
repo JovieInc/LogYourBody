@@ -29,7 +29,7 @@ describe('POST /api/waitlist', () => {
   });
 
   it('accepts a waitlist entry without exposing its database id or membership state', async () => {
-    mockedAccept.mockResolvedValueOnce();
+    mockedAccept.mockResolvedValueOnce({ created: true });
 
     const response = await POST(
       makeRequest({ email: 'new@example.com', source: 'landing:minimal:direct' }),
@@ -52,6 +52,38 @@ describe('POST /api/waitlist', () => {
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ success: true });
     expect(mockedAccept).not.toHaveBeenCalled();
+  });
+
+  it('returns the same public response for a duplicate or suppressed registration', async () => {
+    mockedAccept.mockResolvedValueOnce({ created: false });
+    const response = await POST(makeRequest({ email: 'existing@example.com' }));
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ success: true });
+  });
+
+  it('accepts schema-length sources and rejects longer ones before writing', async () => {
+    mockedAccept.mockResolvedValueOnce({ created: true });
+    expect(
+      (await POST(makeRequest({ email: 'synthetic@example.com', source: 'a'.repeat(64) }))).status,
+    ).toBe(202);
+    jest.clearAllMocks();
+    expect(
+      (await POST(makeRequest({ email: 'synthetic@example.com', source: 'a'.repeat(65) }))).status,
+    ).toBe(400);
+    expect(mockedAccept).not.toHaveBeenCalled();
+  });
+
+  it('does not log a database error containing contact data or credentials', async () => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockedAccept.mockRejectedValueOnce(new Error('synthetic@example.com postgresql://secret'));
+    try {
+      const response = await POST(makeRequest({ email: 'synthetic@example.com' }));
+      expect(response.status).toBe(500);
+      expect(log).toHaveBeenCalledWith('[api/waitlist] Failed to persist waitlist entry');
+      expect(JSON.stringify(log.mock.calls)).not.toMatch(/synthetic@example|secret/);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it.each([
