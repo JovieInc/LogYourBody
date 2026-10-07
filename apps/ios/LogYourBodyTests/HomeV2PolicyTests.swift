@@ -8,24 +8,29 @@ import UIKit
 
 @MainActor
 final class HomeV2PolicyTests: XCTestCase {
-    func testGateOffWithoutFixtureArgumentKeepsHomeV2Off() {
-        XCTAssertFalse(
-            HomeV2Policy.isEnabled(
-                arguments: ["-lybUITestPhotoTimelineHUDFixture"],
-                isGateEnabled: { _ in false }
-            )
-        )
-    }
-
-    func testStatsigGateEnablesHomeV2ByItsKey() {
+    func testHomeV2DefaultsOnWhenKillSwitchIsOff() {
         var askedKey: String?
         XCTAssertTrue(
+            HomeV2Policy.isEnabled(
+                arguments: ["-lybUITestPhotoTimelineHUDFixture"],
+                isGateEnabled: { key in
+                    askedKey = key
+                    return false
+                }
+            )
+        )
+        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
+    }
+
+    func testKillSwitchDisablesHomeV2() {
+        var askedKey: String?
+        XCTAssertFalse(
             HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { key in
                 askedKey = key
                 return true
             })
         )
-        XCTAssertEqual(askedKey, "home_v2_photo_first")
+        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
     }
 
     #if DEBUG
