@@ -5,11 +5,11 @@
 import CoreGraphics
 import Foundation
 
-/// Gate for the photo-first Home (Pencil H2, picked 2026-09-26). Off by default
-/// in production; the Statsig gate owns rollout. Debug fixtures force it on so
-/// XCUITest can cover both states without a network.
+/// Photo-first Home (Pencil H2, picked 2026-09-26). Default on in production.
+/// Statsig is an emergency kill switch only; an unavailable or unset gate must
+/// not silently fall back to the legacy Home. Debug fixtures always force it on.
 enum HomeV2Policy {
-    static let gateKey = "home_v2_photo_first"
+    static let killSwitchKey = "home_v2_kill_switch"
     static let fixtureArgument = "-lybUITestHomeV2Fixture"
     static let photoFixtureArgument = "-lybUITestHomeV2PhotoFixture"
     /// Signed in, nothing logged yet: the H0 day-zero state.
@@ -36,7 +36,7 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return checkGate(gateKey)
+        return !checkGate(killSwitchKey)
     }
 
     @MainActor
