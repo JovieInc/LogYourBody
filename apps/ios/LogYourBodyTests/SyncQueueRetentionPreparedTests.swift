@@ -100,6 +100,7 @@ final class SyncQueueRetentionPreparedTests: XCTestCase {
     private var suiteName = ""
     private var defaults: UserDefaults!
     private var coreData: CoreDataManager!
+    private var storeDirectory: URL!
     private var auth: AuthManager!
     private var analytics: PreparedSyncAnalyticsClient!
 
@@ -107,10 +108,24 @@ final class SyncQueueRetentionPreparedTests: XCTestCase {
         try super.setUpWithError()
         suiteName = "SyncQueueRetentionPreparedTests.\(UUID().uuidString)"
         defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
-        let store = NSPersistentStoreDescription()
-        store.type = NSInMemoryStoreType
+        storeDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(suiteName, isDirectory: true)
+        try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+        let store = NSPersistentStoreDescription(url: storeDirectory.appendingPathComponent("fixture.sqlite"))
+        store.type = NSSQLiteStoreType
         store.shouldAddStoreAsynchronously = false
         coreData = CoreDataManager(persistentStoreDescriptions: [store])
+        // Successful sync exercises the real SQLite batch cleanup and an existing valid profile.
+        try coreData.viewContext.performAndWait {
+            let profile = CachedProfile(context: coreData.viewContext)
+            profile.id = "synthetic-sync-A"
+            profile.email = "sync-a@example.invalid"
+            profile.createdAt = Date()
+            profile.updatedAt = Date()
+            profile.lastModified = Date()
+            profile.isSynced = true
+            profile.syncStatus = "synced"
+            try coreData.viewContext.save()
+        }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [PreparedSyncNoNetworkProtocol.self]
         auth = AuthManager(userDefaults: defaults, urlSession: URLSession(configuration: configuration))
@@ -124,13 +139,20 @@ final class SyncQueueRetentionPreparedTests: XCTestCase {
         analytics = PreparedSyncAnalyticsClient()
     }
 
-    override func tearDown() {
+    override func tearDownWithError() throws {
         defaults?.removePersistentDomain(forName: suiteName)
+        if let coreData {
+            coreData.viewContext.performAndWait { coreData.viewContext.reset() }
+            let coordinator = coreData.persistentContainer.persistentStoreCoordinator
+            for store in coordinator.persistentStores { try coordinator.remove(store) }
+        }
         auth = nil
         coreData = nil
         defaults = nil
         analytics = nil
-        super.tearDown()
+        if let storeDirectory { try FileManager.default.removeItem(at: storeDirectory) }
+        storeDirectory = nil
+        try super.tearDownWithError()
     }
 
     private func makeManager(_ client: PreparedSyncDeleteClient) -> RealtimeSyncManager {
