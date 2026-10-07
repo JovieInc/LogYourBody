@@ -49,7 +49,7 @@ enum HomeChatChromePolicy {
     static func swipeDestination(
         translationX: CGFloat,
         translationY: CGFloat,
-        startX _: CGFloat,
+        startX: CGFloat,
         isOnStats: Bool,
         isChatExpanded: Bool
     ) -> HomeSwipeDestination {
