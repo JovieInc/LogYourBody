@@ -384,6 +384,28 @@ final class RevenueCatPurchaseRestoreFlowTests: XCTestCase {
         XCTAssertFalse(fixture.manager.isSubscribed)
     }
 
+    func testLogoutCompletionClearsCurrentSessionUpdateReceivedDuringSDKLogout() async {
+        let fixture = makeFixture(cachedSubscribed: true)
+        defer { fixture.cleanup() }
+        let held = HeldBillingCustomer()
+        fixture.client.logOutHandler = { _ = try await held.wait() }
+
+        let logout = Task { await fixture.manager.logoutUser() }
+        await fulfillment(of: [held.started], timeout: 5)
+        XCTAssertFalse(fixture.manager.isSubscribed)
+        fixture.manager.updateSubscriptionStatus(
+            customer: Self.customer(isActive: true, appUserId: "billing-fixture-a")
+        )
+        XCTAssertTrue(fixture.manager.isSubscribed)
+
+        held.complete(Self.customer(isActive: false))
+        await logout.value
+
+        XCTAssertFalse(fixture.manager.isSubscribed)
+        XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+        XCTAssertNil(fixture.manager.currentEntitlementSnapshot)
+    }
+
     func testRefreshDuringIdentificationCannotApplyPreviousSDKCustomer() async {
         let fixture = makeFixture()
         defer { fixture.cleanup() }

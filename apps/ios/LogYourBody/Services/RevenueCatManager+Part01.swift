@@ -91,7 +91,12 @@ var cachedTrialExpirationTimestamp: Double {
 /// Log out the current user (call this on sign out)
     func logoutUser() async {
         let ownership = beginBillingSession(subject: nil)
-        defer { finishBillingSession(ownership) }
+        defer {
+            // Keep the completion clear for SDK updates received during logout,
+            // while protecting any replacement login from the old completion.
+            if ownsBillingSession(ownership) { clearLocalSubscriptionState() }
+            finishBillingSession(ownership)
+        }
         // Local access ends immediately; a delayed SDK reply cannot clear a new login.
         clearLocalSubscriptionState()
 
