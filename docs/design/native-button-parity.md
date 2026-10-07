@@ -1,6 +1,6 @@
 # Native button parity contract
 
-Status: gated implementation; native acceptance pending. This is a source comparison, not a completed screen audit or launch certification.
+Status: [draft PR1228](https://github.com/JovieInc/LogYourBody/pull/1228); native acceptance pending. This is a source comparison, not a completed screen audit or launch certification.
 
 ## Evidence and scope
 
@@ -44,6 +44,8 @@ The enabled branch retains the styled label under an overlaid spinner, preserves
 `BaseButtonPolicyTests` adds rendered-size comparisons for idle/loading at `.large`, `.xxxLarge`, `.accessibility1`, `.accessibility3`, and `.accessibility5`; constrained widths 160/240/320pt; full-width and custom-height controls; and icon labels. It also verifies the exact gate key and the unchanged gate-off presentation. A capture test retains eight ImageRenderer attachments comparing gate-off/gate-on idle/loading at default and accessibility3 sizes.
 
 These tests are written but were not executed in this session. SwiftLint with `--strict --no-cache` passed with zero violations; Swift frontend parsing and `git diff --check` passed. Neither proves Swift typechecking, render behavior, accessibility, or a successful build.
+
+Hosted CI at head `efdc662a7a8eb2e3eca2dd70d6c0570033c591da` reached test compilation and caught an invalid attempt to set the read-only `accessibilityReduceMotion` environment value in the capture fixture. The local correction freezes capture animations with a writable transaction instead. Independent inspection of the installed SwiftUI interfaces confirms the API correction; compilation and test execution of the corrected fixture remain pending. Static capture animation control does not test the system Reduce Motion setting. Further publication is held by the parent.
 
 Root lint, typecheck, and tests passed through the pinned pnpm 10.34.1 CLI, with all Turbo tasks satisfied from cache (4/4, 4/4, and 8/8 respectively). These checks cover the unchanged JavaScript workspace and do not execute the native tests. Evidence logs are in the lane workspace's `design-evidence` directory.
 

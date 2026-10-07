@@ -131,7 +131,10 @@ final class BaseButtonPolicyTests: XCTestCase {
                     )
                     .environment(\.baseButtonLoadingParity, parityEnabled)
                     .environment(\.dynamicTypeSize, typeSize)
-                    .environment(\.accessibilityReduceMotion, true)
+                    .transaction {
+                        $0.animation = nil
+                        $0.disablesAnimations = true
+                    }
                     .padding(JovieTokens.screenInset)
                     .background(Color.appBackground)
                     .preferredColorScheme(.dark)
