@@ -3,7 +3,7 @@ import CoreData
 import HealthKit
 @testable import LogYourBody
 
-private final class HealthImportNoNetworkProtocol: URLProtocol {
+final class HealthImportNoNetworkProtocol: URLProtocol {
     // swiftlint:disable:next static_over_final_class
     override class func canInit(with request: URLRequest) -> Bool { true }
     // swiftlint:disable:next static_over_final_class
@@ -17,10 +17,12 @@ private final class HealthImportNoNetworkProtocol: URLProtocol {
 @MainActor
 final class HeldWeightImportQuery {
     let started = XCTestExpectation(description: "Synthetic weight query started")
+    private(set) var hasStarted = false
     private var continuation: CheckedContinuation<[HealthKitWeightImportSample], Never>?
     private var result: [HealthKitWeightImportSample]?
 
     func fetch() async -> [HealthKitWeightImportSample] {
+        hasStarted = true
         started.fulfill()
         return await withCheckedContinuation { continuation in
             if let result { continuation.resume(returning: result) } else { self.continuation = continuation }
@@ -321,13 +323,35 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         let scheduled = await manager.triggerFullHealthKitSyncIfNeeded(imported: 0)
         let firstTask = try XCTUnwrap(scheduled)
         defer { first.complete([]); replacement.complete([]) }
+        // Register a priority-inheriting waiter before observing the detached background import.
+        let joinerStarted = expectation(description: "Scheduled history waiter registered")
+        let firstJoiner = Task(priority: .userInitiated) {
+            joinerStarted.fulfill()
+            await firstTask.value
+        }
+        await fulfillment(of: [joinerStarted], timeout: 3)
         await fulfillment(of: [first.started], timeout: 3)
+        guard first.hasStarted else {
+            firstTask.cancel()
+            first.complete([])
+            await firstJoiner.value
+            return
+        }
         setAccount("synthetic-health-B")
-        let replacementTask = Task { await manager.syncAllHistoricalHealthKitData() }
+        let replacementTask = Task(priority: .userInitiated) { await manager.syncAllHistoricalHealthKitData() }
         await fulfillment(of: [replacement.started], timeout: 3)
+        guard replacement.hasStarted else {
+            firstTask.cancel()
+            replacementTask.cancel()
+            first.complete([])
+            replacement.complete([])
+            await firstJoiner.value
+            _ = await replacementTask.value
+            return
+        }
         let replacementOperation = manager.historicalImportOperation
         first.complete([])
-        await firstTask.value
+        await firstJoiner.value
         XCTAssertTrue(manager.isImporting)
         XCTAssertEqual(manager.historicalImportOperation, replacementOperation)
         XCTAssertEqual(manager.importStatus, "Starting import...")

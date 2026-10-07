@@ -562,7 +562,11 @@ func processBatchHealthKitData(
                     importCompletion(userId)
                 } else {
                     BodyScoreCache.shared.invalidate(for: userId)
-                    BodyScoreRecalculationService.shared.scheduleRecalculation()
+                    if let trigger = self.bodyScoreRecalculationTrigger {
+                        trigger()
+                    } else {
+                        BodyScoreRecalculationService.shared.scheduleRecalculation()
+                    }
                 }
             }
         }
