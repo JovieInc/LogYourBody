@@ -49,7 +49,7 @@ enum HomeChatChromePolicy {
     static func swipeDestination(
         translationX: CGFloat,
         translationY: CGFloat,
-        startX: CGFloat,
+        startX _: CGFloat,
         isOnStats: Bool,
         isChatExpanded: Bool
     ) -> HomeSwipeDestination {
@@ -58,20 +58,23 @@ enum HomeChatChromePolicy {
             return .none
         }
 
-        if translationX > 0, startX <= menuEdgeWidth {
-            return .menu
+        // Founder IA contract (LYB-88): from Home, right opens Stats and left opens
+        // the sidebar. Stats reverses with a left swipe. Expanded chat keeps the
+        // right-swipe collapse gesture rather than navigating underneath the chat.
+        if translationX > 0, isChatExpanded {
+            return .collapseChat
         }
 
-        if translationX < 0, !isOnStats {
+        if translationX > 0, !isOnStats {
             return .stats
         }
 
-        if translationX > 0, isOnStats {
+        if translationX < 0, isOnStats {
             return .home
         }
 
-        if translationX > 0, isChatExpanded {
-            return .collapseChat
+        if translationX < 0, !isOnStats {
+            return .menu
         }
 
         return .none
