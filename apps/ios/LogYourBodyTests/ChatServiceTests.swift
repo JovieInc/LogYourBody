@@ -274,7 +274,11 @@ final class ChatServiceTests: XCTestCase {
             XCTAssertEqual(body["reps"] as? Int, 10)
             XCTAssertEqual(body["loadKg"] as? Double, 15)
             XCTAssertEqual(body["rir"] as? Int, 3)
-            return (201, ["Content-Type": "application/json"], Data("{\"version\":1,\"sessionComplete\":false}".utf8))
+            return (201, ["Content-Type": "application/json"], Data("""
+              {"version":1,"sessionComplete":false,"log":{
+                "sessionId":"session-id","exerciseId":"goblet_squat","setNumber":1,"reps":10,"loadKg":15,"rir":3
+              }}
+            """.utf8))
         }
 
         let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
@@ -289,6 +293,73 @@ final class ChatServiceTests: XCTestCase {
                 rir: 3
             )
         )
+    }
+
+    func testTrainingSetRejectsMissingAcknowledgement() async throws {
+        try await assertTrainingAcknowledgementRejected(#"{"version":1,"sessionComplete":false}"#)
+    }
+
+    func testTrainingSetRejectsAnotherSetsAcknowledgement() async throws {
+        try await assertTrainingAcknowledgementRejected(
+            """
+            {"version":1,"sessionComplete":false,"log":{
+              "sessionId":"another-session","exerciseId":"press","setNumber":1,"reps":10,"loadKg":22.5,"rir":3
+            }}
+            """
+        )
+    }
+
+    func testTrainingSetRejectsEveryMismatchedAcknowledgedValue() async throws {
+        let matching: [String: Any] = [
+            "sessionId": "fixture-session", "exerciseId": "press", "setNumber": 1, "reps": 10, "loadKg": 22.5, "rir": 3
+        ]
+        for (field, value) in [
+            ("exerciseId", "squat" as Any), ("setNumber", 2), ("reps", 11), ("loadKg", 0), ("rir", 4)
+        ] {
+            var log = matching
+            log[field] = value
+            let data = try JSONSerialization.data(withJSONObject: ["version": 1, "sessionComplete": false, "log": log])
+            try await assertTrainingAcknowledgementRejected(try XCTUnwrap(String(data: data, encoding: .utf8)))
+        }
+    }
+
+    func testTrainingSetRejectsNilLoadAcknowledgementForExplicitZero() async throws {
+        ChatURLProtocol.handler = { _ in
+            let body = """
+            {"version":1,"sessionComplete":true,"log":{
+              "sessionId":"fixture-session","exerciseId":"press","setNumber":1,"reps":10,"loadKg":null,"rir":3
+            }}
+            """
+            return (201, ["Content-Type": "application/json"], Data(body.utf8))
+        }
+        let service = URLSessionTrainingService(urlSession: makeSession(), baseURL: URL(string: "https://localhost")!)
+        do {
+            try await service.logSet(
+                accessToken: "fixture-token",
+                request: TrainingSetLogRequest(
+                    sessionId: "fixture-session", exerciseId: "press", setNumber: 1, reps: 10, loadKg: 0, rir: 3
+                )
+            )
+            XCTFail("Explicit zero must remain distinct from bodyweight")
+        } catch { XCTAssertEqual(error as? TrainingServiceError, .invalidResponse) }
+    }
+
+    private func assertTrainingAcknowledgementRejected(_ body: String) async throws {
+        ChatURLProtocol.handler = { _ in
+            (201, ["Content-Type": "application/json"], Data(body.utf8))
+        }
+        let service = URLSessionTrainingService(urlSession: makeSession(), baseURL: URL(string: "https://localhost")!)
+        do {
+            try await service.logSet(
+                accessToken: "fixture-token",
+                request: TrainingSetLogRequest(
+                    sessionId: "fixture-session", exerciseId: "press", setNumber: 1, reps: 10, loadKg: 22.5, rir: 3
+                )
+            )
+            XCTFail("A success status without this exact saved set must not acknowledge the draft")
+        } catch let error as TrainingServiceError {
+            XCTAssertEqual(error, .invalidResponse)
+        }
     }
 
     func testLoadLatestRejectsAnUnsupportedProtocolVersion() async throws {

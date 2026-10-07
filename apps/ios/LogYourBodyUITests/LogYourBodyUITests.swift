@@ -60,6 +60,32 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "training-restored-after-relaunch", from: app)
     }
 
+    func testTrainingUnacknowledgedDraftSurvivesRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let load = app.textFields["training_load_fixture_press_1"]
+        XCTAssertTrue(load.waitForExistence(timeout: 5))
+        XCTAssertEqual(load.value as? String, "60")
+        load.tap()
+        load.press(forDuration: 1.1)
+        if app.menuItems["Select All"].waitForExistence(timeout: 2) { app.menuItems["Select All"].tap() }
+        load.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "22,5")
+        XCTAssertEqual(load.value as? String, "22,5")
+        attachScreenshot(named: "training-unacknowledged-before-relaunch", from: app)
+        app.terminate()
+        app.launchArguments = ["-lybUITestTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        XCTAssertTrue(load.waitForExistence(timeout: 5))
+        XCTAssertEqual(load.value as? String, "22,5", "An interrupted unsaved set must retain the user's exact entry.")
+        XCTAssertEqual(app.buttons["training_log_set_fixture_press_1"].label, "Log set")
+        attachScreenshot(named: "training-unacknowledged-after-relaunch", from: app)
+    }
+
     func testTrainingOfflineFailureRetainsLoadAndReconnectRetrySavesOnce() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
@@ -110,6 +136,45 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["training_fixture_saved_load"].label, "Saved load: bodyweight")
         XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 1")
         attachScreenshot(named: "training-explicit-bodyweight", from: app)
+    }
+
+    func testTrainingLostResponseRelaunchAndManualRetrySavesOneSet() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingLostResponse"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let load = app.textFields["training_load_fixture_press_1"]
+        XCTAssertTrue(load.waitForExistence(timeout: 5))
+        load.tap()
+        load.press(forDuration: 1.1)
+        if app.menuItems["Select All"].waitForExistence(timeout: 2) { app.menuItems["Select All"].tap() }
+        load.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "22,5")
+        app.buttons["training_log_set_fixture_press_1"].tap()
+        XCTAssertTrue(app.staticTexts["Retry this set to confirm it was saved."].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["training_log_set_fixture_press_1"].label, "Log set")
+        XCTAssertFalse(load.isEnabled)
+        attachScreenshot(named: "training-server-commit-response-lost", from: app)
+        app.terminate()
+        // The fixture withholds the next-session ACK to exercise journal retry after an ambiguous response.
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestTrainingLostResponse"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 1")
+        app.buttons["training_fixture_open"].tap()
+        XCTAssertTrue(load.waitForExistence(timeout: 5))
+        XCTAssertEqual(load.value as? String, "22,5")
+        XCTAssertFalse(load.isEnabled)
+        app.buttons["training_log_set_fixture_press_1"].tap()
+        XCTAssertTrue(app.buttons["Set logged"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["training_log_set_fixture_press_1"].isEnabled)
+        app.buttons["Close"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_count"].label, "Acknowledged sets: 1")
+        XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 2")
+        XCTAssertEqual(app.staticTexts["training_fixture_saved_load"].label, "Saved load: 22.5")
+        attachScreenshot(named: "training-response-loss-relaunch-exact-retry", from: app)
     }
 
     func testWhatsNewFixtureRendersTheRedesignedReleaseSurface() throws {
