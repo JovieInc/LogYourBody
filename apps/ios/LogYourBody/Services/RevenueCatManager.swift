@@ -300,6 +300,36 @@ class RevenueCatManager: NSObject, ObservableObject {
     let userDefaults: UserDefaults
     var currentEntitlementSnapshot: RevenueCatEntitlementSnapshot?
 
+    struct BillingSessionOwnership: Equatable {
+        let subject: String?
+        let generation: UInt64
+    }
+
+    private var billingSession = BillingSessionOwnership(subject: nil, generation: 0)
+    private var pendingBillingSession: BillingSessionOwnership?
+
+    func beginBillingSession(subject: String?) -> BillingSessionOwnership {
+        // A fresh login, including the same subject, replaces pending billing work.
+        billingSession = BillingSessionOwnership(subject: subject, generation: billingSession.generation &+ 1)
+        pendingBillingSession = billingSession
+        return billingSession
+    }
+
+    func finishBillingSession(_ ownership: BillingSessionOwnership) {
+        guard pendingBillingSession == ownership else { return }
+        pendingBillingSession = nil
+    }
+
+    func captureBillingSession() -> BillingSessionOwnership? {
+        // The SDK may still hold the previous identity during login/logout.
+        guard pendingBillingSession == nil else { return nil }
+        return billingSession
+    }
+
+    func ownsBillingSession(_ ownership: BillingSessionOwnership) -> Bool {
+        billingSession == ownership
+    }
+
 
     #if DEBUG
     /// Keeps the paywall unavailable-state fixture deterministic without touching production purchase paths.
