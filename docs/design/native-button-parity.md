@@ -10,7 +10,13 @@ Jovie reference was verified against GitHub main `58e35b232dc4f0bf6e0987fec0c591
 
 Changed files: shared `DesignSystem/Atoms/BaseButton.swift`, its existing `BaseButtonPolicyTests.swift`, and this report. No onboarding, Settings, auth, HealthKit, sync, training persistence, Xcode target, scheme, Fastlane, or CI workflow edits. Native tests use the existing test target and will remain in its CI suite.
 
-The only captured simulator image, `design-evidence/00-observed-simulator.png` in the lane workspace, showed SpringBoard and was rejected as product evidence. Simulator inspection subsequently stalled and was cancelled. No app fixture was launched, no real health record was changed, and no accepted before/after screen evidence exists yet.
+The only simulator image captured by this lane, `design-evidence/00-observed-simulator.png`, showed SpringBoard and was rejected as product evidence. Simulator inspection subsequently stalled and was cancelled. No app fixture was launched by this lane, no real health record was changed, and no accepted current-build before/after screen evidence exists yet.
+
+### Historical training fixture diagnostic
+
+Four existing attachments from the reliability owner's earlier `ui-final.xcresult` were inspected read-only. Their manifest records iPhone 17 Pro, synthetic `-lybUITestTrainingFixture` tests, and Oct 6 capture timestamps. Three images show fixture status counters and are not product-screen evidence. The fourth, `reliability-evidence/ui-final-attachments/653779DA-DD85-443A-A4C8-E09E808EEBB8.png`, shows the actual restored live-session sheet: RIR and recovery Stepper labels, stepper controls, and unselected performance segments appear nearly black on dark cards. Exercise names, saved status, and explicitly styled headings remain readable.
+
+Current `TrainingViews.swift` explicitly styles those headings but leaves the Stepper and Picker families to inherited native appearance while supplying dark card backgrounds. This supports a concrete appearance diagnostic; the historical capture's exact source SHA was not established, so it does not prove a defect in the distributed baseline or validate this button change. Reproduce on current source under both inherited light and dark appearance, plus large Dynamic Type, before changing those controls. The proposed visual-only TrainingViews scope was reported to the parent for reconciliation with the reliability owner; no edits were made there.
 
 ## Source-confirmed gaps and parity contracts
 
@@ -42,6 +48,22 @@ These tests are written but were not executed in this session. SwiftLint with `-
 Root lint, typecheck, and tests passed through the pinned pnpm 10.34.1 CLI, with all Turbo tasks satisfied from cache (4/4, 4/4, and 8/8 respectively). These checks cover the unchanged JavaScript workspace and do not execute the native tests. Evidence logs are in the lane workspace's `design-evidence` directory.
 
 Two serial native build-for-testing attempts exited 74 before compiling this change. Moving the Clang module cache and package cache into the lane workspace removed the module-cache permission error; SwiftPM still attempted to write manifest diagnostics under `~/Library/Caches/org.swift.swiftpm/manifests/ManifestLoading`, which the sandbox denied. Signing, hooks, and thresholds were not bypassed.
+
+The second failing command, run from this worktree, was:
+
+```sh
+CLANG_MODULE_CACHE_PATH=/Users/timwhite/Documents/Codex/2026-10-06/task-2/lyb-design-derived/ModuleCache.noindex \
+SWIFTPM_MODULECACHE_OVERRIDE=/Users/timwhite/Documents/Codex/2026-10-06/task-2/lyb-design-derived/ModuleCache.noindex \
+xcodebuild build-for-testing \
+  -project apps/ios/LogYourBody.xcodeproj -scheme LogYourBody \
+  -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath /Users/timwhite/Documents/Codex/2026-10-06/task-2/lyb-design-derived \
+  -packageCachePath /Users/timwhite/Documents/Codex/2026-10-06/task-2/lyb-design-derived/SwiftPMCache \
+  -disableAutomaticPackageResolution \
+  -only-testing:LogYourBodyTests/BaseButtonPolicyTests
+```
+
+Exact denied diagnostic path: `/Users/timwhite/Library/Caches/org.swift.swiftpm/manifests/ManifestLoading/statsig-kit.dia` (also `sentry-cocoa.dia` and `purchases-ios.dia` in that directory). See `design-evidence/native-build-workspace-cache.log`. Further native builds and UI runs are paused: the parent revoked this lane's reservation while reliability owns the active regression run. Resume only through a newly coordinated slot and the supported approval flow; do not work around the sandbox denial.
 
 Independent review found no proven compile or runtime defect in the two Swift file diffs. It identified one P2 coverage gap: the new accessibility representation still requires executable checks for the original name and caller identifier, one accessible button, the `Loading` value, and suppressed activation while loading or disabled by either configuration or parent environment. Source inspection confirms the existing `handleTap` guard, but does not prove the accessibility tree.
 
