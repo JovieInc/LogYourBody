@@ -69,6 +69,7 @@ class HealthKitManager: ObservableObject {
     let earliestImportDateQuery: (() async throws -> Date?)?
     let importSyncTrigger: (@MainActor () -> Void)?
     let importCompletion: (@MainActor (String) -> Void)?
+    let bodyScoreRecalculationTrigger: (@MainActor () -> Void)?
     let metricImportStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)?
     let rawImportStore: (([HKRawSample]) async -> Void)?
 
@@ -81,6 +82,7 @@ class HealthKitManager: ObservableObject {
         earliestImportDateQuery: (() async throws -> Date?)? = nil,
         syncTrigger: (@MainActor () -> Void)? = nil,
         importCompletion: (@MainActor (String) -> Void)? = nil,
+        bodyScoreRecalculationTrigger: (@MainActor () -> Void)? = nil,
         metricImportStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil,
         rawImportStore: (([HKRawSample]) async -> Void)? = nil
     ) {
@@ -92,6 +94,7 @@ class HealthKitManager: ObservableObject {
         self.earliestImportDateQuery = earliestImportDateQuery
         importSyncTrigger = syncTrigger
         self.importCompletion = importCompletion
+        self.bodyScoreRecalculationTrigger = bodyScoreRecalculationTrigger
         self.metricImportStore = metricImportStore
         self.rawImportStore = rawImportStore
     }
