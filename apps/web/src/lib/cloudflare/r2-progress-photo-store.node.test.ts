@@ -191,6 +191,132 @@ describe('presigned R2 PUT tickets', () => {
 });
 
 describe('deleteOwnedProgressPhotos', () => {
+  const env = {
+    CLOUDFLARE_ACCOUNT_ID: fixtureConfig.accountId,
+    CLOUDFLARE_R2_ACCESS_KEY_ID: fixtureConfig.accessKeyId,
+    CLOUDFLARE_R2_SECRET_ACCESS_KEY: fixtureConfig.secretAccessKey,
+    CLOUDFLARE_R2_BUCKET: fixtureConfig.bucket,
+    CLOUDFLARE_R2_PUBLIC_BASE_URL: fixtureConfig.publicBaseUrl,
+  };
+
+  it.each([
+    '<ListBucketResult></ListBucketResult>',
+    '<ListBucketResult><IsTruncated>unknown</IsTruncated></ListBucketResult>',
+    '<Error><IsTruncated>false</IsTruncated></Error>',
+  ])('rejects an unqualified successful listing: %s', async (xml) => {
+    const fetcher = jest.fn(async () => new Response(xml, { status: 200 }));
+    await expect(
+      deleteOwnedProgressPhotos('owner-a', {
+        env,
+        fetcher: fetcher as unknown as typeof fetch,
+      }),
+    ).rejects.toThrow('r2_list_invalid_response');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a partial deletion retry scoped to the remaining owner objects', async () => {
+    const remaining = new Set([
+      'progress-photos/owner-a/one.jpg',
+      'progress-photos/owner-a/two.jpg',
+    ]);
+    let failSecondDelete = true;
+    const fetcher = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (init?.method === 'GET') {
+        return new Response(
+          '<ListBucketResult><IsTruncated>false</IsTruncated>' +
+            [...remaining].map((key) => `<Contents><Key>${key}</Key></Contents>`).join('') +
+            '</ListBucketResult>',
+          { status: 200 },
+        );
+      }
+      const key = url.pathname.replace('/lyb-progress-photos/', '');
+      expect(key.startsWith('progress-photos/owner-a/')).toBe(true);
+      if (key.endsWith('/two.jpg') && failSecondDelete) {
+        return new Response(null, { status: 503 });
+      }
+      remaining.delete(key);
+      return new Response(null, { status: 204 });
+    });
+    const options = { env, fetcher: fetcher as unknown as typeof fetch };
+
+    await expect(deleteOwnedProgressPhotos('owner-a', options)).rejects.toThrow(
+      'r2_delete_failed_503',
+    );
+    expect([...remaining]).toEqual(['progress-photos/owner-a/two.jpg']);
+    failSecondDelete = false;
+    await deleteOwnedProgressPhotos('owner-a', options);
+    expect(remaining.size).toBe(0);
+  });
+
+  it('rejects an incomplete listing without a continuation token', async () => {
+    const fetcher = jest.fn(
+      async () =>
+        new Response('<ListBucketResult><IsTruncated>true</IsTruncated></ListBucketResult>', {
+          status: 200,
+        }),
+    );
+
+    await expect(
+      deleteOwnedProgressPhotos('owner-a', {
+        env,
+        fetcher: fetcher as unknown as typeof fetch,
+      }),
+    ).rejects.toThrow('r2_list_missing_continuation_token');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a repeated continuation token instead of looping indefinitely', async () => {
+    const fetcher = jest.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      // Keep the pre-fix regression bounded even if the loop does not stop.
+      if (fetcher.mock.calls.length > 2) throw new Error('fixture_pagination_did_not_stop');
+      expect(init?.method).toBe('GET');
+      return new Response(
+        '<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>same-page</NextContinuationToken></ListBucketResult>',
+        { status: 200 },
+      );
+    });
+
+    await expect(
+      deleteOwnedProgressPhotos('owner-a', {
+        env,
+        fetcher: fetcher as unknown as typeof fetch,
+      }),
+    ).rejects.toThrow('r2_list_repeated_continuation_token');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('deletes every owner page before reporting completion', async () => {
+    const deleted: string[] = [];
+    const fetcher = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      expect(init?.cache).toBe('no-store');
+      if (init?.method === 'DELETE') {
+        deleted.push(url.pathname);
+        return new Response(null, { status: 204 });
+      }
+      expect(url.searchParams.get('prefix')).toBe('progress-photos/owner-a/');
+      const secondPage = url.searchParams.get('continuation-token') === 'page&two';
+      return new Response(
+        secondPage
+          ? '<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>progress-photos/owner-a/two.jpg</Key></Contents></ListBucketResult>'
+          : '<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>page&amp;two</NextContinuationToken><Contents><Key>progress-photos/owner-a/one.jpg</Key></Contents></ListBucketResult>',
+        { status: 200 },
+      );
+    });
+
+    await deleteOwnedProgressPhotos('owner-a', {
+      env,
+      fetcher: fetcher as unknown as typeof fetch,
+    });
+
+    expect(deleted).toEqual([
+      '/lyb-progress-photos/progress-photos/owner-a/one.jpg',
+      '/lyb-progress-photos/progress-photos/owner-a/two.jpg',
+    ]);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+  });
+
   it('is a no-op when R2 is not configured', async () => {
     const fetcher = jest.fn();
     await deleteOwnedProgressPhotos('owner-a', { env: {}, fetcher });
@@ -230,7 +356,7 @@ describe('deleteOwnedProgressPhotos', () => {
   it('fails closed when a list result escapes the owner prefix', async () => {
     const fetcher = jest.fn(async () => {
       return new Response(
-        `<ListBucketResult><Contents><Key>progress-photos/victim/one.jpg</Key></Contents></ListBucketResult>`,
+        `<ListBucketResult><IsTruncated>false</IsTruncated><Contents><Key>progress-photos/victim/one.jpg</Key></Contents></ListBucketResult>`,
         { status: 200 },
       );
     });
