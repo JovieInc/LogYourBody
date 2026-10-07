@@ -65,15 +65,16 @@ var cachedTrialExpirationTimestamp: Double {
             return
         }
 
-        // print("💰 Identifying user: \(userId)")
+        let ownership = beginBillingSession(subject: userId)
+        defer { finishBillingSession(ownership) }
 
         do {
             let customer = try await purchasesClient.logIn(userId: userId, entitlementID: proEntitlementID)
-            await MainActor.run {
-                self.updateSubscriptionStatus(customer: customer)
-            }
+            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
+            updateSubscriptionStatus(customer: customer)
             // print("💰 User identified successfully")
         } catch {
+            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
             let appError = AppError.billing(operation: "identifyUser", underlying: error)
             let context = ErrorContext(
                 feature: "billing",
@@ -83,24 +84,30 @@ var cachedTrialExpirationTimestamp: Double {
             )
             ErrorReporter.shared.capture(appError, context: context)
 
-            await MainActor.run {
-                self.errorMessage = "Failed to link account: \(error.localizedDescription)"
-            }
+            errorMessage = "Failed to link account: \(error.localizedDescription)"
         }
     }
 
 /// Log out the current user (call this on sign out)
     func logoutUser() async {
-        // print("💰 Logging out user")
+        let ownership = beginBillingSession(subject: nil)
+        defer {
+            // Keep the completion clear for SDK updates received during logout,
+            // while protecting any replacement login from the old completion.
+            if ownsBillingSession(ownership) { clearLocalSubscriptionState() }
+            finishBillingSession(ownership)
+        }
+        // Local access ends immediately; a delayed SDK reply cannot clear a new login.
+        clearLocalSubscriptionState()
 
         guard isConfigured else {
-            clearLocalSubscriptionState()
             return
         }
 
         do {
             try await purchasesClient.logOut()
         } catch {
+            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
             let appError = AppError.billing(operation: "logoutUser", underlying: error)
             let context = ErrorContext(
                 feature: "billing",
@@ -110,8 +117,6 @@ var cachedTrialExpirationTimestamp: Double {
             )
             ErrorReporter.shared.capture(appError, context: context)
         }
-
-        clearLocalSubscriptionState()
     }
 
 // MARK: - Subscription Status
@@ -123,15 +128,14 @@ var cachedTrialExpirationTimestamp: Double {
             return
         }
 
-        // print("💰 Refreshing customer info")
+        guard let ownership = captureBillingSession() else { return }
 
         do {
             let customer = try await purchasesClient.customerInfo(entitlementID: proEntitlementID)
-            await MainActor.run {
-                self.updateSubscriptionStatus(customer: customer)
-                // print("💰 Subscription status: \(self.isSubscribed ? "Active" : "Inactive")")
-            }
+            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
+            updateSubscriptionStatus(customer: customer)
         } catch {
+            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
             let appError = AppError.billing(operation: "refreshCustomerInfo", underlying: error)
             let context = ErrorContext(
                 feature: "billing",
