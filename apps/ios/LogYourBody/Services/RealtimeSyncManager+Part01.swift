@@ -149,105 +149,72 @@ func stopAutoSync() {
     }
 
 func syncAll(onCompletion: (() -> Void)? = nil) {
-        guard !isSyncing else {
+        guard !isSyncing, isOnline, let ownership = authManager.captureRequestSession() else {
+            if !isOnline { syncStatus = .offline }
             onCompletion?()
             return
         }
-        guard isOnline else {
-            syncStatus = .offline
-            onCompletion?()
-            return
-        }
-        guard authManager.isAuthenticated else {
-            onCompletion?()
-            return
-        }
-        guard let userIdSnapshot = authManager.currentUser?.id else {
-            onCompletion?()
-            return
-        }
-
         lastSyncAttempt = Date()
         isSyncing = true
         syncStatus = .syncing
         error = nil
-
-        let operationsToProcess = pendingOperations.filter { $0.userId == userIdSnapshot }
-        // Never assign legacy/unowned work to whichever account happens to be active.
-        // Preserve it for an explicit reconciliation path instead of silently dropping it.
-        pendingOperations.removeAll { $0.userId == userIdSnapshot }
-        savePendingOperations()
-
-        let lastSyncSnapshot = lastSyncDate
-
-        Task.detached(priority: .utility) { [weak self] in
+        let operations = pendingOperations.filter { $0.userId == ownership.subject }
+        let lastSync = lastSyncDate
+        Task { @MainActor [weak self] in
             guard let self else { return }
-            var operationsNeedingRetry = operationsToProcess
-
-            do {
-                guard let token = await self.authManager.getAccessToken() else {
-                    throw SyncError.tokenGenerationFailed
-                }
-
-                if !operationsNeedingRetry.isEmpty {
-                    let failedOperations = await self.processPendingOperations(operationsNeedingRetry, token: token)
-                    if failedOperations.isEmpty {
-                        operationsNeedingRetry.removeAll()
-                    } else {
-                        operationsNeedingRetry = failedOperations
-                        throw PendingSyncError.failedOperations
-                    }
-                }
-
-                try await self.syncLocalChanges(for: userIdSnapshot, token: token)
-                try await self.pullLatestData(userId: userIdSnapshot, lastSync: lastSyncSnapshot, token: token)
-                await self.coreDataManager.cleanupOldData()
-
-                await MainActor.run {
-                    self.isSyncing = false
-                    self.syncStatus = .success
-                    self.lastSyncDate = Date()
-                    self.consecutiveFailures = 0
-                    self.updatePendingSyncCount()
-                    self.savePendingOperations()
-                    onCompletion?()
-                }
-            } catch {
-                if let productAPIError = error as? ProductAPIError {
-                    if case .unauthorized = productAPIError {
-                        await self.authManager.handleProductAPIUnauthorized()
-                    }
-                }
-
-                let retryOperations = operationsNeedingRetry
-                let errorDescription = error.localizedDescription
-
-                await MainActor.run { [retryOperations, errorDescription] in
-                    if !retryOperations.isEmpty {
-                        self.pendingOperations.insert(contentsOf: retryOperations, at: 0)
-                    }
-                    self.isSyncing = false
-                    self.syncStatus = .error(errorDescription)
-                    self.error = errorDescription
-                    self.consecutiveFailures += 1
-
-                    if self.consecutiveFailures >= self.maxConsecutiveFailures {
-                        self.syncInterval = min(self.syncInterval * 2, 3_600)
-                        self.startAutoSync()
-                    }
-
-                    self.savePendingOperations()
-                    self.updatePendingSyncCount()
-                    AnalyticsService.shared.track(
-                        event: "sync_failed",
-                        properties: [
-                            "pending_count": String(self.pendingSyncCount)
-                        ]
-                    )
-                    onCompletion?()
-                }
+            defer {
+                self.isSyncing = false
+                if self.syncStatus == .syncing { self.syncStatus = .idle }
+                onCompletion?()
             }
+            await self.runCapturedSync(operations, ownership: ownership, lastSync: lastSync)
         }
+    }
+
+    func runCapturedSync(
+        _ operations: [SyncOperation], ownership: AuthManager.RequestSessionOwnership, lastSync: Date?
+    ) async {
+        var requestOwner = ownership
+        do {
+            guard let authorization = await authManager.getAccessToken(for: ownership) else {
+                throw SyncError.tokenGenerationFailed
+            }
+            requestOwner = authorization.ownership
+            let failed = await processPendingOperations(
+                operations, token: authorization.token, ownership: requestOwner
+            )
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            guard failed.isEmpty else { throw PendingSyncError.failedOperations }
+            try await syncLocalChanges(for: requestOwner.subject, token: authorization.token)
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            try await pullLatestData(userId: requestOwner.subject, lastSync: lastSync, token: authorization.token)
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            await coreDataManager.cleanupOldData()
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            syncStatus = .success
+            lastSyncDate = Date()
+            consecutiveFailures = 0
+            updatePendingSyncCount()
+        } catch {
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            if let productError = error as? ProductAPIError, productError == .unauthorized {
+                await authManager.handleProductAPIUnauthorized(for: requestOwner)
+            }
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            recordSyncFailure(error.localizedDescription)
+        }
+    }
+
+    func recordSyncFailure(_ description: String) {
+        syncStatus = .error(description)
+        error = description
+        consecutiveFailures += 1
+        if consecutiveFailures >= maxConsecutiveFailures {
+            syncInterval = min(syncInterval * 2, 3_600)
+            startAutoSync()
+        }
+        updatePendingSyncCount()
+        analyticsService.track(event: "sync_failed", properties: ["pending_count": String(pendingSyncCount)])
     }
 
 func syncAllAwaitingCompletion() async {

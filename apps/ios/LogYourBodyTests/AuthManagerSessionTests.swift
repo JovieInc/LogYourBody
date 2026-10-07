@@ -281,6 +281,26 @@ final class AuthManagerSessionTests: XCTestCase {
         XCTAssertEqual(stored?.refreshToken, "new-refresh")
     }
 
+    func testScopedAuthorizationCarriesValidatedSameAccountRefreshGeneration() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        manager.currentUser = LocalUser(
+            id: "user-123", email: "user@example.com", name: "Test User",
+            avatarUrl: nil, profile: nil, onboardingCompleted: false
+        )
+        let original = try XCTUnwrap(manager.captureRequestSession())
+        stubSessionSuccess()
+
+        let authorization = await manager.getAccessToken(for: original)
+
+        XCTAssertEqual(authorization?.token, "new-access")
+        XCTAssertEqual(authorization?.ownership.subject, original.subject)
+        XCTAssertNotEqual(authorization?.ownership, original)
+        let refreshed = try XCTUnwrap(authorization?.ownership)
+        XCTAssertTrue(manager.ownsRequestSession(refreshed))
+        XCTAssertFalse(manager.ownsRequestSession(original))
+    }
+
     func testRefreshKeepsExistingRefreshTokenWhenRotationOmitsIt() async throws {
         let manager = makeManager()
         manager.authSession = makeSession(

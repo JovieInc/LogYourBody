@@ -635,8 +635,48 @@ final class AuthManager: NSObject, ObservableObject {
         return await refreshAccessToken(using: session)
     }
 
+    struct RequestSessionOwnership: Equatable, Sendable {
+        let subject: String
+        let generation: UInt64
+    }
+
+    struct RequestAuthorization: Sendable {
+        let token: String
+        let ownership: RequestSessionOwnership
+    }
+
+    func captureRequestSession() -> RequestSessionOwnership? {
+        guard let session = authSession, isAuthenticated, currentUser?.id == session.subject else { return nil }
+        return RequestSessionOwnership(subject: session.subject, generation: authGeneration)
+    }
+
+    func ownsRequestSession(_ ownership: RequestSessionOwnership) -> Bool {
+        !Task.isCancelled && captureRequestSession() == ownership
+    }
+
+    func getAccessToken(for ownership: RequestSessionOwnership) async -> RequestAuthorization? {
+        guard ownsRequestSession(ownership), let session = authSession else { return nil }
+        if session.expiresAt.timeIntervalSinceNow > 60 {
+            return RequestAuthorization(token: session.accessToken, ownership: ownership)
+        }
+        guard let result = await refreshAccessTokenResult(using: session),
+              let token = currentRefreshToken(result),
+              let current = captureRequestSession(), current.subject == ownership.subject,
+              current.generation == result.generation else { return nil }
+        return RequestAuthorization(token: token, ownership: current)
+    }
+
+    func handleProductAPIUnauthorized(for ownership: RequestSessionOwnership) async {
+        guard ownsRequestSession(ownership) else { return }
+        await handleProductAPIUnauthorized()
+    }
+
     private func refreshAccessToken(using session: ProductAuthSession? = nil) async -> String? {
-        if let refreshTask { return currentRefreshToken(await refreshTask.value) }
+        currentRefreshToken(await refreshAccessTokenResult(using: session))
+    }
+
+    private func refreshAccessTokenResult(using session: ProductAuthSession? = nil) async -> RefreshedToken? {
+        if let refreshTask { return await refreshTask.value }
         guard let current = session ?? authSession else {
             await performLogout(exitReason: .sessionExpired)
             return nil
@@ -679,7 +719,7 @@ final class AuthManager: NSObject, ObservableObject {
         }
         refreshTask = task
         refreshTaskID = taskID
-        return currentRefreshToken(await task.value)
+        return await task.value
     }
 
     private func currentRefreshToken(_ result: RefreshedToken?) -> String? {
