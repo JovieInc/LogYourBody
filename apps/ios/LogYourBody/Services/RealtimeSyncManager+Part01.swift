@@ -177,6 +177,10 @@ func syncAll(onCompletion: (() -> Void)? = nil) {
         var requestOwner = ownership
         do {
             guard let authorization = await authManager.getAccessToken(for: ownership) else {
+                if authManager.didExpireRequestSession(ownership) {
+                    recordSyncFailure(SyncError.tokenGenerationFailed.localizedDescription)
+                    return
+                }
                 throw SyncError.tokenGenerationFailed
             }
             requestOwner = authorization.ownership

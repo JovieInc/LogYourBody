@@ -253,6 +253,7 @@ final class AuthManager: NSObject, ObservableObject {
             // Every replacement invalidates work, including A → B → A and logout
             // during a cold restore, when no session has been applied yet.
             authGeneration &+= 1
+            expiredRequestSession = nil
             refreshTask?.cancel()
             refreshTask = nil
             refreshTaskID = nil
@@ -645,6 +646,14 @@ final class AuthManager: NSObject, ObservableObject {
         let ownership: RequestSessionOwnership
     }
 
+    private var expiredRequestSession: (ownership: RequestSessionOwnership, generation: UInt64)?
+
+    func didExpireRequestSession(_ ownership: RequestSessionOwnership) -> Bool {
+        guard !Task.isCancelled, authSession == nil, currentUser == nil, lastExitReason == .sessionExpired,
+              let expiredRequestSession else { return false }
+        return expiredRequestSession.ownership == ownership && expiredRequestSession.generation == authGeneration
+    }
+
     func captureRequestSession() -> RequestSessionOwnership? {
         guard let session = authSession, isAuthenticated, currentUser?.id == session.subject else { return nil }
         return RequestSessionOwnership(subject: session.subject, generation: authGeneration)
@@ -748,6 +757,7 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func performLogout(exitReason: AuthExitReason) async {
+        let expiredOwnership = exitReason == .sessionExpired ? captureRequestSession() : nil
         try? keychain.delete(forKey: storedSessionKey)
         authSession = nil
         currentUser = nil
@@ -755,6 +765,7 @@ final class AuthManager: NSObject, ObservableObject {
         memberSinceDate = nil
         bootstrappedProfileSessionIds.removeAll()
         lastExitReason = exitReason
+        expiredRequestSession = expiredOwnership.map { ($0, authGeneration) }
         AppServicePorts.analyticsTracker.reset()
     }
 

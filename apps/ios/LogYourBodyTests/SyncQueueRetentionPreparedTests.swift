@@ -446,4 +446,30 @@ final class SyncQueueRetentionPreparedTests: XCTestCase {
         XCTAssertEqual(auth.authSession?.accessToken, "synthetic-token-B")
         XCTAssertEqual(auth.currentUser?.id, "synthetic-sync-B")
     }
+
+    func testOriginatingSessionExpiryReportsErrorWithoutDroppingQueuedWork() async throws {
+        let client = PreparedSyncDeleteClient()
+        let manager = makeManager(client)
+        auth.authSession = ProductAuthSession(
+            accessToken: "synthetic-expired", refreshToken: "synthetic-refresh",
+            expiresAt: Date().addingTimeInterval(-120), subject: "synthetic-sync-A",
+            email: "sync-a@example.invalid", name: "Synthetic Sync", issuedAt: Date()
+        )
+        let ownership = try XCTUnwrap(auth.captureRequestSession())
+        manager.isOnline = false
+        manager.queueOperation(operation())
+        manager.isOnline = true
+        await manager.syncAllAwaitingCompletion()
+        guard case .error = manager.syncStatus else {
+            return XCTFail("Originating session expiry must report the authentication failure")
+        }
+        XCTAssertTrue(auth.didExpireRequestSession(ownership))
+        XCTAssertNil(auth.authSession)
+        XCTAssertEqual(manager.pendingOperations.count, 1)
+        XCTAssertEqual(manager.pendingOperations.first?.retryCount, 0)
+        XCTAssertTrue(client.deletedIDs.isEmpty)
+        XCTAssertEqual(analytics.events, ["sync_failed"])
+        switchToB()
+        XCTAssertFalse(auth.didExpireRequestSession(ownership))
+    }
 }
