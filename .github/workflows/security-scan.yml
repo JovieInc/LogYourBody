@@ -27,7 +27,7 @@ jobs:
       uses: trufflesecurity/trufflehog@v3.97.9
       with:
         path: ./
-        base: ${{ github.event.repository.default_branch }}
+        # An empty base scans full history; main and HEAD coincide on main runs.
         head: HEAD
         extra_args: --debug --only-verified --json
     
