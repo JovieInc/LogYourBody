@@ -17,58 +17,6 @@ import XCTest
 
 @MainActor
 final class BulkImportManagerBoundsTests: XCTestCase {
-    func test_updateImportTask_indexPastEnd_isSafeNoOp() {
-        let manager = BulkImportManager.shared
-        let original = manager.importTasks
-        defer { manager.importTasks = original }
-
-        manager.importTasks = []
-
-        // Would previously crash: importTasks[5] on an empty array.
-        manager.updateImportTask(at: 5) { $0.status = .completed }
-        XCTAssertTrue(manager.importTasks.isEmpty)
-
-        // A negative index is also a safe no-op.
-        manager.updateImportTask(at: -1) { $0.status = .failed }
-        XCTAssertTrue(manager.importTasks.isEmpty)
-    }
-}
-
-/// Synthetic photos and an in-memory store. The image load is the suspension point;
-/// no photo library, network upload, or personal HealthKit store is used.
-@MainActor
-final class HeldPhotoImageLoad {
-    let started = XCTestExpectation(description: "Synthetic photo image load started")
-    private var continuation: CheckedContinuation<UIImage?, Never>?
-    private var result: UIImage??
-
-    func load() async -> UIImage? {
-        started.fulfill()
-        return await withCheckedContinuation { continuation in
-            if let result {
-                continuation.resume(returning: result)
-            } else {
-                self.continuation = continuation
-            }
-        }
-    }
-
-    func complete() {
-        guard result == nil else { return }
-        let image = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { context in
-            UIColor.gray.setFill()
-            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
-        }
-        result = .some(image)
-        continuation?.resume(returning: image)
-        continuation = nil
-    }
-}
-
-private final class SyntheticImportAsset: PHAsset, @unchecked Sendable {}
-
-@MainActor
-final class PhotoImportOwnershipTests: XCTestCase {
     private var suiteName = ""
     private var defaults: UserDefaults!
     private var auth: AuthManager!
@@ -98,6 +46,22 @@ final class PhotoImportOwnershipTests: XCTestCase {
         coreData = nil
         defaults = nil
         super.tearDown()
+    }
+
+    func test_updateImportTask_indexPastEnd_isSafeNoOp() {
+        let manager = BulkImportManager.shared
+        let original = manager.importTasks
+        defer { manager.importTasks = original }
+
+        manager.importTasks = []
+
+        // Would previously crash: importTasks[5] on an empty array.
+        manager.updateImportTask(at: 5) { $0.status = .completed }
+        XCTAssertTrue(manager.importTasks.isEmpty)
+
+        // A negative index is also a safe no-op.
+        manager.updateImportTask(at: -1) { $0.status = .failed }
+        XCTAssertTrue(manager.importTasks.isEmpty)
     }
 
     private func setAccount(_ subject: String) {
@@ -189,3 +153,36 @@ final class PhotoImportOwnershipTests: XCTestCase {
         }
     }
 }
+
+/// Synthetic photos and an in-memory store. The image load is the suspension point;
+/// no photo library, network upload, or personal HealthKit store is used.
+@MainActor
+final class HeldPhotoImageLoad {
+    let started = XCTestExpectation(description: "Synthetic photo image load started")
+    private var continuation: CheckedContinuation<UIImage?, Never>?
+    private var result: UIImage??
+
+    func load() async -> UIImage? {
+        started.fulfill()
+        return await withCheckedContinuation { continuation in
+            if let result {
+                continuation.resume(returning: result)
+            } else {
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func complete() {
+        guard result == nil else { return }
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { context in
+            UIColor.gray.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+        result = .some(image)
+        continuation?.resume(returning: image)
+        continuation = nil
+    }
+}
+
+private final class SyntheticImportAsset: PHAsset, @unchecked Sendable {}
