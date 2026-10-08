@@ -129,6 +129,15 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         return manager
     }
 
+    private func waitForWeightQuery(_ query: HeldWeightImportQuery) async {
+        let deadline = Date().addingTimeInterval(15)
+        while !query.hasStarted, Date() < deadline {
+            await Task.yield()
+            if query.hasStarted { return }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+    }
+
     private func assertHeldImportIsRejected(replace: () -> Void) async {
         let query = HeldWeightImportQuery()
         let manager = manager(query: query)
@@ -450,7 +459,15 @@ final class HealthKitImportOwnershipTests: XCTestCase {
             await firstTask.value
         }
         await fulfillment(of: [joinerStarted], timeout: 3)
-        await fulfillment(of: [first.started], timeout: 3)
+        // The shipped import is a background detached task and must hop to the main actor
+        // before it queries weight. fulfillment(of:) can occupy that actor for the whole
+        // timeout, so a busy runner records "Synthetic weight query started" as unmet
+        // even though the task has not failed. Yield until the query starts.
+        await waitForWeightQuery(first)
+        XCTAssertTrue(
+            first.hasStarted,
+            "The scheduled historical import must reach the weight query before a replacement account can take over."
+        )
         guard first.hasStarted else {
             firstTask.cancel()
             first.complete([])
@@ -459,7 +476,11 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         }
         setAccount("synthetic-health-B")
         let replacementTask = Task(priority: .userInitiated) { await manager.syncAllHistoricalHealthKitData() }
-        await fulfillment(of: [replacement.started], timeout: 3)
+        await waitForWeightQuery(replacement)
+        XCTAssertTrue(
+            replacement.hasStarted,
+            "The replacement account's historical import must reach its own weight query."
+        )
         guard replacement.hasStarted else {
             firstTask.cancel()
             replacementTask.cancel()
