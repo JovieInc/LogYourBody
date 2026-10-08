@@ -3,11 +3,10 @@ import Link from 'next/link';
 import { MarketingFooter } from '@/components/MarketingFooter';
 import { APP_CONFIG } from '@/constants/app';
 import { LANDING_FLAGS } from '@/lib/flags/landing';
+import { LANDING_PRODUCT_PROOF } from '@/lib/marketing/landing-registry';
 import styles from './LaunchLanding.module.css';
 import { launchLandingCopy, launchLandingFeatures } from './launch-landing-copy';
 import { WaitlistForm } from './WaitlistForm';
-
-const HERO_IMAGE = '/marketing/landing/home-metric-first.png';
 
 function BrandMark() {
   return (
@@ -97,10 +96,10 @@ export function LaunchLanding() {
           <div className={`${styles.riseLate} mx-auto w-full max-w-[340px] lg:max-w-[360px]`}>
             <div className={styles.phone}>
               <Image
-                src={HERO_IMAGE}
-                alt={launchLandingCopy.heroImageAlt}
-                width={780}
-                height={1688}
+                src={LANDING_PRODUCT_PROOF.src}
+                alt={LANDING_PRODUCT_PROOF.alt}
+                width={LANDING_PRODUCT_PROOF.width}
+                height={LANDING_PRODUCT_PROOF.height}
                 priority
                 sizes="(min-width: 1024px) 360px, 340px"
                 className="block h-auto w-full"
