@@ -373,7 +373,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(restoreButton.exists)
     }
 
-    func testProfileLogoutSignsOutFromPushedDetail() throws {
+    func testProfileLogoutCancelStaysOnProfile() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
 
@@ -388,6 +388,37 @@ final class LogYourBodyUITests: XCTestCase {
         logoutButton.tap()
 
         let confirmLogout = app.buttons["Log Out"]
+        XCTAssertTrue(confirmLogout.waitForExistence(timeout: 5))
+        let cancel = app.buttons.matching(identifier: "settings_logout_cancel").firstMatch
+        XCTAssertTrue(
+            cancel.waitForExistence(timeout: 3),
+            "Logout confirmation must include a reachable Cancel control."
+        )
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["continueWithAppleButton"].exists)
+    }
+
+    func testProfileLogoutSignsOutFromPushedDetail() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+
+        try openSettings(in: app)
+
+        let profileLink = app.descendants(matching: .any)["settings_profile_link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 5))
+        profileLink.tap()
+
+        let logoutButton = app.descendants(matching: .any)["settings_logout_button"]
+        XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
+        logoutButton.tap()
+
+        let confirmLogout = app.buttons.matching(identifier: "settings_logout_confirm").firstMatch
         XCTAssertTrue(confirmLogout.waitForExistence(timeout: 5))
         confirmLogout.tap()
 
