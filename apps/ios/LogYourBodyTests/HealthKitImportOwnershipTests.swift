@@ -130,7 +130,10 @@ final class HealthKitImportOwnershipTests: XCTestCase {
     }
 
     private func waitForWeightQuery(_ query: HeldWeightImportQuery) async {
-        let deadline = Date().addingTimeInterval(15)
+        // The detached background import can wait behind simulator/main-actor
+        // work before it reaches the injected query. Keep polling cooperative
+        // so this does not block the actor that must start the query.
+        let deadline = Date().addingTimeInterval(30)
         while !query.hasStarted, Date() < deadline {
             await Task.yield()
             if query.hasStarted { return }
