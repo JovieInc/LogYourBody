@@ -68,6 +68,42 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    func testIntegrationDirectorySeparatesHealthAccessAndScanHistory() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestIntegrationsDirectoryFixture"])
+        assertTimelineRootAppears(in: app, timeout: 30)
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        settings.tap()
+
+        let integrations = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'settings_integrations_link'")
+        ).firstMatch
+        XCTAssertTrue(integrations.waitForExistence(timeout: 8))
+        for _ in 0..<4 where !integrations.isHittable { app.swipeUp() }
+        XCTAssertTrue(integrations.isHittable)
+        integrations.tap()
+        XCTAssertTrue(app.navigationBars["Integrations"].waitForExistence(timeout: 8))
+
+        let health = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_health_status'")
+        ).firstMatch
+        XCTAssertTrue(health.waitForExistence(timeout: 8))
+        XCTAssertTrue(health.label.contains("Apple Health"))
+        XCTAssertFalse(health.label.contains("Connected"), "A permission request must not prove read access.")
+
+        let bodySpec = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_link'")
+        ).firstMatch
+        XCTAssertTrue(bodySpec.waitForExistence(timeout: 8))
+        XCTAssertTrue(bodySpec.label.contains("BodySpec"))
+        XCTAssertFalse(bodySpec.label.contains("Last synced"), "A scan date must not become sync freshness.")
+        XCTAssertFalse(app.staticTexts["Health & Fitness"].exists)
+        attachScreenshot(named: "integrations-directory-permission-and-history-fixture", from: app)
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     // MARK: - 1. Weight entry boundaries
 
     func testWeightEntryRejectsInvalidAndOutOfRangeValues() throws {
