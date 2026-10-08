@@ -34,6 +34,12 @@ class BulkImportManager: ObservableObject {
     @Published var currentPhotoName: String?
     @Published var overallProgress: Double = 0
 
+    private let accountOwner: AuthManager
+    private let metricsStore: CoreDataManager
+    private let loadFullImage: (PHAsset) async -> UIImage?
+    private let uploadPhoto: (BodyMetrics, UIImage) async throws -> String
+    private let syncImportedPhoto: @MainActor () -> Void
+
     var totalCount: Int {
         importTasks.count
     }
@@ -49,7 +55,33 @@ class BulkImportManager: ObservableObject {
     private var importQueue = DispatchQueue(label: "com.logyourbody.import", qos: .background)
     private var currentTask: Task<Void, Never>?
 
-    private init() {}
+    private convenience init() {
+        self.init(
+            accountOwner: .shared,
+            metricsStore: .shared,
+            loadFullImage: { asset in
+                await PhotoLibraryScanner.shared.loadFullImage(for: asset)
+            },
+            uploadPhoto: { metrics, image in
+                try await PhotoUploadManager.shared.uploadProgressPhoto(for: metrics, image: image)
+            },
+            syncImportedPhoto: { RealtimeSyncManager.shared.syncIfNeeded() }
+        )
+    }
+
+    init(
+        accountOwner: AuthManager,
+        metricsStore: CoreDataManager,
+        loadFullImage: @escaping (PHAsset) async -> UIImage?,
+        uploadPhoto: @escaping (BodyMetrics, UIImage) async throws -> String,
+        syncImportedPhoto: @escaping @MainActor () -> Void
+    ) {
+        self.accountOwner = accountOwner
+        self.metricsStore = metricsStore
+        self.loadFullImage = loadFullImage
+        self.uploadPhoto = uploadPhoto
+        self.syncImportedPhoto = syncImportedPhoto
+    }
 
     // MARK: - Public Methods
 
@@ -127,9 +159,16 @@ class BulkImportManager: ObservableObject {
         }
 
         do {
-            // Step 1: Extract full resolution image
-            guard let fullImage = await PhotoLibraryScanner.shared.loadFullImage(for: photo.asset) else {
+            guard let ownership = await MainActor.run(body: { accountOwner.captureAccountSession() }) else {
+                throw ImportError.noUser
+            }
+
+            // Step 1: Extract full resolution image for the session that started this photo.
+            guard let fullImage = await loadFullImage(photo.asset) else {
                 throw ImportError.failedToLoadImage
+            }
+            guard await MainActor.run(body: { accountOwner.ownsAccountSession(ownership) }) else {
+                throw ImportError.noUser
             }
 
             await MainActor.run {
@@ -140,12 +179,10 @@ class BulkImportManager: ObservableObject {
             }
 
             // Step 2: Create body metrics entry for the photo date
-            guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else {
-                throw ImportError.noUser
-            }
+            let userId = ownership.subject
 
             // Check if we already have an entry for this date
-            let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
+            let existingMetrics = await metricsStore.fetchBodyMetrics(
                 for: userId,
                 localDate: BodyMetricLocalDate.key(for: photo.date)
             ).first?.toBodyMetrics()
@@ -173,12 +210,21 @@ class BulkImportManager: ObservableObject {
                     updatedAt: Date()
                 )
 
-                // Save to Core Data
-                CoreDataManager.shared.saveBodyMetrics(
+                let admission: CoreDataManager.WriteAdmission = { [accountOwner] in
+                    guard accountOwner.ownsAccountSession(ownership) else {
+                        throw ImportError.noUser
+                    }
+                }
+                try await metricsStore.saveBodyMetricsAndWait(
                     bodyMetrics,
                     userId: userId,
-                    markAsSynced: false
+                    markAsSynced: false,
+                    writeAdmission: admission
                 )
+            }
+
+            guard await MainActor.run(body: { accountOwner.ownsAccountSession(ownership) }) else {
+                throw ImportError.noUser
             }
 
             await MainActor.run {
@@ -189,10 +235,10 @@ class BulkImportManager: ObservableObject {
             }
 
             // Step 3: Upload photo
-            _ = try await PhotoUploadManager.shared.uploadProgressPhoto(
-                for: bodyMetrics,
-                image: fullImage
-            )
+            _ = try await uploadPhoto(bodyMetrics, fullImage)
+            guard await MainActor.run(body: { accountOwner.ownsAccountSession(ownership) }) else {
+                return
+            }
 
             await MainActor.run {
                 updateImportTask(at: index) {
@@ -201,9 +247,10 @@ class BulkImportManager: ObservableObject {
                 }
             }
 
-            // Trigger sync
+            // Trigger sync only for the session that still owns the import.
             await MainActor.run {
-                RealtimeSyncManager.shared.syncIfNeeded()
+                guard accountOwner.ownsAccountSession(ownership) else { return }
+                syncImportedPhoto()
             }
         } catch {
             // print("❌ Failed to import photo: \(error)")

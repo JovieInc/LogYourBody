@@ -30,6 +30,8 @@ class RealtimeSyncManager: ObservableObject {
     nonisolated let coreDataManager: CoreDataManager
     nonisolated let authManager: AuthManager
     nonisolated let productAPIClient: ProductAPIClient
+    let userDefaults: UserDefaults
+    let analyticsService: AnalyticsService
     let networkMonitor: NWPathMonitor
 
     var syncTimer: Timer?
@@ -65,6 +67,13 @@ class RealtimeSyncManager: ObservableObject {
         let tableName: String
         let timestamp: Date
         var retryCount: Int = 0
+        var queueID: UUID? = UUID()
+
+        func matchesQueuedChange(_ other: SyncOperation) -> Bool {
+            queueID == other.queueID && id == other.id && userId == other.userId &&
+                type == other.type && data == other.data && tableName == other.tableName &&
+                timestamp == other.timestamp
+        }
 
         enum OperationType: String, Codable, Sendable {
             case insert, update, delete
@@ -76,6 +85,8 @@ class RealtimeSyncManager: ObservableObject {
         coreDataManager = CoreDataManager.shared
         authManager = AuthManager.shared
         productAPIClient = ProductAPIClient.shared
+        userDefaults = .standard
+        analyticsService = .shared
         networkMonitor = NWPathMonitor()
 
         setupNetworkMonitoring()
@@ -88,12 +99,16 @@ class RealtimeSyncManager: ObservableObject {
         coreDataManager: CoreDataManager,
         authManager: AuthManager,
         productAPIClient: ProductAPIClient,
-        networkMonitor: NWPathMonitor = NWPathMonitor()
+        networkMonitor: NWPathMonitor = NWPathMonitor(),
+        userDefaults: UserDefaults = .standard,
+        analyticsService: AnalyticsService = .shared
     ) {
         self.coreDataManager = coreDataManager
         self.authManager = authManager
         self.productAPIClient = productAPIClient
         self.networkMonitor = networkMonitor
+        self.userDefaults = userDefaults
+        self.analyticsService = analyticsService
     }
 }
 

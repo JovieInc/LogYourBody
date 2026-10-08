@@ -86,7 +86,10 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
 
     func testProcessBatchHealthKitData_DeduplicatesLateNightWeightsAndPreservesLocalDate() async throws {
         let coreData = CoreDataManager.shared
-        let healthKitManager = HealthKitManager.shared
+        let healthKitManager = HealthKitManager(
+            authManager: AuthManager.shared, coreDataManager: coreData,
+            syncTrigger: {}, importCompletion: { _ in }
+        )
 
         let userId = "healthkit_test_user_late_night_dedup_\(UUID().uuidString)"
         let user = LocalUser(
@@ -96,6 +99,15 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
             avatarUrl: nil,
             profile: nil,
             onboardingCompleted: false
+        )
+        let originalSession = AuthManager.shared.authSession
+        let originalUser = AuthManager.shared.currentUser
+        defer {
+            AuthManager.shared.authSession = originalSession
+            AuthManager.shared.currentUser = originalUser
+        }
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId, email: "hk_late_night@example.com", accessToken: "synthetic-health-access"
         )
         AuthManager.shared.currentUser = user
 
@@ -127,7 +139,10 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
 
     func testProcessBatchHealthKitData_PairsBodyFatByLocalDateAcrossMidnight() async throws {
         let coreData = CoreDataManager.shared
-        let healthKitManager = HealthKitManager.shared
+        let healthKitManager = HealthKitManager(
+            authManager: AuthManager.shared, coreDataManager: coreData,
+            syncTrigger: {}, importCompletion: { _ in }
+        )
 
         let userId = "healthkit_test_user_midnight_pairing_\(UUID().uuidString)"
         let user = LocalUser(
@@ -137,6 +152,15 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
             avatarUrl: nil,
             profile: nil,
             onboardingCompleted: false
+        )
+        let originalSession = AuthManager.shared.authSession
+        let originalUser = AuthManager.shared.currentUser
+        defer {
+            AuthManager.shared.authSession = originalSession
+            AuthManager.shared.currentUser = originalUser
+        }
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId, email: "hk_midnight_pairing@example.com", accessToken: "synthetic-health-access"
         )
         AuthManager.shared.currentUser = user
 
