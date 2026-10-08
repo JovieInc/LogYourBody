@@ -176,30 +176,33 @@ struct BodyScoreManualWeightView: View {
                 }
             },
             footer: {
-                Button {
-                    viewModel.persistManualWeightEntry()
-                    viewModel.goToNextStep()
-                } label: {
-                    Text("Continue")
+                VStack(spacing: JovieTokens.itemGap) {
+                    if weightFieldFocused {
+                        Button {
+                            weightFieldFocused = false
+                        } label: {
+                            Text("Done")
+                                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .accessibilityIdentifier("body_score_weight_keyboard_done_button")
+                    }
+                    Button {
+                        viewModel.persistManualWeightEntry()
+                        viewModel.goToNextStep()
+                    } label: {
+                        Text("Continue")
+                    }
+                    .accessibilityIdentifier("body_score_onboarding_manual_weight_continue_button")
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
+                    .disabled(!viewModel.canContinueWeight)
                 }
-                .accessibilityIdentifier("body_score_onboarding_manual_weight_continue_button")
-                .buttonStyle(OnboardingPrimaryButtonStyle())
-                .disabled(!viewModel.canContinueWeight)
             }
         )
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 self.weightFieldFocused = true
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .keyboard) {
-                HStack {
-                    Spacer()
-                    Button("Done") {
-                        weightFieldFocused = false
-                    }
-                }
             }
         }
         .onChange(of: weightError) { _, error in

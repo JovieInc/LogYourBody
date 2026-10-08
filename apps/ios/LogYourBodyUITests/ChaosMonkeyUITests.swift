@@ -569,6 +569,68 @@ final class ChaosMonkeyUITests: XCTestCase {
         "open settings"
     ]
 
+    func testManualWeightKeyboardDoneMeetsMinimumHitTarget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        app.tap()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        app.buttons["body_score_onboarding_basics_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        app.buttons["CM"].tap()
+        let heightField = app.textFields["Height in centimeters"]
+        XCTAssertTrue(heightField.waitForExistence(timeout: 5))
+        heightField.tap()
+        heightField.typeText("178")
+        let heightDone = app.buttons["Done"]
+        if heightDone.waitForExistence(timeout: 2) {
+            heightDone.tap()
+        }
+        app.buttons["body_score_onboarding_height_continue_button"].tap()
+
+        let manual = app.buttons["body_score_onboarding_enter_manually_button"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 8))
+        manual.tap()
+
+        XCTAssertTrue(app.staticTexts["What’s your current weight?"].waitForExistence(timeout: 8))
+        app.buttons["LBS"].tap()
+        let weightField = app.textFields["Weight (lbs)"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5))
+
+        let window = app.windows.firstMatch.frame
+        let done = app.buttons.matching(identifier: "body_score_weight_keyboard_done_button").firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(done.frame), "weight Done \(done.frame) window \(window)")
+        XCTAssertGreaterThanOrEqual(done.frame.width, 44, "weight Done \(done.frame)")
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, "weight Done \(done.frame)")
+
+        let labeledDones = app.buttons.matching(NSPredicate(format: "label == 'Done'"))
+        for index in 0..<labeledDones.count {
+            let control = labeledDones.element(boundBy: index)
+            guard control.exists, control.frame.width > 1, control.frame.height > 1 else { continue }
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "weight Done \(control.frame)")
+        }
+
+        done.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["What’s your current weight?"].exists)
+    }
+
     override func setUpWithError() throws {
         // The monkey must survive individual bad taps; only a hard app-death
         // check below stops the run early.
