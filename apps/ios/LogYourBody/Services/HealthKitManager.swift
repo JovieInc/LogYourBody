@@ -7,6 +7,7 @@ import HealthKit
 
 enum HealthKitDefaultsKey: String {
     case authorizationConfirmed = "hasConfirmedHealthKitAuthorization"
+    case readProbeRecord = "healthKitReadProbeRecord"
     case lastObserverSyncDate = "lastHealthKitObserverSyncDate"
     case fullSyncCompleted = "hasPerformedFullHealthKitSync"
 
@@ -18,12 +19,170 @@ enum HealthKitDefaultsKey: String {
     }
 }
 
+enum HealthKitSampleProbe: Equatable {
+    case found
+    case empty
+    case failed
+}
+
+/// Read kinds the Apple Health prompt asks for. A sample confirms only its own kind.
+enum HealthKitReadKind: String, Equatable, CaseIterable {
+    case bodyMass
+    case bodyFatPercentage
+    case height
+    case stepCount
+    case dateOfBirth
+
+    var displayName: String {
+        switch self {
+        case .bodyMass: return "weight"
+        case .bodyFatPercentage: return "body fat"
+        case .height: return "height"
+        case .stepCount: return "steps"
+        case .dateOfBirth: return "date of birth"
+        }
+    }
+}
+
+enum HealthKitReadProbeRecord: String, Equatable {
+    case emptyNotDenial
+    case writeOnly
+    case partialSample
+    case requestFailed
+}
+
+enum HealthKitConnectFollowUp: Equatable {
+    case startSync
+    case showRequestFailure
+    case showInconclusiveRead
+}
+
+enum HealthKitOnboardingFollowUp: Equatable {
+    case importHealth
+    case manualAfterEmptyRead
+    case manualAfterRequestFailure
+}
+
+struct HealthKitAuthorizationResolution: Equatable {
+    let writeAuthorized: Bool
+    let probes: [HealthKitReadKind: HealthKitSampleProbe]
+    let requestSucceeded: Bool
+    /// True only when the authorization sheet itself fails. An empty read leaves this false.
+    let presentsAccessNeededAlert: Bool
+
+    var confirmedReadKinds: Set<HealthKitReadKind> {
+        Set(probes.compactMap { kind, probe in probe == .found ? kind : nil })
+    }
+
+    var grantsEveryRequestedReadKind: Bool {
+        confirmedReadKinds == Set(HealthKitReadKind.allCases)
+    }
+
+    var canUseHealthKit: Bool {
+        requestSucceeded && (writeAuthorized || !confirmedReadKinds.isEmpty)
+    }
+
+    var shouldPresentAccessNeededAlert: Bool { presentsAccessNeededAlert }
+
+    /// An empty successful read is denial only when the request path treats it as one.
+    var treatsEmptyReadAsDenial: Bool {
+        requestSucceeded && probes.values.contains(.empty) && presentsAccessNeededAlert
+    }
+
+    var statusText: String {
+        HealthKitAuthorizationPolicy.statusText(for: self)
+    }
+
+    var record: HealthKitReadProbeRecord {
+        if !requestSucceeded { return .requestFailed }
+        if confirmedReadKinds.isEmpty {
+            return writeAuthorized ? .writeOnly : .emptyNotDenial
+        }
+        return .partialSample
+    }
+}
+
 struct HealthKitAuthorizationPolicy {
     static func isAuthorized(
         writeStatus: HKAuthorizationStatus,
         hasConfirmedReadAccess: Bool
     ) -> Bool {
         writeStatus == .sharingAuthorized || hasConfirmedReadAccess
+    }
+
+    /// A finished prompt keeps the probe results as they are. Write sharing does not
+    /// confirm unread kinds. An empty or failed probe does not raise a denial alert.
+    static func resolve(
+        writeAuthorized: Bool,
+        probes: [HealthKitReadKind: HealthKitSampleProbe],
+        requestSucceeded: Bool
+    ) -> HealthKitAuthorizationResolution {
+        HealthKitAuthorizationResolution(
+            writeAuthorized: requestSucceeded && writeAuthorized,
+            probes: probes,
+            requestSucceeded: requestSucceeded,
+            presentsAccessNeededAlert: !requestSucceeded
+        )
+    }
+
+    static func statusText(for resolution: HealthKitAuthorizationResolution) -> String {
+        if !resolution.requestSucceeded {
+            return "Apple Health could not be opened. You can log manually and try again."
+        }
+        let names = resolution.confirmedReadKinds
+            .sorted { $0.rawValue < $1.rawValue }
+            .map(\.displayName)
+        if names.isEmpty {
+            if resolution.writeAuthorized {
+                return "Apple Health writing is allowed. No samples were readable, so read access is not confirmed."
+            }
+            return "No Apple Health samples were readable. That is not a denial. You can log manually."
+        }
+        let list = names.joined(separator: ", ")
+        if resolution.grantsEveryRequestedReadKind {
+            return "Apple Health returned samples for \(list)."
+        }
+        return "Apple Health returned samples for \(list). Other requested types are not confirmed. "
+            + "An empty read is not a denial."
+    }
+
+    static func statusText(for record: HealthKitReadProbeRecord) -> String {
+        switch record {
+        case .emptyNotDenial:
+            return "No Apple Health samples were readable. That is not a denial. You can log manually."
+        case .writeOnly:
+            return "Apple Health writing is allowed. No samples were readable, so read access is not confirmed."
+        case .partialSample:
+            return "Some Apple Health types returned samples. Other requested types are not confirmed. "
+                + "An empty read is not a denial."
+        case .requestFailed:
+            return "Apple Health could not be opened. You can log manually and try again."
+        }
+    }
+
+    static func connectFollowUp(
+        _ resolution: HealthKitAuthorizationResolution
+    ) -> HealthKitConnectFollowUp {
+        if resolution.canUseHealthKit { return .startSync }
+        if resolution.shouldPresentAccessNeededAlert { return .showRequestFailure }
+        return .showInconclusiveRead
+    }
+
+    static func onboardingFollowUp(
+        _ resolution: HealthKitAuthorizationResolution?
+    ) -> HealthKitOnboardingFollowUp {
+        guard let resolution else { return .manualAfterRequestFailure }
+        if resolution.canUseHealthKit { return .importHealth }
+        if resolution.requestSucceeded { return .manualAfterEmptyRead }
+        return .manualAfterRequestFailure
+    }
+
+    static func onboardingAnalyticsEvent(_ followUp: HealthKitOnboardingFollowUp) -> String {
+        switch followUp {
+        case .importHealth: return "onboarding_health_import_authorized"
+        case .manualAfterEmptyRead: return "onboarding_health_import_no_samples"
+        case .manualAfterRequestFailure: return "onboarding_health_import_unavailable"
+        }
     }
 }
 
@@ -103,6 +262,9 @@ class HealthKitManager: ObservableObject {
     }
 
     @Published var isAuthorized = false
+    /// Truthful Apple Health status. Empty means the screen may use its legacy connected/not connected label.
+    @Published var authorizationStatusText = ""
+    var lastAuthorizationResolution: HealthKitAuthorizationResolution?
     @Published var latestWeight: Double?
     @Published var latestWeightDate: Date?
     @Published var latestBodyFatPercentage: Double?
