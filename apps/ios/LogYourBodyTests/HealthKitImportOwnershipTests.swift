@@ -108,12 +108,13 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         query: HeldWeightImportQuery? = nil,
         stepQuery: HeldStepHistoryQuery? = nil,
         earliestQuery: (() async throws -> Date?)? = nil,
+        weightQuery: ((Date, Date) async throws -> [HealthKitWeightImportSample])? = nil,
         metricStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil,
         rawStore: (([HKRawSample]) async -> Void)? = nil
     ) -> HealthKitManager {
         let manager = HealthKitManager(
             userDefaults: defaults, authManager: auth, coreDataManager: coreData,
-            weightImportQuery: { _, _ in
+            weightImportQuery: weightQuery ?? { _, _ in
                 if let query { return await query.fetch() }
                 return []
             },
@@ -401,7 +402,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
             queries += 1
             _ = await (queries == 1 ? first : replacement).fetch()
             return Date()
-        })
+        }, weightQuery: { _, _ in [] })
         let scheduled = await manager.triggerFullHealthKitSyncIfNeeded(imported: 0)
         let firstTask = try XCTUnwrap(scheduled)
         defer { first.complete([]); replacement.complete([]) }
