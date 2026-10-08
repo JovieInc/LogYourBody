@@ -25,11 +25,25 @@ export const neonWaitlistStorage: WaitlistStoragePort = {
       throw new Error('INVALID_EMAIL');
     }
 
-    await getDatabase()`
+    const rows = await getDatabase()`
       insert into public.waitlist_entries (email, email_normalized, source)
       values (${normalized}, ${normalized}, ${source})
-      on conflict (email_normalized) do update
-      set updated_at = now()
+      on conflict (email_normalized) do nothing
+      returning true as created
     `;
+    return { created: rows.length === 1 };
+  },
+
+  async countRegistrations({ from, to }) {
+    const rows = await getDatabase()`
+      select count(*)::text as count, now() as observed_at
+      from public.waitlist_entries
+      where created_at >= ${from}::timestamptz
+        and created_at < ${to}::timestamptz
+    `;
+    const count = Number(rows[0]?.count);
+    const observedAt = new Date(rows[0]?.observed_at).toISOString();
+    if (!Number.isSafeInteger(count) || count < 0) throw new Error('INVALID_WAITLIST_COUNT');
+    return { count, observedAt };
   },
 };
