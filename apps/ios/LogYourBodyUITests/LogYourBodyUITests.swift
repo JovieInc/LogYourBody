@@ -1653,6 +1653,43 @@ final class LogYourBodyUITests: XCTestCase {
         )
     }
 
+    func testHomeV2EditEntryDeleteCancelKeepsTheEntry() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let contextButton = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(contextButton.waitForExistence(timeout: 30))
+        contextButton.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 8))
+
+        let edit = app.buttons["home_v2_edit_entry"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 8))
+        edit.tap()
+        let delete = app.buttons["home_v2_log_sheet_delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 8))
+        delete.tap()
+
+        let confirm = app.buttons.matching(identifier: "home_v2_log_sheet_delete_confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        let cancel = app.buttons.matching(identifier: "home_v2_log_sheet_delete_cancel").firstMatch
+        XCTAssertTrue(
+            cancel.waitForExistence(timeout: 3),
+            "Edit-entry delete confirmation must include a reachable Cancel control."
+        )
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 5))
+        app.buttons["home_v2_log_sheet_save"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 8),
+            "Cancel must keep the entry"
+        )
+    }
+
     func testHomeV2EntriesListsTheMonthAndOpensADay() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
