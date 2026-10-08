@@ -286,6 +286,9 @@ func fetchDexaResults(for userId: String, limit: Int) async -> [DexaResult] {
 
                 let cached: CachedDexaResult
                 if let existing = try? context.fetch(fetchRequest).first {
+                    if let owner = existing.userId, !owner.isEmpty, owner != userId {
+                        continue
+                    }
                     cached = existing
                 } else {
                     cached = CachedDexaResult(context: context)
