@@ -100,6 +100,78 @@ final class RevenueCatPurchaseRestoreFlowTests: XCTestCase {
         XCTAssertEqual(fixture.manager.errorMessage, "No active subscriptions found")
     }
 
+    func testRestoreDoesNotApplySubscriptionAfterAccountReplacement() async {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        let owner = fixture.manager.beginBillingSession(subject: "restore-owner")
+        fixture.manager.finishBillingSession(owner)
+        fixture.client.restoreResult = .success(Self.customer(isActive: true, appUserId: "restore-owner"))
+        fixture.client.onRestore = {
+            let replacement = fixture.manager.beginBillingSession(subject: "restore-replacement")
+            fixture.manager.finishBillingSession(replacement)
+        }
+
+        let didRestore = await fixture.manager.restorePurchases()
+
+        XCTAssertFalse(didRestore)
+        XCTAssertFalse(fixture.manager.isPurchasing)
+        XCTAssertNil(fixture.manager.errorMessage)
+        XCTAssertFalse(fixture.manager.isSubscribed)
+        XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+        XCTAssertNil(fixture.manager.customerInfo)
+    }
+
+    func testRestoreAppliesSubscriptionWhileTheBillingSessionStays() async {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        let owner = fixture.manager.beginBillingSession(subject: "restore-stays")
+        fixture.manager.finishBillingSession(owner)
+        fixture.client.restoreResult = .success(Self.customer(isActive: true, appUserId: "restore-stays"))
+
+        let didRestore = await fixture.manager.restorePurchases()
+
+        XCTAssertTrue(didRestore)
+        XCTAssertFalse(fixture.manager.isPurchasing)
+        XCTAssertTrue(fixture.manager.isSubscribed)
+        XCTAssertTrue(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+    }
+
+    func testPurchaseDoesNotApplySubscriptionAfterAccountReplacement() async {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        let owner = fixture.manager.beginBillingSession(subject: "purchase-owner")
+        fixture.manager.finishBillingSession(owner)
+        fixture.client.purchaseResult = .success(Self.customer(isActive: true, appUserId: "purchase-owner"))
+        fixture.client.onPurchase = {
+            let replacement = fixture.manager.beginBillingSession(subject: "purchase-replacement")
+            fixture.manager.finishBillingSession(replacement)
+        }
+
+        let didPurchase = await fixture.manager.purchase(package: Self.makeAnnualPackage())
+
+        XCTAssertFalse(didPurchase)
+        XCTAssertFalse(fixture.manager.isPurchasing)
+        XCTAssertNil(fixture.manager.errorMessage)
+        XCTAssertFalse(fixture.manager.isSubscribed)
+        XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+        XCTAssertNil(fixture.manager.customerInfo)
+    }
+
+    func testPurchaseAppliesSubscriptionWhileTheBillingSessionStays() async {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        let owner = fixture.manager.beginBillingSession(subject: "purchase-stays")
+        fixture.manager.finishBillingSession(owner)
+        fixture.client.purchaseResult = .success(Self.customer(isActive: true, appUserId: "purchase-stays"))
+
+        let didPurchase = await fixture.manager.purchase(package: Self.makeAnnualPackage())
+
+        XCTAssertTrue(didPurchase)
+        XCTAssertFalse(fixture.manager.isPurchasing)
+        XCTAssertTrue(fixture.manager.isSubscribed)
+        XCTAssertTrue(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+    }
+
     func testRefreshFailurePreservesCachedSubscribedAccess() async {
         let fixture = makeFixture(cachedSubscribed: true)
         defer { fixture.cleanup() }

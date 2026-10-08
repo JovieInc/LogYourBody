@@ -282,11 +282,21 @@ func purchase(packageIdentifier: String) async -> Bool {
             self.errorMessage = nil
         }
 
+        guard let ownership = captureBillingSession() else {
+            await MainActor.run { self.isPurchasing = false }
+            return false
+        }
+
         do {
             let customer = try await purchasesClient.purchase(
                 package: package,
                 entitlementID: proEntitlementID
             )
+
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                await MainActor.run { self.isPurchasing = false }
+                return false
+            }
 
             await MainActor.run {
                 self.updateSubscriptionStatus(customer: customer)
@@ -296,13 +306,17 @@ func purchase(packageIdentifier: String) async -> Bool {
             // print("💰 Purchase successful!")
             return true
         } catch let error as RevenueCatPurchasingError {
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                await MainActor.run { self.isPurchasing = false }
+                return false
+            }
             if error != .purchaseCancelled {
                 let appError = AppError.billing(operation: "purchase", underlying: error)
                 let context = ErrorContext(
                     feature: "billing",
                     operation: "purchase",
                     screen: "PaywallView",
-                    userId: nil
+                    userId: ownership.subject
                 )
                 ErrorReporter.shared.capture(appError, context: context)
             }
@@ -329,12 +343,16 @@ func purchase(packageIdentifier: String) async -> Bool {
             }
             return false
         } catch {
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                await MainActor.run { self.isPurchasing = false }
+                return false
+            }
             let appError = AppError.billing(operation: "purchase", underlying: error)
             let context = ErrorContext(
                 feature: "billing",
                 operation: "purchase",
                 screen: "PaywallView",
-                userId: nil
+                userId: ownership.subject
             )
             ErrorReporter.shared.capture(appError, context: context)
 
@@ -364,8 +382,18 @@ func purchase(packageIdentifier: String) async -> Bool {
             return false
         }
 
+        guard let ownership = captureBillingSession() else {
+            await MainActor.run { self.isPurchasing = false }
+            return false
+        }
+
         do {
             let customer = try await purchasesClient.restorePurchases(entitlementID: proEntitlementID)
+
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                await MainActor.run { self.isPurchasing = false }
+                return false
+            }
 
             await MainActor.run {
                 self.updateSubscriptionStatus(customer: customer)
@@ -382,12 +410,16 @@ func purchase(packageIdentifier: String) async -> Bool {
                 return false
             }
         } catch {
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                await MainActor.run { self.isPurchasing = false }
+                return false
+            }
             let appError = AppError.billing(operation: "restorePurchases", underlying: error)
             let context = ErrorContext(
                 feature: "billing",
                 operation: "restorePurchases",
                 screen: "PaywallView",
-                userId: nil
+                userId: ownership.subject
             )
             ErrorReporter.shared.capture(appError, context: context)
 
