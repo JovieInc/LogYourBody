@@ -511,6 +511,9 @@ final class ChaosEdgeCaseUITests: XCTestCase {
     // MARK: - 13. Accessibility XXXL round trip has no layout anomalies
 
     func testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies() throws {
+        // A 120s kill retries all eleven chaos tests and blows the 40-minute
+        // gate. 180s is the audit's existing maximum, not a workflow change.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
@@ -968,23 +971,15 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        attachDiagnosticTree(from: app, named: "layout-scan-\(context)-tree")
-        attachScreenshot(named: "layout-scan-\(context)", from: app)
-        let window = app.windows.firstMatch.frame
-        let elements = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
-        let geometry = elements.map { "\($0.identifier) \($0.label): \($0.frame)" }
-        let attachment = XCTAttachment(string: "window=\(window)\n" + geometry.joined(separator: "\n"))
-        attachment.name = "layout-scan-\(context)-geometry"
-        attachment.lifetime = .keepAlways
-        add(attachment)
         var observations: [String] = []
         let findings = layoutAnomalies(in: app, observations: &observations)
+        guard !findings.isEmpty else { return }
+        attachDiagnosticTree(from: app, named: "layout-scan-\(context)-tree")
+        attachScreenshot(named: "layout-anomaly-\(context)", from: app)
         let clipping = XCTAttachment(string: observations.joined(separator: "\n"))
         clipping.name = "layout-scan-\(context)-expected-native-scroll-clipping"
         clipping.lifetime = .keepAlways
         add(clipping)
-        guard !findings.isEmpty else { return }
-        attachScreenshot(named: "layout-anomaly-\(context)", from: app)
         XCTFail("Layout anomalies at \(context): \(findings.joined(separator: "; "))", file: file, line: line)
     }
 
