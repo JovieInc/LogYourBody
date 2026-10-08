@@ -367,7 +367,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         )
 
         try await coreData.saveBodyMetricsAndWait(metricModel, userId: userId, markAsSynced: true)
-        let didMarkDeleted = await coreData.markBodyMetricDeleted(id: id)
+        let didMarkDeleted = await coreData.markBodyMetricDeleted(id: id, userId: userId)
         XCTAssertTrue(didMarkDeleted)
 
         let formatter = ISO8601DateFormatter()

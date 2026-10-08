@@ -402,12 +402,12 @@ func saveHKSamples(_ samples: [HKRawSample]) async {
         }
     }
 
-func markBodyMetricDeleted(id: String) async -> Bool {
+func markBodyMetricDeleted(id: String, userId: String) async -> Bool {
         let context = viewContext
 
         return await context.perform {
             let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "id == %@", id)
+            fetchRequest.predicate = NSPredicate(format: "id == %@ AND userId == %@", id, userId)
             fetchRequest.fetchLimit = 1
 
             guard let cachedMetric = try? context.fetch(fetchRequest).first else {
