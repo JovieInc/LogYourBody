@@ -32,6 +32,32 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         continueFromRevealToProfile(in: app)
     }
 
+    /// The "Why we ask" disclosure is a compact caption. Its effective target
+    /// must still be at least 44 points, including a tap at the top edge.
+    func testWhyWeAskDisclosureKeepsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture"]
+        app.launch()
+
+        let startButton = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(startButton.waitForExistence(timeout: 10))
+        startButton.tap()
+
+        let whyWeAsk = app.buttons["Why we ask"]
+        XCTAssertTrue(whyWeAsk.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(whyWeAsk.frame.width, 44, "Why we ask width \(whyWeAsk.frame.width)")
+        XCTAssertGreaterThanOrEqual(whyWeAsk.frame.height, 44, "Why we ask height \(whyWeAsk.frame.height)")
+        XCTAssertTrue(whyWeAsk.isHittable)
+
+        whyWeAsk.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap()
+
+        XCTAssertTrue(
+            app.staticTexts["We use sex at birth only to match you to the right comparison group—never for marketing."]
+                .waitForExistence(timeout: 3),
+            "A tap at the top of the 44-point target must expand the disclosure"
+        )
+    }
+
     // MARK: - Steps
 
     private func assertHookStep(in app: XCUIApplication) {

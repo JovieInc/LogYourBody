@@ -124,8 +124,8 @@ struct OnboardingTextButton: View {
                 .font(theme.typography.labelMedium)
                 .foregroundStyle(theme.colors.primary)
                 .padding(.vertical, 8)
+                .jovieTouchTarget()
         }
-        .jovieTouchTarget()
     }
 }
 
@@ -149,9 +149,9 @@ struct OnboardingDisclosureLink: View {
                     .font(theme.typography.captionLarge)
             }
             .foregroundStyle(theme.colors.primary)
+            .jovieTouchTarget()
         }
         .buttonStyle(.plain)
-        .jovieTouchTarget()
         .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
         .accessibilityHint(isExpanded ? "Hides more information." : "Shows more information.")
     }
