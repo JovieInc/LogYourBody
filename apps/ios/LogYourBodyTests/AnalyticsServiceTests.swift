@@ -16,7 +16,8 @@ final class AnalyticsServiceTests: XCTestCase {
         "onboarding_body_score_calculation_attempt", "onboarding_body_score_calculation_failed",
         "onboarding_body_score_calculation_succeeded", "onboarding_completed", "onboarding_email_captured",
         "onboarding_health_import_attempt", "onboarding_health_import_authorized", "onboarding_health_import_denied",
-        "onboarding_health_import_unavailable", "onboarding_pre_auth_completed", "onboarding_started",
+        "onboarding_health_import_no_samples", "onboarding_health_import_unavailable",
+        "onboarding_pre_auth_completed", "onboarding_started",
         "onboarding_step_advanced", "onboarding_view", "paywall_logout", "paywall_view", "photos_tab_opened",
         "purchase_failed", "purchase_start", "purchase_success", "restore_failed", "restore_success",
         "sync_failed", "trial_converted_to_paid", "trial_expired_unpaid", "trial_start"
