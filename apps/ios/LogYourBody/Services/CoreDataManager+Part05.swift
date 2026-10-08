@@ -90,6 +90,9 @@ func saveGlp1Medications(
                 let cached: CachedGlp1Medication
 
                 if let existing = try? context.fetch(request).first {
+                    if let owner = existing.userId, !owner.isEmpty, owner != userId {
+                        continue
+                    }
                     cached = existing
                 } else {
                     cached = CachedGlp1Medication(context: context)
