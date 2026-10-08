@@ -446,4 +446,114 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertNil(withoutVat.vatMassKg)
         XCTAssertNil(withoutVat.vatVolumeCm3)
     }
+
+    func testLogBodyMetricsDoesNotReassignAnotherAccountsRow() async throws {
+        let ownerId = "sync_test_owner_\(UUID().uuidString)"
+        let otherId = "sync_test_other_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(90)
+        let metric = BodyMetrics(
+            id: id,
+            userId: ownerId,
+            date: date,
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "owner-entry",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: ownerId, markAsSynced: true)
+
+        let authManager = AuthManager()
+        authManager.currentUser = LocalUser(
+            id: otherId,
+            email: "other@example.com",
+            name: "Other",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+        let manager = RealtimeSyncManager(
+            coreDataManager: CoreDataManager.shared,
+            authManager: authManager,
+            productAPIClient: StubProductAPIClient()
+        )
+        manager.isOnline = false
+        manager.logBodyMetrics(
+            BodyMetrics(
+                id: id,
+                userId: ownerId,
+                date: date,
+                weight: 55,
+                weightUnit: "kg",
+                bodyFatPercentage: nil,
+                bodyFatMethod: nil,
+                muscleMass: nil,
+                boneMass: nil,
+                notes: "stolen",
+                photoUrl: nil,
+                dataSource: "Manual",
+                createdAt: date,
+                updatedAt: date
+            )
+        )
+
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, ownerId)
+        XCTAssertEqual(row.weight, 80, accuracy: 0.001)
+        XCTAssertEqual(row.notes, "owner-entry")
+        XCTAssertTrue(row.isSynced)
+        XCTAssertFalse(row.isMarkedDeleted)
+    }
+
+    func testUpdateOrCreateBodyMetricDoesNotReassignAnotherAccountsRow() async throws {
+        let ownerId = "sync_test_owner_\(UUID().uuidString)"
+        let otherId = "sync_test_other_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(120)
+        let metric = BodyMetrics(
+            id: id,
+            userId: ownerId,
+            date: date,
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "owner-entry",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: ownerId, markAsSynced: true)
+
+        let formatter = ISO8601DateFormatter()
+        CoreDataManager.shared.updateOrCreateBodyMetric(from: [
+            "id": id,
+            "user_id": otherId,
+            "date": formatter.string(from: date),
+            "weight": 55.0,
+            "weight_unit": "kg",
+            "notes": "foreign-payload",
+            "data_source": "manual",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ])
+
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, ownerId)
+        XCTAssertEqual(row.weight, 80, accuracy: 0.001)
+        XCTAssertEqual(row.notes, "owner-entry")
+        XCTAssertFalse(row.isMarkedDeleted)
+    }
 }

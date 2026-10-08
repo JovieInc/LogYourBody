@@ -33,8 +33,14 @@ extension CoreDataManager {
 
             do {
                 let results = try context.fetch(request)
-                if results.first?.isMarkedDeleted == true {
-                    return
+                let payloadUserId = data["user_id"] as? String
+                if let existing = results.first {
+                    if existing.isMarkedDeleted {
+                        return
+                    }
+                    if let owner = existing.userId, !owner.isEmpty, payloadUserId != owner {
+                        return
+                    }
                 }
 
                 let metric = results.first ?? CachedBodyMetrics(context: context)

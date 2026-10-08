@@ -472,6 +472,16 @@ func saveAndWait() {
                 let cached: CachedBodyMetrics
 
                 if let existing = results.first {
+                    if let owner = existing.userId, !owner.isEmpty, owner != userId {
+                        completion?(.failure(NSError(
+                            domain: "CoreDataManager",
+                            code: 3,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: "Cannot save a measurement owned by another account"
+                            ]
+                        )))
+                        return
+                    }
                     cached = existing
                 } else {
                     cached = CachedBodyMetrics(context: context)
