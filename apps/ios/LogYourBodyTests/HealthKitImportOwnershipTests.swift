@@ -189,6 +189,44 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertEqual(syncTriggers, 1)
     }
 
+    func testStepImportDoesNotLandWhenAnotherAccountOwnsHealthSync() async {
+        defaults.set("synthetic-health-A", forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        setAccount("synthetic-health-B")
+        let query = HeldStepHistoryQuery()
+        query.complete([(stepCount: 4_321, date: Date())])
+        let manager = manager(stepQuery: query)
+
+        do {
+            try await manager.syncStepsFromHealthKit()
+            XCTFail("A different account must not import HealthKit steps")
+        } catch {
+            XCTAssertTrue(error is HealthKitError)
+        }
+
+        let recordsA = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
+        let recordsB = await coreData.fetchDailyMetrics(for: "synthetic-health-B")
+        XCTAssertTrue(recordsA.isEmpty)
+        XCTAssertTrue(recordsB.isEmpty)
+        XCTAssertEqual(syncTriggers, 0)
+    }
+
+    func testBoundAccountCanStillImportItsOwnSteps() async throws {
+        defaults.set("synthetic-health-A", forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        let query = HeldStepHistoryQuery()
+        let manager = manager(stepQuery: query)
+        let day = Date()
+        let task = Task { try await manager.syncStepsFromHealthKit() }
+        await fulfillment(of: [query.started], timeout: 3)
+        query.complete([(stepCount: 2_048, date: day)])
+        try await task.value
+        let records = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
+        let record = try XCTUnwrap(records.first)
+        XCTAssertEqual(record.userId, "synthetic-health-A")
+        XCTAssertEqual(record.steps, 2_048)
+        let recordsB = await coreData.fetchDailyMetrics(for: "synthetic-health-B")
+        XCTAssertTrue(recordsB.isEmpty)
+    }
+
     func testHeldStepHistoryCannotImportUnderReplacementAccount() async {
         await assertHeldStepImportIsRejected { setAccount("synthetic-health-B") }
     }

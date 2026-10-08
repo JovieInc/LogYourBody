@@ -355,6 +355,7 @@ struct LogYourBodyApp: App {
         }
 
         Task { @MainActor in
+            await authInitializationTask.value
             await bootstrapHealthKit()
         }
 
@@ -380,6 +381,11 @@ struct LogYourBodyApp: App {
     @MainActor
     private func bootstrapHealthKit() async {
         let syncEnabled = UserDefaults.standard.bool(forKey: Constants.healthKitSyncEnabledKey)
+        HealthKitAccountSyncPolicy.bindIfUnbound(
+            userId: authManager.currentUser?.id,
+            syncEnabled: syncEnabled,
+            defaults: .standard
+        )
         HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: syncEnabled)
     }
 
