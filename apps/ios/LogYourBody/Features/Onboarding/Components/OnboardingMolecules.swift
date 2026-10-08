@@ -125,8 +125,13 @@ struct OnboardingTextFieldRow: View {
     let placeholder: String
     @Binding var text: String
     var keyboardType: UIKeyboardType = .default
+    var externalFocus: FocusState<Bool>.Binding?
 
     @FocusState private var isFocused: Bool
+
+    private var showsFocus: Bool {
+        externalFocus?.wrappedValue ?? isFocused
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.spacing.xs) {
@@ -134,21 +139,30 @@ struct OnboardingTextFieldRow: View {
                 .font(OnboardingTypography.caption)
                 .foregroundStyle(theme.colors.textSecondary)
 
-            TextField(placeholder, text: $text)
-                .keyboardType(keyboardType)
-                .autocorrectionDisabled(true)
-                .textInputAutocapitalization(.never)
-                .focused($isFocused)
+            focusedField
                 .padding(.horizontal, theme.spacing.sm)
                 .frame(minHeight: JovieTokens.controlHeight)
                 .systemBGlassSurface(
                     cornerRadius: JovieTokens.controlHeight,
-                    tint: isFocused ? theme.colors.primary : theme.colors.text,
-                    tintOpacity: isFocused ? 0.07 : 0.03,
-                    borderColor: isFocused ? theme.colors.primary : theme.colors.border,
-                    borderOpacity: isFocused ? 0.9 : 0.65
+                    tint: showsFocus ? theme.colors.primary : theme.colors.text,
+                    tintOpacity: showsFocus ? 0.07 : 0.03,
+                    borderColor: showsFocus ? theme.colors.primary : theme.colors.border,
+                    borderOpacity: showsFocus ? 0.9 : 0.65
                 )
                 .clipShape(Capsule(style: .continuous))
+        }
+    }
+
+    @ViewBuilder
+    private var focusedField: some View {
+        let field = TextField(placeholder, text: $text)
+            .keyboardType(keyboardType)
+            .autocorrectionDisabled(true)
+            .textInputAutocapitalization(.never)
+        if let externalFocus {
+            field.focused(externalFocus)
+        } else {
+            field.focused($isFocused)
         }
     }
 }

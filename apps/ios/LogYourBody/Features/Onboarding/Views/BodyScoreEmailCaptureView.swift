@@ -30,9 +30,9 @@ struct BodyScoreEmailCaptureView: View {
                                 get: { viewModel.emailAddress },
                                 set: { viewModel.emailAddress = $0 }
                             ),
-                            keyboardType: .emailAddress
+                            keyboardType: .emailAddress,
+                            externalFocus: $emailFieldFocused
                         )
-                        .focused($emailFieldFocused)
                         .onChange(of: viewModel.emailAddress) { _, _ in
                             updateEmailError()
                         }
@@ -69,14 +69,27 @@ struct BodyScoreEmailCaptureView: View {
                 }
             },
             footer: {
-                Button {
-                    viewModel.persistEmailCapture()
-                    viewModel.goToNextStep()
-                } label: {
-                    Text("Continue")
+                VStack(spacing: JovieTokens.itemGap) {
+                    if emailFieldFocused {
+                        Button {
+                            emailFieldFocused = false
+                        } label: {
+                            Text("Done")
+                                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .accessibilityIdentifier("body_score_email_keyboard_done_button")
+                    }
+                    Button {
+                        viewModel.persistEmailCapture()
+                        viewModel.goToNextStep()
+                    } label: {
+                        Text("Continue")
+                    }
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
+                    .disabled(!viewModel.canContinueEmailCapture)
                 }
-                .buttonStyle(OnboardingPrimaryButtonStyle())
-                .disabled(!viewModel.canContinueEmailCapture)
             }
         )
         .onAppear {
@@ -84,16 +97,6 @@ struct BodyScoreEmailCaptureView: View {
                 self.emailFieldFocused = true
             }
             updateEmailError()
-        }
-        .toolbar {
-            ToolbarItem(placement: .keyboard) {
-                HStack {
-                    Spacer()
-                    Button("Done") {
-                        emailFieldFocused = false
-                    }
-                }
-            }
         }
         .onChange(of: emailError) { _, error in
             emailErrorFocused = error != nil
