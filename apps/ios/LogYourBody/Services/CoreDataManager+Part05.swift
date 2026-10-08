@@ -170,4 +170,64 @@ func endActiveGlp1Medications(for userId: String, endedAt: Date) {
             }
         }
     }
+
+    #if DEBUG
+    /// The weekly check-in UI fixture reuses two ids and a new user on every launch.
+    func replaceUITestGlp1WeeklyCheckInFixture(userId: String) async {
+        let context = viewContext
+        await context.perform {
+            let medications: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+            medications.predicate = NSPredicate(format: "id == %@", "ui_test_glp1_medication")
+            (try? context.fetch(medications))?.forEach(context.delete)
+            let doses: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+            doses.predicate = NSPredicate(format: "id == %@", "ui_test_glp1_dose_due")
+            (try? context.fetch(doses))?.forEach(context.delete)
+            if context.hasChanges {
+                try? context.save()
+            }
+        }
+        let calendar = Calendar.current
+        let now = Date()
+        let startedAt = calendar.date(byAdding: .day, value: -42, to: now) ?? now
+        let lastDoseDate = calendar.date(byAdding: .day, value: -9, to: now) ?? now
+        let medication = Glp1Medication(
+            id: "ui_test_glp1_medication",
+            userId: userId,
+            displayName: "Zepbound",
+            genericName: "tirzepatide",
+            drugClass: "dual GIP/GLP-1 receptor agonist",
+            brand: "Zepbound",
+            route: "subcutaneous",
+            frequency: "once weekly",
+            doseUnit: "mg/week",
+            isCompounded: false,
+            hkIdentifier: "hk.glp1.tirzepatide.zepbound.weekly",
+            startedAt: startedAt,
+            endedAt: nil,
+            notes: nil,
+            createdAt: startedAt,
+            updatedAt: now
+        )
+        let doseLog = Glp1DoseLog(
+            id: "ui_test_glp1_dose_due",
+            userId: userId,
+            takenAt: calendar.startOfDay(for: lastDoseDate),
+            medicationId: medication.id,
+            doseAmount: 5.0,
+            doseUnit: "mg/week",
+            drugClass: medication.drugClass,
+            brand: medication.brand,
+            isCompounded: medication.isCompounded,
+            supplierType: nil,
+            supplierName: nil,
+            notes: "UI test weekly check-in seed",
+            createdAt: lastDoseDate,
+            updatedAt: now
+        )
+        saveGlp1Medications([medication], userId: userId)
+        saveGlp1DoseLogs([doseLog], userId: userId)
+        _ = await fetchGlp1Medications(for: userId)
+        _ = await fetchGlp1DoseLogs(for: userId)
+    }
+    #endif
 }

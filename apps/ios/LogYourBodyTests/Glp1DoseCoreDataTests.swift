@@ -267,6 +267,26 @@ final class Glp1DoseCoreDataTests: XCTestCase {
         )
     }
 
+    func testWeeklyCheckInFixtureReseedKeepsTheNewUsersMedication() async throws {
+        let firstUser = "synthetic-glp1-fixture-a"
+        let secondUser = "synthetic-glp1-fixture-b"
+        await CoreDataManager.shared.replaceUITestGlp1WeeklyCheckInFixture(userId: firstUser)
+        let firstMeds = await CoreDataManager.shared.fetchGlp1Medications(for: firstUser)
+        XCTAssertEqual(firstMeds.map(\.id), ["ui_test_glp1_medication"])
+
+        await CoreDataManager.shared.replaceUITestGlp1WeeklyCheckInFixture(userId: secondUser)
+        let secondMeds = await CoreDataManager.shared.fetchGlp1Medications(for: secondUser)
+        XCTAssertEqual(secondMeds.map(\.displayName), ["Zepbound"])
+        let secondDoses = await CoreDataManager.shared.fetchGlp1DoseLogs(for: secondUser)
+        XCTAssertEqual(secondDoses.map(\.notes), ["UI test weekly check-in seed"])
+        let owner = await cachedMedication(id: "ui_test_glp1_medication")
+        XCTAssertEqual(owner?.userId, secondUser)
+        let doseOwner = await cachedDose(id: "ui_test_glp1_dose_due")
+        XCTAssertEqual(doseOwner?.userId, secondUser)
+        let firstAfter = await CoreDataManager.shared.fetchGlp1Medications(for: firstUser)
+        XCTAssertTrue(firstAfter.isEmpty)
+    }
+
     private func cachedDose(id: String) async -> CachedGlp1DoseLog? {
         let context = CoreDataManager.shared.viewContext
         return await context.perform {
