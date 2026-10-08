@@ -5,6 +5,11 @@ semantics: availability, connection or permission state, and data history are
 separate observations. The first native slice is behind the default-off Statsig
 gate `lyb_integrations_directory_v1`, accessed through the analytics port.
 Debug UI runs can enable it with `-lybUITestIntegrationsDirectoryFixture`.
+Default rows show provider, purpose, meaningful status, and next action. Health
+access guidance and scan/device-connection detail use disclosures; actionable
+history refresh errors and retry remain visible.
+Rollout updates refresh history so previously formatted legacy dates cannot
+remain labeled as sync timestamps after enabling the directory.
 
 Provider metadata lives in the existing product registry's
 `src/products/logyourbody-integrations.mjs` and generates the native labels,
@@ -65,7 +70,8 @@ the CI unit-tier plan; no Xcode target or workflow edit is needed.
 `ChaosEdgeCaseUITests.testIntegrationDirectorySeparatesHealthAccessAndScanHistory`
 uses the existing UI test target and a synthetic gated fixture to verify the
 rendered labels and retain a native screenshot without granting Health access
-or connecting a provider account.
+or connecting a provider account. The launch-quality audit explicitly selects
+this case in `CHAOS_REGRESSIONS` and requires its actual passing XCTest result.
 
 The registry's real `pnpm product:check`, scoped root lint/typecheck, strict
 SwiftLint and Swift syntax parsing passed locally. Native test

@@ -86,6 +86,9 @@ final class BodyMetricSourceContractTests: XCTestCase {
         let result = scan(id: "unknown", source: "bodyspec", acquired: nil, updated: 900)
         XCTAssertNil(IntegrationStatusPolicy.scanDate(result, directoryEnabled: true))
         XCTAssertEqual(IntegrationStatusPolicy.scanDate(result, directoryEnabled: false), result.updatedAt)
+        let known = scan(id: "known", source: "bodyspec", acquired: 100, updated: 100)
+        let unknown = scan(id: "another-unknown", source: "bodyspec", acquired: nil, updated: 800)
+        XCTAssertEqual(IntegrationStatusPolicy.bodySpecHistory([result, known, unknown]).first?.id, "known")
     }
 
     private func scan(id: String, source: String, acquired: TimeInterval?, updated: TimeInterval) -> DexaResult {

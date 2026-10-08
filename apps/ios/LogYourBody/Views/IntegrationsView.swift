@@ -51,6 +51,7 @@ struct IntegrationsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
             featureGateRefreshToken = UUID()
+            historyRefreshVersion += 1
         }
         .worldClassScreen(.integrations)
     }
@@ -64,9 +65,12 @@ struct IntegrationsView: View {
                 SettingsRow(
                     icon: "heart.fill",
                     title: ProductRegistry.Integrations.appleHealth.label,
-                    subtitle: appleHealthPresentation.detail,
-                    value: appleHealthPresentation.status
+                    subtitle: "\(ProductRegistry.Integrations.appleHealth.description)\n\(appleHealthPresentation.status)"
                 )
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(ProductRegistry.Integrations.appleHealth.label)
+                .accessibilityValue(appleHealthPresentation.status)
+                .accessibilityHint(appleHealthPresentation.detail)
                 .accessibilityIdentifier("integrations_health_status")
             }
             if healthKitManager.isHealthKitAvailable {
@@ -108,12 +112,20 @@ struct IntegrationsView: View {
                     SettingsRow(
                         icon: "waveform.path.ecg",
                         title: isDirectoryEnabled ? ProductRegistry.Integrations.bodyspec.label : "BodySpec",
-                        subtitle: isDirectoryEnabled ? bodySpecDirectoryDetail : "DEXA scans",
-                        value: isDirectoryEnabled ? bodySpecConnectionStatus : bodySpecSyncStatusText,
+                        subtitle: isDirectoryEnabled ? "\(bodySpecDirectoryDetail)\n\(bodySpecConnectionStatus)" : "DEXA scans",
+                        value: isDirectoryEnabled ? nil : bodySpecSyncStatusText,
                         showChevron: false
                     )
                 }
                 .accessibilityIdentifier("integrations_bodyspec_link")
+                if isDirectoryEnabled {
+                    DisclosureGroup("Scan history") {
+                        Text(bodySpecSyncStatusText)
+                        if BodySpecAuthManager.shared.isConnected { Text("Connection saved on this device") }
+                    }
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("integrations_bodyspec_history")
+                }
                 if isDirectoryEnabled, bodySpecHistoryFailed {
                     Button("Refresh scan history") { historyRefreshVersion += 1 }
                         .disabled(isLoadingBodySpecLastSynced)
@@ -126,6 +138,7 @@ struct IntegrationsView: View {
     private var healthSyncControls: some View {
         Group {
             if isDirectoryEnabled {
+                Text("Apple Health controls which data is shared.").foregroundStyle(.secondary)
                 Button("Manage Apple Health access") { showHealthKitConnect = true }
                     .accessibilityIdentifier("integrations_health_manage_access")
             }
@@ -302,8 +315,6 @@ extension IntegrationsView {
 
     private var bodySpecDirectoryDetail: String {
         var lines = [ProductRegistry.Integrations.bodyspec.description]
-        if BodySpecAuthManager.shared.isConnected { lines.append("Connection saved on this device") }
-        lines.append(bodySpecSyncStatusText)
         if bodySpecHistoryFailed { lines.append("Couldn’t refresh scan history.") }
         return lines.joined(separator: "\n")
     }

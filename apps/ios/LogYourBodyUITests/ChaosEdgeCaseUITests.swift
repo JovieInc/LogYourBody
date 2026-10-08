@@ -92,6 +92,9 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertTrue(health.waitForExistence(timeout: 8))
         XCTAssertTrue(health.label.contains("Apple Health"))
         XCTAssertFalse(health.label.contains("Connected"), "A permission request must not prove read access.")
+        let healthStatus = health.value as? String ?? ""
+        XCTAssertTrue(["Set up access", "Sync enabled", "Sync paused", "Use on iPhone", "Unavailable"].contains(healthStatus))
+        XCTAssertFalse(healthStatus.contains("Connected"), "A permission request must not prove read access.")
 
         let bodySpec = app.buttons.matching(
             NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_link'")
@@ -99,8 +102,17 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertTrue(bodySpec.waitForExistence(timeout: 8))
         XCTAssertTrue(bodySpec.label.contains("BodySpec"))
         XCTAssertFalse(bodySpec.label.contains("Last synced"), "A scan date must not become sync freshness.")
+        XCTAssertFalse(bodySpec.label.contains("Connection saved"), "Device scope belongs in the disclosure.")
+        XCTAssertFalse(bodySpec.label.contains("Latest scan"), "Scan history belongs in the disclosure.")
         XCTAssertFalse(app.staticTexts["Health & Fitness"].exists)
         attachScreenshot(named: "integrations-directory-permission-and-history-fixture", from: app)
+        let history = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_history'")
+        ).firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 8))
+        XCTAssertTrue(history.isHittable)
+        history.tap()
+        attachScreenshot(named: "integrations-directory-expanded-history-fixture", from: app)
         XCTAssertEqual(app.state, .runningForeground)
     }
 
