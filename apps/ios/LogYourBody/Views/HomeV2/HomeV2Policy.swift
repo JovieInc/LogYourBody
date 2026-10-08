@@ -7,9 +7,14 @@ import Foundation
 
 /// Photo-first Home (Pencil H2, picked 2026-09-26). Default on in production.
 /// Statsig is an emergency kill switch only; an unavailable or unset gate must
-/// not silently fall back to the legacy Home. Debug fixtures always force it on.
+/// not silently fall back to the legacy Home. Debug fixtures explicitly choose Home V2 or rollback.
 enum HomeV2Policy {
     static let killSwitchKey = "home_v2_kill_switch"
+    #if DEBUG
+    /// Explicit legacy captures exercise rollback without changing remote gates.
+    /// Rollback wins if a test accidentally supplies both fixture modes.
+    static let rollbackFixtureArgument = "-lybUITestHomeRollbackFixture"
+    #endif
     static let fixtureArgument = "-lybUITestHomeV2Fixture"
     static let photoFixtureArgument = "-lybUITestHomeV2PhotoFixture"
     /// Signed in, nothing logged yet: the H0 day-zero state.
@@ -27,6 +32,7 @@ enum HomeV2Policy {
         isGateEnabled: ((String) -> Bool)? = nil
     ) -> Bool {
         #if DEBUG
+        if arguments.contains(rollbackFixtureArgument) { return false }
         if arguments.contains(fixtureArgument) || arguments.contains(photoFixtureArgument) ||
             arguments.contains(emptyFixtureArgument) ||
             arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument) ||

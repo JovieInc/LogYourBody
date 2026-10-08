@@ -34,6 +34,44 @@ final class HomeV2PolicyTests: XCTestCase {
     }
 
     #if DEBUG
+    func testRollbackFixtureDisablesHomeV2WithoutReadingRemoteGates() {
+        XCTAssertFalse(
+            HomeV2Policy.isEnabled(arguments: [HomeV2Policy.rollbackFixtureArgument], isGateEnabled: { _ in
+                XCTFail("The explicit rollback fixture must not read remote gates")
+                return false
+            })
+        )
+    }
+
+    func testRollbackFixtureWinsOverConflictingHomeV2Fixtures() {
+        let homeFixtures = [
+            HomeV2Policy.fixtureArgument,
+            HomeV2Policy.photoFixtureArgument,
+            HomeV2Policy.emptyFixtureArgument,
+            HomeV2SystemStatePolicy.offlineFixtureArgument,
+            HomeV2SystemStatePolicy.healthOffFixtureArgument,
+            HomeV2SystemStatePolicy.loadingFixtureArgument
+        ]
+        for fixture in homeFixtures {
+            XCTAssertFalse(
+                HomeV2Policy.isEnabled(
+                    arguments: [fixture, HomeV2Policy.rollbackFixtureArgument],
+                    isGateEnabled: { _ in false }
+                ),
+                "Rollback must win over \(fixture)"
+            )
+        }
+    }
+
+    #else
+    func testRollbackFixtureArgumentCannotDisableShippingHome() {
+        XCTAssertTrue(
+            HomeV2Policy.isEnabled(arguments: ["-lybUITestHomeRollbackFixture"], isGateEnabled: { _ in false })
+        )
+    }
+    #endif
+
+    #if DEBUG
     func testFixtureArgumentsEnableHomeV2WithoutTheGate() {
         XCTAssertTrue(
             HomeV2Policy.isEnabled(arguments: [HomeV2Policy.fixtureArgument], isGateEnabled: { _ in false })
