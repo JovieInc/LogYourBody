@@ -556,4 +556,49 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertEqual(row.notes, "owner-entry")
         XCTAssertFalse(row.isMarkedDeleted)
     }
+
+    func testPhotoTimelineFixtureReseedKeepsTheNewUsersMeasurements() async throws {
+        let firstUser = "ui_test_photo_hud_user_first"
+        let secondUser = "ui_test_photo_hud_user_second"
+        let date = wholeSecondDate(180)
+        let unrelatedId = "unrelated-\(UUID().uuidString)"
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+            dashboardFixtureMetric(id: unrelatedId, userId: firstUser, date: date, notes: "unrelated"),
+            userId: firstUser,
+            markAsSynced: true
+        )
+
+        try await UITestFixtureIsolation.seedDashboardMetrics(userId: firstUser, photoURL: nil, now: date)
+        try await UITestFixtureIsolation.seedDashboardMetrics(userId: secondUser, photoURL: nil, now: date)
+
+        let saved = await CoreDataManager.shared.fetchBodyMetrics(for: secondUser)
+        let savedIds = Set(saved.compactMap { $0.toBodyMetrics()?.id })
+        XCTAssertEqual(savedIds, Set(UITestFixtureIsolation.dashboardMetricIDs))
+        let firstSaved = await CoreDataManager.shared.fetchBodyMetrics(for: firstUser)
+        let firstIds = Set(firstSaved.compactMap { $0.toBodyMetrics()?.id })
+        XCTAssertFalse(firstIds.contains("ui_test_full_dashboard_metric_0"))
+        let cachedUnrelated = await cachedBodyMetric(id: unrelatedId)
+        let unrelated = try XCTUnwrap(cachedUnrelated)
+        XCTAssertEqual(unrelated.userId, firstUser)
+        XCTAssertEqual(unrelated.notes, "unrelated")
+    }
+
+    private func dashboardFixtureMetric(id: String, userId: String, date: Date, notes: String) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 82.1,
+            weightUnit: "kg",
+            bodyFatPercentage: 15.8,
+            bodyFatMethod: "manual",
+            muscleMass: 66.2,
+            boneMass: nil,
+            notes: notes,
+            photoUrl: nil,
+            dataSource: "manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
 }
