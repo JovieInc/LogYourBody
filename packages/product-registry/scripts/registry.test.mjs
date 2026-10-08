@@ -1,9 +1,33 @@
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
 import { logYourBody } from '../src/products/logyourbody.mjs';
+import { logYourBodyIntegrations } from '../src/products/logyourbody-integrations.mjs';
 
 const featureIds = logYourBody.features.map((feature) => feature.id);
 assert.equal(new Set(featureIds).size, featureIds.length, 'feature IDs must be unique');
+
+const integrations = logYourBodyIntegrations;
+assert.equal(new Set(integrations.map((entry) => entry.id)).size, integrations.length);
+for (const integration of integrations) {
+  assert.equal(integration.accountScope, 'device', 'current native adapters are device-scoped');
+  assert.deepEqual(
+    integration.platforms,
+    ['ios'],
+    'unverified Mac distribution cannot be advertised',
+  );
+  assert(integration.capabilities.length > 0);
+  if (integration.marketing) {
+    assert(integration.capabilities.some((capability) => capability.availability === 'available'));
+  }
+  for (const capability of integration.capabilities) {
+    assert(capability.requiredScopes.length > 0, 'authorization must be operation-specific');
+    if (capability.mode === 'write') assert(capability.requiresApproval);
+  }
+}
+const health = integrations.find((entry) => entry.id === 'apple_health');
+assert.equal(health.authorization, 'native_permission');
+assert(health.capabilities[0].requiredScopes.includes('HKQuantityTypeIdentifierBodyMass'));
+assert.equal(integrations.find((entry) => entry.id === 'bodyspec').marketing, false);
 
 const planIds = logYourBody.plans.map((plan) => plan.id);
 assert.equal(new Set(planIds).size, planIds.length, 'plan IDs must be unique');

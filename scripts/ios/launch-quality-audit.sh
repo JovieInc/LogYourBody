@@ -282,6 +282,7 @@ run_ui_test_group \
 # exact-test evidence validator as the existing launch quality checks.
 CHAOS_REGRESSIONS=(
   "ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration"
+  "ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory"
   "ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote"
   "ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies"
   "ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor"

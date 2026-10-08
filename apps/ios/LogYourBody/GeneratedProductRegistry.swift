@@ -10,6 +10,33 @@ enum ProductRegistry {
     static let supportEmail = "support@logyourbody.com"
     static let appStoreURL = "https://apps.apple.com/us/app/logyourbody/id6755209876"
 
+    enum Integrations {
+        struct Definition {
+            let id: String
+            let label: String
+            let description: String
+            let authorization: String
+            let platforms: [String]
+            let capabilityLabels: [String]
+        }
+        static let appleHealth = Definition(
+            id: "apple_health",
+            label: "Apple Health",
+            description: "Weight, body fat, and steps.",
+            authorization: "native_permission",
+            platforms: ["ios"],
+            capabilityLabels: ["Sync supported body metrics and steps"]
+        )
+        static let bodyspec = Definition(
+            id: "bodyspec",
+            label: "BodySpec",
+            description: "DEXA scans",
+            authorization: "oauth",
+            platforms: ["ios"],
+            capabilityLabels: ["Import DEXA scans"]
+        )
+    }
+
     enum Contacts {
         static let support = "support@logyourbody.com"
         static let privacy = "privacy@logyourbody.com"
