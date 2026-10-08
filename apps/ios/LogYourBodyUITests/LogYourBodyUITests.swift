@@ -1334,6 +1334,43 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Save GLP-1"].exists)
     }
 
+    func testGlp1DoseDeleteCancelLeavesTheSeededDose() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+        openStatsPage(in: app)
+
+        let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
+        scrollUntilExists(prompt, in: app)
+        scrollUntilHittable(prompt, in: app)
+        prompt.tap()
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
+
+        let delete = app.buttons["Delete dose"].firstMatch
+        XCTAssertTrue(delete.waitForExistence(timeout: 8))
+        if !delete.isHittable {
+            scrollUntilHittable(delete, in: app)
+        }
+        delete.tap()
+
+        XCTAssertTrue(app.staticTexts["Delete dose?"].waitForExistence(timeout: 5))
+        let cancel = app.buttons.matching(identifier: "glp1_dose_delete_cancel").firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 3), "GLP-1 dose delete must show Cancel")
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        let dialogGone = NSPredicate(format: "exists == false")
+        expectation(for: dialogGone, evaluatedWith: app.staticTexts["Delete dose?"])
+        waitForExpectations(timeout: 3)
+        XCTAssertTrue(app.staticTexts["UI test weekly check-in seed"].waitForExistence(timeout: 5))
+    }
+
     func testGlp1WeeklyCheckInFixtureOpensMedicationSelectorWhenEmpty() throws {
         let app = XCUIApplication()
         launch(app, with: [
