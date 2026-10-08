@@ -309,6 +309,53 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(logoutButton.isHittable)
     }
 
+    func testPaywallLogoutCancelStaysOnPaywall() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPaywallFixture"])
+
+        XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 10))
+        let moreMenu = app.buttons["paywall_more_menu"]
+        XCTAssertTrue(moreMenu.waitForExistence(timeout: 5))
+        moreMenu.tap()
+        let logoutButton = app.buttons["paywall_logout_button"]
+        XCTAssertTrue(logoutButton.waitForExistence(timeout: 3))
+        logoutButton.tap()
+
+        let confirm = app.buttons.matching(identifier: "paywall_logout_confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        let cancel = app.buttons.matching(identifier: "paywall_logout_cancel").firstMatch
+        XCTAssertTrue(
+            cancel.waitForExistence(timeout: 3),
+            "Paywall logout confirmation must include a reachable Cancel control."
+        )
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["continueWithAppleButton"].exists)
+    }
+
+    func testPaywallLogoutConfirmReachesSignIn() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPaywallFixture"])
+
+        XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 10))
+        let moreMenu = app.buttons["paywall_more_menu"]
+        XCTAssertTrue(moreMenu.waitForExistence(timeout: 5))
+        moreMenu.tap()
+        let logoutButton = app.buttons["paywall_logout_button"]
+        XCTAssertTrue(logoutButton.waitForExistence(timeout: 3))
+        logoutButton.tap()
+
+        let confirm = app.buttons.matching(identifier: "paywall_logout_confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(app.buttons["continueWithAppleButton"].waitForExistence(timeout: 8))
+    }
+
     func testPaywallPlansFixtureShowsMonthlyAnnualAndSavings() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPaywallPlansFixture", "-lybUITestOnboardingV2Fixture"])
