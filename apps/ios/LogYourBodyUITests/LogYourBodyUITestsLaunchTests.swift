@@ -25,4 +25,39 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+
+    func testFfmiInfoDoneMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestSuppressWhatsNew"
+        ]
+        app.launch()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        app.buttons["body_score_onboarding_basics_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        let why = app.buttons["Why we ask"]
+        XCTAssertTrue(why.waitForExistence(timeout: 5))
+        why.tap()
+
+        let info = app.buttons["What's FFMI?"]
+        XCTAssertTrue(info.waitForExistence(timeout: 5))
+        info.tap()
+
+        let done = app.descendants(matching: .any)["ffmi_info_done_button"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        let frame = done.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "FFMI done \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "FFMI done \(frame)")
+        done.tap()
+        XCTAssertFalse(done.exists)
+    }
 }
