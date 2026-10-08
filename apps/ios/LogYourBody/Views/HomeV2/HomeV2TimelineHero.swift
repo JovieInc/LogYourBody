@@ -122,7 +122,7 @@ struct HomeV2EditorialPlate: View {
 
     /// The timeline's own marks as the quiet centerpiece, echoing the scrubber.
     private var rulerMotif: some View {
-        HStack(alignment: .center, spacing: 6) {
+        HStack(alignment: .center, spacing: HomeV2Tokens.Space.tight) {
             motifTick(height: 16)
             motifTick(height: 32)
             motifTick(height: 16)
