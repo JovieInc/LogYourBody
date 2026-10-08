@@ -611,20 +611,31 @@ func saveBodyMetrics(
     }
 
 func syncStepsFromHealthKit() async throws {
-        let stepHistory = try await fetchStepCountHistory(days: 365) // Get last year of data
+        guard let ownership = await captureImportOwnership() else {
+            throw HealthKitError.notAuthorized
+        }
+        let stepHistory = try await fetchStepCountHistory(days: 365)
+        try await requireImportOwnership(ownership)
 
         for (stepCount, date) in stepHistory {
-            try await syncSingleStepFromHistory(stepCount: stepCount, date: date)
+            try await syncSingleStepFromHistory(stepCount: stepCount, date: date, ownership: ownership)
         }
     }
 
-func syncSingleStepFromHistory(stepCount: Int, date: Date) async throws {
-        // Only sync if steps > 0 and entry doesn't exist
+func syncSingleStepFromHistory(
+        stepCount: Int,
+        date: Date,
+        ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async throws {
         guard stepCount > 0 else { return }
+        guard let ownership = await captureImportOwnership(ownership) else {
+            throw HealthKitError.notAuthorized
+        }
+        try await requireImportOwnership(ownership)
 
-        let exists = await dailyMetricsExists(for: date)
+        let exists = await dailyMetricsExists(for: date, userId: ownership.subject)
         if !exists {
-            try await saveDailySteps(steps: stepCount, date: date)
+            try await saveDailySteps(steps: stepCount, date: date, ownership: ownership)
         }
     }
 

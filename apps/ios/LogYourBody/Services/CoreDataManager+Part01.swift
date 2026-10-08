@@ -53,11 +53,20 @@ var viewContext: NSManagedObjectContext {
 func saveDailyMetrics(
         _ metrics: DailyMetrics,
         userId: String,
+        writeAdmission: WriteAdmission? = nil,
         completion: ((Result<Void, Error>) -> Void)? = nil
     ) {
         let context = viewContext
 
         context.perform {
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?(.failure(error))
+                    return
+                }
+            }
             let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "id == %@", metrics.id)
             fetchRequest.fetchLimit = 1
@@ -104,9 +113,13 @@ func saveDailyMetrics(
         }
     }
 
-func saveDailyMetricsAndWait(_ metrics: DailyMetrics, userId: String) async throws {
+func saveDailyMetricsAndWait(
+        _ metrics: DailyMetrics,
+        userId: String,
+        writeAdmission: WriteAdmission? = nil
+    ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            saveDailyMetrics(metrics, userId: userId) { result in
+            saveDailyMetrics(metrics, userId: userId, writeAdmission: writeAdmission) { result in
                 continuation.resume(with: result)
             }
         }

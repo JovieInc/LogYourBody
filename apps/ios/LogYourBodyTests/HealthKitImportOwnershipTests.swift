@@ -37,6 +37,31 @@ final class HeldWeightImportQuery {
     }
 }
 
+@MainActor
+final class HeldStepHistoryQuery {
+    let started = XCTestExpectation(description: "Synthetic step history query started")
+    private var continuation: CheckedContinuation<[(stepCount: Int, date: Date)], Never>?
+    private var result: [(stepCount: Int, date: Date)]?
+
+    func fetch() async throws -> [(stepCount: Int, date: Date)] {
+        started.fulfill()
+        return await withCheckedContinuation { continuation in
+            if let result {
+                continuation.resume(returning: result)
+            } else {
+                self.continuation = continuation
+            }
+        }
+    }
+
+    func complete(_ samples: [(stepCount: Int, date: Date)]) {
+        guard result == nil else { return }
+        result = samples
+        continuation?.resume(returning: samples)
+        continuation = nil
+    }
+}
+
 /// Synthetic samples use an isolated in-memory store; no live HealthKit or provider transport executes.
 @MainActor
 final class HealthKitImportOwnershipTests: XCTestCase {
@@ -81,6 +106,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
 
     private func manager(
         query: HeldWeightImportQuery? = nil,
+        stepQuery: HeldStepHistoryQuery? = nil,
         earliestQuery: (() async throws -> Date?)? = nil,
         metricStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil,
         rawStore: (([HKRawSample]) async -> Void)? = nil
@@ -92,6 +118,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
                 return []
             },
             bodyFatImportQuery: { _ in [] },
+            stepHistoryQuery: stepQuery.map { held in { _ in try await held.fetch() } },
             earliestImportDateQuery: earliestQuery,
             syncTrigger: { self.syncTriggers += 1 },
             importCompletion: { owner in self.completedOwners.append(owner) },
@@ -120,6 +147,61 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertTrue(recordsB.isEmpty)
         XCTAssertEqual(syncTriggers, 0)
         XCTAssertTrue(completedOwners.isEmpty)
+    }
+
+    private func assertHeldStepImportIsRejected(replace: () -> Void) async {
+        let query = HeldStepHistoryQuery()
+        let manager = manager(stepQuery: query)
+        let task = Task { try await manager.syncStepsFromHealthKit() }
+        defer { query.complete([]) }
+        await fulfillment(of: [query.started], timeout: 3)
+        replace()
+        query.complete([(stepCount: 4_321, date: Date())])
+        do { try await task.value } catch {
+            XCTAssertTrue(error is HealthKitError || error is CancellationError)
+        }
+        let recordsA = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
+        let recordsB = await coreData.fetchDailyMetrics(for: "synthetic-health-B")
+        XCTAssertTrue(recordsA.isEmpty, "In-flight step import must not land for the starting account")
+        XCTAssertTrue(recordsB.isEmpty, "In-flight step import must not land for the replacement account")
+        XCTAssertEqual(syncTriggers, 0)
+    }
+
+    func testCurrentOwnerStepImportPreservesCountAndAccount() async throws {
+        let query = HeldStepHistoryQuery()
+        let manager = manager(stepQuery: query)
+        let day = Date()
+        let task = Task { try await manager.syncStepsFromHealthKit() }
+        await fulfillment(of: [query.started], timeout: 3)
+        query.complete([
+            (stepCount: 4_321, date: day),
+            (stepCount: 0, date: day.addingTimeInterval(-86_400))
+        ])
+        try await task.value
+        let records = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
+        let record = try XCTUnwrap(records.first)
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(record.userId, "synthetic-health-A")
+        XCTAssertEqual(record.steps, 4_321)
+        XCTAssertEqual(record.notes, "Imported from HealthKit")
+        let recordsB = await coreData.fetchDailyMetrics(for: "synthetic-health-B")
+        XCTAssertTrue(recordsB.isEmpty)
+        XCTAssertEqual(syncTriggers, 1)
+    }
+
+    func testHeldStepHistoryCannotImportUnderReplacementAccount() async {
+        await assertHeldStepImportIsRejected { setAccount("synthetic-health-B") }
+    }
+
+    func testHeldStepHistoryCannotImportAfterSameAccountRelogin() async {
+        let originalSession = auth.authSession
+        let originalUser = auth.currentUser
+        await assertHeldStepImportIsRejected {
+            auth.authSession = nil
+            auth.currentUser = nil
+            auth.authSession = originalSession
+            auth.currentUser = originalUser
+        }
     }
 
     func testHeldWeightQueryCannotImportUnderReplacementAccount() async {

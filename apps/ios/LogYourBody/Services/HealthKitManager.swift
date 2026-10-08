@@ -66,6 +66,7 @@ class HealthKitManager: ObservableObject {
     let importCoreDataManager: CoreDataManager?
     let weightImportQuery: ((Date, Date) async throws -> [HealthKitWeightImportSample])?
     let bodyFatImportQuery: ((Date) async throws -> [HealthKitBodyFatImportSample])?
+    let stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])?
     let earliestImportDateQuery: (() async throws -> Date?)?
     let importSyncTrigger: (@MainActor () -> Void)?
     let importCompletion: (@MainActor (String) -> Void)?
@@ -79,6 +80,7 @@ class HealthKitManager: ObservableObject {
         coreDataManager: CoreDataManager? = nil,
         weightImportQuery: ((Date, Date) async throws -> [HealthKitWeightImportSample])? = nil,
         bodyFatImportQuery: ((Date) async throws -> [HealthKitBodyFatImportSample])? = nil,
+        stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])? = nil,
         earliestImportDateQuery: (() async throws -> Date?)? = nil,
         syncTrigger: (@MainActor () -> Void)? = nil,
         importCompletion: (@MainActor (String) -> Void)? = nil,
@@ -91,6 +93,7 @@ class HealthKitManager: ObservableObject {
         importCoreDataManager = coreDataManager
         self.weightImportQuery = weightImportQuery
         self.bodyFatImportQuery = bodyFatImportQuery
+        self.stepHistoryQuery = stepHistoryQuery
         self.earliestImportDateQuery = earliestImportDateQuery
         importSyncTrigger = syncTrigger
         self.importCompletion = importCompletion
