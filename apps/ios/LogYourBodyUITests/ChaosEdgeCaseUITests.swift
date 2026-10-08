@@ -607,6 +607,32 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         attachScreenshot(named: "edge-arabic-locale-root", from: app)
     }
 
+    func testWeightKeyboardControlsMeetMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+        try openMVPWeightEntry(in: app)
+
+        let field = app.textFields["mvp_weight_text_field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        field.tap()
+        XCTAssertTrue(waitForKeyboard(in: app), "Keyboard did not appear after tapping the weight field.")
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_done_button").firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_save_weight_button").firstMatch.exists)
+
+        let window = app.windows.firstMatch.frame
+        for identifier in ["mvp_keyboard_bottom_done_button", "mvp_keyboard_save_weight_bar_button"] {
+            let control = app.buttons.matching(identifier: identifier).firstMatch
+            XCTAssertTrue(control.waitForExistence(timeout: 5), identifier)
+            let frame = control.frame
+            XCTAssertTrue(window.contains(frame), "\(identifier) \(frame) window \(window)")
+            XCTAssertGreaterThanOrEqual(frame.width, 44, "\(identifier) \(frame)")
+            XCTAssertGreaterThanOrEqual(frame.height, 44, "\(identifier) \(frame)")
+        }
+
+        app.buttons.matching(identifier: "mvp_keyboard_bottom_done_button").firstMatch.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+    }
+
     // MARK: - Shared helpers
 
     private func launch(_ app: XCUIApplication, with arguments: [String]) {
