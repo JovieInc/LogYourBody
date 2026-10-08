@@ -1380,22 +1380,28 @@ struct ChatTabView: View {
             if intent.kind == "message" {
                 send(transcript, shouldSpeakReply: true)
             } else if intent.kind == "log_set" {
-                guard let proposal = intent.proposal, intent.missingFields?.isEmpty == true else {
-                    if let session = trainingResponse?.session,
-                       let heard = intent.heard,
-                       let missingFields = intent.missingFields,
-                       !missingFields.isEmpty,
-                       missingFields.allSatisfy({ $0 == "exercise" || $0 == "set_number" }) {
-                        trainingPresentation = .voiceSetReview(session, heard)
+                switch VoiceSetAdmission.route(
+                    proposal: intent.proposal,
+                    heard: intent.heard,
+                    missingFields: intent.missingFields,
+                    session: trainingResponse?.session
+                ) {
+                case .confirm(let proposal):
+                    pendingVoiceSet = proposal
+                    isVoiceSetConfirmationPresented = true
+                case .review(let heard):
+                    guard let session = trainingResponse?.session else {
+                        draft = transcript
+                        chatErrorMessage = VoiceSetAdmission.rejectedLogMessage
                         return
                     }
+                    trainingPresentation = .voiceSetReview(session, heard)
+                case .clarify(let fields, let rejected):
                     draft = transcript
-                    let fields = intent.missingFields ?? []
-                    chatErrorMessage = voiceClarification(for: fields)
-                    return
+                    chatErrorMessage = rejected
+                        ? VoiceSetAdmission.rejectedLogMessage
+                        : voiceClarification(for: fields)
                 }
-                pendingVoiceSet = proposal
-                isVoiceSetConfirmationPresented = true
             } else {
                 draft = transcript
                 chatErrorMessage = voiceClarification(for: intent.missingFields ?? [])
@@ -1437,7 +1443,8 @@ struct ChatTabView: View {
                 try await VoiceSetLogger.commit(
                     proposal,
                     isConfirmed: true,
-                    accessToken: accessToken
+                    accessToken: accessToken,
+                    session: trainingResponse?.session
                 ) { token, request in
                     try await trainingService.logSet(accessToken: token, request: request)
                 }
