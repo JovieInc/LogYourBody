@@ -62,6 +62,18 @@ func checkAuthorizationStatus() {
             writeStatus: writeStatus,
             hasConfirmedReadAccess: hasConfirmedAuthorization()
         )
+        authorizationStatusText = restoredAuthorizationStatusText(writeStatus: writeStatus)
+    }
+
+    func restoredAuthorizationStatusText(writeStatus: HKAuthorizationStatus) -> String {
+        guard let raw = userDefaults.string(forKey: HealthKitDefaultsKey.readProbeRecord.rawValue),
+              let record = HealthKitReadProbeRecord(rawValue: raw) else {
+            return ""
+        }
+        if writeStatus == .sharingAuthorized, record == .emptyNotDenial {
+            return HealthKitAuthorizationPolicy.statusText(for: .writeOnly)
+        }
+        return HealthKitAuthorizationPolicy.statusText(for: record)
     }
 
 func fetchLatestHeight() async throws -> (value: Double?, date: Date?) {
@@ -215,44 +227,47 @@ func requestAuthorization() async -> Bool {
             try await healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead)
 
             let status = healthStore.authorizationStatus(for: weightType)
-            let confirmedReadAccess = status == .sharingAuthorized ? true : await probeReadableHealthKitData()
-            let authorized = HealthKitAuthorizationPolicy.isAuthorized(
-                writeStatus: status,
-                hasConfirmedReadAccess: confirmedReadAccess
+            let probes: [HealthKitReadKind: HealthKitSampleProbe] = [
+                .bodyMass: await probeQuantity(weightType),
+                .bodyFatPercentage: await probeQuantity(bodyFatType),
+                .height: await probeQuantity(heightType)
+            ]
+            let resolution = HealthKitAuthorizationPolicy.resolve(
+                writeAuthorized: status == .sharingAuthorized,
+                probes: probes,
+                requestSucceeded: true
             )
-            if authorized {
-                markAuthorizationConfirmed()
-            }
-            await MainActor.run {
-                self.isAuthorized = authorized
-            }
-
-            return authorized
+            await applyAuthorizationResolution(resolution)
+            return resolution.canUseHealthKit
         } catch {
+            let resolution = HealthKitAuthorizationPolicy.resolve(
+                writeAuthorized: false,
+                probes: [:],
+                requestSucceeded: false
+            )
+            await applyAuthorizationResolution(resolution)
             await captureHealthKitError(
                 error,
                 operation: "requestAuthorization",
                 contextDescription: "requestAuthorization"
             )
-            // print("HealthKit authorization failed: \(error)")
             return false
         }
     }
 
-func probeReadableHealthKitData() async -> Bool {
-        if await hasReadableQuantitySample(weightType) {
-            return true
+    @MainActor
+    func applyAuthorizationResolution(_ resolution: HealthKitAuthorizationResolution) {
+        lastAuthorizationResolution = resolution
+        isAuthorized = resolution.canUseHealthKit
+        authorizationStatusText = resolution.statusText
+        userDefaults.set(resolution.record.rawValue, forKey: HealthKitDefaultsKey.readProbeRecord.rawValue)
+        if resolution.confirmedReadKinds.isEmpty {
+            return
         }
-        if await hasReadableQuantitySample(bodyFatType) {
-            return true
-        }
-        if await hasReadableQuantitySample(heightType) {
-            return true
-        }
-        return false
+        markAuthorizationConfirmed()
     }
 
-func hasReadableQuantitySample(_ sampleType: HKQuantityType) async -> Bool {
+func probeQuantity(_ sampleType: HKQuantityType) async -> HealthKitSampleProbe {
         await withCheckedContinuation { continuation in
             let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
             let query = HKSampleQuery(
@@ -261,7 +276,15 @@ func hasReadableQuantitySample(_ sampleType: HKQuantityType) async -> Bool {
                 limit: 1,
                 sortDescriptors: [sortDescriptor]
             ) { _, samples, error in
-                continuation.resume(returning: error == nil && !(samples?.isEmpty ?? true))
+                if error != nil {
+                    continuation.resume(returning: .failed)
+                    return
+                }
+                if samples?.isEmpty ?? true {
+                    continuation.resume(returning: .empty)
+                    return
+                }
+                continuation.resume(returning: .found)
             }
 
             healthStore.execute(query)
@@ -528,11 +551,14 @@ func resetForCurrentUser() async {
         let lastObserverKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userId)
         let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: userId)
         userDefaults.removeObject(forKey: HealthKitDefaultsKey.authorizationConfirmed.rawValue)
+        userDefaults.removeObject(forKey: HealthKitDefaultsKey.readProbeRecord.rawValue)
         userDefaults.removeObject(forKey: lastObserverKey)
         userDefaults.removeObject(forKey: fullSyncKey)
 
         await MainActor.run {
             self.isAuthorized = false
+            self.authorizationStatusText = ""
+            self.lastAuthorizationResolution = nil
             self.latestWeight = nil
             self.latestWeightDate = nil
             self.latestBodyFatPercentage = nil
