@@ -245,7 +245,21 @@ actor AsyncGate {
 
 @MainActor
 final class AuthManager: NSObject, ObservableObject {
-    static let shared = AuthManager()
+    static let shared: AuthManager = {
+        let manager = AuthManager()
+        manager.prepareHealthAccountHandoff = { userId in
+            let syncEnabled = UserDefaults.standard.bool(forKey: Constants.healthKitSyncEnabledKey)
+            HealthKitAccountSyncPolicy.bindIfUnbound(
+                userId: userId,
+                syncEnabled: syncEnabled,
+                defaults: .standard
+            )
+        }
+        manager.suspendHealthImport = {
+            await HealthSyncCoordinator.shared.suspendAutomaticImportAfterSignOut()
+        }
+        return manager
+    }()
 
     @Published var currentUser: LocalUser?
     @Published var authSession: ProductAuthSession? {
@@ -277,6 +291,8 @@ final class AuthManager: NSObject, ObservableObject {
     let keychain: KeychainManager
     let urlSession: URLSession
     let legalConsentGate = AsyncGate()
+    var prepareHealthAccountHandoff: ((String?) -> Void)?
+    var suspendHealthImport: (() async -> Void)?
 
     private let storedSessionKey = "productAuth.jovieOAuthSession"
     private var initializationTask: Task<Void, Never>?
@@ -777,6 +793,8 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func performLogout(exitReason: AuthExitReason) async {
+        let departingUserId = currentUser?.id
+        prepareHealthAccountHandoff?(departingUserId)
         let expiredOwnership = exitReason == .sessionExpired ? captureRequestSession() : nil
         try? keychain.delete(forKey: storedSessionKey)
         authSession = nil
@@ -787,6 +805,7 @@ final class AuthManager: NSObject, ObservableObject {
         lastExitReason = exitReason
         expiredRequestSession = expiredOwnership.map { ($0, authGeneration) }
         AppServicePorts.analyticsTracker.reset()
+        await suspendHealthImport?()
     }
 
     func updateProfileDurably(_ updates: [String: Any]) async throws {

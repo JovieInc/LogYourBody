@@ -85,8 +85,10 @@ final class MockHealthSyncCoordinator: HealthSyncCoordinating {
 final class MockHealthKitSyncManager: HealthKitSyncManaging {
     var isHealthKitAvailable = true
     var isAuthorized = true
+    var admitsAutomaticImport = true
 
     private(set) var didCallCheckAuthorizationStatus = false
+    private(set) var checkAuthorizationCallCount = 0
     private(set) var didCallObserveWeightChanges = false
     private(set) var didCallObserveBodyFatChanges = false
     private(set) var didCallObserveStepChanges = false
@@ -101,6 +103,11 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
 
     func checkAuthorizationStatus() {
         didCallCheckAuthorizationStatus = true
+        checkAuthorizationCallCount += 1
+    }
+
+    func admitsAutomaticImportForCurrentAccount() -> Bool {
+        admitsAutomaticImport
     }
 
     func observeWeightChanges() {

@@ -6,7 +6,74 @@ extension HealthKitManager {
         _ ownership: AuthManager.ProfileSessionOwnership? = nil
     ) async -> AuthManager.ProfileSessionOwnership? {
         if let ownership { return ownership }
-        return await MainActor.run { (self.importAuthManager ?? .shared).captureAccountSession() }
+        return await MainActor.run {
+            let auth = self.importAuthManager ?? .shared
+            guard let session = auth.captureAccountSession() else { return nil }
+            let bound = self.userDefaults.string(forKey: HealthKitAccountSyncPolicy.accountIdKey)
+            guard HealthKitAccountSyncPolicy.admitsImport(
+                currentUserId: session.subject,
+                boundAccountId: bound
+            ) else { return nil }
+            if bound == nil || bound?.isEmpty == true {
+                self.userDefaults.set(session.subject, forKey: HealthKitAccountSyncPolicy.accountIdKey)
+            }
+            return session
+        }
+    }
+
+    func admitsAutomaticImportForCurrentAccount() -> Bool {
+        let userId = MainActor.assumeIsolated {
+            (self.importAuthManager ?? .shared).currentUser?.id ?? ""
+        }
+        guard !userId.isEmpty else { return false }
+        let bound = userDefaults.string(forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        return HealthKitAccountSyncPolicy.admitsImport(currentUserId: userId, boundAccountId: bound)
+    }
+
+    func claimAutomaticImportAccount() async {
+        let defaults = userDefaults
+        let auth = importAuthManager ?? .shared
+        await MainActor.run {
+            HealthKitAccountSyncPolicy.claim(userId: auth.currentUser?.id, defaults: defaults)
+        }
+    }
+
+    func suspendAutomaticImportAfterSignOut() async {
+        syncDebounceTimer?.invalidate()
+        syncDebounceTimer = nil
+
+        if let weightObserverQuery {
+            healthStore.stop(weightObserverQuery)
+            self.weightObserverQuery = nil
+        }
+        if let bodyFatObserverQuery {
+            healthStore.stop(bodyFatObserverQuery)
+            self.bodyFatObserverQuery = nil
+        }
+        if let stepObserverQuery {
+            healthStore.stop(stepObserverQuery)
+            self.stepObserverQuery = nil
+        }
+        if !activeQueries.isEmpty {
+            for query in activeQueries {
+                healthStore.stop(query)
+            }
+            activeQueries.removeAll()
+        }
+
+        do {
+            try await healthStore.disableAllBackgroundDelivery()
+        } catch {
+            await captureHealthKitError(
+                error,
+                operation: "suspendAutomaticImportAfterSignOut",
+                contextDescription: "suspendAutomaticImportAfterSignOut"
+            )
+        }
+
+        await MainActor.run {
+            self.isAuthorized = false
+        }
     }
 
     func ownsImport(_ ownership: AuthManager.ProfileSessionOwnership) async -> Bool {
@@ -21,6 +88,9 @@ extension HealthKitManager {
 
 func fetchTodayStepCount() async throws -> Int {
         guard isAuthorized else {
+            throw HealthKitError.notAuthorized
+        }
+        guard await MainActor.run(body: { self.admitsAutomaticImportForCurrentAccount() }) else {
             throw HealthKitError.notAuthorized
         }
 
@@ -243,6 +313,9 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
 
 @discardableResult
     func syncAllHistoricalHealthKitData(ownership: AuthManager.ProfileSessionOwnership? = nil) async -> Bool {
+        if ownership == nil {
+            await claimAutomaticImportAccount()
+        }
         guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else { return false }
         let operation = UUID()
         let admitted = await MainActor.run {
