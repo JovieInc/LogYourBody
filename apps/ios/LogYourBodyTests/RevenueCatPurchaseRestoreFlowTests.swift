@@ -12,6 +12,11 @@ import UIKit
 @testable import LogYourBody
 
 
+private final class BillingHopProbe {
+    var subscribedWhenReplacementStarted: Bool?
+    var finished = false
+}
+
 @MainActor
 final class RevenueCatPurchaseRestoreFlowTests: XCTestCase {
     private static let isSubscribedKey = "revenuecat_isSubscribed"
@@ -170,6 +175,62 @@ final class RevenueCatPurchaseRestoreFlowTests: XCTestCase {
         XCTAssertFalse(fixture.manager.isPurchasing)
         XCTAssertTrue(fixture.manager.isSubscribed)
         XCTAssertTrue(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+    }
+
+    func testPurchaseAppliesSubscriptionBeforeAQueuedSessionReplacement() async {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        let probe = BillingHopProbe()
+        let owner = fixture.manager.beginBillingSession(subject: "purchase-hop-owner")
+        fixture.manager.finishBillingSession(owner)
+        fixture.client.purchaseResult = .success(Self.customer(isActive: true, appUserId: "purchase-hop-owner"))
+        fixture.client.onPurchase = {
+            Task { @MainActor in
+                probe.subscribedWhenReplacementStarted = fixture.manager.isSubscribed
+                let replacement = fixture.manager.beginBillingSession(subject: "purchase-hop-replacement")
+                fixture.manager.finishBillingSession(replacement)
+                probe.finished = true
+            }
+        }
+
+        let didPurchase = await fixture.manager.purchase(package: Self.makeAnnualPackage())
+        await waitForBillingHop(probe)
+
+        XCTAssertTrue(didPurchase)
+        XCTAssertTrue(probe.subscribedWhenReplacementStarted == true)
+        XCTAssertFalse(fixture.manager.ownsBillingSession(owner))
+    }
+
+    func testRestoreAppliesSubscriptionBeforeAQueuedSessionReplacement() async {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        let probe = BillingHopProbe()
+        let owner = fixture.manager.beginBillingSession(subject: "restore-hop-owner")
+        fixture.manager.finishBillingSession(owner)
+        fixture.client.restoreResult = .success(Self.customer(isActive: true, appUserId: "restore-hop-owner"))
+        fixture.client.onRestore = {
+            Task { @MainActor in
+                probe.subscribedWhenReplacementStarted = fixture.manager.isSubscribed
+                let replacement = fixture.manager.beginBillingSession(subject: "restore-hop-replacement")
+                fixture.manager.finishBillingSession(replacement)
+                probe.finished = true
+            }
+        }
+
+        let didRestore = await fixture.manager.restorePurchases()
+        await waitForBillingHop(probe)
+
+        XCTAssertTrue(didRestore)
+        XCTAssertTrue(probe.subscribedWhenReplacementStarted == true)
+        XCTAssertFalse(fixture.manager.ownsBillingSession(owner))
+    }
+
+    private func waitForBillingHop(_ probe: BillingHopProbe) async {
+        for _ in 0..<20 {
+            if probe.finished { return }
+            await Task.yield()
+        }
+        XCTFail("Queued billing session replacement did not run")
     }
 
     func testRefreshFailurePreservesCachedSubscribedAccess() async {

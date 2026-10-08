@@ -294,20 +294,18 @@ func purchase(packageIdentifier: String) async -> Bool {
             )
 
             guard ownsBillingSession(ownership), !Task.isCancelled else {
-                await MainActor.run { self.isPurchasing = false }
+                isPurchasing = false
                 return false
             }
 
-            await MainActor.run {
-                self.updateSubscriptionStatus(customer: customer)
-                self.isPurchasing = false
-            }
+            updateSubscriptionStatus(customer: customer)
+            isPurchasing = false
 
             // print("💰 Purchase successful!")
             return true
         } catch let error as RevenueCatPurchasingError {
             guard ownsBillingSession(ownership), !Task.isCancelled else {
-                await MainActor.run { self.isPurchasing = false }
+                isPurchasing = false
                 return false
             }
             if error != .purchaseCancelled {
@@ -321,30 +319,25 @@ func purchase(packageIdentifier: String) async -> Bool {
                 ErrorReporter.shared.capture(appError, context: context)
             }
 
-            await MainActor.run {
-                self.isPurchasing = false
-
-                switch error {
-                case .purchaseCancelled:
-                    // print("💰 Purchase cancelled by user")
-                    // Don't show error for user cancellation
-                    break
-                case .storeProblem:
-                    self.errorMessage = "There was a problem with the App Store. Please try again."
-                case .purchaseNotAllowed:
-                    self.errorMessage = "Purchases are not allowed on this device."
-                case .purchaseInvalid:
-                    self.errorMessage = "Purchase failed. Please try again."
-                case .unexpected(let message):
-                    self.errorMessage = "Purchase failed: \(message)"
-                }
-
-                // print("❌ Purchase failed: \(error)")
+            isPurchasing = false
+            switch error {
+            case .purchaseCancelled:
+                // print("💰 Purchase cancelled by user")
+                // Don't show error for user cancellation
+                break
+            case .storeProblem:
+                errorMessage = "There was a problem with the App Store. Please try again."
+            case .purchaseNotAllowed:
+                errorMessage = "Purchases are not allowed on this device."
+            case .purchaseInvalid:
+                errorMessage = "Purchase failed. Please try again."
+            case .unexpected(let message):
+                errorMessage = "Purchase failed: \(message)"
             }
             return false
         } catch {
             guard ownsBillingSession(ownership), !Task.isCancelled else {
-                await MainActor.run { self.isPurchasing = false }
+                isPurchasing = false
                 return false
             }
             let appError = AppError.billing(operation: "purchase", underlying: error)
@@ -356,10 +349,8 @@ func purchase(packageIdentifier: String) async -> Bool {
             )
             ErrorReporter.shared.capture(appError, context: context)
 
-            await MainActor.run {
-                self.isPurchasing = false
-                self.errorMessage = "An unexpected error occurred"
-            }
+            isPurchasing = false
+            errorMessage = "An unexpected error occurred"
             // print("❌ Unexpected purchase error: \(error.localizedDescription)")
             return false
         }
@@ -391,27 +382,22 @@ func purchase(packageIdentifier: String) async -> Bool {
             let customer = try await purchasesClient.restorePurchases(entitlementID: proEntitlementID)
 
             guard ownsBillingSession(ownership), !Task.isCancelled else {
-                await MainActor.run { self.isPurchasing = false }
+                isPurchasing = false
                 return false
             }
 
-            await MainActor.run {
-                self.updateSubscriptionStatus(customer: customer)
-                self.isPurchasing = false
-            }
+            updateSubscriptionStatus(customer: customer)
+            isPurchasing = false
 
             if isSubscribed {
                 // print("💰 Purchases restored successfully")
                 return true
-            } else {
-                await MainActor.run {
-                    self.errorMessage = "No active subscriptions found"
-                }
-                return false
             }
+            errorMessage = "No active subscriptions found"
+            return false
         } catch {
             guard ownsBillingSession(ownership), !Task.isCancelled else {
-                await MainActor.run { self.isPurchasing = false }
+                isPurchasing = false
                 return false
             }
             let appError = AppError.billing(operation: "restorePurchases", underlying: error)
@@ -423,10 +409,8 @@ func purchase(packageIdentifier: String) async -> Bool {
             )
             ErrorReporter.shared.capture(appError, context: context)
 
-            await MainActor.run {
-                self.isPurchasing = false
-                self.errorMessage = "Failed to restore purchases"
-            }
+            isPurchasing = false
+            errorMessage = "Failed to restore purchases"
             // print("❌ Failed to restore purchases: \(error.localizedDescription)")
             return false
         }
