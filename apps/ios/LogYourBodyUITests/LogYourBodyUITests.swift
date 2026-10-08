@@ -28,6 +28,45 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["login_email_field"].exists)
     }
 
+    func testTrainingStopConfirmationIncludesCancel() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+
+        let open = app.buttons["training_fixture_stop_card"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.tap()
+        let revoke = app.buttons["training_revoke_button"]
+        XCTAssertTrue(revoke.waitForExistence(timeout: 5))
+        revoke.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Delete your training sessions, set logs, and feedback?"].waitForExistence(timeout: 3),
+            "Stop coaching must present its confirmation."
+        )
+        let cancel = app.buttons.matching(identifier: "training_revoke_cancel").firstMatch
+        XCTAssertTrue(
+            cancel.waitForExistence(timeout: 3),
+            "Training stop confirmation must include a reachable Cancel control."
+        )
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        let stops = app.staticTexts["training_fixture_stop_count"]
+        XCTAssertTrue(stops.waitForExistence(timeout: 3))
+        XCTAssertEqual(stops.label, "Stops: 0", "Cancel must not delete training data")
+        XCTAssertTrue(revoke.waitForExistence(timeout: 3))
+
+        revoke.tap()
+        let confirm = app.buttons.matching(identifier: "training_revoke_confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        confirm.tap()
+        XCTAssertEqual(stops.label, "Stops: 1")
+    }
+
     func testTrainingManualLoadAndAcknowledgedSetSurviveRelaunch() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
