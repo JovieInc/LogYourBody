@@ -377,11 +377,20 @@ struct TrainingLiveSessionView: View {
             .background(theme.colors.background)
             .navigationTitle("Live session")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                        .disabled(isSaving || draft.isSaving)
+            // The navigation-bar Close accessibility frame stays 36 points tall.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Close")
+                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .disabled(isSaving || draft.isSaving)
+                .accessibilityIdentifier("training_live_session_close_button")
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.vertical, JovieTokens.itemGap)
             }
         }
         .interactiveDismissDisabled(isSaving || draft.isSaving)
