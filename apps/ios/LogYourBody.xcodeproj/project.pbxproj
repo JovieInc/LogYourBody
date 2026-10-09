@@ -179,6 +179,7 @@
 		AD72435C2E15FA5E002376C6 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AD723B102E15FA5C002376C6 /* LaunchScreen.storyboard */; };
 		AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */; };
 		AD7D30B32E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */; };
+		E4BD849D58744A00A126F801 /* HomeV2LayoutUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4BD849D58744A00A126F802 /* HomeV2LayoutUITests.swift */; };
 		AD8872402EB87EF80041C426 /* BuildFile in Sources */ = {isa = PBXBuildFile; };
 		AD8872412EB87EF80041C426 /* DashboardViewLiquid.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */; };
 		AD8872432EB87F290041C426 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872422EB87F290041C426 /* ProgressRing.swift */; };
@@ -703,6 +704,7 @@
 		AD7D30AC2E1490810072AA5B /* LogYourBodyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LogYourBodyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITests.swift; sourceTree = "<group>"; };
 		AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		E4BD849D58744A00A126F802 /* HomeV2LayoutUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2LayoutUITests.swift; sourceTree = "<group>"; };
 		AD8056FC2E25F5180028C0DD /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		AD8552532E19A2A1003552EE /* ProfileSettingsPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsPolicy.swift; sourceTree = "<group>"; };
 		AD8552552E19A5B5003552EE /* RealtimeSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeSyncManager.swift; sourceTree = "<group>"; };
@@ -1645,6 +1647,7 @@
 			children = (
 				AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */,
 				AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */,
+				E4BD849D58744A00A126F802 /* HomeV2LayoutUITests.swift */,
 			);
 			path = LogYourBodyUITests;
 			sourceTree = "<group>";
@@ -2180,6 +2183,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AD7D30B32E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift in Sources */,
+				E4BD849D58744A00A126F801 /* HomeV2LayoutUITests.swift in Sources */,
 				AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */,
 				401055DB589E0EF494FCBB1E /* OnboardingGoldenPathUITests.swift in Sources */,
 				542F8AAE22D916390F4ACA2D /* ChaosMonkeyUITests.swift in Sources */,

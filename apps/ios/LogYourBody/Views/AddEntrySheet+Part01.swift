@@ -32,11 +32,6 @@ var entryScreen: WorldClassScreen {
 var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if isHomeV2LogEntry {
-                    Text(selectedTab == 0 ? "Log weight" : entryTitle)
-                        .accessibilityIdentifier("home_v2_log_sheet")
-                        .accessibilityAddTraits(.isHeader)
-                }
                 Text(selectedDate.formatted(date: .complete, time: .shortened))
                     .font(.subheadline)
                     .foregroundStyle(Color.jovieTextSecondary)
@@ -108,9 +103,17 @@ var body: some View {
                 .padding(.vertical, 12)
             }
             .worldClassScreen(entryScreen)
-            .navigationTitle(isHomeV2LogEntry && selectedTab == 0 ? "Log weight" : entryTitle)
+            .navigationTitle(isHomeV2LogEntry ? "" : entryTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if isHomeV2LogEntry {
+                    ToolbarItem(placement: .principal) {
+                        Text(selectedTab == 0 ? "Log weight" : entryTitle)
+                            .font(.headline)
+                            .accessibilityIdentifier("home_v2_log_sheet")
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                }
                 ToolbarItemGroup(placement: .cancellationAction) {
                     Button("Cancel") {
                         guard NativeSheetPresentationPolicy.canDismissAddEntry(

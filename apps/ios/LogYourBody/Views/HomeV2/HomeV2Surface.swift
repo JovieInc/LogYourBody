@@ -36,55 +36,76 @@ struct HomeV2Surface: View {
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(alignment: .leading, spacing: 0) {
-                let hasPhoto = PhotoTimelineHUDPolicy.hasUsablePhoto(metric)
-                if systemState == .offline {
-                    HomeV2OfflineBanner()
-                } else if isHealthOff {
-                    HomeV2HealthOffRow()
-                }
-                if hasPhoto, let photoURL = metric.photoUrl {
-                    photoStage(photoURL: photoURL, size: geometry.size)
-                    photoNumberBlock
+            ScrollView {
+                if PhotoTimelineHUDPolicy.hasUsablePhoto(metric), let photoURL = metric.photoUrl {
+                    HomeV2PhotoContentLayout(viewport: geometry.size) {
+                        VStack(spacing: 0) { systemBanner }
+                        GeometryReader { stage in
+                            photoStage(photoURL: photoURL, size: stage.size)
+                        }
+                        VStack(alignment: .leading, spacing: 0) {
+                            photoNumberBlock
+                            Spacer(minLength: 0)
+                            HomeV2DisclosureLink(
+                                title: HomeV2PhotoCopy.allPhotos,
+                                identifier: "home_v2_all_photos_row",
+                                action: onAllPhotos
+                            )
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
                 } else {
-                    metricFirst
-                }
-
-                Spacer(minLength: 0)
-
-                if hasPhoto {
-                    HomeV2DisclosureLink(
-                        title: HomeV2PhotoCopy.allPhotos,
-                        identifier: "home_v2_all_photos_row",
-                        action: onAllPhotos
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-
-                if isHealthOff, !isLogged {
-                    HomeV2Dock(
-                        title: HomeV2SystemCopy.connectAppleHealth,
-                        identifier: "home_v2_connect_health",
-                        action: onConnectHealth
-                    )
-                } else {
-                    HomeV2Dock(
-                        title: isLogged ? HomeV2Copy.done : HomeV2Copy.logWeight,
-                        identifier: isLogged ? "home_v2_done" : "home_v2_log_weight",
-                        action: isLogged ? onDone : onLogWeight
-                    )
+                    VStack(alignment: .leading, spacing: 0) {
+                        systemBanner
+                        metricFirst
+                    }
+                    .frame(minHeight: geometry.size.height, alignment: .top)
                 }
             }
-            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+            .scrollBounceBehavior(.basedOnSize)
+            .accessibilityIdentifier("home_v2_content_scroll")
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            actionDock
+                .background(HomeV2Tokens.Colors.shell)
+        }
+    }
+
+    @ViewBuilder
+    private var systemBanner: some View {
+        if systemState == .offline {
+            HomeV2OfflineBanner()
+        } else if isHealthOff {
+            HomeV2HealthOffRow()
+        }
+    }
+
+    @ViewBuilder
+    private var actionDock: some View {
+        if isHealthOff, !isLogged {
+            HomeV2Dock(
+                title: HomeV2SystemCopy.connectAppleHealth,
+                identifier: "home_v2_connect_health",
+                action: onConnectHealth
+            )
+        } else {
+            HomeV2Dock(
+                title: isLogged ? HomeV2Copy.done : HomeV2Copy.logWeight,
+                identifier: isLogged ? "home_v2_done" : "home_v2_log_weight",
+                action: isLogged ? onDone : onLogWeight
+            )
         }
     }
 
     private func photoStage(photoURL: String, size: CGSize) -> some View {
-        Button(action: onOpenPhoto) {
+        let photoHeight = min(size.height, size.width / HomeV2Tokens.photoAspectRatio)
+        return Button(action: onOpenPhoto) {
             SubjectPlateView(
                 urlString: photoURL,
-                size: CGSize(width: size.width, height: HomeV2Layout.stageHeight(width: size.width, height: size.height))
+                size: CGSize(width: photoHeight * HomeV2Tokens.photoAspectRatio, height: photoHeight)
             )
+            .frame(width: size.width, height: size.height)
+            .background(HomeV2Tokens.Colors.shell)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -243,6 +264,46 @@ struct HomeV2Surface: View {
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .frame(minHeight: HomeV2Tokens.rowHeight)
+    }
+}
+
+/// Measures the real banner and footer before fitting the photo. If large
+/// text needs more space, the content grows inside the scroll view while the
+/// separately inset dock remains visible. The photo keeps its 4:5 crop.
+private struct HomeV2PhotoContentLayout: Layout {
+    let viewport: CGSize
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? viewport.width
+        let heights = heights(width: width, subviews: subviews)
+        return CGSize(width: width, height: max(viewport.height, heights.banner + heights.photo + heights.footer))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 3 else { return }
+        let heights = heights(width: bounds.width, subviews: subviews)
+        let sizes = [heights.banner, heights.photo, bounds.height - heights.banner - heights.photo]
+        var position = bounds.minY
+        for (subview, height) in zip(subviews, sizes) {
+            subview.place(
+                at: CGPoint(x: bounds.minX, y: position),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(width: bounds.width, height: height)
+            )
+            position += height
+        }
+    }
+
+    private func heights(width: CGFloat, subviews: Subviews) -> (banner: CGFloat, photo: CGFloat, footer: CGFloat) {
+        guard subviews.count == 3 else { return (0, 0, 0) }
+        let intrinsic = ProposedViewSize(width: width, height: nil)
+        let banner = subviews[0].sizeThatFits(intrinsic).height
+        let footer = subviews[2].sizeThatFits(intrinsic).height
+        let photo = min(
+            width / HomeV2Tokens.photoAspectRatio,
+            max(HomeV2Layout.minimumStageHeight, viewport.height - banner - footer)
+        )
+        return (banner, photo, footer)
     }
 }
 

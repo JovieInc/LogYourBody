@@ -22,9 +22,13 @@ struct HomeV2PrimaryButton: View {
                 }
                 Text(title)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.horizontal, HomeV2Tokens.Space.row)
+            .padding(.vertical, HomeV2Tokens.Space.tight)
             .foregroundStyle(HomeV2Tokens.Colors.ctaInk)
             .frame(maxWidth: .infinity, minHeight: JovieTokens.controlHeight)
             .background(HomeV2Tokens.Colors.ctaFill, in: Capsule())
