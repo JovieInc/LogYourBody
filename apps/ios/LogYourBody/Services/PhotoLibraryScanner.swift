@@ -84,6 +84,7 @@ class PhotoLibraryScanner: ObservableObject {
     private let metadataProvider: ((PHAsset) -> ScannedPhoto.PhotoMetadata)?
     private let metadataScanEnabled: @MainActor () -> Bool
     private let monotonicTime: () -> TimeInterval
+    private let fetchAssets: (PhotoScanCriteria) async throws -> [PHAsset]
     private var scanTask: Task<Void, Never>?
 
     init(
@@ -92,12 +93,16 @@ class PhotoLibraryScanner: ObservableObject {
         metadataScanEnabled: @escaping @MainActor () -> Bool = {
             AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: "photo_scan_metadata_v1")
         },
-        monotonicTime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+        monotonicTime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        fetchAssets: ((PhotoScanCriteria) async throws -> [PHAsset])? = nil
     ) {
         self.imageManager = imageManager
         self.metadataProvider = metadataProvider
         self.metadataScanEnabled = metadataScanEnabled
         self.monotonicTime = monotonicTime
+        self.fetchAssets = fetchAssets ?? { criteria in
+            try await Self.libraryAssets(matching: criteria)
+        }
         checkAuthorizationStatus()
     }
 
@@ -138,13 +143,22 @@ class PhotoLibraryScanner: ObservableObject {
             photoGroups = []
         }
 
-        scanTask = Task {
+        let task = Task {
             do {
                 // Fetch photos matching initial criteria
-                let photos = try await fetchPhotos(matching: criteria)
+                let photos = try await fetchAssets(criteria)
 
                 // Analyze photos for progress photo likelihood
                 let analyzed = await analyzePhotos(photos, criteria: criteria)
+                // Cancel is cooperative. Stop before a cancelled scan is published
+                // as finished, including progress 1.
+                guard !Task.isCancelled else {
+                    await MainActor.run {
+                        self.isScanning = false
+                        self.scanProgress = 0
+                    }
+                    return
+                }
 
                 // Group photos by date
                 let grouped = groupPhotosByDate(analyzed, minimumDaysBetween: criteria.minimumDaysBetween)
@@ -163,6 +177,8 @@ class PhotoLibraryScanner: ObservableObject {
                 }
             }
         }
+        scanTask = task
+        await task.value
     }
 
     func cancelScan() {
@@ -189,7 +205,7 @@ class PhotoLibraryScanner: ObservableObject {
 
     // MARK: - Private Methods
 
-    private func fetchPhotos(matching criteria: PhotoScanCriteria) async throws -> [PHAsset] {
+    private static func libraryAssets(matching criteria: PhotoScanCriteria) async throws -> [PHAsset] {
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
 

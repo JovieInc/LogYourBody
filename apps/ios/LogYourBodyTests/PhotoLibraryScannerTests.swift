@@ -211,4 +211,62 @@ extension PhotoLibraryScannerTests {
         XCTAssertNotNil(fullImage)
         XCTAssertEqual(manager.requests, 2)
     }
+
+    @MainActor
+    func testCancelDuringFetchDoesNotPublishACompletedScan() async {
+        let gate = ScanFetchGate()
+        let scanner = PhotoLibraryScanner(
+            metadataProvider: { _ in
+                ScannedPhoto.PhotoMetadata(
+                    location: nil, cameraType: .unknown, isScreenshot: false, hasBeenEdited: false
+                )
+            },
+            metadataScanEnabled: { true },
+            fetchAssets: { _ in
+                await gate.wait()
+                return [SyntheticScanAsset()]
+            }
+        )
+        scanner.authorizationStatus = .authorized
+        let task = Task { await scanner.scanPhotoLibrary(with: PhotoScanCriteria(dateRange: nil)) }
+        await fulfillment(of: [gate.started], timeout: 3)
+        scanner.cancelScan()
+        gate.resume()
+        await task.value
+        XCTAssertFalse(scanner.isScanning)
+        XCTAssertEqual(scanner.scanProgress, 0, accuracy: 0.0001)
+        XCTAssertTrue(scanner.scannedPhotos.isEmpty)
+        XCTAssertTrue(scanner.photoGroups.isEmpty)
+    }
+}
+
+/// Suspends the production photo fetch until the test cancels the scan.
+private final class ScanFetchGate: @unchecked Sendable {
+    let started = XCTestExpectation(description: "Synthetic photo fetch started")
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var resumed = false
+
+    func wait() async {
+        started.fulfill()
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if resumed {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+                lock.unlock()
+            }
+        }
+    }
+
+    func resume() {
+        lock.lock()
+        resumed = true
+        let continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume()
+    }
 }
