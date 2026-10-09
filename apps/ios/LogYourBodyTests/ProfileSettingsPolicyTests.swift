@@ -82,10 +82,10 @@ final class ProfileSettingsPolicyTests: XCTestCase {
         XCTAssertEqual(ProfileSettingsPolicy.formattedHeight(heightCm: 100, useMetric: true), "100 cm")
     }
 
-    func testFormattedHeightImperialTruncatesToWholeInches() {
-        XCTAssertEqual(ProfileSettingsPolicy.formattedHeight(heightCm: 170, useMetric: false), "5'6\"")
+    func testFormattedHeightImperialRoundsToNearestInch() {
+        XCTAssertEqual(ProfileSettingsPolicy.formattedHeight(heightCm: 170, useMetric: false), "5'7\"")
         XCTAssertEqual(ProfileSettingsPolicy.formattedHeight(heightCm: 183, useMetric: false), "6'0\"")
-        XCTAssertEqual(ProfileSettingsPolicy.formattedHeight(heightCm: 152, useMetric: false), "4'11\"")
+        XCTAssertEqual(ProfileSettingsPolicy.formattedHeight(heightCm: 152, useMetric: false), "5'0\"")
     }
 
     // MARK: - formattedAge
@@ -149,16 +149,48 @@ final class ProfileSettingsPolicyTests: XCTestCase {
 
     func testImperialHeightComponents() {
         XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 170).feet, 5)
-        XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 170).inches, 6)
+        XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 170).inches, 7)
         XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 183).feet, 6)
         XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 183).inches, 0)
-        XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 213).feet, 6)
-        XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 213).inches, 11)
+        XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 213).feet, 7)
+        XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 213).inches, 0)
     }
 
     func testHeightCmFromImperialComponents() {
-        XCTAssertEqual(ProfileSettingsPolicy.heightCm(feet: 5, inches: 6), 167)
-        XCTAssertEqual(ProfileSettingsPolicy.heightCm(feet: 6, inches: 0), 182)
-        XCTAssertEqual(ProfileSettingsPolicy.heightCm(feet: 4, inches: 11), 149)
+        XCTAssertEqual(ProfileSettingsPolicy.heightCm(feet: 5, inches: 6), 168)
+        XCTAssertEqual(ProfileSettingsPolicy.heightCm(feet: 6, inches: 0), 183)
+        XCTAssertEqual(ProfileSettingsPolicy.heightCm(feet: 4, inches: 11), 150)
+    }
+
+    func testImperialHeightWheelRoundTripsAndMatchesNearestInch() {
+        XCTAssertEqual(ProfileSettingsPolicy.formattedHeight(heightCm: 170, useMetric: false), "5'7\"")
+        XCTAssertEqual(ProfileSettingsPolicy.imperialHeightComponents(heightCm: 170).inches, 7)
+        XCTAssertEqual(ProfileSettingsPolicy.formattedHeight(heightCm: 213, useMetric: false), "7'0\"")
+
+        let sixFeet = ProfileSettingsPolicy.heightCm(feet: 6, inches: 0)
+        let shown = ProfileSettingsPolicy.imperialHeightComponents(heightCm: sixFeet)
+        XCTAssertEqual(shown.feet, 6)
+        XCTAssertEqual(shown.inches, 0)
+
+        for feet in 3...8 {
+            for inches in 0...11 {
+                let centimeters = ProfileSettingsPolicy.heightCm(feet: feet, inches: inches)
+                let components = ProfileSettingsPolicy.imperialHeightComponents(heightCm: centimeters)
+                XCTAssertEqual(
+                    components.feet,
+                    feet,
+                    "\(feet) ft \(inches) in stored \(centimeters) cm and came back as \(components.feet) ft \(components.inches) in"
+                )
+                XCTAssertEqual(
+                    components.inches,
+                    inches,
+                    "\(feet) ft \(inches) in stored \(centimeters) cm and came back as \(components.feet) ft \(components.inches) in"
+                )
+                XCTAssertEqual(
+                    ProfileSettingsPolicy.formattedHeight(heightCm: centimeters, useMetric: false),
+                    "\(feet)'\(inches)\""
+                )
+            }
+        }
     }
 }

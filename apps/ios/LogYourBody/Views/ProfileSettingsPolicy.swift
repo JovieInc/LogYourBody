@@ -41,10 +41,8 @@ enum ProfileSettingsPolicy {
         if useMetric {
             return "\(heightCm) cm"
         }
-        let totalInches = Int(Double(heightCm) / 2.54)
-        let feet = totalInches / 12
-        let inches = totalInches % 12
-        return "\(feet)'\(inches)\""
+        let components = imperialHeightComponents(heightCm: heightCm)
+        return "\(components.feet)'\(components.inches)\""
     }
 
     /// Formats the age row label from a date of birth.
@@ -55,14 +53,15 @@ enum ProfileSettingsPolicy {
 
     /// Imperial wheel components for a height stored in cm.
     static func imperialHeightComponents(heightCm: Int) -> (feet: Int, inches: Int) {
-        let totalInches = Double(heightCm) / 2.54
-        let feet = Int(totalInches / 12)
-        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        let totalInches = Int((Double(heightCm) / 2.54).rounded())
+        let feet = totalInches / 12
+        let inches = totalInches % 12
         return (feet, inches)
     }
 
     /// Height in cm from imperial wheel components.
     static func heightCm(feet: Int, inches: Int) -> Int {
-        Int((Double(feet) * 12 + Double(inches)) * 2.54)
+        let totalInches = (feet * 12) + inches
+        return Int((Double(totalInches) * 2.54).rounded())
     }
 }
