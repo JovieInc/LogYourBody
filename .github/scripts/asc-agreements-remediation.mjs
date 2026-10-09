@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// On an iOS release failure, upsert JOV remediation:asc-agreements (JOV-3027)
+// On an iOS release failure, upsert LYB remediation:asc-agreements
 // when the log contains REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED.
 // Does not replace the existing LYB-68 [ci] filing.
 
@@ -8,6 +8,8 @@ import { pathToFileURL } from 'node:url';
 import {
   addLinearIssueComment,
   listLinearIssueComments,
+  findTeamIdByKey,
+  LYB_TEAM_KEY,
   missingLinearKeyWarning,
   upsertLinearIssue,
 } from './lib/linear-issue-intake.mjs';
@@ -36,6 +38,7 @@ export function planAscAgreementsIssue(logText, runUrl) {
     priority: 1,
     createStateName: 'Todo',
     reopenTerminal: true,
+    teamKey: LYB_TEAM_KEY,
   };
 }
 
@@ -54,8 +57,11 @@ export function shouldAddRunComment(comments, { runUrl, nowMs, windowMs = COMMEN
 }
 
 async function filePlan(plan, { apiKey, runUrl, nowMs = Date.now() }) {
+  const team = await findTeamIdByKey({ teamKey: plan.teamKey, apiKey });
+  if (!team.ok) return team;
   const upserted = await upsertLinearIssue({
     ...plan,
+    teamId: team.id,
     apiKey,
   });
   if (!upserted.ok) return upserted;
