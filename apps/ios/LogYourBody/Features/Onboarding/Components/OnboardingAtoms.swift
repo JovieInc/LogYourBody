@@ -253,13 +253,19 @@ struct FFMIInfoLink: View {
                         .padding(24)
                 }
                 .background(Color.jovieCanvas.ignoresSafeArea())
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") {
-                            isPresenting = false
-                        }
-                        .foregroundStyle(Color.jovieAction)
+                // The navigation-bar Done accessibility frame stays about 35 points tall.
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    Button {
+                        isPresenting = false
+                    } label: {
+                        Text("Done")
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("ffmi_info_done_button")
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.vertical, JovieTokens.itemGap)
                 }
             }
             .presentationDetents([.height(320)])
