@@ -80,9 +80,50 @@ function requiredCheckContexts(ruleset) {
   return contexts;
 }
 
+function bypassActorLabel(actor) {
+  return [
+    actor.actor_type,
+    actor.actor_id === undefined ? undefined : `id=${actor.actor_id}`,
+    actor.bypass_mode === undefined ? undefined : `mode=${actor.bypass_mode}`,
+  ].filter(Boolean).join(' ');
+}
+
+// Protected release branches use the required CI Summary gate as their only
+// admission path. Any configured bypass actor, especially an always-allowed
+// OrganizationAdmin, would make that gate optional for part of the repo.
+export function findBypassActorViolations(
+  rulesets,
+  { protectedBranches = PROTECTED_BRANCHES, defaultBranch } = {},
+) {
+  const violations = [];
+  for (const ruleset of rulesets ?? []) {
+    if (!ruleset || ruleset.target !== 'branch' || ruleset.enforcement !== 'active') continue;
+    const coveredBranches = protectedBranches.filter(branch => isCoveredBy(ruleset, branch, defaultBranch));
+    if (coveredBranches.length === 0) continue;
+
+    for (const actor of ruleset.bypass_actors ?? []) {
+      violations.push({
+        rulesetId: ruleset.id,
+        rulesetName: ruleset.name,
+        branches: coveredBranches,
+        actor: bypassActorLabel(actor),
+      });
+    }
+    if (ruleset.current_user_can_bypass === 'always') {
+      violations.push({
+        rulesetId: ruleset.id,
+        rulesetName: ruleset.name,
+        branches: coveredBranches,
+        actor: 'current user mode=always',
+      });
+    }
+  }
+  return violations;
+}
+
 // rulesets: array of GET /repos/{o}/{r}/rulesets/{id} payloads (branch rulesets).
-// Asserts: no quoted ref targets; each protected branch is covered by an active
-// ruleset that requires the aggregate CI Summary status check.
+// Asserts: no quoted ref targets; protected branches are covered by active
+// rulesets requiring CI Summary; and those rulesets have no bypass actors.
 export function verifyRulesetTargets(
   rulesets,
   { protectedBranches = PROTECTED_BRANCHES, defaultBranch } = {},
@@ -106,6 +147,17 @@ export function verifyRulesetTargets(
   assert(
     !usesDefaultBranch || (typeof defaultBranch === 'string' && defaultBranch.trim() !== ''),
     '~DEFAULT_BRANCH requires the actual repository default branch',
+  );
+
+  const bypassViolations = findBypassActorViolations(rulesets, {
+    protectedBranches,
+    defaultBranch,
+  });
+  assert(
+    bypassViolations.length === 0,
+    `protected branch rulesets allow bypass actors: ${bypassViolations
+      .map(v => `ruleset ${v.rulesetId} (${v.rulesetName}) branches ${v.branches.join(',')} actor ${v.actor}`)
+      .join('; ')}`,
   );
 
   for (const branch of protectedBranches) {
