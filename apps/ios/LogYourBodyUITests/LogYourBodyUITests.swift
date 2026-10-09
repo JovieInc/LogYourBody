@@ -1789,6 +1789,35 @@ final class LogYourBodyUITests: XCTestCase {
         )
     }
 
+    func testHomeV2SparseProgressKeepsRangesAndNamesEachMetric() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+
+        let viewProgress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
+        viewProgress.tap()
+
+        let month = app.buttons["home_v2_range_1M"]
+        let all = app.buttons["home_v2_range_All"]
+        XCTAssertTrue(month.waitForExistence(timeout: 8), "Sparse history must still offer a date range")
+        month.tap()
+        XCTAssertTrue(month.isSelected)
+        XCTAssertTrue(all.waitForExistence(timeout: 5), "A sparse recent range must not hide access to older history")
+        all.tap()
+        XCTAssertTrue(all.isSelected)
+
+        let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
+        for (identifier, title) in [("body_fat", "Body fat"), ("ffmi", "FFMI"), ("steps", "Steps")] {
+            app.buttons["home_v2_progress_tab_\(identifier)"].tap()
+            XCTAssertTrue(chart.waitForExistence(timeout: 5))
+            XCTAssertTrue(chart.label.hasPrefix(title), "VoiceOver must identify the selected metric")
+            XCTAssertFalse(chart.label.contains("Weight"))
+            XCTAssertFalse(chart.label.contains("7-day average"), "These metrics show raw history, not a rolling average")
+            XCTAssertTrue(month.exists, "Ranges remain available across sparse metric changes")
+        }
+        attachScreenshot(named: "home-v2-sparse-progress-ranges", from: app)
+    }
+
     func testHomeV2ViewerDisclosesDetailsToolsAndAllPhotos() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
@@ -1986,6 +2015,44 @@ final class LogYourBodyUITests: XCTestCase {
             "The quiet composer is there"
         )
         attachScreenshot(named: "home-v2-ask", from: app)
+    }
+
+    func testHomeV2AskOpensFromProgressAndReturnsToProgress() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+
+        let viewProgress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
+        viewProgress.tap()
+        XCTAssertTrue(app.buttons["home_v2_progress_tab_weight"].waitForExistence(timeout: 8))
+        app.buttons["photo_timeline_root_menu"].tap()
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 8))
+        ask.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Ask"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["chat_composer"].exists)
+        let close = app.buttons["home_chat_collapse"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "Ask must remain expanded after navigating from Progress")
+        attachScreenshot(named: "home-v2-ask-from-progress", from: app)
+        close.tap()
+        XCTAssertTrue(app.buttons["home_v2_progress_tab_weight"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["home_chat_collapse"].exists)
+
+        app.buttons["photo_timeline_root_menu"].tap()
+        XCTAssertTrue(ask.waitForExistence(timeout: 8))
+        ask.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 8))
+        let header = app.descendants(matching: .any)["photo_timeline_root_nav"]
+        let start = header.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 120, dy: 12))
+        let end = start.withOffset(CGVector(dx: 180, dy: 0))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertTrue(
+            app.buttons["home_v2_progress_tab_weight"].waitForExistence(timeout: 8),
+            "Swiping Ask closed must return to the same workspace as the close button"
+        )
+        XCTAssertFalse(app.buttons["home_chat_collapse"].exists)
     }
 
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {

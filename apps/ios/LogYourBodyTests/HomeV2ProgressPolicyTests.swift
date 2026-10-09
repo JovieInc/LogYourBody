@@ -2,6 +2,7 @@
 // HomeV2ProgressPolicyTests.swift
 // LogYourBodyTests
 //
+import SwiftUI
 import XCTest
 @testable import LogYourBody
 
@@ -59,5 +60,48 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
         }
         XCTAssertTrue(HomeV2ProgressMetric.steps.prefersHigh)
         XCTAssertFalse(HomeV2ProgressMetric.weight.prefersHigh)
+    }
+
+    @MainActor
+    func testRawProgressChartsIdentifyTheirMetricWithoutClaimingAnAverage() {
+        let points = (0..<7).map { point(daysAgo: $0, value: 20) }
+        for metric in HomeV2ProgressMetric.allCases {
+            let chart = HomeV2TrendChart(
+                daily: points,
+                trend: points,
+                accent: metric.accent,
+                range: .constant(.all),
+                axis: .months,
+                metricTitle: metric.title,
+                usesSevenDayAverage: false
+            )
+            XCTAssertEqual(chart.accessibilitySummary, "\(metric.title) history")
+        }
+    }
+
+    @MainActor
+    func testAveragedWeightChartDescribesItsActualSeries() {
+        let points = (0..<7).map { point(daysAgo: $0, value: 170) }
+        let chart = HomeV2TrendChart(
+            daily: points,
+            trend: points,
+            accent: HomeV2ProgressMetric.weight.accent,
+            range: .constant(.all)
+        )
+        XCTAssertEqual(chart.accessibilitySummary, "Weight trend, 7-day average")
+    }
+
+    @MainActor
+    func testSparseProgressChartKeepsMetricIdentityInItsAccessibilitySummary() {
+        let chart = HomeV2TrendChart(
+            daily: [point(daysAgo: 0, value: 8_000)],
+            trend: [],
+            accent: HomeV2ProgressMetric.steps.accent,
+            range: .constant(.month1),
+            axis: .months,
+            metricTitle: HomeV2ProgressMetric.steps.title,
+            usesSevenDayAverage: false
+        )
+        XCTAssertEqual(chart.accessibilitySummary, "Steps history. Your trend appears after 7 days")
     }
 }

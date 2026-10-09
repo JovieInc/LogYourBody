@@ -55,6 +55,8 @@ struct HomeV2TrendChart: View {
     var showsDots = true
     var chartHeight: CGFloat = HomeV2Tokens.chartHeight
     var axis: Axis = .trend
+    var metricTitle = "Weight"
+    var usesSevenDayAverage = true
     var now = Date()
 
     private static let startFormatter: DateFormatter = {
@@ -67,6 +69,15 @@ struct HomeV2TrendChart: View {
     private var visibleTrend: [MetricChartDataPoint] { HomeV2TrendPolicy.points(trend, in: range, now: now) }
     private var hasEnoughData: Bool { HomeV2TrendPolicy.hasEnoughData(visibleDaily) }
 
+    var accessibilitySummary: String {
+        guard hasEnoughData else {
+            return "\(metricTitle) history. \(HomeV2TrendPolicy.notEnoughData)"
+        }
+        return usesSevenDayAverage
+            ? "\(metricTitle) trend, \(HomeV2TrendPolicy.sevenDayAverageLabel)"
+            : "\(metricTitle) history"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Group {
@@ -78,7 +89,7 @@ struct HomeV2TrendChart: View {
             }
             .frame(height: chartHeight)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(hasEnoughData ? "Weight trend, \(HomeV2TrendPolicy.sevenDayAverageLabel)" : HomeV2TrendPolicy.notEnoughData)
+            .accessibilityLabel(accessibilitySummary)
             .accessibilityIdentifier("home_v2_trend_chart")
 
             if axis == .trend {

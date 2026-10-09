@@ -170,19 +170,23 @@ struct HomeV2ProgressView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     headline(current, stats: stats, hasEnoughData: hasEnoughData)
 
-                    if hasEnoughData {
-                        HomeV2TrendChart(
-                            daily: current.daily,
-                            trend: current.trend.isEmpty ? current.daily : current.trend,
-                            accent: metric.accent,
-                            range: $range,
-                            showsDots: !current.trend.isEmpty,
-                            chartHeight: HomeV2Tokens.progressChartHeight,
-                            axis: .months,
-                            now: now
-                        )
-                        .padding(.top, HomeV2Tokens.Space.tight)
+                    // Keep range selection reachable even when this window
+                    // has too few readings to draw a trend.
+                    HomeV2TrendChart(
+                        daily: current.daily,
+                        trend: current.trend.isEmpty ? current.daily : current.trend,
+                        accent: metric.accent,
+                        range: $range,
+                        showsDots: !current.trend.isEmpty,
+                        chartHeight: HomeV2Tokens.progressChartHeight,
+                        axis: .months,
+                        metricTitle: metric.title,
+                        usesSevenDayAverage: !current.trend.isEmpty,
+                        now: now
+                    )
+                    .padding(.top, HomeV2Tokens.Space.tight)
 
+                    if hasEnoughData {
                         insightRow(current)
                         statsRow(stats, target: current.target)
                     } else if metric == .weight {

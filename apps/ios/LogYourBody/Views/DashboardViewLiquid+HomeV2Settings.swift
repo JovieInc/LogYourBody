@@ -71,8 +71,8 @@ extension DashboardViewLiquid {
         case .entries:
             isHomeV2EntriesPresented = true
         case .ask:
-            // Changing the page resets the expanded chat, so Ask expands it on Today.
-            selectedPhotoTimelineRootPage = .timeline
+            // Expand over the current workspace. Changing pages also collapses
+            // chat, and would dismiss Ask when it is opened from Progress.
             isHomeChatExpanded = true
         }
     }
