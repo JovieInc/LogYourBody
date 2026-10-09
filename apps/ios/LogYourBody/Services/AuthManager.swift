@@ -460,7 +460,7 @@ final class AuthManager: NSObject, ObservableObject {
                         if isValid {
                             applyAuthenticatedSession(stored)
                         } else {
-                            await performLogout(exitReason: .sessionExpired)
+                            await performLogout(exitReason: .sessionExpired, knownAccountId: stored.subject)
                         }
                     }
                 } else {
@@ -812,7 +812,7 @@ final class AuthManager: NSObject, ObservableObject {
                 return self.authSession.map { ($0.accessToken, self.authGeneration) }
             } catch {
                 guard self.authGeneration == generation, !Task.isCancelled else { return nil }
-                await self.performLogout(exitReason: .sessionExpired)
+                await self.performLogout(exitReason: .sessionExpired, knownAccountId: current.subject)
                 return nil
             }
         }
@@ -846,10 +846,13 @@ final class AuthManager: NSObject, ObservableObject {
         }
     }
 
-    func performLogout(exitReason: AuthExitReason) async {
-        let departingUserId = currentUser?.id
+    func performLogout(exitReason: AuthExitReason, knownAccountId: String? = nil) async {
+        let signedInUserId = currentUser?.id
+        // A cold restore can fail before currentUser exists. The keychain
+        // subject still owns any unstamped local goals.
+        let departingUserId = signedInUserId ?? authSession?.subject ?? knownAccountId
         AccountLocalGoalFence.noteDepartingUser(departingUserId, defaults: userDefaults)
-        prepareHealthAccountHandoff?(departingUserId)
+        prepareHealthAccountHandoff?(signedInUserId)
         let expiredOwnership = exitReason == .sessionExpired ? captureRequestSession() : nil
         try? keychain.delete(forKey: storedSessionKey)
         authSession = nil

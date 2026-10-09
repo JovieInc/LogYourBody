@@ -917,6 +917,71 @@ final class AuthManagerSessionTests: XCTestCase {
         assertDeviceMeasurementSystemRemains()
     }
 
+    func testRejectedStoredSessionKeepsGoalsWithThatAccount() async throws {
+        let manager = makeManager()
+        storePersonalGoals()
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-a", email: "a@example.invalid"),
+            forKey: storedSessionKey
+        )
+        AuthStubURLProtocol.requestHandler = { _ in
+            AuthStubURLProtocol.StubbedResponse(statusCode: 401, body: Data("{}".utf8))
+        }
+
+        await manager.initialize()
+
+        XCTAssertNil(manager.currentUser)
+        XCTAssertEqual(defaults.string(forKey: AccountLocalGoalFence.ownerKey), "user-a")
+        assertPersonalGoalsIntact()
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-a", email: "a@example.invalid"),
+            forKey: storedSessionKey
+        )
+        stubSessionSuccess()
+
+        await manager.retryAuthProviderInitialization()
+
+        XCTAssertEqual(manager.currentUser?.id, "user-a")
+        assertPersonalGoalsIntact()
+        assertDeviceMeasurementSystemRemains()
+    }
+
+    func testFailedColdRefreshKeepsGoalsUntilADifferentAccountSignsIn() async throws {
+        let manager = makeManager()
+        storePersonalGoals()
+        try keychain.save(
+            ProductAuthSession.localFixture(
+                subject: "user-a",
+                email: "a@example.invalid",
+                expiresAt: Date().addingTimeInterval(-5)
+            ),
+            forKey: storedSessionKey
+        )
+        AuthStubURLProtocol.requestHandler = { _ in
+            AuthStubURLProtocol.StubbedResponse(
+                statusCode: 400,
+                body: Data(#"{"error":"invalid_grant"}"#.utf8)
+            )
+        }
+
+        await manager.initialize()
+
+        XCTAssertNil(manager.currentUser)
+        XCTAssertEqual(defaults.string(forKey: AccountLocalGoalFence.ownerKey), "user-a")
+        assertPersonalGoalsIntact()
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-b", email: "b@example.invalid"),
+            forKey: storedSessionKey
+        )
+        stubSessionSuccess()
+
+        await manager.retryAuthProviderInitialization()
+
+        XCTAssertEqual(manager.currentUser?.id, "user-b")
+        assertPersonalGoalsCleared()
+        assertDeviceMeasurementSystemRemains()
+    }
+
     private func localUser(id: String, email: String) -> LocalUser {
         LocalUser(
             id: id,
