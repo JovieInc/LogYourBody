@@ -314,6 +314,10 @@ class CoreDataManager: ObservableObject {
     // Save context helper
 
     // Clean up body metrics with invalid UUIDs
+
+    /// `updatedAt` for each id in the latest pending sync snapshot.
+    /// Acknowledgement accepts only a row that still has that version.
+    var syncAcknowledgementVersions: [String: [String: Date]] = [:]
 }
 
 extension CachedGlp1Medication {
