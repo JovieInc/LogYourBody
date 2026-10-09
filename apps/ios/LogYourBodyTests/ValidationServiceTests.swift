@@ -55,6 +55,23 @@ final class ValidationServiceTests: XCTestCase {
         )
     }
 
+    func testDecimalCommaIsAValidWeightBodyFatAndHeight() throws {
+        let service = ValidationService.shared
+
+        XCTAssertEqual(try service.validateWeight("80,5", unit: "kg"), 80.5, accuracy: 0.001)
+        XCTAssertEqual(try service.validateWeight("150,5", unit: "lbs"), 150.5, accuracy: 0.001)
+        XCTAssertEqual(try service.validateBodyFat("18,5"), 18.5, accuracy: 0.001)
+        XCTAssertEqual(try service.validateHeight("178,5", unit: "cm"), 178.5, accuracy: 0.001)
+
+        let logged = LogWeightFormValidator.validate(weight: "80,5", bodyFat: "18,5", unit: "kg")
+        XCTAssertEqual(logged.weightValue ?? -1, 80.5, accuracy: 0.001)
+        XCTAssertEqual(logged.bodyFatValue ?? -1, 18.5, accuracy: 0.001)
+        XCTAssertNil(logged.weightError)
+        XCTAssertNil(logged.bodyFatError)
+        XCTAssertTrue(logged.isValid)
+        XCTAssertTrue(PaidWeightLoggerMVPPolicy.canSaveWeight(weightText: "80,5", unit: "kg", isSaving: false))
+    }
+
     func testRejectsBadNumericStrings() {
         let service = ValidationService.shared
 
