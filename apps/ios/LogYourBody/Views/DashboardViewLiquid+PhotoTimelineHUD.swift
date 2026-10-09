@@ -129,6 +129,11 @@ extension DashboardViewLiquid {
             PreferencesView()
                 .environmentObject(authManager)
         }
+        .alert("Couldn’t undo this entry", isPresented: $showsHomeV2UndoError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your entry is still saved. Try Undo again.")
+        }
     }
 
     private var photoTimelineNavigationMenuCover: some View {

@@ -296,10 +296,9 @@ enum HomeV2WeightStepPolicy {
 /// What Home needs to show C2 and to undo it.
 struct HomeV2LoggedEntry: Equatable {
     let metricId: String
+    let userId: String
     let date: Date
-    let existedBefore: Bool
-    let previousWeightKilograms: Double?
-    let previousBodyFat: Double?
+    let previousMetric: BodyMetrics?
     let valueText: String
     let unit: String
 }
