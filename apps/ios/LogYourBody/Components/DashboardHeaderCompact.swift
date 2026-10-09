@@ -20,7 +20,12 @@ struct DashboardHeaderCompact: View {
     }
 
     private var shouldShowPersistentSyncStatus: Bool {
-        isSyncError || syncStatusTitle == "Offline"
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestSyncDetailsFixture") {
+            return true
+        }
+        #endif
+        return isSyncError || syncStatusTitle == "Offline"
     }
 
     var body: some View {

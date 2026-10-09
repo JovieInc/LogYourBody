@@ -70,13 +70,41 @@ struct BodySpecIntegrationView: View {
         }
     }
 
+    #if DEBUG
+    private static let fixturePDF = """
+    %PDF-1.1
+    1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+    2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+    3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj
+    trailer<</Root 1 0 R>>
+    %%EOF
+    """
+
+    private static func fixturePDFURL() -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lyb-ui-dexa-fixture.pdf")
+        if !FileManager.default.fileExists(atPath: url.path) {
+            let bytes = Data(Self.fixturePDF.utf8)
+            try? bytes.write(to: url, options: .atomic)
+        }
+        return url
+    }
+    #endif
+
     private var pdfImportSection: some View {
         SettingsSection(
             header: "Import from PDF",
             footer: "Choose a report from Files or use the iOS share sheet to open a PDF in LogYourBody."
         ) {
             Button {
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-lybUITestDexaPDFSheetFixture") {
+                    selectedPDF = DexaPDFFileSelection(url: Self.fixturePDFURL())
+                } else {
+                    isSelectingPDF = true
+                }
+                #else
                 isSelectingPDF = true
+                #endif
             } label: {
                 Label("Import DEXA or InBody PDF", systemImage: "doc.badge.plus")
             }
