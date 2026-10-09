@@ -3,10 +3,10 @@ name: Merge Queue Token Enrollment
 # GitHub creates no workflow runs for events caused by GITHUB_TOKEN, so a
 # merge group created by auto-enrollment never gets merge-group CI and the
 # queue's check timeout drops the entry. After enrollment completes, this job
-# re-enqueues bot-owned entries with the machine-user token so the merge_group
+# re-enqueues bot-owned entries with the existing App or machine-user token so the merge_group
 # event starts CI. It never runs on pull-request events, never checks out
 # code, re-proves "CI Summary" on the exact head, and is a no-op until the
-# MERGE_QUEUE_TOKEN secret exists.
+# App inputs or MERGE_QUEUE_TOKEN secret exist.
 on:
   workflow_run:
     workflows: [Native Merge Queue Enrollment]
@@ -22,29 +22,64 @@ concurrency:
 
 jobs:
   reenqueue:
-    name: Re-enqueue bot-owned queue entries with the machine-user token
-    if: github.event.workflow_run.conclusion == 'success'
+    name: Re-enqueue bot-owned queue entries with an App or machine-user token
+    if: >-
+      github.repository == 'JovieInc/LogYourBody' &&
+      github.event.workflow_run.name == 'Native Merge Queue Enrollment' &&
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Check for the machine-user token
+      - name: Select existing enrollment credentials
         id: gate
         env:
           MERGE_QUEUE_TOKEN: ${{ secrets.MERGE_QUEUE_TOKEN }}
+          JOVIE_BOT_APP_ID: ${{ vars.JOVIE_BOT_APP_ID }}
+          JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
         run: |
-          if [ -z "$MERGE_QUEUE_TOKEN" ]; then
+          if [ "$GITHUB_REPOSITORY" != "JovieInc/LogYourBody" ]; then
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::SKIPPED: MERGE_QUEUE_TOKEN is not set; queue entries stay bot-owned and need a user-token enqueue"
-          else
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::SKIPPED: enrollment is scoped to JovieInc/LogYourBody"
+          elif [ -n "$JOVIE_BOT_APP_ID" ] && [ -n "$JOVIE_BOT_PRIVATE_KEY" ]; then
             echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "mode=app" >> "$GITHUB_OUTPUT"
+          elif [ -n "$MERGE_QUEUE_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "mode=pat" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::SKIPPED: neither existing App inputs nor MERGE_QUEUE_TOKEN are available"
           fi
 
-      - name: Re-enqueue with the machine-user token
-        if: steps.gate.outputs.present == 'true'
+      - name: Mint the existing repository-scoped App token
+        id: app-token
+        if: steps.gate.outputs.mode == 'app'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-checks: read
+
+      - name: Re-enqueue with the selected App or machine-user token
+        if: steps.gate.outputs.present == 'true' && (steps.gate.outputs.mode == 'pat' || steps.app-token.outputs.token != '')
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          github-token: ${{ secrets.MERGE_QUEUE_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token || secrets.MERGE_QUEUE_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
+            const expectedRepository = 'JovieInc/LogYourBody';
+            const run = context.payload.workflow_run;
+            if (`${owner}/${repo}` !== expectedRepository || context.eventName !== 'workflow_run'
+                || run?.name !== 'Native Merge Queue Enrollment' || run.status !== 'completed'
+                || run.conclusion !== 'success' || run.repository?.full_name !== expectedRepository) {
+              core.notice('SKIPPED: Event is outside the repository token enrollment contract');
+              return;
+            }
             const { repository } = await github.graphql(`
               query Queue($owner: String!, $repo: String!) {
                 repository(owner: $owner, name: $repo) {
@@ -56,6 +91,7 @@ jobs:
                         pullRequest {
                           id
                           number
+                          state
                           isDraft
                           baseRefName
                           headRefOid
@@ -63,6 +99,7 @@ jobs:
                           commits(last: 1) {
                             nodes {
                               commit {
+                                oid
                                 statusCheckRollup {
                                   contexts(first: 50) {
                                     nodes { ... on CheckRun { name conclusion } }
@@ -90,11 +127,16 @@ jobs:
                 core.info(`#${pull.number}: enqueued by ${enqueuer}; nothing to do`);
                 continue;
               }
-              if (pull.isDraft || pull.baseRefName !== 'main' || pull.headRepository?.nameWithOwner !== `${owner}/${repo}`) {
+              if (pull.state !== 'OPEN' || pull.isDraft || pull.baseRefName !== 'main' || pull.headRepository?.nameWithOwner !== `${owner}/${repo}`) {
                 core.info(`#${pull.number}: not eligible (draft, base, or fork)`);
                 continue;
               }
-              const checks = pull.commits.nodes[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? [];
+              const commit = pull.commits.nodes[0]?.commit;
+              if (commit?.oid !== pull.headRefOid) {
+                core.info(`#${pull.number}: source commit no longer matches the head; leaving it`);
+                continue;
+              }
+              const checks = commit.statusCheckRollup?.contexts?.nodes ?? [];
               const summary = checks.find((check) => check.name === 'CI Summary');
               if (summary?.conclusion !== 'SUCCESS') {
                 core.info(`#${pull.number}: CI Summary on ${pull.headRefOid.slice(0, 9)} is ${summary?.conclusion ?? 'missing'}; leaving it`);
