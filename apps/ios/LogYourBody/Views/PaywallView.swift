@@ -444,13 +444,20 @@ struct PaywallView: View {
     private func legalDocumentSheet(_ documentType: LegalDocumentView.LegalDocumentType) -> some View {
         NavigationStack {
             LegalDocumentView(documentType: documentType)
-                .toolbar {
-                    ToolbarItemGroup(placement: .cancellationAction) {
-                        Button("Done") {
-                            showTermsSheet = false
-                            showPrivacySheet = false
-                        }
+                // The navigation-bar Done accessibility frame stays 36 points tall.
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    Button {
+                        showTermsSheet = false
+                        showPrivacySheet = false
+                    } label: {
+                        Text("Done")
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("paywall_legal_done_button")
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.vertical, JovieTokens.itemGap)
                 }
         }
         .nativeSheetChrome(for: .paywallLegal, detent: $legalSheetDetent)
