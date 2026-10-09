@@ -238,6 +238,60 @@ extension PhotoLibraryScannerTests {
         XCTAssertTrue(scanner.scannedPhotos.isEmpty)
         XCTAssertTrue(scanner.photoGroups.isEmpty)
     }
+
+    @MainActor
+    func testCancelAfterAdmissionDoesNotPublishACompletedScan() async {
+        let gate = ScanFetchGate()
+        let scanner = PhotoLibraryScanner(
+            metadataScanEnabled: { false },
+            fetchAssets: { _ in [] },
+            beforePublish: { await gate.wait() }
+        )
+        scanner.authorizationStatus = .authorized
+        let task = Task { await scanner.scanPhotoLibrary(with: PhotoScanCriteria(dateRange: nil)) }
+        await fulfillment(of: [gate.started], timeout: 3)
+        scanner.cancelScan()
+        gate.resume()
+        await task.value
+        XCTAssertFalse(scanner.isScanning)
+        XCTAssertEqual(scanner.scanProgress, 0, accuracy: 0.0001)
+        XCTAssertTrue(scanner.scannedPhotos.isEmpty)
+        XCTAssertTrue(scanner.photoGroups.isEmpty)
+    }
+
+    @MainActor
+    func testCancelledScanCannotClearANewerScan() async {
+        let first = ScanFetchGate()
+        let second = ScanFetchGate()
+        var fetches = 0
+        let scanner = PhotoLibraryScanner(
+            metadataScanEnabled: { false },
+            fetchAssets: { _ in
+                fetches += 1
+                if fetches == 1 {
+                    await first.wait()
+                } else {
+                    await second.wait()
+                }
+                return []
+            }
+        )
+        scanner.authorizationStatus = .authorized
+        let firstScan = Task { await scanner.scanPhotoLibrary(with: PhotoScanCriteria(dateRange: nil)) }
+        await fulfillment(of: [first.started], timeout: 3)
+        scanner.cancelScan()
+        let secondScan = Task { await scanner.scanPhotoLibrary(with: PhotoScanCriteria(dateRange: nil)) }
+        await fulfillment(of: [second.started], timeout: 3)
+        first.resume()
+        await firstScan.value
+        XCTAssertTrue(scanner.isScanning)
+        XCTAssertEqual(scanner.scanProgress, 0, accuracy: 0.0001)
+        scanner.cancelScan()
+        second.resume()
+        await secondScan.value
+        XCTAssertFalse(scanner.isScanning)
+        XCTAssertTrue(scanner.scannedPhotos.isEmpty)
+    }
 }
 
 /// Suspends the production photo fetch until the test cancels the scan.

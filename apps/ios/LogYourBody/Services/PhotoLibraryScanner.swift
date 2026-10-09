@@ -85,7 +85,9 @@ class PhotoLibraryScanner: ObservableObject {
     private let metadataScanEnabled: @MainActor () -> Bool
     private let monotonicTime: () -> TimeInterval
     private let fetchAssets: (PhotoScanCriteria) async throws -> [PHAsset]
+    private let beforePublish: () async -> Void
     private var scanTask: Task<Void, Never>?
+    private var scanGeneration = 0
 
     init(
         imageManager: PHImageManager = PHCachingImageManager(),
@@ -94,7 +96,8 @@ class PhotoLibraryScanner: ObservableObject {
             AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: "photo_scan_metadata_v1")
         },
         monotonicTime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-        fetchAssets: ((PhotoScanCriteria) async throws -> [PHAsset])? = nil
+        fetchAssets: ((PhotoScanCriteria) async throws -> [PHAsset])? = nil,
+        beforePublish: @escaping () async -> Void = {}
     ) {
         self.imageManager = imageManager
         self.metadataProvider = metadataProvider
@@ -103,6 +106,7 @@ class PhotoLibraryScanner: ObservableObject {
         self.fetchAssets = fetchAssets ?? { criteria in
             try await Self.libraryAssets(matching: criteria)
         }
+        self.beforePublish = beforePublish
         checkAuthorizationStatus()
     }
 
@@ -136,11 +140,13 @@ class PhotoLibraryScanner: ObservableObject {
             return
         }
 
-        await MainActor.run {
+        let generation = await MainActor.run { () -> Int in
+            scanGeneration += 1
             isScanning = true
             scanProgress = 0
             scannedPhotos = []
             photoGroups = []
+            return scanGeneration
         }
 
         let task = Task {
@@ -149,21 +155,20 @@ class PhotoLibraryScanner: ObservableObject {
                 let photos = try await fetchAssets(criteria)
 
                 // Analyze photos for progress photo likelihood
-                let analyzed = await analyzePhotos(photos, criteria: criteria)
+                let analyzed = await analyzePhotos(photos, criteria: criteria, generation: generation)
                 // Cancel is cooperative. Stop before a cancelled scan is published
                 // as finished, including progress 1.
                 guard !Task.isCancelled else {
-                    await MainActor.run {
-                        self.isScanning = false
-                        self.scanProgress = 0
-                    }
+                    await self.clearScanIfCurrent(generation)
                     return
                 }
 
                 // Group photos by date
                 let grouped = groupPhotosByDate(analyzed, minimumDaysBetween: criteria.minimumDaysBetween)
+                await beforePublish()
 
                 await MainActor.run {
+                    guard self.scanGeneration == generation else { return }
                     self.scannedPhotos = analyzed
                     self.photoGroups = grouped
                     self.isScanning = false
@@ -171,10 +176,7 @@ class PhotoLibraryScanner: ObservableObject {
                 }
             } catch {
                 // print("❌ Error scanning photo library: \(error)")
-                await MainActor.run {
-                    self.isScanning = false
-                    self.scanProgress = 0
-                }
+                await self.clearScanIfCurrent(generation)
             }
         }
         scanTask = task
@@ -182,10 +184,19 @@ class PhotoLibraryScanner: ObservableObject {
     }
 
     func cancelScan() {
+        scanGeneration += 1
         scanTask?.cancel()
         scanTask = nil
         isScanning = false
         scanProgress = 0
+    }
+
+    private func clearScanIfCurrent(_ generation: Int) async {
+        await MainActor.run {
+            guard self.scanGeneration == generation else { return }
+            self.isScanning = false
+            self.scanProgress = 0
+        }
     }
 
     static func appAuthorizationState(from status: PHAuthorizationStatus) -> AppAuthorizationState {
@@ -232,7 +243,9 @@ class PhotoLibraryScanner: ObservableObject {
         return assets
     }
 
-    func analyzePhotos(_ assets: [PHAsset], criteria: PhotoScanCriteria) async -> [ScannedPhoto] {
+    func analyzePhotos(
+        _ assets: [PHAsset], criteria: PhotoScanCriteria, generation: Int? = nil
+    ) async -> [ScannedPhoto] {
         var analyzed: [ScannedPhoto] = []
         let usesMetadata = await metadataScanEnabled()
         var lastProgressUpdate = monotonicTime()
@@ -243,6 +256,7 @@ class PhotoLibraryScanner: ObservableObject {
             if !usesMetadata || now - lastProgressUpdate >= 0.1 {
                 lastProgressUpdate = now
                 await MainActor.run {
+                    guard generation == nil || self.scanGeneration == generation else { return }
                     self.scanProgress = Double(index) / Double(assets.count)
                 }
             }
