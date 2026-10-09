@@ -330,6 +330,13 @@ class RevenueCatManager: NSObject, ObservableObject {
         billingSession == ownership
     }
 
+    /// Applies a RevenueCat delegate update. `purchases(_:receivedUpdated:)` is the production caller.
+    /// The app user id is the SDK identity at callback time, not `CustomerInfo.originalAppUserId`.
+    func applyDelegateCustomerInfo(_ customer: RevenueCatCustomerSnapshot, appUserID: String) {
+        guard let ownership = captureBillingSession(), ownsBillingSession(ownership) else { return }
+        guard let subject = ownership.subject, !subject.isEmpty, subject == appUserID else { return }
+        updateSubscriptionStatus(customer: customer)
+    }
 
     #if DEBUG
     /// Keeps the paywall unavailable-state fixture deterministic without touching production purchase paths.
@@ -370,14 +377,13 @@ typealias SubscriptionManager = RevenueCatManager
 
 extension RevenueCatManager: PurchasesDelegate {
     nonisolated func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
+        let appUserID = purchases.appUserID
         Task { @MainActor in
-            // print("💰 Received updated customer info")
-            self.updateSubscriptionStatus(
-                customer: RevenueCatCustomerSnapshot(
-                    customerInfo: customerInfo,
-                    entitlementID: RevenueCatManager.entitlementID
-                )
+            let snapshot = RevenueCatCustomerSnapshot(
+                customerInfo: customerInfo,
+                entitlementID: RevenueCatManager.entitlementID
             )
+            self.applyDelegateCustomerInfo(snapshot, appUserID: appUserID)
         }
     }
 }
