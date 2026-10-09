@@ -5,6 +5,7 @@
 // Coverage for the GLP-1 dashboard card data prep (Glp1DoseCardData) and the
 // previously-untested medication catalog lookups (Glp1MedicationCatalog).
 //
+import CoreData
 import XCTest
 @testable import LogYourBody
 
@@ -296,6 +297,171 @@ final class Glp1CardAndCatalogTests: XCTestCase {
         XCTAssertNil(draft.lastLoggedDoseText)
     }
 
+    func testStaleGlp1DoseRefreshDoesNotOverwriteANewerLocalEdit() async throws {
+        try await CoreDataManager.shared.deleteAllDataAndWait()
+        addTeardownBlock {
+            try? await CoreDataManager.shared.deleteAllDataAndWait()
+        }
+        let userId = "glp1-stale-dose-\(UUID().uuidString)"
+        let doseId = UUID().uuidString
+        let older = Date(timeIntervalSince1970: 1_700_000_000)
+        let newer = older.addingTimeInterval(100)
+        try await CoreDataManager.shared.saveGlp1DoseLogsAndWait(
+            [storedDose(id: doseId, userId: userId, dose: 7.5, notes: "edited", updatedAt: newer)],
+            userId: userId,
+            markAsSynced: false
+        )
+
+        try await CoreDataManager.shared.saveGlp1DoseLogsAndWait(
+            [storedDose(id: doseId, userId: userId, dose: 2.5, notes: "server", updatedAt: older)],
+            userId: userId
+        )
+
+        let stored = try await cachedDose(id: doseId)
+        XCTAssertEqual(stored.dose, 7.5, accuracy: 0.001)
+        XCTAssertEqual(stored.notes, "edited")
+        XCTAssertFalse(stored.isSynced)
+        XCTAssertEqual(stored.syncStatus, "pending")
+    }
+
+    func testNewerGlp1DoseRefreshAppliesAndAcknowledges() async throws {
+        try await CoreDataManager.shared.deleteAllDataAndWait()
+        addTeardownBlock {
+            try? await CoreDataManager.shared.deleteAllDataAndWait()
+        }
+        let userId = "glp1-newer-dose-\(UUID().uuidString)"
+        let doseId = UUID().uuidString
+        let older = Date(timeIntervalSince1970: 1_700_000_000)
+        let newer = Date(timeIntervalSince1970: 4_000_000_000)
+        try await CoreDataManager.shared.saveGlp1DoseLogsAndWait(
+            [storedDose(id: doseId, userId: userId, dose: 2.5, notes: "local", updatedAt: older)],
+            userId: userId,
+            markAsSynced: false
+        )
+
+        try await CoreDataManager.shared.saveGlp1DoseLogsAndWait(
+            [storedDose(id: doseId, userId: userId, dose: 7.5, notes: "server", updatedAt: newer)],
+            userId: userId
+        )
+
+        let stored = try await cachedDose(id: doseId)
+        XCTAssertEqual(stored.dose, 7.5, accuracy: 0.001)
+        XCTAssertEqual(stored.notes, "server")
+        XCTAssertTrue(stored.isSynced)
+        XCTAssertEqual(stored.syncStatus, "synced")
+    }
+
+    func testEqualGlp1DoseRefreshAppliesAndAcknowledges() async throws {
+        try await CoreDataManager.shared.deleteAllDataAndWait()
+        addTeardownBlock {
+            try? await CoreDataManager.shared.deleteAllDataAndWait()
+        }
+        let userId = "glp1-equal-dose-\(UUID().uuidString)"
+        let doseId = UUID().uuidString
+        let same = Date(timeIntervalSince1970: 1_700_000_000)
+        try await CoreDataManager.shared.saveGlp1DoseLogsAndWait(
+            [storedDose(id: doseId, userId: userId, dose: 2.5, notes: "local", updatedAt: same)],
+            userId: userId,
+            markAsSynced: false
+        )
+
+        try await CoreDataManager.shared.saveGlp1DoseLogsAndWait(
+            [storedDose(id: doseId, userId: userId, dose: 5, notes: "server", updatedAt: same)],
+            userId: userId
+        )
+
+        let stored = try await cachedDose(id: doseId)
+        XCTAssertEqual(stored.dose, 5, accuracy: 0.001)
+        XCTAssertEqual(stored.notes, "server")
+        XCTAssertTrue(stored.isSynced)
+        XCTAssertEqual(stored.syncStatus, "synced")
+    }
+
+    func testStaleGlp1MedicationRefreshDoesNotOverwriteANewerLocalEdit() async throws {
+        try await CoreDataManager.shared.deleteAllDataAndWait()
+        addTeardownBlock {
+            try? await CoreDataManager.shared.deleteAllDataAndWait()
+        }
+        let userId = "glp1-stale-med-\(UUID().uuidString)"
+        let medicationId = UUID().uuidString
+        let older = Date(timeIntervalSince1970: 1_700_000_000)
+        let newer = older.addingTimeInterval(100)
+        CoreDataManager.shared.saveGlp1Medications(
+            [storedMedication(id: medicationId, userId: userId, name: "Edited", updatedAt: newer)],
+            userId: userId,
+            markAsSynced: false
+        )
+        CoreDataManager.shared.saveGlp1Medications(
+            [storedMedication(id: medicationId, userId: userId, name: "Server", updatedAt: older)],
+            userId: userId
+        )
+
+        let stored = try await cachedMedication(id: medicationId)
+        XCTAssertEqual(stored.name, "Edited")
+        XCTAssertFalse(stored.isSynced)
+        XCTAssertEqual(stored.syncStatus, "pending")
+    }
+
+    func testNewerGlp1MedicationRefreshAppliesAndAcknowledges() async throws {
+        try await CoreDataManager.shared.deleteAllDataAndWait()
+        addTeardownBlock {
+            try? await CoreDataManager.shared.deleteAllDataAndWait()
+        }
+        let userId = "glp1-newer-med-\(UUID().uuidString)"
+        let medicationId = UUID().uuidString
+        let older = Date(timeIntervalSince1970: 1_700_000_000)
+        let newer = Date(timeIntervalSince1970: 4_000_000_000)
+        CoreDataManager.shared.saveGlp1Medications(
+            [storedMedication(id: medicationId, userId: userId, name: "Edited", updatedAt: older)],
+            userId: userId,
+            markAsSynced: false
+        )
+        CoreDataManager.shared.saveGlp1Medications(
+            [storedMedication(id: medicationId, userId: userId, name: "Server", updatedAt: newer)],
+            userId: userId
+        )
+
+        let stored = try await cachedMedication(id: medicationId)
+        XCTAssertEqual(stored.name, "Server")
+        XCTAssertTrue(stored.isSynced)
+        XCTAssertEqual(stored.syncStatus, "synced")
+    }
+
+    func testNewerServerDoseRefreshDoesNotResurrectAPendingDeletedLog() async throws {
+        try await CoreDataManager.shared.deleteAllDataAndWait()
+        addTeardownBlock {
+            try? await CoreDataManager.shared.deleteAllDataAndWait()
+        }
+        let userId = "glp1-tombstone-\(UUID().uuidString)"
+        let doseId = UUID().uuidString
+        let older = Date(timeIntervalSince1970: 1_700_000_000)
+        try await CoreDataManager.shared.saveGlp1DoseLogsAndWait(
+            [storedDose(id: doseId, userId: userId, dose: 2.5, notes: "local", updatedAt: older)],
+            userId: userId,
+            markAsSynced: true
+        )
+        let deleted = await CoreDataManager.shared.markGlp1DoseLogDeleted(id: doseId, userId: userId)
+        XCTAssertTrue(deleted)
+
+        try await CoreDataManager.shared.saveGlp1DoseLogsAndWait(
+            [storedDose(
+                id: doseId,
+                userId: userId,
+                dose: 9,
+                notes: "resurrected",
+                updatedAt: Date(timeIntervalSince1970: 4_000_000_000)
+            )],
+            userId: userId
+        )
+
+        let stored = try await cachedDose(id: doseId)
+        XCTAssertTrue(stored.isMarkedDeleted)
+        XCTAssertFalse(stored.isSynced)
+        XCTAssertEqual(stored.syncStatus, "pending")
+        XCTAssertEqual(stored.notes, "local")
+        XCTAssertEqual(stored.dose, 2.5, accuracy: 0.001)
+    }
+
     // MARK: - Fixtures
 
     private func makeDoseLog(
@@ -349,4 +515,89 @@ final class Glp1CardAndCatalogTests: XCTestCase {
             updatedAt: base
         )
     }
+
+    private func storedDose(
+        id: String,
+        userId: String,
+        dose: Double,
+        notes: String,
+        updatedAt: Date
+    ) -> Glp1DoseLog {
+        Glp1DoseLog(
+            id: id,
+            userId: userId,
+            takenAt: updatedAt,
+            medicationId: "med",
+            doseAmount: dose,
+            doseUnit: "mg/week",
+            drugClass: "GLP-1 receptor agonist",
+            brand: "Zepbound",
+            isCompounded: false,
+            supplierType: nil,
+            supplierName: nil,
+            notes: notes,
+            createdAt: Date(timeIntervalSince1970: 1_699_000_000),
+            updatedAt: updatedAt
+        )
+    }
+
+    private func storedMedication(
+        id: String,
+        userId: String,
+        name: String,
+        updatedAt: Date
+    ) -> Glp1Medication {
+        Glp1Medication(
+            id: id,
+            userId: userId,
+            displayName: name,
+            genericName: "tirzepatide",
+            drugClass: "dual GIP/GLP-1 receptor agonist",
+            brand: name,
+            route: "subcutaneous",
+            frequency: "once weekly",
+            doseUnit: "mg/week",
+            isCompounded: false,
+            hkIdentifier: nil,
+            startedAt: updatedAt,
+            endedAt: nil,
+            notes: name,
+            createdAt: Date(timeIntervalSince1970: 1_699_000_000),
+            updatedAt: updatedAt
+        )
+    }
+
+    private func cachedDose(
+        id: String
+    ) async throws -> (dose: Double, notes: String?, isSynced: Bool, syncStatus: String?, isMarkedDeleted: Bool) {
+        let context = CoreDataManager.shared.viewContext
+        return try await context.perform {
+            let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            request.fetchLimit = 1
+            guard let row = try context.fetch(request).first else {
+                throw Glp1RefreshContractError.missingRow(id)
+            }
+            return (row.doseAmount, row.notes, row.isSynced, row.syncStatus, row.isMarkedDeleted)
+        }
+    }
+
+    private func cachedMedication(
+        id: String
+    ) async throws -> (name: String?, isSynced: Bool, syncStatus: String?) {
+        let context = CoreDataManager.shared.viewContext
+        return try await context.perform {
+            let request: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            request.fetchLimit = 1
+            guard let row = try context.fetch(request).first else {
+                throw Glp1RefreshContractError.missingRow(id)
+            }
+            return (row.displayName, row.isSynced, row.syncStatus)
+        }
+    }
+}
+
+private enum Glp1RefreshContractError: Error {
+    case missingRow(String)
 }
