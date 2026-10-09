@@ -227,17 +227,9 @@ class AppVersionManager {
     }
 
     private func resetProblematicStates() {
-        // print("🔄 Resetting problematic states...")
-
-        // Reset any sync flags that might be stuck
-        Task { @MainActor in
-            if RealtimeSyncManager.shared.pendingSyncCount > 1_000 {
-                // print("⚠️ Excessive pending sync count detected, marking HealthKit entries as synced")
-                CoreDataManager.shared.markHealthKitEntriesAsSynced()
-            }
-        }
-
-        // Reset any other problematic states
+        // A large pending queue is not a server acknowledgement. HealthKit
+        // imports stay pending until sync accepts that version. The one-time
+        // 1.1.0 migration remains the only startup path that marks those rows.
         UserDefaults.standard.removeObject(forKey: "stuck_sync_flag")
     }
 
