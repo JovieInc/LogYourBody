@@ -1,3 +1,11 @@
+import type { TrainingMutationAdmission } from '@/lib/ports/training-mutations';
+import {
+  captureTrainingAdmission,
+  requireAdmittedSetup,
+  commitTrainingMutation,
+} from './mutation-admission';
+import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
+import { TRAINING_BASELINE_POLICY, type RevisionContextToken } from './revision-contract';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type {
@@ -179,11 +187,19 @@ export async function getOrCreateNextWorkout(input: {
   now: Date;
   /** false returns the same prescription without starting or updating a session record. */
   persist?: boolean;
+  admission?: TrainingMutationAdmission;
 }): Promise<NextWorkoutResult> {
   const persist = input.persist ?? true;
+  const admission =
+    input.admission ??
+    (persist ? await captureTrainingAdmission(input.records, input.subject) : null);
+  if (persist && !admission) return { kind: 'not_enrolled' };
   const snapshot = await loadTrainingRecords(input.records, input.subject);
   const setup = snapshot.setup;
   if (!setup) return { kind: 'not_enrolled' };
+  if (admission) requireAdmittedSetup(admission, setup);
+  if (setup.programRevisionId && setup.programPolicyVersion !== TRAINING_BASELINE_POLICY)
+    throw new Error('training_program_policy_requires_review');
 
   const block = createMesoBlock(setup.startedAt, input.now.toISOString());
   let periodSessions = snapshot.sessions as SessionRecord[];
@@ -234,8 +250,13 @@ export async function getOrCreateNextWorkout(input: {
       status: 'completed',
       completedAt: input.now.toISOString(),
     };
-    const saved = await input.records.push(input.subject, 'training_sessions', [completed]);
-    if (saved.rejected_ids.includes(completed.id)) throw new Error('training_completion_rejected');
+    await commitTrainingMutation(
+      input.records,
+      input.subject,
+      admission!,
+      'session_update',
+      completed,
+    );
     periodSessions = periodSessions.map((record) =>
       record.id === completed.id ? completed : record,
     );
@@ -314,16 +335,12 @@ export async function getOrCreateNextWorkout(input: {
     }
     const initialPrescription = initial ?? (!adjusted.safetyStop ? adjusted : undefined);
     if (persist) {
-      const saved = await input.records.push(input.subject, 'training_sessions', [
-        {
-          ...activeRecord,
-          prescription: adjusted,
-          ...(initialPrescription ? { initialPrescription } : {}),
-          status: adjusted.safetyStop ? 'paused' : 'in_progress',
-        },
-      ]);
-      if (saved.rejected_ids.includes(adjusted.id))
-        throw new Error('training_session_owner_conflict');
+      await commitTrainingMutation(input.records, input.subject, admission!, 'session_update', {
+        ...activeRecord,
+        prescription: adjusted,
+        ...(initialPrescription ? { initialPrescription } : {}),
+        status: adjusted.safetyStop ? 'paused' : 'in_progress',
+      });
     }
     return {
       kind: 'workout',
@@ -357,6 +374,7 @@ export async function getOrCreateNextWorkout(input: {
     id: session.id,
     record_type: 'workout_session',
     programSetupId: setup.id,
+    ...(setup.programRevisionId ? { programRevisionId: setup.programRevisionId } : {}),
     blockId: block.id,
     weekNumber: block.currentWeek,
     slot,
@@ -366,8 +384,13 @@ export async function getOrCreateNextWorkout(input: {
     startedAt: input.now.toISOString(),
   };
   if (persist) {
-    const saved = await input.records.push(input.subject, 'training_sessions', [sessionRecord]);
-    if (saved.rejected_ids.includes(session.id)) throw new Error('training_session_owner_conflict');
+    await commitTrainingMutation(
+      input.records,
+      input.subject,
+      admission!,
+      'session_insert',
+      sessionRecord,
+    );
   }
   return {
     kind: 'workout',
@@ -380,6 +403,8 @@ export async function getOrCreateNextWorkout(input: {
 
 export async function storeProgramSetup(input: {
   records: NativeProductRecordsPort;
+  revisions?: TrainingRevisionsPort;
+  expectedContext?: RevisionContextToken;
   subject: string;
   setup: Omit<TrainingProgramSetup, 'id' | 'consentVersion' | 'startedAt'>;
   now: Date;
@@ -391,6 +416,17 @@ export async function storeProgramSetup(input: {
     consentVersion: 'hypertrophy-coach-v1',
     startedAt: input.now.toISOString(),
   };
+  if (input.revisions) {
+    if (!input.expectedContext) throw new Error('training_enrollment_context_required');
+    const { ownerId, generation, profileFingerprint, legacyFingerprint } = input.expectedContext;
+    await input.revisions.storeLegacySetup(input.subject, setup, {
+      ownerId,
+      generation,
+      profileFingerprint,
+      legacyFingerprint,
+    });
+    return setup;
+  }
   const result = await input.records.push(input.subject, 'training_feedback', [
     {
       ...setup,

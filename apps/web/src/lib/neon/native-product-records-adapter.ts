@@ -1,3 +1,4 @@
+import { createNeonTrainingMutations } from './training-mutations-adapter';
 import 'server-only';
 
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
@@ -74,6 +75,7 @@ export function createNeonNativeProductRecords(
   database: NeonQueryFunction<false, false> = getDatabase(),
 ): NativeProductRecordsPort {
   return {
+    trainingMutations: createNeonTrainingMutations(database),
     async insertTrainingSet(subject, record) {
       const id = recordId(record);
       if (!id) return null;
@@ -217,6 +219,11 @@ export function createNeonNativeProductRecords(
 }
 
 export const neonNativeProductRecords: NativeProductRecordsPort = {
+  trainingMutations: {
+    captureAdmission: (subject) =>
+      createNeonTrainingMutations(getDatabase()).captureAdmission(subject),
+    commit: (input) => createNeonTrainingMutations(getDatabase()).commit(input),
+  },
   insertTrainingSet: (subject, record) =>
     createNeonNativeProductRecords().insertTrainingSet!(subject, record),
   push: (subject, collection, records) =>
