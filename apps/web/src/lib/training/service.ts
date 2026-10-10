@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { z } from 'zod';
 import type {
   NativeProductRecord,
   NativeProductRecordCollection,
@@ -11,7 +12,13 @@ import {
   isProgramSetup,
   validTrainingFeedback,
 } from './engine';
-import type { Session, SetLog, TrainingFeedback, TrainingProgramSetup } from './types';
+import {
+  MUSCLE_GROUPS,
+  type Session,
+  type SetLog,
+  type TrainingFeedback,
+  type TrainingProgramSetup,
+} from './types';
 
 const EPOCH = '1970-01-01T00:00:00.000Z';
 
@@ -120,6 +127,40 @@ export type NextWorkoutResult =
       weeklyFractionalVolume: Record<string, number>;
     };
 
+const sessionPrescriptionSchema = z
+  .object({
+    id: z.string(),
+    week: z.number().int().positive(),
+    slot: z.number().int().nonnegative(),
+    pattern: z.enum(['A', 'B']),
+    title: z.string(),
+    exercises: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        primaryMuscle: z.enum(MUSCLE_GROUPS),
+        muscleContribution: z.record(z.string(), z.number().nonnegative()),
+        sets: z.number().int().positive(),
+        repRange: z.object({ min: z.number().int().positive(), max: z.number().int().positive() }),
+        targetReps: z.number().int().positive(),
+        targetRir: z.number().int().nonnegative(),
+        targetLoadKg: z.number().nonnegative().nullable(),
+        loadInstruction: z.string().nullable(),
+        progression: z.enum(['hold', 'add_reps', 'increase_load']),
+        evidenceIds: z.array(z.string()),
+      }),
+    ),
+    safetyStop: z.boolean(),
+    explanation: z.string().nullable(),
+    evidenceIds: z.array(z.string()),
+  })
+  .refine((session) => session.safetyStop === (session.exercises.length === 0));
+
+function isSessionPrescription(value: unknown, sessionId: string): value is Session {
+  const result = sessionPrescriptionSchema.safeParse(value);
+  return result.success && result.data.id === sessionId;
+}
+
 type SessionRecord = NativeProductRecord & {
   record_type?: string;
   programSetupId?: string;
@@ -128,6 +169,7 @@ type SessionRecord = NativeProductRecord & {
   slot?: number;
   status?: string;
   prescription?: Session;
+  initialPrescription?: unknown;
   startedAt?: string;
 };
 
@@ -155,13 +197,20 @@ export async function getOrCreateNextWorkout(input: {
     programSessionIds.has(feedback.sessionId),
   );
   let activeRecord: SessionRecord | undefined = periodSessions
-    .filter((record) => record.programSetupId === setup.id && record.status === 'in_progress')
+    .filter(
+      (record) =>
+        record.programSetupId === setup.id &&
+        (record.status === 'in_progress' || record.status === 'paused'),
+    )
     .sort(
       (a, b) =>
         Date.parse(String(b.startedAt ?? b.server_updated_at)) -
         Date.parse(String(a.startedAt ?? a.server_updated_at)),
     )[0];
   const activePrescription = activeRecord?.prescription;
+  if (activeRecord && !isSessionPrescription(activePrescription, activeRecord.id)) {
+    throw new Error('training_session_invalid_prescription');
+  }
   if (
     persist &&
     activeRecord &&
@@ -200,6 +249,12 @@ export async function getOrCreateNextWorkout(input: {
       record.status === 'completed',
   );
 
+  // Progression for a new session uses completed workouts, never its own unfinished sets.
+  const completedSessionIds = new Set(
+    periodSessions.filter((record) => record.status === 'completed').map((record) => record.id),
+  );
+  const completedLogs = programLogs.filter((log) => completedSessionIds.has(log.sessionId));
+
   const microcycle = buildMicrocycle({
     setup,
     block,
@@ -212,26 +267,58 @@ export async function getOrCreateNextWorkout(input: {
         String(slot),
       ),
     ),
-    logs: programLogs,
+    logs: completedLogs,
     feedback: programFeedback,
   });
 
   if (activeRecord?.prescription) {
     const existing = activeRecord.prescription;
-    const targetRir = existing.exercises[0]?.targetRir ?? block.targetRir;
+    const retained = activeRecord.initialPrescription;
+    const initial =
+      isSessionPrescription(retained, existing.id) &&
+      !retained.safetyStop &&
+      retained.week === existing.week &&
+      retained.slot === existing.slot &&
+      retained.pattern === existing.pattern
+        ? retained
+        : !existing.safetyStop
+          ? existing
+          : undefined;
+    // Legacy paused rows have no exercise snapshot. Recover from completed history
+    // at their original start time; already-overwritten targets cannot be recovered exactly.
+    const startedAt =
+      typeof activeRecord.startedAt === 'string' &&
+      Number.isFinite(Date.parse(activeRecord.startedAt))
+        ? activeRecord.startedAt
+        : input.now.toISOString();
+    const originalBlock = createMesoBlock(setup.startedAt, startedAt);
     const adjusted = buildSession({
       setup,
-      block: { ...block, currentWeek: existing.week, targetRir },
+      block: {
+        ...originalBlock,
+        currentWeek: existing.week,
+        targetRir: initial?.exercises[0]?.targetRir ?? originalBlock.targetRir,
+      },
       sessionId: existing.id,
       slot: existing.slot,
-      logs: programLogs,
+      logs: completedLogs,
       feedback: programFeedback,
     });
+    if (initial && !adjusted.safetyStop) {
+      // Keep the prescribed targets; only the engine's current recovery set count changes.
+      adjusted.exercises = initial.exercises.map((exercise) => ({
+        ...exercise,
+        sets:
+          adjusted.exercises.find((current) => current.id === exercise.id)?.sets ?? exercise.sets,
+      }));
+    }
+    const initialPrescription = initial ?? (!adjusted.safetyStop ? adjusted : undefined);
     if (persist) {
       const saved = await input.records.push(input.subject, 'training_sessions', [
         {
           ...activeRecord,
           prescription: adjusted,
+          ...(initialPrescription ? { initialPrescription } : {}),
           status: adjusted.safetyStop ? 'paused' : 'in_progress',
         },
       ]);
@@ -275,6 +362,7 @@ export async function getOrCreateNextWorkout(input: {
     slot,
     status: session.safetyStop ? 'paused' : 'in_progress',
     prescription: session,
+    ...(!session.safetyStop ? { initialPrescription: session } : {}),
     startedAt: input.now.toISOString(),
   };
   if (persist) {
