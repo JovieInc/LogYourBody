@@ -29,8 +29,6 @@ struct DashboardViewLiquid: View {
 
     // Core data / selection
     @State var selectedIndex: Int = 0
-    @State var homeV2Timeline = HomeV2TimelinePolicy.Snapshot()
-    @State var homeV2TimelineSelection: HomeV2TimelinePolicy.Selection?
 
     // Metrics reordering state
     @AppStorage("metricsOrder") private var metricsOrderData = Data()
@@ -51,6 +49,8 @@ struct DashboardViewLiquid: View {
     @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
     @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
     @State var fullTrendChartCache: [MetricType: [MetricChartDataPoint]] = [:]
+    @State var metricCacheBuildID = UUID()
+    @State private var metricCacheRefreshTask: Task<Void, Never>?
     @State var glp1DoseLogs: [Glp1DoseLog] = []
     @State var glp1Medications: [Glp1Medication] = []
     @State var dailyMetricsLookupCache: [Date: DailyMetrics] = [:]
@@ -91,13 +91,11 @@ struct DashboardViewLiquid: View {
     @State private var isPhotosTabEnabled = true
     @State var selectedPhotoTimelineRootPage: PhotoTimelineRootPage = .timeline
     @State var isHomeChatExpanded = false
-    @State var homeChatDraft = AccountSessionChatDraft()
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false
     @State var isHomeV2ViewerPresented = false
     @State var isHomeV2ContextPresented = false
-    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .bodyFat
-    @StateObject var homeV2StepsReader = HomeV2DailyStepsReader()
+    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
     @State var homeV2LogSheetDate = Date()
@@ -233,10 +231,17 @@ struct DashboardViewLiquid: View {
                 Task { @MainActor in
                     await Task.yield()
                     handleOnAppear()
+                    // A full-screen cover can cancel a cache build after it
+                    // clears the previous values, without emitting new metrics.
+                    if fullChartCache.isEmpty {
+                        scheduleMetricCacheRefresh()
+                    }
                 }
             }
             .onDisappear {
                 syncBannerDismissTask?.cancel()
+                metricCacheRefreshTask?.cancel()
+                metricCacheBuildID = UUID()
             }
 
         let withSyncAndState = withLifecycle
@@ -249,14 +254,11 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(viewModel.$recentDailyMetrics) { _ in
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
+                scheduleMetricCacheRefresh()
             }
-            .onReceive(viewModel.$bodyMetrics) { metrics in
-                reconcileHomeV2Timeline(with: metrics)
+            .onReceive(viewModel.$bodyMetrics) { _ in
                 scheduleDashboardDerivedStateRefresh()
-            }
-            .onChange(of: authManager.currentUser?.id) { _, _ in
-                homeV2TimelineSelection = nil
-                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
+                scheduleMetricCacheRefresh()
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
@@ -269,12 +271,9 @@ struct DashboardViewLiquid: View {
                 fullChartCache = [:]
                 fullTrendChartCache = [:]
                 metricEntriesCache = [:]
-                Task { @MainActor in
-                    await prewarmMetricCaches()
-                }
+                scheduleMetricCacheRefresh()
             }
             .onChange(of: selectedIndex) { _, newIndex in
-                recordHomeV2TimelineSelection(at: newIndex)
                 scheduleDashboardDerivedStateRefresh(animatedIndex: newIndex)
             }
             .onChange(of: selectedTab) { _, newTab in
@@ -290,7 +289,6 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
                 featureGateRefreshToken = UUID()
-                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
@@ -304,8 +302,7 @@ struct DashboardViewLiquid: View {
                     initialWeight: addEntryInitialWeight,
                     initialBodyFat: addEntryInitialBodyFat,
                     isHomeV2LogEntry: isHomeV2LoggingWeight,
-                    onWeightSaved: handleHomeV2WeightEntrySaved,
-                    onBodyFatSaved: handleHomeV2BodyFatEntrySaved
+                    onWeightSaved: handleHomeV2WeightEntrySaved
                 )
                     .environmentObject(authManager)
             }
@@ -491,6 +488,19 @@ struct DashboardViewLiquid: View {
                 selectedIndex: selectedIndex
             )
             scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
+        }
+    }
+
+    @MainActor
+    private func scheduleMetricCacheRefresh() {
+        // Published values arrive before the model finishes updating its sorted
+        // history. Coalesce that burst and snapshot only after the update completes.
+        metricCacheBuildID = UUID()
+        metricCacheRefreshTask?.cancel()
+        metricCacheRefreshTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            await prewarmMetricCaches()
         }
     }
 
