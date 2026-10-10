@@ -96,7 +96,7 @@ struct HomeV2TrendChart: View {
                 axisRow
             }
             if showsRangeTabs {
-                rangeTabs
+                HomeV2RangePicker(range: $range)
             }
         }
     }
@@ -170,8 +170,27 @@ struct HomeV2TrendChart: View {
         .padding(.horizontal, HomeV2Tokens.Space.inset)
         .padding(.top, HomeV2Tokens.Space.tight)
     }
+}
 
-    private var rangeTabs: some View {
+/// Shared range controls. Sparse Progress can scroll them at large text sizes.
+struct HomeV2RangePicker: View {
+    @Binding var range: TimeRange
+    var scrollsHorizontally = false
+
+    var body: some View {
+        Group {
+            if scrollsHorizontally {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    choices
+                }
+            } else {
+                choices
+            }
+        }
+        .accessibilityIdentifier("home_v2_range_selector")
+    }
+
+    private var choices: some View {
         HStack(spacing: HomeV2Tokens.Space.inset) {
             ForEach(HomeV2TrendPolicy.visibleRanges, id: \.self) { candidate in
                 let isSelected = candidate == range

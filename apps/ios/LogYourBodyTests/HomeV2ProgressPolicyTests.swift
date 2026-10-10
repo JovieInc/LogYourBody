@@ -24,8 +24,6 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
             HomeV2ProgressCopy.deltaSentence(delta: nil, unit: "lb", range: .month6),
             "Your trend appears after 7 days"
         )
-        XCTAssertEqual(HomeV2ProgressCopy.loggedDaysSentence(days: 3), "3 days logged. Your trend appears after 7.")
-        XCTAssertEqual(HomeV2ProgressCopy.loggedDaysSentence(days: 1), "1 day logged. Your trend appears after 7.")
         XCTAssertEqual(HomeV2ProgressCopy.estimatedBy("Withings"), "Estimated by your Withings")
         XCTAssertEqual(HomeV2ProgressCopy.estimatedBy("Typed"), "Estimated, typed by you")
         XCTAssertTrue(HomeV2ProgressCopy.stepsAverageSentence(average: 8_412, range: .month3).hasPrefix("Averaging "))
@@ -60,6 +58,19 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
         }
         XCTAssertTrue(HomeV2ProgressMetric.steps.prefersHigh)
         XCTAssertFalse(HomeV2ProgressMetric.weight.prefersHigh)
+    }
+
+    func testSparseClassificationUsesDistinctDaysInTheSelectedRange() {
+        for days in 0...7 {
+            let visible = (0..<days).flatMap { offset in
+                [point(daysAgo: offset, value: 180), point(daysAgo: offset, value: 181)]
+            }
+            let all = visible + [point(daysAgo: 60, value: 190)]
+            let selected = HomeV2TrendPolicy.points(all, in: .month1)
+            let stats = HomeV2ProgressPolicy.stats(points: selected, prefersHigh: false)
+            XCTAssertEqual(stats.distinctDays, days, "Multiple entries on one day do not advance the trend threshold")
+            XCTAssertEqual(HomeV2TrendPolicy.hasEnoughData(selected), days >= HomeV2TrendPolicy.minimumDistinctDays)
+        }
     }
 
     @MainActor

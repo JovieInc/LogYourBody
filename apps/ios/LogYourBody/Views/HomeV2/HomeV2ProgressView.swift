@@ -65,9 +65,9 @@ enum HomeV2ProgressCopy {
     static let high = "High"
     static let target = "Target"
     static let notSet = "Not set"
-    static let keepLogging = "Keep logging"
-    static let keepLoggingBody =
-        "After 7 days you’ll see pace, and whether this looks like a cut, maintenance or a gain."
+    static let sparseRequirement =
+        "A trend needs data on \(HomeV2TrendPolicy.minimumDistinctDays) days in this range."
+    static let earlierDataHint = "Choose a wider range to check earlier entries."
     static let bodyFatInsightTitle = "Body fat is an estimate"
     static let bodyFatInsightBody =
         "Scale and photo estimates drift day to day. The trend line matters more than any single reading."
@@ -112,9 +112,9 @@ enum HomeV2ProgressCopy {
         return "Averaging \(text) a day \(rangeLabel(range))"
     }
 
-    /// R3: "3 days logged. Your trend appears after 7."
-    static func loggedDaysSentence(days: Int) -> String {
-        "\(days) day\(days == 1 ? "" : "s") logged. Your trend appears after \(HomeV2TrendPolicy.minimumDistinctDays)."
+    static func dataDaysSentence(days: Int) -> String {
+        guard days > 0 else { return "No data in this range" }
+        return "\(days) day\(days == 1 ? "" : "s") of data in this range"
     }
 }
 
@@ -148,6 +148,7 @@ enum HomeV2ProgressPolicy {
 /// Progress (Pencil R1/R2/R3): one metric workspace. The selected metric and
 /// its chart stay dominant; the longer reading sits behind View insight.
 struct HomeV2ProgressView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var metric: HomeV2ProgressMetric
     @Binding var range: TimeRange
     let series: (HomeV2ProgressMetric) -> HomeV2ProgressSeries
@@ -170,30 +171,28 @@ struct HomeV2ProgressView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     headline(current, stats: stats, hasEnoughData: hasEnoughData)
 
-                    // Keep range selection reachable even when this window
-                    // has too few readings to draw a trend.
-                    HomeV2TrendChart(
-                        daily: current.daily,
-                        trend: current.trend.isEmpty ? current.daily : current.trend,
-                        accent: metric.accent,
-                        range: $range,
-                        showsDots: !current.trend.isEmpty,
-                        chartHeight: HomeV2Tokens.progressChartHeight,
-                        axis: .months,
-                        metricTitle: metric.title,
-                        usesSevenDayAverage: !current.trend.isEmpty,
-                        now: now
-                    )
-                    .padding(.top, HomeV2Tokens.Space.tight)
-
                     if hasEnoughData {
+                        HomeV2TrendChart(
+                            daily: current.daily,
+                            trend: current.trend.isEmpty ? current.daily : current.trend,
+                            accent: metric.accent,
+                            range: $range,
+                            showsDots: !current.trend.isEmpty,
+                            chartHeight: HomeV2Tokens.progressChartHeight,
+                            axis: .months,
+                            metricTitle: metric.title,
+                            usesSevenDayAverage: !current.trend.isEmpty,
+                            now: now
+                        )
+                        .padding(.top, HomeV2Tokens.Space.tight)
                         insightRow(current)
                         statsRow(stats, target: current.target)
-                    } else if metric == .weight {
-                        keepLoggingCard
+                    } else {
+                        sparseHistory(hasEarlierData: stats.distinctDays == 0 && !current.daily.isEmpty)
                     }
                 }
             }
+            .accessibilityIdentifier("home_v2_progress_scroll")
 
             if !hasEnoughData, metric == .weight {
                 HomeV2Dock(title: HomeV2Copy.logWeight, identifier: "home_v2_progress_log_weight", action: onLogWeight)
@@ -204,39 +203,53 @@ struct HomeV2ProgressView: View {
     }
 
     private var switcher: some View {
-        HStack(spacing: 0) {
-            ForEach(HomeV2ProgressMetric.allCases) { candidate in
-                let isSelected = candidate == metric
-                Button {
-                    metric = candidate
-                    HapticManager.shared.selection()
-                } label: {
-                    Text(candidate.title)
-                        .scaledSystemFont(
-                            size: HomeV2Tokens.TypeSize.title,
-                            weight: isSelected ? .semibold : .medium,
-                            relativeTo: .body
-                        )
-                        .foregroundStyle(isSelected ? HomeV2Tokens.Colors.ink : HomeV2Tokens.Colors.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
-                        .overlay(alignment: .bottom) {
-                            Rectangle()
-                                .fill(isSelected ? HomeV2Tokens.Colors.ink : Color.clear)
-                                .frame(height: 2)
-                        }
-                        .contentShape(Rectangle())
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 0) {
+                    metricButtons
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(candidate.title) progress")
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
-                .accessibilityIdentifier("home_v2_progress_tab_\(candidate.identifier)")
+            } else {
+                HStack(spacing: 0) {
+                    metricButtons
+                }
             }
         }
         .padding(.horizontal, HomeV2Tokens.Space.inset)
         .frame(minHeight: HomeV2Tokens.rowHeight)
         .overlay(alignment: .bottom) { HomeV2Hairline() }
+    }
+
+    private var metricButtons: some View {
+        ForEach(HomeV2ProgressMetric.allCases) { candidate in
+            let isSelected = candidate == metric
+            Button {
+                metric = candidate
+                HapticManager.shared.selection()
+            } label: {
+                Text(candidate.title)
+                    .scaledSystemFont(
+                        size: HomeV2Tokens.TypeSize.title,
+                        weight: isSelected ? .semibold : .medium,
+                        relativeTo: .body
+                    )
+                    .foregroundStyle(isSelected ? HomeV2Tokens.Colors.ink : HomeV2Tokens.Colors.secondary)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                    .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? HomeV2Tokens.Space.tight : 0)
+                    .overlay(alignment: .bottom) {
+                        Rectangle()
+                            .fill(isSelected ? HomeV2Tokens.Colors.ink : Color.clear)
+                            .frame(height: 2)
+                    }
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(candidate.title) progress")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .accessibilityIdentifier("home_v2_progress_tab_\(candidate.identifier)")
+        }
     }
 
     private func headline(_ current: HomeV2ProgressSeries, stats: HomeV2ProgressPolicy.Stats, hasEnoughData: Bool) -> some View {
@@ -276,9 +289,7 @@ struct HomeV2ProgressView: View {
 
     private func deltaText(_ current: HomeV2ProgressSeries, stats: HomeV2ProgressPolicy.Stats, hasEnoughData: Bool) -> String {
         guard hasEnoughData else {
-            return metric == .weight
-                ? HomeV2ProgressCopy.loggedDaysSentence(days: stats.distinctDays)
-                : HomeV2ProgressCopy.noTrendYet
+            return HomeV2ProgressCopy.dataDaysSentence(days: stats.distinctDays)
         }
         if metric == .steps {
             return HomeV2ProgressCopy.stepsAverageSentence(average: stats.average.map { Int($0.rounded()) }, range: range)
@@ -361,22 +372,30 @@ struct HomeV2ProgressView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var keepLoggingCard: some View {
-        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-            Text(HomeV2ProgressCopy.keepLogging)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
-                .foregroundStyle(HomeV2Tokens.Colors.ink)
-            Text(HomeV2ProgressCopy.keepLoggingBody)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
-                .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+    private func sparseHistory(hasEarlierData: Bool) -> some View {
+        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+            HomeV2RangePicker(range: $range, scrollsHorizontally: true)
+
+            VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
+                Text(HomeV2ProgressCopy.sparseRequirement)
+                if hasEarlierData {
+                    Text(HomeV2ProgressCopy.earlierDataHint)
+                }
+            }
+            .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, HomeV2Tokens.Space.inset)
+            .padding(.vertical, HomeV2Tokens.Space.compact)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .top) { HomeV2Hairline() }
+            .overlay(alignment: .bottom) { HomeV2Hairline() }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                "\(metric.title) history. \(HomeV2ProgressCopy.sparseRequirement)" +
+                    (hasEarlierData ? " \(HomeV2ProgressCopy.earlierDataHint)" : "")
+            )
+            .accessibilityIdentifier("home_v2_trend_chart")
         }
-        .padding(.horizontal, HomeV2Tokens.Space.inset)
-        .padding(.vertical, HomeV2Tokens.Space.compact)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .top) { HomeV2Hairline() }
-        .overlay(alignment: .bottom) { HomeV2Hairline() }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("home_v2_progress_keep_logging")
     }
 }

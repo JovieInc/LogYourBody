@@ -1764,8 +1764,8 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(weightTab.waitForExistence(timeout: 5))
         XCTAssertTrue(weightTab.isSelected, "Weight is selected on arrival")
         XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_progress_keep_logging"].waitForExistence(timeout: 5),
-            "Five logged days is not yet a trend; the honest state says so"
+            app.descendants(matching: .any)["home_v2_trend_chart"].waitForExistence(timeout: 5),
+            "Sparse history keeps a compact explanation in the metric workspace"
         )
         XCTAssertTrue(app.buttons["home_v2_progress_log_weight"].exists, "Not-enough-data keeps the one action")
         attachScreenshot(named: "home-v2-progress-weight", from: app)
@@ -1802,6 +1802,12 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(month.waitForExistence(timeout: 8), "Sparse history must still offer a date range")
         month.tap()
         XCTAssertTrue(month.isSelected)
+        let sparseContext = app.descendants(matching: .any)["home_v2_trend_chart"]
+        XCTAssertTrue(sparseContext.waitForExistence(timeout: 5))
+        XCTAssertLessThan(sparseContext.frame.height, 140, "Sparse history uses a compact explanation, not an empty plot")
+        XCTAssertLessThanOrEqual(month.frame.maxY, sparseContext.frame.minY, "Ranges precede the sparse explanation")
+        XCTAssertTrue(app.buttons["home_v2_progress_log_weight"].isHittable)
+        attachScreenshot(named: "home-v2-sparse-progress-compact", from: app)
         XCTAssertTrue(all.waitForExistence(timeout: 5), "A sparse recent range must not hide access to older history")
         all.tap()
         XCTAssertTrue(all.isSelected)
@@ -1816,6 +1822,81 @@ final class LogYourBodyUITests: XCTestCase {
             XCTAssertTrue(month.exists, "Ranges remain available across sparse metric changes")
         }
         attachScreenshot(named: "home-v2-sparse-progress-ranges", from: app)
+    }
+
+    func testHomeV2EmptyProgressKeepsMetricRangesAndLoggingReachable() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2EmptyFixture"])
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        let progress = app.buttons["home_v2_sidebar_progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 5))
+        progress.tap()
+
+        let value = app.descendants(matching: .any)["home_v2_progress_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+        XCTAssertEqual(value.label, "—", "An empty range cannot invent a latest value")
+        for identifier in ["weight", "body_fat", "ffmi", "steps"] {
+            app.buttons["home_v2_progress_tab_\(identifier)"].tap()
+            XCTAssertEqual(value.label, "—")
+            XCTAssertTrue(app.buttons["home_v2_range_All"].isHittable)
+        }
+        app.buttons["home_v2_progress_tab_weight"].tap()
+        attachScreenshot(named: "home-v2-empty-progress", from: app)
+        let logWeight = app.buttons["home_v2_progress_log_weight"]
+        XCTAssertTrue(logWeight.isHittable)
+        logWeight.tap()
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].waitForExistence(timeout: 5))
+    }
+
+    func testHomeV2SparseProgressAtLargestTextKeepsRangeAndLogActionsReachable() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        let progress = app.buttons["home_v2_sidebar_progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 5))
+        progress.tap()
+
+        let bodyFat = app.buttons["home_v2_progress_tab_body_fat"]
+        XCTAssertTrue(bodyFat.waitForExistence(timeout: 8))
+        XCTAssertTrue(bodyFat.isHittable)
+        bodyFat.tap()
+        XCTAssertTrue(bodyFat.isSelected)
+        app.buttons["home_v2_progress_tab_weight"].tap()
+        attachScreenshot(named: "home-v2-sparse-progress-largest-text-initial", from: app)
+
+        let all = app.buttons["home_v2_range_All"]
+        XCTAssertTrue(all.waitForExistence(timeout: 8))
+        let scroll = app.scrollViews["home_v2_progress_scroll"]
+        for _ in 0..<4 where !all.isHittable {
+            scroll.swipeUp()
+        }
+        let ranges = app.scrollViews["home_v2_range_selector"]
+        for _ in 0..<4 where !all.isHittable {
+            ranges.swipeLeft()
+        }
+        XCTAssertTrue(all.isHittable, "Every range remains reachable at the largest text size")
+        all.tap()
+        XCTAssertTrue(all.isSelected)
+        let logWeight = app.buttons["home_v2_progress_log_weight"]
+        XCTAssertTrue(logWeight.isHittable)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(logWeight.frame))
+        attachScreenshot(named: "home-v2-sparse-progress-largest-text", from: app)
+        let explanation = app.descendants(matching: .any)["home_v2_trend_chart"]
+        for _ in 0..<4 where explanation.frame.maxY > logWeight.frame.minY {
+            scroll.swipeUp()
+        }
+        XCTAssertTrue(scroll.frame.contains(explanation.frame), "The entire sparse explanation is reachable by scrolling")
+        XCTAssertLessThanOrEqual(explanation.frame.maxY, logWeight.frame.minY, "The explanation clears the pinned dock")
+        attachScreenshot(named: "home-v2-sparse-progress-largest-text-scrolled", from: app)
+        logWeight.tap()
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].waitForExistence(timeout: 5))
     }
 
     func testHomeV2ViewerDisclosesDetailsToolsAndAllPhotos() throws {
