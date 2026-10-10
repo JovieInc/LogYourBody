@@ -300,6 +300,34 @@ func markAsSynced(entityName: String, id: String) {
         }
     }
 
+    /// A reply owns only the exact DEXA snapshot it uploaded, including its subject.
+    func markDexaResultsAsSynced(_ acknowledged: [PendingDexaResultSyncItem]) async throws {
+        guard !acknowledged.isEmpty else { return }
+        let context = viewContext
+        try await context.perform {
+            let request = CachedDexaResult.fetchRequest()
+            request.predicate = NSPredicate(format: "id IN %@", acknowledged.map(\.id) as NSArray)
+            let rows = try context.fetch(request).filter {
+                !$0.isSynced && acknowledged.contains($0.pendingSyncItem())
+            }
+            guard !rows.isEmpty else { return }
+            let priorStates = rows.map { ($0.isSynced, $0.syncStatus) }
+            do {
+                for row in rows {
+                    row.isSynced = true
+                    row.syncStatus = "synced"
+                }
+                if context.hasChanges { try context.save() }
+            } catch {
+                for (row, state) in zip(rows, priorStates) {
+                    row.isSynced = state.0
+                    row.syncStatus = state.1
+                }
+                throw error
+            }
+        }
+    }
+
 func markAsSynced(entityName: String, ids: Set<String>) async {
         guard !ids.isEmpty else { return }
 
