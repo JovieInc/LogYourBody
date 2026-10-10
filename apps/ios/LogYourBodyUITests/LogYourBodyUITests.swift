@@ -2326,6 +2326,61 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "onboarding-v2-paywall", from: app)
     }
 
+    func testHomeV2UnsentAskDraftSurvivesCollapseAndReopenWithoutSending() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture", "-lybUITestChatFirstFixture"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+        let composer = app.textFields["chat_composer"]
+        let draft = "Unsent body composition question"
+        composer.tap()
+        composer.typeText(draft)
+        XCTAssertEqual(composer.value as? String, draft)
+        app.buttons["home_chat_collapse"].tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5))
+        openHomeV2AskForDraftCheck(in: app)
+        attachScreenshot(named: "home-v2-unsent-draft-reopened", from: app)
+        XCTAssertEqual(composer.value as? String, draft, "Closing Ask must preserve the unsent draft")
+        XCTAssertFalse(app.staticTexts[draft].exists, "Closing Ask must not submit the draft")
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+    }
+
+    func testHomeV2SentAskDraftStaysClearedAfterCollapseAndReopen() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture", "-lybUITestChatFirstFixture"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        composer.typeText("Send this fixture question")
+        let send = app.buttons["chat_send_button"]
+        let sendEnabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
+        XCTAssertEqual(XCTWaiter.wait(for: [sendEnabled], timeout: 8), .completed)
+        send.tap()
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 8), "The fake provider must complete the actual send")
+        app.buttons["home_chat_collapse"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5))
+        openHomeV2AskForDraftCheck(in: app)
+        let value = try XCTUnwrap(composer.value as? String)
+        XCTAssertTrue(value.isEmpty || value == composer.placeholderValue, "Sent text must not return as an unsent draft")
+        attachScreenshot(named: "home-v2-sent-draft-remains-cleared", from: app)
+    }
+
+    private func openHomeV2AskForDraftCheck(in app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        app.buttons["photo_timeline_root_menu"].tap()
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 5))
+        ask.tap()
+        XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 8))
+    }
+
     func testHomeV2AskOpensFromTheSidebarWithTheQuietComposer() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])

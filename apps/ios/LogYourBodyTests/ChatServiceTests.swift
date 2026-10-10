@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import LogYourBody
 
@@ -5,6 +6,42 @@ final class ChatServiceTests: XCTestCase {
     override func tearDown() {
         ChatURLProtocol.handler = nil
         super.tearDown()
+    }
+
+    @MainActor
+    func testUnsentDraftSurvivesNewBindingsForTheSameAccountSession() {
+        let owner = AuthManager.ProfileSessionOwnership(subject: "owner-A", generation: 1)
+        var draft = AccountSessionChatDraft()
+        let storage = Binding(get: { draft }, set: { draft = $0 })
+        let first = AccountSessionChatDraft.binding(storage: storage, owner: owner, isCurrent: { true })
+        first.wrappedValue = "Unsent body composition question"
+        let reopened = AccountSessionChatDraft.binding(storage: storage, owner: owner, isCurrent: { true })
+        XCTAssertEqual(reopened.wrappedValue, "Unsent body composition question")
+        reopened.wrappedValue = ""
+        XCTAssertEqual(first.wrappedValue, "", "Sending clears the shared draft for every mounted field")
+    }
+
+    @MainActor
+    func testDraftRejectsStaleBindingsAfterAccountReplacementLogoutAndNewSession() {
+        let original = AuthManager.ProfileSessionOwnership(subject: "owner-A", generation: 1)
+        let replacements: [AuthManager.ProfileSessionOwnership?] = [
+            .init(subject: "owner-B", generation: 2), nil, .init(subject: "owner-A", generation: 3)
+        ]
+        for replacement in replacements {
+            var current: AuthManager.ProfileSessionOwnership? = original
+            var draft = AccountSessionChatDraft()
+            let storage = Binding(get: { draft }, set: { draft = $0 })
+            let stale = AccountSessionChatDraft.binding(storage: storage, owner: original) { current == original }
+            stale.wrappedValue = "Private original draft"
+            current = replacement
+            let next = AccountSessionChatDraft.binding(storage: storage, owner: replacement) { current == replacement }
+            XCTAssertEqual(stale.wrappedValue, "", "An old binding cannot read after its owner changes")
+            XCTAssertEqual(next.wrappedValue, "", "A replacement session never inherits the original draft")
+            next.wrappedValue = "Replacement draft"
+            stale.wrappedValue = "Late original callback"
+            XCTAssertEqual(next.wrappedValue, replacement == nil ? "" : "Replacement draft")
+            XCTAssertEqual(stale.wrappedValue, "")
+        }
     }
 
     func testSSEParserRequiresVersionedMetadataAndBuildsDeltas() throws {

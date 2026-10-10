@@ -716,8 +716,34 @@ private struct FailedChatTurn: Equatable {
     let clientMessageId: String
 }
 
+/// An unsent draft belongs to one authenticated account lifetime, not one mounted Ask view.
+@MainActor
+struct AccountSessionChatDraft {
+    private var owner: AuthManager.ProfileSessionOwnership?
+    private var text = ""
+
+    static func binding(
+        storage: Binding<Self>,
+        owner: AuthManager.ProfileSessionOwnership?,
+        isCurrent: @escaping () -> Bool
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                guard let owner, isCurrent(), storage.wrappedValue.owner == owner else { return "" }
+                return storage.wrappedValue.text
+            },
+            set: { value in
+                // An old field/voice callback must never adopt the replacement account's session.
+                guard let owner, isCurrent() else { return }
+                storage.wrappedValue = Self(owner: owner, text: value)
+            }
+        )
+    }
+}
+
 @MainActor
 struct ChatTabView: View {
+    @Binding var draft: String
     var showsTranscript: Bool = true
     var onExpandRequest: () -> Void = {}
 
@@ -730,7 +756,6 @@ struct ChatTabView: View {
     @ScaledMetric(relativeTo: .body) private var composerFontSize: CGFloat = 16
     @ScaledMetric(relativeTo: .body) private var composerMultilineThreshold: CGFloat =
         ChatComposerGeometry.multilineTextHeightThreshold
-    @State private var draft = ""
     @State private var composerTextHeight: CGFloat = 0
     @State private var isResponding = false
     @State private var isLoadingConversation = true
@@ -1766,7 +1791,9 @@ struct ChatTabView: View {
         if conversationOwner != ownership {
             messages = [.welcome]
             conversationId = UUID().uuidString
-            draft = ""
+            // A new Ask view may reattach an unsent draft owned by this same session.
+            // An existing view still clears its draft when its conversation owner changes.
+            if conversationOwner != nil { draft = "" }
         }
         conversationOwner = ownership
         currentRequestTask?.cancel()
