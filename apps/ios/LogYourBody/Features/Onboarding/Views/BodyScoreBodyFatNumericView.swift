@@ -101,30 +101,33 @@ struct BodyScoreBodyFatNumericView: View {
                 }
             },
             footer: {
-                Button {
-                    viewModel.persistBodyFatPercentageEntry()
-                    viewModel.goToNextStep()
-                } label: {
-                    Text("Continue")
+                VStack(spacing: JovieTokens.itemGap) {
+                    if percentageFieldFocused {
+                        Button {
+                            percentageFieldFocused = false
+                        } label: {
+                            Text("Done")
+                                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .accessibilityIdentifier("body_score_body_fat_keyboard_done_button")
+                    }
+                    Button {
+                        viewModel.persistBodyFatPercentageEntry()
+                        viewModel.goToNextStep()
+                    } label: {
+                        Text("Continue")
+                    }
+                    .accessibilityIdentifier("body_score_onboarding_body_fat_numeric_continue_button")
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
+                    .disabled(!viewModel.canContinueBodyFatNumeric)
                 }
-                .accessibilityIdentifier("body_score_onboarding_body_fat_numeric_continue_button")
-                .buttonStyle(OnboardingPrimaryButtonStyle())
-                .disabled(!viewModel.canContinueBodyFatNumeric)
             }
         )
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 self.percentageFieldFocused = true
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .keyboard) {
-                HStack {
-                    Spacer()
-                    Button("Done") {
-                        percentageFieldFocused = false
-                    }
-                }
             }
         }
         .onChange(of: bodyFatError) { _, error in
