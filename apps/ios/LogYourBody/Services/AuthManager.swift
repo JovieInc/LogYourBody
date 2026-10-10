@@ -243,6 +243,55 @@ actor AsyncGate {
     }
 }
 
+/// Weight, body-fat, FFMI, and step targets live in unscoped UserDefaults.
+/// Logout remembers which account owned them. The next signed-in account keeps
+/// them only when it is that same account.
+enum AccountLocalGoalFence {
+    static let ownerKey = "accountLocalGoalOwnerUserId"
+    static let valueKeys = [
+        Constants.goalWeightKey,
+        Constants.goalWeightKilogramsKey,
+        Constants.goalBodyFatPercentageKey,
+        Constants.goalFFMIKey,
+        "stepGoal"
+    ]
+
+    static func noteDepartingUser(_ userId: String?, defaults: UserDefaults) {
+        guard let userId, !userId.isEmpty else { return }
+        guard defaults.string(forKey: ownerKey) == nil else { return }
+        guard hasValues(in: defaults) else { return }
+        defaults.set(userId, forKey: ownerKey)
+    }
+
+    static func adopt(_ userId: String, replacing previousUserId: String?, defaults: UserDefaults) {
+        guard !userId.isEmpty else { return }
+        let owner = defaults.string(forKey: ownerKey)
+        let ownedBySomeoneElse = owner.map { $0 != userId } ?? false
+        let replacingSomeoneElse = previousUserId.map { !$0.isEmpty && $0 != userId } ?? false
+        if hasValues(in: defaults) && (ownedBySomeoneElse || (owner == nil && replacingSomeoneElse)) {
+            clear(defaults)
+            return
+        }
+        if ownedBySomeoneElse {
+            defaults.removeObject(forKey: ownerKey)
+        }
+        if defaults.string(forKey: ownerKey) == nil && hasValues(in: defaults) {
+            defaults.set(userId, forKey: ownerKey)
+        }
+    }
+
+    private static func hasValues(in defaults: UserDefaults) -> Bool {
+        valueKeys.contains { defaults.object(forKey: $0) != nil }
+    }
+
+    private static func clear(_ defaults: UserDefaults) {
+        for key in valueKeys {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.removeObject(forKey: ownerKey)
+    }
+}
+
 @MainActor
 final class AuthManager: NSObject, ObservableObject {
     static let shared: AuthManager = {
@@ -411,7 +460,7 @@ final class AuthManager: NSObject, ObservableObject {
                         if isValid {
                             applyAuthenticatedSession(stored)
                         } else {
-                            await performLogout(exitReason: .sessionExpired)
+                            await performLogout(exitReason: .sessionExpired, knownAccountId: stored.subject)
                         }
                     }
                 } else {
@@ -636,6 +685,11 @@ final class AuthManager: NSObject, ObservableObject {
     ) {
         // This assignment is synchronous on MainActor. Only a validated refresh
         // for the currently applied subject may preserve profile ownership.
+        AccountLocalGoalFence.adopt(
+            session.subject,
+            replacing: currentUser?.id,
+            defaults: userDefaults
+        )
         isRotatingProfileSession = preservingProfileSession
         authSession = session
         isRotatingProfileSession = false
@@ -758,7 +812,7 @@ final class AuthManager: NSObject, ObservableObject {
                 return self.authSession.map { ($0.accessToken, self.authGeneration) }
             } catch {
                 guard self.authGeneration == generation, !Task.isCancelled else { return nil }
-                await self.performLogout(exitReason: .sessionExpired)
+                await self.performLogout(exitReason: .sessionExpired, knownAccountId: current.subject)
                 return nil
             }
         }
@@ -792,9 +846,13 @@ final class AuthManager: NSObject, ObservableObject {
         }
     }
 
-    func performLogout(exitReason: AuthExitReason) async {
-        let departingUserId = currentUser?.id
-        prepareHealthAccountHandoff?(departingUserId)
+    func performLogout(exitReason: AuthExitReason, knownAccountId: String? = nil) async {
+        let signedInUserId = currentUser?.id
+        // A cold restore can fail before currentUser exists. The keychain
+        // subject still owns any unstamped local goals.
+        let departingUserId = signedInUserId ?? authSession?.subject ?? knownAccountId
+        AccountLocalGoalFence.noteDepartingUser(departingUserId, defaults: userDefaults)
+        prepareHealthAccountHandoff?(signedInUserId)
         let expiredOwnership = exitReason == .sessionExpired ? captureRequestSession() : nil
         try? keychain.delete(forKey: storedSessionKey)
         authSession = nil
