@@ -127,3 +127,27 @@ Advisory checks:
 - Follow-up cleanup and test coverage ideas.
 
 When advisory review finds a noncritical issue, open a focused follow-up PR or issue instead of delaying a landable PR.
+### Shared Mac runner routing
+
+The `iOS` and `iOS Launch Quality Gate` jobs use hosted `macos-15` unless the
+repository variable `MAC_RUNNER` is exactly `on` and the latest LogYourBody Mac
+heartbeat proves a fresh successful job on the `jovie-mac` pool. The route reads
+trusted helpers from `main`; missing, stale, failed, pending or uncertain evidence
+keeps hosted capacity. Both existing test and quality gates remain required.
+
+Keep `MAC_RUNNER` unset until the manual setup canary succeeds on a self-hosted
+Mac. After this workflow is on `main`, dispatch:
+
+```sh
+gh workflow run mac-runner-heartbeat.yml --repo JovieInc/LogYourBody --ref main \
+  -f verify-ios-setup=true
+```
+
+Verify the **Self-hosted iOS setup canary** job and its recorded runner name,
+Xcode, pinned SwiftLint, xcbeautify, Ruby/Bundler and `bundle check` output before
+setting `MAC_RUNNER=on`. Remove the variable or set it to `off` to return to hosted
+capacity. Registration/heartbeat success alone does not prove iOS setup.
+
+CI runs `scripts/tests/test_runner_routing.py` with Bashcov 4.0.0 and requires at
+least 80% executed-line coverage for each copied heartbeat helper. The coverage
+check rejects missing scripts, zero-line reports and reused suite records.
