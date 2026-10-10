@@ -60,6 +60,63 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].exists)
     }
 
+    func testLogSheetEditsUnitsWithKeyboardAndCancelsWithoutChangingHome() {
+        let app = launch(photo: false, state: "Offline")
+        let originalWeight = app.descendants(matching: .any)["home_v2_weight_value"].label
+        app.buttons["home_v2_log_weight"].tap()
+        let field = app.textFields["home_v2_log_sheet_value"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.datePickers["home_v2_log_sheet_date"].exists)
+        capture(app, named: "polished-log-weight-compact")
+
+        let unit = app.buttons["home_v2_log_sheet_unit"]
+        XCTAssertTrue(unit.isHittable)
+        unit.tap()
+        app.buttons["kg"].tap()
+        XCTAssertEqual(unit.value as? String, "kg")
+        unit.tap()
+        app.buttons["lbs"].tap()
+        XCTAssertEqual(unit.value as? String, "lbs")
+
+        field.tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "182.4")
+        XCTAssertEqual(field.value as? String, "182.4")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        let save = app.buttons["home_v2_log_sheet_save"]
+        XCTAssertTrue(save.isEnabled)
+        XCTAssertTrue(save.isHittable)
+        XCTAssertLessThanOrEqual(save.frame.maxY, app.keyboards.firstMatch.frame.minY)
+        capture(app, named: "polished-log-weight-keyboard")
+
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.descendants(matching: .any)["home_v2_weight_value"].label, originalWeight)
+        XCTAssertFalse(app.buttons["home_v2_undo"].exists)
+    }
+
+    func testLogSheetAtLargestTextKeepsValueAndDetailsReachable() {
+        let app = launch(photo: false, state: "Offline", largestText: true)
+        app.buttons["home_v2_log_weight"].tap()
+        let field = app.textFields["home_v2_log_sheet_value"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        XCTAssertTrue(field.isHittable)
+        capture(app, named: "polished-log-weight-largest-text")
+
+        let scroll = app.scrollViews["home_v2_log_sheet_content"]
+        let details = app.buttons["home_v2_log_sheet_details"]
+        for _ in 0..<6 where !details.isHittable || !scroll.frame.contains(details.frame) {
+            scroll.swipeUp()
+        }
+        XCTAssertTrue(details.isHittable)
+        XCTAssertTrue(scroll.frame.contains(details.frame))
+        let save = app.buttons["home_v2_log_sheet_save"]
+        XCTAssertTrue(save.isHittable)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(save.frame))
+        capture(app, named: "polished-log-weight-largest-text-scrolled")
+        details.tap()
+        XCTAssertTrue(app.staticTexts["Enter body fat percentage"].waitForExistence(timeout: 5))
+    }
+
     private func launch(photo: Bool, state: String, largestText: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
