@@ -308,6 +308,34 @@ describe('LogYourBody MCP route', () => {
     expect(checkIn.content[0]?.text).toContain('qualified clinician');
   });
 
+  it('does not turn repeated MCP check-ins into multiple sessions and still accepts pain updates', async () => {
+    const h = harness();
+    await enroll(h);
+    await call(h, 'log_sets', { exercise: 'goblet_squat', sets: [{ reps: 10, rir: 3 }] });
+    const feedback = { soreness: 8, pump: 4, performance: 'down', jointPain: 0 };
+    expect((await call(h, 'log_session_feedback', feedback)).isError).toBeUndefined();
+    const originalRows = (await h.records.pull('subject-a', 'training_feedback')).records;
+    expect((await call(h, 'log_session_feedback', feedback)).isError).toBeUndefined();
+    expect((await h.records.pull('subject-a', 'training_feedback')).records).toEqual(originalRows);
+    const unchanged = await call(h, 'get_todays_workout');
+    expect(unchanged.structuredContent?.session.exercises[0].sets).toBe(2);
+
+    const pain = await call(h, 'log_session_feedback', { ...feedback, jointPain: 5 });
+    expect(pain.isError).toBeUndefined();
+    expect(pain.content[0]?.text).toContain('qualified clinician');
+    expect((await call(h, 'get_todays_workout')).structuredContent?.session.safetyStop).toBe(true);
+    expect(
+      (
+        await call(h, 'log_session_feedback', {
+          ...feedback,
+          performance: 'stable',
+          soreness: 2,
+        })
+      ).isError,
+    ).toBeUndefined();
+    expect((await call(h, 'get_todays_workout')).structuredContent?.session.safetyStop).toBe(false);
+  });
+
   it('validates tool input before touching records', async () => {
     const h = harness();
     const result = await call(h, 'log_sets', { exercise: 'x', sets: [{ reps: 0, rir: 9 }] });
