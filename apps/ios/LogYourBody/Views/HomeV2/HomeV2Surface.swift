@@ -11,17 +11,15 @@ import SwiftUI
 struct HomeV2Surface: View {
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
-    @Binding var selectedIndex: Int
+    let timeline: HomeV2TimelinePolicy.Snapshot
+    @Binding var selectedID: HomeV2TimelinePolicy.EntryID
     let weightValue: String
     let weightUnit: String
     let changeSentence: String
-    let compositionSentence: String
+    let dateText: (BodyMetrics) -> String
     let phaseSentence: String?
     let loggedSentence: String?
-    let latestPhotoCaption: String?
     var systemState: HomeV2SystemState?
-    let chartDaily: [MetricChartDataPoint]
-    let chartTrend: [MetricChartDataPoint]
     let onOpenPhoto: () -> Void
     let onViewProgress: () -> Void
     let onTodayDetails: () -> Void
@@ -31,28 +29,37 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
 
-    @State private var editorialPhoto: (key: String, image: UIImage?)?
+    @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
 
     private var isLogged: Bool { loggedSentence != nil }
     private var isHealthOff: Bool { systemState == .healthOff }
+    private var hasAnyPhoto: Bool {
+        bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
+    }
 
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     systemBanner
-                    editorialCard(width: geometry.size.width)
+                    HomeV2TimelinePager(
+                        snapshot: timeline, selectedID: userSelection,
+                        size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
+                        unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto
+                    )
                     photoNumberBlock
-                    if hasPhoto {
+                    if hasAnyPhoto {
                         HomeV2DisclosureLink(
                             title: HomeV2PhotoCopy.allPhotos,
                             identifier: "home_v2_all_photos_row",
                             action: onAllPhotos
                         )
                         .frame(maxWidth: .infinity)
-                    } else {
-                        rangeRow
-                        todayDetailsRow
+                    }
+                    rangeRow
+                    if !hasPhoto || isHealthOff { todayDetailsRow }
+                    if !coachDismissed {
+                        HomeV2TimelineCoachMark(onDismiss: { coachDismissed = true })
                     }
                 }
                 .frame(minHeight: geometry.size.height, alignment: .top)
@@ -61,8 +68,11 @@ struct HomeV2Surface: View {
             .accessibilityIdentifier("home_v2_content_scroll")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            actionDock
-                .background(HomeV2Tokens.Colors.shell)
+            VStack(spacing: 0) {
+                timelineScrubber
+                actionDock
+            }
+            .background(HomeV2Tokens.Colors.shell)
         }
     }
 
@@ -94,48 +104,26 @@ struct HomeV2Surface: View {
 
     private var hasPhoto: Bool { PhotoTimelineHUDPolicy.hasUsablePhoto(metric) }
 
-    private func editorialCard(width: CGFloat) -> some View {
-        let size = CGSize(width: width, height: width / HomeV2Tokens.photoAspectRatio)
-        return ZStack {
-            if hasPhoto, let photoURL = metric.photoUrl {
-                let photoKey = metric.userId + "|" + photoURL
-                let photoLoadFailed = editorialPhoto?.key == photoKey && editorialPhoto?.image == nil
-                Button(action: onOpenPhoto) {
-                    ZStack(alignment: .top) {
-                        if let snapshot = editorialPhoto, snapshot.key == photoKey, let image = snapshot.image {
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } else {
-                            HomeV2DataHero(metric: metric, metrics: bodyMetrics, unit: weightUnit)
-                            Text(photoLoadFailed ? "Photo unavailable" : "Loading photo…")
-                                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                                .foregroundStyle(HomeV2Tokens.Colors.ink)
-                                .padding(HomeV2Tokens.Space.tight)
-                                .background(HomeV2Tokens.Colors.shell)
-                        }
-                    }
-                    .frame(width: size.width, height: size.height)
-                    .clipped()
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(photoLoadFailed ? "Photo unavailable. Saved measurements shown." : "Progress photo")
-                .accessibilityHint("Open the photo")
-                .accessibilityIdentifier("home_v2_photo_stage")
-                .task(id: photoKey) {
-                    let image = await ImageCacheService.shared.loadImage(from: photoURL)
-                    guard !Task.isCancelled else { return }
-                    editorialPhoto = (photoKey, image)
-                }
-            } else {
-                HomeV2DataHero(metric: metric, metrics: bodyMetrics, unit: weightUnit)
-                    .frame(width: size.width, height: size.height)
-                    .accessibilityIdentifier("home_v2_metric_first")
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("home_v2_editorial_card")
+    private var userSelection: Binding<HomeV2TimelinePolicy.EntryID> {
+        Binding(get: { selectedID }, set: { next in
+            guard next != selectedID else { return }
+            selectedID = next
+            coachDismissed = true
+        })
+    }
+
+    private var timelineScrubber: some View {
+        HomeV2PhotoTimelineRuler(
+            dates: timeline.chronologicalDates,
+            selected: timeline.chronologicalPosition(for: selectedID),
+            onSelect: { position in
+                if let next = timeline.id(atChronologicalPosition: position) { userSelection.wrappedValue = next }
+            },
+            allowsVerticalScrolling: true,
+            accessibilityId: "home_v2_timeline_scrubber",
+            accessibilityName: "Body timeline"
+        )
+        .padding(.top, HomeV2Tokens.Space.tight)
     }
 
     private var hasSingleWeightHero: Bool {
@@ -145,8 +133,8 @@ struct HomeV2Surface: View {
 
     private var photoNumberBlock: some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-            if hasPhoto, let latestPhotoCaption {
-                Text(latestPhotoCaption)
+            Group {
+                Text(HomeV2Copy.dayCaption(date: dateText(metric), source: HomeV2Provenance.subline(for: metric)))
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                     .foregroundStyle(HomeV2Tokens.Colors.secondary)
                     .accessibilityIdentifier("home_v2_photo_caption")
@@ -156,8 +144,7 @@ struct HomeV2Surface: View {
                 numberRow(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .semibold, kerning: -1.2)
             }
 
-            Text(HomeV2EditorialPolicy.supportsWeightComparison(in: bodyMetrics, selected: metric)
-                 ? changeSentence : "No 30-day trend yet")
+            Text(changeSentence)
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .accessibilityIdentifier("home_v2_change_sentence")
@@ -197,7 +184,7 @@ struct HomeV2Surface: View {
     }
 
     private var compositionLine: some View {
-        Text(compositionSentence)
+        Text(HomeV2TimelinePolicy.bodyFatSentence(for: metric))
             .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
             .foregroundStyle(HomeV2Tokens.Colors.secondary)
             .fixedSize(horizontal: false, vertical: true)

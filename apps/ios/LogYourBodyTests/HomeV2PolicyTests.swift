@@ -8,25 +8,68 @@ import UIKit
 
 @MainActor
 final class HomeV2PolicyTests: XCTestCase {
-    func testGateOffWithoutFixtureArgumentKeepsHomeV2Off() {
-        XCTAssertFalse(
-            HomeV2Policy.isEnabled(
-                arguments: ["-lybUITestPhotoTimelineHUDFixture"],
-                isGateEnabled: { _ in false }
-            )
-        )
-    }
-
-    func testStatsigGateEnablesHomeV2ByItsKey() {
+    func testHomeV2DefaultsOnWhenKillSwitchIsOff() {
         var askedKey: String?
         XCTAssertTrue(
+            HomeV2Policy.isEnabled(
+                arguments: ["-lybUITestPhotoTimelineHUDFixture"],
+                isGateEnabled: { key in
+                    askedKey = key
+                    return false
+                }
+            )
+        )
+        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
+    }
+
+    func testKillSwitchDisablesHomeV2() {
+        var askedKey: String?
+        XCTAssertFalse(
             HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { key in
                 askedKey = key
                 return true
             })
         )
-        XCTAssertEqual(askedKey, "home_v2_photo_first")
+        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
     }
+
+    #if DEBUG
+    func testRollbackFixtureDisablesHomeV2WithoutReadingRemoteGates() {
+        XCTAssertFalse(
+            HomeV2Policy.isEnabled(arguments: [HomeV2Policy.rollbackFixtureArgument], isGateEnabled: { _ in
+                XCTFail("The explicit rollback fixture must not read remote gates")
+                return false
+            })
+        )
+    }
+
+    func testRollbackFixtureWinsOverConflictingHomeV2Fixtures() {
+        let homeFixtures = [
+            HomeV2Policy.fixtureArgument,
+            HomeV2Policy.photoFixtureArgument,
+            HomeV2Policy.emptyFixtureArgument,
+            HomeV2SystemStatePolicy.offlineFixtureArgument,
+            HomeV2SystemStatePolicy.healthOffFixtureArgument,
+            HomeV2SystemStatePolicy.loadingFixtureArgument
+        ]
+        for fixture in homeFixtures {
+            XCTAssertFalse(
+                HomeV2Policy.isEnabled(
+                    arguments: [fixture, HomeV2Policy.rollbackFixtureArgument],
+                    isGateEnabled: { _ in false }
+                ),
+                "Rollback must win over \(fixture)"
+            )
+        }
+    }
+
+    #else
+    func testRollbackFixtureArgumentCannotDisableShippingHome() {
+        XCTAssertTrue(
+            HomeV2Policy.isEnabled(arguments: ["-lybUITestHomeRollbackFixture"], isGateEnabled: { _ in false })
+        )
+    }
+    #endif
 
     #if DEBUG
     func testFixtureArgumentsEnableHomeV2WithoutTheGate() {

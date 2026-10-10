@@ -430,6 +430,9 @@ struct LogYourBodyApp: App {
         if arguments.contains("-lybUITestResetWhatsNewReviewState") {
             ReleaseReviewStateStore().reset()
         }
+        if arguments.contains("-lybUITestResetHomeV2TimelineCoach") {
+            UserDefaults.standard.removeObject(forKey: HomeV2Copy.coachDismissedDefaultsKey)
+        }
         let usesPaidFixture = arguments.contains("-lybUITestPaidMVPFixture")
         let usesWeightLoggerFixture = arguments.contains("-lybUITestWeightLoggerMVPFixture")
         let usesPaywallFixture = arguments.contains("-lybUITestPaywallFixture")
@@ -535,11 +538,14 @@ struct LogYourBodyApp: App {
         realtimeSyncManager.syncStatus = .offline
         realtimeSyncManager.pendingSyncCount = 0
 
-        if (usesFullDashboardFixture || usesPhotoTimelineHUDFixture) &&
-            !arguments.contains(HomeV2Policy.emptyFixtureArgument) {
-            let fixturePhotoURL = arguments.contains(HomeV2Policy.photoFixtureArgument)
-                ? writeHomeV2FixturePhoto()
-                : nil
+        // These data-only aliases exercise the ordinary Home policy without
+        // the HomeV2 fixture arguments that force a particular rollout state.
+        let usesEmptyHomeData = arguments.contains(HomeV2Policy.emptyFixtureArgument) ||
+            arguments.contains("-lybUITestPhotoTimelineEmptyFixture")
+        if (usesFullDashboardFixture || usesPhotoTimelineHUDFixture) && !usesEmptyHomeData {
+            let usesPhotoData = arguments.contains(HomeV2Policy.photoFixtureArgument) ||
+                arguments.contains("-lybUITestPhotoTimelinePhotoFixture")
+            let fixturePhotoURL = usesPhotoData ? writeHomeV2FixturePhoto() : nil
             await seedFullDashboardUITestFixtureData(userId: userId, photoURL: fixturePhotoURL)
         }
 
@@ -570,10 +576,12 @@ struct LogYourBodyApp: App {
 
     /// A deterministic 4:5 "photo" so the photo-first Home is testable without a
     /// network: a soft gradient with a darker figure in the middle.
-    private func writeHomeV2FixturePhoto() -> String? {
+    private func writeHomeV2FixturePhoto(variant: Int? = nil) -> String? {
         let size = CGSize(width: 400, height: 500)
         let image = UIGraphicsImageRenderer(size: size).image { context in
-            let colors = [UIColor.lightGray.cgColor, UIColor.darkGray.cgColor] as CFArray
+            let palette: [Int: UIColor] = [0: .red, 7: .blue, 14: .green, 21: .purple, 35: .orange]
+            let tint = variant.flatMap { palette[$0] }
+            let colors = [(tint ?? .lightGray).cgColor, (tint ?? .darkGray).cgColor] as CFArray
             if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
                 context.cgContext.drawLinearGradient(
                     gradient,
@@ -586,7 +594,8 @@ struct LogYourBodyApp: App {
             UIBezierPath(roundedRect: CGRect(x: 150, y: 90, width: 100, height: 360), cornerRadius: 48).fill()
         }
         guard let data = image.jpegData(compressionQuality: 0.9) else { return nil }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lyb-ui-test-home-v2-photo.jpg")
+        let suffix = variant.map { "-\($0)" } ?? ""
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lyb-ui-test-home-v2-photo\(suffix).jpg")
         do {
             try data.write(to: url, options: .atomic)
         } catch {
@@ -620,6 +629,8 @@ struct LogYourBodyApp: App {
                 continue
             }
 
+            let timelinePhoto = editorialArguments.contains("-lybUITestHomeV2TimelineFixture")
+                ? writeHomeV2FixturePhoto(variant: entry.daysAgo) : photoURL
             let metric = BodyMetrics(
                 id: "ui_test_full_dashboard_metric_\(entry.daysAgo)",
                 userId: userId,
@@ -635,7 +646,7 @@ struct LogYourBodyApp: App {
                 hipCm: nil,
                 waistUnit: nil,
                 notes: entry.notes,
-                photoUrl: photoURL,
+                photoUrl: timelinePhoto,
                 dataSource: entry.source,
                 createdAt: date,
                 updatedAt: now
