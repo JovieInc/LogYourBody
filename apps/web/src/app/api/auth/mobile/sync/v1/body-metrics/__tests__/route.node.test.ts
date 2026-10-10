@@ -3,6 +3,7 @@
 import { NextRequest } from 'next/server';
 import { createNativeBodyMetricsSyncHandlers } from '../route-handlers';
 import type {
+  NativeBodyMetricsAccountMutationsPort,
   NativeBodyMetricPushInput,
   NativeBodyMetricSyncRecord,
   NativeBodyMetricsSyncPort,
@@ -42,6 +43,12 @@ function asRecord(input: NativeBodyMetricPushInput): NativeBodyMetricSyncRecord 
 }
 
 class MemoryNativeSync implements NativeBodyMetricsSyncPort {
+  accountMutations: NativeBodyMetricsAccountMutationsPort = {
+    capture: async (subject) => ({ subject, ownerId: morningId }),
+    push: (a, records) => this.push(a.subject, records),
+    remove: (a, ids) => this.remove(a.subject, ids),
+  };
+
   pushed: Array<{ subject: string; records: NativeBodyMetricPushInput[] }> = [];
   pulled: Array<{ subject: string; since: string; after_id: string | null; limit?: number }> = [];
   removed: Array<{ subject: string; ids: string[] }> = [];

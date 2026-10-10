@@ -3,6 +3,7 @@
 import { NextRequest } from 'next/server';
 import { createNativeProductRecordHandlers } from '../route-handlers';
 import type {
+  NativeProductAccountMutationsPort,
   NativeProductRecord,
   NativeProductRecordCollection,
   NativeProductRecordsPort,
@@ -20,6 +21,13 @@ const morning = {
 };
 
 class MemoryNativeRecords implements NativeProductRecordsPort {
+  accountMutations: NativeProductAccountMutationsPort = {
+    capture: async (subject) => ({ subject, ownerId: morningId }),
+    push: (a, collection, records) => this.push(a.subject, collection, records),
+    remove: (a, collection, ids) => this.remove(a.subject, collection, ids),
+    endActiveGlp1Medications: (a, endedAt) => this.endActiveGlp1Medications(a.subject, endedAt),
+  };
+
   pushed: Array<{
     subject: string;
     collection: NativeProductRecordCollection;
