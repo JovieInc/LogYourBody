@@ -21,7 +21,7 @@ extension DashboardViewLiquid {
         }
     }
 
-    func openHomeV2Progress(metric: HomeV2ProgressMetric = .weight) {
+    func openHomeV2Progress(metric: HomeV2ProgressMetric = .bodyFat) {
         homeV2ProgressMetric = metric
         if !HomeV2TrendPolicy.visibleRanges.contains(selectedRange) {
             selectedRange = .month3

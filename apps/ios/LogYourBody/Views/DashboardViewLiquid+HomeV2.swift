@@ -33,26 +33,36 @@ extension DashboardViewLiquid {
             bodyMetrics: homeV2Timeline.metrics,
             timeline: homeV2Timeline,
             selectedID: Binding(get: { HomeV2TimelinePolicy.EntryID(metric) }, set: selectHomeV2TimelineEntry),
-            weightValue: formatTrendWeightHeadline(metric, usesTrend: weightUsesTrend),
+            weightValue: HomeV2EditorialPolicy.displayWeight(in: metric, system: currentMeasurementSystem)
+                .map { String(format: "%.1f", $0) } ?? "—",
             weightUnit: unit,
+            ffmiValue: homeV2FFMIValue(metric).map { String(format: "%.1f", $0) },
+            stepsValue: homeV2StepsText(for: metric).value,
+            stepsDetail: homeV2StepsText(for: metric).detail,
             changeSentence: homeV2Timeline.weightChangeSentence(
                 for: HomeV2TimelinePolicy.EntryID(metric), system: currentMeasurementSystem
             ),
             dateText: { formatHUDDate($0.date) },
-            phaseSentence: homeV2PhaseSentence,
             loggedSentence: homeV2Logged.map { HomeV2Copy.loggedSentence(value: $0.valueText, unit: $0.unit) },
             systemState: homeV2SystemState,
             onOpenPhoto: { isHomeV2ViewerPresented = true },
-            onViewProgress: { openHomeV2Progress(metric: .weight) },
+            onViewProgress: { openHomeV2Progress() },
+            onViewMetric: { openHomeV2Progress(metric: $0) },
             onTodayDetails: { openHomeV2Context() },
             onAllPhotos: { isHomeV2AllPhotosPresented = true },
-            onLogWeight: { presentHomeV2LogSheet() },
+            onLogWeight: { presentHomeV2LogSheet(for: metric.date, initialTab: 1) },
             onConnectHealth: {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
             onDone: { homeV2Logged = nil },
             onUndo: { Task { await undoHomeV2Logged() } }
         )
+        .task(id: homeV2StepsRequest(on: metric.date)) {
+            guard let ownership = authManager.captureAccountSession() else { return }
+            await homeV2StepsReader.load(
+                metric: metric, ownership: ownership, ownsSession: authManager.ownsAccountSession
+            )
+        }
         // The whole-history chart series are built off the main actor by
         // prewarmMetricCaches; never regenerate them inside body. The caches
         // reset to [:] whenever metrics change, so this re-warms on demand.
@@ -109,15 +119,65 @@ extension DashboardViewLiquid {
 
     /// H0, shown instead of the legacy empty state while the gate is on.
     var homeV2DayZero: some View {
-        HomeV2DayZero(
+        let date = Date()
+        let steps = homeV2StepsText(on: date)
+        return HomeV2DayZero(
+            stepsValue: steps.value,
+            stepsDetail: steps.detail,
+            onViewSteps: { openHomeV2Progress(metric: .steps) },
             onConnectHealth: {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
-            onLogWeight: { presentHomeV2LogSheet() }
+            onLogWeight: { presentHomeV2LogSheet(initialTab: 1) }
+        )
+        .task(id: homeV2StepsRequest(on: date)) {
+            guard let ownership = authManager.captureAccountSession() else { return }
+            await homeV2StepsReader.load(
+                date: date, ownership: ownership, ownsSession: authManager.ownsAccountSession
+            )
+        }
+    }
+
+    struct HomeV2StepsRequest: Hashable {
+        let key: HomeV2DailyStepsReader.Key?
+        let revisions: [String]
+    }
+
+    /// Refresh after a real daily-row publication, including a corrected same-day total.
+    func homeV2StepsRequest(on date: Date) -> HomeV2StepsRequest {
+        let ownership = authManager.captureAccountSession()
+        let rows = recentDailyMetrics + (dailyMetrics.map { [$0] } ?? [])
+        return HomeV2StepsRequest(
+            key: homeV2StepsReader.key(for: date, ownership: ownership),
+            revisions: rows.filter {
+                $0.userId == ownership?.subject && Calendar.current.isDate($0.date, inSameDayAs: date)
+            }.map { "\($0.id)|\($0.steps.map(String.init) ?? "nil")|\($0.updatedAt.timeIntervalSince1970)" }.sorted()
         )
     }
 
-    func presentHomeV2LogSheet(for date: Date = Date()) {
+    func homeV2StepsText(for metric: BodyMetrics) -> (value: String, detail: String) {
+        let state = homeV2StepsReader.state(
+            for: metric, ownership: authManager.captureAccountSession(), ownsSession: authManager.ownsAccountSession
+        )
+        return homeV2StepsText(state)
+    }
+
+    func homeV2StepsText(on date: Date) -> (value: String, detail: String) {
+        let state = homeV2StepsReader.state(
+            for: date, ownership: authManager.captureAccountSession(), ownsSession: authManager.ownsAccountSession
+        )
+        return homeV2StepsText(state)
+    }
+
+    private func homeV2StepsText(_ state: HomeV2DailyStepsReader.State) -> (value: String, detail: String) {
+        switch state {
+        case .loading: return ("—", "Loading steps…")
+        case .missing: return ("—", "No step data")
+        case .value(let value): return (value.formatted(), "Daily total")
+        }
+    }
+
+    func presentHomeV2LogSheet(for date: Date = Date(), initialTab: Int = 0) {
         homeV2LogSheetDate = date
         let existing = homeV2Metric(on: date)
         let latestKilograms = existing?.weight
@@ -129,11 +189,22 @@ extension DashboardViewLiquid {
         homeV2LogPreviousBodyFat = existing?.bodyFatPercentage
         HapticManager.shared.selection()
         presentAddEntrySheet(
+            initialTab: initialTab,
             date: date,
             weight: HomeV2WeightStepPolicy.text(initial),
             bodyFat: existing?.bodyFatPercentage,
             isHomeV2LoggingWeight: true
         )
+    }
+
+    @MainActor
+    func handleHomeV2BodyFatEntrySaved(_ saved: BodyMetrics) {
+        guard isHomeV2LoggingWeight, saved.userId == authManager.currentUser?.id else { return }
+        // Body fat has its own save; a prior weight receipt must not describe it.
+        homeV2Logged = nil
+        Task { @MainActor in
+            await refreshHomeV2AfterWrite(selecting: saved.id)
+        }
     }
 
     @MainActor

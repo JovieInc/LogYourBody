@@ -667,6 +667,40 @@ struct LogYourBodyApp: App {
             savedIds.count == expectedIds.count && Set(savedIds) == expectedIds,
             "Dashboard UI fixture expected \(entries.count) saved measurements, found \(savedIds.count)"
         )
+        if editorialArguments.contains("-lybUITestHomeV2StepsFixture") {
+            await seedHomeV2StepsUITestFixtureData(userId: userId, metrics: savedMetrics.compactMap { $0.toBodyMetrics() })
+        }
+    }
+
+    /// Opt-in real saved totals for the selected today and preceding timeline entry.
+    private func seedHomeV2StepsUITestFixtureData(userId: String, metrics: [BodyMetrics]) async {
+        let entries = [(daysAgo: 0, steps: 6_000), (daysAgo: 7, steps: 8_000)]
+        for entry in entries {
+            guard let metric = metrics.first(where: {
+                $0.userId == userId && $0.id == "ui_test_full_dashboard_metric_\(entry.daysAgo)"
+            }) else {
+                preconditionFailure("Steps UI fixture requires the full dashboard's today and seven-days-ago entries")
+            }
+            let daily = DailyMetrics(
+                id: "\(userId)_daily_steps_\(entry.daysAgo)",
+                userId: userId,
+                date: metric.date,
+                steps: entry.steps,
+                notes: "Selected-day steps UI fixture",
+                createdAt: metric.createdAt,
+                updatedAt: metric.updatedAt
+            )
+            do {
+                try await CoreDataManager.shared.saveDailyMetricsAndWait(daily, userId: userId)
+            } catch {
+                preconditionFailure("Steps UI fixture could not save its daily row")
+            }
+            let saved = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: metric.date)
+            precondition(
+                saved?.id == daily.id && saved?.userId == userId && saved?.steps == Int32(entry.steps),
+                "Steps UI fixture expected its saved owner/day total before authentication"
+            )
+        }
     }
 
     private func seedGlp1WeeklyCheckInUITestFixtureData(userId: String) async {

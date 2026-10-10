@@ -96,7 +96,8 @@ struct DashboardViewLiquid: View {
     @State var isPhotoTimelineSettingsPresented = false
     @State var isHomeV2ViewerPresented = false
     @State var isHomeV2ContextPresented = false
-    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
+    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .bodyFat
+    @StateObject var homeV2StepsReader = HomeV2DailyStepsReader()
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
     @State var homeV2LogSheetDate = Date()
@@ -303,7 +304,8 @@ struct DashboardViewLiquid: View {
                     initialWeight: addEntryInitialWeight,
                     initialBodyFat: addEntryInitialBodyFat,
                     isHomeV2LogEntry: isHomeV2LoggingWeight,
-                    onWeightSaved: handleHomeV2WeightEntrySaved
+                    onWeightSaved: handleHomeV2WeightEntrySaved,
+                    onBodyFatSaved: handleHomeV2BodyFatEntrySaved
                 )
                     .environmentObject(authManager)
             }

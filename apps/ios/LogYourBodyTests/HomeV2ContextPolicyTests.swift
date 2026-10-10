@@ -2,6 +2,7 @@
 // HomeV2ContextPolicyTests.swift
 // LogYourBodyTests
 //
+import CoreData
 import XCTest
 @testable import LogYourBody
 
@@ -156,5 +157,295 @@ final class HomeV2ContextPolicyTests: XCTestCase {
         XCTAssertEqual(sections[1].delta, "Down 0.4 kg")
         XCTAssertNil(sections[0].delta)
         XCTAssertNil(sections[2].delta)
+    }
+}
+
+@MainActor
+extension HomeV2ContextPolicyTests {
+    func testDailyStepsCanReadTodayWithoutFabricatingABodyMetric() async throws {
+        let today = Date()
+        let ownership = stepsOwner()
+        let reader = HomeV2DailyStepsReader(calendar: try fixedCalendar()) { owner, start, _ in
+            [self.stepsRow(owner: owner, date: start, steps: 0)]
+        }
+        XCTAssertEqual(reader.state(for: today, ownership: ownership, ownsSession: { $0 == ownership }), .loading)
+
+        await reader.load(date: today, ownership: ownership, ownsSession: { $0 == ownership })
+
+        XCTAssertEqual(reader.state(for: today, ownership: ownership, ownsSession: { $0 == ownership }), .value(0))
+        XCTAssertEqual(reader.snapshot?.key, reader.key(for: today, ownership: ownership))
+    }
+
+    func testDailyStepsDoesNotInventAZeroFromMissingOrAmbiguousStoredSteps() async throws {
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        let manager = CoreDataManager(persistentStoreDescriptions: [description])
+        let ready = expectation(
+            for: NSPredicate { _, _ in manager.persistentStoreLoadState != .loading },
+            evaluatedWith: manager
+        )
+        await fulfillment(of: [ready], timeout: 5)
+        XCTAssertEqual(manager.persistentStoreLoadState, .ready)
+        let reader = HomeV2DailyStepsReader(calendar: try fixedCalendar()) { owner, start, end in
+            await HomeV2DailyStepsReader.readStoredMetrics(for: owner, from: start, to: end, coreDataManager: manager)
+        }
+        let ownership = stepsOwner()
+
+        let values: [Int?] = [nil, 0, 321]
+        for (index, value) in values.enumerated() {
+            let date = Date(timeIntervalSince1970: 1_790_000_000 + Double(index) * 86_400)
+            let selected = stepsMetric(date: date)
+            let row = stepsRow(id: "persisted-\(index)", date: date, steps: value)
+            try await manager.saveDailyMetricsAndWait(row, userId: ownership.subject)
+            let stored = await manager.fetchDailyMetrics(for: ownership.subject, date: date)
+            XCTAssertEqual(stored?.steps, Int32(value ?? 0), "The legacy writer loses nil-versus-zero presence")
+
+            await reader.load(metric: selected, ownership: ownership, ownsSession: { $0 == ownership })
+
+            let expected: HomeV2DailyStepsReader.State = value == 321 ? .value(321) : .missing
+            XCTAssertEqual(reader.state(for: selected, ownership: ownership, ownsSession: { $0 == ownership }), expected)
+        }
+    }
+
+    func testDailyStepsFiltersOwnerAndHalfOpenDayBeforeSelectingNewestDuplicate() async throws {
+        let selected = stepsMetric()
+        let calendar = try fixedCalendar()
+        let start = calendar.startOfDay(for: selected.date)
+        let end = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: start))
+        let reader = HomeV2DailyStepsReader(calendar: calendar) { _, _, _ in
+            [
+                self.stepsRow(id: "older", date: selected.date, steps: 400, updated: 1),
+                self.stepsRow(id: "latest-a", date: selected.date, steps: 500, updated: 2),
+                self.stepsRow(id: "latest-z", date: selected.date, steps: 600, updated: 2),
+                self.stepsRow(owner: "other", date: selected.date, steps: 900, updated: 9),
+                self.stepsRow(date: end, steps: 1_000, updated: 10),
+                self.stepsRow(date: start.addingTimeInterval(-1), steps: 2_000, updated: 11)
+            ]
+        }
+        let ownership = stepsOwner()
+
+        await reader.load(metric: selected, ownership: ownership, ownsSession: { $0 == ownership })
+
+        XCTAssertEqual(reader.snapshot?.state, .value(600))
+    }
+
+    func testDailyStepsMissingOrNegativeNewestValueDoesNotBorrowAnOlderValue() async throws {
+        let selected = stepsMetric()
+        let ownership = stepsOwner()
+        for value: Int? in [nil, -1] {
+            let reader = HomeV2DailyStepsReader(calendar: try fixedCalendar()) { _, _, _ in
+                [
+                    self.stepsRow(id: "old", date: selected.date, steps: 8_000, updated: 1),
+                    self.stepsRow(id: "new", date: selected.date, steps: value, updated: 2)
+                ]
+            }
+            await reader.load(metric: selected, ownership: ownership, ownsSession: { $0 == ownership })
+            XCTAssertEqual(reader.snapshot?.state, .missing)
+        }
+    }
+
+    func testDailyStepsFetchesOldSelectedDayWithoutThirtyDayLimitOrTodayFallback() async throws {
+        let calendar = try fixedCalendar()
+        let selected = metric(daysAgo: 90, weight: nil, now: Date(), calendar: calendar)
+        let start = calendar.startOfDay(for: selected.date)
+        let end = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: start))
+        let ownership = stepsOwner()
+        let reader = HomeV2DailyStepsReader(calendar: calendar) { owner, from, to in
+            XCTAssertEqual(owner, ownership.subject)
+            XCTAssertEqual(from, start)
+            XCTAssertEqual(to, end)
+            return [self.stepsRow(date: Date(), steps: 9_000)]
+        }
+
+        await reader.load(metric: selected, ownership: ownership, ownsSession: { $0 == ownership })
+        XCTAssertEqual(reader.snapshot?.state, .missing)
+        let oldReader = HomeV2DailyStepsReader(calendar: calendar) { _, _, _ in
+            [self.stepsRow(date: selected.date, steps: 123)]
+        }
+        await oldReader.load(metric: selected, ownership: ownership, ownsSession: { $0 == ownership })
+        XCTAssertEqual(oldReader.snapshot?.state, .value(123))
+    }
+
+    func testDailyStepsUsesCalendarDayAcrossDaylightSavingChange() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let date = try XCTUnwrap(calendar.date(from: DateComponents(year: 2_026, month: 3, day: 8, hour: 12)))
+        let selected = stepsMetric(date: date)
+        let reader = HomeV2DailyStepsReader(calendar: calendar) { _, start, end in
+            XCTAssertEqual(end.timeIntervalSince(start), 23 * 60 * 60)
+            return [self.stepsRow(date: start, steps: 0)]
+        }
+        let ownership = stepsOwner()
+
+        await reader.load(metric: selected, ownership: ownership, ownsSession: { $0 == ownership })
+
+        XCTAssertEqual(reader.snapshot?.state, .value(0))
+    }
+
+    func testDailyStepsLateDayReadCannotReplaceNewSelection() async throws {
+        let calendar = try fixedCalendar()
+        let first = stepsMetric()
+        let second = stepsMetric(date: first.date.addingTimeInterval(86_400))
+        let held = HeldDailyStepsRead()
+        let ownership = stepsOwner()
+        let reader = HomeV2DailyStepsReader(calendar: calendar) { _, start, _ in
+            if start == calendar.startOfDay(for: first.date) { return await held.read() }
+            return [self.stepsRow(date: second.date, steps: 222)]
+        }
+        let task = Task { await reader.load(metric: first, ownership: ownership, ownsSession: { $0 == ownership }) }
+        await fulfillment(of: [held.started], timeout: 2)
+        XCTAssertEqual(reader.state(for: first, ownership: ownership, ownsSession: { $0 == ownership }), .loading)
+        XCTAssertEqual(reader.state(for: second, ownership: ownership, ownsSession: { $0 == ownership }), .loading)
+        await reader.load(metric: second, ownership: ownership, ownsSession: { $0 == ownership })
+        try held.resume(with: [stepsRow(date: first.date, steps: 111)])
+        await task.value
+
+        XCTAssertEqual(reader.state(for: second, ownership: ownership, ownsSession: { $0 == ownership }), .value(222))
+        XCTAssertEqual(reader.state(for: first, ownership: ownership, ownsSession: { $0 == ownership }), .loading)
+    }
+
+    func testDailyStepsLateSameDayReadCannotOverwriteReload() async throws {
+        let selected = stepsMetric()
+        let ownership = stepsOwner()
+        let held = HeldDailyStepsRead()
+        var reads = 0
+        let reader = HomeV2DailyStepsReader(calendar: try fixedCalendar()) { _, _, _ in
+            reads += 1
+            if reads == 1 { return await held.read() }
+            return [self.stepsRow(date: selected.date, steps: 222)]
+        }
+        let task = Task { await reader.load(metric: selected, ownership: ownership, ownsSession: { $0 == ownership }) }
+        await fulfillment(of: [held.started], timeout: 2)
+        await reader.load(metric: selected, ownership: ownership, ownsSession: { $0 == ownership })
+        try held.resume(with: [stepsRow(date: selected.date, steps: 111)])
+        await task.value
+
+        XCTAssertEqual(reader.snapshot?.state, .value(222))
+    }
+
+    func testDailyStepsHeldAccountAReadCannotReplaceAccountB() async throws {
+        try await assertHeldStepsReadRejectsReplacement(stepsOwner(subject: "other", generation: 2))
+    }
+
+    func testDailyStepsHeldOldLifetimeCannotReplaceSameSubjectNewLifetime() async throws {
+        try await assertHeldStepsReadRejectsReplacement(stepsOwner(generation: 2))
+    }
+
+    func testDailyStepsRenderHidesOldLifetimeBeforeReplacementLoadStarts() async throws {
+        let selected = stepsMetric()
+        let ownership = stepsOwner()
+        var current = ownership
+        let reader = HomeV2DailyStepsReader(calendar: try fixedCalendar()) { _, _, _ in
+            [self.stepsRow(date: selected.date, steps: 100)]
+        }
+        await reader.load(metric: selected, ownership: ownership, ownsSession: { $0 == current })
+        XCTAssertEqual(reader.state(for: selected, ownership: ownership, ownsSession: { $0 == current }), .value(100))
+        current = stepsOwner(generation: 2)
+
+        XCTAssertEqual(reader.state(for: selected, ownership: ownership, ownsSession: { $0 == current }), .missing)
+        XCTAssertEqual(reader.state(for: selected, ownership: current, ownsSession: { $0 == current }), .loading)
+        XCTAssertEqual(reader.state(for: selected, ownership: nil, ownsSession: { $0 == current }), .missing)
+    }
+
+    func testDailyStepsRejectsMismatchedMetricOrStaleOwnershipBeforeReading() async throws {
+        let selected = stepsMetric()
+        let ownership = stepsOwner()
+        let reader = HomeV2DailyStepsReader(calendar: try fixedCalendar()) { _, _, _ in
+            XCTFail("Unowned selected days must not enter the reader")
+            return []
+        }
+        await reader.load(metric: selected, ownership: stepsOwner(subject: "other"), ownsSession: { _ in true })
+        await reader.load(metric: selected, ownership: ownership, ownsSession: { _ in false })
+
+        XCTAssertNil(reader.snapshot)
+        XCTAssertNil(reader.key(for: selected, ownership: stepsOwner(subject: "other")))
+    }
+
+    func testDailyStepsCancelledHeldReadDoesNotPublishItsValue() async throws {
+        let selected = stepsMetric()
+        let ownership = stepsOwner()
+        let held = HeldDailyStepsRead()
+        let reader = HomeV2DailyStepsReader(calendar: try fixedCalendar()) { _, _, _ in await held.read() }
+        let task = Task { await reader.load(metric: selected, ownership: ownership, ownsSession: { _ in true }) }
+        await fulfillment(of: [held.started], timeout: 2)
+        task.cancel()
+        try held.resume(with: [stepsRow(date: selected.date, steps: 999)])
+        await task.value
+
+        XCTAssertEqual(reader.snapshot?.state, .loading)
+    }
+
+    private func assertHeldStepsReadRejectsReplacement(
+        _ replacement: AuthManager.ProfileSessionOwnership
+    ) async throws {
+        let original = stepsOwner()
+        var current = original
+        let first = stepsMetric()
+        let second = stepsMetric(owner: replacement.subject)
+        let held = HeldDailyStepsRead()
+        var reads = 0
+        let reader = HomeV2DailyStepsReader(calendar: try fixedCalendar()) { _, _, _ in
+            reads += 1
+            if reads == 1 { return await held.read() }
+            return [self.stepsRow(owner: replacement.subject, date: second.date, steps: 222)]
+        }
+        let task = Task { await reader.load(metric: first, ownership: original, ownsSession: { $0 == current }) }
+        await fulfillment(of: [held.started], timeout: 2)
+        current = replacement
+        XCTAssertEqual(reader.state(for: first, ownership: original, ownsSession: { $0 == current }), .missing)
+        try held.resume(with: [stepsRow(date: first.date, steps: 111)])
+        await task.value
+        // No replacement request has run: this proves lifetime admission, not only request-ID rejection.
+        XCTAssertEqual(reader.snapshot?.state, .loading)
+        await reader.load(metric: second, ownership: replacement, ownsSession: { $0 == current })
+        // A late old load must not clear the replacement's successfully published value either.
+        await reader.load(metric: first, ownership: original, ownsSession: { $0 == current })
+
+        XCTAssertEqual(reader.state(for: second, ownership: replacement, ownsSession: { $0 == current }), .value(222))
+        XCTAssertEqual(reader.snapshot?.key.ownership, replacement)
+    }
+
+    private func stepsOwner(subject: String = "user", generation: UInt64 = 1) -> AuthManager.ProfileSessionOwnership {
+        AuthManager.ProfileSessionOwnership(subject: subject, generation: generation)
+    }
+
+    private func stepsMetric(owner: String = "user", date: Date = Date(timeIntervalSince1970: 1_790_000_000)) -> BodyMetrics {
+        BodyMetrics(
+            id: "body", userId: owner, date: date, weight: nil, weightUnit: "kg",
+            bodyFatPercentage: nil, bodyFatMethod: nil, muscleMass: nil, boneMass: nil,
+            notes: nil, photoUrl: nil, dataSource: "manual", createdAt: date, updatedAt: date
+        )
+    }
+
+    private func stepsRow(
+        id: String = "daily",
+        owner: String = "user",
+        date: Date,
+        steps: Int?,
+        updated: TimeInterval = 0
+    ) -> DailyMetrics {
+        DailyMetrics(
+            id: id, userId: owner, date: date, steps: steps, notes: nil,
+            createdAt: date, updatedAt: date.addingTimeInterval(updated)
+        )
+    }
+}
+
+@MainActor
+private final class HeldDailyStepsRead {
+    let started = XCTestExpectation(description: "Selected-day read admitted")
+    private var continuation: CheckedContinuation<[DailyMetrics], Never>?
+
+    func read() async -> [DailyMetrics] {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            started.fulfill()
+        }
+    }
+
+    func resume(with rows: [DailyMetrics]) throws {
+        let continuation = try XCTUnwrap(continuation)
+        self.continuation = nil
+        continuation.resume(returning: rows)
     }
 }

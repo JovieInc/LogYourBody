@@ -53,6 +53,7 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
     }
 
     func testEveryMetricHasAnAccentAndATitle() {
+        XCTAssertEqual(HomeV2ProgressMetric.allCases, [.bodyFat, .ffmi, .weight, .steps])
         for metric in HomeV2ProgressMetric.allCases {
             XCTAssertFalse(metric.title.isEmpty)
             XCTAssertFalse(metric.identifier.isEmpty)

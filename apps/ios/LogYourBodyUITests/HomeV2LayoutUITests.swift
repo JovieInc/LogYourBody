@@ -54,6 +54,7 @@ final class HomeV2LayoutUITests: XCTestCase {
         let app = launch(photo: false, state: "Offline")
         app.buttons["home_v2_log_weight"].tap()
         XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        selectWeightEntry(in: app)
         capture(app, named: "single-log-weight-heading")
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Log weight")).count, 1)
         XCTAssertTrue(app.segmentedControls.firstMatch.exists)
@@ -65,6 +66,7 @@ final class HomeV2LayoutUITests: XCTestCase {
         let app = launch(photo: false, state: "Offline")
         let originalWeight = app.descendants(matching: .any)["home_v2_weight_value"].label
         app.buttons["home_v2_log_weight"].tap()
+        selectWeightEntry(in: app)
         let field = app.textFields["home_v2_log_sheet_value"]
         XCTAssertTrue(field.waitForExistence(timeout: 8))
         XCTAssertTrue(app.datePickers["home_v2_log_sheet_date"].exists)
@@ -98,6 +100,7 @@ final class HomeV2LayoutUITests: XCTestCase {
     func testLogSheetAtLargestTextKeepsValueAndDetailsReachable() {
         let app = launch(photo: false, state: "Offline", largestText: true)
         app.buttons["home_v2_log_weight"].tap()
+        selectWeightEntry(in: app)
         let field = app.textFields["home_v2_log_sheet_value"]
         XCTAssertTrue(field.waitForExistence(timeout: 8))
         XCTAssertTrue(field.isHittable)
@@ -150,6 +153,8 @@ final class HomeV2LayoutUITests: XCTestCase {
         assertReachableByScrolling("home_v2_view_progress", in: app)
         app.buttons["home_v2_view_progress"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_progress_value"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["home_v2_progress_tab_body_fat"].isSelected,
+                      "Generic Progress opens body fat; explicit metric taps choose their own workspace")
         capture(app, named: "revealed-link-progress-destination")
     }
 
@@ -200,7 +205,8 @@ final class HomeV2LayoutUITests: XCTestCase {
                 XCTAssertTrue(bodyFat.label.contains("Entered by you"))
             }
             XCTAssertEqual(app.staticTexts["home_v2_weight_value"].label, "181.0")
-            XCTAssertEqual(app.staticTexts["home_v2_change_sentence"].label, "No 30-day trend yet")
+            XCTAssertFalse(app.staticTexts["home_v2_change_sentence"].exists,
+                           "A body-fat-led card must not restore the removed weight-trend headline")
             XCTAssertFalse(app.staticTexts["No change in 30 days"].exists)
             capture(app, named: photo ? "editorial-single-reading-photo" : "editorial-single-reading-body-fat")
             app.terminate()
@@ -215,6 +221,90 @@ final class HomeV2LayoutUITests: XCTestCase {
         capture(app, named: "editorial-empty-largest-text-scrolled")
         app.buttons["home_v2_log_weight"].tap()
         XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
+    }
+
+    func testCompositionHomeShowsBodyFatFirstAndHonestSupportingMetrics() {
+        for photo in [false, true] {
+            let app = launchEditorial(fixture: photo ? "-lybUITestHomeV2PhotoFixture" : "-lybUITestHomeV2Fixture")
+            let primary = app.descendants(matching: .any)[photo ? "home_v2_photo_stage" : "home_v2_body_fat_graphic"]
+            XCTAssertTrue(primary.waitForExistence(timeout: 30))
+            XCTAssertTrue(primary.label.contains("15.8"), primary.label)
+            XCTAssertTrue(primary.label.contains("Entered by you"), primary.label)
+            XCTAssertFalse(app.staticTexts["home_v2_change_sentence"].exists)
+            XCTAssertEqual(app.buttons["home_v2_log_weight"].label, "Log check-in")
+            capture(app, named: photo ? "composition-photo-primary" : "composition-data-primary")
+
+            assertReachableByScrolling("home_v2_ffmi_summary", in: app)
+            XCTAssertEqual(app.staticTexts["home_v2_ffmi_value"].label, "21.9")
+            assertReachableByScrolling("home_v2_weight_summary", in: app)
+            XCTAssertEqual(app.staticTexts["home_v2_weight_value"].label, "181.0")
+            assertReachableByScrolling("home_v2_steps_summary", in: app)
+            XCTAssertTrue(app.staticTexts["No step data"].waitForExistence(timeout: 8))
+            XCTAssertEqual(app.staticTexts["home_v2_steps_value"].label, "—",
+                           "The fixture has no daily step row; missing must not become zero or another day's total")
+            capture(app, named: photo ? "composition-photo-context" : "composition-data-context")
+            app.buttons["home_v2_log_weight"].tap()
+            assertBodyFatEntry(in: app, expected: "15.8")
+            app.terminate()
+        }
+    }
+
+    func testSupportingMetricTapsOpenTheirOwnProgressWorkspace() {
+        for metric in ["ffmi", "weight", "steps"] {
+            let app = launchEditorial()
+            XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
+            let identifier = "home_v2_\(metric)_summary"
+            assertReachableByScrolling(identifier, in: app)
+            app.buttons[identifier].tap()
+            let tab = app.buttons["home_v2_progress_tab_\(metric)"]
+            XCTAssertTrue(tab.waitForExistence(timeout: 8))
+            XCTAssertTrue(tab.isSelected, "The \(metric) action must not fall back to generic body-fat Progress")
+            XCTAssertTrue(app.descendants(matching: .any)["home_v2_progress_value"].exists)
+            capture(app, named: "composition-progress-\(metric)")
+            app.terminate()
+        }
+    }
+
+    func testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight() {
+        let app = launchEditorial()
+        let graphic = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+        XCTAssertTrue(graphic.waitForExistence(timeout: 30))
+        let weight = app.staticTexts["home_v2_weight_value"].label
+        app.buttons["home_v2_log_weight"].tap()
+        assertBodyFatEntry(in: app, expected: "15.8")
+        let field = app.textFields["Body fat percentage value"]
+        field.tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "17.0")
+        let save = app.buttons["home_v2_log_sheet_save"]
+        XCTAssertTrue(save.isEnabled)
+        XCTAssertTrue(save.isHittable)
+        save.tap()
+        let refreshed = expectation(
+            for: NSPredicate(format: "label CONTAINS %@", "17.0 percent"), evaluatedWith: graphic
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [refreshed], timeout: 8), .completed)
+        XCTAssertEqual(app.staticTexts["home_v2_weight_value"].label, weight)
+        XCTAssertEqual(app.staticTexts["home_v2_ffmi_value"].label, "21.6")
+        XCTAssertFalse(app.buttons["home_v2_undo"].exists)
+        XCTAssertFalse(app.buttons["home_v2_done"].exists)
+        XCTAssertFalse(app.staticTexts["home_v2_logged_sentence"].exists)
+        capture(app, named: "composition-body-fat-save-data")
+    }
+
+    private func assertBodyFatEntry(in app: XCUIApplication, expected: String) {
+        XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.segmentedControls.firstMatch.buttons["Body Fat"].isSelected)
+        let field = app.textFields["Body fat percentage value"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, expected)
+        XCTAssertTrue(app.buttons["Body fat measurement method"].exists)
+    }
+
+    private func selectWeightEntry(in app: XCUIApplication) {
+        let segment = app.segmentedControls.firstMatch.buttons["Weight"]
+        XCTAssertTrue(segment.waitForExistence(timeout: 8))
+        segment.tap()
+        XCTAssertTrue(segment.isSelected)
     }
 
     private func launchEditorial(

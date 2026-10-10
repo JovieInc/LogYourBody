@@ -4,17 +4,25 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testHorizontalPhotoDragPagesPixelsAndMetricsWithoutOpeningViewer() throws {
-        let app = launch()
+        let app = launch(withSteps: true)
         let stage = app.buttons["home_v2_photo_stage"]
         let caption = app.staticTexts["home_v2_photo_caption"]
         let weight = app.staticTexts["home_v2_weight_value"]
         XCTAssertTrue(caption.waitForExistence(timeout: 8))
+        let steps = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Steps · ")).firstMatch
+        XCTAssertTrue(steps.waitForExistence(timeout: 5))
         let firstCaption = caption.label, firstWeight = weight.label
+        assertStepCount(6_000, in: app)
+        let firstStepsLabel = steps.label
+        XCTAssertTrue(firstCaption.hasPrefix(firstStepsLabel.replacingOccurrences(of: "Steps · ", with: "")))
         try assertPhotoColor(stage, red: true)
         drag(stage, from: 0.85, to: 0.3)
         let moved = expectation(for: NSPredicate(format: "label != %@", firstCaption), evaluatedWith: caption)
         XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 5), .completed)
         XCTAssertNotEqual(weight.label, firstWeight)
+        XCTAssertNotEqual(steps.label, firstStepsLabel, "Steps must follow the selected day, not remain labeled Today")
+        XCTAssertTrue(caption.label.hasPrefix(steps.label.replacingOccurrences(of: "Steps · ", with: "")))
+        assertStepCount(8_000, in: app)
         XCTAssertTrue(app.buttons["home_v2_log_weight"].isHittable)
         XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
         try assertPhotoColor(stage, red: false)
@@ -25,6 +33,8 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         let returned = expectation(for: NSPredicate(format: "label == %@", firstCaption), evaluatedWith: caption)
         XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 5), .completed)
         XCTAssertEqual(weight.label, firstWeight)
+        XCTAssertEqual(steps.label, firstStepsLabel)
+        assertStepCount(6_000, in: app)
         XCTAssertTrue(app.buttons["home_v2_log_weight"].isHittable)
         XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
         try assertPhotoColor(stage, red: true)
@@ -50,6 +60,9 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         )
         XCTAssertEqual(XCTWaiter.wait(for: [missing], timeout: 5), .completed)
         XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
+        XCTAssertEqual(app.staticTexts["home_v2_ffmi_value"].label, "—",
+                       "FFMI must not borrow body fat from today's record")
+        XCTAssertEqual(app.staticTexts["home_v2_steps_value"].label, "—")
         capture(app, "timeline-selected-missing-body-fat")
     }
 
@@ -71,18 +84,66 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         capture(app, "timeline-ruler-largest-text")
     }
 
-    private func launch(largestText: Bool = false) -> XCUIApplication {
+    func testBodyFatCheckInUpdatesSelectedHistoricalPhotoWithoutChangingWeight() throws {
+        let app = launch()
+        let stage = app.buttons["home_v2_photo_stage"]
+        let caption = app.staticTexts["home_v2_photo_caption"]
+        let today = caption.label
+        drag(stage, from: 0.85, to: 0.3)
+        let moved = expectation(for: NSPredicate(format: "label != %@", today), evaluatedWith: caption)
+        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 5), .completed)
+        let ruler = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(ruler.waitForExistence(timeout: 5))
+        let selectedDate = try XCTUnwrap(ruler.value as? String)
+        try assertPhotoColor(stage, red: false)
+        let weight = app.staticTexts["home_v2_weight_value"].label
+        let oldFFMI = app.staticTexts["home_v2_ffmi_value"].label
+        app.buttons["home_v2_log_weight"].tap()
+        XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.segmentedControls.firstMatch.buttons["Body Fat"].isSelected)
+        let field = app.textFields["Body fat percentage value"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, "16.2", "The sheet must use the selected older check-in")
+        field.tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "16.0")
+        let save = app.buttons["home_v2_log_sheet_save"]
+        XCTAssertTrue(save.isEnabled)
+        XCTAssertTrue(save.isHittable)
+        save.tap()
+        let updated = expectation(for: NSPredicate(format: "label CONTAINS %@", "16.0"), evaluatedWith: stage)
+        XCTAssertEqual(XCTWaiter.wait(for: [updated], timeout: 8), .completed)
+        XCTAssertEqual(ruler.value as? String, selectedDate, "Saving body fat must retain the selected historical day")
+        try assertPhotoColor(stage, red: false)
+        XCTAssertEqual(app.staticTexts["home_v2_weight_value"].label, weight)
+        XCTAssertNotEqual(app.staticTexts["home_v2_ffmi_value"].label, oldFFMI)
+        XCTAssertFalse(app.buttons["home_v2_undo"].exists)
+        XCTAssertFalse(app.buttons["home_v2_done"].exists)
+        XCTAssertFalse(app.staticTexts["home_v2_logged_sentence"].exists)
+        capture(app, "timeline-body-fat-save-selected-photo")
+    }
+
+    private func launch(largestText: Bool = false, withSteps: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
             "-lybUITestHomeV2TimelineFixture", "-lybUITestHomeV2OfflineFixture", "-lybUITestSuppressWhatsNew"
         ]
+        if withSteps { app.launchArguments.append("-lybUITestHomeV2StepsFixture") }
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         }
         app.launch()
         XCTAssertTrue(app.buttons["home_v2_photo_stage"].waitForExistence(timeout: 30))
         return app
+    }
+
+    private func assertStepCount(_ expected: Int, in app: XCUIApplication) {
+        let value = app.staticTexts["home_v2_steps_value"]
+        let loaded = expectation(
+            for: NSPredicate(format: "label == %@", expected.formatted()), evaluatedWith: value
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 8), .completed,
+                       "Steps must be read from the selected fixture owner's actual daily row")
     }
 
     private func drag(_ stage: XCUIElement, from: CGFloat, to: CGFloat) {

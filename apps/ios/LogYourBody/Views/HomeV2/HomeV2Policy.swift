@@ -62,6 +62,7 @@ enum HomeV2Policy {
 enum HomeV2Copy {
     static let title = "Today"
     static let logWeight = "Log weight"
+    static let logCheckIn = "Log check-in"
     static let done = "Done"
     static let undo = "Undo"
     static let lastThirtyDays = "Last 30 days"
@@ -344,6 +345,29 @@ enum HomeV2Layout {
 /// Values for the editorial fallback come from stored readings, never photo
 /// appearance, a target, or interpolated chart caches.
 enum HomeV2EditorialPolicy {
+    /// Recorded values only. Current profile height is canonical centimeters;
+    /// another account's profile or an interpolated BF value cannot supply FFMI.
+    static func ffmi(in metric: BodyMetrics, owner: String?, heightCm: Double?) -> Double? {
+        guard metric.userId == owner, let weight = weight(in: metric),
+              let bodyFat = bodyFat(in: metric), let heightCm,
+              heightCm.isFinite, heightCm > 0,
+              let value = UnitConversion.calculateFFMI(
+                weightKg: weight, bodyFatPercentage: bodyFat.percentage, heightCm: heightCm
+              ), value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    static func weight(in metric: BodyMetrics) -> Double? {
+        guard let value = metric.weight, value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    static func displayWeight(in metric: BodyMetrics, system: MeasurementSystem) -> Double? {
+        guard let weight = weight(in: metric) else { return nil }
+        let value = system == .imperial ? weight.kgToLbs : weight
+        return value.isFinite ? value : nil
+    }
+
     struct BodyFatReading: Equatable {
         let percentage: Double
         let caption: String
