@@ -760,11 +760,11 @@ func scheduleObservedBodyMetricSync() {
     }
 
 @MainActor
-    func scheduleObservedBodyMetricSync(for currentUserId: String?) {
+    func scheduleObservedBodyMetricSync(for currentUserId: String?, debounce: TimeInterval = 5) {
         // Check if we should sync (not more than once per hour)
         let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
         let shouldSync: Bool = {
-            if let lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date {
+            if let lastSync = userDefaults.object(forKey: lastSyncKey) as? Date {
                 let minutesSinceLastSync = Date().timeIntervalSince(lastSync) / 60
                 return minutesSinceLastSync >= 60
             }
@@ -776,8 +776,17 @@ func scheduleObservedBodyMetricSync() {
         // Debounce sync requests to prevent multiple concurrent syncs.
         DispatchQueue.main.async { [weak self] in
             self?.syncDebounceTimer?.invalidate()
-            self?.syncDebounceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
-                UserDefaults.standard.set(Date(), forKey: lastSyncKey)
+            self?.syncDebounceTimer = Timer.scheduledTimer(withTimeInterval: debounce, repeats: false) { _ in
+                // The cooldown belongs to the account that scheduled this sync.
+                // A switch during the debounce must not burn that account's hour
+                // or import as whoever is signed in when the timer fires.
+                let signedInId = MainActor.assumeIsolated {
+                    (self?.importAuthManager ?? .shared).currentUser?.id
+                }
+                guard signedInId == currentUserId, let currentUserId, !currentUserId.isEmpty else {
+                    return
+                }
+                self?.userDefaults.set(Date(), forKey: lastSyncKey)
                 Task { [weak self] in
                     // Weight sync imports both weight and body fat for the recent window.
                     try? await self?.syncWeightFromHealthKitIncremental(days: 7)
