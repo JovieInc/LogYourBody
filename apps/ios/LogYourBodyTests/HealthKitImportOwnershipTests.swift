@@ -130,11 +130,16 @@ final class HealthKitImportOwnershipTests: XCTestCase {
     }
 
     private func waitForWeightQuery(_ query: HeldWeightImportQuery) async {
-        let deadline = Date().addingTimeInterval(15)
+        // This test is @MainActor. Task.yield() and Task.sleep resume it at
+        // the test's priority, ahead of triggerFullHealthKitSyncIfNeeded's
+        // Task.detached(priority: .background) hop into MainActor.run. A busy
+        // runner then never starts the weight query. Sleep off the main actor
+        // so that import can enter. The deadline is only a ceiling.
+        let deadline = Date().addingTimeInterval(30)
         while !query.hasStarted, Date() < deadline {
-            await Task.yield()
-            if query.hasStarted { return }
-            try? await Task.sleep(nanoseconds: 20_000_000)
+            await Task.detached(priority: .background) {
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }.value
         }
     }
 
@@ -460,9 +465,8 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         }
         await fulfillment(of: [joinerStarted], timeout: 3)
         // The shipped import is a background detached task and must hop to the main actor
-        // before it queries weight. fulfillment(of:) can occupy that actor for the whole
-        // timeout, so a busy runner records "Synthetic weight query started" as unmet
-        // even though the task has not failed. Yield until the query starts.
+        // before it queries weight. Waiting on this actor resumes the test first, so a
+        // busy runner records the weight query as unmet even though the task has not failed.
         await waitForWeightQuery(first)
         XCTAssertTrue(
             first.hasStarted,
