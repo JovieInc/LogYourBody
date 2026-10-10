@@ -177,6 +177,95 @@ describe('authenticated training API', () => {
     expect((await handlers.logSet(request('POST', 'log-set', 'token-b', set))).status).toBe(409);
   });
 
+  it('keeps the first active-session set immutable across conflicts and delayed retries', async () => {
+    const { handlers, records, setNow } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const set = {
+      sessionId: session.id,
+      exerciseId: session.exercises[0].id,
+      setNumber: 1,
+      reps: 10,
+      loadKg: 20,
+      rir: 3,
+    };
+    const first = await handlers.logSet(request('POST', 'log-set', 'token-a', set));
+    expect(first.status).toBe(201);
+    const firstBody = await first.json();
+    setNow('2026-01-10T12:01:00.000Z');
+    const conflict = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', {
+        ...set,
+        reps: 8,
+        loadKg: 25,
+      }),
+    );
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toMatchObject({ error: 'set_conflict' });
+    setNow('2026-01-10T12:02:00.000Z');
+    const retry = await handlers.logSet(request('POST', 'log-set', 'token-a', set));
+    expect(retry.status).toBe(201);
+    await expect(retry.json()).resolves.toMatchObject({
+      log: firstBody.log,
+      sessionComplete: false,
+    });
+    expect((await records.pull('subject-a', 'logged_sets')).records).toEqual([firstBody.log]);
+  });
+
+  it.each([false, true])(
+    'atomically resolves concurrent set submissions (identical=%s)',
+    async (identical) => {
+      const { handlers, records } = makeHarness();
+      await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+      const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+      const set = {
+        sessionId: session.id,
+        exerciseId: session.exercises[0].id,
+        setNumber: 1,
+        reps: 10,
+        loadKg: 20,
+        rir: 3,
+      };
+      const responses = await Promise.all([
+        handlers.logSet(request('POST', 'log-set', 'token-a', set)),
+        handlers.logSet(
+          request('POST', 'log-set', 'token-a', {
+            ...set,
+            reps: identical ? 10 : 8,
+          }),
+        ),
+      ]);
+      expect(responses.map((response) => response.status).sort()).toEqual(
+        identical ? [201, 201] : [201, 409],
+      );
+      const bodies = await Promise.all(responses.map((response) => response.json()));
+      const accepted = bodies.filter((body) => body.log);
+      const stored = (await records.pull('subject-a', 'logged_sets')).records;
+      expect(stored).toHaveLength(1);
+      for (const body of accepted) expect(body.log).toEqual(stored[0]);
+      if (!identical) expect(bodies.find((body) => body.error)?.error).toBe('set_conflict');
+    },
+  );
+
+  it('fails safely when atomic set insertion is unavailable', async () => {
+    const { handlers, records } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    Object.defineProperty(records, 'insertTrainingSet', { value: undefined });
+    const response = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', {
+        sessionId: session.id,
+        exerciseId: session.exercises[0].id,
+        setNumber: 1,
+        reps: 10,
+        loadKg: 20,
+        rir: 3,
+      }),
+    );
+    expect(response.status).toBe(503);
+    expect((await records.pull('subject-a', 'logged_sets')).records).toEqual([]);
+  });
+
   it('uses feedback conservatively and revokes all program records on opt-out', async () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));

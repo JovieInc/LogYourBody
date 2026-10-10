@@ -30,6 +30,7 @@ export type LogSetResult =
   | { kind: 'session_not_found' }
   | { kind: 'session_not_active' }
   | { kind: 'set_not_in_session' }
+  | { kind: 'set_conflict' }
   | { kind: 'rejected' };
 
 /** Stores one set against the subject's active session. Shared by the mobile API and MCP. */
@@ -94,9 +95,20 @@ export async function logTrainingSet(input: {
     rir: set.rir,
     completedAt,
   };
-  const saved = await records.push(subject, 'logged_sets', [log]);
-  if (saved.rejected_ids.includes(logId)) return { kind: 'rejected' };
-  const allLogs = [...snapshot.logs, log];
+  if (!records.insertTrainingSet) return { kind: 'rejected' };
+  const saved = await records.insertTrainingSet(subject, log);
+  if (!saved || saved.id !== logId || saved.deleted_at !== null || saved.record_type !== 'set_log')
+    return { kind: 'rejected' };
+  if (
+    saved.sessionId !== set.sessionId ||
+    saved.exerciseId !== set.exerciseId ||
+    saved.setNumber !== set.setNumber ||
+    saved.reps !== set.reps ||
+    saved.loadKg !== set.loadKg ||
+    saved.rir !== set.rir
+  )
+    return { kind: 'set_conflict' };
+  const allLogs = [...snapshot.logs.filter((prior) => prior.id !== logId), saved];
   const sessionComplete = session.exercises.every((exercise) =>
     Array.from({ length: exercise.sets }, (_, index) => index + 1).every((setNumber) =>
       allLogs.some(
@@ -113,7 +125,7 @@ export async function logTrainingSet(input: {
     ]);
     if (completion.rejected_ids.includes(session.id)) return { kind: 'rejected' };
   }
-  return { kind: 'logged', log: saved.records[0] ?? log, sessionComplete };
+  return { kind: 'logged', log: saved, sessionComplete };
 }
 
 export type FeedbackInput = Pick<

@@ -74,6 +74,30 @@ export function createNeonNativeProductRecords(
   database: NeonQueryFunction<false, false> = getDatabase(),
 ): NativeProductRecordsPort {
   return {
+    async insertTrainingSet(subject, record) {
+      const id = recordId(record);
+      if (!id) return null;
+      const inserted = (await database.query(
+        `insert into public.native_records (
+           collection, id, user_subject, payload, deleted_at, updated_at
+         ) values ('logged_sets', $1, $2, $3::jsonb, null, now())
+         on conflict (collection, id) do nothing
+         returning id, payload, deleted_at, updated_at`,
+        [id, subject, JSON.stringify(payloadForInsert(record))],
+      )) as NativeRecordRow[];
+      if (inserted[0]) return mapRecord(subject, inserted[0]);
+
+      // A conflicting insert waits for the winner. Read it in a fresh statement
+      // so its committed row is visible; never update or revive an existing set.
+      const existing = (await database.query(
+        `select id, payload, deleted_at, updated_at from public.native_records
+         where collection = 'logged_sets' and id = $1
+           and user_subject = $2 and deleted_at is null`,
+        [id, subject],
+      )) as NativeRecordRow[];
+      return existing[0] ? mapRecord(subject, existing[0]) : null;
+    },
+
     async push(subject, collection, records) {
       const accepted: NativeProductRecord[] = [];
       const rejectedIds: string[] = [];
@@ -193,6 +217,8 @@ export function createNeonNativeProductRecords(
 }
 
 export const neonNativeProductRecords: NativeProductRecordsPort = {
+  insertTrainingSet: (subject, record) =>
+    createNeonNativeProductRecords().insertTrainingSet!(subject, record),
   push: (subject, collection, records) =>
     createNeonNativeProductRecords().push(subject, collection, records),
   pull: (subject, collection, input) =>
