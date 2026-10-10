@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { hasSafeReportedMeasurements } from '@/lib/ports/reported-measurements';
+
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import type {
   NativeProductRecord,
@@ -81,12 +83,24 @@ export function createNeonNativeProductRecords(
       for (const record of records) {
         const id = recordId(record);
         if (!id) continue;
+        if (collection === 'dexa_results' && !hasSafeReportedMeasurements(record)) {
+          rejectedIds.push(id);
+          continue;
+        }
         const rows = (await database.query(
           `insert into public.native_records (
              collection, id, user_subject, payload, deleted_at, updated_at
            ) values ($1, $2, $3, $4::jsonb, null, now())
            on conflict (collection, id) do update set
-             payload = excluded.payload,
+             payload = case
+               when excluded.collection = 'dexa_results'
+                 and not (excluded.payload ? 'reported_measurements')
+                 and public.native_records.payload ? 'reported_measurements'
+               then excluded.payload || jsonb_build_object(
+                 'reported_measurements', public.native_records.payload->'reported_measurements'
+               )
+               else excluded.payload
+             end,
              deleted_at = null,
              updated_at = now()
            where public.native_records.user_subject = excluded.user_subject
