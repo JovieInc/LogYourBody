@@ -26,7 +26,10 @@ Tools:
 
 `log_sets` only adds sets. It never overwrites a logged set and never logs beyond the
 engine's plan, so `destructiveHint: false` is accurate. It previews the plan before
-starting a session, so a misheard exercise name writes nothing.
+starting a session, so a misheard exercise name writes nothing. The shared set writer
+atomically keeps the first saved value for a session/exercise/set identity. Identical
+retries return that original record; different values return `set_conflict` (HTTP 409
+on the mobile route). A correction requires a separate, explicit update contract.
 
 Recovery check-ins contribute one latest observation per session, including legacy
 records and concurrent duplicate writes. Repeating that session's latest identical
