@@ -1992,26 +1992,18 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
 
-        let stage = app.descendants(matching: .any)["home_v2_photo_stage"]
-        XCTAssertTrue(stage.waitForExistence(timeout: 30), "The Home timeline stage is always the hero")
-
-        let plate = app.descendants(matching: .any)["home_v2_editorial_plate"]
-        XCTAssertTrue(
-            plate.waitForExistence(timeout: 5),
-            "Without a photo the day keeps the 4:5 editorial plate, never an empty avatar state"
-        )
-        XCTAssertGreaterThanOrEqual(stage.frame.width, app.frame.width - 1, "The timeline runs edge to edge")
-
+        let card = app.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 30), "Without a photo, saved data fills the same editorial card")
+        let bodyFat = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+        XCTAssertTrue(bodyFat.exists)
+        XCTAssertTrue(bodyFat.label.contains("15.8 percent"))
         let value = app.descendants(matching: .any)["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
-        XCTAssertGreaterThanOrEqual(value.frame.minY, stage.frame.maxY - 1, "The number sits below the visual")
-
-        XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_timeline_scrubber"].waitForExistence(timeout: 5),
-            "The bottom scrubber browses metric-only history"
-        )
+        XCTAssertGreaterThanOrEqual(value.frame.minY, card.frame.maxY - 1, "Supporting weight sits below the card")
+        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Date ranges live in Progress")
         let viewProgress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 5), "Progress is one disclosure away")
+        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, value.frame.maxY - 1)
 
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")
@@ -2063,7 +2055,7 @@ final class LogYourBodyUITests: XCTestCase {
             evaluatedWith: caption
         )
         XCTAssertEqual(
-            wait(for: [moved], timeout: 5),
+            XCTWaiter.wait(for: [moved], timeout: 5),
             .completed,
             "Swiping left moves one day back through body history"
         )
@@ -2076,7 +2068,7 @@ final class LogYourBodyUITests: XCTestCase {
             evaluatedWith: caption
         )
         XCTAssertEqual(
-            wait(for: [returned], timeout: 5),
+            XCTWaiter.wait(for: [returned], timeout: 5),
             .completed,
             "Swiping right returns to the latest day"
         )
@@ -2103,7 +2095,7 @@ final class LogYourBodyUITests: XCTestCase {
             evaluatedWith: caption
         )
         XCTAssertEqual(
-            wait(for: [moved], timeout: 5),
+            XCTWaiter.wait(for: [moved], timeout: 5),
             .completed,
             "Scrubbing resolves to the same selected day a swipe would reach"
         )

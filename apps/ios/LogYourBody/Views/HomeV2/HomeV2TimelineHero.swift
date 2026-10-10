@@ -1,140 +1,230 @@
-//
-// HomeV2TimelineHero.swift
-// LogYourBody
-//
 import SwiftUI
 
-/// Order helpers shared by the pager and the scrubber (JOV-6016): both resolve
-/// to the same bodyMetrics index so swiping and scrubbing never disagree on the
-/// selected day.
+/// Stable entry identity is shared by the pager, ruler and dashboard's index adapter.
 enum HomeV2TimelinePolicy {
-    /// Day indices oldest first — the order the scrubber draws time.
-    static func chronologicalIndices(in bodyMetrics: [BodyMetrics]) -> [Int] {
-        bodyMetrics.indices.sorted { bodyMetrics[$0].date < bodyMetrics[$1].date }
+    struct EntryID: Hashable {
+        let owner: String
+        let record: String
+        init(_ metric: BodyMetrics) { owner = metric.userId; record = metric.id }
     }
 
-    /// The scrubber position for a selected index (0-based, oldest first).
+    struct Selection: Equatable {
+        let id: EntryID
+        let date: Date
+        init(_ metric: BodyMetrics) { id = EntryID(metric); date = metric.date }
+    }
+
+    /// Rebuilt when published history changes, never on the scrub hot path.
+    struct Snapshot {
+        let metrics: [BodyMetrics]
+        let chronologicalDates: [Date]
+        private let sourceOrder: [EntryID]
+        private let weightChanges: [EntryID: Double]
+
+        init(metrics: [BodyMetrics] = [], owner: String? = nil, calendar: Calendar = .current) {
+            self.metrics = metrics.filter { $0.userId == owner }.sorted {
+                $0.date == $1.date ? $0.id > $1.id : $0.date > $1.date
+            }
+            chronologicalDates = self.metrics.reversed().map(\.date)
+            sourceOrder = metrics.map(EntryID.init)
+            weightChanges = Self.weightChanges(in: self.metrics, calendar: calendar)
+        }
+
+        /// The @Published callback runs before the view model's stored array changes.
+        /// Resolve its legacy index against this exact publication, never that older array.
+        func sourceIndex(for id: EntryID) -> Int? { sourceOrder.firstIndex(of: id) }
+        func selection(atSourceIndex index: Int) -> Selection? {
+            guard sourceOrder.indices.contains(index) else { return nil }
+            return metric(for: sourceOrder[index]).map(Selection.init)
+        }
+
+        func weightDeltaKilograms30d(for id: EntryID) -> Double? { weightChanges[id] }
+
+        func weightChangeSentence(for id: EntryID, system: MeasurementSystem) -> String {
+            let delta = weightChanges[id].map { system == .imperial ? $0 * 2.20462 : $0 }
+            return HomeV2Copy.changeSentence(
+                delta: delta.flatMap { $0.isFinite ? $0 : nil }, unit: HomeV2Copy.displayUnit(system)
+            )
+        }
+
+        /// Two moving bounds cache each selected date's actual 30-day readings in
+        /// one pass after the history sort. Future weights can never enter its window.
+        private static func weightChanges(in metrics: [BodyMetrics], calendar: Calendar) -> [EntryID: Double] {
+            let weights = metrics.reversed().compactMap { metric -> HomeV2EditorialPolicy.WeightReading? in
+                guard let weight = metric.weight, weight.isFinite, weight > 0 else { return nil }
+                return .init(id: metric.id, date: metric.date, kilograms: weight)
+            }
+            var changes: [EntryID: Double] = [:]
+            var lower = 0, upper = 0
+            for metric in metrics.reversed() {
+                guard let start = calendar.date(byAdding: .day, value: -30, to: metric.date) else { continue }
+                while upper < weights.count, weights[upper].date <= metric.date { upper += 1 }
+                while lower < upper, weights[lower].date < start { lower += 1 }
+                guard upper - lower >= 2 else { continue }
+                let delta = weights[upper - 1].kilograms - weights[lower].kilograms
+                if delta.isFinite { changes[EntryID(metric)] = delta }
+            }
+            return changes
+        }
+
+        func reconcile(_ previous: Selection?) -> Selection? {
+            guard let latest = metrics.first else { return nil }
+            guard let previous, previous.id.owner == latest.userId else { return Selection(latest) }
+            if let retained = metrics.first(where: { EntryID($0) == previous.id }) { return Selection(retained) }
+            // On deletion, retain the closest surviving date; an equal-distance tie goes newer.
+            return metrics.min {
+                abs($0.date.timeIntervalSince(previous.date)) < abs($1.date.timeIntervalSince(previous.date))
+            }.map(Selection.init)
+        }
+
+        func metric(for id: EntryID) -> BodyMetrics? { metrics.first { EntryID($0) == id } }
+        func index(for id: EntryID) -> Int? { metrics.firstIndex { EntryID($0) == id } }
+        func chronologicalPosition(for id: EntryID) -> Int {
+            index(for: id).map { metrics.count - 1 - $0 } ?? 0
+        }
+        func id(atChronologicalPosition position: Int) -> EntryID? {
+            guard chronologicalDates.indices.contains(position) else { return nil }
+            return EntryID(metrics[metrics.count - 1 - position])
+        }
+        func adjusted(_ id: EntryID, newer: Bool) -> EntryID? {
+            guard index(for: id) != nil else { return nil }
+            let position = chronologicalPosition(for: id) + (newer ? 1 : -1)
+            return self.id(atChronologicalPosition: position)
+        }
+    }
+
+    static func chronologicalIndices(in bodyMetrics: [BodyMetrics]) -> [Int] {
+        bodyMetrics.indices.sorted {
+            let first = bodyMetrics[$0], second = bodyMetrics[$1]
+            return first.date == second.date ? first.id < second.id : first.date < second.date
+        }
+    }
     static func chronologicalPosition(of index: Int, in bodyMetrics: [BodyMetrics]) -> Int {
         chronologicalIndices(in: bodyMetrics).firstIndex(of: index) ?? 0
     }
-
-    /// The index at a scrubber position, or nil when out of range.
     static func index(at position: Int, in bodyMetrics: [BodyMetrics]) -> Int? {
         let order = chronologicalIndices(in: bodyMetrics)
         return order.indices.contains(position) ? order[position] : nil
     }
+
+    static func bodyFatSentence(for metric: BodyMetrics) -> String {
+        guard let reading = HomeV2EditorialPolicy.bodyFat(in: metric) else {
+            return "Body fat not logged for this day."
+        }
+        return "Body fat \(String(format: "%.1f", reading.percentage))% · \(reading.caption)"
+    }
 }
 
-/// The signature Home stage (JOV-6016): one full-width 4:5 page per day.
-/// Days with a photo show the plate and tap through to the viewer; days
-/// without one render the editorial plate so the timeline stays browsable
-/// through metric-only history. Swiping left travels back in time because
-/// `bodyMetrics` is newest-first.
+/// The existing timeline pager, displaying the approved original-photo/data card.
 struct HomeV2TimelinePager: View {
-    let bodyMetrics: [BodyMetrics]
-    @Binding var selectedIndex: Int
+    let snapshot: HomeV2TimelinePolicy.Snapshot
+    @Binding var selectedID: HomeV2TimelinePolicy.EntryID
     let size: CGSize
+    let unit: String
     let dateText: (BodyMetrics) -> String
     let onOpenPhoto: () -> Void
 
-    private var selected: BodyMetrics? {
-        bodyMetrics.indices.contains(selectedIndex) ? bodyMetrics[selectedIndex] : nil
-    }
-
     var body: some View {
-        TabView(selection: $selectedIndex) {
-            ForEach(bodyMetrics.indices, id: \.self) { index in
-                page(for: bodyMetrics[index])
-                    .tag(index)
+        TabView(selection: $selectedID) {
+            ForEach(snapshot.metrics) { metric in
+                HomeV2TimelinePage(metric: metric, metrics: snapshot.metrics, size: size, unit: unit,
+                                   dateText: dateText(metric), onOpenPhoto: onOpenPhoto)
+                    .tag(HomeV2TimelinePolicy.EntryID(metric))
+                    .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .frame(width: size.width, height: size.height)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("Swipe left or right to move through your history")
-        .accessibilityIdentifier("home_v2_photo_stage")
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Body timeline")
+        .accessibilityValue("Entry \(snapshot.chronologicalPosition(for: selectedID) + 1) of \(snapshot.metrics.count)")
+        .accessibilityHint("Adjust up for newer entries or down for older entries")
+        .accessibilityIdentifier("home_v2_timeline_pager")
         .accessibilityAdjustableAction { direction in
             switch direction {
-            case .increment:
-                if selectedIndex + 1 < bodyMetrics.count { selectedIndex += 1 }
-            case .decrement:
-                if selectedIndex > 0 { selectedIndex -= 1 }
-            @unknown default:
-                break
+            case .increment: adjust(newer: true)
+            case .decrement: adjust(newer: false)
+            @unknown default: break
             }
         }
     }
 
-    @ViewBuilder
-    private func page(for metric: BodyMetrics) -> some View {
-        if PhotoTimelineHUDPolicy.hasUsablePhoto(metric), let photoURL = metric.photoUrl {
-            SubjectPlateView(urlString: photoURL, size: size)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: onOpenPhoto)
-        } else {
-            HomeV2EditorialPlate(dateText: dateText(metric), size: size)
-        }
-    }
-
-    private var accessibilityLabel: String {
-        guard let selected else { return "Body timeline" }
-        return PhotoTimelineHUDPolicy.hasUsablePhoto(selected)
-            ? "Progress photo, \(dateText(selected))"
-            : "No photo, \(dateText(selected))"
+    private func adjust(newer: Bool) {
+        if let next = snapshot.adjusted(selectedID, newer: newer) { selectedID = next }
     }
 }
 
-/// The no-photo page of the timeline: the same 4:5 geometry with an editorial
-/// treatment — quiet gradient shell, the ruler motif, and the day — so a
-/// metric-only history never reads as an empty avatar state.
-struct HomeV2EditorialPlate: View {
-    let dateText: String
+/// Image bytes are displayed only for their exact owner/URL. A replacement or
+/// failed load keeps the selected record's real-data fallback, never the previous photo.
+private struct HomeV2TimelinePage: View {
+    let metric: BodyMetrics
+    let metrics: [BodyMetrics]
     let size: CGSize
+    let unit: String
+    let dateText: String
+    let onOpenPhoto: () -> Void
+    @State private var editorialPhoto: (key: String, image: UIImage?)?
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [HomeV2Tokens.Colors.elevated, HomeV2Tokens.Colors.shell],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            rulerMotif
-
-            VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight / 2) {
-                Text(dateText)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .light, relativeTo: .largeTitle)
-                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                Text(HomeV2Copy.noPhotoThisDay)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
-                    .foregroundStyle(HomeV2Tokens.Colors.quiet)
+        Group {
+            if PhotoTimelineHUDPolicy.hasUsablePhoto(metric), let photoURL = metric.photoUrl {
+                photo(url: photoURL)
+            } else {
+                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit)
+                    .frame(width: size.width, height: size.height)
+                    .accessibilityIdentifier("home_v2_metric_first")
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            .padding(HomeV2Tokens.Space.margin)
+        }
+        .frame(width: size.width, height: size.height)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home_v2_editorial_card")
+        .id(HomeV2TimelinePolicy.EntryID(metric))
+    }
+
+    private func photo(url: String) -> some View {
+        let key = metric.userId + "|" + url
+        let failed = editorialPhoto?.key == key && editorialPhoto?.image == nil
+        return ZStack(alignment: .top) {
+            if let snapshot = editorialPhoto, snapshot.key == key, let image = snapshot.image {
+                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill)
+            } else {
+                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit)
+                Text(failed ? "Photo unavailable" : "Loading photo…")
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                    .padding(HomeV2Tokens.Space.tight)
+                    .background(HomeV2Tokens.Colors.shell)
+            }
         }
         .frame(width: size.width, height: size.height)
         .clipped()
+        .contentShape(Rectangle())
+        .gesture(HomeV2PhotoTap(onTap: onOpenPhoto))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("No photo for \(dateText)")
-        .accessibilityIdentifier("home_v2_editorial_plate")
-    }
-
-    /// The timeline's own marks as the quiet centerpiece, echoing the scrubber.
-    private var rulerMotif: some View {
-        HStack(alignment: .center, spacing: HomeV2Tokens.Space.tight) {
-            motifTick(height: 16)
-            motifTick(height: 32)
-            motifTick(height: 16)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction(.default, onOpenPhoto)
+        .accessibilityLabel(failed ? "Photo unavailable. Saved measurements shown. \(dateText)" : "Progress photo, \(dateText)")
+        .accessibilityHint("Open the photo")
+        .accessibilityIdentifier("home_v2_photo_stage")
+        .task(id: key) {
+            let image = await ImageCacheService.shared.loadImage(from: url)
+            guard !Task.isCancelled else { return }
+            editorialPhoto = (key, image)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityHidden(true)
+    }
+}
+
+/// A real tap recognizer fails when the finger drags. A plain button can activate
+/// at release during a horizontal card gesture before the pager has taken over.
+private struct HomeV2PhotoTap: UIGestureRecognizerRepresentable {
+    let onTap: () -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UITapGestureRecognizer {
+        UITapGestureRecognizer()
     }
 
-    private func motifTick(height: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 1, style: .continuous)
-            .fill(HomeV2Tokens.Colors.borderStrong)
-            .frame(width: 2, height: height)
+    func handleUIGestureRecognizerAction(_ recognizer: UITapGestureRecognizer, context: Context) {
+        if recognizer.state == .ended { onTap() }
     }
 }
 
