@@ -2,17 +2,12 @@ name: Mac Runner Heartbeat
 # Shared JovieInc Mac pool; no checkout or secrets in the heartbeat probe.
 
 on:
-  # GitHub cron delivery is best-effort. Mac-bound callers treat a stale,
-  # queued, or in-progress probe as down and fall back to hosted macOS, so a
-  # busy, asleep, or offline Mac never blocks the merge queue.
-  push:
-    branches: [main]
-  schedule:
-    - cron: '*/10 * * * *'
+  # Qualification is manual and independent of required CI. A heartbeat does
+  # not reserve capacity or provide failover after selecting self-hosted labels.
   workflow_dispatch:
     inputs:
       verify-ios-setup:
-        description: Verify setup-ios-build on a self-hosted Mac before enabling MAC_RUNNER.
+        description: Verify setup-ios-build before considering optional self-hosted capacity.
         type: boolean
         default: false
 

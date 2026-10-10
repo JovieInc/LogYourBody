@@ -21,64 +21,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'merge_group' && github.ref != 'refs/heads/main' }}
 
 jobs:
-  mac-runner-route:
-    name: Mac Runner Route
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      actions: read
-      contents: read
-    outputs:
-      runner_class: ${{ steps.route.outputs.runner_class }}
-    steps:
-      - name: Checkout trusted runner routing policy
-        if: ${{ vars.MAC_RUNNER == 'on' }}
-        continue-on-error: true
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 1
-          sparse-checkout: |
-            .github/scripts/await-runner-heartbeat.sh
-            .github/scripts/query-runner-heartbeat.sh
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-
-      - name: Query Mac runner heartbeat
-        id: heartbeat
-        if: ${{ vars.MAC_RUNNER == 'on' }}
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          HEARTBEAT_WORKFLOW: mac-runner-heartbeat.yml
-          HEARTBEAT_MAX_AGE_SECONDS: '1500'
-          HEARTBEAT_API_TIMEOUT_SECONDS: '5'
-          HEARTBEAT_POLL_ATTEMPTS: '1'
-          HEARTBEAT_POLL_INTERVAL_SECONDS: '1'
-        run: |
-          set -uo pipefail
-          helper='.github/scripts/await-runner-heartbeat.sh'
-          if [ -x "$helper" ]; then
-            timeout 60s "$helper" || true
-          fi
-          exit 0
-
-      - name: Select Mac runner route
-        id: route
-        env:
-          HEARTBEAT_HEALTH: ${{ steps.heartbeat.outputs.health }}
-          HEARTBEAT_EVIDENCE: ${{ steps.heartbeat.outputs.evidence }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          runner_class='hosted'
-          if [ "$HEARTBEAT_HEALTH" = 'up' ]; then
-            runner_class='mac'
-          fi
-          echo "runner_class=$runner_class" >> "$GITHUB_OUTPUT"
-          echo "::notice::LogYourBody iOS runner route: $runner_class — ${HEARTBEAT_EVIDENCE:-not probed}"
-
   mac-runner-routing-tests:
     name: Mac Runner Routing Tests
     runs-on: ubuntu-latest
@@ -208,8 +150,9 @@ jobs:
 
   ios:
     name: iOS
-    runs-on: ${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
-    needs: [detect-changes, mac-runner-route]
+    # Required CI keeps hosted capacity even if a shared Mac is busy or disappears.
+    runs-on: macos-15
+    needs: detect-changes
     if: needs.detect-changes.outputs.ios == 'true'
     timeout-minutes: 40
     steps:
@@ -258,8 +201,9 @@ jobs:
 
   ios_quality:
     name: iOS Launch Quality Gate
-    runs-on: ${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
-    needs: [detect-changes, mac-runner-route]
+    # Required CI keeps hosted capacity even if a shared Mac is busy or disappears.
+    runs-on: macos-15
+    needs: detect-changes
     if: needs.detect-changes.outputs.ios == 'true'
     # Setup plus one 40-minute audit plus the 8-minute performance cap.
     timeout-minutes: 52

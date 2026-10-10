@@ -39,27 +39,6 @@ def _job_block(workflow: str, job_name: str) -> str:
     return "\n".join(lines)
 
 
-def _step_run_script(workflow: str, job_name: str, step_name: str) -> str:
-    job = _job_block(workflow, job_name)
-    marker = f"      - name: {step_name}\n"
-    assert marker in job
-    step = job.split(marker, 1)[1]
-    run_marker = "        run: |\n"
-    assert run_marker in step
-    body = step.split(run_marker, 1)[1]
-    lines: list[str] = []
-    for line in body.splitlines():
-        if line.startswith("      - "):
-            break
-        if not line:
-            lines.append("")
-            continue
-        if not line.startswith("          "):
-            break
-        lines.append(line[10:])
-    return "\n".join(lines) + "\n"
-
-
 def _fake_gh(tmp_path: Path) -> Path:
     fake = tmp_path / "gh"
     fake.write_text(
@@ -611,44 +590,24 @@ def test_wrong_run_identity_or_job_attestation_degrades_to_hosted(
         assert outputs["health"] == "down"
 
 
-def test_route_selects_mac_only_from_healthy_evidence(tmp_path: Path) -> None:
-    script = _step_run_script('ci.yml', 'mac-runner-route', 'Select Mac runner route')
-    for health, expected in [('up', 'mac'), ('down', 'hosted'), ('', 'hosted'), ('unknown', 'hosted')]:
-        output = tmp_path / f'output-{expected}-{health}'
-        result = subprocess.run(
-            ['bash', '-c', script], text=True, capture_output=True,
-            env={**os.environ, 'GITHUB_OUTPUT': str(output), 'HEARTBEAT_HEALTH': health,
-                 'HEARTBEAT_EVIDENCE': 'fixture evidence'}, check=False, pass_fds=_coverage_fds(),
-        )
-        assert result.returncode == 0, result.stderr
-        assert output.read_text().strip() == f'runner_class={expected}'
-
-
-def test_missing_trusted_helper_keeps_hosted_fallback(tmp_path: Path) -> None:
-    script = _step_run_script('ci.yml', 'mac-runner-route', 'Query Mac runner heartbeat')
-    result = subprocess.run(['bash', '-c', script], cwd=tmp_path,
-                            text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
-    assert result.returncode == 0, result.stderr
-
-
-def test_both_ios_jobs_use_opt_in_trusted_route_and_retain_quality_gates() -> None:
-    route = _job_block('ci.yml', 'mac-runner-route')
-    assert route.count("if: ${{ vars.MAC_RUNNER == 'on' }}") == 2
-    assert 'ref: main' in route
-    assert 'persist-credentials: false' in route
-    assert 'actions: read' in route
-    assert 'actions: write' not in route
-    assert 'secrets.' not in route
-    assert route.count('continue-on-error: true') == 2
-    assert "HEARTBEAT_API_TIMEOUT_SECONDS: '5'" in route
-    assert "HEARTBEAT_POLL_ATTEMPTS: '1'" in route
-    assert 'timeout 60s "$helper"' in route
+def test_required_ios_jobs_ignore_mac_opt_in_and_heartbeat_state() -> None:
+    workflow = (_WORKFLOWS / 'ci.yml').read_text()
+    # No preflight state or repository opt-in can divert or delay required CI.
+    # Literal hosted labels also cover a Mac disappearing after a fresh probe.
+    assert 'vars.MAC_RUNNER' not in workflow
+    assert '  mac-runner-route:' not in workflow
     for name in ['ios', 'ios_quality']:
         job = _job_block('ci.yml', name)
-        assert 'needs: [detect-changes, mac-runner-route]' in job
-        assert '''runs-on: ${{ needs.mac-runner-route.outputs.runner_class == 'mac' && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}''' in job
+        assert '    runs-on: macos-15' in job.splitlines()
+        assert '    needs: detect-changes' in job.splitlines()
+        assert 'heartbeat' not in job
+        assert 'self-hosted' not in job
+        assert 'runner_class' not in job
         assert 'uses: ./.github/actions/setup-ios-build' in job
         assert "if: needs.detect-changes.outputs.ios == 'true'" in job
+
+
+def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> None:
     assert 'bundle exec fastlane ci_ios' in _job_block('ci.yml', 'ios')
     assert 'ci_test_unit' in _job_block('ci.yml', 'ios')
     assert 'launch-quality-audit.sh' in _job_block('ci.yml', 'ios_quality')
@@ -656,19 +615,26 @@ def test_both_ios_jobs_use_opt_in_trusted_route_and_retain_quality_gates() -> No
     summary = _job_block('ci.yml', 'ci-summary')
     assert 'assert_expected_result "iOS Launch Quality Gate"' in summary
     assert 'mac-runner-routing-tests' in summary
+    assert 'setup-canary' not in summary
+    assert 'heartbeat' not in summary
 
 
 def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
     workflow = (_WORKFLOWS / 'mac-runner-heartbeat.yml').read_text()
     heartbeat = _job_block('mac-runner-heartbeat.yml', 'heartbeat')
     canary = _job_block('mac-runner-heartbeat.yml', 'setup-canary')
-    assert 'schedule:' in workflow
+    assert 'schedule:' not in workflow
+    assert '  push:' not in workflow
+    assert 'workflow_dispatch:' in workflow
     assert 'pull_request:' not in workflow
     assert 'secrets.' not in workflow
     assert 'checkout' not in heartbeat
     assert "if: github.event_name == 'workflow_dispatch' && inputs.verify-ios-setup" in canary
     assert 'uses: ./.github/actions/setup-ios-build' in canary
     assert 'bundle check' in canary
+    assert "create-config-files: 'false'" in canary
+
+
 def test_invalid_awaiter_bounds_and_missing_helper_fall_back(tmp_path: Path) -> None:
     cases = [
         {'HEARTBEAT_POLL_ATTEMPTS': '0'},

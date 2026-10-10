@@ -127,27 +127,33 @@ Advisory checks:
 - Follow-up cleanup and test coverage ideas.
 
 When advisory review finds a noncritical issue, open a focused follow-up PR or issue instead of delaying a landable PR.
-### Shared Mac runner routing
+### Shared Mac qualification
 
-The `iOS` and `iOS Launch Quality Gate` jobs use hosted `macos-15` unless the
-repository variable `MAC_RUNNER` is exactly `on` and the latest LogYourBody Mac
-heartbeat proves a fresh successful job on the `jovie-mac` pool. The route reads
-trusted helpers from `main`; missing, stale, failed, pending or uncertain evidence
-keeps hosted capacity. Both existing test and quality gates remain required.
+The required `iOS` and `iOS Launch Quality Gate` jobs always use standard hosted
+`macos-15`. Their execution and signing paths are independent of shared Mac
+availability, heartbeat state, and `MAC_RUNNER`; setting that variable cannot
+reroute either required job. Existing tests and quality gates remain required.
 
-Keep `MAC_RUNNER` unset until the manual setup canary succeeds on a self-hosted
-Mac. After this workflow is on `main`, dispatch:
+Self-hosted Macs are optional capacity pending successful setup qualification and
+measured pickup time, execution time, and reliability benefit. A fresh heartbeat
+is not a capacity reservation: a Mac can become busy or disappear after the
+probe, and GitHub does not switch a queued self-hosted job to hosted macOS. Job
+execution timeouts do not bound that queue wait. No dispatcher or duplicate
+product/release execution path is introduced.
+
+The shared Mac workflow is manual only and cannot gate required CI. After it is
+on `main`, request a secretless setup canary explicitly:
 
 ```sh
 gh workflow run mac-runner-heartbeat.yml --repo JovieInc/LogYourBody --ref main \
   -f verify-ios-setup=true
 ```
 
-Verify the **Self-hosted iOS setup canary** job and its recorded runner name,
-Xcode, pinned SwiftLint, xcbeautify, Ruby/Bundler and `bundle check` output before
-setting `MAC_RUNNER=on`. Remove the variable or set it to `off` to return to hosted
-capacity. Registration/heartbeat success alone does not prove iOS setup.
+Inspect the **Self-hosted iOS setup canary** job, its recorded runner name, and
+Xcode, pinned SwiftLint, xcbeautify, Ruby/Bundler and `bundle check` output. Setup
+or heartbeat success alone does not demonstrate shipping benefit or authorize
+routing required builds onto the shared Macs.
 
-CI runs `scripts/tests/test_runner_routing.py` with Bashcov 4.0.0 and requires at
-least 80% executed-line coverage for each copied heartbeat helper. The coverage
+CI tests this hosted policy and the diagnostic heartbeat helpers with Bashcov
+4.0.0, requiring at least 80% executed-line coverage for each helper. The coverage
 check rejects missing scripts, zero-line reports and reused suite records.
