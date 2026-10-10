@@ -29,9 +29,9 @@ enum HomeV2PhotoCopy {
     static let cardOptions = "Card options"
     static let showNumbers = "Show numbers"
     static let showDates = "Show dates"
-    static let cropAboveShoulders = "Crop above shoulders"
-    static let faceVisible = "Your face is visible in this card."
-    static let faceCropped = "Cropped above the shoulders. Your face is not in this card."
+    static let cropPhotoTop = "Crop top of photos"
+    static let reviewPhotos = "Check the preview for faces and details you don’t want to share."
+    static let croppedPhotoNote = "Top of each photo cropped. Your face may still be visible; check the preview."
     static let brand = "LogYourBody"
     static let changeDates = "Change dates"
     static let slider = "Slider"
@@ -46,6 +46,14 @@ enum HomeV2PhotoCopy {
     static let loopOn = "Loop on"
     static let preparing = "Preparing photos…"
     static let notEnoughPhotos = "Two photos are needed to compare."
+    static let needsAnotherPhoto = "Add another progress photo from Home, then try again."
+    static let shareLoadFailed = "Couldn’t load both photos. Try again, or choose different photos."
+    static let shareRenderFailed = "Couldn’t prepare the share card. Try again."
+    static let retryPhotos = "Retry photos"
+
+    static func insufficientPhotos(for tool: HomeV2PhotoTool) -> String {
+        tool == .share ? "Two photos are needed to share progress." : notEnoughPhotos
+    }
 
     static func photoDetails(weight: String) -> String {
         "Photo details · \(weight)"
@@ -62,7 +70,8 @@ enum HomeV2PhotoCopy {
     /// "−12.8 lb in 176 days".
     static func cardHeadline(delta: Double?, unit: String, days: Int) -> String {
         let period = "in \(days) day\(days == 1 ? "" : "s")"
-        guard let delta, abs(delta) >= 0.05 else { return "No change \(period)" }
+        guard let delta, delta.isFinite else { return "Weight change unavailable" }
+        guard abs(delta) >= 0.05 else { return "No change \(period)" }
         return "\(signed(delta)) \(unit) \(period)"
     }
 
@@ -77,7 +86,9 @@ enum HomeV2PhotoCopy {
     }
 
     static func estimatedBySource(_ source: String) -> String {
-        "Body fat estimated by your \(source)."
+        source == HomeV2ContextCopy.typed
+            ? "Body fat estimate entered by you."
+            : "Body fat estimated by your \(source)."
     }
 
     static func bodyFatEstimated(_ text: String) -> String {
@@ -85,7 +96,8 @@ enum HomeV2PhotoCopy {
     }
 
     static func bodyFatChange(_ points: Double?) -> String {
-        guard let points, abs(points) >= 0.05 else { return "Body fat · no change" }
+        guard let points, points.isFinite else { return "Body fat · no comparison" }
+        guard abs(points) >= 0.05 else { return "Body fat · no change" }
         return "Body fat · \(signed(points)) pts"
     }
 
@@ -220,7 +232,7 @@ enum HomeV2TimelapsePolicy {
 
     /// The frame after `index`; nil when the run ends and does not loop.
     static func next(after index: Int, count: Int, loops: Bool) -> Int? {
-        guard count > 0 else { return nil }
+        guard count >= 1 else { return nil }
         if index + 1 < count { return index + 1 }
         return loops ? 0 : nil
     }
@@ -231,4 +243,25 @@ struct HomeV2PhotoPair: Identifiable, Equatable {
     let before: Int
     let after: Int
     var id: String { "\(before)-\(after)" }
+}
+
+/// Removes the top portion before aspect-filling the pane. Scaling the
+/// remaining image avoids the empty strip left by translating a fitted image.
+enum HomeV2ShareCropPolicy {
+    static let topFraction: CGFloat = 0.22
+
+    static func drawRect(imageSize: CGSize, in target: CGSize, cropsTop: Bool) -> CGRect {
+        guard imageSize.width > 0, imageSize.height > 0, target.width > 0, target.height > 0 else {
+            return CGRect(origin: .zero, size: target)
+        }
+        let removedHeight = cropsTop ? imageSize.height * topFraction : 0
+        let remainingHeight = imageSize.height - removedHeight
+        let scale = max(target.width / imageSize.width, target.height / remainingHeight)
+        return CGRect(
+            x: (target.width - imageSize.width * scale) / 2,
+            y: (target.height - remainingHeight * scale) / 2 - removedHeight * scale,
+            width: imageSize.width * scale,
+            height: imageSize.height * scale
+        )
+    }
 }

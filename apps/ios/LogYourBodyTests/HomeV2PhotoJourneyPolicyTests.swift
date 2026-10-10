@@ -2,6 +2,7 @@
 // HomeV2PhotoJourneyPolicyTests.swift
 // LogYourBodyTests
 //
+import UIKit
 import XCTest
 @testable import LogYourBody
 
@@ -27,6 +28,8 @@ final class HomeV2PhotoJourneyPolicyTests: XCTestCase {
         XCTAssertEqual(HomeV2PhotoCopy.timelapseSubtitle(from: "Apr 2", to: "Sep 25", count: 24), "Apr 2 to Sep 25, 24 photos")
         XCTAssertEqual(HomeV2PhotoCopy.bodyFatChange(-7.2), "Body fat · −7.2 pts")
         XCTAssertEqual(HomeV2PhotoCopy.bodyFatChange(0.0), "Body fat · no change")
+        XCTAssertEqual(HomeV2PhotoCopy.estimatedBySource(HomeV2ContextCopy.typed), "Body fat estimate entered by you.")
+        XCTAssertEqual(HomeV2PhotoCopy.estimatedBySource("scale"), "Body fat estimated by your scale.")
     }
 
     func testRulerSpansAtLeastEightWeeksAndFindsTheNearestPhoto() {
@@ -61,5 +64,105 @@ final class HomeV2PhotoJourneyPolicyTests: XCTestCase {
             XCTAssertFalse(tool.identifier.isEmpty)
         }
         XCTAssertEqual(HomeV2PhotoPair(before: 2, after: 5).id, "2-5")
+    }
+
+    func testMissingMeasurementsDoNotClaimNoChange() {
+        for delta: Double? in [nil, .nan, .infinity, -.infinity] {
+            XCTAssertEqual(
+                HomeV2PhotoCopy.cardHeadline(delta: delta, unit: "lb", days: 30),
+                "Weight change unavailable"
+            )
+            XCTAssertEqual(HomeV2PhotoCopy.bodyFatChange(delta), "Body fat · no comparison")
+        }
+        XCTAssertEqual(HomeV2PhotoCopy.cardHeadline(delta: 0, unit: "lb", days: 30), "No change in 30 days")
+        XCTAssertEqual(HomeV2PhotoCopy.bodyFatChange(0), "Body fat · no change")
+    }
+
+    func testShareCropCoversTheWholePaneAndRemovesTheTop() {
+        let pane = CGSize(width: 154, height: 329)
+        for imageSize in [CGSize(width: 400, height: 500), CGSize(width: 1_000, height: 500)] {
+            let rect = HomeV2ShareCropPolicy.drawRect(imageSize: imageSize, in: pane, cropsTop: true)
+            XCTAssertLessThanOrEqual(rect.minX, 0)
+            XCTAssertLessThanOrEqual(rect.minY, 0)
+            XCTAssertGreaterThanOrEqual(rect.maxX, pane.width)
+            XCTAssertGreaterThanOrEqual(rect.maxY, pane.height)
+            let croppedTop = rect.minY + rect.height * HomeV2ShareCropPolicy.topFraction
+            XCTAssertLessThanOrEqual(croppedTop, 0.001, "The removed top must be outside the rendered pane")
+        }
+    }
+
+    @MainActor
+    func testRenderedShareCropHasNoTopStripeOrEmptyBottom() throws {
+        let size = CGSize(width: 100, height: 100)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let source = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor.blue.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 100, height: 22))
+        }
+        let crop = HomeV2ShareCropper.crop(source, to: size, cropsTop: true)
+        let image = try XCTUnwrap(crop.cgImage)
+        var pixels = [UInt8](repeating: 0, count: 100 * 100 * 4)
+        let context = try XCTUnwrap(CGContext(
+            data: &pixels, width: 100, height: 100, bitsPerComponent: 8, bytesPerRow: 400,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.draw(image, in: CGRect(origin: .zero, size: size))
+        for row in [0, 50, 99] {
+            let offset = (row * 100 + 50) * 4
+            XCTAssertEqual(pixels[offset], 0, "No red top stripe should survive the crop")
+            XCTAssertEqual(pixels[offset + 2], 255, "The photo must cover the top, middle and bottom")
+            XCTAssertEqual(pixels[offset + 3], 255, "The pane must have no transparent gap")
+        }
+    }
+
+    func testPairToolsExplainInsufficientPhotosAndKeepNormalRoutes() {
+        let pair = HomeV2PhotoPair(before: 1, after: 0)
+        XCTAssertEqual(HomeV2PhotoRoute.destination(for: .compare, pair: nil), .insufficientPhotos(.compare))
+        XCTAssertEqual(HomeV2PhotoRoute.destination(for: .share, pair: nil), .insufficientPhotos(.share))
+        XCTAssertEqual(HomeV2PhotoRoute.destination(for: .compare, pair: pair), .compare(pair))
+        XCTAssertEqual(HomeV2PhotoRoute.destination(for: .share, pair: pair), .share(pair))
+        XCTAssertEqual(HomeV2PhotoRoute.destination(for: .allPhotos, pair: nil), .allPhotos)
+    }
+
+    @MainActor
+    func testShareLoadingFailureCanRetrySuccessfully() async {
+        let loader = HomeV2SharePhotoLoader()
+        let image = UIImage()
+        await loader.load(beforeURL: "before", afterURL: "after", plate: { url in
+            url == "before" ? nil : image
+        })
+        XCTAssertEqual(loader.state, .failed)
+        XCTAssertNil(loader.beforePlate)
+        await loader.load(beforeURL: "before", afterURL: "after", plate: { _ in image })
+        XCTAssertEqual(loader.state, .ready)
+        XCTAssertTrue(loader.beforePlate === image)
+        XCTAssertTrue(loader.afterPlate === image)
+        await loader.load(beforeURL: nil, afterURL: "after", plate: { _ in image })
+        XCTAssertEqual(loader.state, .failed)
+        XCTAssertNil(loader.beforePlate, "A different pair cannot reuse the previous share image")
+        XCTAssertNil(loader.afterPlate)
+    }
+
+    @MainActor
+    func testSupersededShareLoadCannotReplaceTheCurrentPair() async {
+        let loader = HomeV2SharePhotoLoader()
+        let oldImage = UIImage()
+        let currentImage = UIImage()
+        var resumeOld: CheckedContinuation<UIImage?, Never>?
+        let oldTask = Task {
+            await loader.load(beforeURL: "old-before", afterURL: "old-after", plate: { _ in
+                await withCheckedContinuation { resumeOld = $0 }
+            })
+        }
+        while resumeOld == nil { await Task.yield() }
+        await loader.load(beforeURL: "new-before", afterURL: "new-after", plate: { _ in currentImage })
+        resumeOld?.resume(returning: oldImage)
+        await oldTask.value
+        XCTAssertEqual(loader.state, .ready)
+        XCTAssertTrue(loader.beforePlate === currentImage)
+        XCTAssertTrue(loader.afterPlate === currentImage)
     }
 }

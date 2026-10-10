@@ -613,6 +613,15 @@ struct LogYourBodyApp: App {
                 continue
             }
 
+            let fixturePhotoURL: String?
+            if ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2SinglePhotoFixture"), entry.daysAgo != 0 {
+                fixturePhotoURL = nil
+            } else if ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2ShareMissingPhotoFixture"), entry.daysAgo != 0 {
+                fixturePhotoURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("lyb-ui-test-missing-share-photo.jpg").absoluteString
+            } else {
+                fixturePhotoURL = photoURL
+            }
             let metric = BodyMetrics(
                 id: "ui_test_full_dashboard_metric_\(entry.daysAgo)",
                 userId: userId,
@@ -627,7 +636,7 @@ struct LogYourBodyApp: App {
                 hipCm: nil,
                 waistUnit: nil,
                 notes: entry.notes,
-                photoUrl: photoURL,
+                photoUrl: fixturePhotoURL,
                 dataSource: entry.source,
                 createdAt: date,
                 updatedAt: now

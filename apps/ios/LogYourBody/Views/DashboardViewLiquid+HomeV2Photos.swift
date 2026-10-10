@@ -12,6 +12,7 @@ enum HomeV2PhotoRoute: Identifiable, Equatable {
     case allPhotos
     case share(HomeV2PhotoPair)
     case timelapse
+    case insufficientPhotos(HomeV2PhotoTool)
 
     var id: String {
         switch self {
@@ -20,6 +21,17 @@ enum HomeV2PhotoRoute: Identifiable, Equatable {
         case .allPhotos: return "all"
         case .share(let pair): return "share-\(pair.id)"
         case .timelapse: return "timelapse"
+        case .insufficientPhotos(let tool): return "insufficient-\(tool.id)"
+        }
+    }
+
+    static func destination(for tool: HomeV2PhotoTool, pair: HomeV2PhotoPair?) -> Self? {
+        switch tool {
+        case .compare: return pair.map(Self.compare) ?? .insufficientPhotos(tool)
+        case .share: return pair.map(Self.share) ?? .insufficientPhotos(tool)
+        case .allPhotos: return .allPhotos
+        case .timelapse: return .timelapse
+        case .timeline: return nil
         }
     }
 }
@@ -69,18 +81,7 @@ extension DashboardViewLiquid {
 
     func openHomeV2PhotoTool(_ tool: HomeV2PhotoTool) {
         HapticManager.shared.selection()
-        switch tool {
-        case .compare:
-            if let pair = homeV2DefaultPair { homeV2PhotoRoute = .compare(pair) }
-        case .share:
-            if let pair = homeV2DefaultPair { homeV2PhotoRoute = .share(pair) }
-        case .allPhotos:
-            homeV2PhotoRoute = .allPhotos
-        case .timelapse:
-            homeV2PhotoRoute = .timelapse
-        case .timeline:
-            break
-        }
+        homeV2PhotoRoute = HomeV2PhotoRoute.destination(for: tool, pair: homeV2DefaultPair)
     }
 
     /// Presented from `photoTimelineRoot`, the same level as the menu cover, so
@@ -141,6 +142,32 @@ extension DashboardViewLiquid {
                 formatters: homeV2Formatters,
                 onCancel: { homeV2PhotoRoute = nil }
             )
+        case .insufficientPhotos(let tool):
+            VStack(spacing: HomeV2Tokens.Space.margin) {
+                ScrollView {
+                    VStack(spacing: HomeV2Tokens.Space.margin) {
+                        Text(HomeV2PhotoCopy.insufficientPhotos(for: tool))
+                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle, weight: .semibold, relativeTo: .title2)
+                            .foregroundStyle(HomeV2Tokens.Colors.ink)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityIdentifier("home_v2_photos_needed")
+                        Text(HomeV2PhotoCopy.needsAnotherPhoto)
+                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    }
+                    .padding(.top, HomeV2Tokens.Space.margin)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                HomeV2PrimaryButton(
+                    title: "Back to photo",
+                    identifier: "home_v2_photos_needed_back",
+                    action: { homeV2PhotoRoute = nil }
+                )
+            }
+            .multilineTextAlignment(.center)
+            .padding(HomeV2Tokens.Space.margin)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(HomeV2Tokens.Colors.canvas.ignoresSafeArea())
         case .timelapse:
             HomeV2TimelapseView(
                 bodyMetrics: bodyMetrics,

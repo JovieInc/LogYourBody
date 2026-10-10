@@ -43,11 +43,12 @@ struct HomeV2PhotoViewer: View {
     let onClose: () -> Void
     let onTool: (HomeV2PhotoTool) -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showsDetails = false
     @State private var showsTools = false
+    @State private var pendingTool: HomeV2PhotoTool?
 
     private static let detailsCollapsedHeight: CGFloat = 64
-    private static let detailsExpandedHeight: CGFloat = 250
 
     private var photoIndices: [Int] { HomeV2PhotoIndex.photoIndices(in: bodyMetrics) }
     private var chronological: [Int] { HomeV2PhotoIndex.chronologicalPhotoIndices(in: bodyMetrics) }
@@ -58,109 +59,130 @@ struct HomeV2PhotoViewer: View {
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            let reserved = JovieTokens.compactControlHeight
-                + (showsDetails ? Self.detailsExpandedHeight : Self.detailsCollapsedHeight)
-            let stage = CGSize(
-                width: geometry.size.width,
-                height: HomeV2Layout.stageHeight(
-                    width: geometry.size.width,
-                    height: geometry.size.height - reserved + HomeV2Layout.belowPhotoHeight
-                )
-            )
-
-            VStack(spacing: 0) {
-                topBar
-
-                TabView(selection: $selectedIndex) {
-                    ForEach(photoIndices, id: \.self) { index in
-                        SubjectPlateView(urlString: bodyMetrics[index].photoUrl ?? "", size: stage)
-                            .tag(index)
+        VStack(spacing: 0) {
+            topBar
+            GeometryReader { geometry in
+                ScrollView {
+                    HomeV2ViewerContentLayout(viewport: geometry.size) {
+                        GeometryReader { stage in
+                            photoStage(size: stage.size)
+                        }
+                        VStack(spacing: 0) {
+                            if let current {
+                                if showsDetails {
+                                    details(for: current)
+                                } else {
+                                    detailsRow(for: current)
+                                }
+                            }
+                        }
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(width: stage.width, height: stage.height)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(current.map { "Progress photo, \(formatters.dateText($0))" } ?? "Progress photo")
-                .accessibilityIdentifier("home_v2_viewer_stage")
-
-                Spacer(minLength: 0)
-
-                if let current {
-                    if showsDetails {
-                        details(for: current)
-                    } else {
-                        detailsRow(for: current)
-                    }
-                }
+                .scrollBounceBehavior(.basedOnSize)
+                .accessibilityIdentifier("home_v2_viewer_scroll")
             }
-            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
         }
         .background(Color.black.ignoresSafeArea())
-        .sheet(isPresented: $showsTools) {
+        .sheet(isPresented: $showsTools, onDismiss: {
+            guard let tool = pendingTool else { return }
+            pendingTool = nil
+            onTool(tool)
+        }, content: {
             HomeV2PhotoToolsSheet(
                 dateText: current.map(formatters.dateText) ?? "",
                 positionText: HomeV2Copy.photoPosition(position(of: selectedIndex), of: photoIndices.count),
                 onSelect: { tool in
-                    showsTools = false
                     if tool == .timeline {
                         showsDetails = true
                     } else {
-                        onTool(tool)
+                        pendingTool = tool
                     }
+                    showsTools = false
                 },
                 onDone: { showsTools = false }
             )
+        })
+    }
+
+    private func photoStage(size: CGSize) -> some View {
+        let height = min(size.height, size.width / HomeV2Tokens.photoAspectRatio)
+        let photoSize = CGSize(width: height * HomeV2Tokens.photoAspectRatio, height: height)
+        return TabView(selection: $selectedIndex) {
+            ForEach(photoIndices, id: \.self) { index in
+                SubjectPlateView(urlString: bodyMetrics[index].photoUrl ?? "", size: photoSize)
+                    .frame(width: size.width, height: size.height)
+                    .tag(index)
+            }
         }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .frame(width: size.width, height: size.height)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(current.map { "Progress photo, \(formatters.dateText($0))" } ?? "Progress photo")
+        .accessibilityIdentifier("home_v2_viewer_stage")
     }
 
     private var topBar: some View {
-        HStack(spacing: 0) {
-            Button(action: onClose) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-                    .contentShape(Rectangle())
+        VStack(spacing: HomeV2Tokens.Space.tight) {
+            HStack(spacing: HomeV2Tokens.Space.tight) {
+                closeButton
+                Spacer(minLength: 0)
+                if !dynamicTypeSize.isAccessibilitySize { photoHeading }
+                Spacer(minLength: 0)
+                toolsButton
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Close")
-            .accessibilityIdentifier("home_v2_viewer_close")
-
-            Spacer(minLength: 0)
-
-            VStack(spacing: 2) {
-                Text(current.map(formatters.dateText) ?? "")
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
-                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    .lineLimit(1)
-
-                Text(HomeV2Copy.photoPosition(position(of: selectedIndex), of: photoIndices.count))
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .caption)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-            }
-
-            Spacer(minLength: 0)
-
-            Button {
-                showsTools = true
-            } label: {
-                HStack(spacing: HomeV2Tokens.Space.tight / 2) {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16, weight: .medium))
-                    Text(HomeV2PhotoCopy.tools)
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                }
-                .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                .frame(minWidth: 64, minHeight: JovieTokens.minimumHitTarget)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(HomeV2PhotoCopy.photoTools)
-            .accessibilityIdentifier("home_v2_viewer_tools")
+            if dynamicTypeSize.isAccessibilitySize { photoHeading }
         }
         .padding(.horizontal, HomeV2Tokens.Space.row)
-        .frame(height: JovieTokens.compactControlHeight)
+        .padding(.bottom, dynamicTypeSize.isAccessibilitySize ? HomeV2Tokens.Space.tight : 0)
+        .frame(minHeight: JovieTokens.compactControlHeight)
+    }
+
+    private var photoHeading: some View {
+        VStack(spacing: 2) {
+            Text(current.map(formatters.dateText) ?? "")
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("home_v2_viewer_date")
+            Text(HomeV2Copy.photoPosition(position(of: selectedIndex), of: photoIndices.count))
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .caption)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .multilineTextAlignment(.center)
+    }
+
+    private var closeButton: some View {
+        Button(action: onClose) {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close")
+        .accessibilityIdentifier("home_v2_viewer_close")
+    }
+
+    private var toolsButton: some View {
+        Button {
+            showsTools = true
+        } label: {
+            HStack(spacing: HomeV2Tokens.Space.tight / 2) {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .medium))
+                Text(HomeV2PhotoCopy.tools)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+            .frame(minWidth: 64, minHeight: JovieTokens.minimumHitTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(HomeV2PhotoCopy.photoTools)
+        .accessibilityIdentifier("home_v2_viewer_tools")
     }
 
     private func detailsRow(for metric: BodyMetrics) -> some View {
@@ -171,6 +193,7 @@ struct HomeV2PhotoViewer: View {
                 Text(HomeV2PhotoCopy.photoDetails(weight: "\(formatters.weightText(metric)) \(formatters.weightUnit)"))
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                     .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("home_v2_viewer_weight")
                 Spacer(minLength: HomeV2Tokens.Space.tight)
                 Image(systemName: "chevron.down")
@@ -188,31 +211,9 @@ struct HomeV2PhotoViewer: View {
 
     private func details(for metric: BodyMetrics) -> some View {
         VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: HomeV2Tokens.Space.tight) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(formatters.weightText(metric)) \(formatters.weightUnit)")
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle, weight: .medium, relativeTo: .title2)
-                        .foregroundStyle(HomeV2Tokens.Colors.ink)
-                        .lineLimit(1)
-                        .accessibilityIdentifier("home_v2_viewer_weight")
-                    Text(sinceSentence(for: metric))
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                }
-
-                Spacer(minLength: HomeV2Tokens.Space.tight)
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(HomeV2PhotoCopy.bodyFatEstimated(formatters.bodyFatText(metric)))
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
-                        .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    Text(HomeV2PhotoCopy.bodyFatChange(bodyFatDelta(for: metric)))
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                }
-            }
-            .padding(.horizontal, HomeV2Tokens.Space.margin)
-            .padding(.top, HomeV2Tokens.Space.compact)
+            metricDetails(for: metric)
+                .padding(.horizontal, HomeV2Tokens.Space.margin)
+                .padding(.top, HomeV2Tokens.Space.compact)
 
             HomeV2PhotoTimelineRuler(
                 dates: photoDates,
@@ -220,28 +221,17 @@ struct HomeV2PhotoViewer: View {
                 onSelect: { position in
                     guard chronological.indices.contains(position) else { return }
                     selectedIndex = chronological[position]
-                }
+                },
+                allowsVerticalScrolling: true
             )
             .padding(.top, HomeV2Tokens.Space.compact)
 
-            HStack(spacing: 0) {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4),
+                spacing: HomeV2Tokens.Space.tight
+            ) {
                 ForEach([HomeV2PhotoTool.compare, .timelapse, .allPhotos, .share]) { tool in
-                    Button {
-                        onTool(tool)
-                    } label: {
-                        VStack(spacing: HomeV2Tokens.Space.tight / 2) {
-                            Image(systemName: tool.systemImage)
-                                .font(.system(size: 22, weight: .regular))
-                            Text(tool.shortTitle)
-                                .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
-                        }
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                        .frame(maxWidth: .infinity, minHeight: HomeV2Tokens.rowHeight)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(tool.title)
-                    .accessibilityIdentifier("home_v2_viewer_action_\(tool.identifier)")
+                    toolButton(tool)
                 }
             }
             .padding(.horizontal, HomeV2Tokens.Space.inset)
@@ -272,6 +262,58 @@ struct HomeV2PhotoViewer: View {
         }
     }
 
+    private func metricDetails(for metric: BodyMetrics) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: HomeV2Tokens.Space.compact))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: HomeV2Tokens.Space.tight))
+        return layout {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(formatters.weightText(metric)) \(formatters.weightUnit)")
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle, weight: .medium, relativeTo: .title2)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                    .accessibilityIdentifier("home_v2_viewer_weight")
+                Text(sinceSentence(for: metric))
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    .accessibilityIdentifier("home_v2_viewer_since")
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
+                Text(HomeV2PhotoCopy.bodyFatEstimated(formatters.bodyFatText(metric)))
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                Text(HomeV2PhotoCopy.bodyFatChange(bodyFatDelta(for: metric)))
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    .accessibilityIdentifier("home_v2_viewer_body_fat_change")
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
+        }
+    }
+
+    private func toolButton(_ tool: HomeV2PhotoTool) -> some View {
+        Button {
+            onTool(tool)
+        } label: {
+            VStack(spacing: HomeV2Tokens.Space.tight / 2) {
+                Image(systemName: tool.systemImage)
+                    .font(.system(size: 22, weight: .regular))
+                Text(tool.shortTitle)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+            .frame(maxWidth: .infinity, minHeight: HomeV2Tokens.rowHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tool.title)
+        .accessibilityIdentifier("home_v2_viewer_action_\(tool.identifier)")
+    }
+
     private func position(of index: Int) -> Int {
         (chronological.firstIndex(of: index) ?? 0) + 1
     }
@@ -298,5 +340,40 @@ struct HomeV2PhotoViewer: View {
             return nil
         }
         return now - then
+    }
+}
+
+/// Uses the details' intrinsic height so a wrapped date never loses space to
+/// the photo. Larger content scrolls while the close and tools controls stay visible.
+private struct HomeV2ViewerContentLayout: Layout {
+    let viewport: CGSize
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? viewport.width
+        let heights = heights(width: width, subviews: subviews)
+        return CGSize(width: width, height: max(viewport.height, heights.photo + heights.details))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let heights = heights(width: bounds.width, subviews: subviews)
+        subviews[0].place(
+            at: bounds.origin, anchor: .topLeading,
+            proposal: ProposedViewSize(width: bounds.width, height: heights.photo)
+        )
+        subviews[1].place(
+            at: CGPoint(x: bounds.minX, y: bounds.maxY - heights.details), anchor: .topLeading,
+            proposal: ProposedViewSize(width: bounds.width, height: heights.details)
+        )
+    }
+
+    private func heights(width: CGFloat, subviews: Subviews) -> (photo: CGFloat, details: CGFloat) {
+        guard subviews.count == 2 else { return (0, 0) }
+        let details = subviews[1].sizeThatFits(ProposedViewSize(width: width, height: nil)).height
+        let photo = min(
+            width / HomeV2Tokens.photoAspectRatio,
+            max(HomeV2Layout.minimumStageHeight, viewport.height - details)
+        )
+        return (photo, details)
     }
 }
