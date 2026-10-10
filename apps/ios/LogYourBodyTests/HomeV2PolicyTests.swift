@@ -8,25 +8,68 @@ import UIKit
 
 @MainActor
 final class HomeV2PolicyTests: XCTestCase {
-    func testGateOffWithoutFixtureArgumentKeepsHomeV2Off() {
-        XCTAssertFalse(
-            HomeV2Policy.isEnabled(
-                arguments: ["-lybUITestPhotoTimelineHUDFixture"],
-                isGateEnabled: { _ in false }
-            )
-        )
-    }
-
-    func testStatsigGateEnablesHomeV2ByItsKey() {
+    func testHomeV2DefaultsOnWhenKillSwitchIsOff() {
         var askedKey: String?
         XCTAssertTrue(
+            HomeV2Policy.isEnabled(
+                arguments: ["-lybUITestPhotoTimelineHUDFixture"],
+                isGateEnabled: { key in
+                    askedKey = key
+                    return false
+                }
+            )
+        )
+        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
+    }
+
+    func testKillSwitchDisablesHomeV2() {
+        var askedKey: String?
+        XCTAssertFalse(
             HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { key in
                 askedKey = key
                 return true
             })
         )
-        XCTAssertEqual(askedKey, "home_v2_photo_first")
+        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
     }
+
+    #if DEBUG
+    func testRollbackFixtureDisablesHomeV2WithoutReadingRemoteGates() {
+        XCTAssertFalse(
+            HomeV2Policy.isEnabled(arguments: [HomeV2Policy.rollbackFixtureArgument], isGateEnabled: { _ in
+                XCTFail("The explicit rollback fixture must not read remote gates")
+                return false
+            })
+        )
+    }
+
+    func testRollbackFixtureWinsOverConflictingHomeV2Fixtures() {
+        let homeFixtures = [
+            HomeV2Policy.fixtureArgument,
+            HomeV2Policy.photoFixtureArgument,
+            HomeV2Policy.emptyFixtureArgument,
+            HomeV2SystemStatePolicy.offlineFixtureArgument,
+            HomeV2SystemStatePolicy.healthOffFixtureArgument,
+            HomeV2SystemStatePolicy.loadingFixtureArgument
+        ]
+        for fixture in homeFixtures {
+            XCTAssertFalse(
+                HomeV2Policy.isEnabled(
+                    arguments: [fixture, HomeV2Policy.rollbackFixtureArgument],
+                    isGateEnabled: { _ in false }
+                ),
+                "Rollback must win over \(fixture)"
+            )
+        }
+    }
+
+    #else
+    func testRollbackFixtureArgumentCannotDisableShippingHome() {
+        XCTAssertTrue(
+            HomeV2Policy.isEnabled(arguments: ["-lybUITestHomeRollbackFixture"], isGateEnabled: { _ in false })
+        )
+    }
+    #endif
 
     #if DEBUG
     func testFixtureArgumentsEnableHomeV2WithoutTheGate() {
@@ -88,13 +131,13 @@ final class HomeV2PolicyTests: XCTestCase {
         )
     }
 
-    private func compositionMetric(date: Date, bodyFat: Double, method: String) -> BodyMetrics {
+    private func compositionMetric(date: Date, bodyFat: Double?, method: String, weight: Double? = 80) -> BodyMetrics {
         BodyMetrics(
             id: UUID().uuidString,
             userId: "home-composition-test",
             date: date,
             localDate: BodyMetricLocalDate.key(for: date),
-            weight: 80,
+            weight: weight,
             weightUnit: "kg",
             bodyFatPercentage: bodyFat,
             bodyFatMethod: method,
@@ -106,6 +149,123 @@ final class HomeV2PolicyTests: XCTestCase {
             createdAt: date,
             updatedAt: date
         )
+    }
+
+    func testEditorialBodyFatKeepsEstimateAndUnknownOriginsDistinct() {
+        let now = Date()
+        let estimate = compositionMetric(date: now, bodyFat: 18.5, method: "visual_estimate")
+        let scan = compositionMetric(date: now, bodyFat: 18.5, method: "DEXA (BodySpec)")
+        let unknown = compositionMetric(date: now, bodyFat: 18.5, method: "")
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: estimate)?.caption, "Visual estimate")
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: scan)?.caption, "From your DEXA scan")
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: unknown)?.caption, "Source not recorded")
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: estimate)?.percentage, 18.5)
+    }
+
+    func testEditorialBodyFatAcceptsOnlyKnownSourceAliases() {
+        let known: [(String, String)] = [
+            ("  DEXA  (BodySpec)\n", "From your DEXA scan"),
+            ("DEXA", "From your DEXA scan"), ("bodyspec_dexa", "From your DEXA scan"),
+            (" InBody ", "From your InBody scan"), (" VISUAL_ESTIMATE ", "Visual estimate"),
+            ("Manual", "Entered by you"), ("typed", "Entered by you"),
+            ("HealthKit", "From Apple Health"), ("apple_health", "From Apple Health"),
+            ("body_scan", "Body scan estimate"), ("bia_scale", "Bioelectrical estimate"),
+            ("bioelectrical", "Bioelectrical estimate"), ("caliper", "Caliper estimate"),
+            ("calipers", "Caliper estimate")
+        ]
+        for (method, caption) in known {
+            XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in:
+                compositionMetric(date: Date(), bodyFat: 18, method: method))?.caption, caption, method)
+        }
+        for method in ["not dexa", "possibly inbody", "not_visual_estimate", "DEXA?", "unknown", ""] {
+            XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in:
+                compositionMetric(date: Date(), bodyFat: 18, method: method))?.caption,
+                "Source not recorded", method)
+        }
+    }
+
+    func testEditorialGraphicDoesNotInventBodyFatFromMissingOrSyntheticReadings() {
+        XCTAssertNil(HomeV2EditorialPolicy.bodyFat(in: nil))
+        for value in [Double.nan, .infinity, -2, 0, 100, 120] {
+            XCTAssertNil(HomeV2EditorialPolicy.bodyFat(in:
+                compositionMetric(date: Date(), bodyFat: value, method: "manual")))
+        }
+        for method in ["interpolated", "derived"] {
+            XCTAssertNil(HomeV2EditorialPolicy.bodyFat(in:
+                compositionMetric(date: Date(), bodyFat: 18, method: method)))
+        }
+    }
+
+    func testEditorialFFMIUsesRecordedCompositionAndCanonicalHeightAcrossDisplayUnits() throws {
+        let metric = compositionMetric(date: Date(), bodyFat: 10, method: "visual_estimate")
+        let ffmi = try XCTUnwrap(HomeV2EditorialPolicy.ffmi(in: metric, owner: metric.userId, heightCm: 177.8))
+        XCTAssertEqual(ffmi, 72 / (1.778 * 1.778) + 6.1 * (1.8 - 1.778), accuracy: 0.000001)
+        XCTAssertEqual(HomeV2EditorialPolicy.displayWeight(in: metric, system: .metric), 80)
+        XCTAssertEqual(try XCTUnwrap(HomeV2EditorialPolicy.displayWeight(in: metric, system: .imperial)),
+                       80.0.kgToLbs, accuracy: 0.000001)
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: metric)?.caption, "Visual estimate")
+    }
+
+    func testEditorialFFMICannotCombineForeignProfileOrMissingAndSyntheticReadings() {
+        let metric = compositionMetric(date: Date(), bodyFat: 18, method: "manual")
+        XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: metric, owner: "another-owner", heightCm: 178))
+        XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: metric, owner: nil, heightCm: 178))
+        XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: metric, owner: metric.userId, heightCm: nil))
+        let missing = compositionMetric(date: Date(), bodyFat: nil, method: "manual")
+        XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: missing, owner: missing.userId, heightCm: 178))
+        for method in ["interpolated", "derived"] {
+            let synthetic = compositionMetric(date: Date(), bodyFat: 18, method: method)
+            XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: synthetic, owner: synthetic.userId, heightCm: 178))
+        }
+    }
+
+    func testEditorialValuesRejectNonfiniteInputsAndConversionOverflow() {
+        let metric = compositionMetric(date: Date(), bodyFat: 18, method: "manual")
+        for height in [Double.nan, .infinity, -.infinity, 0, -1, .leastNonzeroMagnitude] {
+            XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: metric, owner: metric.userId, heightCm: height))
+        }
+        for weight: Double? in [nil, .nan, .infinity, -.infinity, 0, -1] {
+            let invalid = compositionMetric(date: Date(), bodyFat: 18, method: "manual", weight: weight)
+            XCTAssertNil(HomeV2EditorialPolicy.weight(in: invalid))
+            XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: invalid, owner: invalid.userId, heightCm: 178))
+        }
+        let overflow = compositionMetric(date: Date(), bodyFat: 18, method: "manual", weight: .greatestFiniteMagnitude)
+        XCTAssertNil(HomeV2EditorialPolicy.displayWeight(in: overflow, system: .imperial))
+    }
+
+    func testEditorialWeightHistoryUsesOnlyFiniteOwnedRecordedValuesThroughSelectedDate() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let selected = editorialMetric(id: "today", user: "A", date: now, weight: 80)
+        let previous = editorialMetric(id: "previous", user: "A", date: now.addingTimeInterval(-86_400), weight: 81)
+        let unrelated = [
+            editorialMetric(id: "foreign", user: "B", date: now, weight: 140),
+            editorialMetric(id: "future", user: "A", date: now.addingTimeInterval(86_400), weight: 79),
+            editorialMetric(id: "old", user: "A", date: now.addingTimeInterval(-40 * 86_400), weight: 90),
+            editorialMetric(id: "invalid", user: "A", date: now, weight: .nan),
+            editorialMetric(id: "missing", user: "A", date: now, weight: nil)
+        ]
+        let points = HomeV2EditorialPolicy.weights(in: unrelated + [selected, previous], selected: selected)
+        XCTAssertEqual(points.map(\.id), ["previous", "today"])
+        XCTAssertEqual(points.map(\.kilograms), [81, 80])
+        XCTAssertEqual(points.map(\.date), [previous.date, selected.date])
+    }
+
+    func testEditorialSingleWeightRemainsOneReadingAndNoSelectionHasNoHistory() {
+        let entry = editorialMetric(id: "only", user: "A", date: Date(), weight: 80)
+        XCTAssertEqual(HomeV2EditorialPolicy.weights(in: [entry], selected: entry).count, 1)
+        XCTAssertTrue(HomeV2EditorialPolicy.weights(in: [entry], selected: nil).isEmpty)
+        XCTAssertFalse(HomeV2EditorialPolicy.supportsWeightComparison(in: [], selected: entry))
+        XCTAssertFalse(HomeV2EditorialPolicy.supportsWeightComparison(in: [entry], selected: entry))
+        let excluded = editorialMetric(id: "foreign", user: "B", date: entry.date, weight: 90)
+        XCTAssertFalse(HomeV2EditorialPolicy.supportsWeightComparison(in: [entry, excluded], selected: entry))
+        let earlier = editorialMetric(id: "earlier", user: "A", date: entry.date.addingTimeInterval(-86_400), weight: 81)
+        XCTAssertTrue(HomeV2EditorialPolicy.supportsWeightComparison(in: [earlier, entry], selected: entry))
+    }
+
+    private func editorialMetric(id: String, user: String, date: Date, weight: Double?) -> BodyMetrics {
+        BodyMetrics(id: id, userId: user, date: date, weight: weight, weightUnit: "kg",
+                    bodyFatPercentage: nil, bodyFatMethod: nil, muscleMass: nil, boneMass: nil,
+                    notes: nil, photoUrl: nil, dataSource: "manual", createdAt: date, updatedAt: date)
     }
 
     func testSinceSentenceAndPhotoPositionReadAsSentences() {

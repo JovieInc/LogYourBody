@@ -6,9 +6,9 @@ import SwiftUI
 
 /// The four metrics of the one Progress workspace (Pencil R1/R2).
 enum HomeV2ProgressMetric: String, CaseIterable, Identifiable {
-    case weight
     case bodyFat
     case ffmi
+    case weight
     case steps
 
     var id: String { rawValue }
@@ -40,7 +40,7 @@ enum HomeV2ProgressMetric: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Steps count up; everything else reads best as its low.
+    /// The summary shows a range extreme, not a recommendation or goal.
     var prefersHigh: Bool { self == .steps }
 }
 

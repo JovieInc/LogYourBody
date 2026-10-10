@@ -176,6 +176,7 @@ struct AddEntrySheet: View {
     let isHomeV2LogEntry: Bool
     @State var selectedDate = Date()
     let onWeightSaved: ((BodyMetrics) -> Void)?
+    let onBodyFatSaved: ((BodyMetrics) -> Void)?
     @AppStorage(Constants.preferredMeasurementSystemKey) var measurementSystem = PreferencesView.defaultMeasurementSystem
 
     init(
@@ -186,7 +187,8 @@ struct AddEntrySheet: View {
         initialWeight: String? = nil,
         initialBodyFat: Double? = nil,
         isHomeV2LogEntry: Bool = false,
-        onWeightSaved: ((BodyMetrics) -> Void)? = nil
+        onWeightSaved: ((BodyMetrics) -> Void)? = nil,
+        onBodyFatSaved: ((BodyMetrics) -> Void)? = nil
     ) {
         let resolvedInitialTab = initialTab == 3 && !includesGlp1Entry ? 0 : initialTab
         self._isPresented = isPresented
@@ -197,6 +199,7 @@ struct AddEntrySheet: View {
         self._weight = State(initialValue: initialWeight ?? "")
         self._bodyFat = State(initialValue: initialBodyFat.map { String(format: "%.1f", $0) } ?? "")
         self.onWeightSaved = onWeightSaved
+        self.onBodyFatSaved = onBodyFatSaved
     }
 
 

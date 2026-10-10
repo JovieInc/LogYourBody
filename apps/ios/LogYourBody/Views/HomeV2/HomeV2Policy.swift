@@ -5,11 +5,16 @@
 import CoreGraphics
 import Foundation
 
-/// Gate for the photo-first Home (Pencil H2, picked 2026-09-26). Off by default
-/// in production; the Statsig gate owns rollout. Debug fixtures force it on so
-/// XCUITest can cover both states without a network.
+/// Photo-first Home (Pencil H2, picked 2026-09-26). Default on in production.
+/// Statsig is an emergency kill switch only; an unavailable or unset gate must
+/// not silently fall back to the legacy Home. Debug fixtures explicitly choose Home V2 or rollback.
 enum HomeV2Policy {
-    static let gateKey = "home_v2_photo_first"
+    static let killSwitchKey = "home_v2_kill_switch"
+    #if DEBUG
+    /// Explicit legacy captures exercise rollback without changing remote gates.
+    /// Rollback wins if a test accidentally supplies both fixture modes.
+    static let rollbackFixtureArgument = "-lybUITestHomeRollbackFixture"
+    #endif
     static let fixtureArgument = "-lybUITestHomeV2Fixture"
     static let photoFixtureArgument = "-lybUITestHomeV2PhotoFixture"
     /// Signed in, nothing logged yet: the H0 day-zero state.
@@ -27,6 +32,7 @@ enum HomeV2Policy {
         isGateEnabled: ((String) -> Bool)? = nil
     ) -> Bool {
         #if DEBUG
+        if arguments.contains(rollbackFixtureArgument) { return false }
         if arguments.contains(fixtureArgument) || arguments.contains(photoFixtureArgument) ||
             arguments.contains(emptyFixtureArgument) ||
             arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument) ||
@@ -36,7 +42,7 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return checkGate(gateKey)
+        return !checkGate(killSwitchKey)
     }
 
     @MainActor
@@ -56,6 +62,7 @@ enum HomeV2Policy {
 enum HomeV2Copy {
     static let title = "Today"
     static let logWeight = "Log weight"
+    static let logCheckIn = "Log check-in"
     static let done = "Done"
     static let undo = "Undo"
     static let lastThirtyDays = "Last 30 days"
@@ -124,6 +131,22 @@ enum HomeV2Copy {
     static func latestPhotoCaption(date: String) -> String {
         "Latest photo · \(date)"
     }
+
+    /// Timeline caption above the number: "Sep 25 · Apple Health".
+    static func dayCaption(date: String, source: String) -> String {
+        "\(date) · \(source)"
+    }
+
+    /// Selected-day body fat with provenance: "Body fat 15.8% · DEXA".
+    static func dayBodyFatLine(value: String, source: String) -> String {
+        "Body fat \(value)% · \(source)"
+    }
+
+    /// The editorial plate on a day without a photo.
+    static let noPhotoThisDay = "No photo this day"
+    /// Shown once, then gone for good.
+    static let timelineCoachHint = "Swipe through your history. Drag the timeline to jump in time."
+    static let coachDismissedDefaultsKey = "home_v2_timeline_coach_dismissed"
 
     /// H1 status line: "Cutting for 9 weeks." Nothing is claimed about pace
     /// without a target, and nothing at all before there is a trend.
@@ -316,5 +339,86 @@ enum HomeV2Layout {
         let fourByFive = width / HomeV2Tokens.photoAspectRatio
         let available = max(minimumStageHeight, height - belowPhotoHeight)
         return min(fourByFive, available)
+    }
+}
+
+/// Values for the editorial fallback come from stored readings, never photo
+/// appearance, a target, or interpolated chart caches.
+enum HomeV2EditorialPolicy {
+    /// Recorded values only. Current profile height is canonical centimeters;
+    /// another account's profile or an interpolated BF value cannot supply FFMI.
+    static func ffmi(in metric: BodyMetrics, owner: String?, heightCm: Double?) -> Double? {
+        guard metric.userId == owner, let weight = weight(in: metric),
+              let bodyFat = bodyFat(in: metric), let heightCm,
+              heightCm.isFinite, heightCm > 0,
+              let value = UnitConversion.calculateFFMI(
+                weightKg: weight, bodyFatPercentage: bodyFat.percentage, heightCm: heightCm
+              ), value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    static func weight(in metric: BodyMetrics) -> Double? {
+        guard let value = metric.weight, value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    static func displayWeight(in metric: BodyMetrics, system: MeasurementSystem) -> Double? {
+        guard let weight = weight(in: metric) else { return nil }
+        let value = system == .imperial ? weight.kgToLbs : weight
+        return value.isFinite ? value : nil
+    }
+
+    struct BodyFatReading: Equatable {
+        let percentage: Double
+        let caption: String
+    }
+
+    struct WeightReading: Identifiable, Equatable {
+        let id: String
+        let date: Date
+        let kilograms: Double
+    }
+
+    static func bodyFat(in metric: BodyMetrics?) -> BodyFatReading? {
+        guard let metric, let value = metric.bodyFatPercentage,
+              value.isFinite, value > 0, value < 100 else { return nil }
+        let method = metric.bodyFatMethod?.lowercased()
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ") ?? ""
+        // Synthetic estimates must not be presented as recorded body fat.
+        guard !method.contains("interpolat"), !method.contains("derived") else { return nil }
+        let caption: String
+        // Only known stored methods establish provenance. Free-form or negated
+        // labels must not become scan claims merely because they mention one.
+        switch method {
+        case "visual_estimate": caption = "Visual estimate"
+        case "inbody": caption = "From your InBody scan"
+        case "dexa", "dexa (bodyspec)", "bodyspec_dexa": caption = "From your DEXA scan"
+        case "manual", "typed": caption = "Entered by you"
+        case "healthkit", "apple_health": caption = "From Apple Health"
+        case "body_scan": caption = "Body scan estimate"
+        case "bia_scale", "bioelectrical": caption = "Bioelectrical estimate"
+        case "caliper", "calipers": caption = "Caliper estimate"
+        default: caption = "Source not recorded"
+        }
+        return BodyFatReading(percentage: value, caption: caption)
+    }
+
+    static func supportsWeightComparison(in metrics: [BodyMetrics], selected: BodyMetrics?) -> Bool {
+        weights(in: metrics, selected: selected).count >= 2
+    }
+
+    static func weights(
+        in metrics: [BodyMetrics],
+        selected: BodyMetrics?,
+        calendar: Calendar = .current
+    ) -> [WeightReading] {
+        guard let selected,
+              let start = calendar.date(byAdding: .day, value: -30, to: selected.date) else { return [] }
+        return metrics.compactMap { metric in
+            guard metric.userId == selected.userId,
+                  metric.date >= start, metric.date <= selected.date,
+                  let weight = metric.weight, weight.isFinite, weight > 0 else { return nil }
+            return WeightReading(id: metric.id, date: metric.date, kilograms: weight)
+        }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date < $1.date }
     }
 }

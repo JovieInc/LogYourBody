@@ -6,6 +6,7 @@ import type {
   BeginChatTurnResult,
   ChatConversationPort,
   ChatRateLimitResult,
+  ChatTurnStatus,
   StoredChatConversation,
   StoredChatMessage,
 } from '@/lib/ports/chat-conversations';
@@ -37,6 +38,8 @@ type MessageRow = {
   content: string;
   client_message_id: string | null;
   created_at: Date | string;
+  turn_status?: ChatTurnStatus | null;
+  turn_retryable?: boolean | null;
 };
 
 type TurnRow = {
@@ -60,6 +63,9 @@ function mapMessage(row: MessageRow): StoredChatMessage {
     content: row.content,
     clientMessageId: row.client_message_id,
     createdAt: iso(row.created_at),
+    ...(row.role === 'user' && row.turn_status
+      ? { turn: { status: row.turn_status, retryable: row.turn_retryable === true } }
+      : {}),
   };
 }
 
@@ -90,15 +96,23 @@ async function getConversation(
   if (!conversation) return null;
 
   const messages = (await database.query(
-    `select id, role, content, client_message_id, created_at
+    `select recent_messages.id, recent_messages.role, recent_messages.content,
+       recent_messages.client_message_id, recent_messages.created_at,
+       turns.status as turn_status,
+       (turns.status in ('failed', 'cancelled') or
+         (turns.status = 'pending' and turns.lease_expires_at <= now())) as turn_retryable
      from (
-       select id, role, content, client_message_id, created_at
+       select id, role, content, client_message_id, created_at, turn_id
        from public.chat_messages
        where conversation_id = $1 and user_subject = $2
        order by created_at desc, id desc
        limit 100
      ) recent_messages
-     order by created_at asc, id asc`,
+     left join public.chat_turns turns
+       on turns.id = recent_messages.turn_id
+      and turns.conversation_id = $1
+      and turns.user_subject = $2
+     order by recent_messages.created_at asc, recent_messages.id asc`,
     [conversationId, subject],
   )) as MessageRow[];
   return mapConversation(conversation, messages);

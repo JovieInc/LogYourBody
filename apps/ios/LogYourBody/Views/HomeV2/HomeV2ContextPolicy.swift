@@ -2,6 +2,7 @@
 // HomeV2ContextPolicy.swift
 // LogYourBody
 //
+import Combine
 import Foundation
 
 /// Copy for Context (Pencil N2), Entries (E0), Edit entry (E1) and the
@@ -221,6 +222,132 @@ enum HomeV2EntriesPolicy {
                     ? HomeV2ContextCopy.monthDelta(first: chronological.first, last: chronological.last, unit: unit)
                     : nil,
                 rows: rows
+            )
+        }
+    }
+}
+
+/// Reads the selected calendar day independently of the dashboard's recent-history cache.
+@MainActor
+final class HomeV2DailyStepsReader: ObservableObject {
+    struct Key: Hashable {
+        let ownership: AuthManager.ProfileSessionOwnership
+        let day: Date
+    }
+
+    enum State: Equatable {
+        case loading
+        case missing
+        case value(Int)
+    }
+
+    struct Snapshot: Equatable {
+        let key: Key
+        let state: State
+    }
+
+    typealias Fetch = @MainActor (String, Date, Date) async -> [DailyMetrics]
+    typealias OwnsSession = @MainActor (AuthManager.ProfileSessionOwnership) -> Bool
+
+    @Published private(set) var snapshot: Snapshot?
+    private let calendar: Calendar
+    private let fetch: Fetch
+    private var requestID: UUID?
+
+    init(calendar: Calendar = .current, fetch: Fetch? = nil) {
+        self.calendar = calendar
+        self.fetch = fetch ?? { owner, start, end in
+            await Self.readStoredMetrics(for: owner, from: start, to: end)
+        }
+    }
+
+    func key(for metric: BodyMetrics, ownership: AuthManager.ProfileSessionOwnership?) -> Key? {
+        guard let ownership, metric.userId == ownership.subject else { return nil }
+        return key(for: metric.date, ownership: ownership)
+    }
+
+    func key(for date: Date, ownership: AuthManager.ProfileSessionOwnership?) -> Key? {
+        ownership.map { Key(ownership: $0, day: calendar.startOfDay(for: date)) }
+    }
+
+    /// Rechecks ownership at render time, before a replacement task necessarily starts.
+    func state(
+        for metric: BodyMetrics,
+        ownership: AuthManager.ProfileSessionOwnership?,
+        ownsSession: OwnsSession
+    ) -> State {
+        guard key(for: metric, ownership: ownership) != nil else { return .missing }
+        return state(for: metric.date, ownership: ownership, ownsSession: ownsSession)
+    }
+
+    func state(
+        for date: Date,
+        ownership: AuthManager.ProfileSessionOwnership?,
+        ownsSession: OwnsSession
+    ) -> State {
+        guard let key = key(for: date, ownership: ownership), ownsSession(key.ownership) else { return .missing }
+        guard snapshot?.key == key else { return .loading }
+        return snapshot?.state ?? .loading
+    }
+
+    func load(
+        metric: BodyMetrics,
+        ownership: AuthManager.ProfileSessionOwnership,
+        ownsSession: OwnsSession
+    ) async {
+        guard metric.userId == ownership.subject else { return }
+        await load(date: metric.date, ownership: ownership, ownsSession: ownsSession)
+    }
+
+    func load(
+        date: Date,
+        ownership: AuthManager.ProfileSessionOwnership,
+        ownsSession: OwnsSession
+    ) async {
+        guard !Task.isCancelled,
+              let key = key(for: date, ownership: ownership),
+              ownsSession(ownership),
+              let end = calendar.date(byAdding: .day, value: 1, to: key.day) else { return }
+        let request = UUID()
+        requestID = request
+        snapshot = Snapshot(key: key, state: .loading)
+        let rows = await fetch(ownership.subject, key.day, end)
+        guard !Task.isCancelled, requestID == request, ownsSession(ownership) else { return }
+
+        // The range API includes its upper bound; exclude the following day's midnight.
+        let newest = rows.filter {
+            $0.userId == ownership.subject && $0.date >= key.day && $0.date < end
+        }.max {
+            $0.updatedAt == $1.updatedAt ? $0.id < $1.id : $0.updatedAt < $1.updatedAt
+        }
+        let state: State
+        if let steps = newest?.steps, steps >= 0 {
+            state = .value(steps)
+        } else {
+            state = .missing
+        }
+        snapshot = Snapshot(key: key, state: state)
+    }
+
+    static func readStoredMetrics(
+        for owner: String,
+        from start: Date,
+        to end: Date,
+        coreDataManager: CoreDataManager = .shared
+    ) async -> [DailyMetrics] {
+        let rows = await coreDataManager.fetchDailyMetrics(for: owner, from: start, to: end)
+        return rows.compactMap { row in
+            guard let id = row.id, let userId = row.userId, let date = row.date else { return nil }
+            // Legacy writers store both nil and a real zero as 0. Preserve the
+            // canonical missing-value interpretation until storage records presence.
+            return DailyMetrics(
+                id: id,
+                userId: userId,
+                date: date,
+                steps: row.steps > 0 ? Int(row.steps) : nil,
+                notes: row.notes,
+                createdAt: row.createdAt ?? date,
+                updatedAt: row.updatedAt ?? row.createdAt ?? date
             )
         }
     }

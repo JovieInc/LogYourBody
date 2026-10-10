@@ -50,7 +50,23 @@ class MemoryConversationStore implements ChatConversationPort {
 
   async getLatest(subject: string) {
     const values = [...this.conversations.values()].filter(({ owner }) => owner === subject);
-    return values.at(-1)?.conversation ?? null;
+    const conversation = values.at(-1)?.conversation;
+    if (!conversation) return null;
+    return {
+      ...conversation,
+      messages: conversation.messages.map((message) => {
+        const turn = this.turns.get(`${conversation.id}:${message.clientMessageId}`);
+        return message.role === 'user' && turn && turn.owner === subject
+          ? {
+              ...message,
+              turn: {
+                status: turn.status,
+                retryable: turn.status === 'failed' || turn.status === 'cancelled',
+              },
+            }
+          : message;
+      }),
+    };
   }
 
   async beginTurn(input: BeginChatTurnInput) {
@@ -568,12 +584,27 @@ describe('/api/auth/mobile/chat/v1', () => {
     expect(await failed.text()).toContain('event: error');
     expect([...store.turns.values()][0]?.status).toBe('failed');
 
+    const reloaded = await (await handlers.GET(request('GET', 'user-a'))).json();
+    expect(reloaded.conversation.messages).toEqual([
+      expect.objectContaining({
+        clientMessageId,
+        content: chatBody().message,
+        turn: { status: 'failed', retryable: true },
+      }),
+    ]);
+    expect(reloaded.conversation.id).toBe(conversationId);
+
     model.shouldFail = false;
     const retried = await handlers.POST(request('POST', 'user-a', chatBody()));
     expect(await retried.text()).toContain('event: done');
     const conversation = await store.getLatest('user-a');
     expect(conversation?.messages.filter(({ role }) => role === 'user')).toHaveLength(1);
     expect(conversation?.messages.filter(({ role }) => role === 'assistant')).toHaveLength(1);
+    const completedHistory = await (await handlers.GET(request('GET', 'user-a'))).json();
+    expect(completedHistory.conversation.messages[0].turn).toEqual({
+      status: 'completed',
+      retryable: false,
+    });
   });
 
   it('delivers a terminal stream error even when failure persistence is unavailable', async () => {

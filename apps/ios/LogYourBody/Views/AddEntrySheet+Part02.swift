@@ -211,7 +211,7 @@ func saveBodyFat(userId: String) {
                 defer { isSavingEntry = false }
 
                 do {
-                    _ = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                    let savedMetric = try await PhotoMetadataService.shared.createOrUpdateMetrics(
                         for: selectedDate,
                         bodyFatPercentage: validatedBodyFat,
                         bodyFatMethod: bodyFatMethod,
@@ -224,6 +224,7 @@ func saveBodyFat(userId: String) {
 
                     trackEntrySaved(type: "body_fat")
                     HapticManager.shared.successAction()
+                    onBodyFatSaved?(savedMetric)
                     dismiss()
                 } catch {
                     handleValidationError(

@@ -29,6 +29,8 @@ struct DashboardViewLiquid: View {
 
     // Core data / selection
     @State var selectedIndex: Int = 0
+    @State var homeV2Timeline = HomeV2TimelinePolicy.Snapshot()
+    @State var homeV2TimelineSelection: HomeV2TimelinePolicy.Selection?
 
     // Metrics reordering state
     @AppStorage("metricsOrder") private var metricsOrderData = Data()
@@ -89,11 +91,13 @@ struct DashboardViewLiquid: View {
     @State private var isPhotosTabEnabled = true
     @State var selectedPhotoTimelineRootPage: PhotoTimelineRootPage = .timeline
     @State var isHomeChatExpanded = false
+    @State var homeChatDraft = AccountSessionChatDraft()
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false
     @State var isHomeV2ViewerPresented = false
     @State var isHomeV2ContextPresented = false
-    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
+    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .bodyFat
+    @StateObject var homeV2StepsReader = HomeV2DailyStepsReader()
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
     @State var homeV2LogSheetDate = Date()
@@ -246,8 +250,13 @@ struct DashboardViewLiquid: View {
             .onReceive(viewModel.$recentDailyMetrics) { _ in
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
             }
-            .onReceive(viewModel.$bodyMetrics) { _ in
+            .onReceive(viewModel.$bodyMetrics) { metrics in
+                reconcileHomeV2Timeline(with: metrics)
                 scheduleDashboardDerivedStateRefresh()
+            }
+            .onChange(of: authManager.currentUser?.id) { _, _ in
+                homeV2TimelineSelection = nil
+                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
@@ -265,6 +274,7 @@ struct DashboardViewLiquid: View {
                 }
             }
             .onChange(of: selectedIndex) { _, newIndex in
+                recordHomeV2TimelineSelection(at: newIndex)
                 scheduleDashboardDerivedStateRefresh(animatedIndex: newIndex)
             }
             .onChange(of: selectedTab) { _, newTab in
@@ -280,6 +290,7 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
                 featureGateRefreshToken = UUID()
+                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
@@ -293,7 +304,8 @@ struct DashboardViewLiquid: View {
                     initialWeight: addEntryInitialWeight,
                     initialBodyFat: addEntryInitialBodyFat,
                     isHomeV2LogEntry: isHomeV2LoggingWeight,
-                    onWeightSaved: handleHomeV2WeightEntrySaved
+                    onWeightSaved: handleHomeV2WeightEntrySaved,
+                    onBodyFatSaved: handleHomeV2BodyFatEntrySaved
                 )
                     .environmentObject(authManager)
             }
