@@ -1,3 +1,8 @@
+import type { TrainingMutationsPort } from './training-mutations';
+import type {
+  NativeAccountAdmission,
+  NativeAccountAdmissionPort,
+} from './native-account-admission';
 export const NATIVE_PRODUCT_RECORD_COLLECTIONS = [
   'daily_metrics',
   'glp1_medications',
@@ -34,6 +39,15 @@ export type NativeProductRecordsPullCursor = {
 };
 
 export interface NativeProductRecordsPort {
+  accountMutations?: NativeProductAccountMutationsPort;
+  trainingMutations?: TrainingMutationsPort;
+  /** Insert a set once, or return its existing owned, active row without changing it.
+   * Missing capability must fail closed; callers must never fall back to push.
+   */
+  insertTrainingSet?(
+    subject: string,
+    record: Record<string, unknown>,
+  ): Promise<NativeProductRecord | null>;
   push(
     subject: string,
     collection: NativeProductRecordCollection,
@@ -56,6 +70,23 @@ export interface NativeProductRecordsPort {
   endActiveGlp1Medications(subject: string, endedAt: string): Promise<{ updated: number }>;
   listAll(subject: string): Promise<Record<NativeProductRecordCollection, NativeProductRecord[]>>;
   deleteAllForSubject(subject: string): Promise<void>;
+}
+
+export interface NativeProductAccountMutationsPort extends NativeAccountAdmissionPort {
+  push(
+    admission: NativeAccountAdmission,
+    collection: NativeProductRecordCollection,
+    records: Array<Record<string, unknown>>,
+  ): Promise<{ records: NativeProductRecord[]; rejected_ids: string[] }>;
+  remove(
+    admission: NativeAccountAdmission,
+    collection: NativeProductRecordCollection,
+    ids: string[],
+  ): Promise<{ deleted_ids: string[] }>;
+  endActiveGlp1Medications(
+    admission: NativeAccountAdmission,
+    endedAt: string,
+  ): Promise<{ updated: number }>;
 }
 
 export function isNativeProductRecordCollection(

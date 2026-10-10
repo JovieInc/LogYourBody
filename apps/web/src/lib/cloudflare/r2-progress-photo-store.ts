@@ -7,6 +7,8 @@ export const PROGRESS_PHOTO_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/w
 
 export type ProgressPhotoContentType = (typeof PROGRESS_PHOTO_CONTENT_TYPES)[number];
 
+export type ProgressPhotoAccountScope = Readonly<{ subject: string; ownerId: string }>;
+
 export type R2PhotoStoreConfig = {
   accountId: string;
   accessKeyId: string;
@@ -77,8 +79,16 @@ export function progressPhotoOwnerPrefix(userId: string): string {
   return `progress-photos/${safeOwnerSegment(userId)}/`;
 }
 
+export function progressPhotoAccountPrefix(scope: ProgressPhotoAccountScope): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(scope.ownerId)) {
+    throw new Error('invalid_product_owner_id');
+  }
+  return `${progressPhotoOwnerPrefix(scope.subject)}accounts/${scope.ownerId.toLowerCase()}/`;
+}
+
 export function progressPhotoObjectKey(input: {
   userId: string;
+  ownerId: string;
   metricsId: string;
   contentType: ProgressPhotoContentType;
   now?: Date;
@@ -89,7 +99,7 @@ export function progressPhotoObjectKey(input: {
   }
   const stamp = (input.now ?? new Date()).getTime();
   const extension = CONTENT_TYPE_EXTENSION[input.contentType];
-  return `${progressPhotoOwnerPrefix(input.userId)}${metricsId}_${stamp}.${extension}`;
+  return `${progressPhotoAccountPrefix({ subject: input.userId, ownerId: input.ownerId })}${metricsId}_${stamp}.${extension}`;
 }
 
 export function publicProgressPhotoUrl(config: R2PhotoStoreConfig, objectKey: string): string {
@@ -103,6 +113,7 @@ export function publicProgressPhotoUrl(config: R2PhotoStoreConfig, objectKey: st
 export function createProgressPhotoUploadTicket(input: {
   config: R2PhotoStoreConfig;
   userId: string;
+  ownerId: string;
   metricsId: string;
   contentType: ProgressPhotoContentType;
   now?: Date;
@@ -112,6 +123,7 @@ export function createProgressPhotoUploadTicket(input: {
   const expiresIn = input.expiresIn ?? PROGRESS_PHOTO_UPLOAD_TTL_SECONDS;
   const objectKey = progressPhotoObjectKey({
     userId: input.userId,
+    ownerId: input.ownerId,
     metricsId: input.metricsId,
     contentType: input.contentType,
     now,
@@ -139,18 +151,19 @@ export function createProgressPhotoUploadTicket(input: {
 }
 
 export async function deleteOwnedProgressPhotos(
-  userId: string,
+  scope: ProgressPhotoAccountScope,
   options: {
     env?: NodeJS.ProcessEnv;
     fetcher?: typeof fetch;
     now?: Date;
   } = {},
 ): Promise<void> {
+  const accountPrefix = progressPhotoAccountPrefix(scope);
   const config = readR2PhotoStoreConfig(options.env ?? process.env);
   if (!config) return;
   const fetcher = options.fetcher ?? fetch;
   const now = options.now ?? new Date();
-  const prefix = progressPhotoOwnerPrefix(userId);
+  const prefix = progressPhotoOwnerPrefix(scope.subject);
   let continuationToken: string | undefined;
   const seenContinuationTokens = new Set<string>();
   do {
@@ -171,6 +184,11 @@ export async function deleteOwnedProgressPhotos(
       if (!key.startsWith(prefix)) {
         throw new Error('r2_list_returned_unowned_object');
       }
+      // Pre-incarnation tickets used flat keys. New tickets always live under
+      // their product-account UUID, so an old cleanup cannot erase a new account.
+      const suffix = key.slice(prefix.length);
+      const isLegacyFlatKey = suffix.length > 0 && !suffix.includes('/');
+      if (!isLegacyFlatKey && !key.startsWith(accountPrefix)) continue;
       await deleteR2Object({ config, key, fetcher, now });
     }
     continuationToken = listed.nextContinuationToken;

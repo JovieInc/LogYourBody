@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
+import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import {
   PROGRESS_PHOTO_MAX_BYTES,
   createProgressPhotoUploadTicket,
@@ -55,20 +56,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const parsed = PhotoUploadRequestSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return noStoreJson({ error: 'invalid_photo_upload' }, 400);
-  }
-
-  const contentType = parsed.data.contentType;
-  if (!isProgressPhotoContentType(contentType)) {
-    return noStoreJson({ error: 'invalid_photo_upload' }, 400);
-  }
-
   try {
+    const admission = await neonUserDirectory.captureAccountAdmission(identity.sub);
+    if (!admission) return noStoreJson({ error: 'account_not_found' }, 404);
+
+    const parsed = PhotoUploadRequestSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return noStoreJson({ error: 'invalid_photo_upload' }, 400);
+    const contentType = parsed.data.contentType;
+    if (!isProgressPhotoContentType(contentType)) {
+      return noStoreJson({ error: 'invalid_photo_upload' }, 400);
+    }
+
+    const current = await neonUserDirectory.captureAccountAdmission(identity.sub);
+    if (!current || current.ownerId !== admission.ownerId) {
+      return noStoreJson({ error: 'account_changed' }, 409);
+    }
     const ticket = createProgressPhotoUploadTicket({
       config,
-      userId: identity.sub,
+      userId: admission.subject,
+      ownerId: admission.ownerId,
       metricsId: parsed.data.metricsId,
       contentType,
     });

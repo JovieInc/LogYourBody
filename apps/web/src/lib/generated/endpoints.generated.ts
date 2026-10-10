@@ -48,6 +48,10 @@ export const endpoints = {
     'chat_usage_limits',
     'waitlist_entries',
     'native_records',
+    'training_revision_proposals',
+    'training_program_revisions',
+    'training_revision_state',
+    'revenuecat_events',
     'progress_photos',
     'data_exports',
     'dexa_results',
@@ -410,6 +414,16 @@ export const endpoints = {
     {
       value: 'https://docs.revenuecat.com',
       reason: 'RevenueCat docs links.',
+    },
+    {
+      value:
+        'https://www.six-group.com/en/products-services/financial-information/market-reference-data/data-standards.html',
+      reason: 'Official ISO 4217 maintenance source for revenue currency qualification.',
+    },
+    {
+      value:
+        'https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml',
+      reason: 'Official ISO 4217 currency snapshot source for the revenue report.',
     },
     {
       value: 'https://fastlane.tools',
