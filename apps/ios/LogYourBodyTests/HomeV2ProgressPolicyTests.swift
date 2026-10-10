@@ -30,6 +30,67 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
         XCTAssertTrue(HomeV2ProgressCopy.stepsAverageSentence(average: 8_412, range: .month3).hasPrefix("Averaging "))
     }
 
+    func testStepFormatterPreservesOrdinaryRoundingAndLocale() {
+        let formatter = FormatterCache.stepsFormatter
+        let originalLocale = formatter.locale
+        defer { formatter.locale = originalLocale }
+        formatter.locale = Locale(identifier: "en_US")
+        XCTAssertEqual(FormatterCache.formattedSteps(0), "0")
+        XCTAssertEqual(FormatterCache.formattedSteps(8_421.49), "8,421")
+        XCTAssertEqual(FormatterCache.formattedSteps(8_421.5), "8,422")
+        XCTAssertEqual(FormatterCache.formattedSteps(-8_421.5), "-8,422")
+        XCTAssertEqual(FormatterCache.formattedSteps(Double(Int32.max)), "2,147,483,647")
+        formatter.locale = Locale(identifier: "de_DE")
+        XCTAssertEqual(FormatterCache.formattedSteps(8_421.5), "8.422")
+        formatter.locale = Locale(identifier: "hi_IN")
+        XCTAssertEqual(FormatterCache.formattedSteps(123_456), "1,23,456")
+    }
+
+    func testStepFormatterHandlesFiniteValuesBeyondIntegerRange() {
+        let formatter = FormatterCache.stepsFormatter
+        let originalLocale = formatter.locale
+        defer { formatter.locale = originalLocale }
+        formatter.locale = Locale(identifier: "en_US")
+        XCTAssertEqual(FormatterCache.formattedSteps(1e20), "100,000,000,000,000,000,000")
+        for value in [Double(Int.max), Double(Int.min), Double.greatestFiniteMagnitude] {
+            XCTAssertFalse(FormatterCache.formattedSteps(value)?.isEmpty ?? true)
+        }
+    }
+
+    func testStepFormatterTreatsNonfiniteValuesAsMissing() {
+        for value in [Double.nan, Double.infinity, -Double.infinity] {
+            XCTAssertNil(FormatterCache.formattedSteps(value))
+        }
+    }
+
+    func testStepAverageFormatsFractionalAndLargeValuesWithoutIntegerConversion() {
+        let formatter = FormatterCache.stepsFormatter
+        let originalLocale = formatter.locale
+        defer { formatter.locale = originalLocale }
+        formatter.locale = Locale(identifier: "en_US")
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsAverageSentence(average: 8_421.5, range: .month3),
+            "Averaging 8,422 a day in 3 months"
+        )
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsAverageSentence(average: 1e20, range: .all),
+            "Averaging 100,000,000,000,000,000,000 a day overall"
+        )
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsAverageSentence(average: 0, range: .week1),
+            "Averaging 0 a day in 7 days"
+        )
+    }
+
+    func testStepAverageTreatsMissingAndNonfiniteValuesAsNoTrend() {
+        for value: Double? in [nil, .nan, .infinity, -.infinity] {
+            XCTAssertEqual(
+                HomeV2ProgressCopy.stepsAverageSentence(average: value, range: .month1),
+                HomeV2ProgressCopy.noTrendYet
+            )
+        }
+    }
+
     func testStatsTakeStartLowAndChangeFromTheVisiblePoints() {
         let points = [point(daysAgo: 0, value: 173.4), point(daysAgo: 10, value: 172.9), point(daysAgo: 40, value: 186.2)]
         let stats = HomeV2ProgressPolicy.stats(points: points, prefersHigh: false)
