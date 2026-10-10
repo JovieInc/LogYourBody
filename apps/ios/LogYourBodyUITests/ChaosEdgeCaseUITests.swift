@@ -511,6 +511,9 @@ final class ChaosEdgeCaseUITests: XCTestCase {
     // MARK: - 13. Accessibility XXXL round trip has no layout anomalies
 
     func testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies() throws {
+        // A 120s kill retries all eleven chaos tests and blows the 40-minute
+        // gate. 180s is the audit's existing maximum, not a workflow change.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
@@ -605,6 +608,104 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         )
         XCTAssertTrue(composer.isHittable)
         attachScreenshot(named: "edge-arabic-locale-root", from: app)
+    }
+
+    // MARK: - 15. Privacy, export, and delete confirmation
+
+    func testPrivacyExportAndDeleteConfirmationStayReachable() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+
+        assertTimelineRootAppears(in: app, timeout: 30)
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+
+        let privacy = revealButton("settings_privacy_data_link", in: app)
+        XCTAssertTrue(privacy.waitForExistence(timeout: 5))
+        XCTAssertTrue(privacy.isHittable)
+        privacy.tap()
+        XCTAssertTrue(waitForSettingsDetailScreen(in: app, timeout: 8))
+        XCTAssertTrue(app.staticTexts["Remove from Photos after import"].waitForExistence(timeout: 5))
+        navigateBack(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+
+        let export = revealButton("home_v2_settings_export", in: app)
+        XCTAssertTrue(export.isHittable)
+        export.tap()
+        XCTAssertTrue(
+            app.staticTexts["Export your data"].waitForExistence(timeout: 8),
+            "The export row must open the export screen."
+        )
+        let exportAction = app.descendants(matching: .any)["export_data_action"]
+        for _ in 0..<4 where !exportAction.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(exportAction.waitForExistence(timeout: 3))
+        XCTAssertTrue(exportAction.isHittable)
+        navigateBack(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+
+        let delete = revealButton("home_v2_settings_delete", in: app)
+        XCTAssertTrue(delete.isHittable)
+        delete.tap()
+        let field = app.textFields["delete_account_confirmation_field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        let confirm = app.buttons["delete_account_confirm_button"]
+        for _ in 0..<6 where !(confirm.exists && confirm.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirm.isHittable)
+        XCTAssertFalse(confirm.isEnabled)
+
+        field.tap()
+        XCTAssertTrue(waitForKeyboard(in: app))
+        field.typeText("DELET")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["delete_account_confirmation_error"].waitForExistence(timeout: 3)
+        )
+        XCTAssertFalse(confirm.isEnabled)
+
+        clearText(in: field)
+        field.typeText("DELETE")
+        dismissKeyboardIfNeeded(in: app)
+        for _ in 0..<4 where !(confirm.exists && confirm.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirm.isHittable)
+        XCTAssertTrue(confirm.isEnabled)
+        confirm.tap()
+
+        let alert = app.alerts["Delete Account?"]
+        XCTAssertTrue(
+            alert.waitForExistence(timeout: 5),
+            "The final delete confirmation must present as an alert with a reachable Cancel control."
+        )
+        let cancel = app.buttons.matching(identifier: "delete_account_final_cancel").firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 2))
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertFalse(alert.exists)
+        XCTAssertFalse(app.staticTexts["Deleting your account..."].exists)
+    }
+
+    private func revealButton(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let button = app.buttons[identifier]
+        for _ in 0..<6 {
+            if button.exists, button.isHittable {
+                return button
+            }
+            app.swipeUp()
+        }
+        return button
     }
 
     // MARK: - Shared helpers
@@ -870,23 +971,15 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        attachDiagnosticTree(from: app, named: "layout-scan-\(context)-tree")
-        attachScreenshot(named: "layout-scan-\(context)", from: app)
-        let window = app.windows.firstMatch.frame
-        let elements = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
-        let geometry = elements.map { "\($0.identifier) \($0.label): \($0.frame)" }
-        let attachment = XCTAttachment(string: "window=\(window)\n" + geometry.joined(separator: "\n"))
-        attachment.name = "layout-scan-\(context)-geometry"
-        attachment.lifetime = .keepAlways
-        add(attachment)
         var observations: [String] = []
         let findings = layoutAnomalies(in: app, observations: &observations)
+        guard !findings.isEmpty else { return }
+        attachDiagnosticTree(from: app, named: "layout-scan-\(context)-tree")
+        attachScreenshot(named: "layout-anomaly-\(context)", from: app)
         let clipping = XCTAttachment(string: observations.joined(separator: "\n"))
         clipping.name = "layout-scan-\(context)-expected-native-scroll-clipping"
         clipping.lifetime = .keepAlways
         add(clipping)
-        guard !findings.isEmpty else { return }
-        attachScreenshot(named: "layout-anomaly-\(context)", from: app)
         XCTFail("Layout anomalies at \(context): \(findings.joined(separator: "; "))", file: file, line: line)
     }
 
