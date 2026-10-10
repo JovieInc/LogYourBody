@@ -87,6 +87,8 @@ export type TrainingProgramSetup = {
   sessionsPerWeek: 2 | 3;
   equipment: Equipment;
   startedAt: string;
+  programRevisionId?: string;
+  programPolicyVersion?: string;
 };
 
 export type TrainingFeedback = {

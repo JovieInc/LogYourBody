@@ -177,6 +177,197 @@ describe('authenticated training API', () => {
     expect((await handlers.logSet(request('POST', 'log-set', 'token-b', set))).status).toBe(409);
   });
 
+  it('keeps the first active-session set immutable across conflicts and delayed retries', async () => {
+    const { handlers, records, setNow } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const set = {
+      sessionId: session.id,
+      exerciseId: session.exercises[0].id,
+      setNumber: 1,
+      reps: 10,
+      loadKg: 20,
+      rir: 3,
+    };
+    const first = await handlers.logSet(request('POST', 'log-set', 'token-a', set));
+    expect(first.status).toBe(201);
+    const firstBody = await first.json();
+    setNow('2026-01-10T12:01:00.000Z');
+    const conflict = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', {
+        ...set,
+        reps: 8,
+        loadKg: 25,
+      }),
+    );
+    expect(conflict.status).toBe(409);
+    await expect(conflict.json()).resolves.toMatchObject({ error: 'set_conflict' });
+    setNow('2026-01-10T12:02:00.000Z');
+    const retry = await handlers.logSet(request('POST', 'log-set', 'token-a', set));
+    expect(retry.status).toBe(201);
+    await expect(retry.json()).resolves.toMatchObject({
+      log: firstBody.log,
+      sessionComplete: false,
+    });
+    expect((await records.pull('subject-a', 'logged_sets')).records).toEqual([firstBody.log]);
+  });
+
+  it.each([false, true])(
+    'atomically resolves concurrent set submissions (identical=%s)',
+    async (identical) => {
+      const { handlers, records } = makeHarness();
+      await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+      const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+      const set = {
+        sessionId: session.id,
+        exerciseId: session.exercises[0].id,
+        setNumber: 1,
+        reps: 10,
+        loadKg: 20,
+        rir: 3,
+      };
+      const responses = await Promise.all([
+        handlers.logSet(request('POST', 'log-set', 'token-a', set)),
+        handlers.logSet(
+          request('POST', 'log-set', 'token-a', {
+            ...set,
+            reps: identical ? 10 : 8,
+          }),
+        ),
+      ]);
+      expect(responses.map((response) => response.status).sort()).toEqual(
+        identical ? [201, 201] : [201, 409],
+      );
+      const bodies = await Promise.all(responses.map((response) => response.json()));
+      const accepted = bodies.filter((body) => body.log);
+      const stored = (await records.pull('subject-a', 'logged_sets')).records;
+      expect(stored).toHaveLength(1);
+      for (const body of accepted) expect(body.log).toEqual(stored[0]);
+      if (!identical) expect(bodies.find((body) => body.error)?.error).toBe('set_conflict');
+    },
+  );
+
+  it('fails safely when atomic set insertion is unavailable', async () => {
+    const { handlers, records } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    Object.defineProperty(records, 'insertTrainingSet', { value: undefined });
+    const response = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', {
+        sessionId: session.id,
+        exerciseId: session.exercises[0].id,
+        setNumber: 1,
+        reps: 10,
+        loadKg: 20,
+        rir: 3,
+      }),
+    );
+    expect(response.status).toBe(503);
+    expect((await records.pull('subject-a', 'logged_sets')).records).toEqual([]);
+  });
+
+  it('acknowledges saved sets after effective volume changes without accepting edits or new out-of-plan sets', async () => {
+    const { handlers, records, setNow } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const set = {
+      sessionId: session.id,
+      exerciseId: session.exercises[0].id,
+      setNumber: 2,
+      reps: 10,
+      loadKg: 20,
+      rir: 3,
+    };
+    const original = await (
+      await handlers.logSet(request('POST', 'log-set', 'token-a', set))
+    ).json();
+    const storedSession = (await records.pull('subject-a', 'training_sessions')).records[0]!;
+    await records.push('subject-a', 'training_sessions', [
+      {
+        ...storedSession,
+        prescription: {
+          ...session,
+          exercises: session.exercises.map((exercise: { sets: number }) => ({
+            ...exercise,
+            sets: 1,
+          })),
+        },
+      },
+    ]);
+    setNow('2026-01-10T12:02:00.000Z');
+    const retry = await handlers.logSet(request('POST', 'log-set', 'token-a', set));
+    expect(retry.status).toBe(201);
+    await expect(retry.json()).resolves.toMatchObject({
+      log: original.log,
+      sessionComplete: false,
+    });
+    const changed = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', { ...set, reps: 8 }),
+    );
+    expect(changed.status).toBe(409);
+    await expect(changed.json()).resolves.toMatchObject({ error: 'set_conflict' });
+    const newSet = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', { ...set, exerciseId: session.exercises[1].id }),
+    );
+    expect(newSet.status).toBe(400);
+    await expect(newSet.json()).resolves.toMatchObject({ error: 'set_not_in_session' });
+    await handlers.enroll(request('POST', 'enroll', 'token-b', eligibleSetup));
+    expect((await handlers.logSet(request('POST', 'log-set', 'token-b', set))).status).toBe(404);
+    expect((await records.pull('subject-a', 'logged_sets')).records).toEqual([original.log]);
+  });
+
+  it.each(['deleted-before-read', 'deleted-before-insert', 'unsupported'])(
+    'does not bypass atomic safety for an out-of-plan saved set retry (%s)',
+    async (state) => {
+      const { handlers, records } = makeHarness();
+      await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+      const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+      const set = {
+        sessionId: session.id,
+        exerciseId: session.exercises[0].id,
+        setNumber: 2,
+        reps: 10,
+        loadKg: 20,
+        rir: 3,
+      };
+      const { log } = await (
+        await handlers.logSet(request('POST', 'log-set', 'token-a', set))
+      ).json();
+      const storedSession = (await records.pull('subject-a', 'training_sessions')).records[0]!;
+      await records.push('subject-a', 'training_sessions', [
+        {
+          ...storedSession,
+          prescription: {
+            ...session,
+            exercises: session.exercises.map((exercise: { sets: number }) => ({
+              ...exercise,
+              sets: 1,
+            })),
+          },
+        },
+      ]);
+      if (state === 'deleted-before-read') {
+        await records.remove('subject-a', 'logged_sets', [log.id]);
+      } else if (state === 'deleted-before-insert') {
+        const insert = records.insertTrainingSet.bind(records);
+        records.insertTrainingSet = async (subject, value) => {
+          await records.remove(subject, 'logged_sets', [log.id]);
+          return insert(subject, value);
+        };
+      } else {
+        Object.defineProperty(records, 'insertTrainingSet', { value: undefined });
+      }
+      const response = await handlers.logSet(request('POST', 'log-set', 'token-a', set));
+      expect(response.status).toBe(state === 'deleted-before-read' ? 400 : 503);
+      const saved = (await records.pull('subject-a', 'logged_sets')).records;
+      expect(saved).toHaveLength(1);
+      expect(saved[0]).toEqual({
+        ...log,
+        deleted_at: state === 'unsupported' ? null : expect.any(String),
+      });
+    },
+  );
+
   it('uses feedback conservatively and revokes all program records on opt-out', async () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
@@ -354,6 +545,74 @@ describe('authenticated training API', () => {
     expect(reopened.session.loggedSets).toEqual([expect.objectContaining(set)]);
     const otherAccount = await (await handlers.next(request('GET', 'next', 'token-b'))).json();
     expect(otherAccount.session).toBeUndefined();
+  });
+
+  it('retains an unfinished prescription through logging, pain pause, next-week resume and opt-out', async () => {
+    const { handlers, setNow } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session: original } = await (
+      await handlers.next(request('GET', 'next', 'token-a'))
+    ).json();
+    const set = {
+      sessionId: original.id,
+      exerciseId: original.exercises[0].id,
+      reps: 10,
+      loadKg: 25,
+      rir: 4,
+    };
+    for (const setNumber of [1, 2]) {
+      expect(
+        (await handlers.logSet(request('POST', 'log-set', 'token-a', { ...set, setNumber })))
+          .status,
+      ).toBe(201);
+    }
+    const reopened = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(reopened.session.exercises).toEqual(original.exercises);
+    const checkIn = {
+      sessionId: original.id,
+      soreness: 2,
+      pump: 5,
+      performance: 'stable',
+      jointPain: 5,
+    };
+    expect((await handlers.feedback(request('POST', 'feedback', 'token-a', checkIn))).status).toBe(
+      201,
+    );
+    const paused = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(paused.session).toMatchObject({ id: original.id, safetyStop: true, exercises: [] });
+    expect(
+      (
+        await handlers.logSet(
+          request('POST', 'log-set', 'token-a', {
+            ...set,
+            exerciseId: original.exercises[1].id,
+            setNumber: 1,
+          }),
+        )
+      ).status,
+    ).toBe(409);
+    setNow('2026-01-17T12:00:00.000Z');
+    expect(
+      (
+        await handlers.feedback(
+          request('POST', 'feedback', 'token-a', { ...checkIn, jointPain: 0 }),
+        )
+      ).status,
+    ).toBe(201);
+    const resumed = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(resumed.session).toMatchObject({
+      id: original.id,
+      week: original.week,
+      safetyStop: false,
+      exercises: original.exercises,
+    });
+    expect(resumed.session.loggedSets).toEqual(reopened.session.loggedSets);
+    expect((await handlers.revoke(request('DELETE', 'enroll', 'token-a'))).status).toBe(200);
+    expect((await handlers.next(request('GET', 'next', 'token-a'))).status).toBe(409);
+    expect(
+      (await handlers.logSet(request('POST', 'log-set', 'token-a', { ...set, setNumber: 1 })))
+        .status,
+    ).toBe(409);
   });
 
   it('reports rejected check-ins as unavailable instead of saved', async () => {

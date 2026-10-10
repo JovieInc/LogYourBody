@@ -1,3 +1,10 @@
+import type { TrainingMutationAdmission } from '@/lib/ports/training-mutations';
+import {
+  captureTrainingAdmission,
+  requireAdmittedSetup,
+  requireCurrentTrainingAdmission,
+  commitTrainingMutation,
+} from './mutation-admission';
 import type {
   NativeProductRecord,
   NativeProductRecordsPort,
@@ -30,6 +37,7 @@ export type LogSetResult =
   | { kind: 'session_not_found' }
   | { kind: 'session_not_active' }
   | { kind: 'set_not_in_session' }
+  | { kind: 'set_conflict' }
   | { kind: 'rejected' };
 
 /** Stores one set against the subject's active session. Shared by the mobile API and MCP. */
@@ -38,13 +46,17 @@ export async function logTrainingSet(input: {
   subject: string;
   now: Date;
   set: LogSetInput;
+  admission?: TrainingMutationAdmission;
 }): Promise<LogSetResult> {
   const { records, subject, set } = input;
+  const admission = input.admission ?? (await captureTrainingAdmission(records, subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
   const [snapshot, sessions] = await Promise.all([
     loadTrainingRecords(records, subject),
     pullAllTrainingRecords(records, subject, 'training_sessions'),
   ]);
   if (!snapshot.setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, snapshot.setup);
   const sessionRecord = sessions.find((record) => record.id === set.sessionId);
   if (
     !sessionRecord ||
@@ -80,7 +92,20 @@ export async function logTrainingSet(input: {
     return { kind: 'session_not_active' };
   }
   const completedAt = input.now.toISOString();
-  if (!session || !validateSetLog({ id: 'server-generated', ...set, completedAt }, session))
+  const hasSavedIdentity = snapshot.logs.some(
+    (prior) =>
+      prior.id === logId &&
+      prior.sessionId === set.sessionId &&
+      prior.exerciseId === set.exerciseId &&
+      prior.setNumber === set.setNumber,
+  );
+  // Recovery can reduce the effective set count after a set was already saved.
+  // Let the atomic read below acknowledge that row or reject a changed payload;
+  // only a genuinely new identity must fit the current prescription.
+  if (
+    !session ||
+    (!hasSavedIdentity && !validateSetLog({ id: 'server-generated', ...set, completedAt }, session))
+  )
     return { kind: 'set_not_in_session' };
 
   const log: SetLog & { record_type: string } = {
@@ -94,9 +119,19 @@ export async function logTrainingSet(input: {
     rir: set.rir,
     completedAt,
   };
-  const saved = await records.push(subject, 'logged_sets', [log]);
-  if (saved.rejected_ids.includes(logId)) return { kind: 'rejected' };
-  const allLogs = [...snapshot.logs, log];
+  const saved = await commitTrainingMutation(records, subject, admission, 'set_insert', log);
+  if (!saved || saved.id !== logId || saved.deleted_at !== null || saved.record_type !== 'set_log')
+    return { kind: 'rejected' };
+  if (
+    saved.sessionId !== set.sessionId ||
+    saved.exerciseId !== set.exerciseId ||
+    saved.setNumber !== set.setNumber ||
+    saved.reps !== set.reps ||
+    saved.loadKg !== set.loadKg ||
+    saved.rir !== set.rir
+  )
+    return { kind: 'set_conflict' };
+  const allLogs = [...snapshot.logs.filter((prior) => prior.id !== logId), saved];
   const sessionComplete = session.exercises.every((exercise) =>
     Array.from({ length: exercise.sets }, (_, index) => index + 1).every((setNumber) =>
       allLogs.some(
@@ -108,12 +143,13 @@ export async function logTrainingSet(input: {
     ),
   );
   if (sessionComplete) {
-    const completion = await records.push(subject, 'training_sessions', [
-      { ...sessionRecord, status: 'completed', completedAt },
-    ]);
-    if (completion.rejected_ids.includes(session.id)) return { kind: 'rejected' };
+    await commitTrainingMutation(records, subject, admission, 'session_update', {
+      ...sessionRecord,
+      status: 'completed',
+      completedAt,
+    });
   }
-  return { kind: 'logged', log: saved.records[0] ?? log, sessionComplete };
+  return { kind: 'logged', log: saved, sessionComplete };
 }
 
 export type FeedbackInput = Pick<
@@ -135,9 +171,14 @@ export async function recordTrainingFeedback(input: {
   now: Date;
   createId: () => string;
   feedback: FeedbackInput;
+  admission?: TrainingMutationAdmission;
 }): Promise<FeedbackResult> {
+  const admission =
+    input.admission ?? (await captureTrainingAdmission(input.records, input.subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
   const snapshot = await loadTrainingRecords(input.records, input.subject);
   if (!snapshot.setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, snapshot.setup);
   const sessionExists = snapshot.sessions.some(
     (record) =>
       record.id === input.feedback.sessionId &&
@@ -157,6 +198,7 @@ export async function recordTrainingFeedback(input: {
     latest.jointPain === input.feedback.jointPain
   ) {
     // Keep the original observation time, even when another session has newer feedback.
+    await requireCurrentTrainingAdmission(input.records, input.subject, admission);
     return {
       kind: 'recorded',
       feedback: {
@@ -178,7 +220,12 @@ export async function recordTrainingFeedback(input: {
     ...input.feedback,
     createdAt,
   };
-  const saved = await input.records.push(input.subject, 'training_feedback', [feedback]);
-  if (saved.rejected_ids.includes(feedback.id)) return { kind: 'rejected' };
+  await commitTrainingMutation(
+    input.records,
+    input.subject,
+    admission,
+    'feedback_insert',
+    feedback,
+  );
   return { kind: 'recorded', feedback };
 }

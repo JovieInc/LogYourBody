@@ -135,32 +135,17 @@ export const neonUserDirectory: UserDirectoryPort = {
   async deleteUser(subject) {
     const database = getDatabase();
 
-    // User-owned product rows do not have a database cascade to app_users yet.
-    // Delete them first so a failed cleanup never removes the identity record
-    // while leaving private data orphaned and unreachable by the user.
-    await database`
-      delete from public.chat_usage_limits
-      where user_subject = ${subject}
-    `;
-
-    await database`
-      delete from public.chat_conversations
-      where user_subject = ${subject}
-    `;
-
-    await database`
-      delete from public.body_metrics
-      where user_subject = ${subject}
-    `;
-
-    await database`
-      delete from public.native_records
-      where user_subject = ${subject}
-    `;
-
-    await database`
-      delete from public.app_users
-      where identity_provider = 'jovie' and identity_subject = ${subject}
-    `;
+    // Serialize with training revision decisions on the canonical owner/profile row.
+    // Keep all existing cleanup predicates; rollback preserves the identity on failure.
+    await database.transaction([
+      database`select id from public.app_users
+        where identity_provider = 'jovie' and identity_subject = ${subject} for update`,
+      database`delete from public.chat_usage_limits where user_subject = ${subject}`,
+      database`delete from public.chat_conversations where user_subject = ${subject}`,
+      database`delete from public.body_metrics where user_subject = ${subject}`,
+      database`delete from public.native_records where user_subject = ${subject}`,
+      database`delete from public.app_users
+        where identity_provider = 'jovie' and identity_subject = ${subject}`,
+    ]);
   },
 };
