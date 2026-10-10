@@ -15,7 +15,9 @@ final class BodySpecAuthManagerPKCETests: XCTestCase {
     )
 
     func testCodeVerifierHasRFC7636LengthOf64() {
-        let manager = BodySpecAuthManager()
+        let manager = BodySpecAuthManager(
+            tokenStore: BodySpecMemoryTokenStore(), account: .init(capture: { nil }, owns: { _ in false })
+        )
 
         for _ in 0..<10 {
             XCTAssertEqual(manager.generateCodeVerifier().count, 64)
@@ -23,7 +25,9 @@ final class BodySpecAuthManagerPKCETests: XCTestCase {
     }
 
     func testCodeVerifierUsesOnlyRFC7636UnreservedCharacters() {
-        let manager = BodySpecAuthManager()
+        let manager = BodySpecAuthManager(
+            tokenStore: BodySpecMemoryTokenStore(), account: .init(capture: { nil }, owns: { _ in false })
+        )
 
         for _ in 0..<10 {
             let verifier = manager.generateCodeVerifier()
@@ -35,7 +39,9 @@ final class BodySpecAuthManagerPKCETests: XCTestCase {
     }
 
     func testCodeVerifierIsUniqueAcrossCalls() {
-        let manager = BodySpecAuthManager()
+        let manager = BodySpecAuthManager(
+            tokenStore: BodySpecMemoryTokenStore(), account: .init(capture: { nil }, owns: { _ in false })
+        )
 
         let verifiers = (0..<200).map { _ in manager.generateCodeVerifier() }
 
@@ -43,7 +49,9 @@ final class BodySpecAuthManagerPKCETests: XCTestCase {
     }
 
     func testCodeChallengeMatchesRFC7636AppendixBVector() {
-        let manager = BodySpecAuthManager()
+        let manager = BodySpecAuthManager(
+            tokenStore: BodySpecMemoryTokenStore(), account: .init(capture: { nil }, owns: { _ in false })
+        )
 
         let challenge = manager.codeChallenge(for: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")
 
@@ -53,7 +61,9 @@ final class BodySpecAuthManagerPKCETests: XCTestCase {
     func testCodeChallengeAppliesBase64URLReplacementsAndStripsPadding() {
         // Fixed vector whose plain base64 digest contains '+', '/', and '='
         // padding, so every replacement branch is exercised deterministically.
-        let manager = BodySpecAuthManager()
+        let manager = BodySpecAuthManager(
+            tokenStore: BodySpecMemoryTokenStore(), account: .init(capture: { nil }, owns: { _ in false })
+        )
 
         let challenge = manager.codeChallenge(for: "bodyspec-pkce-vector-0")
 
@@ -65,7 +75,9 @@ final class BodySpecAuthManagerPKCETests: XCTestCase {
     }
 
     func testCodeChallengeIsDeterministicForSameVerifier() {
-        let manager = BodySpecAuthManager()
+        let manager = BodySpecAuthManager(
+            tokenStore: BodySpecMemoryTokenStore(), account: .init(capture: { nil }, owns: { _ in false })
+        )
         let verifier = "deterministic-verifier-123"
 
         XCTAssertEqual(manager.codeChallenge(for: verifier), manager.codeChallenge(for: verifier))

@@ -158,7 +158,7 @@ struct PendingGlp1MedicationSyncItem {
     let updatedAt: Date
 }
 
-struct PendingDexaResultSyncItem {
+struct PendingDexaResultSyncItem: Equatable {
     let id: String
     let userId: String
     let bodyMetricsId: String?
@@ -177,6 +177,7 @@ struct PendingDexaResultSyncItem {
     let bodyFatPercentage: Double?
     let muscleMass: Double?
     let boneMass: Double?
+    let reportedMeasurementsJSON: String?
     let resultPdfUrl: String?
     let resultPdfName: String?
     let createdAt: Date
@@ -390,6 +391,7 @@ extension CachedDexaResult {
             bodyFatPercentage: bodyFatPercentage > 0 ? bodyFatPercentage : nil,
             muscleMass: muscleMass > 0 ? muscleMass : nil,
             boneMass: boneMass > 0 ? boneMass : nil,
+            reportedMeasurementsJSON: reportedMeasurementsJSON,
             resultPdfUrl: resultPdfUrl,
             resultPdfName: resultPdfName,
             createdAt: createdAt ?? Date(),
@@ -440,6 +442,7 @@ extension CachedDexaResult {
             bodyFatPercentage: bodyFatPercentage > 0 ? bodyFatPercentage : nil,
             muscleMass: muscleMass > 0 ? muscleMass : nil,
             boneMass: boneMass > 0 ? boneMass : nil,
+            reportedMeasurements: ReportedMeasurements(jsonString: reportedMeasurementsJSON),
             resultPdfUrl: resultPdfUrl,
             resultPdfName: resultPdfName,
             createdAt: createdAt,
