@@ -72,6 +72,10 @@ final class StubProductAPIClient: ProductAPIClient {
 }
 
 final class StubBodySpecDexaAPI: BodySpecDexaAPIClient {
+    func importSession(for ownership: AuthManager.ProfileSessionOwnership) async throws -> BodySpecDexaImportSession {
+        BodySpecDexaImportSession(api: self, admission: {})
+    }
+
     var pages: [Int: BodySpecResultsListResponse] = [:]
     var scanInfos: [String: BodySpecDexaScanInfoResponse] = [:]
     var compositions: [String: BodySpecDexaCompositionResponse] = [:]
