@@ -77,7 +77,9 @@ final class ValidationService {
 
     private func sanitizeNumericValue(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.replacingOccurrences(
+        // A decimal pad inserts "," in locales whose decimal separator is a comma.
+        let decimalNormalized = trimmed.replacingOccurrences(of: ",", with: ".")
+        return decimalNormalized.replacingOccurrences(
             of: "[^0-9.]",
             with: "",
             options: .regularExpression,

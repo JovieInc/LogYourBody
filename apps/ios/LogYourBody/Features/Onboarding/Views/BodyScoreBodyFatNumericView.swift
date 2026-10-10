@@ -92,7 +92,7 @@ struct BodyScoreBodyFatNumericView: View {
                         )
 
                         if showHelp {
-                            Text("Go back to use reference photos instead.")
+                            Text("Go back to choose an estimated percentage instead.")
                                 .font(OnboardingTypography.body)
                                 .foregroundStyle(theme.colors.textSecondary)
                                 .transition(.opacity.combined(with: .move(edge: .top)))

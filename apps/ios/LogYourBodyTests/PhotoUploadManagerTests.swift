@@ -276,6 +276,54 @@ final class PhotoUploadManagerTests: XCTestCase {
         XCTAssertNil(cached.originalPhotoUrl)
     }
 
+    func testAccountSwitchDuringPutKeepsPhotoOnOriginalAccount() async throws {
+        let originalUserId = "photo_owner_\(UUID().uuidString)"
+        let replacementUserId = "photo_replacement_\(UUID().uuidString)"
+        let metricId = UUID().uuidString
+        let metrics = try await seedPhotoPlaceholder(id: metricId, userId: originalUserId)
+        authenticate(userId: originalUserId)
+
+        let objectKey = "progress-photos/\(originalUserId)/\(metricId)_account_switch.jpg"
+        let photoUrl = "https://photos.logyourbody.com/\(objectKey)"
+        let uploadPath = "/r2/\(objectKey)"
+        PhotoUploadStubURLProtocol.install { request in
+            if request.httpMethod == "POST" {
+                return .http(200, body: Data("""
+                {
+                  "uploadUrl": "https://\(PhotoUploadStubURLProtocol.stubHost)\(uploadPath)",
+                  "uploadMethod": "PUT",
+                  "uploadHeaders": { "Content-Type": "image/jpeg" },
+                  "objectKey": "\(objectKey)",
+                  "photoUrl": "\(photoUrl)",
+                  "storagePath": "\(objectKey)",
+                  "expiresIn": 300
+                }
+                """.utf8))
+            }
+
+            switchPhotoUploadSignedInAccount(to: replacementUserId)
+            return .http(200, body: Data())
+        }
+
+        let manager = makeManager(token: "stub-jwt")
+        let returned = try await manager.uploadProgressPhoto(
+            for: metrics,
+            imageData: try makePNGData()
+        )
+
+        XCTAssertEqual(returned, photoUrl)
+        XCTAssertEqual(AuthManager.shared.currentUser?.id, replacementUserId)
+        let cached = try await cachedPhotoState(metricId: metricId)
+        XCTAssertEqual(cached.photoUrl, photoUrl)
+        XCTAssertEqual(cached.originalPhotoUrl, objectKey)
+        let owner = try await cachedMetricOwner(metricId: metricId)
+        XCTAssertEqual(owner, originalUserId)
+        let replacementRows = try await bodyMetricCount(userId: replacementUserId)
+        XCTAssertEqual(replacementRows, 0)
+        let rowsForMetric = try await bodyMetricCount(id: metricId)
+        XCTAssertEqual(rowsForMetric, 1)
+    }
+
     // MARK: - Helpers
 
     private enum PhotoErrorCase {
@@ -379,6 +427,34 @@ final class PhotoUploadManagerTests: XCTestCase {
         }
     }
 
+    private func cachedMetricOwner(metricId: String) async throws -> String? {
+        let context = CoreDataManager.shared.viewContext
+        return try await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", metricId)
+            request.fetchLimit = 1
+            return try context.fetch(request).first?.userId
+        }
+    }
+
+    private func bodyMetricCount(userId: String) async throws -> Int {
+        let context = CoreDataManager.shared.viewContext
+        return try await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "userId == %@", userId)
+            return try context.fetch(request).count
+        }
+    }
+
+    private func bodyMetricCount(id: String) async throws -> Int {
+        let context = CoreDataManager.shared.viewContext
+        return try await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            return try context.fetch(request).count
+        }
+    }
+
     private func makeSolidImage(size: CGSize = CGSize(width: 64, height: 64)) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
@@ -395,6 +471,25 @@ final class PhotoUploadManagerTests: XCTestCase {
 
     private enum PhotoUploadTestError: Error {
         case missingMetric
+    }
+}
+
+private func switchPhotoUploadSignedInAccount(to userId: String) {
+    let apply = {
+        MainActor.assumeIsolated {
+            AuthManager.shared.currentUser = LocalUser(
+                id: userId,
+                email: "photo-replacement@example.com",
+                name: nil,
+                avatarUrl: nil,
+                profile: nil
+            )
+        }
+    }
+    if Thread.isMainThread {
+        apply()
+    } else {
+        DispatchQueue.main.sync(execute: apply)
     }
 }
 
