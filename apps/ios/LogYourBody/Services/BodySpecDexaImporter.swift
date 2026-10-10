@@ -229,6 +229,51 @@ struct DexaPDFScan: Decodable, Equatable {
     }
 }
 
+/// A reported source label is evidence of a method only when it explicitly names one.
+/// Preserve that label separately; it is not a scanner-model identifier.
+struct PDFScanProvenance {
+    let reportedLabel: String?
+    let dataSource: String
+    let bodyFatMethod: String?
+    let importNote: String
+
+    var displayLabel: String { reportedLabel ?? "Source not identified" }
+
+    init(source: String?) {
+        let trimmed = source?.trimmingCharacters(in: .whitespacesAndNewlines)
+        reportedLabel = trimmed?.isEmpty == false ? trimmed : nil
+        let words = (reportedLabel ?? "").lowercased()
+            .components(separatedBy: CharacterSet.letters.inverted)
+            .filter { !$0.isEmpty }
+        let mentionsInBody = words.contains("inbody") || zip(words, words.dropFirst()).contains {
+            $0.0 == "in" && $0.1 == "body"
+        }
+        let mentionsDexa = words.contains("dexa") || words.contains("dxa")
+        let isInBodyLabel = words.first == "inbody" || words.starts(with: ["in", "body"])
+        let isDexaLabel = words.first == "dexa" || words.first == "dxa"
+        let uncertaintyWords: Set<String> = [
+            "no", "not", "non", "cannot", "unknown", "unidentified", "unspecified", "undetermined",
+            "uncertain", "unconfirmed", "unverified", "unclear", "possible", "possibly", "probable",
+            "probably", "suspected", "maybe", "tentative", "pending"
+        ]
+        let hasUncertainMethod = !uncertaintyWords.isDisjoint(with: words) || reportedLabel?.contains("?") == true
+
+        if isInBodyLabel && !mentionsDexa && !hasUncertainMethod {
+            dataSource = BodyMetricSource.inbodyPDF.rawValue
+            bodyFatMethod = "inbody"
+            importNote = "Imported from InBody PDF"
+        } else if isDexaLabel && !mentionsInBody && !hasUncertainMethod {
+            dataSource = BodyMetricSource.dexaPDF.rawValue
+            bodyFatMethod = "dexa"
+            importNote = "Imported from DEXA PDF"
+        } else {
+            dataSource = BodyMetricSource.pdfImport.rawValue
+            bodyFatMethod = nil
+            importNote = "Imported from PDF"
+        }
+    }
+}
+
 private struct DexaPDFParserResponse: Decodable {
     struct Payload: Decodable {
         let scans: [DexaPDFScan]?
@@ -261,11 +306,11 @@ enum DexaPDFScanMapper {
 
         for scan in scans {
             guard let date = date(for: scan.date), scan.weight > 0 else { continue }
-            let sourceName = scan.source ?? "DEXA Scan"
-            let isInBody = sourceName.localizedCaseInsensitiveContains("inbody")
-            let dataSource = isInBody ? BodyMetricSource.inbodyPDF.rawValue : BodyMetricSource.dexaPDF.rawValue
+            let provenance = PDFScanProvenance(source: scan.source)
+            let dataSource = provenance.dataSource
             let externalResultId = stableResultId(for: scan, dataSource: dataSource)
-            guard seenIds.insert(externalResultId).inserted else {
+            guard !matchesLegacyImport(scan, dataSource: dataSource, existingResults: existingResults),
+                  seenIds.insert(externalResultId).inserted else {
                 skippedDuplicates += 1
                 continue
             }
@@ -280,15 +325,15 @@ enum DexaPDFScanMapper {
                     weight: scan.weight,
                     weightUnit: scan.weightUnit.lowercased(),
                     bodyFatPercentage: scan.bodyFatPercentage,
-                    bodyFatMethod: isInBody ? "inbody" : "dexa",
+                    bodyFatMethod: provenance.bodyFatMethod,
                     muscleMass: scan.muscleMass,
                     boneMass: scan.boneMass,
-                    notes: isInBody ? "Imported from InBody PDF" : "Imported from DEXA PDF",
+                    notes: provenance.importNote,
                     photoUrl: nil,
                     dataSource: dataSource,
                     sourceMetadata: BodyMetricSourceMetadata(
                         vendor: "pdf_import",
-                        sourceName: isInBody ? "InBody PDF" : "DEXA PDF",
+                        sourceName: provenance.reportedLabel,
                         externalResultId: externalResultId,
                         importedAt: ISO8601DateFormatter().string(from: now)
                     ),
@@ -305,7 +350,7 @@ enum DexaPDFScanMapper {
                     externalSource: dataSource,
                     externalResultId: externalResultId,
                     externalUpdateTime: nil,
-                    scannerModel: sourceName,
+                    scannerModel: nil,
                     locationId: nil,
                     locationName: nil,
                     acquireTime: date,
@@ -330,6 +375,28 @@ enum DexaPDFScanMapper {
             results: candidateResults,
             skippedDuplicateCount: skippedDuplicates
         )
+    }
+
+    private static func matchesLegacyImport(
+        _ scan: DexaPDFScan,
+        dataSource: String,
+        existingResults: [DexaResult]
+    ) -> Bool {
+        let oldLabel = scan.source ?? "DEXA Scan"
+        let oldSource = oldLabel.localizedCaseInsensitiveContains("inbody")
+            ? BodyMetricSource.inbodyPDF.rawValue : BodyMetricSource.dexaPDF.rawValue
+        guard oldSource != dataSource else { return false }
+        let oldId = stableResultId(for: scan, dataSource: oldSource)
+        let oldTrimmedLabel = oldLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Old imports stored their report label in scannerModel. Require that
+        // evidence so the old ID cannot hide a different reported source. Do
+        // not add this alias to seenIds: new unknown and DEXA rows are distinct.
+        return existingResults.contains { result in
+            result.externalResultId == oldId && result.externalSource == oldSource &&
+                result.scannerModel?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .caseInsensitiveCompare(oldTrimmedLabel) == .orderedSame
+        }
     }
 
     private static func date(for value: String) -> Date? {
