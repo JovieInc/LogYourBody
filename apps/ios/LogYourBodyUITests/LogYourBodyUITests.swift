@@ -1941,19 +1941,12 @@ final class LogYourBodyUITests: XCTestCase {
 
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture", "-lybUITestOnboardingV2Fixture"])
         XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_first_run_health"].waitForExistence(timeout: 30),
-            "First run starts with Apple Health"
+            app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 30),
+            "The gate no longer forks the first run: everyone starts at Your data"
         )
-        XCTAssertTrue(app.buttons["home_v2_first_run_connect"].exists)
-        attachScreenshot(named: "onboarding-v2-health", from: app)
-        app.buttons["home_v2_first_run_not_now"].tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_first_run_target"].waitForExistence(timeout: 8),
-            "Not now moves on to the optional target"
-        )
-        XCTAssertTrue(app.buttons["home_v2_first_run_save_target"].exists)
-        XCTAssertTrue(app.buttons["home_v2_first_run_skip"].exists, "Skip stays quiet but visible")
-        attachScreenshot(named: "onboarding-v2-target", from: app)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_first_run_health"].exists)
+        XCTAssertTrue(app.buttons["body_score_onboarding_import_scan_button"].exists)
+        attachScreenshot(named: "onboarding-v2-first-run", from: app)
 
         launch(app, with: ["-lybUITestPaywallFixture", "-lybUITestOnboardingV2Fixture"])
         XCTAssertTrue(
@@ -1986,6 +1979,42 @@ final class LogYourBodyUITests: XCTestCase {
             "The quiet composer is there"
         )
         attachScreenshot(named: "home-v2-ask", from: app)
+    }
+
+    func testDailyReminderIsOfferedAfterTheFirstLoggedWeighInNotBeforeToday() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestDailyReminderPromptFixture"
+        ])
+
+        // Home's dock appears once the fixture has seeded.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 45),
+            "A new subscriber lands on Today"
+        )
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].exists, "No reminder ask before Today")
+
+        logWeight.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 10),
+            "The first logged weigh-in is when a reminder has a job"
+        )
+        attachScreenshot(named: "daily-reminder-after-first-weigh-in", from: app)
+        let notNow = app.buttons["daily_reminder_skip_button"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 3))
+        notNow.tap()
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].waitForExistence(timeout: 5))
     }
 
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
@@ -2059,7 +2088,7 @@ final class LogYourBodyUITests: XCTestCase {
     private func assertAndCaptureOnboardingFixedCTA(in app: XCUIApplication) throws {
         XCTAssertTrue(app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 10))
 
-        let startButton = app.buttons["Find out"]
+        let startButton = app.buttons["Enter my numbers"]
         XCTAssertTrue(startButton.waitForExistence(timeout: 5))
         XCTAssertTrue(startButton.isHittable)
 

@@ -13,25 +13,53 @@ import UIKit
 
 
 final class DailyReminderPolicyTests: XCTestCase {
-    func testPromptRequiresSubscriptionAndIncompletePrompt() {
+    func testPromptRequiresSubscriptionIncompletePromptAndAFirstWeighIn() {
         XCTAssertTrue(
             DailyReminderPolicy.shouldShowPostPaywallPrompt(
                 isSubscribed: true,
-                hasCompletedPrompt: false
+                hasCompletedPrompt: false,
+                hasLoggedFirstWeighIn: true
             )
+        )
+        XCTAssertFalse(
+            DailyReminderPolicy.shouldShowPostPaywallPrompt(
+                isSubscribed: true,
+                hasCompletedPrompt: false,
+                hasLoggedFirstWeighIn: false
+            ),
+            "No reminder ask between the paywall and Today"
         )
         XCTAssertFalse(
             DailyReminderPolicy.shouldShowPostPaywallPrompt(
                 isSubscribed: false,
-                hasCompletedPrompt: false
+                hasCompletedPrompt: false,
+                hasLoggedFirstWeighIn: true
             )
         )
         XCTAssertFalse(
             DailyReminderPolicy.shouldShowPostPaywallPrompt(
                 isSubscribed: true,
-                hasCompletedPrompt: true
+                hasCompletedPrompt: true,
+                hasLoggedFirstWeighIn: true
             )
         )
+    }
+
+    @MainActor
+    func testRecordingTheFirstWeighInUnlocksTheOfferOnce() throws {
+        let suite = "daily-reminder-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let manager = NotificationManager(defaults: defaults)
+
+        XCTAssertFalse(manager.shouldShowPostPaywallPrompt(isSubscribed: true))
+        manager.recordWeighInLogged()
+        XCTAssertTrue(manager.shouldShowPostPaywallPrompt(isSubscribed: true))
+        XCTAssertTrue(defaults.bool(forKey: Constants.hasLoggedFirstWeighInKey))
+
+        manager.skipDailyWeighInPrompt()
+        manager.recordWeighInLogged()
+        XCTAssertFalse(manager.shouldShowPostPaywallPrompt(isSubscribed: true), "Answered once, never asked again")
     }
 
     func testDailyWeighInReminderDefaultsToSevenAM() {

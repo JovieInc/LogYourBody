@@ -9,10 +9,9 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// Golden path through the first run: hook → basics → height → health
-    /// connect (manual entry) → manual weight → body fat choice → body fat
-    /// numeric → loading → fat-vs-muscle reveal → profile (no Home-mode
-    /// question, no last name). The launch fixture
+    /// Manual path through the first run: "Enter my numbers" → weight → body
+    /// fat choice → body fat value → fat-vs-muscle reveal → profile, which asks
+    /// what's still missing (no Home-mode question, no last name). The launch fixture
     /// provisions an authenticated, subscribed user with
     /// `onboardingCompleted: false`, so the app lands on the hook step with a
     /// fresh progress store (unique userId per launch).
@@ -22,9 +21,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         app.launch()
 
         assertHookStep(in: app)
-        completeBasicsStep(in: app)
-        completeHeightStep(in: app)
-        completeHealthConnectStep(in: app)
+        app.buttons["body_score_onboarding_start_button"].tap()
         completeManualWeightStep(in: app)
         completeBodyFatChoiceStep(in: app)
         completeBodyFatNumericStep(in: app)
@@ -64,10 +61,56 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyScoreIntro"].exists)
 
+        // One primary path (the scan), Apple Health second, typing last.
+        XCTAssertTrue(app.buttons["body_score_onboarding_import_scan_button"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["body_score_onboarding_use_health_button"].isHittable)
         let startButton = app.buttons["body_score_onboarding_start_button"]
         XCTAssertTrue(startButton.waitForExistence(timeout: 5))
         XCTAssertTrue(startButton.isHittable)
-        startButton.tap()
+    }
+
+    /// Scan path: importing two DEXA scans goes straight to the reveal, which
+    /// says what changed between them, then asks only what the scan lacks.
+    func testScanImportGoesStraightToFatVsMuscleWithWhatChanged() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture", "-lybUITestOnboardingScanImportFixture"]
+        app.launch()
+
+        assertHookStep(in: app)
+        attachScreenshot(named: "first-run-your-data", from: app)
+        app.buttons["body_score_onboarding_import_scan_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs muscle."].waitForExistence(timeout: 15))
+        let summary = app.descendants(matching: .any)["body_score_reveal_fat_vs_muscle"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 5))
+        XCTAssertEqual(summary.label, "Fat 34 lb. Lean mass 146 lb. Body fat 19%. Body fat measured by your scan.")
+        let change = app.descendants(matching: .any)["body_score_reveal_scan_change"]
+        XCTAssertTrue(change.waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.staticTexts["Since Jun 2, 2026: 7 lb less fat, 1 lb more lean mass."].exists,
+            "Two scans answer the question directly"
+        )
+        attachScreenshot(named: "first-run-scan-reveal", from: app)
+
+        continueFromRevealToProfile(in: app)
+        attachScreenshot(named: "first-run-only-whats-missing", from: app)
+    }
+
+    /// Apple Health is one tap from the first screen, and Back returns to it.
+    func testAppleHealthPathOpensFromTheFirstScreenAndBackReturns() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture"]
+        app.launch()
+
+        assertHookStep(in: app)
+        app.buttons["body_score_onboarding_use_health_button"].tap()
+        XCTAssertTrue(app.staticTexts["Use what your iPhone already knows."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["body_score_onboarding_enter_manually_button"].exists, "Health stays optional")
+
+        let back = app.buttons["Back"]
+        XCTAssertTrue(back.waitForExistence(timeout: 3))
+        back.tap()
+        XCTAssertTrue(app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 5))
     }
 
     private func completeBasicsStep(in app: XCUIApplication) {
@@ -195,6 +238,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
             "The reveal answers fat vs muscle, not a 0-100 score"
         )
         XCTAssertFalse(app.buttons["Share my score"].exists, "One primary action")
+        attachScreenshot(named: "first-run-manual-reveal", from: app)
     }
 
     private func continueFromRevealToProfile(in app: XCUIApplication) {
@@ -212,6 +256,13 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     }
 
     // MARK: - Field helpers
+
+    private func attachScreenshot(named name: String, from app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
 
     private func clearText(in field: XCUIElement) {
         guard let currentValue = field.value as? String, !currentValue.isEmpty else { return }

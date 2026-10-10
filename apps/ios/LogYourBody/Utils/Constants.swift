@@ -55,6 +55,7 @@ struct Constants {
     static let dailyWeighInReminderHourKey = "dailyWeighInReminderHour"
     static let dailyWeighInReminderMinuteKey = "dailyWeighInReminderMinute"
     static let dailyWeighInReminderPromptCompletedKey = "dailyWeighInReminderPromptCompleted"
+    static let hasLoggedFirstWeighInKey = "hasLoggedFirstWeighIn"
 
     // Goal Keys
     static let goalBodyFatPercentageKey = "goalBodyFatPercentage"

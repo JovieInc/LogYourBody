@@ -136,6 +136,8 @@ final class OnboardingFlowViewModel: ObservableObject {
         didSet { persistProgress() }
     }
     @Published var isRequestingHealthImport = false
+    /// Scans imported on the first screen; kept in memory for the reveal.
+    @Published var scanImport: OnboardingScanImport?
     @Published var manualWeightText: String = "" {
         didSet { persistProgress() }
     }

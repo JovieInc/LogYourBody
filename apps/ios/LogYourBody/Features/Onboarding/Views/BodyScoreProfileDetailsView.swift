@@ -201,7 +201,7 @@ struct BodyScoreProfileDetailsView: View {
         case .sex:
             return "Used only for body composition calculations."
         case .height:
-            return "Needed for FFMI and body score."
+            return "Used to compare your lean mass with your frame."
         }
     }
 

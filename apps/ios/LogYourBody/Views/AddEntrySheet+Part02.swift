@@ -184,6 +184,7 @@ func saveWeight(userId: String) {
                         ]
                     )
                     HapticManager.shared.successAction()
+                    NotificationManager.shared.recordWeighInLogged()
                     onWeightSaved?(savedMetric)
 
                     dismiss()

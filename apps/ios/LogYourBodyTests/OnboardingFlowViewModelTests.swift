@@ -646,6 +646,82 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertEqual(FatVsMuscleSummary.sourceText(for: .visualEstimate), "Body fat is a visual estimate")
     }
 
+    func testFirstScreenPathsAndBackReturnToIt() {
+        let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+        XCTAssertEqual(viewModel.currentStep, .hook)
+
+        viewModel.chooseHealthPath()
+        XCTAssertEqual(viewModel.currentStep, .healthConnect)
+        viewModel.goBack()
+        XCTAssertEqual(viewModel.currentStep, .hook)
+
+        viewModel.chooseManualPath()
+        XCTAssertEqual(viewModel.currentStep, .manualWeight)
+        viewModel.goBack()
+        XCTAssertEqual(viewModel.currentStep, .hook)
+    }
+
+    func testImportedScansFillTheRevealAndSkipTyping() throws {
+        let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+        viewModel.setWeightUnit(.pounds)
+        viewModel.applyImportedScans([
+            DexaPDFScan(date: "2026-09-01", weight: 180, weightUnit: "lbs", bodyFatPercentage: 19,
+                        muscleMass: nil, boneMass: nil, source: "BodySpec"),
+            DexaPDFScan(date: "2026-06-02", weight: 186, weightUnit: "lbs", bodyFatPercentage: 22,
+                        muscleMass: nil, boneMass: nil, source: "BodySpec")
+        ])
+
+        XCTAssertEqual(viewModel.currentStep, .loading)
+        XCTAssertEqual(viewModel.bodyScoreInput.bodyFat, BodyFatValue(percentage: 19, source: .scan))
+        XCTAssertEqual(try XCTUnwrap(viewModel.bodyScoreInput.weight.inPounds), 180, accuracy: 0.01)
+        let scanImport = try XCTUnwrap(viewModel.scanImport)
+        XCTAssertEqual(scanImport.previous?.bodyFatPercentage, 22, "The latest scan is compared with the one before it")
+        XCTAssertEqual(
+            ScanChangePolicy.changeText(for: scanImport, system: .imperial),
+            "Since Jun 2, 2026: 7 lb less fat, 1 lb more lean mass."
+        )
+
+        viewModel.currentStep = .bodyScore
+        viewModel.goBack()
+        XCTAssertEqual(viewModel.currentStep, .hook, "Editing a scan's numbers means importing again")
+    }
+
+    func testScanWithoutBodyFatAsksForBodyFatNext() {
+        let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+        viewModel.applyImportedScans([
+            DexaPDFScan(date: "2026-09-01", weight: 82, weightUnit: "kg", bodyFatPercentage: nil,
+                        muscleMass: nil, boneMass: nil, source: "InBody")
+        ])
+        XCTAssertEqual(viewModel.currentStep, .bodyFatChoice)
+        XCTAssertNil(viewModel.scanImport?.previous)
+    }
+
+    func testUnusableScansLeaveTheFirstScreenAlone() {
+        let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+        viewModel.applyImportedScans([
+            DexaPDFScan(date: "not a date", weight: 82, weightUnit: "kg", bodyFatPercentage: 20,
+                        muscleMass: nil, boneMass: nil, source: nil),
+            DexaPDFScan(date: "2026-09-01", weight: 82, weightUnit: "stone", bodyFatPercentage: 20,
+                        muscleMass: nil, boneMass: nil, source: nil)
+        ])
+        XCTAssertEqual(viewModel.currentStep, .hook)
+        XCTAssertNil(viewModel.scanImport)
+    }
+
+    func testScanChangeSaysAboutTheSameForTinyChanges() {
+        let day = Date(timeIntervalSince1970: 1_780_000_000)
+        let scanImport = OnboardingScanImport(
+            latest: .init(date: day, weightKg: 80, bodyFatPercentage: 20),
+            previous: .init(date: day.addingTimeInterval(-86_400 * 60), weightKg: 80.2, bodyFatPercentage: 20)
+        )
+        XCTAssertEqual(
+            ScanChangePolicy.changeText(for: scanImport, system: .metric)?.hasSuffix(
+                "fat about the same, lean mass about the same."
+            ),
+            true
+        )
+    }
+
     func testFatVsMuscleSummaryNeedsWeightAndBodyFat() {
         XCTAssertNil(FatVsMuscleSummary(input: BodyScoreInput(
             weight: WeightValue(value: 80, unit: .kilograms)
