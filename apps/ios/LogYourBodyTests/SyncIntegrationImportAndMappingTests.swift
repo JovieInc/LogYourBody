@@ -172,6 +172,9 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         let authManager = AuthManager()
 
         let userId = "bodyspec_import_user_\(UUID().uuidString)"
+        authManager.authSession = .localFixture(
+            subject: userId, email: "bodyspec@example.invalid", accessToken: "synthetic"
+        )
         let user = LocalUser(
             id: userId,
             email: "bodyspec@example.com",
@@ -285,6 +288,9 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         let authManager = AuthManager()
 
         let userId = "bodyspec_duplicate_user_\(UUID().uuidString)"
+        authManager.authSession = .localFixture(
+            subject: userId, email: "bodyspec@example.invalid", accessToken: "synthetic"
+        )
         authManager.currentUser = LocalUser(
             id: userId,
             email: "bodyspec-duplicate@example.com",
