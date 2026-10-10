@@ -21,6 +21,7 @@ final class SettingsSurfacePolicyTests: XCTestCase {
                 "settings_tracking_link",
                 "settings_integrations_link",
                 "settings_account_subscription_link",
+                "settings_security_link",
                 "settings_privacy_data_link",
                 "world_class_screen_settings"
             ]
@@ -48,6 +49,8 @@ final class SettingsSurfacePolicyTests: XCTestCase {
         XCTAssertTrue(identifiers.contains("settings_subscription_status_row"))
         XCTAssertTrue(identifiers.contains("settings_manage_subscription_button"))
         XCTAssertTrue(identifiers.contains("settings_restore_purchases_button"))
+        XCTAssertTrue(identifiers.contains("home_v2_settings_face_id"))
+        XCTAssertTrue(identifiers.contains("home_v2_settings_export"))
         XCTAssertTrue(identifiers.contains("settings_goal_editor_sheet"))
         XCTAssertTrue(identifiers.contains("settings_goal_editor_text_field"))
         XCTAssertEqual(Set(identifiers).count, identifiers.count)

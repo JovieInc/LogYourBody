@@ -7,6 +7,13 @@ import SwiftUI
 extension PreferencesView {
     var securitySection: some View {
         SettingsSection(header: "Security") {
+            SettingsToggleRow(
+                icon: "faceid",
+                title: "Face ID lock",
+                isOn: $biometricLockEnabled
+            )
+            .accessibilityIdentifier("home_v2_settings_face_id")
+
             activeSessionsRow
         }
     }
