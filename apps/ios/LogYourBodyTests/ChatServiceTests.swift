@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import LogYourBody
 
@@ -5,6 +6,42 @@ final class ChatServiceTests: XCTestCase {
     override func tearDown() {
         ChatURLProtocol.handler = nil
         super.tearDown()
+    }
+
+    @MainActor
+    func testUnsentDraftSurvivesNewBindingsForTheSameAccountSession() {
+        let owner = AuthManager.ProfileSessionOwnership(subject: "owner-A", generation: 1)
+        var draft = AccountSessionChatDraft()
+        let storage = Binding(get: { draft }, set: { draft = $0 })
+        let first = AccountSessionChatDraft.binding(storage: storage, owner: owner, isCurrent: { true })
+        first.wrappedValue = "Unsent body composition question"
+        let reopened = AccountSessionChatDraft.binding(storage: storage, owner: owner, isCurrent: { true })
+        XCTAssertEqual(reopened.wrappedValue, "Unsent body composition question")
+        reopened.wrappedValue = ""
+        XCTAssertEqual(first.wrappedValue, "", "Sending clears the shared draft for every mounted field")
+    }
+
+    @MainActor
+    func testDraftRejectsStaleBindingsAfterAccountReplacementLogoutAndNewSession() {
+        let original = AuthManager.ProfileSessionOwnership(subject: "owner-A", generation: 1)
+        let replacements: [AuthManager.ProfileSessionOwnership?] = [
+            .init(subject: "owner-B", generation: 2), nil, .init(subject: "owner-A", generation: 3)
+        ]
+        for replacement in replacements {
+            var current: AuthManager.ProfileSessionOwnership? = original
+            var draft = AccountSessionChatDraft()
+            let storage = Binding(get: { draft }, set: { draft = $0 })
+            let stale = AccountSessionChatDraft.binding(storage: storage, owner: original) { current == original }
+            stale.wrappedValue = "Private original draft"
+            current = replacement
+            let next = AccountSessionChatDraft.binding(storage: storage, owner: replacement) { current == replacement }
+            XCTAssertEqual(stale.wrappedValue, "", "An old binding cannot read after its owner changes")
+            XCTAssertEqual(next.wrappedValue, "", "A replacement session never inherits the original draft")
+            next.wrappedValue = "Replacement draft"
+            stale.wrappedValue = "Late original callback"
+            XCTAssertEqual(next.wrappedValue, replacement == nil ? "" : "Replacement draft")
+            XCTAssertEqual(stale.wrappedValue, "")
+        }
     }
 
     func testSSEParserRequiresVersionedMetadataAndBuildsDeltas() throws {
@@ -64,6 +101,163 @@ final class ChatServiceTests: XCTestCase {
         XCTAssertEqual(conversation?.messages.first?.clientMessageId, "client-1")
     }
 
+    @MainActor
+    func testTurnRejectsDelayedReplacementTokenBeforeOpeningStream() async throws {
+        for interruption in ["owner-B", "same-owner-new-session", "newer-turn", "cancelled"] {
+            for token in ["replacement-token", nil] as [String?] {
+                let owner = AuthManager.ProfileSessionOwnership(subject: "owner-A", generation: 1)
+                var currentOwner = owner
+                let turnId = UUID()
+                var currentTurnId = turnId
+                var tokenResponse: CheckedContinuation<String?, Never>?
+                let started = expectation(description: "Token request held")
+                var openedStreams = 0
+                var received: [ChatStreamEvent] = []
+                let operation = Task { @MainActor in
+                    try await ChatTurnExecutor.run(
+                        accessToken: {
+                            await withCheckedContinuation {
+                                tokenResponse = $0
+                                started.fulfill()
+                            }
+                        },
+                        makeStream: { _ in
+                            openedStreams += 1
+                            return AsyncThrowingStream { $0.finish() }
+                        },
+                        isCurrent: { currentOwner == owner && currentTurnId == turnId },
+                        receive: { received.append($0) }
+                    )
+                }
+                await fulfillment(of: [started], timeout: 3)
+                switch interruption {
+                case "owner-B": currentOwner = .init(subject: "owner-B", generation: 2)
+                case "same-owner-new-session": currentOwner = .init(subject: "owner-A", generation: 3)
+                case "newer-turn": currentTurnId = UUID()
+                default: operation.cancel()
+                }
+                try XCTUnwrap(tokenResponse).resume(returning: token)
+                do {
+                    try await operation.value
+                    XCTFail("A stale turn must finish silently as cancellation")
+                } catch is CancellationError {} catch {
+                    XCTFail("Stale token must not publish authentication or stream errors: \(error)")
+                }
+                XCTAssertEqual(openedStreams, 0, "Do not send old content with a replacement token")
+                XCTAssertTrue(received.isEmpty)
+            }
+        }
+    }
+
+    @MainActor
+    func testTurnDropsHeldMetadataDeltasCompletionAndFailureAfterReplacement() async throws {
+        let events: [ChatStreamEvent] = [
+            .metadata(conversationId: "old-conversation", clientMessageId: "old-client", replayed: false),
+            .delta("old account answer"),
+            .completed(messageId: "old-answer", createdAt: "fixture-date", replayed: false),
+            .failure(code: "provider_error", message: "old error", retryable: true)
+        ]
+        for interruption in ["owner-B", "same-owner-new-session", "newer-turn"] {
+            let owner = AuthManager.ProfileSessionOwnership(subject: "owner-A", generation: 1)
+            var currentOwner = owner
+            let turnId = UUID()
+            var currentTurnId = turnId
+            let started = expectation(description: "Stream held")
+            var continuation: AsyncThrowingStream<ChatStreamEvent, Error>.Continuation?
+            let stream = AsyncThrowingStream<ChatStreamEvent, Error> { continuation = $0 }
+            var received: [ChatStreamEvent] = []
+            let operation = Task { @MainActor in
+                try await ChatTurnExecutor.run(
+                    accessToken: { "owner-A-token" },
+                    makeStream: { _ in started.fulfill(); return stream },
+                    isCurrent: { currentOwner == owner && currentTurnId == turnId },
+                    receive: { event in
+                        received.append(event)
+                        if case .failure(_, let message, let retryable) = event {
+                            throw ChatServiceError.server(message: message, retryable: retryable)
+                        }
+                    }
+                )
+            }
+            await fulfillment(of: [started], timeout: 3)
+            switch interruption {
+            case "owner-B": currentOwner = .init(subject: "owner-B", generation: 2)
+            case "same-owner-new-session": currentOwner = .init(subject: "owner-A", generation: 3)
+            default: currentTurnId = UUID()
+            }
+            let held = try XCTUnwrap(continuation)
+            events.forEach { held.yield($0) }
+            held.finish()
+            do {
+                try await operation.value
+                XCTFail("Stale stream completion must not become success")
+            } catch is CancellationError {} catch { XCTFail("Stale error must be suppressed: \(error)") }
+            XCTAssertTrue(received.isEmpty, "No old metadata, answer, spoken completion or Retry error may publish")
+        }
+    }
+
+    @MainActor
+    func testTurnSuppressesDelayedProviderErrorButPreservesCurrentErrors() async throws {
+        for replaced in [false, true] {
+            var isCurrent = true
+            let started = expectation(description: "Provider stream held")
+            var continuation: AsyncThrowingStream<ChatStreamEvent, Error>.Continuation?
+            let stream = AsyncThrowingStream<ChatStreamEvent, Error> { continuation = $0 }
+            let operation = Task { @MainActor in
+                try await ChatTurnExecutor.run(
+                    accessToken: { "fixture-token" },
+                    makeStream: { _ in started.fulfill(); return stream },
+                    isCurrent: { isCurrent },
+                    receive: { _ in XCTFail("A failed provider emitted no messages") }
+                )
+            }
+            await fulfillment(of: [started], timeout: 3)
+            isCurrent = !replaced
+            try XCTUnwrap(continuation).finish(throwing: ChatServiceError.offline)
+            do {
+                try await operation.value
+                XCTFail("Expected provider failure or stale cancellation")
+            } catch is CancellationError {
+                XCTAssertTrue(replaced)
+            } catch {
+                XCTAssertFalse(replaced, "A delayed error must not restore an old Retry identity")
+                XCTAssertEqual(error as? ChatServiceError, .offline)
+            }
+        }
+    }
+
+    @MainActor
+    func testCurrentTurnAcceptsRotatedTokenEventsAndRequiresCompletion() async throws {
+        let events: [ChatStreamEvent] = [
+            .metadata(conversationId: "conversation", clientMessageId: "client", replayed: false),
+            .delta("answer"),
+            .completed(messageId: "answer", createdAt: "fixture-date", replayed: false)
+        ]
+        var received: [ChatStreamEvent] = []
+        try await ChatTurnExecutor.run(
+            accessToken: { "rotated-token-same-session" },
+            makeStream: { token in
+                XCTAssertEqual(token, "rotated-token-same-session")
+                return AsyncThrowingStream { continuation in
+                    events.forEach { continuation.yield($0) }
+                    continuation.finish()
+                }
+            },
+            isCurrent: { true },
+            receive: { received.append($0) }
+        )
+        XCTAssertEqual(received, events)
+        do {
+            try await ChatTurnExecutor.run(
+                accessToken: { "fixture-token" },
+                makeStream: { _ in AsyncThrowingStream { $0.finish() } },
+                isCurrent: { true },
+                receive: { _ in }
+            )
+            XCTFail("An empty stream must not be accepted as complete")
+        } catch { XCTAssertEqual(error as? ChatServiceError, .invalidResponse) }
+    }
+
     func testTrainingLoadFieldStartsAtTheEngineLoad() {
         XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 60), "60")
         XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 62.5), "62.5")
@@ -71,6 +265,204 @@ final class ChatServiceTests: XCTestCase {
         XCTAssertEqual(Double(TrainingLoadPrefillPolicy.text(for: 1_002.5)), 1_002.5, "Parses back when the set is logged")
         XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: nil), "", "increase_load keeps the field empty")
         XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 0), "")
+    }
+
+    func testRecoveryPresentationKeepsPendingNeutralWithoutMaskingLaterErrors() throws {
+        let pending = try historySnapshot(messages: [historyMessage(status: "pending", retryable: false)])
+        var presentation = ChatRecoveryPresentation()
+        presentation.restore(pending.historyRecovery)
+        XCTAssertEqual(presentation.kind, .pending)
+        XCTAssertEqual(presentation.message, pending.historyRecovery?.errorMessage)
+
+        presentation.message = ChatServiceError.offline.localizedDescription
+        XCTAssertEqual(presentation.kind, .warning, "A reload error replaces the previous pending status")
+        XCTAssertEqual(presentation.message, ChatServiceError.offline.localizedDescription)
+        presentation.restore(pending.historyRecovery)
+        presentation.message = nil
+        XCTAssertNil(presentation.message)
+        XCTAssertEqual(presentation.kind, .warning, "Clearing the notice must clear pending presentation too")
+    }
+
+    func testRecoveryPresentationPreservesDistinctFailureAndStoppedCopy() throws {
+        var presentation = ChatRecoveryPresentation()
+        for (status, retryable) in [("failed", true), ("cancelled", true), ("pending", true)] {
+            let history = try historySnapshot(messages: [historyMessage(status: status, retryable: retryable)])
+            presentation.restore(history.historyRecovery)
+            XCTAssertEqual(presentation.kind, .warning)
+            XCTAssertEqual(presentation.message, history.historyRecovery?.errorMessage)
+        }
+        presentation.restore(nil)
+        XCTAssertNil(presentation.message)
+    }
+
+    func testHistoryRecoveryKeepsServerRetryPermissionAndDistinctFailureStates() throws {
+        let cases: [(String, Bool, ChatHistoryDelivery, String)] = [
+            ("failed", true, .failed, "The answer could not be completed."),
+            ("cancelled", true, .stopped, "Answer stopped."),
+            ("pending", true, .failed, "The answer was interrupted."),
+            ("pending", false, .sending, "An answer is still in progress.")
+        ]
+        for (status, retryable, delivery, copy) in cases {
+            let history = try historySnapshot(messages: [historyMessage(status: status, retryable: retryable)])
+            let recovery = try XCTUnwrap(history.historyRecovery)
+            XCTAssertEqual(recovery.clientMessageId, "client-1")
+            XCTAssertEqual(recovery.message, "How am I doing?")
+            XCTAssertEqual(recovery.retryable, retryable)
+            XCTAssertEqual(recovery.shouldReload, status == "pending" && !retryable)
+            XCTAssertTrue(recovery.errorMessage.hasPrefix(copy))
+            XCTAssertEqual(history.messages[0].historyDelivery, delivery)
+        }
+    }
+
+    func testHistoryRecoveryDoesNotOfferOldFailuresAfterNewerSuccessOrInferLegacyFailures() throws {
+        let oldFailure = historyMessage(status: "failed", retryable: true)
+        for status in [nil, "completed", "future-status"] as [String?] {
+            var newest = historyMessage(status: status, retryable: false)
+            newest["id"] = "new-message"
+            newest["clientMessageId"] = "new-client"
+            let history = try historySnapshot(messages: [oldFailure, newest])
+            XCTAssertNil(history.historyRecovery)
+            XCTAssertEqual(history.messages[0].historyDelivery, .failed)
+            XCTAssertEqual(history.messages[1].historyDelivery, .complete)
+        }
+        var missingIdentity = oldFailure
+        missingIdentity["clientMessageId"] = NSNull()
+        XCTAssertNil(try historySnapshot(messages: [missingIdentity]).historyRecovery)
+        XCTAssertNil(try historySnapshot(messages: []).historyRecovery)
+    }
+
+    func testLoadedFailureRetriesOriginalConversationAndMessageIdentity() async throws {
+        let snapshot = try historySnapshot(messages: [historyMessage(status: "failed", retryable: true)])
+        let history = try JSONSerialization.data(withJSONObject: [
+            "version": 1,
+            "conversation": ["id": snapshot.id, "title": snapshot.title, "createdAt": snapshot.createdAt,
+                             "updatedAt": snapshot.updatedAt, "expiresAt": snapshot.expiresAt,
+                             "messages": [historyMessage(status: "failed", retryable: true)]]
+        ])
+        ChatURLProtocol.handler = { request in
+            if request.httpMethod == "GET" { return (200, ["Content-Type": "application/json"], history) }
+            let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
+            XCTAssertEqual(body["conversationId"] as? String, "conversation-1")
+            XCTAssertEqual(body["clientMessageId"] as? String, "client-1")
+            XCTAssertEqual(body["message"] as? String, "How am I doing?")
+            let response = """
+            event: done
+            data: {"version":1,"messageId":"answer","createdAt":"2026-10-09","replayed":false}
+
+            """
+            return (200, ["Content-Type": "text/event-stream"], Data(response.utf8))
+        }
+        let service = URLSessionChatService(urlSession: makeSession(), baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        let loaded = try await service.loadLatest(accessToken: "fixture-token")
+        let recovery = try XCTUnwrap(loaded?.historyRecovery)
+        var events: [ChatStreamEvent] = []
+        for try await event in service.streamMessage(
+            accessToken: "fixture-token", conversationId: try XCTUnwrap(loaded?.id),
+            clientMessageId: recovery.clientMessageId, message: recovery.message, voiceMode: false
+        ) { events.append(event) }
+        XCTAssertEqual(events, [.completed(messageId: "answer", createdAt: "2026-10-09", replayed: false)])
+    }
+
+    @MainActor
+    func testHistoryLoadRejectsDelayedSuccessEmptyAndErrorAfterOwnershipOrLoadChanges() async throws {
+        let snapshot = try historySnapshot(messages: [historyMessage(status: "failed", retryable: true)])
+        for interruption in ["other-owner", "same-owner-new-session", "newer-load", "cancelled"] {
+            for outcome in ["history", "empty", "error"] {
+                let owner = AuthManager.ProfileSessionOwnership(subject: "owner-A", generation: 1)
+                var currentOwner = owner
+                let loadId = UUID()
+                var currentLoadId = loadId
+                let started = expectation(description: "History request held")
+                var response: CheckedContinuation<ChatConversationSnapshot?, Error>?
+                let operation = Task { @MainActor in
+                    try await ChatHistoryLoader.load(
+                        accessToken: { "fixture-token" },
+                        loadHistory: { _ in
+                            try await withCheckedThrowingContinuation {
+                                response = $0
+                                started.fulfill()
+                            }
+                        },
+                        isCurrent: { currentOwner == owner && currentLoadId == loadId }
+                    )
+                }
+                await fulfillment(of: [started], timeout: 3)
+                switch interruption {
+                case "other-owner":
+                    currentOwner = .init(subject: "owner-B", generation: 2)
+                case "same-owner-new-session":
+                    currentOwner = .init(subject: "owner-A", generation: 3)
+                case "newer-load": currentLoadId = UUID()
+                default: operation.cancel()
+                }
+                let held = try XCTUnwrap(response)
+                if outcome == "error" { held.resume(throwing: ChatServiceError.offline) } else {
+                    held.resume(returning: outcome == "history" ? snapshot : nil)
+                }
+                do {
+                    _ = try await operation.value
+                    XCTFail("Stale \(outcome) must not replace messages, retry identity or error for \(interruption)")
+                } catch is CancellationError {
+                    // Cancellation is silent; the newer load owns all visible state.
+                } catch { XCTFail("Stale failure must not become a visible error: \(error)") }
+            }
+        }
+    }
+
+    @MainActor
+    func testHistoryLoadRejectsTokenFromReplacementSessionBeforeSending() async throws {
+        var isCurrent = true
+        var sends = 0
+        do {
+            _ = try await ChatHistoryLoader.load(
+                accessToken: {
+                    await Task.yield()
+                    isCurrent = false
+                    return "replacement-token"
+                },
+                loadHistory: { _ in sends += 1; return nil },
+                isCurrent: { isCurrent }
+            )
+            XCTFail("A replaced session must not use the new token for the old load")
+        } catch is CancellationError {} catch { XCTFail("Unexpected error: \(error)") }
+        XCTAssertEqual(sends, 0)
+    }
+
+    @MainActor
+    func testHistoryLoadAcceptsCurrentOwnerAndPreservesCurrentErrors() async throws {
+        let snapshot = try historySnapshot(messages: [historyMessage(status: "failed", retryable: true)])
+        let loaded = try await ChatHistoryLoader.load(
+            accessToken: { "rotated-token-same-session" },
+            loadHistory: { token in
+                XCTAssertEqual(token, "rotated-token-same-session")
+                return snapshot
+            },
+            isCurrent: { true }
+        )
+        XCTAssertEqual(loaded, snapshot)
+        do {
+            _ = try await ChatHistoryLoader.load(
+                accessToken: { "fixture-token" },
+                loadHistory: { _ in throw ChatServiceError.offline },
+                isCurrent: { true }
+            )
+            XCTFail("Current failures must remain visible")
+        } catch { XCTAssertEqual(error as? ChatServiceError, .offline) }
+    }
+
+    private func historyMessage(status: String?, retryable: Bool) -> [String: Any] {
+        var value: [String: Any] = ["id": "message-1", "role": "user", "content": "How am I doing?",
+                                    "clientMessageId": "client-1", "createdAt": "2026-10-09"]
+        if let status { value["turn"] = ["status": status, "retryable": retryable] }
+        return value
+    }
+
+    private func historySnapshot(messages: [[String: Any]]) throws -> ChatConversationSnapshot {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "id": "conversation-1", "title": "How am I doing?", "createdAt": "2026-10-09",
+            "updatedAt": "2026-10-09", "expiresAt": "2026-11-09", "messages": messages
+        ])
+        return try JSONDecoder().decode(ChatConversationSnapshot.self, from: data)
     }
 
     func testTrainingLoadInputPreservesDecimalOverridesAndRejectsInvalidLoads() throws {

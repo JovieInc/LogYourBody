@@ -23,12 +23,6 @@ extension DashboardViewLiquid {
         bodyMetrics.first { Calendar.current.isDateInToday($0.date) }
     }
 
-    var homeV2LatestPhotoMetric: BodyMetrics? {
-        bodyMetrics
-            .filter { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
-            .max { $0.date < $1.date }
-    }
-
     /// Photo-first Home behind `HomeV2Policy`; the legacy `LaunchTimelineSurface`
     /// keeps serving when the gate is off.
     func homeV2Surface(for metric: BodyMetrics) -> some View {
@@ -36,18 +30,18 @@ extension DashboardViewLiquid {
 
         return HomeV2Surface(
             metric: metric,
-            bodyMetrics: bodyMetrics,
-            selectedIndex: $selectedIndex,
+            bodyMetrics: homeV2Timeline.metrics,
+            timeline: homeV2Timeline,
+            selectedID: Binding(get: { HomeV2TimelinePolicy.EntryID(metric) }, set: selectHomeV2TimelineEntry),
             weightValue: formatTrendWeightHeadline(metric, usesTrend: weightUsesTrend),
             weightUnit: unit,
-            changeSentence: HomeV2Copy.changeSentence(delta: heroWeightDelta30d(), unit: unit),
-            compositionSentence: HomeV2CompositionPolicy.headline(metrics: bodyMetrics),
+            changeSentence: homeV2Timeline.weightChangeSentence(
+                for: HomeV2TimelinePolicy.EntryID(metric), system: currentMeasurementSystem
+            ),
+            dateText: { formatHUDDate($0.date) },
             phaseSentence: homeV2PhaseSentence,
             loggedSentence: homeV2Logged.map { HomeV2Copy.loggedSentence(value: $0.valueText, unit: $0.unit) },
-            latestPhotoCaption: homeV2LatestPhotoMetric.map { HomeV2Copy.latestPhotoCaption(date: formatHUDDate($0.date)) },
             systemState: homeV2SystemState,
-            chartDaily: fullChartCache[.weight] ?? [],
-            chartTrend: fullTrendChartCache[.weight] ?? [],
             onOpenPhoto: { isHomeV2ViewerPresented = true },
             onViewProgress: { openHomeV2Progress(metric: .weight) },
             onTodayDetails: { openHomeV2Context() },
@@ -72,6 +66,31 @@ extension DashboardViewLiquid {
                 weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: bodyMetrics)
             )
         }
+    }
+
+    /// The ID remains authoritative when a background refresh inserts, reorders or deletes rows.
+    func reconcileHomeV2Timeline(with metrics: [BodyMetrics]) {
+        guard layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled() else { return }
+        let snapshot = HomeV2TimelinePolicy.Snapshot(metrics: metrics, owner: authManager.currentUser?.id)
+        let selected = snapshot.reconcile(homeV2TimelineSelection)
+        homeV2Timeline = snapshot
+        homeV2TimelineSelection = selected
+        selectedIndex = selected.flatMap { snapshot.sourceIndex(for: $0.id) } ?? 0
+    }
+
+    func recordHomeV2TimelineSelection(at index: Int) {
+        guard layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled(),
+              let selection = homeV2Timeline.selection(atSourceIndex: index),
+              selection.id.owner == authManager.currentUser?.id else { return }
+        homeV2TimelineSelection = selection
+    }
+
+    func selectHomeV2TimelineEntry(_ id: HomeV2TimelinePolicy.EntryID) {
+        guard id.owner == authManager.currentUser?.id,
+              let index = homeV2Timeline.sourceIndex(for: id),
+              let selection = homeV2Timeline.selection(atSourceIndex: index) else { return }
+        homeV2TimelineSelection = selection
+        selectedIndex = index
     }
 
     /// Loading, offline or Apple Health off, in that order; nil when all is well.

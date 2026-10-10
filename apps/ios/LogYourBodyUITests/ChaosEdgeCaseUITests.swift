@@ -434,7 +434,10 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
     func testAddEntryAccepts300CharacterNote() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestGlp1WeeklyCheckInFixture"])
+        // The GLP-1 prompt belongs to legacy Stats; keep its note-entry contract covered during rollback.
+        launch(app, with: [
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture", "-lybUITestGlp1WeeklyCheckInFixture"
+        ])
         assertTimelineRootAppears(in: app, timeout: 30)
         openPhotoTimelineMenu(in: app)
         let stats = app.buttons["Stats"]
@@ -860,6 +863,30 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
     // MARK: - Layout defect detection
 
+    /// Values belong to one stationary checkpoint, never to a later tap or scroll.
+    private struct LayoutSample {
+        let element: XCUIElement
+        let type: XCUIElement.ElementType
+        let identifier: String
+        let label: String
+        let frame: CGRect
+
+        init?(_ element: XCUIElement) {
+            guard element.exists else { return nil }
+            self.element = element
+            type = element.elementType
+            identifier = element.identifier
+            label = element.label
+            frame = element.frame
+        }
+
+        var description: String {
+            let identifier = self.identifier.isEmpty ? "(no identifier)" : self.identifier
+            let label = self.label.isEmpty ? "(no label)" : self.label
+            return "\(String(describing: type)) id=\(identifier) label=\"\(label)\" frame=\(frame)"
+        }
+    }
+
     /// Fails with a screenshot if `layoutAnomalies` finds anything at this
     /// checkpoint. Unlike the chaos monkey's soft per-step recording, these
     /// are dedicated, deterministic checkpoints under an extreme text size,
@@ -874,13 +901,16 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         attachScreenshot(named: "layout-scan-\(context)", from: app)
         let window = app.windows.firstMatch.frame
         let elements = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
-        let geometry = elements.map { "\($0.identifier) \($0.label): \($0.frame)" }
+        let samples = elements.compactMap { LayoutSample($0) }
+        let geometry = samples.map { "\($0.identifier) \($0.label): \($0.frame)" }
         let attachment = XCTAttachment(string: "window=\(window)\n" + geometry.joined(separator: "\n"))
         attachment.name = "layout-scan-\(context)-geometry"
         attachment.lifetime = .keepAlways
         add(attachment)
         var observations: [String] = []
-        let findings = layoutAnomalies(in: app, observations: &observations)
+        let findings = layoutAnomalies(
+            candidates: samples, windowFrame: window, in: app, observations: &observations
+        )
         let clipping = XCTAttachment(string: observations.joined(separator: "\n"))
         clipping.name = "layout-scan-\(context)-expected-native-scroll-clipping"
         clipping.lifetime = .keepAlways
@@ -895,17 +925,16 @@ final class ChaosEdgeCaseUITests: XCTestCase {
     /// zero-size frame while the element still reports as hittable, or a
     /// label clipped down to a single ellipsis. The keyboard and system
     /// alerts are excluded -- neither is the app's layout to fix.
-    private func layoutAnomalies(in app: XCUIApplication, observations: inout [String]) -> [String] {
+    private func layoutAnomalies(
+        candidates: [LayoutSample], windowFrame: CGRect,
+        in app: XCUIApplication, observations: inout [String]
+    ) -> [String] {
         guard !app.keyboards.element.exists, !app.alerts.firstMatch.exists else { return [] }
-        let windowFrame = app.windows.firstMatch.frame
         guard windowFrame.width > 0, windowFrame.height > 0 else { return [] }
-
-        let candidates = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
 
         let scrollGeometry = ChaosScrollGeometry(app: app)
         var findings: [String] = []
         for element in candidates {
-            guard element.exists else { continue }
             let frame = element.frame
 
             // `.isHittable` itself can hard-fail ("Failed to determine
@@ -918,40 +947,37 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             // AccessibilityXXXL, before this reordering).
             guard frame.width.isFinite, frame.height.isFinite,
                 frame.origin.x.isFinite, frame.origin.y.isFinite else {
-                findings.append("non-finite frame: \(describeLayoutElement(element))")
+                findings.append("non-finite frame: \(element.description)")
                 continue
             }
             if frame.width <= 0 || frame.height <= 0 {
-                findings.append("zero-size frame: \(describeLayoutElement(element))")
+                findings.append("zero-size frame: \(element.description)")
                 continue
             }
 
             let overflowsWindow = frame.minX < windowFrame.minX - 1 || frame.maxX > windowFrame.maxX + 1
                 || frame.minY < windowFrame.minY - 1 || frame.maxY > windowFrame.maxY + 1
-            if overflowsWindow && scrollGeometry.isExpectedScrollClipping(element, window: windowFrame) {
-                observations.append("native scroll clipping: \(describeLayoutElement(element))")
+            if overflowsWindow && scrollGeometry.isExpectedScrollClipping(
+                type: element.type, identifier: element.identifier, label: element.label,
+                frame: frame, window: windowFrame
+            ) {
+                observations.append("native scroll clipping: \(element.description)")
                 continue
             }
             // Fully offscreen frames must never reach XCTest's activation-point query.
             guard frame.intersects(windowFrame) else {
-                findings.append("non-scroll frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                findings.append("non-scroll frame outside window bounds \(windowFrame): \(element.description)")
                 continue
             }
-            guard element.isHittable else { continue }
+            guard element.element.isHittable else { continue }
             if overflowsWindow {
-                findings.append("frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                findings.append("frame outside window bounds \(windowFrame): \(element.description)")
                 continue
             }
             if element.label == "\u{2026}" {
-                findings.append("label clipped to a single ellipsis: \(describeLayoutElement(element))")
+                findings.append("label clipped to a single ellipsis: \(element.description)")
             }
         }
         return findings
-    }
-
-    private func describeLayoutElement(_ element: XCUIElement) -> String {
-        let identifier = element.identifier.isEmpty ? "(no identifier)" : element.identifier
-        let label = element.label.isEmpty ? "(no label)" : element.label
-        return "\(String(describing: element.elementType)) id=\(identifier) label=\"\(label)\" frame=\(element.frame)"
     }
 }
