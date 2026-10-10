@@ -435,6 +435,74 @@ describe('authenticated training API', () => {
     expect(otherAccount.session).toBeUndefined();
   });
 
+  it('retains an unfinished prescription through logging, pain pause, next-week resume and opt-out', async () => {
+    const { handlers, setNow } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session: original } = await (
+      await handlers.next(request('GET', 'next', 'token-a'))
+    ).json();
+    const set = {
+      sessionId: original.id,
+      exerciseId: original.exercises[0].id,
+      reps: 10,
+      loadKg: 25,
+      rir: 4,
+    };
+    for (const setNumber of [1, 2]) {
+      expect(
+        (await handlers.logSet(request('POST', 'log-set', 'token-a', { ...set, setNumber })))
+          .status,
+      ).toBe(201);
+    }
+    const reopened = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(reopened.session.exercises).toEqual(original.exercises);
+    const checkIn = {
+      sessionId: original.id,
+      soreness: 2,
+      pump: 5,
+      performance: 'stable',
+      jointPain: 5,
+    };
+    expect((await handlers.feedback(request('POST', 'feedback', 'token-a', checkIn))).status).toBe(
+      201,
+    );
+    const paused = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(paused.session).toMatchObject({ id: original.id, safetyStop: true, exercises: [] });
+    expect(
+      (
+        await handlers.logSet(
+          request('POST', 'log-set', 'token-a', {
+            ...set,
+            exerciseId: original.exercises[1].id,
+            setNumber: 1,
+          }),
+        )
+      ).status,
+    ).toBe(409);
+    setNow('2026-01-17T12:00:00.000Z');
+    expect(
+      (
+        await handlers.feedback(
+          request('POST', 'feedback', 'token-a', { ...checkIn, jointPain: 0 }),
+        )
+      ).status,
+    ).toBe(201);
+    const resumed = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(resumed.session).toMatchObject({
+      id: original.id,
+      week: original.week,
+      safetyStop: false,
+      exercises: original.exercises,
+    });
+    expect(resumed.session.loggedSets).toEqual(reopened.session.loggedSets);
+    expect((await handlers.revoke(request('DELETE', 'enroll', 'token-a'))).status).toBe(200);
+    expect((await handlers.next(request('GET', 'next', 'token-a'))).status).toBe(409);
+    expect(
+      (await handlers.logSet(request('POST', 'log-set', 'token-a', { ...set, setNumber: 1 })))
+        .status,
+    ).toBe(409);
+  });
+
   it('reports rejected check-ins as unavailable instead of saved', async () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
