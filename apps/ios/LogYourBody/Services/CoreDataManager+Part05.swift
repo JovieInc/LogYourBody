@@ -97,6 +97,11 @@ func saveGlp1Medications(
                     cached.createdAt = medication.createdAt
                 }
 
+                // Keep a strictly newer local edit. An equal or newer payload still applies.
+                if let storedUpdatedAt = cached.updatedAt, storedUpdatedAt > medication.updatedAt {
+                    continue
+                }
+
                 cached.userId = userId
                 cached.displayName = medication.displayName
                 cached.genericName = medication.genericName

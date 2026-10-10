@@ -565,6 +565,11 @@ func saveGlp1DoseLogs(
                     continue
                 }
 
+                // Keep a strictly newer local edit. An equal or newer payload still applies.
+                if let storedUpdatedAt = cached.updatedAt, storedUpdatedAt > log.updatedAt {
+                    continue
+                }
+
                 cached.userId = userId
                 cached.takenAt = log.takenAt
                 cached.medicationId = log.medicationId
