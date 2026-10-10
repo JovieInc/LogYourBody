@@ -607,7 +607,70 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         attachScreenshot(named: "edge-arabic-locale-root", from: app)
     }
 
+    func testGlp1MedicationSelectorCancelMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture",
+            "-lybUITestGlp1EmptyMedicationFixture"
+        ])
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+        if !app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists {
+            let menu = app.buttons["Open Menu"]
+            XCTAssertTrue(menu.waitForExistence(timeout: 8))
+            menu.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 5))
+            let stats = app.buttons["Stats"]
+            XCTAssertTrue(stats.waitForExistence(timeout: 5))
+            stats.tap()
+        }
+
+        let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
+        swipeUntilExists(prompt, in: app)
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        swipeUntilHittable(prompt, in: app)
+        prompt.tap()
+
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
+        let addMedication = app.buttons["Add medication"]
+        XCTAssertTrue(addMedication.waitForExistence(timeout: 5))
+        swipeUntilHittable(addMedication, in: app)
+        addMedication.tap()
+
+        let sheetBar = app.navigationBars["Select GLP-1"]
+        XCTAssertTrue(sheetBar.waitForExistence(timeout: 8))
+        let cancel = app.descendants(matching: .any)["glp1_medication_selector_cancel_button"]
+        let save = app.descendants(matching: .any)["glp1_medication_selector_save_button"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        let cancelFrame = cancel.frame
+        let saveFrame = save.frame
+        let windowFrame = app.windows.firstMatch.frame
+        XCTAssertTrue(windowFrame.contains(cancelFrame), "Cancel \(cancelFrame) window \(windowFrame)")
+        XCTAssertTrue(windowFrame.contains(saveFrame), "Save \(saveFrame) window \(windowFrame)")
+        XCTAssertGreaterThanOrEqual(cancelFrame.width, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(cancelFrame.height, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(saveFrame.width, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(saveFrame.height, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        cancel.tap()
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 5))
+        XCTAssertFalse(sheetBar.exists)
+    }
+
     // MARK: - Shared helpers
+
+    private func swipeUntilExists(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<8 where !element.exists {
+            app.swipeUp()
+        }
+    }
+
+    private func swipeUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<6 where !element.isHittable {
+            app.swipeUp()
+        }
+    }
 
     private func launch(_ app: XCUIApplication, with arguments: [String]) {
         if app.state != .notRunning {
