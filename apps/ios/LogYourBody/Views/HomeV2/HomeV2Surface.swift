@@ -278,6 +278,8 @@ struct HomeV2Surface: View {
 }
 
 struct HomeV2StepsSummary: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let value: String
     let detail: String
     let dateText: String
@@ -285,21 +287,24 @@ struct HomeV2StepsSummary: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(alignment: .firstTextBaseline, spacing: HomeV2Tokens.Space.compact) {
-                VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-                    Text("Steps · \(dateText)")
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
-                        .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    Text(detail)
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
+                        heading
+                        stepValue
+                        detailText
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: HomeV2Tokens.Space.compact) {
+                        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
+                            heading
+                            detailText
+                        }
+                        Spacer(minLength: 0)
+                        stepValue
+                    }
                 }
-                Spacer(minLength: 0)
-                Text(value)
-                    .scaledSystemFont(size: 28, weight: .semibold, relativeTo: .title2)
-                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    .accessibilityIdentifier("home_v2_steps_value")
             }
             .frame(minHeight: JovieTokens.minimumHitTarget)
             .contentShape(Rectangle())
@@ -308,6 +313,28 @@ struct HomeV2StepsSummary: View {
         .accessibilityElement(children: .contain)
         .accessibilityHint("View steps progress")
         .accessibilityIdentifier("home_v2_steps_summary")
+    }
+
+    private var heading: some View {
+        Text("Steps · \(dateText)")
+            .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
+            .foregroundStyle(HomeV2Tokens.Colors.ink)
+            .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
+    }
+
+    private var detailText: some View {
+        Text(detail)
+            .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var stepValue: some View {
+        Text(value)
+            .scaledSystemFont(size: 28, weight: .semibold, relativeTo: .title2)
+            .foregroundStyle(HomeV2Tokens.Colors.ink)
+            .fixedSize(horizontal: false, vertical: dynamicTypeSize.isAccessibilitySize)
+            .accessibilityIdentifier("home_v2_steps_value")
     }
 }
 /// The same full-bleed card as the photo, using only data the person has saved.

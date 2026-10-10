@@ -158,6 +158,7 @@ extension DashboardViewLiquid {
         date: Date = Date(),
         weight: String? = nil,
         bodyFat: Double? = nil,
+        bodyFatMethod: String? = nil,
         isHomeV2LoggingWeight: Bool = false
     ) {
         addEntryInitialTab = initialTab
@@ -165,6 +166,7 @@ extension DashboardViewLiquid {
         addEntryInitialDate = date
         addEntryInitialWeight = weight
         addEntryInitialBodyFat = bodyFat
+        addEntryInitialBodyFatMethod = bodyFatMethod
         self.isHomeV2LoggingWeight = isHomeV2LoggingWeight
         showAddEntrySheet = true
     }

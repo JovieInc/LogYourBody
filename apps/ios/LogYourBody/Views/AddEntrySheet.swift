@@ -11,6 +11,28 @@ enum BodyFatEntryMethod: String, CaseIterable {
     case bioelectrical = "bia_scale"
     case dexa
 
+    /// A prefilled reading keeps its exact provenance until the user chooses another method.
+    static func initialSelection(bodyFat: Double?, recordedMethod: String?) -> String? {
+        bodyFat == nil ? visualEstimate.rawValue : recordedMethod
+    }
+
+    static func selectionTitle(_ raw: String?) -> String {
+        let normalized = raw?.lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        if let normalized, let method = Self(rawValue: normalized) { return method.title }
+        switch normalized {
+        case "manual", "typed": return "Entered by you"
+        case "dexa (bodyspec)", "bodyspec_dexa": return "DEXA"
+        case "inbody": return "InBody"
+        case "bioelectrical": return "Bioelectrical"
+        case "calipers": return "Calipers"
+        default: return "Method not specified"
+        }
+    }
+
+    static func needsPreservedOption(_ raw: String?) -> Bool {
+        raw.flatMap(Self.init(rawValue:)) == nil
+    }
+
     var title: String {
         switch self {
         case .visualEstimate: "Visual Estimate"
@@ -169,6 +191,7 @@ private struct NativeSheetChromeModifier: ViewModifier {
 struct AddEntrySheet: View {
     @Environment(\.dismiss)
     var dismiss
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @EnvironmentObject var authManager: AuthManager
     @Binding var isPresented: Bool
     @State var selectedTab: Int
@@ -186,6 +209,7 @@ struct AddEntrySheet: View {
         initialDate: Date = Date(),
         initialWeight: String? = nil,
         initialBodyFat: Double? = nil,
+        initialBodyFatMethod: String? = nil,
         isHomeV2LogEntry: Bool = false,
         onWeightSaved: ((BodyMetrics) -> Void)? = nil,
         onBodyFatSaved: ((BodyMetrics) -> Void)? = nil
@@ -198,6 +222,9 @@ struct AddEntrySheet: View {
         self._selectedDate = State(initialValue: initialDate)
         self._weight = State(initialValue: initialWeight ?? "")
         self._bodyFat = State(initialValue: initialBodyFat.map { String(format: "%.1f", $0) } ?? "")
+        self._bodyFatMethod = State(initialValue: BodyFatEntryMethod.initialSelection(
+            bodyFat: initialBodyFat, recordedMethod: initialBodyFatMethod
+        ))
         self.onWeightSaved = onWeightSaved
         self.onBodyFatSaved = onBodyFatSaved
     }
@@ -210,8 +237,9 @@ struct AddEntrySheet: View {
 
     // Body fat entry
     @State var bodyFat: String = ""
-    @State var bodyFatMethod = BodyFatEntryMethod.visualEstimate.rawValue
+    @State var bodyFatMethod: String?
     @State var bodyFatError: String?
+    @State var isBodyFatFieldEditing = false
 
     // Photo entry
     @State var selectedPhotos: [AppPhotoAsset] = []

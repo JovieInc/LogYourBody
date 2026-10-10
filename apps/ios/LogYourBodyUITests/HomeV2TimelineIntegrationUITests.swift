@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 final class HomeV2TimelineIntegrationUITests: XCTestCase {
@@ -48,6 +49,12 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         let app = launch()
         let stage = app.buttons["home_v2_photo_stage"]
         let caption = app.staticTexts["home_v2_photo_caption"]
+        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
+        let historyLoaded = expectation(
+            for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [historyLoaded], timeout: 8), .completed,
+                       "Wait for real history after the newest-only first paint before swiping")
         for _ in 0..<2 {
             let previous = caption.label
             stage.swipeLeft()
@@ -104,6 +111,9 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         let field = app.textFields["Body fat percentage value"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         XCTAssertEqual(field.value as? String, "16.2", "The sheet must use the selected older check-in")
+        let method = app.descendants(matching: .any).matching(identifier: "home_v2_body_fat_method").firstMatch
+        XCTAssertTrue(method.waitForExistence(timeout: 5))
+        XCTAssertEqual(method.value as? String, "Method not specified", "Apple Health alone does not identify a method")
         field.tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "16.0")
         let save = app.buttons["home_v2_log_sheet_save"]
@@ -116,10 +126,99 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         try assertPhotoColor(stage, red: false)
         XCTAssertEqual(app.staticTexts["home_v2_weight_value"].label, weight)
         XCTAssertNotEqual(app.staticTexts["home_v2_ffmi_value"].label, oldFFMI)
+        XCTAssertTrue(stage.label.contains("From Apple Health"), "The original provenance must survive the value edit")
+        XCTAssertFalse(stage.label.contains("Visual estimate"))
         XCTAssertFalse(app.buttons["home_v2_undo"].exists)
         XCTAssertFalse(app.buttons["home_v2_done"].exists)
         XCTAssertFalse(app.staticTexts["home_v2_logged_sentence"].exists)
         capture(app, "timeline-body-fat-save-selected-photo")
+        app.buttons["home_v2_log_weight"].tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        XCTAssertEqual(field.value as? String, "16.0")
+        XCTAssertEqual(method.value as? String, "Method not specified")
+        capture(app, "timeline-body-fat-method-after-save")
+    }
+
+    func testSelectedDayStepsAtLargestTextFollowThePhotoAndRemainReachable() throws {
+        let app = launch(largestText: true, withSteps: true)
+        let stage = app.buttons["home_v2_photo_stage"]
+        let caption = app.staticTexts["home_v2_photo_caption"]
+        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
+        let historyLoaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
+        XCTAssertEqual(XCTWaiter.wait(for: [historyLoaded], timeout: 8), .completed)
+        let firstCaption = caption.label
+        let initialCardY = stage.frame.minY
+        for (index, count) in [6_000, 8_000, 6_000].enumerated() {
+            if index > 0 {
+                revealTimelineCard(stage, initialY: initialCardY, in: app)
+                let previous = caption.label
+                if index == 1 { stage.swipeLeft() } else { stage.swipeRight() }
+                let moved = expectation(for: NSPredicate(format: "label != %@", previous), evaluatedWith: caption)
+                XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 5), .completed)
+            }
+            assertStepCount(count, in: app)
+            let stepsDate = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Steps · ")).firstMatch
+            XCTAssertTrue(caption.label.hasPrefix(stepsDate.label.replacingOccurrences(of: "Steps · ", with: "")))
+            try assertPhotoColor(stage, red: index != 1)
+            capture(app, "timeline-steps-ax5-photo-\(index)")
+            let summary = app.otherElements["home_v2_steps_summary"].buttons.firstMatch
+            revealTimelineSteps(summary, in: app)
+            let value = app.staticTexts["home_v2_steps_value"]
+            let traits = UITraitCollection(preferredContentSizeCategory: .accessibilityExtraExtraExtraLarge)
+            let font = UIFontMetrics(forTextStyle: .title2).scaledFont(
+                for: .systemFont(ofSize: 28, weight: .semibold), compatibleWith: traits
+            )
+            XCTAssertLessThan(value.frame.height, font.lineHeight * 1.5,
+                              "The step total must remain one readable line, not split its final digit")
+            XCTAssertLessThanOrEqual(stepsDate.frame.maxY, value.frame.minY,
+                                     "At accessibility sizes the complete dated heading must precede the total")
+            XCTAssertTrue(timelineViewport(in: app).contains(stepsDate.frame))
+            XCTAssertTrue(timelineViewport(in: app).contains(value.frame))
+            capture(app, "timeline-steps-ax5-value-\(index)")
+            XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
+        }
+        XCTAssertEqual(caption.label, firstCaption)
+    }
+
+    private func revealTimelineCard(_ stage: XCUIElement, initialY: CGFloat, in app: XCUIApplication) {
+        let scroll = app.scrollViews["home_v2_content_scroll"]
+        let viewport = timelineViewport(in: app)
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        let top = origin.withOffset(CGVector(dx: viewport.midX, dy: viewport.minY + 30))
+        let bottom = origin.withOffset(CGVector(dx: viewport.midX, dy: viewport.maxY - 30))
+        XCTAssertTrue(scroll.exists)
+        for _ in 0..<6 where stage.frame.minY < initialY - 1 {
+            top.press(forDuration: 0.05, thenDragTo: bottom)
+        }
+        XCTAssertEqual(stage.frame.minY, initialY, accuracy: 1)
+    }
+
+    private func revealTimelineSteps(_ target: XCUIElement, in app: XCUIApplication) {
+        let viewport = timelineViewport(in: app)
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        let top = origin.withOffset(CGVector(dx: viewport.midX, dy: viewport.minY + 30))
+        let bottom = origin.withOffset(CGVector(dx: viewport.midX, dy: viewport.maxY - 30))
+        XCTAssertTrue(target.waitForExistence(timeout: 5))
+        for _ in 0..<6 where !target.isHittable || !viewport.contains(target.frame) {
+            if target.frame.minY < viewport.minY {
+                top.press(forDuration: 0.05, thenDragTo: bottom)
+            } else {
+                bottom.press(forDuration: 0.05, thenDragTo: top)
+            }
+        }
+        XCTAssertTrue(target.isHittable)
+        XCTAssertTrue(viewport.contains(target.frame), "Selected-day steps must fit above the pinned controls")
+    }
+
+    private func timelineViewport(in app: XCUIApplication) -> CGRect {
+        let scroll = app.scrollViews["home_v2_content_scroll"]
+        let ruler = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(scroll.exists)
+        XCTAssertTrue(ruler.exists)
+        let viewport = CGRect(x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
+                              height: max(0, min(scroll.frame.maxY, ruler.frame.minY) - scroll.frame.minY))
+        XCTAssertGreaterThan(viewport.height, 88, "Home must leave a usable scrolling viewport")
+        return viewport
     }
 
     private func launch(largestText: Bool = false, withSteps: Bool = false) -> XCUIApplication {
