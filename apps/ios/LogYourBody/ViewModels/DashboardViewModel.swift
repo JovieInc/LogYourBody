@@ -15,6 +15,10 @@ final class DashboardViewModel: ObservableObject {
     private let healthKitManager: HealthKitManager
     private let healthSyncCoordinator: HealthSyncCoordinating
     private let latestMetricLoader: @MainActor (String) async -> BodyMetrics?
+    private let todayStepCountLoader: (() async throws -> Int)?
+    private let dailyStepLoader: @MainActor (String, Date) async -> DailyMetrics?
+    private let dailyStepWriter: @MainActor (DailyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void
+    private let stepSyncTrigger: (@MainActor () -> Void)?
     private var historicalLoadTask: Task<Void, Never>?
 
     init(
@@ -23,11 +27,27 @@ final class DashboardViewModel: ObservableObject {
         latestMetricLoader: @escaping @MainActor (String) async -> BodyMetrics? = { userId in
             let cached = await CoreDataManager.shared.fetchLatestBodyMetric(for: userId)
             return cached?.toBodyMetrics()
-        }
+        },
+        todayStepCountLoader: (() async throws -> Int)? = nil,
+        dailyStepLoader: @escaping @MainActor (String, Date) async -> DailyMetrics? = { userId, date in
+            await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: date)?.toDailyMetrics()
+        },
+        dailyStepWriter: @escaping @MainActor (
+            DailyMetrics, @escaping CoreDataManager.WriteAdmission
+        ) async throws -> Void = { metrics, admission in
+            try await CoreDataManager.shared.saveDailyMetricsAndWait(
+                metrics, userId: metrics.userId, writeAdmission: admission
+            )
+        },
+        stepSyncTrigger: (@MainActor () -> Void)? = nil
     ) {
         self.healthKitManager = healthKitManager
         self.healthSyncCoordinator = healthSyncCoordinator
         self.latestMetricLoader = latestMetricLoader
+        self.todayStepCountLoader = todayStepCountLoader
+        self.dailyStepLoader = dailyStepLoader
+        self.dailyStepWriter = dailyStepWriter
+        self.stepSyncTrigger = stepSyncTrigger
     }
 
     convenience init(healthKitManager: HealthKitManager = .shared) {
@@ -175,59 +195,79 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
-    private func syncStepsFromHealthKit(
+    func syncStepsFromHealthKit(
         authManager: AuthManager,
         realtimeSyncManager: RealtimeSyncManager
     ) async {
+        guard let ownership = authManager.captureAccountSession() else { return }
         do {
-            let stepCount = try await healthKitManager.fetchTodayStepCount()
-            await updateStepCount(
+            let stepCount: Int
+            if let todayStepCountLoader {
+                stepCount = try await todayStepCountLoader()
+            } else {
+                stepCount = try await healthKitManager.fetchTodayStepCount()
+            }
+            try await updateStepCount(
                 steps: stepCount,
                 authManager: authManager,
-                realtimeSyncManager: realtimeSyncManager
+                realtimeSyncManager: realtimeSyncManager,
+                ownership: ownership
             )
         } catch {
+            guard !Task.isCancelled, authManager.ownsAccountSession(ownership) else { return }
             let context = ErrorContext(
                 feature: "healthKit",
-                operation: "fetchTodayStepCount",
+                operation: "syncStepsFromHealthKit",
                 screen: "Dashboard",
-                userId: authManager.currentUser?.id
+                userId: ownership.subject
             )
             ErrorReporter.shared.captureNonFatal(error, context: context)
         }
     }
 
-    private func updateStepCount(
+    func updateStepCount(
         steps: Int,
         authManager: AuthManager,
-        realtimeSyncManager: RealtimeSyncManager
-    ) async {
-        guard let userId = authManager.currentUser?.id else { return }
-
-        let today = Date()
-
-        if let existingMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {
-            existingMetrics.steps = Int32(steps)
-            existingMetrics.updatedAt = Date()
-
-            let metrics = existingMetrics.toDailyMetrics()
-            dailyMetrics = metrics
-        } else {
-            let newMetrics = DailyMetrics(
-                id: UUID().uuidString,
-                userId: userId,
-                date: today,
-                steps: steps,
-                notes: nil,
-                createdAt: Date(),
-                updatedAt: Date()
-            )
-
-            CoreDataManager.shared.saveDailyMetrics(newMetrics, userId: userId)
-
-            dailyMetrics = newMetrics
+        realtimeSyncManager: RealtimeSyncManager,
+        ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async throws {
+        _ = try DailyStepCountPolicy.storedSteps(steps)
+        guard let ownership = ownership ?? authManager.captureAccountSession() else {
+            throw HealthKitError.notAuthorized
         }
+        try requireStepOwnership(ownership, authManager: authManager)
+        let today = Date()
+        let current = await dailyStepLoader(ownership.subject, today)
+        try requireStepOwnership(ownership, authManager: authManager)
+        let metrics = DailyMetrics(
+            id: current?.id ?? UUID().uuidString,
+            userId: ownership.subject,
+            date: current?.date ?? today,
+            steps: steps,
+            notes: current?.notes,
+            createdAt: current?.createdAt ?? today,
+            updatedAt: Date()
+        )
+        let cancellation = HealthKitImportCancellation()
+        let admission: CoreDataManager.WriteAdmission = {
+            guard !cancellation.isCancelled, authManager.ownsAccountSession(ownership) else {
+                throw HealthKitError.notAuthorized
+            }
+        }
+        try await withTaskCancellationHandler {
+            try await dailyStepWriter(metrics, admission)
+        } onCancel: {
+            cancellation.cancel()
+        }
+        try requireStepOwnership(ownership, authManager: authManager)
+        dailyMetrics = metrics
+        if let stepSyncTrigger { stepSyncTrigger() } else { realtimeSyncManager.syncAll() }
+    }
 
-        realtimeSyncManager.syncAll()
+    private func requireStepOwnership(
+        _ ownership: AuthManager.ProfileSessionOwnership, authManager: AuthManager
+    ) throws {
+        try Task.checkCancellation()
+        guard authManager.ownsAccountSession(ownership) else { throw HealthKitError.notAuthorized }
     }
 }

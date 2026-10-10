@@ -101,13 +101,25 @@ func fetchStepCountHistory(days: Int = 30) async throws -> [(stepCount: Int, dat
                 }
 
                 var results: [(stepCount: Int, date: Date)] = []
+                var conversionError: Error?
 
-                statisticsCollection?.enumerateStatistics(from: startDate, to: endDate) { statistics, _ in
-                    let stepCount = statistics.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
-                    results.append((stepCount: Int(stepCount), date: statistics.startDate))
+                statisticsCollection?.enumerateStatistics(from: startDate, to: endDate) { statistics, stop in
+                    do {
+                        let stepCount = try HealthKitStepCountPolicy.stepCount(
+                            from: statistics.sumQuantity()?.doubleValue(for: HKUnit.count())
+                        )
+                        results.append((stepCount: stepCount, date: statistics.startDate))
+                    } catch {
+                        conversionError = error
+                        stop.pointee = true
+                    }
                 }
 
-                continuation.resume(returning: results)
+                if let conversionError {
+                    continuation.resume(throwing: conversionError)
+                } else {
+                    continuation.resume(returning: results)
+                }
             }
 
             healthStore.execute(query)
@@ -129,9 +141,13 @@ func setupStepCountBackgroundDelivery() async throws {
 
     func syncStepsToProductAPI(userId: String) async {
         guard let ownership = await captureImportOwnership(), ownership.subject == userId else { return }
-        // Get today's steps
-        let todaySteps = todayStepCount
-        guard todaySteps > 0 else { return }
+        // A current account cannot adopt a count produced by an earlier session.
+        let ownedSteps = await MainActor.run { () -> Int? in
+            guard self.isAuthorized, self.todayStepCountOwner == ownership,
+                  (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return nil }
+            return self.todayStepCount
+        }
+        guard let todaySteps = ownedSteps, todaySteps > 0 else { return }
         guard await ownsImport(ownership) else { return }
 
         // Get or create today's daily metrics
