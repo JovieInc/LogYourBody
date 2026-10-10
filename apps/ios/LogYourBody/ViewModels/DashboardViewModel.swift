@@ -181,7 +181,7 @@ final class DashboardViewModel: ObservableObject {
     ) async {
         do {
             let stepCount = try await healthKitManager.fetchTodayStepCount()
-            await updateStepCount(
+            try await updateStepCount(
                 steps: stepCount,
                 authManager: authManager,
                 realtimeSyncManager: realtimeSyncManager
@@ -189,7 +189,7 @@ final class DashboardViewModel: ObservableObject {
         } catch {
             let context = ErrorContext(
                 feature: "healthKit",
-                operation: "fetchTodayStepCount",
+                operation: "syncStepsFromHealthKit",
                 screen: "Dashboard",
                 userId: authManager.currentUser?.id
             )
@@ -197,13 +197,14 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
-    private func updateStepCount(
+    func updateStepCount(
         steps: Int,
         authManager: AuthManager,
         realtimeSyncManager: RealtimeSyncManager
-    ) async {
+    ) async throws {
         guard let userId = authManager.currentUser?.id else { return }
 
+        _ = try DailyStepCountPolicy.storedSteps(steps)
         let today = Date()
 
         if let existingMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {
