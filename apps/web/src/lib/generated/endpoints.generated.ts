@@ -173,6 +173,12 @@ export const endpoints = {
       reason: 'Pinned sentry-cli binary for release dSYM upload in CI.',
     },
     {
+      value:
+        'https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz',
+      reason:
+        'Official Gitleaks 8.30.1 Linux x64 archive, verified by pinned SHA256 before CI execution.',
+    },
+    {
       value: 'https://github.com/statsig-io/statsig-kit',
       reason: 'SPM dependency repository.',
     },
