@@ -780,6 +780,53 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "chat-provider-retry", from: app)
     }
 
+    func testReloadedChatFailureKeepsRetryAndOriginalMessage() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryFailedFixture"
+        ])
+        try waitForHomeChatComposer(in: app)
+        XCTAssertTrue(app.buttons["chat_retry_button"].waitForExistence(timeout: 8))
+        app.terminate()
+        app.launch()
+        try waitForHomeChatComposer(in: app)
+        let retry = app.buttons["chat_retry_button"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["The answer could not be completed. Retry when you’re ready."].exists)
+        attachScreenshot(named: "chat-reloaded-failure", from: app)
+        retry.tap()
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(
+            answer.waitForExistence(timeout: 8),
+            "The fixture completes only for the original conversation, client ID and message"
+        )
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        attachScreenshot(named: "chat-reloaded-retry-completed", from: app)
+    }
+
+    func testReloadedPendingChatOffersReloadWithoutResending() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryPendingFixture"
+        ])
+        try waitForHomeChatComposer(in: app)
+        XCTAssertTrue(app.buttons["chat_reload_button"].waitForExistence(timeout: 8))
+        XCTAssertEqual(app.buttons["chat_reload_button"].label, "Reload")
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        XCTAssertTrue(app.staticTexts["An answer is still in progress. Reload to check it."].exists)
+        app.buttons["chat_reload_button"].tap()
+        XCTAssertTrue(app.buttons["chat_reload_button"].waitForExistence(timeout: 8))
+        XCTAssertEqual(app.buttons["chat_reload_button"].label, "Reload")
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        attachScreenshot(named: "chat-reloaded-pending", from: app)
+    }
+
     func testChatOfflineStateIsVisibleAndRetryable() throws {
         let app = XCUIApplication()
         launch(app, with: [

@@ -658,12 +658,7 @@ private struct ChatMessage: Identifiable, Equatable {
         case user
     }
 
-    enum Delivery: Equatable {
-        case complete
-        case sending
-        case failed
-        case stopped
-    }
+    typealias Delivery = ChatHistoryDelivery
 
     var id: String
     let role: Role
@@ -721,6 +716,8 @@ struct ChatTabView: View {
     @State private var composerTextHeight: CGFloat = 0
     @State private var isResponding = false
     @State private var isLoadingConversation = true
+    @State private var conversationLoadId: UUID?
+    @State private var conversationOwner: AuthManager.ProfileSessionOwnership?
     @State private var messages: [ChatMessage] = [.welcome]
     @State private var conversationId = UUID().uuidString
     @State private var currentRequestTask: Task<Void, Never>?
@@ -759,7 +756,7 @@ struct ChatTabView: View {
             }
         }
         .modifier(ChatTabWorldClassScreenModifier(isEnabled: showsTranscript))
-        .task(id: authManager.currentUser?.id) {
+        .task(id: authManager.captureAccountSession()) {
             await loadLatestConversation()
         }
         .task(id: authManager.captureAccountSession()) {
@@ -772,6 +769,7 @@ struct ChatTabView: View {
             Task { await loadTrainingNext() }
         }
         .onDisappear {
+            conversationLoadId = nil
             currentRequestTask?.cancel()
             voiceCapture.cancel()
         }
@@ -1006,7 +1004,7 @@ struct ChatTabView: View {
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("chat_retry_button")
                     } else if isConversationLoadRetryAvailable {
-                        Button("Retry") {
+                        Button("Reload") {
                             Task { await loadLatestConversation() }
                         }
                         .font(.system(size: 13, weight: .semibold))
@@ -1599,6 +1597,9 @@ struct ChatTabView: View {
 
     private func retryFailedTurn() {
         guard let failedTurn, !isResponding else { return }
+        if HomeChatChromePolicy.shouldExpandChat(afterSendingUserMessage: true) {
+            onExpandRequest()
+        }
         startTurn(message: failedTurn.message, clientMessageId: failedTurn.clientMessageId)
     }
 
@@ -1669,19 +1670,42 @@ struct ChatTabView: View {
     }
 
     private func loadLatestConversation() async {
+        let loadId = UUID()
+        conversationLoadId = loadId
+        let ownership = authManager.captureAccountSession()
+        if conversationOwner != ownership {
+            messages = [.welcome]
+            conversationId = UUID().uuidString
+            draft = ""
+        }
+        conversationOwner = ownership
         currentRequestTask?.cancel()
+        currentRequestTask = nil
+        requestGeneration = nil
+        activeClientMessageId = nil
+        isResponding = false
         isLoadingConversation = true
         isConversationLoadRetryAvailable = false
-        defer { isLoadingConversation = false }
+        failedTurn = nil
+        chatErrorMessage = nil
+        defer { if conversationLoadId == loadId { isLoadingConversation = false } }
 
-        guard authManager.currentUser != nil,
-              let accessToken = await chatAccessToken() else {
+        guard let ownership else {
             chatErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
             return
         }
+        func isCurrent() -> Bool {
+            conversationLoadId == loadId && authManager.ownsAccountSession(ownership)
+        }
 
         do {
-            guard let conversation = try await chatService.loadLatest(accessToken: accessToken) else {
+            let conversation = try await ChatHistoryLoader.load(
+                accessToken: { await chatAccessToken() },
+                loadHistory: { try await chatService.loadLatest(accessToken: $0) },
+                isCurrent: isCurrent
+            )
+            guard isCurrent() else { return }
+            guard let conversation else {
                 messages = [.welcome]
                 conversationId = UUID().uuidString
                 return
@@ -1693,15 +1717,24 @@ struct ChatTabView: View {
                     role: message.role == .user ? .user : .assistant,
                     text: message.content,
                     clientMessageId: message.clientMessageId,
-                    delivery: .complete
+                    delivery: message.historyDelivery
                 )
             }
             if messages.isEmpty { messages = [.welcome] }
-            chatErrorMessage = nil
+            let recovery = conversation.historyRecovery
+            if let recovery, recovery.retryable {
+                failedTurn = FailedChatTurn(message: recovery.message, clientMessageId: recovery.clientMessageId)
+            }
+            chatErrorMessage = recovery?.errorMessage
+            isConversationLoadRetryAvailable = recovery?.shouldReload == true
+        } catch is CancellationError {
+            return
         } catch let error as ChatServiceError {
+            guard isCurrent() else { return }
             chatErrorMessage = error.localizedDescription
             isConversationLoadRetryAvailable = error.isRetryable
         } catch {
+            guard isCurrent() else { return }
             chatErrorMessage = "Your conversation could not be loaded. Please try again."
             isConversationLoadRetryAvailable = true
         }

@@ -21,6 +21,48 @@ struct ChatConversationMessage: Identifiable, Equatable, Decodable, Sendable {
     let content: String
     let clientMessageId: String?
     let createdAt: String
+    struct Turn: Equatable, Decodable, Sendable {
+        let status: String
+        let retryable: Bool
+    }
+    let turn: Turn?
+
+    var historyDelivery: ChatHistoryDelivery {
+        guard role == .user else { return .complete }
+        switch turn?.status {
+        case "failed": return .failed
+        case "cancelled": return .stopped
+        case "pending": return turn?.retryable == true ? .failed : .sending
+        default: return .complete
+        }
+    }
+}
+
+enum ChatHistoryDelivery: Equatable {
+    case complete
+    case sending
+    case failed
+    case stopped
+}
+
+struct ChatHistoryRecovery: Equatable {
+    let message: String
+    let clientMessageId: String
+    let status: String
+    let retryable: Bool
+
+    var shouldReload: Bool { status == "pending" && !retryable }
+
+    var errorMessage: String {
+        if shouldReload { return "An answer is still in progress. Reload to check it." }
+        let explanation: String
+        switch status {
+        case "cancelled": explanation = "Answer stopped."
+        case "pending": explanation = "The answer was interrupted."
+        default: explanation = "The answer could not be completed."
+        }
+        return explanation + (retryable ? " Retry when you’re ready." : "")
+    }
 }
 
 struct ChatConversationSnapshot: Equatable, Decodable, Sendable {
@@ -30,6 +72,47 @@ struct ChatConversationSnapshot: Equatable, Decodable, Sendable {
     let updatedAt: String
     let expiresAt: String
     let messages: [ChatConversationMessage]
+
+    var historyRecovery: ChatHistoryRecovery? {
+        guard let latestUser = messages.last(where: { $0.role == .user }),
+              let turn = latestUser.turn,
+              ["failed", "cancelled", "pending"].contains(turn.status),
+              let clientMessageId = latestUser.clientMessageId,
+              !clientMessageId.isEmpty else { return nil }
+        return ChatHistoryRecovery(
+            message: latestUser.content,
+            clientMessageId: clientMessageId,
+            status: turn.status,
+            retryable: turn.retryable
+        )
+    }
+}
+
+/// Rejects a late history response even when a service does not cooperate with task cancellation.
+@MainActor
+enum ChatHistoryLoader {
+    static func load(
+        accessToken: () async -> String?,
+        loadHistory: (String) async throws -> ChatConversationSnapshot?,
+        isCurrent: () -> Bool
+    ) async throws -> ChatConversationSnapshot? {
+        func requireCurrent() throws {
+            try Task.checkCancellation()
+            guard isCurrent() else { throw CancellationError() }
+        }
+        try requireCurrent()
+        let token = await accessToken()
+        try requireCurrent()
+        guard let token else { throw ChatServiceError.authenticationExpired }
+        do {
+            let history = try await loadHistory(token)
+            try requireCurrent()
+            return history
+        } catch {
+            try requireCurrent()
+            throw error
+        }
+    }
 }
 
 enum ChatStreamEvent: Equatable, Sendable {
@@ -370,12 +453,25 @@ private struct FixtureChatService: ChatServicing {
         case providerError
         case offline
         case slow
+        case historyFailed
+        case historyPending
     }
 
     let mode: Mode
 
     func loadLatest(accessToken: String) async throws -> ChatConversationSnapshot? {
         if mode == .offline { throw ChatServiceError.offline }
+        if mode == .historyFailed || mode == .historyPending {
+            let body = """
+            {"id":"history-conversation","title":"How am I doing?","createdAt":"2026-10-09",
+             "updatedAt":"2026-10-09","expiresAt":"2026-11-09","messages":[
+              {"id":"history-user","role":"user","content":"How am I doing?",
+               "clientMessageId":"history-client","createdAt":"2026-10-09",
+               "turn":{"status":"\(mode == .historyFailed ? "failed" : "pending")",
+                       "retryable":\(mode == .historyFailed)}}]}
+            """
+            return try JSONDecoder().decode(ChatConversationSnapshot.self, from: Data(body.utf8))
+        }
         return nil
     }
 
@@ -388,6 +484,12 @@ private struct FixtureChatService: ChatServicing {
     ) -> AsyncThrowingStream<ChatStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
+                if mode == .historyFailed &&
+                    (conversationId != "history-conversation" || clientMessageId != "history-client" ||
+                     message != "How am I doing?") {
+                    continuation.finish(throwing: ChatServiceError.invalidResponse)
+                    return
+                }
                 continuation.yield(
                     .metadata(
                         conversationId: conversationId,
@@ -397,10 +499,10 @@ private struct FixtureChatService: ChatServicing {
                 )
 
                 switch mode {
-                case .success:
+                case .success, .historyFailed:
                     continuation.yield(.delta("Your fixture trend is stable. "))
                     continuation.yield(.delta("Open Timeline to inspect the selected day."))
-                case .providerError:
+                case .providerError, .historyPending:
                     continuation.yield(
                         .failure(
                             code: "provider_error",
@@ -450,7 +552,11 @@ extension AppServicePorts {
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("-lybUITestChatFirstFixture") {
             let mode: FixtureChatService.Mode
-            if arguments.contains("-lybUITestChatErrorFixture") {
+            if arguments.contains("-lybUITestChatHistoryFailedFixture") {
+                mode = .historyFailed
+            } else if arguments.contains("-lybUITestChatHistoryPendingFixture") {
+                mode = .historyPending
+            } else if arguments.contains("-lybUITestChatErrorFixture") {
                 mode = .providerError
             } else if arguments.contains("-lybUITestChatOfflineFixture") {
                 mode = .offline
