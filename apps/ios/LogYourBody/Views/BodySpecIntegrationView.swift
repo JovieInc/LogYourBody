@@ -10,6 +10,7 @@ struct BodySpecIntegrationView: View {
     @State private var isConnecting = false
     @State private var isSyncing = false
     @State private var lastSyncSummary: String?
+    @State private var lastSyncFailed = false
     @State private var errorMessage: String?
     @State private var recoveryAction: RecoveryAction?
     @State private var isLoadingScans = false
@@ -150,10 +151,10 @@ struct BodySpecIntegrationView: View {
 
             if let lastSyncSummary {
                 DataInfoRow(
-                    icon: "checkmark.circle",
-                    title: "Sync complete",
+                    icon: lastSyncFailed ? "exclamationmark.triangle" : "checkmark.circle",
+                    title: lastSyncFailed ? "Sync incomplete" : "Sync complete",
                     description: lastSyncSummary,
-                    iconColor: Color.appSuccess
+                    iconColor: lastSyncFailed ? Color.appWarning : Color.appSuccess
                 )
             }
         }
@@ -270,25 +271,29 @@ struct BodySpecIntegrationView: View {
 
     @MainActor
     private func loadRecentScansIfNeeded() async {
-        guard let userId = authManager.currentUser?.id else {
+        guard let ownership = authManager.captureAccountSession() else {
             recentScans = []
             recentScansError = nil
             return
         }
 
+        let userId = ownership.subject
         isLoadingScans = true
         recentScansError = nil
 
         let cached = await CoreDataManager.shared.fetchDexaResults(for: userId, limit: 10)
+        guard authManager.ownsAccountSession(ownership) else { return }
         if !cached.isEmpty {
             recentScans = cached
         }
 
         do {
             let scans = try await AppServicePorts.dexaResultRemoteDataProvider.fetchDexaResults(userId: userId, limit: 10)
+            guard authManager.ownsAccountSession(ownership) else { return }
             recentScans = scans
             CoreDataManager.shared.saveDexaResults(scans, userId: userId)
         } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
             if recentScans.isEmpty {
                 recentScansError = "Check your connection and try again."
             }
@@ -346,6 +351,7 @@ struct BodySpecIntegrationView: View {
             return
         }
 
+        guard let ownership = authManager.captureAccountSession() else { return }
         errorMessage = nil
         recoveryAction = nil
         lastSyncSummary = nil
@@ -354,7 +360,9 @@ struct BodySpecIntegrationView: View {
         Task { @MainActor in
             let result = await BodySpecDexaImporter.shared.importDexaResults()
             isSyncing = false
-            lastSyncSummary = syncSummary(for: result)
+            guard authManager.ownsAccountSession(ownership) else { return }
+            lastSyncSummary = result.summary
+            lastSyncFailed = result.failedCount > 0 || result.wasCancelled
             await loadRecentScansIfNeeded()
         }
     }
@@ -366,16 +374,6 @@ struct BodySpecIntegrationView: View {
         case nil:
             break
         }
-    }
-
-    private func syncSummary(for result: BodySpecDexaImporter.ImportResult) -> String {
-        if result.importedCount == 0, result.skippedCount == 0 {
-            return "No new DEXA scans found."
-        }
-
-        let importedUnit = result.importedCount == 1 ? "scan" : "scans"
-        let skippedUnit = result.skippedCount == 1 ? "scan" : "scans"
-        return "Imported \(result.importedCount) new \(importedUnit) and skipped \(result.skippedCount) \(skippedUnit)."
     }
 
     private func formattedDate(_ date: Date?) -> String {

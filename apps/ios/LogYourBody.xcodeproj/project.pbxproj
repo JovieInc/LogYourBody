@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5A1AE51CD34B4A8E812811B2 /* CoreDataManager+BodySpecImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */; };
+		D7B509EA4FE543A7A3E32A1F /* BodySpecAtomicImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */; };
 		A62E114302EC00A5A0070201 /* HealthKitImportOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */; };
 		E9A811932F40800000C0A701 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */; };
 		0183C845E0301D4B10100ACE /* BodyMetricAppIntentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */; };
@@ -470,6 +472,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CoreDataManager+BodySpecImport.swift"; sourceTree = "<group>"; };
+		435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecAtomicImportTests.swift; sourceTree = "<group>"; };
 		A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitImportOwnershipTests.swift; sourceTree = "<group>"; };
 		E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSTrendIndicator.swift; path = DesignSystem/Atoms/DSTrendIndicator.swift; sourceTree = "<group>"; };
@@ -1265,6 +1269,7 @@
 				5F1996527170EC15B242FF4B /* RevenueCatSubscriptionAnalyticsTransitionTests.swift */,
 				8EA82A71E77423D56A70AA46 /* ProductAPIProfilePayloadTests.swift */,
 				C0AE830DA0CFDB1735F6894C /* SyncIntegrationBodyMetricSyncTests.swift */,
+				435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */,
 				CA338579090538FBCCA21785 /* SyncIntegrationImportAndMappingTests.swift */,
 				128B0622423D7E7711DCD94D /* SyncIntegrationRemotePayloadTests.swift */,
 				245B5601A048FDB45C7F4042 /* SyncIntegrationSupplementalSyncTests.swift */,
@@ -1433,6 +1438,7 @@
 				2EECFD68955AD0F3633D8B32 /* CoreDataManager+Part02.swift */,
 				A88D7AC2C7FF4E14A3BB8168 /* CoreDataManager+Part03.swift */,
 				62F02AB81FF64BBC27043BB9 /* CoreDataManager+Part04.swift */,
+				12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */,
 				4CD612A21566CB070FFC0086 /* CoreDataManager+Part05.swift */,
 				3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */,
 				7A1DE682AE51BF7A3EFF75FF /* HealthKitManager+Part02.swift */,
@@ -2107,6 +2113,7 @@
 				E251E204A77F2161E880A19E /* RevenueCatSubscriptionAnalyticsTransitionTests.swift in Sources */,
 				0922CA98E79021C4CB2595A5 /* ProductAPIProfilePayloadTests.swift in Sources */,
 				F5BBD3CA8052B53CA70ADDA1 /* SyncIntegrationBodyMetricSyncTests.swift in Sources */,
+				D7B509EA4FE543A7A3E32A1F /* BodySpecAtomicImportTests.swift in Sources */,
 				DB19A6EC4AA997A0EF4C5791 /* SyncIntegrationImportAndMappingTests.swift in Sources */,
 				C5C96F424F3D65A1180A3EA7 /* SyncIntegrationRemotePayloadTests.swift in Sources */,
 				FE090848E956D28A4C72FAD1 /* SyncIntegrationSupplementalSyncTests.swift in Sources */,
@@ -2425,6 +2432,7 @@
 				E8BE69C83DC3F20913970568 /* CoreDataManager+Part02.swift in Sources */,
 				2117B18E82C133B5150AB357 /* CoreDataManager+Part03.swift in Sources */,
 				DC51280D16A74D3E38D4B798 /* CoreDataManager+Part04.swift in Sources */,
+				5A1AE51CD34B4A8E812811B2 /* CoreDataManager+BodySpecImport.swift in Sources */,
 				5346F8338497DE5F23D6F20D /* CoreDataManager+Part05.swift in Sources */,
 				841527E772D0CA94BE0D3F96 /* HealthKitManager+Part01.swift in Sources */,
 				CB4A7A11426D64B74959C447 /* HealthKitManager+Part02.swift in Sources */,
