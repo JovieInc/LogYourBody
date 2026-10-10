@@ -70,6 +70,76 @@ const request = (method: string, body?: unknown) =>
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
 describe('training stale mutation receipts', () => {
+  it.each(['mobile', 'MCP'] as const)(
+    '%s rejects an identical feedback acknowledgement from a replaced owner',
+    async (caller) => {
+      const h = await fixture();
+      h.restoreCommit();
+      const feedback = { soreness: 2, pump: 2, performance: 'stable', jointPain: 0 };
+      const body = { sessionId: h.session.id, ...feedback };
+      expect((await h.handlers.feedback(request('POST', body))).status).toBe(201);
+      const original = await h.records.listAll(subject);
+      let enter!: () => void;
+      let release!: () => void;
+      const entered = new Promise<void>((r) => {
+        enter = r;
+      });
+      const gate = new Promise<void>((r) => {
+        release = r;
+      });
+      const pull = h.records.pull.bind(h.records);
+      let feedbackReads = 0;
+      h.records.pull = async (...args) => {
+        const snapshot = await pull(...args);
+        if (args[1] === 'training_feedback' && ++feedbackReads === (caller === 'MCP' ? 2 : 1)) {
+          enter();
+          await gate;
+        }
+        return snapshot;
+      };
+      const operation =
+        caller === 'mobile'
+          ? h.handlers.feedback(request('POST', body))
+          : handleMcpRequest({
+              body: {
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'tools/call',
+                params: { name: 'log_session_feedback', arguments: feedback },
+              },
+              principal: {
+                subject,
+                scopes: new Set([LYB_MCP_SCOPES.trainingRead, LYB_MCP_SCOPES.trainingWrite]),
+                clientId: 'synthetic',
+              },
+              deps: {
+                records: h.records,
+                now: () => now,
+                createId: () => '22222222-2222-4222-8222-222222222222',
+                resourceUrl: 'http://localhost/api/mcp',
+                reserveRequest: h.reserveRequest,
+              },
+            });
+      await entered;
+      await h.records.deleteAllForSubject(subject);
+      h.records.recreateOwner(subject);
+      for (const collection of ['training_feedback', 'training_sessions', 'logged_sets'] as const)
+        await h.records.push(subject, collection, original[collection]);
+      const replacement = await h.records.listAll(subject);
+      release();
+      const result = await operation;
+      if (result instanceof Response) {
+        expect(result.status).toBe(409);
+        expect(await result.json()).toMatchObject({ error: 'training_context_changed' });
+      } else {
+        expect(result.body).toMatchObject({
+          result: { isError: true, structuredContent: { code: 'training_context_changed' } },
+        });
+      }
+      expect(await h.records.listAll(subject)).toEqual(replacement);
+    },
+  );
+
   it.each(['next', 'set', 'feedback'] as const)(
     'mobile %s returns409 after revoke wins',
     async (kind) => {

@@ -14,6 +14,22 @@ export async function captureTrainingAdmission(records: NativeProductRecordsPort
   if (!records.trainingMutations) throw new TrainingMutationError('training_mutations_unavailable');
   return records.trainingMutations.captureAdmission(subject);
 }
+/** A read-only acknowledgement must still belong to the captured account and consent lifetime. */
+export async function requireCurrentTrainingAdmission(
+  records: NativeProductRecordsPort,
+  subject: string,
+  admission: TrainingMutationAdmission,
+) {
+  const current = await captureTrainingAdmission(records, subject);
+  if (
+    !current ||
+    current.ownerId !== admission.ownerId ||
+    current.generation !== admission.generation ||
+    current.setupId !== admission.setupId ||
+    current.revisionId !== admission.revisionId
+  )
+    throw new TrainingMutationError('training_context_changed');
+}
 export function requireAdmittedSetup(
   admission: TrainingMutationAdmission,
   setup: TrainingProgramSetup,

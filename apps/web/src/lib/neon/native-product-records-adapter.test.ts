@@ -139,6 +139,29 @@ describe('createNeonNativeProductRecords', () => {
     expect(query.mock.calls[1][1]).toEqual([morningId, 'owner-subject']);
   });
 
+  it('rejects an explicit null DEXA payload even for an internal caller', async () => {
+    const query = jest.fn();
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    await expect(
+      store.push('owner-subject', 'dexa_results', [{ id: morningId, reported_measurements: null }]),
+    ).resolves.toEqual({ records: [], rejected_ids: [morningId] });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('retains an uninterpreted future envelope in both database parameters and returned records', async () => {
+    const envelope = {
+      schema_version: 2,
+      items: [{ kind: 'future', payload: { observed: 'unknown' } }],
+    };
+    const input = { id: morningId, reported_measurements: envelope };
+    const query = jest.fn().mockResolvedValue([row(input)]);
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    const result = await store.push('owner-subject', 'dexa_results', [input]);
+    expect(JSON.parse(String(query.mock.calls[0]?.[1]?.[3]))).toEqual(input);
+    expect(result.records[0]?.reported_measurements).toEqual(envelope);
+    expect(result.records[0]).not.toHaveProperty('muscle_mass');
+  });
+
   it('pulls incrementally for the authenticated subject including tombstones', async () => {
     const query = jest
       .fn()

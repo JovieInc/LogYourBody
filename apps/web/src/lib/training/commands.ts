@@ -2,13 +2,14 @@ import type { TrainingMutationAdmission } from '@/lib/ports/training-mutations';
 import {
   captureTrainingAdmission,
   requireAdmittedSetup,
+  requireCurrentTrainingAdmission,
   commitTrainingMutation,
 } from './mutation-admission';
 import type {
   NativeProductRecord,
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import { validTrainingFeedback, validateSetLog } from './engine';
+import { latestFeedbackPerSession, validTrainingFeedback, validateSetLog } from './engine';
 import {
   isWorkoutSessionRecord,
   loadTrainingRecords,
@@ -185,6 +186,29 @@ export async function recordTrainingFeedback(input: {
         snapshot.setup?.id,
   );
   if (!sessionExists) return { kind: 'session_not_found' };
+  if (!validTrainingFeedback(input.feedback)) return { kind: 'invalid' };
+  const latest = latestFeedbackPerSession(snapshot.feedback).find(
+    (item) => item.sessionId === input.feedback.sessionId,
+  );
+  if (
+    latest &&
+    latest.soreness === input.feedback.soreness &&
+    latest.pump === input.feedback.pump &&
+    latest.performance === input.feedback.performance &&
+    latest.jointPain === input.feedback.jointPain
+  ) {
+    // Keep the original observation time, even when another session has newer feedback.
+    await requireCurrentTrainingAdmission(input.records, input.subject, admission);
+    return {
+      kind: 'recorded',
+      feedback: {
+        id: latest.id,
+        record_type: 'session_feedback',
+        ...input.feedback,
+        createdAt: latest.createdAt,
+      },
+    };
+  }
   const latestFeedbackTime = snapshot.feedback.reduce(
     (latest, item) => Math.max(latest, Date.parse(item.createdAt)),
     0,
@@ -196,7 +220,6 @@ export async function recordTrainingFeedback(input: {
     ...input.feedback,
     createdAt,
   };
-  if (!validTrainingFeedback(feedback)) return { kind: 'invalid' };
   await commitTrainingMutation(
     input.records,
     input.subject,

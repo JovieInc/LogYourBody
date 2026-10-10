@@ -415,6 +415,118 @@ describe('authenticated training API', () => {
     }
   });
 
+  it('replays an identical recovery check-in without adding evidence or changing the saved time', async () => {
+    const { handlers, records, setNow } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const checkIn = {
+      sessionId: session.id,
+      soreness: 8,
+      pump: 4,
+      performance: 'down',
+      jointPain: 0,
+    };
+    const first = await handlers.feedback(request('POST', 'feedback', 'token-a', checkIn));
+    expect(first.status).toBe(201);
+    const saved = (await first.json()).feedback;
+    setNow('2026-01-10T12:01:00.000Z');
+    const retry = await handlers.feedback(request('POST', 'feedback', 'token-a', checkIn));
+    expect(retry.status).toBe(201);
+    await expect(retry.json()).resolves.toMatchObject({ feedback: saved });
+    expect(
+      (await records.pull('subject-a', 'training_feedback')).records.filter(
+        (row) => row.record_type === 'session_feedback',
+      ),
+    ).toHaveLength(1);
+    const reopened = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(reopened.session.exercises[0].sets).toBe(2);
+  });
+
+  it('counts concurrent duplicate check-ins as one session of recovery evidence', async () => {
+    const { handlers, records } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const checkIn = {
+      sessionId: session.id,
+      soreness: 8,
+      pump: 4,
+      performance: 'down',
+      jointPain: 0,
+    };
+    const responses = await Promise.all([
+      handlers.feedback(request('POST', 'feedback', 'token-a', checkIn)),
+      handlers.feedback(request('POST', 'feedback', 'token-a', checkIn)),
+    ]);
+    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+    const saved = (await records.pull('subject-a', 'training_feedback')).records.filter(
+      (row) => row.record_type === 'session_feedback',
+    );
+    expect(new Set(saved.map((row) => row.sessionId)).size).toBe(1);
+    const reopened = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(reopened.session.exercises[0].sets).toBe(2);
+  });
+
+  it('does not move an old session retry ahead of a newer session pain check-in', async () => {
+    const { handlers, records, setNow } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const earlier = {
+      sessionId: session.id,
+      soreness: 8,
+      pump: 4,
+      performance: 'down',
+      jointPain: 0,
+    };
+    const first = await handlers.feedback(request('POST', 'feedback', 'token-a', earlier));
+    const firstFeedback = (await first.json()).feedback;
+    for (const exercise of session.exercises) {
+      for (let setNumber = 1; setNumber <= exercise.sets; setNumber += 1) {
+        expect(
+          (
+            await handlers.logSet(
+              request('POST', 'log-set', 'token-a', {
+                sessionId: session.id,
+                exerciseId: exercise.id,
+                setNumber,
+                reps: 10,
+                loadKg: 20,
+                rir: 3,
+              }),
+            )
+          ).status,
+        ).toBe(201);
+      }
+    }
+    setNow('2026-01-10T13:00:00.000Z');
+    const { session: nextSession } = await (
+      await handlers.next(request('GET', 'next', 'token-a'))
+    ).json();
+    expect(nextSession.id).not.toBe(session.id);
+    expect(
+      (
+        await handlers.feedback(
+          request('POST', 'feedback', 'token-a', {
+            ...earlier,
+            sessionId: nextSession.id,
+            performance: 'stable',
+            jointPain: 5,
+          }),
+        )
+      ).status,
+    ).toBe(201);
+    setNow('2026-01-10T14:00:00.000Z');
+    const retry = await handlers.feedback(request('POST', 'feedback', 'token-a', earlier));
+    expect(retry.status).toBe(201);
+    await expect(retry.json()).resolves.toMatchObject({ feedback: firstFeedback });
+    expect(
+      (await records.pull('subject-a', 'training_feedback')).records.filter(
+        (row) => row.record_type === 'session_feedback',
+      ),
+    ).toHaveLength(2);
+    const reopened = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(reopened.session.safetyStop).toBe(true);
+  });
+
   it('restores acknowledged sets and their entered values when reopening an active session', async () => {
     const { handlers } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));

@@ -123,6 +123,101 @@ describe('training mutation privacy admission', () => {
 });
 
 describe('training immutable request admission', () => {
+  it.each(['revoke', 'same-owner generation', 'recreated owner'] as const)(
+    'identical feedback cannot acknowledge an old snapshot after %s',
+    async (change) => {
+      const records = await fixture();
+      const session = await workout(records);
+      const input = {
+        records,
+        subject,
+        now,
+        createId: () => '22222222-2222-4222-8222-000000000001',
+        feedback: {
+          sessionId: session.id,
+          soreness: 2,
+          pump: 2,
+          performance: 'stable' as const,
+          jointPain: 0,
+        },
+      };
+      await recordTrainingFeedback(input);
+      const original = await records.listAll(subject);
+      const before = await records.trainingMutations.captureAdmission(subject);
+      const held = barrier();
+      const pull = records.pull.bind(records);
+      let first = true;
+      records.pull = async (...args) => {
+        const snapshot = await pull(...args);
+        if (first && args[1] === 'training_feedback') {
+          first = false;
+          held.enter();
+          await held.released;
+        }
+        return snapshot;
+      };
+      const operation = recordTrainingFeedback(input);
+      await held.entered;
+      if (change === 'revoke') {
+        await revoke(records);
+      } else {
+        if (change === 'recreated owner') {
+          await records.deleteAllForSubject(subject);
+          records.recreateOwner(subject);
+        }
+        for (const collection of ['training_feedback', 'training_sessions', 'logged_sets'] as const)
+          await records.push(subject, collection, original[collection]);
+      }
+      const after = await records.trainingMutations.captureAdmission(subject);
+      if (change === 'revoke') expect(after).toBeNull();
+      else if (change === 'same-owner generation') {
+        expect(after!.ownerId).toBe(before!.ownerId);
+        expect(after!.generation).toBeGreaterThan(before!.generation);
+      } else {
+        expect(after!.ownerId).not.toBe(before!.ownerId);
+        expect(after!.generation).toBe(before!.generation);
+        expect(after!.setupId).toBe(before!.setupId);
+      }
+      const replacement = await records.listAll(subject);
+      const rejection = expect(operation).rejects.toMatchObject({
+        code: 'training_context_changed',
+      });
+      held.release();
+      await rejection;
+      expect(await records.listAll(subject)).toEqual(replacement);
+    },
+  );
+
+  it('acknowledges current identical feedback without inserting or changing its timestamp', async () => {
+    const records = await fixture();
+    const session = await workout(records);
+    const input = {
+      records,
+      subject,
+      now,
+      createId: jest.fn(() => '22222222-2222-4222-8222-000000000001'),
+      feedback: {
+        sessionId: session.id,
+        soreness: 2,
+        pump: 2,
+        performance: 'stable' as const,
+        jointPain: 0,
+      },
+    };
+    const first = await recordTrainingFeedback(input);
+    const rows = await records.listAll(subject);
+    const commit = jest.spyOn(records.trainingMutations, 'commit');
+    input.createId.mockClear();
+    const replay = await recordTrainingFeedback({
+      ...input,
+      now: new Date(now.getTime() + 60_000),
+    });
+    expect(replay).toEqual(first);
+    expect(commit).not.toHaveBeenCalled();
+    expect(input.createId).not.toHaveBeenCalled();
+    expect(await records.listAll(subject)).toEqual(rows);
+  });
+
   it.each(['next', 'set', 'feedback'] as const)(
     '%s captures incarnation before snapshot awaits',
     async (kind) => {

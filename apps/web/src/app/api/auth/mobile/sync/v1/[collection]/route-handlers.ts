@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { hasSafeReportedMeasurements } from '@/lib/ports/reported-measurements';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import { NATIVE_BODY_METRICS_SYNC_VERSION } from '@/lib/ports/native-body-metrics-sync';
 import {
@@ -141,7 +142,11 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_records' }, 400);
       }
 
-      const result = await deps.records.push(identity.sub, collection, pushRecords(parsed.data));
+      const records = pushRecords(parsed.data);
+      if (collection === 'dexa_results' && !records.every(hasSafeReportedMeasurements)) {
+        return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_records' }, 400);
+      }
+      const result = await deps.records.push(identity.sub, collection, records);
       return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, ...result });
     },
 
