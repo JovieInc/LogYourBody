@@ -586,27 +586,6 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         assertNoLayoutAnomalies(in: app, context: "timeline root after round trip")
     }
 
-    // MARK: - 14. Arabic locale renders the root with a hittable composer
-
-    func testArabicLocaleRootRendersAndComposerIsHittable() throws {
-        let app = XCUIApplication()
-        launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
-            "-AppleLanguages", "(ar)",
-            "-AppleLocale", "ar_SA"
-        ])
-
-        assertTimelineRootAppears(in: app, timeout: 30)
-
-        let composer = app.textFields["chat_composer"]
-        XCTAssertTrue(
-            composer.waitForExistence(timeout: 12),
-            "The docked chat composer (home_chat_composer_dock, MainTabView.swift) must render under Arabic/RTL."
-        )
-        XCTAssertTrue(composer.isHittable)
-        attachScreenshot(named: "edge-arabic-locale-root", from: app)
-    }
-
     func testWeightKeyboardControlsMeetMinimumHitTarget() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
@@ -631,6 +610,27 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
         app.buttons.matching(identifier: "mvp_keyboard_bottom_done_button").firstMatch.tap()
         XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+    }
+
+    // MARK: - 14. Arabic locale renders the root with a hittable composer
+
+    func testArabicLocaleRootRendersAndComposerIsHittable() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-AppleLanguages", "(ar)",
+            "-AppleLocale", "ar_SA"
+        ])
+
+        assertTimelineRootAppears(in: app, timeout: 30)
+
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(
+            composer.waitForExistence(timeout: 12),
+            "The docked chat composer (home_chat_composer_dock, MainTabView.swift) must render under Arabic/RTL."
+        )
+        XCTAssertTrue(composer.isHittable)
+        attachScreenshot(named: "edge-arabic-locale-root", from: app)
     }
 
     // MARK: - Shared helpers
