@@ -1941,7 +1941,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         launch(app, with: ["-lybUITestBodyScoreOnboardingFixture", "-lybUITestOnboardingV2Fixture"])
         XCTAssertTrue(
-            app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 30),
+            app.staticTexts["Are you losing fat or lean mass?"].waitForExistence(timeout: 30),
             "The gate no longer forks the first run: everyone starts at Your data"
         )
         XCTAssertFalse(app.descendants(matching: .any)["home_v2_first_run_health"].exists)
@@ -2050,15 +2050,25 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     private func assertAndCaptureOnboardingFixedCTA(in app: XCUIApplication) throws {
-        XCTAssertTrue(app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Are you losing fat or lean mass?"].waitForExistence(timeout: 10))
 
-        let startButton = app.buttons["Enter my numbers"]
-        XCTAssertTrue(startButton.waitForExistence(timeout: 5))
-        XCTAssertTrue(startButton.isHittable)
+        let footer = app.descendants(matching: .any)["body_score_onboarding_hook_footer"].firstMatch
+        let primary = app.buttons["body_score_onboarding_import_scan_button"]
+        XCTAssertTrue(footer.waitForExistence(timeout: 5))
+        XCTAssertTrue(primary.isHittable)
 
         let windowFrame = app.windows.firstMatch.frame
-        XCTAssertGreaterThan(startButton.frame.minY, windowFrame.height * 0.72)
-        XCTAssertLessThanOrEqual(startButton.frame.maxY, windowFrame.maxY + 1)
+        XCTAssertGreaterThan(footer.frame.maxY, windowFrame.maxY - windowFrame.height * 0.15)
+        XCTAssertLessThanOrEqual(footer.frame.maxY, windowFrame.maxY + 1)
+        XCTAssertGreaterThanOrEqual(primary.frame.minY, footer.frame.minY - 1)
+        XCTAssertLessThanOrEqual(primary.frame.maxY, footer.frame.maxY + 1)
+        let pinnedFrame = footer.frame
+        let scrollStart = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: windowFrame.width * 0.5, dy: footer.frame.minY - app.frame.minY - 24))
+        scrollStart.press(forDuration: 0.05, thenDragTo: scrollStart.withOffset(CGVector(dx: 0, dy: -100)))
+        XCTAssertEqual(footer.frame.minY, pinnedFrame.minY, accuracy: 1)
+        XCTAssertEqual(footer.frame.maxY, pinnedFrame.maxY, accuracy: 1)
+        XCTAssertTrue(primary.isHittable)
         XCTAssertFalse(app.staticTexts["Your latest weight"].exists)
         XCTAssertFalse(app.staticTexts["A measured or estimated body-fat value"].exists)
         XCTAssertFalse(app.staticTexts["Your height for a frame-adjusted comparison"].exists)

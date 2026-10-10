@@ -118,9 +118,6 @@ struct DexaPDFImportSheet: View {
         if let bodyFat = scan.bodyFatPercentage {
             values.append("\(bodyFat.formatted(.number.precision(.fractionLength(0...1))))% body fat")
         }
-        if let muscleMass = scan.muscleMass {
-            values.append("\(muscleMass.formatted(.number.precision(.fractionLength(0...1)))) muscle mass")
-        }
         return values.joined(separator: " · ")
     }
 

@@ -10,7 +10,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     }
 
     /// Manual path through the first run: "Enter my numbers" → weight → body
-    /// fat choice → body fat value → fat-vs-muscle reveal → profile, which asks
+    /// fat choice → body fat value → composition reveal → profile, which asks
     /// what's still missing (no Home-mode question, no last name). The launch fixture
     /// provisions an authenticated, subscribed user with
     /// `onboardingCompleted: false`, so the app lands on the hook step with a
@@ -42,23 +42,159 @@ final class OnboardingGoldenPathUITests: XCTestCase {
 
         let whyWeAsk = app.buttons["Why we ask"]
         XCTAssertTrue(whyWeAsk.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        let continueButton = app.buttons["body_score_onboarding_manual_weight_continue_button"]
+        XCTAssertTrue(continueButton.exists)
+
+        // Weight entry focuses the keyboard. Scroll the whole disclosure above
+        // the pinned CTA before testing its edge; hittable alone is insufficient.
+        for _ in 0..<3 where whyWeAsk.frame.maxY > continueButton.frame.minY {
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+                .withOffset(CGVector(dx: 0, dy: continueButton.frame.minY - app.frame.minY - 24))
+            let end = start.withOffset(CGVector(dx: 0, dy: -120))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+        attachScreenshot(named: "manual-weight-disclosure-visible-before-edge-tap", from: app)
+        XCTAssertGreaterThanOrEqual(whyWeAsk.frame.minY, app.frame.minY)
+        XCTAssertLessThanOrEqual(
+            whyWeAsk.frame.maxY,
+            continueButton.frame.minY,
+            "The complete disclosure target must be visible above the pinned Continue button"
+        )
         XCTAssertGreaterThanOrEqual(whyWeAsk.frame.width, 44, "Why we ask width \(whyWeAsk.frame.width)")
         XCTAssertGreaterThanOrEqual(whyWeAsk.frame.height, 44, "Why we ask height \(whyWeAsk.frame.height)")
         XCTAssertTrue(whyWeAsk.isHittable)
 
         whyWeAsk.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap()
+        attachScreenshot(named: "manual-weight-disclosure-expanded-after-edge-tap", from: app)
+        XCTAssertEqual(whyWeAsk.value as? String, "Expanded", "The visible target's top edge must expand it")
 
         XCTAssertTrue(
-            app.staticTexts["We use sex at birth only to match you to the right comparison group—never for marketing."]
+            app.staticTexts["Your weight and body fat percentage are used to calculate fat and lean mass."]
                 .waitForExistence(timeout: 3),
             "A tap at the top of the 44-point target must expand the disclosure"
         )
     }
 
+    func testProfileHeightInvalidDraftSurvivesUnitChangeAndCanRecover() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture", "-lybUITestOnboardingScanImportFixture"]
+        app.launch()
+        assertHookStep(in: app)
+        app.buttons["body_score_onboarding_import_scan_button"].tap()
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs lean mass."].waitForExistence(timeout: 15))
+        continueFromRevealToProfile(in: app)
+
+        let centimeters = app.buttons["CM"]
+        let feetAndInches = app.buttons["FT/IN"]
+        XCTAssertTrue(centimeters.waitForExistence(timeout: 5))
+        centimeters.tap()
+        let height = app.textFields["Height in centimeters"]
+        let finish = app.buttons["Finish setup"]
+        XCTAssertTrue(height.waitForExistence(timeout: 3))
+        XCTAssertTrue(finish.exists)
+
+        // Hardware typing or paste can enter text unavailable on the decimal pad.
+        for draft in ["inf", "nan", "1e309", "999"] {
+            replaceHeightDraft(draft, in: height)
+            dismissKeyboardIfNeeded(in: app)
+            XCTAssertFalse(finish.isEnabled)
+            feetAndInches.tap()
+            XCTAssertEqual(app.state, .runningForeground, "Malformed height must not terminate the app")
+            XCTAssertTrue(height.waitForExistence(timeout: 3), "Invalid draft must remain in its original unit")
+            XCTAssertEqual(height.value as? String, draft)
+            XCTAssertEqual(centimeters.value as? String, "Selected")
+            XCTAssertFalse(finish.isEnabled)
+            XCTAssertTrue(app.staticTexts["Enter a height from 100 to 250 cm."].isHittable)
+            attachScreenshot(named: "profile-height-invalid-\(draft)-preserved", from: app)
+        }
+
+        replaceHeightDraft("178", in: height)
+        dismissKeyboardIfNeeded(in: app)
+        XCTAssertTrue(finish.isEnabled)
+        feetAndInches.tap()
+        XCTAssertEqual(feetAndInches.value as? String, "Selected")
+        XCTAssertFalse(height.exists)
+        XCTAssertEqual(app.pickerWheels.element(boundBy: 0).value as? String, "5 ft")
+        XCTAssertEqual(app.pickerWheels.element(boundBy: 1).value as? String, "10 in")
+        XCTAssertTrue(finish.isEnabled)
+        attachScreenshot(named: "profile-height-valid-unit-conversion", from: app)
+    }
+
+    func testDataSourceActionsRemainReadableAndWorkAtLargestText() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture", "-lybUITestOnboardingScanImportFixture",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ]
+        app.launch()
+
+        let title = app.staticTexts["Are you losing fat or lean mass?"]
+        XCTAssertTrue(title.waitForExistence(timeout: 10))
+        let footer = app.descendants(matching: .any)["body_score_onboarding_hook_footer"].firstMatch
+        let scroll = app.scrollViews["onboarding_scaffold_scroll"]
+        XCTAssertTrue(footer.waitForExistence(timeout: 3))
+        XCTAssertTrue(scroll.exists)
+        XCTAssertTrue(title.isHittable)
+        XCTAssertGreaterThanOrEqual(title.frame.minY, scroll.frame.minY - 1)
+        XCTAssertLessThanOrEqual(
+            title.frame.maxY, footer.frame.minY + 1,
+            "The complete introduction title must be visible initially"
+        )
+
+        let primary = app.buttons["body_score_onboarding_import_scan_button"]
+        XCTAssertTrue(primary.isHittable)
+        XCTAssertTrue(primary.staticTexts["Import a DEXA or InBody scan"].exists)
+        let pinnedFrame = primary.frame
+        XCTAssertGreaterThanOrEqual(pinnedFrame.minY, footer.frame.minY - 1)
+        XCTAssertLessThanOrEqual(pinnedFrame.maxY, footer.frame.maxY + 1)
+        attachScreenshot(named: "first-run-title-and-primary-largest-text", from: app)
+
+        for (identifier, title) in [
+            ("body_score_onboarding_use_health_button", "Use Apple Health"),
+            ("body_score_onboarding_start_button", "Enter my numbers")
+        ] {
+            let button = app.buttons[identifier]
+            scrollHookActionIntoView(button, above: footer, in: app)
+            XCTAssertEqual(button.label, title, "The complete action label must remain available")
+            XCTAssertGreaterThanOrEqual(button.frame.height, 44)
+            // SwiftUI exposes the styled label's whole button box to VoiceOver;
+            // its accessibility frame cannot measure glyph padding. Review the
+            // screenshot for clipping and assert the complete control is visible.
+            XCTAssertGreaterThanOrEqual(button.frame.minX, app.windows.firstMatch.frame.minX - 1)
+            XCTAssertLessThanOrEqual(button.frame.maxX, app.windows.firstMatch.frame.maxX + 1)
+            XCTAssertGreaterThanOrEqual(button.frame.minY, app.windows.firstMatch.frame.minY - 1)
+            XCTAssertLessThanOrEqual(button.frame.maxY, footer.frame.minY + 1)
+            XCTAssertTrue(button.isHittable)
+            XCTAssertEqual(primary.frame.minY, pinnedFrame.minY, accuracy: 1)
+            XCTAssertEqual(primary.frame.maxY, pinnedFrame.maxY, accuracy: 1)
+            XCTAssertTrue(primary.isHittable)
+            attachScreenshot(named: "first-run-\(identifier)-largest-text", from: app)
+        }
+        primary.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap()
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs lean mass."].waitForExistence(timeout: 15))
+        attachScreenshot(named: "scan-reveal-largest-text", from: app)
+    }
+
     // MARK: - Steps
 
+    private func scrollHookActionIntoView(_ action: XCUIElement, above footer: XCUIElement, in app: XCUIApplication) {
+        let scroll = app.scrollViews["onboarding_scaffold_scroll"]
+        for _ in 0..<6 {
+            if action.isHittable && action.frame.minY >= scroll.frame.minY - 1 && action.frame.maxY <= footer.frame.minY + 1 {
+                break
+            }
+            let start = app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: app.frame.width * 0.5, dy: footer.frame.minY - app.frame.minY - 24))
+            let end = start.withOffset(CGVector(dx: 0, dy: -160))
+            start.press(forDuration: 0.05, thenDragTo: end)
+        }
+        XCTAssertGreaterThanOrEqual(action.frame.minY, scroll.frame.minY - 1)
+        XCTAssertLessThanOrEqual(action.frame.maxY, footer.frame.minY + 1)
+    }
+
     private func assertHookStep(in app: XCUIApplication) {
-        XCTAssertTrue(app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Are you losing fat or lean mass?"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyScoreIntro"].exists)
 
         // One primary path (the scan), Apple Health second, typing last.
@@ -80,10 +216,10 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         attachScreenshot(named: "first-run-your-data", from: app)
         app.buttons["body_score_onboarding_import_scan_button"].tap()
 
-        XCTAssertTrue(app.staticTexts["Here’s your fat vs muscle."].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs lean mass."].waitForExistence(timeout: 15))
         let summary = app.descendants(matching: .any)["body_score_reveal_fat_vs_muscle"]
         XCTAssertTrue(summary.waitForExistence(timeout: 5))
-        XCTAssertEqual(summary.label, "Fat 34 lb. Lean mass 146 lb. Body fat 19%. Body fat measured by your scan.")
+        XCTAssertEqual(summary.label, "Fat 34 lb. Lean mass 146 lb. Body fat 19%. Body fat from your scan.")
         let change = app.descendants(matching: .any)["body_score_reveal_scan_change"]
         XCTAssertTrue(change.waitForExistence(timeout: 3))
         XCTAssertTrue(
@@ -110,7 +246,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         let back = app.buttons["Back"]
         XCTAssertTrue(back.waitForExistence(timeout: 3))
         back.tap()
-        XCTAssertTrue(app.staticTexts["Are you losing fat or muscle?"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Are you losing fat or lean mass?"].waitForExistence(timeout: 5))
     }
 
     private func completeBasicsStep(in app: XCUIApplication) {
@@ -223,9 +359,9 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     private func assertRevealStep(in app: XCUIApplication) {
         // The loading step runs a fully local calculation; waiting for the
         // reveal is the deterministic way to observe that transition.
-        XCTAssertTrue(app.staticTexts["Here’s your fat vs muscle."].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs lean mass."].waitForExistence(timeout: 15))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_bodyScoreReveal"].exists)
-        XCTAssertFalse(app.staticTexts["Splitting fat from muscle"].exists)
+        XCTAssertFalse(app.staticTexts["Calculating body composition"].exists)
 
         // 182 lb at 18% body fat: 33 lb fat, 149 lb lean, labeled as an entered value.
         let summary = app.descendants(matching: .any)["body_score_reveal_fat_vs_muscle"]
@@ -235,7 +371,7 @@ final class OnboardingGoldenPathUITests: XCTestCase {
             app.descendants(matching: .any)
                 .matching(NSPredicate(format: "label BEGINSWITH %@", "Body Score"))
                 .firstMatch.exists,
-            "The reveal answers fat vs muscle, not a 0-100 score"
+            "The reveal presents fat and lean mass, not a 0-100 score"
         )
         XCTAssertFalse(app.buttons["Share my score"].exists, "One primary action")
         attachScreenshot(named: "first-run-manual-reveal", from: app)
@@ -262,6 +398,20 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func replaceHeightDraft(_ draft: String, in field: XCUIElement) {
+        // A center tap can place the caret inside the old value. Tap beyond its
+        // trailing edge before deleting, then verify setup before the unit tap.
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        clearText(in: field)
+        let clearedValue = field.value as? String ?? ""
+        XCTAssertTrue(
+            clearedValue.isEmpty || clearedValue == field.placeholderValue,
+            "The previous height must be fully cleared before replacing it: \(clearedValue)"
+        )
+        field.typeText(draft)
+        XCTAssertEqual(field.value as? String, draft)
     }
 
     private func clearText(in field: XCUIElement) {

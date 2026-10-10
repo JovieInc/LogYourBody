@@ -147,13 +147,11 @@ func advanceFromReveal() {
         UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
 
         if entryContext == .preAuth {
-            if let result = bodyScoreResult {
-                PreAuthOnboardingStore.shared.save(
-                    input: bodyScoreInput,
-                    result: result,
-                    defaultHomeMode: defaultHomeMode
-                )
-            }
+            PreAuthOnboardingStore.shared.save(
+                input: bodyScoreInput,
+                result: bodyScoreResult,
+                defaultHomeMode: defaultHomeMode
+            )
             currentStep = .emailCapture
         } else {
             if hasAuthenticatedAccountEmail {
@@ -321,6 +319,7 @@ func fetchHealthMetrics() async {
                 let preferredUnit = weightUnit
                 let value = preferredUnit == .kilograms ? weightInKilograms : pounds
                 bodyScoreInput.weight = WeightValue(value: value, unit: preferredUnit)
+                bodyScoreInput.weightSource = .healthKit
                 bodyScoreInput.healthSnapshot.weightKg = weightInKilograms
                 bodyScoreInput.healthSnapshot.weightDate = weight.date
                 manualWeightText = Self.formatNumber(value)
@@ -363,6 +362,7 @@ func applyHealthCharacteristics() {
 
 func chooseHealthPath() {
         let previousStep = currentStep
+        scanImport = nil
         currentStep = .healthConnect
         trackStepTransition(from: previousStep, to: currentStep)
     }
@@ -383,6 +383,7 @@ func applyImportedScans(_ scans: [DexaPDFScan]) {
 
         let weightValue = weightUnit == .kilograms ? imported.latest.weightKg : imported.latest.weightKg / 0.45359237
         bodyScoreInput.weight = WeightValue(value: weightValue, unit: weightUnit)
+        bodyScoreInput.weightSource = .scan
         manualWeightText = Self.formatNumber(weightValue)
 
         AppServicePorts.analyticsTracker.track(
@@ -397,8 +398,12 @@ func applyImportedScans(_ scans: [DexaPDFScan]) {
         if let bodyFat = imported.latest.bodyFatPercentage {
             bodyScoreInput.bodyFat = BodyFatValue(percentage: bodyFat, source: .scan)
             bodyFatPercentageText = Self.formatNumber(bodyFat)
+            selectedVisualBodyFat = nil
             currentStep = .loading
         } else {
+            bodyScoreInput.bodyFat = BodyFatValue()
+            bodyFatPercentageText = ""
+            selectedVisualBodyFat = nil
             currentStep = .bodyFatChoice
         }
         trackStepTransition(from: previousStep, to: currentStep)
@@ -484,20 +489,20 @@ func calculateScoreIfNeeded() async {
 var canContinueHeight: Bool {
         switch heightUnit {
         case .centimeters:
-            let numeric = Double(heightCentimetersText) ?? bodyScoreInput.height.inCentimeters ?? 0
-            return numeric >= 100 // ~3'3"
+            return HeightEntryPolicy.validatedCentimeters(
+                for: heightCentimetersText, storedValue: bodyScoreInput.height.inCentimeters
+            ) != nil
         case .inches:
-            let totalInches = Double((heightFeet * 12) + heightInches)
-            return totalInches >= 48 // 4 feet minimum safeguard
+            let totalInches = Double(heightFeet) * 12 + Double(heightInches)
+            return totalInches >= 48 && HeightEntryPolicy.isRepresentableCentimeters(totalInches * 2.54)
         }
     }
 
 var canContinueWeight: Bool {
-        let entered = Double(manualWeightText)
-            ?? (weightUnit == .kilograms ? bodyScoreInput.weight.inKilograms : bodyScoreInput.weight.inPounds)
-            ?? 0
-        let poundsEquivalent = weightUnit == .kilograms ? entered * 2.2046226218 : entered
-        return poundsEquivalent >= 70
+        let stored = weightUnit == .kilograms ? bodyScoreInput.weight.inKilograms : bodyScoreInput.weight.inPounds
+        return ManualWeightEntryPolicy.validatedValue(
+            for: manualWeightText, unit: weightUnit, storedValue: stored
+        ) != nil
     }
 
 var canContinueBodyFatChoice: Bool {
@@ -547,8 +552,7 @@ func updateBirthYear(_ year: Int) {
 func setHeightUnit(_ unit: HeightUnit) {
         guard heightUnit != unit else { return }
 
-        convertHeightFields(to: unit)
-        applyMeasurementSystem(unit.measurementSystem, skipHeight: true)
+        applyMeasurementSystem(unit.measurementSystem)
     }
 
 func updateHeightCentimetersText(_ text: String) {
@@ -558,12 +562,11 @@ func updateHeightCentimetersText(_ text: String) {
 func persistHeightEntry() {
         switch heightUnit {
         case .centimeters:
-            if let value = Double(heightCentimetersText) {
-                bodyScoreInput.height = HeightValue(value: value, unit: .centimeters)
-            }
+            guard let value = HeightEntryPolicy.validatedCentimeters(for: heightCentimetersText) else { return }
+            bodyScoreInput.height = HeightValue(value: value, unit: .centimeters)
         case .inches:
-            let total = Double((heightFeet * 12) + heightInches)
-            guard total > 0 else { return }
+            let total = Double(heightFeet) * 12 + Double(heightInches)
+            guard total >= 48, HeightEntryPolicy.isRepresentableCentimeters(total * 2.54) else { return }
             bodyScoreInput.height = HeightValue(value: total, unit: .inches)
             heightCentimetersText = Self.formatHeight(total * 2.54)
         }
@@ -574,15 +577,15 @@ func updateManualWeightText(_ text: String) {
     }
 
 func persistManualWeightEntry() {
-        guard let value = Double(manualWeightText) else { return }
+        guard let value = ManualWeightEntryPolicy.validatedValue(for: manualWeightText, unit: weightUnit) else { return }
         bodyScoreInput.weight = WeightValue(value: value, unit: weightUnit)
+        bodyScoreInput.weightSource = .manual
     }
 
 func setWeightUnit(_ unit: WeightUnit) {
         guard weightUnit != unit else { return }
 
-        convertWeightFields(to: unit)
-        applyMeasurementSystem(unit.measurementSystem, skipWeight: true)
+        applyMeasurementSystem(unit.measurementSystem)
     }
 
 func updateBodyFatSource(_ source: BodyFatInputSource) {

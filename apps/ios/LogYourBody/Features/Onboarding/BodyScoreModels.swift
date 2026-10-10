@@ -165,6 +165,12 @@ struct HealthImportSnapshot: Codable, Equatable {
     }
 }
 
+enum OnboardingWeightSource: String, Codable {
+    case healthKit
+    case manual
+    case scan
+}
+
 struct BodyScoreInput: Codable, Equatable {
     var sex: BiologicalSex?
     var birthYear: Int?
@@ -173,6 +179,8 @@ struct BodyScoreInput: Codable, Equatable {
     var bodyFat: BodyFatValue
     var measurementPreference: MeasurementSystem
     var healthSnapshot: HealthImportSnapshot
+    /// Optional so drafts created before provenance was stored remain readable.
+    var weightSource: OnboardingWeightSource?
 
     init(
         sex: BiologicalSex? = nil,
@@ -181,7 +189,8 @@ struct BodyScoreInput: Codable, Equatable {
         weight: WeightValue = WeightValue(),
         bodyFat: BodyFatValue = BodyFatValue(),
         measurementPreference: MeasurementSystem = .localeDefault,
-        healthSnapshot: HealthImportSnapshot = HealthImportSnapshot()
+        healthSnapshot: HealthImportSnapshot = HealthImportSnapshot(),
+        weightSource: OnboardingWeightSource? = nil
     ) {
         self.sex = sex
         self.birthYear = birthYear
@@ -190,6 +199,7 @@ struct BodyScoreInput: Codable, Equatable {
         self.bodyFat = bodyFat
         self.measurementPreference = measurementPreference
         self.healthSnapshot = healthSnapshot
+        self.weightSource = weightSource
     }
 
     var age: Int? {

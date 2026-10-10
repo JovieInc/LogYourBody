@@ -155,6 +155,56 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertNil(PreAuthOnboardingStore.shared.load())
     }
 
+    func testPreAuthRevealWithoutScoreSurvivesAuthenticatedHandoff() async throws {
+        let userId = "preauth-insight-\(UUID().uuidString)"
+        let previousUser = AuthManager.shared.currentUser
+        let previousSession = AuthManager.shared.authSession
+        let previousMode = UserDefaults.standard.string(forKey: Constants.defaultHomeModeKey)
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.authSession = previousSession
+            UserDefaults.standard.set(previousMode, forKey: Constants.defaultHomeModeKey)
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+            PreAuthOnboardingStore.shared.clear()
+        }
+        AuthManager.shared.currentUser = nil
+        AuthManager.shared.authSession = nil
+        PreAuthOnboardingStore.shared.clear()
+        let input = BodyScoreInput(
+            sex: nil,
+            birthYear: nil,
+            height: HeightValue(value: nil, unit: .centimeters),
+            weight: WeightValue(value: 82, unit: .kilograms),
+            bodyFat: BodyFatValue(percentage: 18, source: .manualValue)
+        )
+        let beforeSignIn = OnboardingFlowViewModel(entryContext: .preAuth)
+        beforeSignIn.bodyScoreInput = input
+        await beforeSignIn.calculateScore()
+        XCTAssertEqual(beforeSignIn.currentStep, .bodyScore)
+        XCTAssertNil(beforeSignIn.bodyScoreResult, "The first insight must not wait for profile-only inputs")
+        beforeSignIn.goToNextStep()
+        XCTAssertEqual(beforeSignIn.currentStep, .emailCapture)
+        XCTAssertEqual(PreAuthOnboardingStore.shared.load()?.input, input)
+
+        AuthManager.shared.currentUser = User(id: userId, email: "insight@example.com", name: "Insight")
+        AuthManager.shared.authSession = .localFixture(subject: userId, email: "insight@example.com", name: "Insight")
+        XCTAssertEqual(AuthManager.shared.currentUser?.id, userId)
+        XCTAssertEqual(AuthManager.shared.authSession?.subject, userId)
+        XCTAssertFalse(
+            OnboardingStateManager.shared.hasCompletedCurrentVersion(for: userId),
+            "A new account must not inherit a previous test's onboarding completion"
+        )
+        XCTAssertNil(
+            OnboardingProgressStore.shared.loadProgress(for: userId),
+            "A new account must restore the pre-auth snapshot without an existing authenticated draft"
+        )
+        let afterSignIn = OnboardingFlowViewModel()
+        XCTAssertEqual(afterSignIn.currentStep, .profileDetails)
+        XCTAssertEqual(afterSignIn.bodyScoreInput, input, "Sign-in must retain the numbers already entered")
+        XCTAssertNil(afterSignIn.bodyScoreResult)
+        XCTAssertNil(PreAuthOnboardingStore.shared.load())
+    }
+
     func testPersistedProgressRestoresProfileDetailsDraft() throws {
         let userId = "onboarding-profile-draft-\(UUID().uuidString)"
         let previousUser = AuthManager.shared.currentUser
@@ -301,7 +351,8 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         viewModel.currentStep = .profileDetails
         viewModel.hasMarkedOnboardingComplete = true
 
-        viewModel.goToNextStep()
+        // Await the completion path once so no unstructured task can outlive
+        // this test and mark a later test's account as completed.
         await viewModel.finishOnboardingAndShowPaywall()
 
         XCTAssertEqual(viewModel.currentStep, OnboardingTerminalStepPolicy.destinationAfterSuccessfulCompletion)
@@ -615,8 +666,8 @@ final class OnboardingFlowViewModelTests: XCTestCase {
 
         viewModel.goBack()
         XCTAssertEqual(viewModel.currentStep, .bodyScore)
-        XCTAssertEqual(viewModel.progress(for: .bodyScore)?.label, "Fat vs Muscle")
-        XCTAssertEqual(viewModel.progressMilestonePlan.count, 5, "Welcome, Basics, Measurements, Fat vs Muscle, Profile")
+        XCTAssertEqual(viewModel.progress(for: .bodyScore)?.label, "Body composition")
+        XCTAssertEqual(viewModel.progressMilestonePlan.count, 5, "Welcome, Basics, Measurements, Body composition, Profile")
     }
 
     func testFatVsMuscleSummarySplitsWeightInTheUsersUnits() throws {
@@ -684,6 +735,43 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         viewModel.currentStep = .bodyScore
         viewModel.goBack()
         XCTAssertEqual(viewModel.currentStep, .hook, "Editing a scan's numbers means importing again")
+    }
+
+    func testChoosingHealthAfterScanDropsThePreviousScanComparison() throws {
+        let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+        viewModel.applyImportedScans([
+            DexaPDFScan(date: "2026-09-01", weight: 80, weightUnit: "kg", bodyFatPercentage: 19,
+                        muscleMass: nil, boneMass: nil, source: "BodySpec"),
+            DexaPDFScan(date: "2026-06-02", weight: 84, weightUnit: "kg", bodyFatPercentage: 22,
+                        muscleMass: nil, boneMass: nil, source: "BodySpec")
+        ])
+        XCTAssertNotNil(try XCTUnwrap(viewModel.scanImport).previous)
+        viewModel.currentStep = .bodyScore
+        viewModel.goBack()
+        viewModel.chooseHealthPath()
+        XCTAssertEqual(viewModel.currentStep, .healthConnect)
+        XCTAssertNil(viewModel.scanImport, "The Health path must not present a comparison from an abandoned scan import")
+    }
+
+    func testNewScanWithoutBodyFatDoesNotReuseThePreviousScansValue() {
+        let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+        viewModel.applyImportedScans([
+            DexaPDFScan(date: "2026-09-01", weight: 80, weightUnit: "kg", bodyFatPercentage: 19,
+                        muscleMass: nil, boneMass: nil, source: "BodySpec")
+        ])
+        viewModel.selectedVisualBodyFat = 31
+        viewModel.applyImportedScans([
+            DexaPDFScan(date: "2026-10-01", weight: 82, weightUnit: "kg", bodyFatPercentage: nil,
+                        muscleMass: nil, boneMass: nil, source: "InBody")
+        ])
+        XCTAssertEqual(viewModel.currentStep, .bodyFatChoice)
+        XCTAssertNil(viewModel.bodyScoreInput.bodyFat.percentage)
+        XCTAssertEqual(viewModel.bodyFatPercentageText, "")
+        XCTAssertNil(viewModel.selectedVisualBodyFat)
+        XCTAssertNil(FatVsMuscleSummary(input: viewModel.bodyScoreInput), "Missing scan data must remain missing")
+        viewModel.updateBodyFatSource(.unspecified)
+        viewModel.advanceFromBodyFatChoice()
+        XCTAssertEqual(viewModel.currentStep, .bodyFatChoice, "Skipping must not calculate with the abandoned value")
     }
 
     func testScanWithoutBodyFatAsksForBodyFatNext() {

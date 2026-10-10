@@ -63,6 +63,33 @@ final class OnboardingStepEntryPolicyTests: XCTestCase {
         )
     }
 
+    func testWeightValidationRejectsNonfiniteNumbersAndUnitConversionOverflow() {
+        for unit in WeightUnit.allCases {
+            for text in ["inf", "-inf", "nan", "1e309"] {
+                XCTAssertEqual(ManualWeightEntryPolicy.validationError(for: text, unit: unit), "Enter a valid number.")
+            }
+        }
+        XCTAssertEqual(
+            ManualWeightEntryPolicy.validationError(for: "1e308", unit: .kilograms),
+            "Enter a valid number."
+        )
+    }
+
+    func testWeightNudgeRecoversNonfiniteDraftWithoutPropagatingIt() {
+        for text in ["inf", "-inf", "nan", "1e309"] {
+            XCTAssertEqual(ManualWeightEntryPolicy.nudgeText(currentText: text, storedValue: 175, amount: 1), "176")
+        }
+        XCTAssertEqual(ManualWeightEntryPolicy.nudgeText(currentText: "", storedValue: .infinity, amount: 1), "1")
+    }
+
+    func testProfileHeightConversionRejectsInvalidValuesBeforePersistence() {
+        for text in ["inf", "-inf", "nan", "1e309", "1e308", "999", "-1"] {
+            let height = HeightInput(unit: .centimeters, centimetersText: text, feet: 5, inches: 10)
+            XCTAssertFalse(ProfileDetailsValidationPolicy.isHeightValid(height), text)
+            XCTAssertNil(ProfileDetailsValidationPolicy.heightInCentimeters(height), text)
+        }
+    }
+
     // MARK: - Body fat numeric entry (BodyScoreBodyFatNumericView)
 
     func testBodyFatValidationErrorEnforcesPlausibleBand() {
@@ -195,5 +222,12 @@ final class OnboardingStepEntryPolicyTests: XCTestCase {
             WorldClassScreen.completeProfile.accessibilityIdentifier,
             "world_class_screen_completeProfile"
         )
+    }
+
+    func testLegacyHeightErrorRejectsNonfiniteAndUnrepresentableValues() {
+        for text in ["inf", "nan", "1e309", "1e308"] {
+            XCTAssertNotNil(HeightEntryPolicy.centimetersError(for: text), text)
+        }
+        XCTAssertNil(HeightEntryPolicy.centimetersError(for: "250.4"), "Keep the existing legacy domain")
     }
 }

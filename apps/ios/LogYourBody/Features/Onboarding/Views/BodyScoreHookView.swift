@@ -1,12 +1,13 @@
 import SwiftUI
 
 /// The first screen asks where the person's numbers already live. A DEXA or
-/// InBody report is the primary path because it answers fat vs muscle with a
-/// measurement; Apple Health and typing the numbers are the alternatives.
+/// InBody report is the primary path for existing body-composition data;
+/// Apple Health and typing the numbers are the alternatives.
 struct BodyScoreHookView: View {
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isSelectingScan = false
     @State private var selectedScan: DexaPDFFileSelection?
     @State private var scanPickerError: String?
@@ -19,15 +20,17 @@ struct BodyScoreHookView: View {
 
     var body: some View {
         OnboardingPageTemplate(
-            title: "Are you losing fat or muscle?",
+            title: "Are you losing fat or lean mass?",
             subtitle: "Start with the numbers you already have.",
             showsBackButton: false,
             progress: viewModel.progress(for: .hook),
             screen: .bodyScoreIntro
         ) {
             VStack(spacing: 16) {
-                BodyScoreContourField()
-                    .frame(height: 170)
+                if !dynamicTypeSize.isAccessibilitySize {
+                    BodyScoreContourField()
+                        .frame(height: 170)
+                }
 
                 if let scanPickerError {
                     Text(scanPickerError)
@@ -36,46 +39,21 @@ struct BodyScoreHookView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("body_score_onboarding_scan_error")
                 }
+
+                if dynamicTypeSize.isAccessibilitySize {
+                    alternativeActions
+                }
             }
         } footer: {
             VStack(spacing: 12) {
-                if offersScanImport {
-                    Button {
-                        startScanImport()
-                    } label: {
-                        Label("Import a DEXA or InBody scan", systemImage: "doc.text.viewfinder")
-                    }
-                    .accessibilityIdentifier("body_score_onboarding_import_scan_button")
-                    .buttonStyle(OnboardingPrimaryButtonStyle())
+                primaryAction
 
-                    Button {
-                        viewModel.chooseHealthPath()
-                    } label: {
-                        Label("Use Apple Health", systemImage: "heart.fill")
-                    }
-                    .accessibilityIdentifier("body_score_onboarding_use_health_button")
-                    .buttonStyle(OnboardingSecondaryButtonStyle())
-                } else {
-                    Button {
-                        viewModel.chooseHealthPath()
-                    } label: {
-                        Label("Use Apple Health", systemImage: "heart.fill")
-                    }
-                    .accessibilityIdentifier("body_score_onboarding_use_health_button")
-                    .buttonStyle(OnboardingPrimaryButtonStyle())
-                }
-
-                OnboardingTextButton(title: "Enter my numbers") {
-                    viewModel.chooseManualPath()
-                }
-                .accessibilityIdentifier("body_score_onboarding_start_button")
-
-                if viewModel.entryContext == .preAuth {
-                    OnboardingTextButton(title: "I already have an account") {
-                        dismiss()
-                    }
+                if !dynamicTypeSize.isAccessibilitySize {
+                    alternativeActions
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("body_score_onboarding_hook_footer")
         }
         .fileImporter(
             isPresented: $isSelectingScan,
@@ -96,6 +74,50 @@ struct BodyScoreHookView: View {
                 viewModel.applyImportedScans(scans)
             }
             .environmentObject(authManager)
+        }
+    }
+
+    @ViewBuilder
+    private var primaryAction: some View {
+        if offersScanImport {
+            Button(action: startScanImport) {
+                Label("Import a DEXA or InBody scan", systemImage: "doc.text.viewfinder")
+            }
+            .accessibilityIdentifier("body_score_onboarding_import_scan_button")
+            .buttonStyle(OnboardingPrimaryButtonStyle())
+        } else {
+            Button {
+                viewModel.chooseHealthPath()
+            } label: {
+                Label("Use Apple Health", systemImage: "heart.fill")
+            }
+            .accessibilityIdentifier("body_score_onboarding_use_health_button")
+            .buttonStyle(OnboardingPrimaryButtonStyle())
+        }
+    }
+
+    private var alternativeActions: some View {
+        VStack(spacing: 12) {
+            if offersScanImport {
+                Button {
+                    viewModel.chooseHealthPath()
+                } label: {
+                    Label("Use Apple Health", systemImage: "heart.fill")
+                }
+                .accessibilityIdentifier("body_score_onboarding_use_health_button")
+                .buttonStyle(OnboardingSecondaryButtonStyle())
+            }
+
+            OnboardingTextButton(title: "Enter my numbers") {
+                viewModel.chooseManualPath()
+            }
+            .accessibilityIdentifier("body_score_onboarding_start_button")
+
+            if viewModel.entryContext == .preAuth {
+                OnboardingTextButton(title: "I already have an account") {
+                    dismiss()
+                }
+            }
         }
     }
 

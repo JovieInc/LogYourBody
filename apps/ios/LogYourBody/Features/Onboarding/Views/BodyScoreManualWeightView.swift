@@ -7,11 +7,10 @@ enum ManualWeightEntryPolicy {
     static func validationError(for text: String, unit: WeightUnit) -> String? {
         guard !text.isEmpty else { return nil }
 
-        guard let numeric = Double(text) else {
+        guard let numeric = Double(text), let poundsEquivalent = poundsEquivalent(numeric, unit: unit) else {
             return "Enter a valid number."
         }
 
-        let poundsEquivalent = unit == .kilograms ? numeric * 2.2046226218 : numeric
         guard poundsEquivalent < 70 else { return nil }
 
         switch unit {
@@ -22,6 +21,21 @@ enum ManualWeightEntryPolicy {
         }
     }
 
+    /// Only an empty draft may use a stored measurement; invalid typed text
+    /// must not silently accept the previous measurement.
+    static func validatedValue(for text: String, unit: WeightUnit, storedValue: Double? = nil) -> Double? {
+        let candidate = text.isEmpty ? storedValue : Double(text)
+        guard let candidate,
+              let pounds = poundsEquivalent(candidate, unit: unit), pounds >= 70 else { return nil }
+        return candidate
+    }
+
+    private static func poundsEquivalent(_ value: Double, unit: WeightUnit) -> Double? {
+        guard value.isFinite else { return nil }
+        let pounds = unit == .kilograms ? value * 2.2046226218 : value
+        return pounds.isFinite ? pounds : nil
+    }
+
     /// Plus/minus buttons nudge by half a kilogram or a whole pound.
     static func stepAmount(for unit: WeightUnit) -> Double {
         unit == .kilograms ? 0.5 : 1
@@ -30,8 +44,11 @@ enum ManualWeightEntryPolicy {
     /// A nudge starts from the typed text, falls back to the stored value,
     /// never goes below zero, and keeps whole numbers integer-formatted.
     static func nudgeText(currentText: String, storedValue: Double?, amount: Double) -> String {
-        let baseline = Double(currentText) ?? storedValue ?? 0
-        let newValue = max(0, baseline + amount)
+        let typed = Double(currentText).flatMap { $0.isFinite ? $0 : nil }
+        let stored = storedValue.flatMap { $0.isFinite ? $0 : nil }
+        let baseline = typed ?? stored ?? 0
+        let proposed = baseline + amount
+        let newValue = max(0, proposed.isFinite ? proposed : baseline)
 
         if newValue == floor(newValue) {
             return String(format: "%.0f", newValue)
@@ -163,7 +180,7 @@ struct BodyScoreManualWeightView: View {
 
                         if showWhyWeAsk {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Weight plus body fat unlocks lean-mass insights for your Body Score.")
+                                Text("Your weight and body fat percentage are used to calculate fat and lean mass.")
                                     .font(OnboardingTypography.body)
                                     .foregroundStyle(theme.colors.textSecondary)
 
