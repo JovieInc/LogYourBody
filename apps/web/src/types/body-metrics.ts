@@ -50,6 +50,7 @@ export type BodyMetricSource =
   | 'bodyspec_dexa'
   | 'dexa_pdf'
   | 'inbody_pdf'
+  | 'pdf_import'
   | 'caliper'
   | 'photo';
 
