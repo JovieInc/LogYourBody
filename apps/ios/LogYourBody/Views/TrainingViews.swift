@@ -2,13 +2,13 @@ import SwiftUI
 
 enum TrainingPresentation: Identifiable {
     case setup
-    case session(TrainingSession)
+    case session(TrainingSession, AuthManager.ProfileSessionOwnership)
     case voiceSetReview(TrainingSession, VoiceHeardIntent)
 
     var id: String {
         switch self {
         case .setup: "setup"
-        case .session(let session): "session-\(session.id)"
+        case .session(let session, let owner): "session-\(owner.subject)-\(owner.generation)-\(session.id)"
         case .voiceSetReview(let session, _): "voice-set-review-\(session.id)"
         }
     }
@@ -94,13 +94,15 @@ struct TrainingCoachCard: View {
             RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
                 .stroke(theme.colors.border.opacity(0.7), lineWidth: 1)
         }
-        .confirmationDialog(
+        // confirmationDialog presents without Cancel, so stopping coaching has no reachable escape hatch.
+        .alert(
             "Delete your training sessions, set logs, and feedback?",
-            isPresented: $isStopConfirmationPresented,
-            titleVisibility: .visible
+            isPresented: $isStopConfirmationPresented
         ) {
             Button("Stop coaching and delete data", role: .destructive, action: onStop)
+                .accessibilityIdentifier("training_revoke_confirm")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("training_revoke_cancel")
         } message: {
             Text("This removes training records from your account. It does not delete your body-composition data or chat.")
         }
@@ -259,6 +261,54 @@ struct TrainingEnrollmentView: View {
     }
 }
 
+/// The engine carries last session's final-set load forward on hold and
+/// add-reps weeks; the load field starts there, like reps start at the target.
+enum TrainingLoadPrefillPolicy {
+    static func text(for targetLoadKg: Double?) -> String {
+        guard let targetLoadKg, targetLoadKg > 0 else { return "" }
+        let rounded = (targetLoadKg * 100).rounded() / 100
+        let style = FloatingPointFormatStyle<Double>.number
+            .precision(.fractionLength(0...2))
+            .grouping(.never)
+            .locale(Locale(identifier: "en_US_POSIX"))
+        return rounded.formatted(style)
+    }
+}
+
+enum TrainingLoadInputPolicy {
+    static let invalidMessage = "Enter a load from 0 to 500 kg, or leave it blank for bodyweight."
+
+    static func loadKg(from text: String) throws -> Double? {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty { return nil }
+        guard value.range(of: #"^([0-9]+([.,][0-9]*)?|[.,][0-9]+)$"#, options: .regularExpression) != nil,
+              let load = Double(value.replacingOccurrences(of: ",", with: ".")),
+              load.isFinite, (0...500).contains(load)
+        else { throw InputError.invalidLoad }
+        return load
+    }
+
+    static func isValid(_ text: String) -> Bool {
+        do {
+            _ = try loadKg(from: text)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    static func savedText(for load: Double?) -> String {
+        guard let load else { return "" }
+        let text = String(load)
+        return text.hasSuffix(".0") ? String(text.dropLast(2)) : text
+    }
+
+    enum InputError: LocalizedError {
+        case invalidLoad
+        var errorDescription: String? { TrainingLoadInputPolicy.invalidMessage }
+    }
+}
+
 struct TrainingLiveSessionView: View {
     let session: TrainingSession
     let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
@@ -266,10 +316,8 @@ struct TrainingLiveSessionView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
-    @State private var repsByKey: [String: String] = [:]
-    @State private var loadByKey: [String: String] = [:]
-    @State private var rirByKey: [String: Int] = [:]
-    @State private var loggedSets: Set<String> = []
+    @StateObject private var draft: TrainingSessionDraft
+    private var loggedSets: Set<String> { Set(draft.loggedSets.keys) }
     @State private var soreness = 0
     @State private var pump = 0
     @State private var jointPain = 0
@@ -277,6 +325,22 @@ struct TrainingLiveSessionView: View {
     @State private var feedbackSaved = false
     @State private var isSaving = false
     @State private var errorMessage: String?
+
+    init(
+        session: TrainingSession,
+        ownerId: String,
+        draftStore: TrainingDraftStore = .shared,
+        isCurrent: @escaping () -> Bool,
+        onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
+        onFeedback: @escaping (Int, Int, String, Int) async throws -> Void
+    ) {
+        self.session = session
+        self.onLogSet = onLogSet
+        self.onFeedback = onFeedback
+        _draft = StateObject(wrappedValue: TrainingSessionDraft(
+            session: session, ownerId: ownerId, store: draftStore, isCurrent: isCurrent
+        ))
+    }
 
     var body: some View {
         NavigationStack {
@@ -302,7 +366,7 @@ struct TrainingLiveSessionView: View {
                         feedbackCard
                     }
 
-                    if let errorMessage {
+                    if let errorMessage = errorMessage ?? draft.errorMessage {
                         Text(errorMessage)
                             .font(.footnote)
                             .foregroundStyle(Color.appWarning)
@@ -316,9 +380,11 @@ struct TrainingLiveSessionView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
+                        .disabled(isSaving || draft.isSaving)
                 }
             }
         }
+        .interactiveDismissDisabled(isSaving || draft.isSaving)
     }
 
     private func exerciseCard(_ exercise: TrainingExercisePrescription) -> some View {
@@ -365,19 +431,33 @@ struct TrainingLiveSessionView: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("training_load_\(exercise.id)_\(setNumber)")
             }
+            .disabled(isSaving || draft.isSaving || loggedSets.contains(key) || draft.rows[key]?.pendingRequest != nil)
+            if !TrainingLoadInputPolicy.isValid(loadBinding(for: exercise, setNumber: setNumber).wrappedValue) {
+                Text(TrainingLoadInputPolicy.invalidMessage)
+                    .font(.footnote)
+                    .foregroundStyle(Color.appWarning)
+                    .accessibilityIdentifier("training_load_error_\(exercise.id)_\(setNumber)")
+            }
             Stepper("\(rirBinding(for: exercise, setNumber: setNumber).wrappedValue) reps in reserve", value: rirBinding(for: exercise, setNumber: setNumber), in: 0...6)
                 .font(.system(size: 13))
+                .disabled(isSaving || draft.isSaving || loggedSets.contains(key) || draft.rows[key]?.pendingRequest != nil)
                 .accessibilityIdentifier("training_rir_\(exercise.id)_\(setNumber)")
             Button(loggedSets.contains(key) ? "Set logged" : "Log set") {
                 Task { await log(exercise, setNumber: setNumber) }
             }
             .disabled(
-                loggedSets.contains(key) || isSaving ||
-                    Int(repsBinding(for: exercise, setNumber: setNumber).wrappedValue) == nil
+                loggedSets.contains(key) || isSaving || draft.isSaving ||
+                    !(1...50).contains(Int(repsBinding(for: exercise, setNumber: setNumber).wrappedValue) ?? 0) ||
+                    !TrainingLoadInputPolicy.isValid(loadBinding(for: exercise, setNumber: setNumber).wrappedValue)
             )
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.colors.text)
             .accessibilityIdentifier("training_log_set_\(exercise.id)_\(setNumber)")
+            if draft.rows[key]?.pendingRequest != nil && !draft.isSaving && !loggedSets.contains(key) {
+                Text("Retry this set to confirm it was saved.")
+                    .font(.footnote)
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
         }
     }
 
@@ -398,7 +478,7 @@ struct TrainingLiveSessionView: View {
             Button(feedbackSaved ? "Feedback saved" : session.safetyStop ? "Save updated check-in" : "Save check-in") {
                 Task { await saveFeedback() }
             }
-            .disabled(feedbackSaved || isSaving)
+            .disabled(feedbackSaved || isSaving || draft.isSaving)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(theme.colors.text)
             .accessibilityIdentifier("training_save_feedback")
@@ -412,43 +492,38 @@ struct TrainingLiveSessionView: View {
     }
 
     private func repsBinding(for exercise: TrainingExercisePrescription, setNumber: Int) -> Binding<String> {
-        let key = setKey(exercise, setNumber: setNumber)
-        return Binding(get: { repsByKey[key] ?? String(exercise.targetReps) }, set: { repsByKey[key] = $0 })
+        Binding(
+            get: { draft.row(for: exercise, setNumber: setNumber).repsText },
+            set: { value in draft.update(exercise, setNumber: setNumber) { $0.repsText = value } }
+        )
     }
 
     private func loadBinding(for exercise: TrainingExercisePrescription, setNumber: Int) -> Binding<String> {
-        let key = setKey(exercise, setNumber: setNumber)
-        return Binding(get: { loadByKey[key] ?? "" }, set: { loadByKey[key] = $0 })
+        return Binding(
+            get: { draft.row(for: exercise, setNumber: setNumber).loadText },
+            set: { value in draft.update(exercise, setNumber: setNumber) { $0.loadText = value } }
+        )
     }
 
     private func rirBinding(for exercise: TrainingExercisePrescription, setNumber: Int) -> Binding<Int> {
-        let key = setKey(exercise, setNumber: setNumber)
-        return Binding(get: { rirByKey[key] ?? exercise.targetRir }, set: { rirByKey[key] = $0 })
+        Binding(
+            get: { draft.row(for: exercise, setNumber: setNumber).rir },
+            set: { value in draft.update(exercise, setNumber: setNumber) { $0.rir = value } }
+        )
     }
 
     private func log(_ exercise: TrainingExercisePrescription, setNumber: Int) async {
-        guard let reps = Int(repsBinding(for: exercise, setNumber: setNumber).wrappedValue) else { return }
-        isSaving = true
+        guard !isSaving else { return }
         errorMessage = nil
-        defer { isSaving = false }
-        do {
-            let loadText = loadBinding(for: exercise, setNumber: setNumber).wrappedValue
+        await draft.save(exercise, setNumber: setNumber) { request in
             try await onLogSet(
-                exercise,
-                setNumber,
-                reps,
-                Double(loadText),
-                rirBinding(for: exercise, setNumber: setNumber).wrappedValue
+                exercise, request.setNumber, request.reps, request.loadKg, request.rir
             )
-            loggedSets.insert(setKey(exercise, setNumber: setNumber))
-        } catch let error as LocalizedError {
-            errorMessage = error.errorDescription ?? "The set could not be saved."
-        } catch {
-            errorMessage = "The set could not be saved."
         }
     }
 
     private func saveFeedback() async {
+        guard !isSaving, !draft.isSaving, !feedbackSaved else { return }
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -562,3 +637,95 @@ struct VoiceSetReviewView: View {
         dismiss()
     }
 }
+
+#if DEBUG
+/// Uses the production live view with isolated synthetic acknowledgments; never contacts a service.
+struct TrainingLiveSessionFixtureView: View {
+    private static let defaults = UserDefaults(suiteName: "lyb.training.ui-fixture")!
+    private static let draftStore = TrainingDraftStore(
+        rootURL: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("TrainingDrafts-UIFixture", isDirectory: true)
+    )
+    @State private var savedSets: [TrainingSavedSet]
+    @State private var presented = false
+    @State private var showStopCard = false
+    @State private var stopCount = 0
+    @State private var offline = false
+    @State private var submissionCount = 0
+
+    init() {
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestResetTrainingFixture") {
+            Self.defaults.removeObject(forKey: "savedSets")
+            Self.defaults.removeObject(forKey: "submissionCount")
+            try? Self.draftStore.purge(ownerId: "fixture-training-owner")
+        }
+        let data = Self.defaults.data(forKey: "savedSets") ?? Data("[]".utf8)
+        _savedSets = State(initialValue: (try? JSONDecoder().decode([TrainingSavedSet].self, from: data)) ?? [])
+        _submissionCount = State(initialValue: Self.defaults.integer(forKey: "submissionCount"))
+    }
+
+    private var session: TrainingSession {
+        TrainingSession(
+            id: "fixture-training-session", week: 2, slot: 0, pattern: "A", title: "Fixture training",
+            exercises: [
+                TrainingExercisePrescription(
+                    id: "fixture_press", name: "Fixture press", primaryMuscle: "chest",
+                    muscleContribution: ["chest": 1], sets: 2, repRange: .init(min: 8, max: 12),
+                    targetReps: 10, targetRir: 3,
+                    targetLoadKg: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingBlankLoad") ? nil : 60,
+                    loadInstruction: "Repeat last session’s load.", progression: "hold", evidenceIds: []
+                )
+            ],
+            safetyStop: false, explanation: nil, evidenceIds: [],
+            loggedSets: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingLostResponse") ? [] : savedSets
+        )
+    }
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Button("Open fixture session") { presented = true }
+                .accessibilityIdentifier("training_fixture_open")
+            Button("Open stop card") { showStopCard = true }
+                .accessibilityIdentifier("training_fixture_stop_card")
+            if showStopCard {
+                TrainingCoachCard(session: session, onStart: {}, onStop: { stopCount += 1 })
+            }
+            Text("Stops: \(stopCount)")
+                .accessibilityIdentifier("training_fixture_stop_count")
+            Toggle("Offline fixture", isOn: $offline)
+                .accessibilityIdentifier("training_fixture_offline")
+            Text("Acknowledged sets: \(savedSets.count)")
+                .accessibilityIdentifier("training_fixture_count")
+            Text("Submissions: \(submissionCount)")
+                .accessibilityIdentifier("training_fixture_submissions")
+            if let saved = savedSets.first {
+                Text("Saved load: \(saved.loadKg.map { TrainingLoadInputPolicy.savedText(for: $0) } ?? "bodyweight")")
+                    .accessibilityIdentifier("training_fixture_saved_load")
+            }
+        }
+        .padding(20)
+        .sheet(isPresented: $presented) {
+            TrainingLiveSessionView(
+                session: session, ownerId: "fixture-training-owner", draftStore: Self.draftStore,
+                isCurrent: { true }, onLogSet: { exercise, number, reps, load, rir in
+                    submissionCount += 1
+                    Self.defaults.set(submissionCount, forKey: "submissionCount")
+                    guard !offline else { throw URLError(.notConnectedToInternet) }
+                    let losesResponse = savedSets.isEmpty &&
+                        ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingLostResponse")
+                    let saved = TrainingSavedSet(
+                        sessionId: session.id, exerciseId: exercise.id, setNumber: number,
+                        reps: reps, loadKg: load, rir: rir
+                    )
+                    savedSets.removeAll { $0.exerciseId == exercise.id && $0.setNumber == number }
+                    savedSets.append(saved)
+                    Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
+                    if losesResponse { throw URLError(.networkConnectionLost) }
+                }, onFeedback: { _, _, _, _ in
+                    guard !offline else { throw URLError(.notConnectedToInternet) }
+                }
+            )
+        }
+    }
+}
+#endif

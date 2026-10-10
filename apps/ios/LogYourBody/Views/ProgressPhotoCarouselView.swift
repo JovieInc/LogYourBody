@@ -158,7 +158,7 @@ struct PhotoCard: View {
                     CachedAsyncImage(urlString: photoUrl) { image in
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .scaledToFill()
                             .frame(width: geometry.size.width, height: geometry.size.height)
                             .clipped()
                     } placeholder: {

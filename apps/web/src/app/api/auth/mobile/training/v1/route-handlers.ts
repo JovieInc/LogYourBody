@@ -5,19 +5,15 @@ import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
 import type { UserDirectoryPort } from '@/lib/ports/user-directory';
 import {
   isTrainingRecordCollection,
-  type NativeProductRecord,
   type NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import { validTrainingFeedback, validateSetLog } from '@/lib/training/engine';
+import { logTrainingSet, recordTrainingFeedback } from '@/lib/training/commands';
 import {
   getOrCreateNextWorkout,
-  isWorkoutSessionRecord,
-  loadTrainingRecords,
   pullAllTrainingRecords,
-  stableTrainingUuid,
   storeProgramSetup,
 } from '@/lib/training/service';
-import { TRAINING_CONSENT_VERSION, type SetLog, type TrainingFeedback } from '@/lib/training/types';
+import { TRAINING_CONSENT_VERSION } from '@/lib/training/types';
 
 export const TRAINING_API_VERSION = 1;
 
@@ -247,78 +243,29 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const parsed = LogSetBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) return apiError('invalid_request', 400);
       try {
-        const [snapshot, sessions] = await Promise.all([
-          loadTrainingRecords(dependencies.records, identity.sub),
-          collectionRecords(dependencies.records, identity.sub, 'training_sessions'),
-        ]);
-        if (!snapshot.setup) return apiError('program_not_enrolled', 409);
-        const sessionRecord = sessions.records.find(
-          (record) => record.id === parsed.data.sessionId,
-        );
-        if (
-          !sessionRecord ||
-          !isWorkoutSessionRecord(sessionRecord) ||
-          sessionRecord.programSetupId !== snapshot.setup.id
-        ) {
-          return apiError('session_not_found', 404);
+        const result = await logTrainingSet({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          set: { ...parsed.data, loadKg: parsed.data.loadKg ?? null },
+        });
+        switch (result.kind) {
+          case 'logged':
+            return json(
+              withVersion({ log: result.log, sessionComplete: result.sessionComplete }),
+              201,
+            );
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'session_not_active':
+            return apiError('session_not_active', 409);
+          case 'set_not_in_session':
+            return apiError('set_not_in_session', 400);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
         }
-        if (sessionRecord.status !== 'in_progress') return apiError('session_not_active', 409);
-        const session = sessionRecord.prescription;
-        if (
-          !session ||
-          !validateSetLog(
-            {
-              id: 'server-generated',
-              ...parsed.data,
-              loadKg: parsed.data.loadKg ?? null,
-              completedAt: dependencies.now().toISOString(),
-            },
-            session,
-          )
-        )
-          return apiError('set_not_in_session', 400);
-
-        const completedAt = dependencies.now().toISOString();
-        const logId = stableTrainingUuid(
-          identity.sub,
-          session.id,
-          parsed.data.exerciseId,
-          String(parsed.data.setNumber),
-        );
-        const log: SetLog & { record_type: string } = {
-          id: logId,
-          record_type: 'set_log',
-          sessionId: session.id,
-          exerciseId: parsed.data.exerciseId,
-          setNumber: parsed.data.setNumber,
-          reps: parsed.data.reps,
-          loadKg: parsed.data.loadKg ?? null,
-          rir: parsed.data.rir,
-          completedAt,
-        };
-        const saved = await dependencies.records.push(identity.sub, 'logged_sets', [log]);
-        if (saved.rejected_ids.includes(logId)) return apiError('training_unavailable', 503);
-        const allLogs = [...snapshot.logs, log];
-        const sessionComplete = session.exercises.every((exercise) =>
-          Array.from({ length: exercise.sets }, (_, index) => index + 1).every((setNumber) =>
-            allLogs.some(
-              (record) =>
-                record.sessionId === session.id &&
-                record.exerciseId === exercise.id &&
-                record.setNumber === setNumber,
-            ),
-          ),
-        );
-        if (sessionComplete) {
-          await dependencies.records.push(identity.sub, 'training_sessions', [
-            {
-              ...sessionRecord,
-              status: 'completed',
-              completedAt,
-            },
-          ]);
-        }
-        return json(withVersion({ log: saved.records[0] ?? log, sessionComplete }), 201);
       } catch {
         return apiError('training_unavailable', 503);
       }
@@ -333,31 +280,25 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const parsed = FeedbackBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) return apiError('invalid_request', 400);
       try {
-        const snapshot = await loadTrainingRecords(dependencies.records, identity.sub);
-        if (!snapshot.setup) return apiError('program_not_enrolled', 409);
-        const sessionExists = snapshot.sessions.some(
-          (record) =>
-            record.id === parsed.data.sessionId &&
-            (record as NativeProductRecord & { programSetupId?: string }).programSetupId ===
-              snapshot.setup?.id,
-        );
-        if (!sessionExists) return apiError('session_not_found', 404);
-        const latestFeedbackTime = snapshot.feedback.reduce(
-          (latest, item) => Math.max(latest, Date.parse(item.createdAt)),
-          0,
-        );
-        const createdAt = new Date(
-          Math.max(dependencies.now().getTime(), latestFeedbackTime + 1),
-        ).toISOString();
-        const feedback: TrainingFeedback & { record_type: string } = {
-          id: dependencies.createId(),
-          record_type: 'session_feedback',
-          ...parsed.data,
-          createdAt,
-        };
-        if (!validTrainingFeedback(feedback)) return apiError('invalid_request', 400);
-        await dependencies.records.push(identity.sub, 'training_feedback', [feedback]);
-        return json(withVersion({ feedback }), 201);
+        const result = await recordTrainingFeedback({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          createId: dependencies.createId,
+          feedback: parsed.data,
+        });
+        switch (result.kind) {
+          case 'recorded':
+            return json(withVersion({ feedback: result.feedback }), 201);
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'invalid':
+            return apiError('invalid_request', 400);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
+        }
       } catch {
         return apiError('training_unavailable', 503);
       }

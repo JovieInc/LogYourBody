@@ -280,24 +280,26 @@ function progressionForExercise(
 ): {
   action: ExercisePrescription['progression'];
   targetReps: number;
+  targetLoadKg: number | null;
   loadInstruction: string | null;
 } {
   const exerciseLogs = logs
     .filter((log) => log.exerciseId === exerciseId)
     .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt));
   if (exerciseLogs.length < 2)
-    return { action: 'hold', targetReps: REP_RANGE.min, loadInstruction: null };
+    return { action: 'hold', targetReps: REP_RANGE.min, targetLoadKg: null, loadInstruction: null };
   const lastSession = exerciseLogs[0]?.sessionId;
   const lastSets = exerciseLogs
     .filter((log) => log.sessionId === lastSession)
     .sort((a, b) => a.setNumber - b.setNumber);
   if (lastSets.length < 2)
-    return { action: 'hold', targetReps: REP_RANGE.min, loadInstruction: null };
+    return { action: 'hold', targetReps: REP_RANGE.min, targetLoadKg: null, loadInstruction: null };
   const allReachedTop = lastSets.every((log) => log.reps >= REP_RANGE.max && log.rir >= targetRir);
   if (allReachedTop) {
     return {
       action: 'increase_load',
       targetReps: REP_RANGE.min,
+      targetLoadKg: null,
       loadInstruction:
         'Use the next available load increment, then build repetitions within the range again.',
     };
@@ -309,7 +311,15 @@ function progressionForExercise(
         Math.max(REP_RANGE.min, Math.min(...lastSets.map((log) => log.reps)) + 1),
       )
     : Math.max(REP_RANGE.min, Math.min(...lastSets.map((log) => log.reps)));
-  return { action: canAddReps ? 'add_reps' : 'hold', targetReps, loadInstruction: null };
+  // Hold or add reps at the load the final set used last session. Equipment increments
+  // differ, so a load increase stays an instruction rather than a number.
+  const carriedLoad = lastSets[lastSets.length - 1]?.loadKg ?? null;
+  return {
+    action: canAddReps ? 'add_reps' : 'hold',
+    targetReps,
+    targetLoadKg: carriedLoad,
+    loadInstruction: null,
+  };
 }
 
 export function buildSession(input: {
@@ -338,7 +348,7 @@ export function buildSession(input: {
           repRange: REP_RANGE,
           targetReps: progression.targetReps,
           targetRir,
-          targetLoadKg: null,
+          targetLoadKg: progression.targetLoadKg,
           loadInstruction: progression.loadInstruction,
           progression: progression.action,
           evidenceIds: progression.action === 'increase_load' ? LOAD_EVIDENCE : EFFORT_EVIDENCE,

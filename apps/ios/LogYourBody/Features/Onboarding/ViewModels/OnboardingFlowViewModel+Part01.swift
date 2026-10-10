@@ -287,17 +287,21 @@ func progressMilestone(for step: Step) -> ProgressMilestone? {
             return
         }
 
-        let granted = await healthKitManager.requestAuthorization()
-        if granted {
+        _ = await healthKitManager.requestAuthorization()
+        let followUp = HealthKitAuthorizationPolicy.onboardingFollowUp(
+            healthKitManager.lastAuthorizationResolution
+        )
+        switch followUp {
+        case .importHealth:
             didRequestHealthSync = true
             AppServicePorts.analyticsTracker.track(
-                event: "onboarding_health_import_authorized"
+                event: HealthKitAuthorizationPolicy.onboardingAnalyticsEvent(followUp)
             )
             currentStep = .healthConfirmation
             await fetchHealthMetrics()
-        } else {
+        case .manualAfterEmptyRead, .manualAfterRequestFailure:
             AppServicePorts.analyticsTracker.track(
-                event: "onboarding_health_import_denied"
+                event: HealthKitAuthorizationPolicy.onboardingAnalyticsEvent(followUp)
             )
             currentStep = .manualWeight
         }

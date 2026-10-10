@@ -40,6 +40,10 @@ const LOAD_PATTERN =
 const RIR_PATTERN = /\b(\d)\s*(?:rir|reps?\s+in\s+reserve)\b/i;
 const SET_PATTERN = /\bset\s*(\d{1,2})\b/i;
 
+export function poundsToKg(pounds: number): number {
+  return Number((pounds * 0.45359237).toFixed(2));
+}
+
 function canonicalWeightUnit(unit: string | undefined): VoiceWeightUnit | undefined {
   if (!unit) return undefined;
   return /^(?:lb|lbs|pound|pounds)$/i.test(unit) ? 'lbs' : 'kg';
@@ -90,7 +94,7 @@ export function parseVoiceIntent(
 
   const loadKg =
     loadMatch && loadValue !== undefined && weightUnit === 'lbs'
-      ? Number((loadValue * 0.45359237).toFixed(2))
+      ? poundsToKg(loadValue)
       : loadMatch
         ? loadValue!
         : null;

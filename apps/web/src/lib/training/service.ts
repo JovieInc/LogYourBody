@@ -114,7 +114,7 @@ export type NextWorkoutResult =
   | { kind: 'week_complete'; week: number; weeklyFractionalVolume: Record<string, number> }
   | {
       kind: 'workout';
-      session: Session;
+      session: Session & { loggedSets: SetLog[] };
       week: number;
       weekCount: number;
       weeklyFractionalVolume: Record<string, number>;
@@ -135,13 +135,16 @@ export async function getOrCreateNextWorkout(input: {
   records: NativeProductRecordsPort;
   subject: string;
   now: Date;
+  /** false returns the same prescription without starting or updating a session record. */
+  persist?: boolean;
 }): Promise<NextWorkoutResult> {
+  const persist = input.persist ?? true;
   const snapshot = await loadTrainingRecords(input.records, input.subject);
   const setup = snapshot.setup;
   if (!setup) return { kind: 'not_enrolled' };
 
   const block = createMesoBlock(setup.startedAt, input.now.toISOString());
-  const periodSessions = snapshot.sessions as SessionRecord[];
+  let periodSessions = snapshot.sessions as SessionRecord[];
   const programSessionIds = new Set(
     periodSessions
       .filter((record) => record.programSetupId === setup.id)
@@ -151,13 +154,44 @@ export async function getOrCreateNextWorkout(input: {
   const programFeedback = snapshot.feedback.filter((feedback) =>
     programSessionIds.has(feedback.sessionId),
   );
-  const activeRecord = periodSessions
+  let activeRecord: SessionRecord | undefined = periodSessions
     .filter((record) => record.programSetupId === setup.id && record.status === 'in_progress')
     .sort(
       (a, b) =>
         Date.parse(String(b.startedAt ?? b.server_updated_at)) -
         Date.parse(String(a.startedAt ?? a.server_updated_at)),
     )[0];
+  const activePrescription = activeRecord?.prescription;
+  if (
+    persist &&
+    activeRecord &&
+    activePrescription &&
+    !activePrescription.safetyStop &&
+    activePrescription.exercises.length > 0 &&
+    activePrescription.exercises.every((exercise) =>
+      Array.from({ length: exercise.sets }, (_, index) => index + 1).every((setNumber) =>
+        programLogs.some(
+          (log) =>
+            log.sessionId === activePrescription.id &&
+            log.exerciseId === exercise.id &&
+            log.setNumber === setNumber,
+        ),
+      ),
+    )
+  ) {
+    // Recover a final set that was acknowledged before the completion write failed.
+    const completed = {
+      ...activeRecord,
+      status: 'completed',
+      completedAt: input.now.toISOString(),
+    };
+    const saved = await input.records.push(input.subject, 'training_sessions', [completed]);
+    if (saved.rejected_ids.includes(completed.id)) throw new Error('training_completion_rejected');
+    periodSessions = periodSessions.map((record) =>
+      record.id === completed.id ? completed : record,
+    );
+    activeRecord = undefined;
+  }
   const completedThisWeek = periodSessions.filter(
     (record) =>
       record.programSetupId === setup.id &&
@@ -193,16 +227,23 @@ export async function getOrCreateNextWorkout(input: {
       logs: programLogs,
       feedback: programFeedback,
     });
-    await input.records.push(input.subject, 'training_sessions', [
-      {
-        ...activeRecord,
-        prescription: adjusted,
-        status: adjusted.safetyStop ? 'paused' : 'in_progress',
-      },
-    ]);
+    if (persist) {
+      const saved = await input.records.push(input.subject, 'training_sessions', [
+        {
+          ...activeRecord,
+          prescription: adjusted,
+          status: adjusted.safetyStop ? 'paused' : 'in_progress',
+        },
+      ]);
+      if (saved.rejected_ids.includes(adjusted.id))
+        throw new Error('training_session_owner_conflict');
+    }
     return {
       kind: 'workout',
-      session: adjusted,
+      session: {
+        ...adjusted,
+        loggedSets: programLogs.filter((log) => log.sessionId === adjusted.id),
+      },
       week: existing.week,
       weekCount: block.weekCount,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
@@ -236,11 +277,13 @@ export async function getOrCreateNextWorkout(input: {
     prescription: session,
     startedAt: input.now.toISOString(),
   };
-  const saved = await input.records.push(input.subject, 'training_sessions', [sessionRecord]);
-  if (saved.rejected_ids.includes(session.id)) throw new Error('training_session_owner_conflict');
+  if (persist) {
+    const saved = await input.records.push(input.subject, 'training_sessions', [sessionRecord]);
+    if (saved.rejected_ids.includes(session.id)) throw new Error('training_session_owner_conflict');
+  }
   return {
     kind: 'workout',
-    session,
+    session: { ...session, loggedSets: programLogs.filter((log) => log.sessionId === session.id) },
     week: block.currentWeek,
     weekCount: block.weekCount,
     weeklyFractionalVolume: microcycle.plannedFractionalVolume,

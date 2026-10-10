@@ -116,6 +116,7 @@ export const logYourBody = {
       { value: 'https://techiegamers.com', reason: 'Research-note citation links in docs/research; not runtime endpoints.' },
       { value: 'https://docs.developer.apple.com', reason: 'Apple developer documentation links in docs/research.' },
       { value: 'https://edpb.europa.eu', reason: 'Legal-doc link (EDPB) referenced by privacy copy.' },
+      { value: 'https://chatgpt.com', reason: 'ChatGPT OAuth redirect for the LogYourBody MCP connector (docs/integrations/chatgpt-app).' },
       { value: 'https://apps.apple.com', reason: 'Apple storefront links.' },
       { value: 'https://appstoreconnect.apple.com', reason: 'App Store Connect links in release docs.' },
       { value: 'https://api.appstoreconnect.apple.com', reason: 'App Store Connect API base used by CI scripts.' },

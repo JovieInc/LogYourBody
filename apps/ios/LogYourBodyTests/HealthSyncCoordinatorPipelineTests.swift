@@ -14,6 +14,33 @@ import UIKit
 
 @MainActor
 final class HealthSyncCoordinatorPipelineTests: XCTestCase {
+    func testBootstrapSkipsObserversWhenAnotherAccountOwnsHealthSync() async throws {
+        let manager = MockHealthKitSyncManager()
+        manager.admitsAutomaticImport = false
+        let coordinator = HealthSyncCoordinator(healthKitManager: manager)
+
+        coordinator.bootstrapIfNeeded(syncEnabled: true)
+        await Task.yield()
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertFalse(manager.didCallCheckAuthorizationStatus)
+        XCTAssertFalse(manager.didCallObserveWeightChanges)
+        XCTAssertFalse(manager.didCallObserveStepChanges)
+        XCTAssertEqual(manager.setupBackgroundDeliveryCallCount, 0)
+    }
+
+    func testSignOutSuspensionAllowsTheSameAccountToBootstrapAgain() async throws {
+        let manager = MockHealthKitSyncManager()
+        let coordinator = HealthSyncCoordinator(healthKitManager: manager)
+
+        coordinator.bootstrapIfNeeded(syncEnabled: true)
+        await coordinator.suspendAutomaticImportAfterSignOut()
+        coordinator.bootstrapIfNeeded(syncEnabled: true)
+
+        XCTAssertEqual(manager.checkAuthorizationCallCount, 2)
+        XCTAssertTrue(manager.didCallObserveWeightChanges)
+    }
+
     func testBootstrapSkipsHealthKitWhenSyncIsDisabled() async {
         let manager = MockHealthKitSyncManager()
         let coordinator = HealthSyncCoordinator(healthKitManager: manager)
