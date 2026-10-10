@@ -62,6 +62,18 @@ func checkAuthorizationStatus() {
             writeStatus: writeStatus,
             hasConfirmedReadAccess: hasConfirmedAuthorization()
         )
+        authorizationStatusText = restoredAuthorizationStatusText(writeStatus: writeStatus)
+    }
+
+    func restoredAuthorizationStatusText(writeStatus: HKAuthorizationStatus) -> String {
+        guard let raw = userDefaults.string(forKey: HealthKitDefaultsKey.readProbeRecord.rawValue),
+              let record = HealthKitReadProbeRecord(rawValue: raw) else {
+            return ""
+        }
+        if writeStatus == .sharingAuthorized, record == .emptyNotDenial {
+            return HealthKitAuthorizationPolicy.statusText(for: .writeOnly)
+        }
+        return HealthKitAuthorizationPolicy.statusText(for: record)
     }
 
 func fetchLatestHeight() async throws -> (value: Double?, date: Date?) {
@@ -96,12 +108,16 @@ func fetchLatestHeight() async throws -> (value: Double?, date: Date?) {
         }
     }
 
-func persistHealthKitSamples(_ samples: [HKQuantitySample], unit: HKUnit) {
-        guard !samples.isEmpty else { return }
+@discardableResult
+func persistHealthKitSamples(
+        _ samples: [HKQuantitySample], unit: HKUnit, ownership: AuthManager.ProfileSessionOwnership?
+    ) -> Task<Void, Never>? {
+        guard !samples.isEmpty, let ownership else { return nil }
 
-        Task.detached(priority: .background) { [weak self] in
+        return Task.detached(priority: .background) { [weak self] in
             guard let self = self else { return }
-            guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else { return }
+            guard await self.ownsImport(ownership) else { return }
+            let userId = ownership.subject
             var rawSamples: [HKRawSample] = []
 
             for sample in samples {
@@ -132,7 +148,12 @@ func persistHealthKitSamples(_ samples: [HKQuantitySample], unit: HKUnit) {
                 rawSamples.append(hkSample)
             }
 
-            await CoreDataManager.shared.saveHKSamples(rawSamples)
+            guard await self.ownsImport(ownership) else { return }
+            if let store = self.rawImportStore {
+                await store(rawSamples)
+            } else {
+                await (self.importCoreDataManager ?? .shared).saveHKSamples(rawSamples)
+            }
         }
     }
 
@@ -206,44 +227,47 @@ func requestAuthorization() async -> Bool {
             try await healthStore.requestAuthorization(toShare: typesToWrite, read: typesToRead)
 
             let status = healthStore.authorizationStatus(for: weightType)
-            let confirmedReadAccess = status == .sharingAuthorized ? true : await probeReadableHealthKitData()
-            let authorized = HealthKitAuthorizationPolicy.isAuthorized(
-                writeStatus: status,
-                hasConfirmedReadAccess: confirmedReadAccess
+            let probes: [HealthKitReadKind: HealthKitSampleProbe] = [
+                .bodyMass: await probeQuantity(weightType),
+                .bodyFatPercentage: await probeQuantity(bodyFatType),
+                .height: await probeQuantity(heightType)
+            ]
+            let resolution = HealthKitAuthorizationPolicy.resolve(
+                writeAuthorized: status == .sharingAuthorized,
+                probes: probes,
+                requestSucceeded: true
             )
-            if authorized {
-                markAuthorizationConfirmed()
-            }
-            await MainActor.run {
-                self.isAuthorized = authorized
-            }
-
-            return authorized
+            await applyAuthorizationResolution(resolution)
+            return resolution.canUseHealthKit
         } catch {
+            let resolution = HealthKitAuthorizationPolicy.resolve(
+                writeAuthorized: false,
+                probes: [:],
+                requestSucceeded: false
+            )
+            await applyAuthorizationResolution(resolution)
             await captureHealthKitError(
                 error,
                 operation: "requestAuthorization",
                 contextDescription: "requestAuthorization"
             )
-            // print("HealthKit authorization failed: \(error)")
             return false
         }
     }
 
-func probeReadableHealthKitData() async -> Bool {
-        if await hasReadableQuantitySample(weightType) {
-            return true
+    @MainActor
+    func applyAuthorizationResolution(_ resolution: HealthKitAuthorizationResolution) {
+        lastAuthorizationResolution = resolution
+        isAuthorized = resolution.canUseHealthKit
+        authorizationStatusText = resolution.statusText
+        userDefaults.set(resolution.record.rawValue, forKey: HealthKitDefaultsKey.readProbeRecord.rawValue)
+        if resolution.confirmedReadKinds.isEmpty {
+            return
         }
-        if await hasReadableQuantitySample(bodyFatType) {
-            return true
-        }
-        if await hasReadableQuantitySample(heightType) {
-            return true
-        }
-        return false
+        markAuthorizationConfirmed()
     }
 
-func hasReadableQuantitySample(_ sampleType: HKQuantityType) async -> Bool {
+func probeQuantity(_ sampleType: HKQuantityType) async -> HealthKitSampleProbe {
         await withCheckedContinuation { continuation in
             let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
             let query = HKSampleQuery(
@@ -252,7 +276,15 @@ func hasReadableQuantitySample(_ sampleType: HKQuantityType) async -> Bool {
                 limit: 1,
                 sortDescriptors: [sortDescriptor]
             ) { _, samples, error in
-                continuation.resume(returning: error == nil && !(samples?.isEmpty ?? true))
+                if error != nil {
+                    continuation.resume(returning: .failed)
+                    return
+                }
+                if samples?.isEmpty ?? true {
+                    continuation.resume(returning: .empty)
+                    return
+                }
+                continuation.resume(returning: .found)
             }
 
             healthStore.execute(query)
@@ -337,53 +369,35 @@ func fetchWeightHistoryInRange(startDate: Date, endDate: Date) async throws -> [
     }
 
 func fetchWeightImportSamplesInRange(
-        startDate: Date,
-        endDate: Date
+        startDate: Date, endDate: Date, ownership: AuthManager.ProfileSessionOwnership? = nil
     ) async throws -> [HealthKitWeightImportSample] {
-        guard isAuthorized else {
-            throw HealthKitError.notAuthorized
+        guard isAuthorized else { throw HealthKitError.notAuthorized }
+        let ownership = await captureImportOwnership(ownership)
+        if let ownership { try await requireImportOwnership(ownership) }
+        if let weightImportQuery {
+            let results = try await weightImportQuery(startDate, endDate)
+            if let ownership { try await requireImportOwnership(ownership) }
+            return results
         }
-
-        let predicate = HKQuery.predicateForSamples(
-            withStart: startDate,
-            end: endDate,
-            options: .strictStartDate
-        )
-
-        return try await withCheckedThrowingContinuation { [weak self] continuation in
-            guard let self else {
-                continuation.resume(returning: [])
-                return
-            }
-            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
-
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        let samples: [HKQuantitySample] = try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
-                sampleType: weightType,
-                predicate: predicate,
-                limit: HKObjectQueryNoLimit,
-                sortDescriptors: [sortDescriptor]
+                sampleType: weightType, predicate: predicate, limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
             ) { _, samples, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
+                if let error { continuation.resume(throwing: error) } else {
+                    continuation.resume(returning: samples as? [HKQuantitySample] ?? [])
                 }
-
-                let hkSamples = samples as? [HKQuantitySample] ?? []
-                self.persistHealthKitSamples(hkSamples, unit: HKUnit.gramUnit(with: .kilo))
-
-                let results = hkSamples.map { sample in
-                    let weightInKg = sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
-                    return HealthKitWeightImportSample(
-                        weight: weightInKg,
-                        date: sample.startDate,
-                        sourceMetadata: self.sourceMetadata(from: sample)
-                    )
-                }
-
-                continuation.resume(returning: results)
             }
-
             healthStore.execute(query)
+        }
+        if let ownership { try await requireImportOwnership(ownership) }
+        persistHealthKitSamples(samples, unit: HKUnit.gramUnit(with: .kilo), ownership: ownership)
+        return samples.map { sample in
+            HealthKitWeightImportSample(
+                weight: sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo)),
+                date: sample.startDate, sourceMetadata: sourceMetadata(from: sample)
+            )
         }
     }
 
@@ -391,6 +405,7 @@ func fetchLatestBodyFatPercentage() async throws -> (percentage: Double?, date: 
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }
+        let ownership = await captureImportOwnership()
 
         return try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self else {
@@ -411,7 +426,7 @@ func fetchLatestBodyFatPercentage() async throws -> (percentage: Double?, date: 
                 }
 
                 if let sample = samples?.first as? HKQuantitySample {
-                    self.persistHealthKitSamples([sample], unit: HKUnit.percent())
+                    self.persistHealthKitSamples([sample], unit: HKUnit.percent(), ownership: ownership)
                     let percentage = sample.quantity.doubleValue(for: HKUnit.percent()) * 100 // Convert to percentage
                     continuation.resume(returning: (percentage, sample.startDate))
                 } else {
@@ -428,51 +443,36 @@ func fetchBodyFatHistory(startDate: Date) async throws -> [(percentage: Double, 
         return samples.map { (percentage: $0.percentage, date: $0.date) }
     }
 
-func fetchBodyFatImportSamples(startDate: Date) async throws -> [HealthKitBodyFatImportSample] {
-        guard isAuthorized else {
-            throw HealthKitError.notAuthorized
+func fetchBodyFatImportSamples(
+        startDate: Date, ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async throws -> [HealthKitBodyFatImportSample] {
+        guard isAuthorized else { throw HealthKitError.notAuthorized }
+        let ownership = await captureImportOwnership(ownership)
+        if let ownership { try await requireImportOwnership(ownership) }
+        if let bodyFatImportQuery {
+            let results = try await bodyFatImportQuery(startDate)
+            if let ownership { try await requireImportOwnership(ownership) }
+            return results
         }
-
-        let predicate = HKQuery.predicateForSamples(
-            withStart: startDate,
-            end: Date(),
-            options: .strictStartDate
-        )
-
-        return try await withCheckedThrowingContinuation { [weak self] continuation in
-            guard let self else {
-                continuation.resume(returning: [])
-                return
-            }
-            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
-
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: Date(), options: .strictStartDate)
+        let samples: [HKQuantitySample] = try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
-                sampleType: bodyFatType,
-                predicate: predicate,
-                limit: HKObjectQueryNoLimit,
-                sortDescriptors: [sortDescriptor]
+                sampleType: bodyFatType, predicate: predicate, limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
             ) { _, samples, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
+                if let error { continuation.resume(throwing: error) } else {
+                    continuation.resume(returning: samples as? [HKQuantitySample] ?? [])
                 }
-
-                let hkSamples = samples as? [HKQuantitySample] ?? []
-                self.persistHealthKitSamples(hkSamples, unit: HKUnit.percent())
-
-                let results = hkSamples.map { sample in
-                    let percentage = sample.quantity.doubleValue(for: HKUnit.percent()) * 100
-                    return HealthKitBodyFatImportSample(
-                        percentage: percentage,
-                        date: sample.startDate,
-                        sourceMetadata: self.sourceMetadata(from: sample)
-                    )
-                }
-
-                continuation.resume(returning: results)
             }
-
             healthStore.execute(query)
+        }
+        if let ownership { try await requireImportOwnership(ownership) }
+        persistHealthKitSamples(samples, unit: HKUnit.percent(), ownership: ownership)
+        return samples.map { sample in
+            HealthKitBodyFatImportSample(
+                percentage: sample.quantity.doubleValue(for: HKUnit.percent()) * 100,
+                date: sample.startDate, sourceMetadata: sourceMetadata(from: sample)
+            )
         }
     }
 
@@ -551,11 +551,14 @@ func resetForCurrentUser() async {
         let lastObserverKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userId)
         let fullSyncKey = HealthKitDefaultsKey.fullSyncCompleted.scoped(with: userId)
         userDefaults.removeObject(forKey: HealthKitDefaultsKey.authorizationConfirmed.rawValue)
+        userDefaults.removeObject(forKey: HealthKitDefaultsKey.readProbeRecord.rawValue)
         userDefaults.removeObject(forKey: lastObserverKey)
         userDefaults.removeObject(forKey: fullSyncKey)
 
         await MainActor.run {
             self.isAuthorized = false
+            self.authorizationStatusText = ""
+            self.lastAuthorizationResolution = nil
             self.latestWeight = nil
             self.latestWeightDate = nil
             self.latestBodyFatPercentage = nil

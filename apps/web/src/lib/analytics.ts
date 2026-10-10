@@ -2,27 +2,16 @@
 
 import { createStatsigAnalytics, type StatsigAnalyticsConfig } from './statsigAnalyticsAdapter';
 import { createVercelAnalytics } from './vercelAnalyticsAdapter';
+import {
+  isAnalyticsEvent,
+  sanitizeAnalyticsProperties,
+  sanitizeAnalyticsTraits,
+  type AnalyticsEvent,
+  type AnalyticsProperties,
+  type AnalyticsUserTraits,
+} from './analytics-schema';
 
-export type AnalyticsEvent =
-  | 'app_open'
-  | 'web_landing_viewed'
-  | 'web_waitlist_started'
-  | 'web_waitlist_submit_attempted'
-  | 'web_waitlist_submit_result'
-  | 'web_waitlist_submitted'
-  | 'web_cta_clicked'
-  | 'login_attempt'
-  | 'login_failed'
-  | 'logout';
-
-export type AnalyticsProperties = Record<string, string | number | boolean | null | undefined>;
-
-export interface AnalyticsUserTraits {
-  email?: string;
-  name?: string;
-  plan?: string;
-  [key: string]: string | number | boolean | null | undefined;
-}
+export type { AnalyticsEvent, AnalyticsProperties, AnalyticsUserTraits } from './analytics-schema';
 
 export interface AnalyticsPort {
   identify(userId: string | null, traits?: AnalyticsUserTraits): void;
@@ -40,10 +29,14 @@ const statsig = createStatsigAnalytics(config);
 const vercel = createVercelAnalytics();
 
 export const analytics: AnalyticsPort = {
-  identify: statsig.identify,
+  identify(userId, traits) {
+    statsig.identify(userId, sanitizeAnalyticsTraits(traits));
+  },
   track(event, properties) {
-    statsig.track(event, properties);
-    vercel.track(event, properties);
+    if (!isAnalyticsEvent(event)) return;
+    const safeProperties = sanitizeAnalyticsProperties(event, properties);
+    statsig.track(event, safeProperties);
+    vercel.track(event, safeProperties);
   },
   reset: statsig.reset,
   isFeatureEnabled: statsig.isFeatureEnabled,

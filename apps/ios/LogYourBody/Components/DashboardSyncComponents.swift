@@ -189,11 +189,21 @@ struct DashboardSyncDetailsSheet: View {
 
     private var healthKitSection: some View {
         Section(header: Text("HealthKit")) {
-            HStack {
-                Text("Authorization")
-                Spacer()
-                Text(healthKitManager.isAuthorized ? "Authorized" : "Not authorized")
-                    .foregroundColor(healthKitManager.isAuthorized ? Color.appSuccess : Color.appWarning)
+            if healthKitManager.authorizationStatusText.isEmpty {
+                HStack {
+                    Text("Authorization")
+                    Spacer()
+                    Text(healthKitManager.isAuthorized ? "Authorized" : "Not authorized")
+                        .foregroundColor(healthKitManager.isAuthorized ? Color.appSuccess : Color.appWarning)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Authorization")
+                    Text(healthKitManager.authorizationStatusText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             if healthKitManager.isImporting {

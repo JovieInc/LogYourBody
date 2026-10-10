@@ -30,4 +30,19 @@ describe('createVercelAnalytics', () => {
 
     expect(() => createVercelAnalytics().track('web_waitlist_submitted')).not.toThrow();
   });
+
+  it('drops sensitive metadata and arbitrary event names at the adapter boundary', () => {
+    const port = createVercelAnalytics();
+    port.track('web_waitlist_submitted', {
+      email: 'synthetic@example.com',
+      weight: 80,
+      campaign: 'private health text',
+      photo_url: 'https://e/private',
+      error: 'secret',
+      variant: 'waitlist_minimal',
+    });
+    expect(track).toHaveBeenCalledWith('web_waitlist_submitted', { variant: 'waitlist_minimal' });
+    port.track('synthetic@example.com');
+    expect(track).toHaveBeenCalledTimes(1);
+  });
 });

@@ -3,6 +3,7 @@
 // LogYourBodyTests
 //
 import XCTest
+import CoreData
 @testable import LogYourBody
 
 /// Stubs the OAuth/HTTP boundary for AuthManager session tests.
@@ -281,6 +282,62 @@ final class AuthManagerSessionTests: XCTestCase {
         XCTAssertEqual(stored?.refreshToken, "new-refresh")
     }
 
+    func testScopedAuthorizationCarriesValidatedSameAccountRefreshGeneration() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        manager.currentUser = LocalUser(
+            id: "user-123", email: "user@example.com", name: "Test User",
+            avatarUrl: nil, profile: nil, onboardingCompleted: false
+        )
+        let original = try XCTUnwrap(manager.captureRequestSession())
+        stubSessionSuccess()
+
+        let authorization = await manager.getAccessToken(for: original)
+
+        XCTAssertEqual(authorization?.token, "new-access")
+        XCTAssertEqual(authorization?.ownership.subject, original.subject)
+        XCTAssertNotEqual(authorization?.ownership, original)
+        let refreshed = try XCTUnwrap(authorization?.ownership)
+        XCTAssertTrue(manager.ownsRequestSession(refreshed))
+        XCTAssertFalse(manager.ownsRequestSession(original))
+    }
+
+    func testValidatedTokenRotationKeepsHeldHealthImportInSameAccountLifetime() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        manager.currentUser = LocalUser(
+            id: "user-123", email: "user@example.com", name: "Synthetic Health",
+            avatarUrl: nil, profile: nil, onboardingCompleted: true
+        )
+        let ownership = try XCTUnwrap(manager.captureAccountSession())
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        description.shouldAddStoreAsynchronously = false
+        let store = CoreDataManager(persistentStoreDescriptions: [description])
+        let query = HeldWeightImportQuery()
+        let health = HealthKitManager(
+            userDefaults: defaults, authManager: manager, coreDataManager: store,
+            weightImportQuery: { _, _ in await query.fetch() }, bodyFatImportQuery: { _ in [] },
+            syncTrigger: {}, importCompletion: { _ in },
+            rawImportStore: { _ in XCTFail("Synthetic query cannot dispatch raw samples") }
+        )
+        health.isAuthorized = true
+        let sample = HealthKitWeightImportSample(weight: 70, date: Date())
+        let work = Task { try await health.syncWeightFromHealthKitIncremental(days: 30) }
+        defer { query.complete([]) }
+        await fulfillment(of: [query.started], timeout: 3)
+        stubSessionSuccess()
+        let token = await manager.getAccessToken()
+        XCTAssertEqual(token, "new-access")
+        XCTAssertTrue(manager.ownsAccountSession(ownership))
+        query.complete([sample])
+        try await work.value
+        let records = await store.fetchAllBodyMetrics(for: "user-123")
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.first?.userId, "user-123")
+        XCTAssertEqual(records.first?.weight, 70)
+    }
+
     func testRefreshKeepsExistingRefreshTokenWhenRotationOmitsIt() async throws {
         let manager = makeManager()
         manager.authSession = makeSession(
@@ -525,5 +582,265 @@ final class AuthManagerSessionTests: XCTestCase {
         XCTAssertNil(manager.authSession)
         XCTAssertEqual(manager.lastExitReason, .sessionExpired)
         XCTAssertNil(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self))
+    }
+
+    private func applyProfileAccount(
+        _ manager: AuthManager, subject: String, name: String, accessToken: String = "jovie-local-access"
+    ) {
+        let email = "\(subject)@example.invalid"
+        manager.authSession = .localFixture(subject: subject, email: email, name: name, accessToken: accessToken)
+        manager.currentUser = LocalUser(
+            id: subject, email: email, name: name, avatarUrl: nil,
+            profile: nil, onboardingCompleted: false
+        )
+    }
+
+    private func profileBody(subject: String, name: String) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: ["profile": [
+            "id": subject, "full_name": name, "onboarding_completed": true,
+            "legal_accepted_at": "2026-10-06T00:00:00Z"
+        ]])
+        return try XCTUnwrap(String(data: data, encoding: .utf8))
+    }
+
+    func testProfileBootstrapAfterAccountSwitchCannotOverwriteReplacement() async throws {
+        let manager = makeManager()
+        let subjectA = "profile-a-\(UUID().uuidString)"
+        let subjectB = "profile-b-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subjectA, name: "Account A")
+        let held = holdResponse(path: "/api/auth/mobile/profile")
+        let bootstrap = Task { await manager.bootstrapAuthenticatedProfileIfNeeded(sessionId: subjectA) }
+        await fulfillment(of: [held.started], timeout: 3)
+        applyProfileAccount(manager, subject: subjectB, name: "Account B")
+        held.complete(status: 200, body: try profileBody(subject: subjectA, name: "Old A"))
+        await bootstrap.value
+
+        XCTAssertEqual(manager.currentUser?.id, subjectB)
+        XCTAssertEqual(manager.currentUser?.name, "Account B")
+        XCTAssertNil(manager.currentUser?.profile)
+        XCTAssertEqual(manager.currentUser?.onboardingCompleted, false)
+        let staleCache = await CoreDataManager.shared.fetchUserProfileSnapshot(for: subjectA)
+        XCTAssertNil(staleCache, "An obsolete response must not persist its profile after the account changes")
+    }
+
+    func testProfileBootstrapAfterAccountABACannotOverwriteFreshProfile() async throws {
+        let manager = makeManager()
+        let subjectA = "profile-a-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subjectA, name: "Original A")
+        let held = holdResponse(path: "/api/auth/mobile/profile")
+        let bootstrap = Task { await manager.bootstrapAuthenticatedProfileIfNeeded(sessionId: subjectA) }
+        await fulfillment(of: [held.started], timeout: 3)
+        applyProfileAccount(manager, subject: "profile-b-\(UUID().uuidString)", name: "Account B")
+        applyProfileAccount(manager, subject: subjectA, name: "Fresh A")
+        let freshProfile = try AuthManager.decodeProductProfileEnvelope(
+            from: Data(profileBody(subject: subjectA, name: "Fresh A").utf8)
+        ).profile.userProfile
+        XCTAssertTrue(manager.applySavedProfileToCurrentUser(freshProfile))
+        held.complete(status: 200, body: try profileBody(subject: subjectA, name: "Old A"))
+        await bootstrap.value
+
+        XCTAssertEqual(manager.currentUser?.profile?.fullName, "Fresh A")
+        XCTAssertEqual(manager.currentUser?.name, "Fresh A")
+        let staleCache = await CoreDataManager.shared.fetchUserProfileSnapshot(for: subjectA)
+        XCTAssertNil(staleCache, "An obsolete A lifetime must not persist over the fresh A profile")
+    }
+
+    func testProfileBootstrapRejectsWrongOwnerResponse() async throws {
+        let manager = makeManager()
+        let subject = "profile-a-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subject, name: "Account A")
+        let body = try profileBody(subject: "profile-b-\(UUID().uuidString)", name: "Wrong owner")
+        AuthStubURLProtocol.requestHandler = { _ in .init(statusCode: 200, body: Data(body.utf8)) }
+
+        await manager.bootstrapAuthenticatedProfileIfNeeded(sessionId: subject)
+
+        XCTAssertNil(manager.currentUser?.profile)
+        XCTAssertEqual(manager.currentUser?.name, "Account A")
+        XCTAssertEqual(manager.currentUser?.onboardingCompleted, false)
+    }
+
+    func testNameWriteAfterAccountSwitchCannotRenameReplacement() async throws {
+        let manager = makeManager()
+        let subjectA = "profile-a-\(UUID().uuidString)"
+        let subjectB = "profile-b-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subjectA, name: "Account A")
+        let held = holdResponse(path: "/api/auth/mobile/profile")
+        let save = Task {
+            do {
+                try await manager.consolidateNameUpdate("Old A edit")
+                return true
+            } catch { return false }
+        }
+        await fulfillment(of: [held.started], timeout: 3)
+        applyProfileAccount(manager, subject: subjectB, name: "Account B")
+        held.complete(status: 204, body: "")
+        let saved = await save.value
+
+        XCTAssertFalse(saved)
+        XCTAssertEqual(manager.currentUser?.name, "Account B")
+        XCTAssertEqual(manager.currentUser?.id, subjectB)
+    }
+
+    func testDeleteResponseAfterAccountSwitchCannotLogOutReplacement() async throws {
+        let manager = makeManager()
+        applyProfileAccount(manager, subject: "profile-a-\(UUID().uuidString)", name: "Account A")
+        let held = holdResponse(path: "/api/auth/mobile/profile")
+        let deletion = Task {
+            do {
+                try await manager.deleteCurrentAccount()
+                return true
+            } catch { return false }
+        }
+        await fulfillment(of: [held.started], timeout: 3)
+        let subjectB = "profile-b-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subjectB, name: "Account B")
+        let replacement = try XCTUnwrap(manager.authSession)
+        try keychain.save(replacement, forKey: storedSessionKey)
+        held.complete(status: 204, body: "")
+        let deleted = await deletion.value
+
+        XCTAssertFalse(deleted)
+        XCTAssertEqual(manager.authSession, replacement)
+        XCTAssertEqual(manager.currentUser?.id, subjectB)
+        XCTAssertEqual(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self), replacement)
+    }
+
+    func testLegalConsentWriteAfterAccountSwitchCannotClearReplacementConsent() async {
+        let manager = makeManager()
+        let subjectA = "profile-a-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subjectA, name: "Account A")
+        let held = holdResponse(path: "/api/auth/mobile/profile")
+        let consent = Task { await manager.acceptLegalConsent(userId: subjectA) }
+        await fulfillment(of: [held.started], timeout: 3)
+        applyProfileAccount(manager, subject: "profile-b-\(UUID().uuidString)", name: "Account B")
+        manager.needsLegalConsent = true
+        held.complete(status: 204, body: "")
+        await consent.value
+
+        XCTAssertTrue(manager.needsLegalConsent)
+    }
+
+    func testLegalConsentReadAfterAccountSwitchDoesNotReturnDepartingConsent() async throws {
+        let manager = makeManager()
+        let subjectA = "profile-a-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subjectA, name: "Account A")
+        let held = holdResponse(path: "/api/auth/mobile/profile")
+        let consent = Task { await manager.checkLegalConsent(userId: subjectA) }
+        await fulfillment(of: [held.started], timeout: 3)
+        applyProfileAccount(manager, subject: "profile-b-\(UUID().uuidString)", name: "Account B")
+        held.complete(status: 200, body: try profileBody(subject: subjectA, name: "Old A"))
+        let accepted = await consent.value
+
+        XCTAssertFalse(accepted)
+    }
+
+    func testProfileWriteStillSucceedsAfterValidTokenRotation() async throws {
+        let manager = makeManager()
+        applyProfileAccount(manager, subject: "user-123", name: "Test User")
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        stubSessionSuccess()
+        let oauthHandler = try XCTUnwrap(AuthStubURLProtocol.requestHandler)
+        let body = try profileBody(subject: "user-123", name: "Saved name")
+        AuthStubURLProtocol.requestHandler = { request in
+            if request.url?.path.hasSuffix("/api/auth/mobile/profile") == true {
+                return .init(statusCode: 200, body: Data(body.utf8))
+            }
+            return oauthHandler(request)
+        }
+
+        try await manager.consolidateNameUpdate("Saved name")
+
+        XCTAssertEqual(manager.authSession?.accessToken, "new-access")
+        XCTAssertEqual(manager.currentUser?.name, "Saved name")
+        let patch = try XCTUnwrap(AuthStubURLProtocol.recordedRequests.first { $0.httpMethod == "PATCH" })
+        XCTAssertEqual(patch.value(forHTTPHeaderField: "Authorization"), "Bearer new-access")
+    }
+
+    func testProfileWriteRejectsDecodableWrongOwnerInsteadOfSuccessfulFallback() async throws {
+        let manager = makeManager()
+        let subject = "profile-a-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subject, name: "Account A")
+        let body = try profileBody(subject: "profile-b-\(UUID().uuidString)", name: "Wrong owner")
+        AuthStubURLProtocol.requestHandler = { _ in .init(statusCode: 200, body: Data(body.utf8)) }
+        do {
+            try await manager.updateProfileDurably(["fullName": "Account A edit"])
+            XCTFail("A decodable wrong-owner profile must not be acknowledged as the current account save")
+        } catch {
+            XCTAssertEqual(manager.currentUser?.name, "Account A")
+        }
+    }
+
+    func testFreshAccountABACanBootstrapWhileOldRequestIsHeld() async throws {
+        let manager = makeManager()
+        let subject = "profile-a-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subject, name: "Old A", accessToken: "old-a")
+        stubSessionSuccess()
+        let heldOld = HeldAuthResponse()
+        let heldFresh = HeldAuthResponse()
+        AuthStubURLProtocol.deferredHandler = { request in
+            guard request.request.url?.path.hasSuffix("/api/auth/mobile/profile") == true else { return false }
+            let held = request.request.value(forHTTPHeaderField: "Authorization") == "Bearer old-a"
+                ? heldOld : heldFresh
+            held.capture(request)
+            return true
+        }
+        let old = Task { await manager.bootstrapAuthenticatedProfileIfNeeded(sessionId: subject) }
+        await fulfillment(of: [heldOld.started], timeout: 3)
+        applyProfileAccount(manager, subject: "profile-b-\(UUID().uuidString)", name: "Account B")
+        applyProfileAccount(manager, subject: subject, name: "Fresh A", accessToken: "fresh-a")
+        let fresh = Task { await manager.bootstrapAuthenticatedProfileIfNeeded(sessionId: subject) }
+        await fulfillment(of: [heldFresh.started], timeout: 3)
+        heldFresh.complete(status: 200, body: try profileBody(subject: subject, name: "Fresh A"))
+        await fresh.value
+        heldOld.complete(status: 200, body: try profileBody(subject: subject, name: "Old A"))
+        await old.value
+
+        XCTAssertEqual(manager.currentUser?.profile?.fullName, "Fresh A")
+        XCTAssertEqual(manager.currentUser?.name, "Fresh A")
+    }
+
+    func testLegalConsentWaiterCannotWriteAfterAccountABA() async throws {
+        let manager = makeManager()
+        let subject = "profile-a-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subject, name: "Old A")
+        let body = try profileBody(subject: subject, name: "Fresh A")
+        AuthStubURLProtocol.requestHandler = { _ in .init(statusCode: 200, body: Data(body.utf8)) }
+        await manager.legalConsentGate.wait()
+        let waiting = expectation(description: "Consent task waits for the gate")
+        let consent = Task {
+            waiting.fulfill()
+            await manager.acceptLegalConsent(userId: subject)
+        }
+        await fulfillment(of: [waiting], timeout: 3)
+        applyProfileAccount(manager, subject: "profile-b-\(UUID().uuidString)", name: "Account B")
+        applyProfileAccount(manager, subject: subject, name: "Fresh A")
+        manager.needsLegalConsent = true
+        await manager.legalConsentGate.signal()
+        await consent.value
+
+        XCTAssertTrue(manager.needsLegalConsent)
+        XCTAssertTrue(AuthStubURLProtocol.recordedRequests.isEmpty)
+    }
+
+    func testCancelledProfileBootstrapCanRetryInTheSameAccountLifetime() async throws {
+        let manager = makeManager()
+        let subject = "profile-a-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subject, name: "Account A")
+        let held = holdResponse(path: "/api/auth/mobile/profile")
+        let bootstrap = Task { await manager.bootstrapAuthenticatedProfileIfNeeded(sessionId: subject) }
+        await fulfillment(of: [held.started], timeout: 3)
+        bootstrap.cancel()
+        held.complete(status: 200, body: try profileBody(subject: subject, name: "Cancelled response"))
+        await bootstrap.value
+        AuthStubURLProtocol.deferredHandler = nil
+        let body = try profileBody(subject: subject, name: "Retried profile")
+        AuthStubURLProtocol.requestHandler = { _ in .init(statusCode: 200, body: Data(body.utf8)) }
+
+        await manager.bootstrapAuthenticatedProfileIfNeeded(sessionId: subject)
+
+        XCTAssertEqual(manager.currentUser?.profile?.fullName, "Retried profile")
+        XCTAssertEqual(AuthStubURLProtocol.recordedRequests.filter {
+            $0.url?.path.hasSuffix("/api/auth/mobile/profile") == true
+        }.count, 2)
     }
 }

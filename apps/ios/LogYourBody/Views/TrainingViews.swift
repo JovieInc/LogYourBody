@@ -2,13 +2,13 @@ import SwiftUI
 
 enum TrainingPresentation: Identifiable {
     case setup
-    case session(TrainingSession)
+    case session(TrainingSession, AuthManager.ProfileSessionOwnership)
     case voiceSetReview(TrainingSession, VoiceHeardIntent)
 
     var id: String {
         switch self {
         case .setup: "setup"
-        case .session(let session): "session-\(session.id)"
+        case .session(let session, let owner): "session-\(owner.subject)-\(owner.generation)-\(session.id)"
         case .voiceSetReview(let session, _): "voice-set-review-\(session.id)"
         }
     }
@@ -94,13 +94,15 @@ struct TrainingCoachCard: View {
             RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
                 .stroke(theme.colors.border.opacity(0.7), lineWidth: 1)
         }
-        .confirmationDialog(
+        // confirmationDialog presents without Cancel, so stopping coaching has no reachable escape hatch.
+        .alert(
             "Delete your training sessions, set logs, and feedback?",
-            isPresented: $isStopConfirmationPresented,
-            titleVisibility: .visible
+            isPresented: $isStopConfirmationPresented
         ) {
             Button("Stop coaching and delete data", role: .destructive, action: onStop)
+                .accessibilityIdentifier("training_revoke_confirm")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("training_revoke_cancel")
         } message: {
             Text("This removes training records from your account. It does not delete your body-composition data or chat.")
         }
@@ -314,10 +316,8 @@ struct TrainingLiveSessionView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
-    @State private var repsByKey: [String: String] = [:]
-    @State private var loadByKey: [String: String] = [:]
-    @State private var rirByKey: [String: Int] = [:]
-    @State private var loggedSets: Set<String> = []
+    @StateObject private var draft: TrainingSessionDraft
+    private var loggedSets: Set<String> { Set(draft.loggedSets.keys) }
     @State private var soreness = 0
     @State private var pump = 0
     @State private var jointPain = 0
@@ -328,31 +328,18 @@ struct TrainingLiveSessionView: View {
 
     init(
         session: TrainingSession,
+        ownerId: String,
+        draftStore: TrainingDraftStore = .shared,
+        isCurrent: @escaping () -> Bool,
         onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
         onFeedback: @escaping (Int, Int, String, Int) async throws -> Void
     ) {
         self.session = session
         self.onLogSet = onLogSet
         self.onFeedback = onFeedback
-        var reps: [String: String] = [:]
-        var loads: [String: String] = [:]
-        var rir: [String: Int] = [:]
-        for saved in session.loggedSets ?? [] {
-            guard saved.sessionId == session.id,
-                  let exercise = session.exercises.first(where: { $0.id == saved.exerciseId }),
-                  (1...max(1, exercise.sets)).contains(saved.setNumber),
-                  (1...50).contains(saved.reps), (0...6).contains(saved.rir),
-                  saved.loadKg.map({ $0.isFinite && (0...500).contains($0) }) ?? true
-            else { continue }
-            let key = "\(saved.exerciseId)-\(saved.setNumber)"
-            reps[key] = String(saved.reps)
-            loads[key] = TrainingLoadInputPolicy.savedText(for: saved.loadKg)
-            rir[key] = saved.rir
-        }
-        _repsByKey = State(initialValue: reps)
-        _loadByKey = State(initialValue: loads)
-        _rirByKey = State(initialValue: rir)
-        _loggedSets = State(initialValue: Set(reps.keys))
+        _draft = StateObject(wrappedValue: TrainingSessionDraft(
+            session: session, ownerId: ownerId, store: draftStore, isCurrent: isCurrent
+        ))
     }
 
     var body: some View {
@@ -379,7 +366,7 @@ struct TrainingLiveSessionView: View {
                         feedbackCard
                     }
 
-                    if let errorMessage {
+                    if let errorMessage = errorMessage ?? draft.errorMessage {
                         Text(errorMessage)
                             .font(.footnote)
                             .foregroundStyle(Color.appWarning)
@@ -393,11 +380,11 @@ struct TrainingLiveSessionView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
-                        .disabled(isSaving)
+                        .disabled(isSaving || draft.isSaving)
                 }
             }
         }
-        .interactiveDismissDisabled(isSaving)
+        .interactiveDismissDisabled(isSaving || draft.isSaving)
     }
 
     private func exerciseCard(_ exercise: TrainingExercisePrescription) -> some View {
@@ -444,7 +431,7 @@ struct TrainingLiveSessionView: View {
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("training_load_\(exercise.id)_\(setNumber)")
             }
-            .disabled(isSaving || loggedSets.contains(key))
+            .disabled(isSaving || draft.isSaving || loggedSets.contains(key) || draft.rows[key]?.pendingRequest != nil)
             if !TrainingLoadInputPolicy.isValid(loadBinding(for: exercise, setNumber: setNumber).wrappedValue) {
                 Text(TrainingLoadInputPolicy.invalidMessage)
                     .font(.footnote)
@@ -453,19 +440,24 @@ struct TrainingLiveSessionView: View {
             }
             Stepper("\(rirBinding(for: exercise, setNumber: setNumber).wrappedValue) reps in reserve", value: rirBinding(for: exercise, setNumber: setNumber), in: 0...6)
                 .font(.system(size: 13))
-                .disabled(isSaving || loggedSets.contains(key))
+                .disabled(isSaving || draft.isSaving || loggedSets.contains(key) || draft.rows[key]?.pendingRequest != nil)
                 .accessibilityIdentifier("training_rir_\(exercise.id)_\(setNumber)")
             Button(loggedSets.contains(key) ? "Set logged" : "Log set") {
                 Task { await log(exercise, setNumber: setNumber) }
             }
             .disabled(
-                loggedSets.contains(key) || isSaving ||
+                loggedSets.contains(key) || isSaving || draft.isSaving ||
                     !(1...50).contains(Int(repsBinding(for: exercise, setNumber: setNumber).wrappedValue) ?? 0) ||
                     !TrainingLoadInputPolicy.isValid(loadBinding(for: exercise, setNumber: setNumber).wrappedValue)
             )
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(theme.colors.text)
             .accessibilityIdentifier("training_log_set_\(exercise.id)_\(setNumber)")
+            if draft.rows[key]?.pendingRequest != nil && !draft.isSaving && !loggedSets.contains(key) {
+                Text("Retry this set to confirm it was saved.")
+                    .font(.footnote)
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
         }
     }
 
@@ -486,7 +478,7 @@ struct TrainingLiveSessionView: View {
             Button(feedbackSaved ? "Feedback saved" : session.safetyStop ? "Save updated check-in" : "Save check-in") {
                 Task { await saveFeedback() }
             }
-            .disabled(feedbackSaved || isSaving)
+            .disabled(feedbackSaved || isSaving || draft.isSaving)
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(theme.colors.text)
             .accessibilityIdentifier("training_save_feedback")
@@ -500,50 +492,38 @@ struct TrainingLiveSessionView: View {
     }
 
     private func repsBinding(for exercise: TrainingExercisePrescription, setNumber: Int) -> Binding<String> {
-        let key = setKey(exercise, setNumber: setNumber)
-        return Binding(get: { repsByKey[key] ?? String(exercise.targetReps) }, set: { repsByKey[key] = $0 })
+        Binding(
+            get: { draft.row(for: exercise, setNumber: setNumber).repsText },
+            set: { value in draft.update(exercise, setNumber: setNumber) { $0.repsText = value } }
+        )
     }
 
     private func loadBinding(for exercise: TrainingExercisePrescription, setNumber: Int) -> Binding<String> {
-        let key = setKey(exercise, setNumber: setNumber)
         return Binding(
-            get: { loadByKey[key] ?? TrainingLoadPrefillPolicy.text(for: exercise.targetLoadKg) },
-            set: { loadByKey[key] = $0 }
+            get: { draft.row(for: exercise, setNumber: setNumber).loadText },
+            set: { value in draft.update(exercise, setNumber: setNumber) { $0.loadText = value } }
         )
     }
 
     private func rirBinding(for exercise: TrainingExercisePrescription, setNumber: Int) -> Binding<Int> {
-        let key = setKey(exercise, setNumber: setNumber)
-        return Binding(get: { rirByKey[key] ?? exercise.targetRir }, set: { rirByKey[key] = $0 })
+        Binding(
+            get: { draft.row(for: exercise, setNumber: setNumber).rir },
+            set: { value in draft.update(exercise, setNumber: setNumber) { $0.rir = value } }
+        )
     }
 
     private func log(_ exercise: TrainingExercisePrescription, setNumber: Int) async {
-        guard !isSaving, !loggedSets.contains(setKey(exercise, setNumber: setNumber)),
-              let reps = Int(repsBinding(for: exercise, setNumber: setNumber).wrappedValue),
-              (1...50).contains(reps)
-        else { return }
-        isSaving = true
+        guard !isSaving else { return }
         errorMessage = nil
-        defer { isSaving = false }
-        do {
-            let loadText = loadBinding(for: exercise, setNumber: setNumber).wrappedValue
+        await draft.save(exercise, setNumber: setNumber) { request in
             try await onLogSet(
-                exercise,
-                setNumber,
-                reps,
-                try TrainingLoadInputPolicy.loadKg(from: loadText),
-                rirBinding(for: exercise, setNumber: setNumber).wrappedValue
+                exercise, request.setNumber, request.reps, request.loadKg, request.rir
             )
-            loggedSets.insert(setKey(exercise, setNumber: setNumber))
-        } catch let error as LocalizedError {
-            errorMessage = error.errorDescription ?? "The set could not be saved."
-        } catch {
-            errorMessage = "The set could not be saved."
         }
     }
 
     private func saveFeedback() async {
-        guard !isSaving, !feedbackSaved else { return }
+        guard !isSaving, !draft.isSaving, !feedbackSaved else { return }
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -662,17 +642,26 @@ struct VoiceSetReviewView: View {
 /// Uses the production live view with isolated synthetic acknowledgments; never contacts a service.
 struct TrainingLiveSessionFixtureView: View {
     private static let defaults = UserDefaults(suiteName: "lyb.training.ui-fixture")!
+    private static let draftStore = TrainingDraftStore(
+        rootURL: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("TrainingDrafts-UIFixture", isDirectory: true)
+    )
     @State private var savedSets: [TrainingSavedSet]
     @State private var presented = false
+    @State private var showStopCard = false
+    @State private var stopCount = 0
     @State private var offline = false
     @State private var submissionCount = 0
 
     init() {
         if ProcessInfo.processInfo.arguments.contains("-lybUITestResetTrainingFixture") {
             Self.defaults.removeObject(forKey: "savedSets")
+            Self.defaults.removeObject(forKey: "submissionCount")
+            try? Self.draftStore.purge(ownerId: "fixture-training-owner")
         }
         let data = Self.defaults.data(forKey: "savedSets") ?? Data("[]".utf8)
         _savedSets = State(initialValue: (try? JSONDecoder().decode([TrainingSavedSet].self, from: data)) ?? [])
+        _submissionCount = State(initialValue: Self.defaults.integer(forKey: "submissionCount"))
     }
 
     private var session: TrainingSession {
@@ -686,7 +675,9 @@ struct TrainingLiveSessionFixtureView: View {
                     targetLoadKg: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingBlankLoad") ? nil : 60,
                     loadInstruction: "Repeat last session’s load.", progression: "hold", evidenceIds: []
                 )
-            ], safetyStop: false, explanation: nil, evidenceIds: [], loggedSets: savedSets
+            ],
+            safetyStop: false, explanation: nil, evidenceIds: [],
+            loggedSets: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingLostResponse") ? [] : savedSets
         )
     }
 
@@ -694,6 +685,13 @@ struct TrainingLiveSessionFixtureView: View {
         VStack(spacing: 20) {
             Button("Open fixture session") { presented = true }
                 .accessibilityIdentifier("training_fixture_open")
+            Button("Open stop card") { showStopCard = true }
+                .accessibilityIdentifier("training_fixture_stop_card")
+            if showStopCard {
+                TrainingCoachCard(session: session, onStart: {}, onStop: { stopCount += 1 })
+            }
+            Text("Stops: \(stopCount)")
+                .accessibilityIdentifier("training_fixture_stop_count")
             Toggle("Offline fixture", isOn: $offline)
                 .accessibilityIdentifier("training_fixture_offline")
             Text("Acknowledged sets: \(savedSets.count)")
@@ -707,19 +705,26 @@ struct TrainingLiveSessionFixtureView: View {
         }
         .padding(20)
         .sheet(isPresented: $presented) {
-            TrainingLiveSessionView(session: session, onLogSet: { exercise, number, reps, load, rir in
-                submissionCount += 1
-                guard !offline else { throw URLError(.notConnectedToInternet) }
-                let saved = TrainingSavedSet(
-                    sessionId: session.id, exerciseId: exercise.id, setNumber: number,
-                    reps: reps, loadKg: load, rir: rir
-                )
-                savedSets.removeAll { $0.exerciseId == exercise.id && $0.setNumber == number }
-                savedSets.append(saved)
-                Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
-            }, onFeedback: { _, _, _, _ in
-                guard !offline else { throw URLError(.notConnectedToInternet) }
-            })
+            TrainingLiveSessionView(
+                session: session, ownerId: "fixture-training-owner", draftStore: Self.draftStore,
+                isCurrent: { true }, onLogSet: { exercise, number, reps, load, rir in
+                    submissionCount += 1
+                    Self.defaults.set(submissionCount, forKey: "submissionCount")
+                    guard !offline else { throw URLError(.notConnectedToInternet) }
+                    let losesResponse = savedSets.isEmpty &&
+                        ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingLostResponse")
+                    let saved = TrainingSavedSet(
+                        sessionId: session.id, exerciseId: exercise.id, setNumber: number,
+                        reps: reps, loadKg: load, rir: rir
+                    )
+                    savedSets.removeAll { $0.exerciseId == exercise.id && $0.setNumber == number }
+                    savedSets.append(saved)
+                    Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
+                    if losesResponse { throw URLError(.networkConnectionLost) }
+                }, onFeedback: { _, _, _, _ in
+                    guard !offline else { throw URLError(.notConnectedToInternet) }
+                }
+            )
         }
     }
 }

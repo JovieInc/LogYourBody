@@ -1,19 +1,17 @@
 'use client';
 
 import { track as trackVercelEvent } from '@vercel/analytics';
-
-type AnalyticsProperties = Record<string, string | number | boolean | null | undefined>;
+import { isAnalyticsEvent, sanitizeAnalyticsProperties } from './analytics-schema';
 
 export interface VercelAnalyticsPort {
-  track(event: string, properties?: AnalyticsProperties): void;
+  track(event: string, properties?: object): void;
 }
 
 export function createVercelAnalytics(): VercelAnalyticsPort {
   return {
     track(event, properties) {
-      const safeProperties = Object.fromEntries(
-        Object.entries(properties ?? {}).filter(([, value]) => value !== undefined),
-      ) as Record<string, string | number | boolean | null>;
+      if (!isAnalyticsEvent(event)) return;
+      const safeProperties = sanitizeAnalyticsProperties(event, properties);
 
       try {
         trackVercelEvent(event, safeProperties);

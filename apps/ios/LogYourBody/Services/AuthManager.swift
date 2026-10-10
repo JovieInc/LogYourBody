@@ -245,7 +245,21 @@ actor AsyncGate {
 
 @MainActor
 final class AuthManager: NSObject, ObservableObject {
-    static let shared = AuthManager()
+    static let shared: AuthManager = {
+        let manager = AuthManager()
+        manager.prepareHealthAccountHandoff = { userId in
+            let syncEnabled = UserDefaults.standard.bool(forKey: Constants.healthKitSyncEnabledKey)
+            HealthKitAccountSyncPolicy.bindIfUnbound(
+                userId: userId,
+                syncEnabled: syncEnabled,
+                defaults: .standard
+            )
+        }
+        manager.suspendHealthImport = {
+            await HealthSyncCoordinator.shared.suspendAutomaticImportAfterSignOut()
+        }
+        return manager
+    }()
 
     @Published var currentUser: LocalUser?
     @Published var authSession: ProductAuthSession? {
@@ -253,6 +267,11 @@ final class AuthManager: NSObject, ObservableObject {
             // Every replacement invalidates work, including A → B → A and logout
             // during a cold restore, when no session has been applied yet.
             authGeneration &+= 1
+            expiredRequestSession = nil
+            if !isRotatingProfileSession {
+                profileGeneration &+= 1
+                bootstrappedProfileSessions.removeAll()
+            }
             refreshTask?.cancel()
             refreshTask = nil
             refreshTaskID = nil
@@ -272,6 +291,8 @@ final class AuthManager: NSObject, ObservableObject {
     let keychain: KeychainManager
     let urlSession: URLSession
     let legalConsentGate = AsyncGate()
+    var prepareHealthAccountHandoff: ((String?) -> Void)?
+    var suspendHealthImport: (() async -> Void)?
 
     private let storedSessionKey = "productAuth.jovieOAuthSession"
     private var initializationTask: Task<Void, Never>?
@@ -279,8 +300,16 @@ final class AuthManager: NSObject, ObservableObject {
     private var refreshTask: Task<RefreshedToken?, Never>?
     private var refreshTaskID: UUID?
     private var authGeneration: UInt64 = 0
+    // Token rotation keeps this account lifetime; a login/logout/replacement,
+    // including the same subject, starts a new one and invalidates profile work.
+    struct ProfileSessionOwnership: Hashable, Sendable {
+        let subject: String
+        let generation: UInt64
+    }
+    private var profileGeneration: UInt64 = 0
+    private var isRotatingProfileSession = false
     private var webAuthenticationSession: ASWebAuthenticationSession?
-    private var bootstrappedProfileSessionIds = Set<String>()
+    private var bootstrappedProfileSessions = Set<ProfileSessionOwnership>()
 
     private final class AuthorizationContinuation<T>: @unchecked Sendable {
         private let lock = NSLock()
@@ -581,7 +610,8 @@ final class AuthManager: NSObject, ObservableObject {
     private func persist(
         tokenResponse: OAuthTokenResponse,
         userInfo: OAuthUserInfo,
-        fallbackRefreshToken: String? = nil
+        fallbackRefreshToken: String? = nil,
+        preservingProfileSession: Bool = false
     ) throws {
         guard let refreshToken = tokenResponse.refreshToken ?? fallbackRefreshToken else {
             throw AuthError.invalidToken
@@ -597,11 +627,18 @@ final class AuthManager: NSObject, ObservableObject {
             issuedAt: Date()
         )
         try keychain.save(session, forKey: storedSessionKey)
-        applyAuthenticatedSession(session)
+        applyAuthenticatedSession(session, preservingProfileSession: preservingProfileSession)
     }
 
-    private func applyAuthenticatedSession(_ session: ProductAuthSession) {
+    private func applyAuthenticatedSession(
+        _ session: ProductAuthSession,
+        preservingProfileSession: Bool = false
+    ) {
+        // This assignment is synchronous on MainActor. Only a validated refresh
+        // for the currently applied subject may preserve profile ownership.
+        isRotatingProfileSession = preservingProfileSession
         authSession = session
+        isRotatingProfileSession = false
         lastExitReason = .none
 
         if var existing = currentUser, existing.id == session.subject {
@@ -611,7 +648,6 @@ final class AuthManager: NSObject, ObservableObject {
             }
             currentUser = existing
             if existing.profile == nil {
-                bootstrappedProfileSessionIds.remove(session.id)
                 Task { await bootstrapAuthenticatedProfileIfNeeded(sessionId: session.id) }
             }
             return
@@ -635,8 +671,56 @@ final class AuthManager: NSObject, ObservableObject {
         return await refreshAccessToken(using: session)
     }
 
+    struct RequestSessionOwnership: Equatable, Sendable {
+        let subject: String
+        let generation: UInt64
+    }
+
+    struct RequestAuthorization: Sendable {
+        let token: String
+        let ownership: RequestSessionOwnership
+    }
+
+    private var expiredRequestSession: (ownership: RequestSessionOwnership, generation: UInt64)?
+
+    func didExpireRequestSession(_ ownership: RequestSessionOwnership) -> Bool {
+        guard !Task.isCancelled, authSession == nil, currentUser == nil, lastExitReason == .sessionExpired,
+              let expiredRequestSession else { return false }
+        return expiredRequestSession.ownership == ownership && expiredRequestSession.generation == authGeneration
+    }
+
+    func captureRequestSession() -> RequestSessionOwnership? {
+        guard let session = authSession, isAuthenticated, currentUser?.id == session.subject else { return nil }
+        return RequestSessionOwnership(subject: session.subject, generation: authGeneration)
+    }
+
+    func ownsRequestSession(_ ownership: RequestSessionOwnership) -> Bool {
+        !Task.isCancelled && captureRequestSession() == ownership
+    }
+
+    func getAccessToken(for ownership: RequestSessionOwnership) async -> RequestAuthorization? {
+        guard ownsRequestSession(ownership), let session = authSession else { return nil }
+        if session.expiresAt.timeIntervalSinceNow > 60 {
+            return RequestAuthorization(token: session.accessToken, ownership: ownership)
+        }
+        guard let result = await refreshAccessTokenResult(using: session),
+              let token = currentRefreshToken(result),
+              let current = captureRequestSession(), current.subject == ownership.subject,
+              current.generation == result.generation else { return nil }
+        return RequestAuthorization(token: token, ownership: current)
+    }
+
+    func handleProductAPIUnauthorized(for ownership: RequestSessionOwnership) async {
+        guard ownsRequestSession(ownership) else { return }
+        await handleProductAPIUnauthorized()
+    }
+
     private func refreshAccessToken(using session: ProductAuthSession? = nil) async -> String? {
-        if let refreshTask { return currentRefreshToken(await refreshTask.value) }
+        currentRefreshToken(await refreshAccessTokenResult(using: session))
+    }
+
+    private func refreshAccessTokenResult(using session: ProductAuthSession? = nil) async -> RefreshedToken? {
+        if let refreshTask { return await refreshTask.value }
         guard let current = session ?? authSession else {
             await performLogout(exitReason: .sessionExpired)
             return nil
@@ -668,7 +752,8 @@ final class AuthManager: NSObject, ObservableObject {
                 try self.persist(
                     tokenResponse: response,
                     userInfo: userInfo,
-                    fallbackRefreshToken: current.refreshToken
+                    fallbackRefreshToken: current.refreshToken,
+                    preservingProfileSession: self.authSession?.subject == current.subject
                 )
                 return self.authSession.map { ($0.accessToken, self.authGeneration) }
             } catch {
@@ -679,7 +764,7 @@ final class AuthManager: NSObject, ObservableObject {
         }
         refreshTask = task
         refreshTaskID = taskID
-        return currentRefreshToken(await task.value)
+        return await task.value
     }
 
     private func currentRefreshToken(_ result: RefreshedToken?) -> String? {
@@ -708,20 +793,26 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func performLogout(exitReason: AuthExitReason) async {
+        let departingUserId = currentUser?.id
+        prepareHealthAccountHandoff?(departingUserId)
+        let expiredOwnership = exitReason == .sessionExpired ? captureRequestSession() : nil
         try? keychain.delete(forKey: storedSessionKey)
         authSession = nil
         currentUser = nil
         needsLegalConsent = false
         memberSinceDate = nil
-        bootstrappedProfileSessionIds.removeAll()
+        bootstrappedProfileSessions.removeAll()
         lastExitReason = exitReason
+        expiredRequestSession = expiredOwnership.map { ($0, authGeneration) }
         AppServicePorts.analyticsTracker.reset()
+        await suspendHealthImport?()
     }
 
     func updateProfileDurably(_ updates: [String: Any]) async throws {
-        guard currentUser != nil else { throw AuthError.invalidToken }
+        guard let ownership = currentProfileSession() else { throw AuthError.invalidToken }
         let payload = try Self.normalizedProductProfilePayload(updates)
         _ = try await requestProductProfile(method: "PATCH", body: payload)
+        try requireCurrentProfileSession(ownership)
     }
 
     func updateProfile(_ updates: [String: Any]) async {
@@ -743,7 +834,9 @@ final class AuthManager: NSObject, ObservableObject {
     func consolidateNameUpdate(_ fullName: String) async throws {
         let trimmed = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        guard let ownership = currentProfileSession() else { throw AuthError.invalidToken }
         try await updateProfileDurably(["fullName": trimmed])
+        try requireCurrentProfileSession(ownership)
         currentUser?.name = trimmed
     }
 
@@ -754,18 +847,27 @@ final class AuthManager: NSObject, ObservableObject {
 
     func bootstrapAuthenticatedProfileIfNeeded(sessionId: String?) async {
         guard let sessionId,
-              !bootstrappedProfileSessionIds.contains(sessionId),
+              let ownership = currentProfileSession(),
+              ownership.subject == sessionId,
+              !bootstrappedProfileSessions.contains(ownership),
               let user = currentUser else { return }
-        bootstrappedProfileSessionIds.insert(sessionId)
+        bootstrappedProfileSessions.insert(ownership)
+        defer {
+            // Cancellation did not complete this bootstrap. Its generation is
+            // unique, so removing it cannot clear a replacement account's marker.
+            if Task.isCancelled { bootstrappedProfileSessions.remove(ownership) }
+        }
 
-        if let cached = await CoreDataManager.shared.fetchUserProfileSnapshot(for: user.id),
-           cached.hasPendingLocalChanges {
+        let cached = await CoreDataManager.shared.fetchUserProfileSnapshot(for: user.id)
+        guard isCurrentProfileSession(ownership) else { return }
+        if let cached, cached.hasPendingLocalChanges {
             applyAuthenticatedProfile(cached.profile, fallbackEmail: user.email)
             return
         }
 
         do {
             let remote = try await requestProductProfile(method: "GET").profile.userProfile
+            try requireCurrentProfileSession(ownership)
             applyAuthenticatedProfile(remote, fallbackEmail: user.email)
             if AuthProfileBootstrapPolicy.shouldPersistProjectedProfile(remote) {
                 CoreDataManager.shared.saveProfile(
@@ -776,16 +878,19 @@ final class AuthManager: NSObject, ObservableObject {
                 )
             }
         } catch {
-            if let cached = await CoreDataManager.shared.fetchUserProfile(for: user.id) {
+            guard isCurrentProfileSession(ownership) else { return }
+            let cached = await CoreDataManager.shared.fetchUserProfile(for: user.id)
+            guard isCurrentProfileSession(ownership) else { return }
+            if let cached {
                 applyAuthenticatedProfile(cached, fallbackEmail: user.email)
             } else {
-                bootstrappedProfileSessionIds.remove(sessionId)
+                bootstrappedProfileSessions.remove(ownership)
             }
         }
     }
 
     func applyAuthenticatedProfile(_ profile: UserProfile, fallbackEmail: String) {
-        guard var user = currentUser else { return }
+        guard var user = currentUser, profile.id == user.id else { return }
         user.profile = profile
         if let fullName = profile.fullName?.trimmingCharacters(in: .whitespacesAndNewlines),
            !fullName.isEmpty {
@@ -809,21 +914,24 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func checkLegalConsent(userId: String) async -> Bool {
+        guard let ownership = currentProfileSession(), ownership.subject == userId else { return false }
         await legalConsentGate.wait()
         defer { Task { await legalConsentGate.signal() } }
-        guard currentUser?.id == userId,
-              let response = try? await requestProductProfile(method: "GET") else { return false }
+        guard isCurrentProfileSession(ownership),
+              let response = try? await requestProductProfile(method: "GET"),
+              isCurrentProfileSession(ownership) else { return false }
         return response.profile.legalAcceptedAt != nil
     }
 
     func acceptLegalConsent(userId: String) async {
+        guard let ownership = currentProfileSession(), ownership.subject == userId else { return }
         await legalConsentGate.wait()
         defer { Task { await legalConsentGate.signal() } }
-        guard currentUser?.id == userId else { return }
+        guard isCurrentProfileSession(ownership) else { return }
         if (try? await requestProductProfile(
             method: "PATCH",
             body: ["legalAccepted": true]
-        )) != nil {
+        )) != nil, isCurrentProfileSession(ownership) {
             needsLegalConsent = false
         }
     }
@@ -836,11 +944,13 @@ final class AuthManager: NSObject, ObservableObject {
         method: String,
         body: [String: Any]? = nil
     ) async throws -> ProductProfileEnvelope {
+        guard let ownership = currentProfileSession() else { throw AuthError.invalidToken }
         guard let accessToken = await getAccessToken(),
               let baseURL = URL(string: Configuration.apiBaseURL),
               let url = URL(string: "/api/auth/mobile/profile", relativeTo: baseURL)?.absoluteURL else {
             throw AuthError.invalidToken
         }
+        try requireCurrentProfileSession(ownership)
 
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -852,6 +962,7 @@ final class AuthManager: NSObject, ObservableObject {
         }
 
         let (data, response) = try await urlSession.data(for: request)
+        try requireCurrentProfileSession(ownership)
         guard let http = response as? HTTPURLResponse else { throw AuthError.networkError }
         guard (200...299).contains(http.statusCode) else {
             if http.statusCode == 401 { throw AuthError.invalidToken }
@@ -862,8 +973,9 @@ final class AuthManager: NSObject, ObservableObject {
             return fallbackProductProfileEnvelope()
         }
 
+        let envelope: ProductProfileEnvelope
         do {
-            return try Self.decodeProductProfileEnvelope(from: data)
+            envelope = try Self.decodeProductProfileEnvelope(from: data)
         } catch {
             // A 2xx write already landed. Failing closed on a date-format
             // mismatch would strand the last onboarding step on a false error.
@@ -872,6 +984,31 @@ final class AuthManager: NSObject, ObservableObject {
             }
             throw AuthError.server("Your LogYourBody profile could not be updated.")
         }
+        // A decodable wrong-owner response is never a successful PATCH fallback.
+        guard envelope.profile.id == ownership.subject else { throw AuthError.invalidToken }
+        return envelope
+    }
+
+    private func currentProfileSession() -> ProfileSessionOwnership? {
+        guard let subject = authSession?.subject, currentUser?.id == subject else { return nil }
+        return ProfileSessionOwnership(subject: subject, generation: profileGeneration)
+    }
+
+    /// Read-only account lifetime shared with local imports; token rotation keeps it valid.
+    func captureAccountSession() -> ProfileSessionOwnership? {
+        currentProfileSession()
+    }
+
+    func ownsAccountSession(_ ownership: ProfileSessionOwnership) -> Bool {
+        isCurrentProfileSession(ownership)
+    }
+
+    private func isCurrentProfileSession(_ ownership: ProfileSessionOwnership) -> Bool {
+        !Task.isCancelled && currentProfileSession() == ownership
+    }
+
+    private func requireCurrentProfileSession(_ ownership: ProfileSessionOwnership) throws {
+        guard isCurrentProfileSession(ownership) else { throw AuthError.invalidToken }
     }
 
     private func fallbackProductProfileEnvelope() -> ProductProfileEnvelope {
@@ -950,7 +1087,9 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func deleteCurrentAccount() async throws {
+        guard let ownership = currentProfileSession() else { throw AuthError.invalidToken }
         try await deleteProductAccount()
+        try requireCurrentProfileSession(ownership)
         await performLogout(exitReason: .userInitiated)
     }
 
