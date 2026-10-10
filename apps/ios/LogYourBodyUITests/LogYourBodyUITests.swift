@@ -2040,6 +2040,56 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
     }
 
+    func testHomeV2ProgressRefreshesAfterEditingAnExistingDay() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture",
+            "-lybUITestHomeV2OfflineFixture"
+        ])
+
+        let viewProgress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
+        viewProgress.tap()
+        let value = app.staticTexts["home_v2_progress_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+        let loaded = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label != %@", "—"), object: value
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+        let originalValue = value.label
+        attachScreenshot(named: "home-v2-progress-before-edit", from: app)
+
+        app.buttons["photo_timeline_root_menu"].tap()
+        let today = app.buttons["home_v2_sidebar_today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 5))
+        today.tap()
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 8))
+        logWeight.tap()
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        let savedValue = try XCTUnwrap(app.textFields["Weight value"].value as? String)
+        XCTAssertNotEqual(savedValue, originalValue)
+        app.buttons["home_v2_log_sheet_save"].tap()
+        let done = app.buttons["home_v2_done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        done.tap()
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 8))
+        viewProgress.tap()
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+
+        let refreshed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", savedValue),
+            object: value
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [refreshed], timeout: 10), .completed,
+            "Progress must show the saved edit even when the number of measurement rows is unchanged"
+        )
+        attachScreenshot(named: "home-v2-progress-after-edit", from: app)
+    }
+
     private func attachScreenshot(named name: String, from app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

@@ -121,6 +121,9 @@ extension DashboardViewLiquid {
 
     @MainActor
     func prewarmMetricCaches() async {
+        let buildID = UUID()
+        metricCacheBuildID = buildID
+        let userIdSnapshot = authManager.currentUser?.id
         guard !sortedBodyMetricsAscending.isEmpty || !recentDailyMetrics.isEmpty || !glp1DoseLogs.isEmpty else {
             fullChartCache = [:]
             fullTrendChartCache = [:]
@@ -210,6 +213,10 @@ extension DashboardViewLiquid {
             return (cache, trendCache, bodyScoreEntries)
         }.value
 
+        // Detached work can finish after a newer measurement, unit or account
+        // update. Only the current build may publish display values.
+        guard !Task.isCancelled, metricCacheBuildID == buildID,
+              authManager.currentUser?.id == userIdSnapshot else { return }
         fullChartCache = chartCache
         fullTrendChartCache = trendChartCache
 
