@@ -211,6 +211,48 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         XCTAssertFalse(app.textFields["Last name"].exists)
     }
 
+    func testBugReportFormOpensAndCancelDismissesIt() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestWeightLoggerMVPFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock",
+            "-lybUITestPresentBugReport"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 20))
+
+        let report = app.buttons["Report a problem"]
+        XCTAssertTrue(report.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.navigationBars["Report a problem"].waitForExistence(timeout: 5))
+        let reportFrame = report.frame
+        XCTAssertGreaterThanOrEqual(reportFrame.width, 44, "Report button width \(reportFrame)")
+        XCTAssertGreaterThanOrEqual(reportFrame.height, 44, "Report button height \(reportFrame)")
+        report.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_bugReport"].waitForExistence(timeout: 8)
+        )
+        let cancel = app.buttons["Cancel"]
+        let send = app.buttons["Send"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertTrue(send.waitForExistence(timeout: 5))
+        let cancelFrame = cancel.frame
+        let sendFrame = send.frame
+        XCTAssertGreaterThanOrEqual(cancelFrame.width, 44, "Cancel \(cancelFrame) Send \(sendFrame)")
+        XCTAssertGreaterThanOrEqual(cancelFrame.height, 44, "Cancel \(cancelFrame) Send \(sendFrame)")
+        XCTAssertGreaterThanOrEqual(sendFrame.width, 44, "Send \(sendFrame)")
+        XCTAssertGreaterThanOrEqual(sendFrame.height, 44, "Send \(sendFrame)")
+        cancel.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_bugReport"].waitForNonExistence(timeout: 5)
+        )
+        XCTAssertFalse(app.buttons["Send"].exists)
+        XCTAssertTrue(app.staticTexts["Weight log"].exists)
+    }
+
     // MARK: - Field helpers
 
     private func clearText(in field: XCUIElement) {

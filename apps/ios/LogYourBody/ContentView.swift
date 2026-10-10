@@ -289,6 +289,14 @@ struct ContentView: View {
         .onShake {
             bugReportManager.handleShakeGesture()
         }
+        #if DEBUG
+        .onAppear {
+            // XCUIDevice has no shake in this SDK. The UI test uses the same handler as the gesture.
+            if ProcessInfo.processInfo.arguments.contains("-lybUITestPresentBugReport") {
+                bugReportManager.handleShakeGesture()
+            }
+        }
+        #endif
     }
 
     private var mainContent: some View {

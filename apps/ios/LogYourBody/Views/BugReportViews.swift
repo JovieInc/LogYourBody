@@ -74,23 +74,34 @@ struct BugReportFormView: View {
             }
             .navigationTitle("Report a problem")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .cancellationAction) {
-                    Button("Cancel") {
+            // Navigation-bar actions stay 36 points tall in the accessibility frame.
+            .safeAreaInset(edge: .bottom) {
+                HStack(spacing: 12) {
+                    Button {
                         HapticManager.shared.selection()
                         bugReportManager.cancel()
                         dismiss()
+                    } label: {
+                        Text("Cancel")
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
-                }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
 
-                ToolbarItemGroup(placement: .confirmationAction) {
-                    Button("Send") {
+                    Button {
                         HapticManager.shared.buttonTap()
                         bugReportManager.submit()
                         dismiss()
+                    } label: {
+                        Text("Send")
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
                     .disabled(!bugReportManager.canSubmit)
                 }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
             }
         }
         .onAppear {
