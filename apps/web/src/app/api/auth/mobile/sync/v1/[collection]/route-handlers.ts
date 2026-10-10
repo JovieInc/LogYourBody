@@ -1,5 +1,11 @@
+import {
+  NativeAccountAdmissionError,
+  nativeAccountFailureStatus,
+  requireNativeAccountAdmission,
+} from '@/lib/ports/native-account-admission';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { hasSafeReportedMeasurements } from '@/lib/ports/reported-measurements';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import { NATIVE_BODY_METRICS_SYNC_VERSION } from '@/lib/ports/native-body-metrics-sync';
 import {
@@ -64,7 +70,7 @@ function pushRecords(body: z.infer<typeof PushBodySchema>) {
 }
 
 export function createNativeProductRecordHandlers(deps: RouteDependencies) {
-  return {
+  const handlers = {
     async GET(request: NextRequest) {
       const identity = await deps.authenticate(request);
       if (!identity)
@@ -116,6 +122,10 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
         );
       }
 
+      const mutations = deps.records.accountMutations;
+      if (!mutations) throw new NativeAccountAdmissionError('account_admission_unavailable');
+      const admission = requireNativeAccountAdmission(await mutations.capture(identity.sub));
+
       const payload = await request.json().catch(() => null);
       if (
         collection === 'glp1_medications' &&
@@ -129,8 +139,8 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
         if (!parsed.success) {
           return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_records' }, 400);
         }
-        const result = await deps.records.endActiveGlp1Medications(
-          identity.sub,
+        const result = await mutations.endActiveGlp1Medications(
+          admission,
           new Date(parsed.data.ended_at).toISOString(),
         );
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, ...result });
@@ -141,7 +151,11 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_records' }, 400);
       }
 
-      const result = await deps.records.push(identity.sub, collection, pushRecords(parsed.data));
+      const records = pushRecords(parsed.data);
+      if (collection === 'dexa_results' && !records.every(hasSafeReportedMeasurements)) {
+        return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_records' }, 400);
+      }
+      const result = await mutations.push(admission, collection, records);
       return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, ...result });
     },
 
@@ -162,13 +176,37 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
         );
       }
 
+      const mutations = deps.records.accountMutations;
+      if (!mutations) throw new NativeAccountAdmissionError('account_admission_unavailable');
+      const admission = requireNativeAccountAdmission(await mutations.capture(identity.sub));
+
       const parsed = DeleteBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) {
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_delete' }, 400);
       }
 
-      const result = await deps.records.remove(identity.sub, collection, parsed.data.ids);
+      const result = await mutations.remove(admission, collection, parsed.data.ids);
       return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, ...result });
     },
+  };
+  async function admittedResponse(action: () => Promise<NextResponse>) {
+    try {
+      return await action();
+    } catch (error) {
+      const status = nativeAccountFailureStatus(error);
+      if (status === null) throw error;
+      return json(
+        {
+          version: NATIVE_BODY_METRICS_SYNC_VERSION,
+          error: (error as NativeAccountAdmissionError).code,
+        },
+        status,
+      );
+    }
+  }
+  return {
+    GET: handlers.GET,
+    POST: (request: NextRequest) => admittedResponse(() => handlers.POST(request)),
+    DELETE: (request: NextRequest) => admittedResponse(() => handlers.DELETE(request)),
   };
 }
