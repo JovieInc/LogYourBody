@@ -8,6 +8,7 @@ import { createNeonTrainingMutations } from './training-mutations-adapter';
 import 'server-only';
 
 import { hasSafeReportedMeasurements } from '@/lib/ports/reported-measurements';
+import { hasSafeDailyStepMeasurement } from '@/lib/ports/daily-metric-steps';
 
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import type {
@@ -140,6 +141,10 @@ export function createNeonNativeProductRecords(
     for (const record of records) {
       const id = recordId(record);
       if (!id) continue;
+      if (collection === 'daily_metrics' && !hasSafeDailyStepMeasurement(record)) {
+        rejectedIds.push(id);
+        continue;
+      }
       if (collection === 'dexa_results' && !hasSafeReportedMeasurements(record)) {
         rejectedIds.push(id);
         continue;
@@ -151,6 +156,14 @@ export function createNeonNativeProductRecords(
            ) values ($1, $2, $3, $4::jsonb, null, now())
            on conflict (collection, id) do update set
              payload = case
+               when excluded.collection = 'daily_metrics'
+                 and not (excluded.payload ? 'steps_present')
+                 and public.native_records.payload->'steps_present' = 'true'::jsonb
+                 and jsonb_typeof(excluded.payload->'steps') = 'number'
+                 and public.native_records.payload->'steps' = excluded.payload->'steps'
+                 and jsonb_typeof(excluded.payload->'date') = 'string'
+                 and public.native_records.payload->'date' = excluded.payload->'date'
+               then excluded.payload || jsonb_build_object('steps_present', true)
                when excluded.collection = 'dexa_results'
                  and not (excluded.payload ? 'reported_measurements')
                  and public.native_records.payload ? 'reported_measurements'

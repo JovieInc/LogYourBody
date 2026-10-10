@@ -43,6 +43,60 @@ def check(condition, message):
             + literal(message) + "; END IF; END $$;")
 
 
+def daily_presence_sql():
+    lookup = ("(SELECT payload FROM public.native_records WHERE collection='daily_metrics' "
+              "AND id=" + literal(OWNER_ID) + ")")
+    observed = {"id": OWNER_ID, "date": "2026-10-10T00:00:00Z", "steps": 0,
+                "steps_present": True, "obsolete": "replace me"}
+    legacy = {"id": OWNER_ID, "date": observed["date"], "steps": 0, "notes": "legacy edit"}
+    sql = [
+        write("daily_metrics", "owner-a", observed),
+        check(lookup + "->'steps' = '0'::jsonb AND " + lookup + "->'steps_present' = 'true'::jsonb",
+              "explicit observed zero was not persisted"),
+        write("daily_metrics", "owner-a", legacy),
+        write("daily_metrics", "owner-a", legacy),
+        check(lookup + "->'steps_present' = 'true'::jsonb",
+              "legacy same-reading replay erased known zero presence"),
+        check(lookup + "->>'notes' = 'legacy edit' AND NOT (" + lookup + " ? 'obsolete')",
+              "daily compatibility changed unrelated replacement semantics"),
+        write("daily_metrics", "owner-b", {**legacy, "steps_present": False, "steps": None}),
+        check(lookup + "->'steps_present' = 'true'::jsonb AND " + lookup + "->'steps' = '0'::jsonb",
+              "foreign owner cleared known zero"),
+        write("daily_metrics", "owner-a", {**observed, "steps": 8421}),
+        write("daily_metrics", "owner-a", {**legacy, "steps": 8421}),
+        check(lookup + "->'steps_present' = 'true'::jsonb AND " + lookup + "->'steps' = '8421'::jsonb",
+              "same positive reading lost its explicit presence"),
+        write("daily_metrics", "owner-a", {**legacy, "steps_present": False, "steps": None}),
+        check(lookup + "->'steps_present' = 'false'::jsonb AND " + lookup + "->'steps' = 'null'::jsonb",
+              "explicit missing did not clear the prior measurement"),
+    ]
+    for label, replacement in [
+        ("changed count", {**legacy, "steps": 1}),
+        ("changed day", {**legacy, "date": "2026-10-11T00:00:00Z"}),
+        ("null count", {**legacy, "steps": None}),
+        ("omitted count", {"id": OWNER_ID, "date": observed["date"]}),
+        ("omitted day", {"id": OWNER_ID, "steps": 0}),
+    ]:
+        sql.extend([
+            write("daily_metrics", "owner-a", observed),
+            write("daily_metrics", "owner-a", replacement),
+            check("NOT (" + lookup + " ? 'steps_present')",
+                  label + " inherited presence from a different reading"),
+        ])
+    sql.extend([
+        "DELETE FROM public.native_records WHERE collection='daily_metrics' AND id=" + literal(OWNER_ID) + ";",
+        write("daily_metrics", "owner-a", legacy),
+        check("NOT (" + lookup + " ? 'steps_present')", "bare legacy zero acquired invented presence"),
+        write("daily_metrics", "owner-a", observed),
+        check(lookup + "->'steps_present' = 'true'::jsonb", "explicit observed zero did not upgrade ambiguous data"),
+        write("progress_photos", "owner-a", observed),
+        write("progress_photos", "owner-a", legacy),
+        check("NOT ((SELECT payload FROM public.native_records WHERE collection='progress_photos' AND id="
+              + literal(OWNER_ID) + ") ? 'steps_present')", "daily preservation leaked into another collection"),
+    ])
+    return sql
+
+
 def regression_sql():
     statements = re.findall(
         r"`(insert into public\.native_records .*?returning id, payload, deleted_at, updated_at)`",
@@ -92,7 +146,7 @@ def regression_sql():
               "AND id=" + literal(LEGACY_ID) + ") ? 'reported_measurements')",
               "legacy insert invented measurements"),
     ]
-    return "\n".join(sql) + "\n"
+    return "\n".join(sql + daily_presence_sql()) + "\n"
 
 
 def main():
@@ -132,7 +186,7 @@ def main():
         run([*psql, "-c", "CREATE TABLE public.schema_migrations(version text PRIMARY KEY);"])
         run([*psql, "-f", str(MIGRATION)])
         run(psql, sql)
-        print("PASS: actual adapter SQL preserves measurements, ownership and legacy compatibility")
+        print("PASS: actual adapter SQL preserves DEXA measurements, daily step presence, ownership and legacy compatibility")
     except subprocess.CalledProcessError as error:
         print(error.stdout or "PostgreSQL command failed")
         raise SystemExit(1) from error
