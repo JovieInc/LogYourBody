@@ -569,6 +569,12 @@ final class ChaosMonkeyUITests: XCTestCase {
         "open settings"
     ]
 
+    override func setUpWithError() throws {
+        // The monkey must survive individual bad taps; only a hard app-death
+        // check below stops the run early.
+        continueAfterFailure = true
+    }
+
     func testManualWeightKeyboardDoneMeetsMinimumHitTarget() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -629,12 +635,6 @@ final class ChaosMonkeyUITests: XCTestCase {
         done.tap()
         XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["What’s your current weight?"].exists)
-    }
-
-    override func setUpWithError() throws {
-        // The monkey must survive individual bad taps; only a hard app-death
-        // check below stops the run early.
-        continueAfterFailure = true
     }
 
     func testChaosMonkey() throws {
