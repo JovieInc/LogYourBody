@@ -308,6 +308,86 @@ describe('LogYourBody MCP route', () => {
     expect(checkIn.content[0]?.text).toContain('qualified clinician');
   });
 
+  it('keeps previewed targets after logging an exercise and honors a later pain stop', async () => {
+    const h = harness();
+    await enroll(h);
+    const original = (await call(h, 'get_todays_workout')).structuredContent;
+    expect(
+      (
+        await call(h, 'log_sets', {
+          exercise: 'goblet_squat',
+          sets: [
+            { reps: 10, load: 25, rir: 4 },
+            { reps: 10, load: 25, rir: 4 },
+          ],
+        })
+      ).isError,
+    ).toBeUndefined();
+    const rowsBefore = await h.records.listAll('subject-a');
+    const reopened = (await call(h, 'get_todays_workout')).structuredContent;
+    expect(reopened?.session.id).toBe(original?.session.id);
+    expect(reopened?.session.exercises).toEqual(
+      original?.session.exercises.map((exercise: Record<string, unknown>) => ({
+        ...exercise,
+        loggedSets:
+          exercise.id === 'goblet_squat'
+            ? [
+                { setNumber: 1, reps: 10, loadKg: 25, loadLb: 55.1, rir: 4 },
+                { setNumber: 2, reps: 10, loadKg: 25, loadLb: 55.1, rir: 4 },
+              ]
+            : [],
+      })),
+    );
+    expect(await h.records.listAll('subject-a')).toEqual(rowsBefore);
+    await call(h, 'log_session_feedback', {
+      soreness: 2,
+      pump: 5,
+      performance: 'stable',
+      jointPain: 5,
+    });
+    expect((await call(h, 'get_todays_workout')).structuredContent?.session).toMatchObject({
+      safetyStop: true,
+      exercises: [],
+    });
+    expect(
+      (
+        await call(h, 'log_sets', {
+          exercise: 'dumbbell bench press',
+          sets: [{ reps: 10, rir: 4 }],
+        })
+      ).isError,
+    ).toBe(true);
+    expect((await h.records.pull('subject-a', 'logged_sets')).records).toHaveLength(2);
+  });
+
+  it('does not turn repeated MCP check-ins into multiple sessions and still accepts pain updates', async () => {
+    const h = harness();
+    await enroll(h);
+    await call(h, 'log_sets', { exercise: 'goblet_squat', sets: [{ reps: 10, rir: 3 }] });
+    const feedback = { soreness: 8, pump: 4, performance: 'down', jointPain: 0 };
+    expect((await call(h, 'log_session_feedback', feedback)).isError).toBeUndefined();
+    const originalRows = (await h.records.pull('subject-a', 'training_feedback')).records;
+    expect((await call(h, 'log_session_feedback', feedback)).isError).toBeUndefined();
+    expect((await h.records.pull('subject-a', 'training_feedback')).records).toEqual(originalRows);
+    const unchanged = await call(h, 'get_todays_workout');
+    expect(unchanged.structuredContent?.session.exercises[0].sets).toBe(2);
+
+    const pain = await call(h, 'log_session_feedback', { ...feedback, jointPain: 5 });
+    expect(pain.isError).toBeUndefined();
+    expect(pain.content[0]?.text).toContain('qualified clinician');
+    expect((await call(h, 'get_todays_workout')).structuredContent?.session.safetyStop).toBe(true);
+    expect(
+      (
+        await call(h, 'log_session_feedback', {
+          ...feedback,
+          performance: 'stable',
+          soreness: 2,
+        })
+      ).isError,
+    ).toBeUndefined();
+    expect((await call(h, 'get_todays_workout')).structuredContent?.session.safetyStop).toBe(false);
+  });
+
   it('validates tool input before touching records', async () => {
     const h = harness();
     const result = await call(h, 'log_sets', { exercise: 'x', sets: [{ reps: 0, rir: 9 }] });
