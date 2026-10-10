@@ -36,6 +36,52 @@ function row(
 }
 
 describe('createNeonNativeProductRecords', () => {
+  it.each([
+    { steps_present: true },
+    { steps_present: true, steps: null },
+    { steps_present: true, steps: Number.NaN },
+    { steps_present: true, steps: Number.POSITIVE_INFINITY },
+    { steps_present: true, steps: -1 },
+    { steps_present: true, steps: 0.5 },
+    { steps_present: true, steps: 2147483648 },
+    { steps_present: false },
+    { steps_present: false, steps: 0 },
+    { steps_present: null, steps: 0 },
+    { steps_present: 'true', steps: 0 },
+    { steps_present: undefined, steps: 0 },
+  ])(
+    'rejects invalid daily presence from an internal caller without a write: %p',
+    async (value) => {
+      const query = jest.fn().mockResolvedValueOnce([row({ id: morningId, ...value })]);
+      const store = createNeonNativeProductRecords(databaseWith(query));
+      await expect(
+        store.push('owner-subject', 'daily_metrics', [{ id: morningId, ...value }]),
+      ).resolves.toEqual({ records: [], rejected_ids: [morningId] });
+      expect(query).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    {},
+    { steps: null },
+    { steps: 0 },
+    { steps: 8421 },
+    { steps: 0, steps_present: true },
+    { steps: 2147483647, steps_present: true },
+    { steps: null, steps_present: false },
+  ])('keeps raw legacy and explicit daily presence payloads distinct: %p', async (value) => {
+    const record = { id: morningId, date: morning.date, ...value };
+    const query = jest.fn().mockResolvedValueOnce([row(record)]);
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    const result = await store.push('owner-subject', 'daily_metrics', [record]);
+    expect(result.rejected_ids).toEqual([]);
+    expect(JSON.parse(String(query.mock.calls[0][1][3]))).toEqual(record);
+    expect(result.records[0]).toMatchObject(record);
+    if (!Object.hasOwn(value, 'steps_present')) {
+      expect(result.records[0]).not.toHaveProperty('steps_present');
+    }
+  });
+
   it('upserts jsonb payloads by client id without dropping extra native fields', async () => {
     const query = jest.fn().mockResolvedValueOnce([row(morning)]);
     const store = createNeonNativeProductRecords(databaseWith(query));
@@ -71,11 +117,104 @@ describe('createNeonNativeProductRecords', () => {
     });
   });
 
+  it('inserts training sets once without accepting caller-owned metadata', async () => {
+    const set = {
+      id: morningId,
+      record_type: 'set_log',
+      sessionId: eveningId,
+      exerciseId: 'goblet_squat',
+      setNumber: 1,
+      reps: 10,
+      loadKg: 20,
+      rir: 3,
+      completedAt: '2026-08-13T12:15:00.000Z',
+    };
+    const query = jest.fn().mockResolvedValueOnce([row(set)]);
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    await expect(
+      store.insertTrainingSet!('owner-subject', {
+        ...set,
+        user_id: 'other-subject',
+        deleted_at: '2026-01-01',
+        server_updated_at: '2026-01-01',
+      }),
+    ).resolves.toMatchObject({ ...set, user_id: 'owner-subject', deleted_at: null });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(normalized(query.mock.calls[0][0])).toContain('on conflict (collection, id) do nothing');
+    expect(normalized(query.mock.calls[0][0])).toContain(
+      "values ('logged_sets', $1, $2, $3::jsonb",
+    );
+    expect(query.mock.calls[0][1]).toEqual([morningId, 'owner-subject', JSON.stringify(set)]);
+  });
+
+  it('reads the existing owned training set after an insert conflict without changing its payload', async () => {
+    const original = { id: morningId, record_type: 'set_log', reps: 10, loadKg: 20 };
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([row(original)]);
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    const result = await store.insertTrainingSet!('owner-subject', {
+      ...original,
+      reps: 8,
+      loadKg: 25,
+    });
+    expect(result).toMatchObject({ ...original, server_updated_at: '2026-08-13T12:16:00.000Z' });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(normalized(query.mock.calls[0][0])).toContain('on conflict (collection, id) do nothing');
+    expect(normalized(query.mock.calls[1][0])).toContain(
+      "where collection = 'logged_sets' and id = $1 and user_subject = $2 and deleted_at is null",
+    );
+    expect(query.mock.calls[1][1]).toEqual([morningId, 'owner-subject']);
+  });
+
+  it('rejects training set conflicts with no owned active row instead of reviving or taking over a row', async () => {
+    const query = jest.fn().mockResolvedValue([]);
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    await expect(
+      store.insertTrainingSet!('owner-subject', {
+        id: morningId,
+        record_type: 'set_log',
+        reps: 10,
+      }),
+    ).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(normalized(query.mock.calls[1][0])).toContain(
+      'user_subject = $2 and deleted_at is null',
+    );
+    expect(query.mock.calls[1][1]).toEqual([morningId, 'owner-subject']);
+  });
+
+  it('rejects an explicit null DEXA payload even for an internal caller', async () => {
+    const query = jest.fn();
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    await expect(
+      store.push('owner-subject', 'dexa_results', [{ id: morningId, reported_measurements: null }]),
+    ).resolves.toEqual({ records: [], rejected_ids: [morningId] });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('retains an uninterpreted future envelope in both database parameters and returned records', async () => {
+    const envelope = {
+      schema_version: 2,
+      items: [{ kind: 'future', payload: { observed: 'unknown' } }],
+    };
+    const input = { id: morningId, reported_measurements: envelope };
+    const query = jest.fn().mockResolvedValue([row(input)]);
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    const result = await store.push('owner-subject', 'dexa_results', [input]);
+    expect(JSON.parse(String(query.mock.calls[0]?.[1]?.[3]))).toEqual(input);
+    expect(result.records[0]?.reported_measurements).toEqual(envelope);
+    expect(result.records[0]).not.toHaveProperty('muscle_mass');
+  });
+
   it('pulls incrementally for the authenticated subject including tombstones', async () => {
-    const query = jest.fn().mockResolvedValue([
-      row(morning),
-      row({ id: eveningId }, { deleted_at: '2026-08-13T23:50:00.000Z' }),
-    ]);
+    const query = jest
+      .fn()
+      .mockResolvedValue([
+        row(morning),
+        row({ id: eveningId }, { deleted_at: '2026-08-13T23:50:00.000Z' }),
+      ]);
     const store = createNeonNativeProductRecords(databaseWith(query));
 
     const result = await store.pull('owner-subject', 'daily_metrics', {
@@ -84,7 +223,9 @@ describe('createNeonNativeProductRecords', () => {
       limit: 200,
     });
 
-    expect(normalized(query.mock.calls[0]?.[0])).toContain('where user_subject = $1 and collection = $2');
+    expect(normalized(query.mock.calls[0]?.[0])).toContain(
+      'where user_subject = $1 and collection = $2',
+    );
     expect(query.mock.calls[0]?.[1]).toEqual([
       'owner-subject',
       'daily_metrics',

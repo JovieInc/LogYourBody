@@ -24,8 +24,10 @@ export type ProductProfileUpdate = {
 };
 
 export interface UserDirectoryPort {
+  captureAccountAdmission(subject: string): Promise<NativeAccountAdmission | null>;
   recordSignIn(identity: ProductUserIdentity): Promise<void>;
   getUser(subject: string): Promise<ProductUserRecord | null>;
   updateProfile(subject: string, update: ProductProfileUpdate): Promise<ProductUserRecord>;
-  deleteUser(subject: string): Promise<void>;
+  deleteUser(admission: NativeAccountAdmission): Promise<void>;
 }
+import type { NativeAccountAdmission } from './native-account-admission';

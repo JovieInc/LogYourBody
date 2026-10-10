@@ -1,3 +1,8 @@
+import {
+  NativeAccountAdmissionError,
+  nativeAccountFailureStatus,
+  requireNativeAccountAdmission,
+} from '@/lib/ports/native-account-admission';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
@@ -99,7 +104,7 @@ function mapPushRecord(record: z.infer<typeof NativeBodyMetricPushSchema>) {
 }
 
 export function createNativeBodyMetricsSyncHandlers(deps: NativeSyncRouteDependencies) {
-  return {
+  const handlers = {
     async GET(request: NextRequest) {
       const identity = await deps.authenticate(request);
       if (!identity)
@@ -131,12 +136,16 @@ export function createNativeBodyMetricsSyncHandlers(deps: NativeSyncRouteDepende
       if (!identity)
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unauthorized' }, 401);
 
+      const mutations = deps.sync.accountMutations;
+      if (!mutations) throw new NativeAccountAdmissionError('account_admission_unavailable');
+      const admission = requireNativeAccountAdmission(await mutations.capture(identity.sub));
+
       const parsed = PushBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) {
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_records' }, 400);
       }
 
-      const result = await deps.sync.push(identity.sub, parsed.data.records.map(mapPushRecord));
+      const result = await mutations.push(admission, parsed.data.records.map(mapPushRecord));
       return json(
         {
           version: NATIVE_BODY_METRICS_SYNC_VERSION,
@@ -152,13 +161,37 @@ export function createNativeBodyMetricsSyncHandlers(deps: NativeSyncRouteDepende
       if (!identity)
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unauthorized' }, 401);
 
+      const mutations = deps.sync.accountMutations;
+      if (!mutations) throw new NativeAccountAdmissionError('account_admission_unavailable');
+      const admission = requireNativeAccountAdmission(await mutations.capture(identity.sub));
+
       const parsed = DeleteBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) {
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_delete' }, 400);
       }
 
-      const result = await deps.sync.remove(identity.sub, parsed.data.ids);
+      const result = await mutations.remove(admission, parsed.data.ids);
       return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, ...result });
     },
+  };
+  async function admittedResponse(action: () => Promise<NextResponse>) {
+    try {
+      return await action();
+    } catch (error) {
+      const status = nativeAccountFailureStatus(error);
+      if (status === null) throw error;
+      return json(
+        {
+          version: NATIVE_BODY_METRICS_SYNC_VERSION,
+          error: (error as NativeAccountAdmissionError).code,
+        },
+        status,
+      );
+    }
+  }
+  return {
+    GET: handlers.GET,
+    POST: (request: NextRequest) => admittedResponse(() => handlers.POST(request)),
+    DELETE: (request: NextRequest) => admittedResponse(() => handlers.DELETE(request)),
   };
 }

@@ -1,0 +1,21 @@
+# Training mutation admission
+
+Canonical next-workout, log-set and recovery check-in requests capture an immutable admission before loading their workout/history snapshot. It contains the internal `app_users.id` (the account incarnation), consent generation, setup ID and program revision. The native-records port must provide the dedicated atomic capability; these callers never fall back to generic push.
+
+Each write calls `training_mutation_command`, which locks the same owner row as enrollment, revocation and account deletion, then checks the captured admission against current state. A revoke or delete that commits first prevents a delayed request from recreating training records. If a write commits first, the following revoke/delete removes it. A deleted/recreated account has a new internal UUID even when its public subject, generation, setup and deterministic record IDs match. Missing/null admission fields fail closed.
+
+New sessions, effective prescription updates, recovery of a completed session, set insertion and check-in insertion all use this boundary. Set insertion and session completion remain separate guarded commits: an accepted final set can survive a failed completion and the existing next-workout recovery can finish it. If consent changes between those writes, the second write is refused. Accepted set identities retain their original payload and timestamp; changed resubmissions still conflict through the existing domain check. A reduced effective volume does not invalidate an already accepted identical retry. No numerical policy or active-prescription calculation changes.
+
+A stale request returns mobile HTTP 409 `training_context_changed`, or an MCP tool error with the same structured code. Missing capability, unavailable migration/database, and rejected storage writes retain the existing unavailable response. There is no success receipt after a failed write. The generic native-records sync API remains outside this canonical-command fence; this change does not claim it is immutable or fully revision-aware.
+
+## Migration and deployment
+
+Apply `20261010090000_training_revision_foundation.sql`, then additive `20261010103000_training_mutation_admission.sql`, before deploying this server. The second migration adds account incarnation to the context function, replaces the revision command with request/proposal incarnation checks, and adds the guarded mutation function. It does not rewrite historical personal records. The deploy workflow applies migrations before deploying the server; no migration or deployment is performed by this patch's local validation.
+
+Historical proposals without `ownerId` remain parseable, readable and exportable. They cannot authorize a new apply/reject; a fresh proposal/review is required. Existing committed receipts remain readable and safely replayable with a current request context. New legacy enrollment and proposal writes require the current incarnation. Context comparisons use JSONB equality or `IS DISTINCT FROM`, including missing values.
+
+An old server during the migration/deploy interval strips the newly added incarnation from context, so its enrollment/proposal decisions fail closed; its reads/export remain compatible. Old mutable workout commands are still unfenced until those old server instances have drained. Therefore the deployment is complete only after requests run on the new server; applying the migration alone does not close the privacy gap. A new server started before the migration fails unavailable (HTTP 503) instead of using the old generic writer. This is a rollout dependency, not a request to alter CI, flags or deployment configuration.
+
+## Validation scope
+
+Deterministic domain barriers exercise the actual canonical writers. Local PostgreSQL tests use real migrations and the exact account-delete transaction with synthetic data in a temporary socket-only cluster. They observe blocked database backends before releasing a lock holder, rather than relying on elapsed time. Cases cover both orderings of revoke/delete against all writer actions, owner recreation, missing incarnation, historical proposals, atomic rollback, accepted-set replay/conflict, foreign ownership and tombstones. Mobile/MCP tests verify caller-visible stale results. No customer database, provider, credentials or numerical training policy is involved.
