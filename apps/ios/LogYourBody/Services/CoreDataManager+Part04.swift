@@ -160,13 +160,14 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
             request.fetchLimit = 1
 
             do {
+                let steps = try DailyStepCountPolicy.storedRemoteSteps(data["steps"])
                 let results = try context.fetch(request)
                 let metric = results.first ?? CachedDailyMetrics(context: context)
 
                 // Update fields
                 metric.id = id
                 metric.userId = data["user_id"] as? String
-                metric.steps = Int32(data["steps"] as? Int ?? 0)
+                metric.steps = steps
                 metric.notes = data["notes"] as? String
 
                 if let dateString = data["date"] as? String,
