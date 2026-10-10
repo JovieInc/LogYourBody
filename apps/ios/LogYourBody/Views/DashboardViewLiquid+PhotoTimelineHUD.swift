@@ -317,10 +317,6 @@ extension DashboardViewLiquid {
         case .menu:
             isShowingPhotoTimelineMenu = true
         case .stats:
-            if isHomeV2CheckIn {
-                openHomeV2Context()
-                return
-            }
             selectedPhotoTimelineRootPage = .analytics
             isHomeChatExpanded = false
             HapticManager.shared.selection()

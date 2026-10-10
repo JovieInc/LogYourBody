@@ -101,10 +101,16 @@ struct ChaosScrollGeometry {
     }
 
     func isExpectedScrollClipping(_ element: XCUIElement, window: CGRect) -> Bool {
-        let type = element.elementType
-        let identifier = element.identifier
-        let label = element.label
-        let elementFrame = element.frame
+        isExpectedScrollClipping(
+            type: element.elementType, identifier: element.identifier,
+            label: element.label, frame: element.frame, window: window
+        )
+    }
+
+    func isExpectedScrollClipping(
+        type: XCUIElement.ElementType, identifier: String, label: String,
+        frame elementFrame: CGRect, window: CGRect
+    ) -> Bool {
         let matches = records.filter {
             $0.type == type && $0.identifier == identifier
                 && $0.label == label && Self.sameNativeFrame($0.frame, elementFrame)
@@ -309,6 +315,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
+        openDefaultHomeAsk(in: app)
         let composer = app.textFields["chat_composer"]
         XCTAssertTrue(composer.waitForExistence(timeout: 12))
         var rng = ChaosRNG(seed: 42)
@@ -316,7 +323,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         let menu = app.buttons["photo_timeline_root_menu"]
         XCTAssertTrue(menu.exists)
         accounting.record(performTap(app: app, candidates: [menu], rng: &rng))
-        let closeMenu = app.buttons["Close Menu"]
+        let closeMenu = app.buttons["home_v2_sidebar_scrim"]
         XCTAssertTrue(closeMenu.waitForExistence(timeout: 5))
         accounting.record(performDismiss(app: app, buttons: [closeMenu]))
         XCTAssertTrue(closeMenu.waitForNonExistence(timeout: 5))
@@ -327,6 +334,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         XCTAssertEqual(accounting.skipped, 0)
         XCTAssertFalse(accounting.shouldAttempt)
         XCTAssertFalse(app.keyboards.element.exists)
+        if !composer.exists { openDefaultHomeAsk(in: app) }
         XCTAssertNotEqual(composer.value as? String, "", "Actual typing must leave a local draft without sending it.")
     }
 
@@ -381,6 +389,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
+        openDefaultHomeAsk(in: app)
         let composer = app.textFields["chat_composer"]
         XCTAssertTrue(composer.waitForExistence(timeout: 12))
         composer.tap()
@@ -388,12 +397,15 @@ final class ChaosMonkeyUITests: XCTestCase {
         composer.typeText(draft)
         XCTAssertTrue(app.keyboards.element.exists)
         XCTAssertEqual(dismissKeyboardForStep(app: app), .executed(.dismiss))
+        XCTAssertFalse(app.keyboards.element.exists)
+        // Default Home removes the Ask view when collapsed; reopen before inspecting its draft.
+        if !composer.exists { openDefaultHomeAsk(in: app) }
         let tree = XCTAttachment(string: app.debugDescription)
         tree.name = "Keyboard dismissal draft preservation"
         tree.lifetime = .keepAlways
         add(tree)
         XCTAssertEqual(composer.value as? String, draft, "Keyboard dismissal must not submit or clear a draft.")
-        XCTAssertFalse(app.keyboards.element.exists)
+        XCTAssertFalse(app.staticTexts[draft].exists, "Keyboard dismissal must not submit the local draft.")
     }
 
     func testSystemAlertsRequireKnownDenyOnlyAction() {
@@ -455,12 +467,13 @@ final class ChaosMonkeyUITests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = [
-            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestSuppressWhatsNew",
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestChatFirstFixture", "-lybUITestSuppressWhatsNew",
             "-lybUITestDisableBiometricLock", "-UIPreferredContentSizeCategoryName",
             "UICTContentSizeCategoryAccessibilityXXXL"
         ]
         app.forwardActualXCTestContext()
         app.launch()
+        openDefaultHomeAsk(in: app)
         let prompt = app.buttons["Summarize my trend"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 30))
         let window = app.windows.firstMatch.frame
@@ -489,6 +502,18 @@ final class ChaosMonkeyUITests: XCTestCase {
                                    width: send.frame.width / 2, height: send.frame.height)
         XCTAssertGreaterThan(send.frame.maxX, croppedWindow.maxX)
         XCTAssertFalse(geometry.isExpectedScrollClipping(send, window: croppedWindow))
+    }
+
+    private func openDefaultHomeAsk(in app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_surface"].exists)
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.isHittable)
+        menu.tap()
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 5))
+        ask.tap()
+        XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 8))
     }
 
     private static let edgeStrings: [String] = [
@@ -568,6 +593,57 @@ final class ChaosMonkeyUITests: XCTestCase {
         "continue with apple",
         "open settings"
     ]
+
+    func testHeightKeyboardDoneMeetsMinimumHitTarget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        app.tap()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        let basicsContinue = app.buttons["body_score_onboarding_basics_continue_button"]
+        XCTAssertTrue(basicsContinue.waitForExistence(timeout: 5))
+        basicsContinue.tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        let centimeters = app.buttons["CM"]
+        XCTAssertTrue(centimeters.waitForExistence(timeout: 5))
+        centimeters.tap()
+        let field = app.textFields["Height in centimeters"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5))
+
+        let window = app.windows.firstMatch.frame
+        let done = app.buttons.matching(identifier: "body_score_height_keyboard_done_button").firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(done.frame), "height Done \(done.frame) window \(window)")
+        XCTAssertGreaterThanOrEqual(done.frame.width, 44, "height Done \(done.frame)")
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, "height Done \(done.frame)")
+
+        let labeledDones = app.buttons.matching(NSPredicate(format: "label == 'Done'"))
+        for index in 0..<labeledDones.count {
+            let control = labeledDones.element(boundBy: index)
+            guard control.exists, control.frame.width > 1, control.frame.height > 1 else { continue }
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "height Done \(control.frame)")
+        }
+
+        done.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["How tall are you?"].exists)
+    }
 
     override func setUpWithError() throws {
         // The monkey must survive individual bad taps; only a hard app-death
@@ -833,7 +909,13 @@ final class ChaosMonkeyUITests: XCTestCase {
         let candidates = buttons ?? ["Back", "Close", "Cancel", "Done"].map { app.buttons[$0] }
             + [app.navigationBars.buttons.element(boundBy: 0)]
         for button in candidates where button.exists && button.isHittable && !isDenylisted(button) {
-            button.tap()
+            if button.identifier == "home_v2_sidebar_scrim" {
+                // The drawer covers the scrim's center; dismiss through its exposed right edge.
+                button.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+                    .withOffset(CGVector(dx: -8, dy: 0)).tap()
+            } else {
+                button.tap()
+            }
             return .executed(.dismiss)
         }
         return .skipped("no safe dismissal control")
