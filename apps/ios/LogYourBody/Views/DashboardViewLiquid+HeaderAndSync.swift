@@ -86,21 +86,12 @@ extension DashboardViewLiquid {
     }
 
     var userHeightDisplay: String {
-        guard let heightCm = authManager.currentUser?.profile?.height,
-              heightCm > 0 else {
+        guard let heightCm = authManager.currentUser?.profile?.height else {
             return "—"
         }
 
         let unit = authManager.currentUser?.profile?.heightUnit?.lowercased() ?? "cm"
-        if unit == "cm" {
-            let centimeters = Int(heightCm.rounded())
-            return "\(centimeters) cm"
-        }
-
-        let totalInches = Int((heightCm / 2.54).rounded())
-        let feet = totalInches / 12
-        let inches = totalInches % 12
-        return "\(feet)'\(inches)\""
+        return ProfileSettingsPolicy.storedHeightText(heightCm, useMetric: unit == "cm") ?? "—"
     }
 
     var isSyncError: Bool {
