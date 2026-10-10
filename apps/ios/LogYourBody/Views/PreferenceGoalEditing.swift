@@ -186,25 +186,6 @@ struct PreferenceGoalEditorSheet: View {
             .navigationTitle(goal.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: dismiss.callAsFunction)
-                        .accessibilityLabel("Cancel editing")
-                        .accessibilityHint("Discards changes to this goal")
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        guard let value = validation.value else { return }
-                        save(value)
-                        dismiss()
-                    }
-                    .disabled(!validation.isValid)
-                    .accessibilityLabel("Save")
-                    .accessibilityHint(
-                        validation.isValid ? "Saves this goal" : validation.errorMessage ?? "Enter a valid goal"
-                    )
-                }
-
                 ToolbarItem(placement: .keyboard) {
                     Button("Done") {
                         focusedField = nil
@@ -212,6 +193,38 @@ struct PreferenceGoalEditorSheet: View {
                     .font(.body.weight(.semibold))
                     .accessibilityIdentifier("settings_goal_editor_keyboard_done_button")
                 }
+            }
+            // Navigation-bar Cancel and Save accessibility frames stay under 44 points tall.
+            .safeAreaInset(edge: .bottom) {
+                HStack(spacing: 12) {
+                    Button(action: dismiss.callAsFunction) {
+                        Text("Cancel")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityLabel("Cancel editing")
+                    .accessibilityHint("Discards changes to this goal")
+
+                    Button {
+                        guard let value = validation.value else { return }
+                        save(value)
+                        dismiss()
+                    } label: {
+                        Text("Save")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .disabled(!validation.isValid)
+                    .accessibilityLabel("Save")
+                    .accessibilityIdentifier("settings_goal_editor_save")
+                    .accessibilityHint(
+                        validation.isValid ? "Saves this goal" : validation.errorMessage ?? "Enter a valid goal"
+                    )
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
             }
         }
         .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
