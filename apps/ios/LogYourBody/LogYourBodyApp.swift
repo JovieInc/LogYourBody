@@ -371,11 +371,8 @@ struct LogYourBodyApp: App {
 
         await authTask.value
 
-        if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
-            await subscriptionManager.identifyUser(userId: userId)
-        } else {
-            await subscriptionManager.refreshCustomerInfo()
-        }
+        // AuthManager's bound lifecycle owns every account transition, including cold restore.
+        await subscriptionManager.waitForBillingReconciliation()
     }
 
     @MainActor
@@ -505,17 +502,6 @@ struct LogYourBodyApp: App {
             goalWeightUnit: "kg",
             onboardingCompleted: !usesBodyScoreOnboardingFixture
         )
-        subscriptionManager.isSubscribed = isSubscribed
-        subscriptionManager.customerInfo = nil
-        subscriptionManager.currentOffering = nil
-        subscriptionManager.errorMessage = nil
-        subscriptionManager.isPurchasing = false
-        if usesPaywallFixture {
-            subscriptionManager.applyCachedPaywallOfferingUITestFixture()
-        } else if usesPaywallPlansFixture {
-            subscriptionManager.applyPaywallPlansUITestFixture()
-        }
-        UserDefaults.standard.set(isSubscribed, forKey: Constants.revenueCatIsSubscribedKey)
         if isSubscribed && !usesDailyReminderPromptFixture {
             NotificationManager.shared.skipDailyWeighInPrompt()
         }
@@ -564,6 +550,21 @@ struct LogYourBodyApp: App {
             name: fixtureName
         )
         authManager.isAuthProviderLoaded = true
+
+        // Auth publication synchronously invalidates the previous billing owner.
+        // Install the synthetic UI-test state afterward, without yielding or
+        // configuring the live purchasing SDK.
+        subscriptionManager.isSubscribed = isSubscribed
+        subscriptionManager.customerInfo = nil
+        subscriptionManager.currentOffering = nil
+        subscriptionManager.errorMessage = nil
+        subscriptionManager.isPurchasing = false
+        if usesPaywallFixture {
+            subscriptionManager.applyCachedPaywallOfferingUITestFixture()
+        } else if usesPaywallPlansFixture {
+            subscriptionManager.applyPaywallPlansUITestFixture()
+        }
+        UserDefaults.standard.set(isSubscribed, forKey: Constants.revenueCatIsSubscribedKey)
 
         return true
     }

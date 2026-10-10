@@ -40,6 +40,7 @@ func billingPeriodLabel(for package: Package) -> String {
         trackTrialAnalyticsIfNeeded(customer: customer, entitlement: entitlement, now: Date())
         self.isSubscribed = isActive
         self.cachedIsSubscribed = isActive
+        userDefaults.set(billingAccountSubject, forKey: DefaultsKey.subscriptionOwner)
         self.lastFetchTimestamp = Date().timeIntervalSince1970
         // print("💰 Updated subscription status: \(isActive) (cached)")
     }
@@ -102,6 +103,7 @@ func clearLocalSubscriptionState() {
         customerInfo = nil
         isSubscribed = false
         cachedIsSubscribed = false
+        userDefaults.removeObject(forKey: DefaultsKey.subscriptionOwner)
         currentOffering = nil
         currentEntitlementSnapshot = nil
         resetSubscriptionAnalyticsCache()

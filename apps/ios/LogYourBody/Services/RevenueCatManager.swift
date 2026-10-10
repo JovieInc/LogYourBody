@@ -193,12 +193,21 @@ enum RevenueCatPurchasingError: Error, Equatable {
     }
 }
 
+enum RevenueCatCustomerInfoRead: Equatable {
+    case cached
+    case current(expectedAppUserID: String)
+}
+
+enum RevenueCatCustomerInfoError: Error {
+    case identityChanged
+}
+
 @MainActor
 protocol RevenueCatPurchasesProtocol: AnyObject {
     func configure(apiKey: String, delegate: PurchasesDelegate)
     func logIn(userId: String, entitlementID: String) async throws -> RevenueCatCustomerSnapshot
     func logOut() async throws
-    func customerInfo(entitlementID: String) async throws -> RevenueCatCustomerSnapshot
+    func customerInfo(entitlementID: String, read: RevenueCatCustomerInfoRead) async throws -> RevenueCatCustomerSnapshot
     func offerings() async throws -> Offerings
     func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot
     func restorePurchases(entitlementID: String) async throws -> RevenueCatCustomerSnapshot
@@ -218,12 +227,54 @@ final class LiveRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
     }
 
     func logOut() async throws {
-        _ = try await Purchases.shared.logOut()
+        try await Self.logOutIfIdentified(
+            isAnonymous: { Purchases.shared.isAnonymous },
+            logOut: { _ = try await Purchases.shared.logOut() }
+        )
     }
 
-    func customerInfo(entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
-        let customerInfo = try await Purchases.shared.customerInfo()
-        return RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID)
+    static func logOutIfIdentified(
+        isAnonymous: () -> Bool,
+        logOut: () async throws -> Void
+    ) async throws {
+        guard !isAnonymous() else { return }
+        try await logOut()
+    }
+
+    func customerInfo(entitlementID: String, read: RevenueCatCustomerInfoRead) async throws -> RevenueCatCustomerSnapshot {
+        try await Self.readCustomerInfo(
+            read: read,
+            currentAppUserID: { Purchases.shared.appUserID },
+            fetch: { policy in
+                let customerInfo = try await Purchases.shared.customerInfo(fetchPolicy: policy)
+                return RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID)
+            }
+        )
+    }
+
+    static func readCustomerInfo(
+        read: RevenueCatCustomerInfoRead,
+        currentAppUserID: () -> String,
+        fetch: (CacheFetchPolicy) async throws -> RevenueCatCustomerSnapshot
+    ) async throws -> RevenueCatCustomerSnapshot {
+        let expectedAppUserID: String?
+        let policy: CacheFetchPolicy
+        switch read {
+        case .cached:
+            expectedAppUserID = nil
+            policy = .default
+        case .current(let subject):
+            expectedAppUserID = subject
+            policy = .fetchCurrent
+        }
+        if let expectedAppUserID, currentAppUserID() != expectedAppUserID {
+            throw RevenueCatCustomerInfoError.identityChanged
+        }
+        let customer = try await fetch(policy)
+        if let expectedAppUserID, currentAppUserID() != expectedAppUserID {
+            throw RevenueCatCustomerInfoError.identityChanged
+        }
+        return customer
     }
 
     func offerings() async throws -> Offerings {
@@ -259,6 +310,7 @@ class RevenueCatManager: NSObject, ObservableObject {
         static let subscriptionAnalyticsPhase = "revenuecat_subscriptionAnalyticsPhase"
         static let subscriptionAnalyticsAppUserId = "revenuecat_subscriptionAnalyticsAppUserId"
         static let trialExpirationTimestamp = "revenuecat_trialExpirationTimestamp"
+        static let subscriptionOwner = "revenuecat_subscriptionOwner"
         static let cachedPaywallOfferingDisplay = "revenuecat_cachedPaywallOfferingDisplay"
     }
 
@@ -307,6 +359,23 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     private var billingSession = BillingSessionOwnership(subject: nil, generation: 0)
     private var pendingBillingSession: BillingSessionOwnership?
+    private var delegateRefresh: DelegateRefresh?
+    var lastAuthBillingSession: AuthBillingSession?
+    var desiredBillingIdentity: BillingIdentityRequest?
+    var attemptedBillingIdentity: BillingSessionOwnership?
+    var billingIdentityWorker: Task<Void, Never>?
+    var billingIdentityWaiters: [UInt64: [UUID: CheckedContinuation<Void, Never>]] = [:]
+
+    var billingAccountSubject: String? { billingSession.subject }
+
+    private final class DelegateRefresh {
+        let ownership: BillingSessionOwnership
+        var needsRefresh = false
+
+        init(ownership: BillingSessionOwnership) {
+            self.ownership = ownership
+        }
+    }
 
     func beginBillingSession(subject: String?) -> BillingSessionOwnership {
         // A fresh login, including the same subject, replaces pending billing work.
@@ -323,6 +392,7 @@ class RevenueCatManager: NSObject, ObservableObject {
     func captureBillingSession() -> BillingSessionOwnership? {
         // The SDK may still hold the previous identity during login/logout.
         guard pendingBillingSession == nil else { return nil }
+        guard lastAuthBillingSession == nil || billingSession.subject != nil else { return nil }
         return billingSession
     }
 
@@ -330,6 +400,45 @@ class RevenueCatManager: NSObject, ObservableObject {
         billingSession == ownership
     }
 
+    /// Delegate payloads can belong to an earlier SDK identity. Read the current owner instead.
+    func refreshForDelegate(appUserID: String) async {
+        guard isConfigured, !Task.isCancelled, let ownership = captureBillingSession() else { return }
+        guard let subject = ownership.subject, !subject.isEmpty, subject == appUserID else { return }
+        if let delegateRefresh, delegateRefresh.ownership == ownership {
+            delegateRefresh.needsRefresh = true
+            return
+        }
+        let refresh = DelegateRefresh(ownership: ownership)
+        delegateRefresh = refresh
+        defer {
+            if delegateRefresh === refresh { delegateRefresh = nil }
+        }
+        repeat {
+            refresh.needsRefresh = false
+            guard await performOwnedDelegateRefresh(refresh, subject: subject) else { return }
+        } while refresh.needsRefresh
+    }
+
+    private func performOwnedDelegateRefresh(_ refresh: DelegateRefresh, subject: String) async -> Bool {
+        guard ownsBillingSession(refresh.ownership), !Task.isCancelled, delegateRefresh === refresh else { return false }
+        do {
+            let customer = try await purchasesClient.customerInfo(
+                entitlementID: proEntitlementID,
+                read: .current(expectedAppUserID: subject)
+            )
+            guard ownsBillingSession(refresh.ownership), !Task.isCancelled, delegateRefresh === refresh else { return false }
+            updateSubscriptionStatus(customer: customer)
+            return true
+        } catch {
+            guard ownsBillingSession(refresh.ownership), !Task.isCancelled, delegateRefresh === refresh else { return false }
+            // Preserve access on failure and drain only an explicitly coalesced notification.
+            ErrorReporter.shared.capture(
+                AppError.billing(operation: "delegateCustomerInfo", underlying: error),
+                context: ErrorContext(feature: "billing", operation: "delegateCustomerInfo", screen: nil, userId: subject)
+            )
+            return true
+        }
+    }
 
     #if DEBUG
     /// Keeps the paywall unavailable-state fixture deterministic without touching production purchase paths.
@@ -352,7 +461,8 @@ class RevenueCatManager: NSObject, ObservableObject {
         // print("💰 RevenueCatManager initialized")
 
         // Load cached subscription status for instant UI update
-        self.isSubscribed = cachedIsSubscribed
+        // A cached Boolean does not establish the authenticated account at launch.
+        self.isSubscribed = false
         self.cachedPaywallOfferingDisplay = loadCachedPaywallOfferingDisplay()
         // print("💰 Loaded cached subscription status: \(cachedIsSubscribed)")
     }
@@ -369,15 +479,10 @@ typealias SubscriptionManager = RevenueCatManager
 // MARK: - PurchasesDelegate
 
 extension RevenueCatManager: PurchasesDelegate {
-    nonisolated func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
-        Task { @MainActor in
-            // print("💰 Received updated customer info")
-            self.updateSubscriptionStatus(
-                customer: RevenueCatCustomerSnapshot(
-                    customerInfo: customerInfo,
-                    entitlementID: RevenueCatManager.entitlementID
-                )
-            )
+    nonisolated func purchases(_ purchases: Purchases, receivedUpdated _: CustomerInfo) {
+        let appUserID = purchases.appUserID
+        Task { @MainActor [weak self] in
+            await self?.refreshForDelegate(appUserID: appUserID)
         }
     }
 }

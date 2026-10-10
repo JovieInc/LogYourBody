@@ -30,6 +30,7 @@
 		1564F129E1D9BAAC5F85C703 /* BodyMetricLocalDateContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 776620205152E0A15A875703 /* BodyMetricLocalDateContractTests.swift */; };
 		16AD66AC6E3FF4FB4B8E33B3 /* SyncIntegrationTestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45999DF3001C2F424CBB44DB /* SyncIntegrationTestDoubles.swift */; };
 		18EBE5224556DDF573EE3E12 /* RevenueCatManager+Part02.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7148912B179107B65580E27E /* RevenueCatManager+Part02.swift */; };
+		EB0042AF78B74F52A42FBB18 /* RevenueCatManager+Lifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D416CADF171F4B0BB27A26A1 /* RevenueCatManager+Lifecycle.swift */; };
 		18ED1A86B416E8821C250840 /* GlobalTimelineServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 620823F9E8905856BB1B666D /* GlobalTimelineServiceTests.swift */; };
 		1A9F2B46985D75138DA4DF89 /* MetricChartDataHelperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEFAE7953B075E849003EA70 /* MetricChartDataHelperTests.swift */; };
 		1C6CAB83A8724849F1FC5804 /* OnboardingFlowValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2732D288C61F35059E6C4D /* OnboardingFlowValidationTests.swift */; };
@@ -126,6 +127,7 @@
 		A3CFAB8A53F95BD9F8FA0B82 /* PhotoLibraryScannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2715F4BF0E82E86A99821E3 /* PhotoLibraryScannerTests.swift */; };
 		A40A693BDA9D2826E3DE900D /* OnboardingStepEntryPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E16AB6CFAC7A59EBD3B2792 /* OnboardingStepEntryPolicyTests.swift */; };
 		A4856A2B9E1FC174F9F1739F /* RevenueCatFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FE602CA4F092CAB186EE952 /* RevenueCatFlowTests.swift */; };
+		E2E530F646B04158935304E2 /* AuthBillingLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5DBE937361342FBA97F2B58 /* AuthBillingLifecycleTests.swift */; };
 		A7876ACC0BAFED8A57643661 /* AccountDeletionAndShareCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8631504046C70A4EE432C9B8 /* AccountDeletionAndShareCardTests.swift */; };
 		AD0054EB2E2197600029E0FF /* privacy-policy.md in Resources */ = {isa = PBXBuildFile; fileRef = AD0054E82E2197600029E0FF /* privacy-policy.md */; };
 		AD0054EC2E2197600029E0FF /* terms-of-service.md in Resources */ = {isa = PBXBuildFile; fileRef = AD0054E92E2197600029E0FF /* terms-of-service.md */; };
@@ -532,6 +534,7 @@
 		4E493B38B586CB7B2C6FB452 /* ErrorTrackingServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorTrackingServiceTests.swift; sourceTree = "<group>"; };
 		4F614C8BD21F414268DB7829 /* BodySpecAuthManagerPKCETests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodySpecAuthManagerPKCETests.swift; sourceTree = "<group>"; };
 		4FE602CA4F092CAB186EE952 /* RevenueCatFlowTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RevenueCatFlowTests.swift; sourceTree = "<group>"; };
+		D5DBE937361342FBA97F2B58 /* AuthBillingLifecycleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "AuthBillingLifecycleTests.swift"; sourceTree = "<group>"; };
 		509C2DEE545A83990C02B1BE /* HomeV2ShareView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2ShareView.swift; sourceTree = "<group>"; };
 		50EBF62AD8F9F25BB301D998 /* ProgressPhotoAttachPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProgressPhotoAttachPolicyTests.swift; sourceTree = "<group>"; };
 		53C0B4CD7942CEEF6E37A0AC /* HomeV2PhotoToolsSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2PhotoToolsSheet.swift; sourceTree = "<group>"; };
@@ -558,6 +561,7 @@
 		6F426E17B8C3036E6FCEDEA6 /* DashboardViewLiquid+HomeV2Context.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HomeV2Context.swift"; sourceTree = "<group>"; };
 		6FC41129661E6DC33C6C4877 /* AnalyticsServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AnalyticsServiceTests.swift; sourceTree = "<group>"; };
 		7148912B179107B65580E27E /* RevenueCatManager+Part02.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "RevenueCatManager+Part02.swift"; path = "RevenueCatManager+Part02.swift"; sourceTree = "<group>"; };
+		D416CADF171F4B0BB27A26A1 /* RevenueCatManager+Lifecycle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "RevenueCatManager+Lifecycle.swift"; sourceTree = "<group>"; };
 		75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
 		76E40D3BC9C969629954E803 /* PhaseInsightPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhaseInsightPolicyTests.swift; sourceTree = "<group>"; };
 		776620205152E0A15A875703 /* BodyMetricLocalDateContractTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricLocalDateContractTests.swift; sourceTree = "<group>"; };
@@ -1260,6 +1264,7 @@
 				D6047B9B9F0280ED4CEC0DFB /* PreferenceGoalValidatorTests.swift */,
 				50EBF62AD8F9F25BB301D998 /* ProgressPhotoAttachPolicyTests.swift */,
 				4FE602CA4F092CAB186EE952 /* RevenueCatFlowTests.swift */,
+				D5DBE937361342FBA97F2B58 /* AuthBillingLifecycleTests.swift */,
 				7899ADA31AC216735A9FE299 /* RevenueCatProductConfigurationTests.swift */,
 				23F9119B26AB2A527AA6E344 /* RevenueCatPurchaseRestoreFlowTests.swift */,
 				5F1996527170EC15B242FF4B /* RevenueCatSubscriptionAnalyticsTransitionTests.swift */,
@@ -1441,6 +1446,7 @@
 				83531C42434F71BA31C75D89 /* RealtimeSyncManager+Part02.swift */,
 				29553DC6811B06CAE2621869 /* RevenueCatManager+Part01.swift */,
 				7148912B179107B65580E27E /* RevenueCatManager+Part02.swift */,
+				D416CADF171F4B0BB27A26A1 /* RevenueCatManager+Lifecycle.swift */,
 				EC645B4F52DDE739FAFF042E /* ProductAPIClient+Part01.swift */,
 				5E56886A697AD88A24468E56 /* SubjectPlateRenderer.swift */,
 			);
@@ -2102,6 +2108,7 @@
 				BE37C87CC62A611B794DC9B9 /* PreferenceGoalValidatorTests.swift in Sources */,
 				91DA2456348FBCCDC9343F30 /* ProgressPhotoAttachPolicyTests.swift in Sources */,
 				A4856A2B9E1FC174F9F1739F /* RevenueCatFlowTests.swift in Sources */,
+				E2E530F646B04158935304E2 /* AuthBillingLifecycleTests.swift in Sources */,
 				D47F9BD18CBEE2413DF244FC /* RevenueCatProductConfigurationTests.swift in Sources */,
 				FFC041175CAD1871B45B8FE6 /* RevenueCatPurchaseRestoreFlowTests.swift in Sources */,
 				E251E204A77F2161E880A19E /* RevenueCatSubscriptionAnalyticsTransitionTests.swift in Sources */,
@@ -2433,6 +2440,7 @@
 				F5374395372D2C41AF05F233 /* RealtimeSyncManager+Part02.swift in Sources */,
 				929DE2322E275AEB79624023 /* RevenueCatManager+Part01.swift in Sources */,
 				18EBE5224556DDF573EE3E12 /* RevenueCatManager+Part02.swift in Sources */,
+				EB0042AF78B74F52A42FBB18 /* RevenueCatManager+Lifecycle.swift in Sources */,
 				61C198996EE85136862ECEDB /* ProductAPIClient+Part01.swift in Sources */,
 				6934AE196684173B83F61482 /* AddEntrySheet+Part01.swift in Sources */,
 				7D497AAAA2BAEEBCDB6A590E /* AddEntrySheet+Part02.swift in Sources */,
