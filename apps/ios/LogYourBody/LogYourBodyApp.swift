@@ -4,6 +4,7 @@
 //
 import SwiftUI
 import AppIntents
+import CoreData
 
 enum LogYourBodyDeepLink {
     enum Destination: Equatable {
@@ -596,56 +597,19 @@ struct LogYourBodyApp: App {
     }
 
     private func seedFullDashboardUITestFixtureData(userId: String, photoURL: String? = nil) async {
-        let calendar = Calendar.current
         let now = Date()
-        let entries: [
-            (daysAgo: Int, weight: Double, bodyFat: Double?, muscle: Double, notes: String, source: String)
-        ] = [
-            (0, 82.1, 15.8, 66.2, "Latest check-in", "manual"),
-            (7, 82.8, 16.2, 66.0, "Weekly check-in", "healthkit"),
-            (14, 83.4, nil, 65.9, "Weight-only import", "healthkit"),
-            (21, 84.0, 16.9, 65.7, "DEXA baseline", "bodyspec_dexa"),
-            (35, 84.7, 17.4, 65.4, "Manual baseline", "manual")
-        ]
-
-        for entry in entries {
-            guard let date = calendar.date(byAdding: .day, value: -entry.daysAgo, to: now) else {
-                continue
-            }
-
-            let metric = BodyMetrics(
-                id: "ui_test_full_dashboard_metric_\(entry.daysAgo)",
-                userId: userId,
-                date: date,
-                weight: entry.weight,
-                weightUnit: "kg",
-                bodyFatPercentage: entry.bodyFat,
-                bodyFatMethod: entry.bodyFat == nil ? nil : entry.source,
-                muscleMass: entry.muscle,
-                boneMass: nil,
-                waistCm: nil,
-                hipCm: nil,
-                waistUnit: nil,
-                notes: entry.notes,
-                photoUrl: photoURL,
-                dataSource: entry.source,
-                createdAt: date,
-                updatedAt: now
-            )
-
-            try? await CoreDataManager.shared.saveBodyMetricsAndWait(
-                metric,
-                userId: userId,
-                markAsSynced: entry.source != "manual"
-            )
-        }
+        try? await UITestFixtureIsolation.seedDashboardMetrics(
+            userId: userId,
+            photoURL: photoURL,
+            now: now
+        )
 
         let savedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
         let savedIds = savedMetrics.compactMap { $0.toBodyMetrics()?.id }
-        let expectedIds = Set(entries.map { "ui_test_full_dashboard_metric_\($0.daysAgo)" })
+        let expectedIds = Set(UITestFixtureIsolation.dashboardMetricIDs)
         precondition(
-            savedIds.count == entries.count && Set(savedIds) == expectedIds,
-            "Dashboard UI fixture expected \(entries.count) saved measurements, found \(savedIds.count)"
+            savedIds.count == expectedIds.count && Set(savedIds) == expectedIds,
+            "Dashboard UI fixture expected \(expectedIds.count) saved measurements, found \(savedIds.count)"
         )
     }
 
@@ -785,3 +749,69 @@ struct LogYourBodyApp: App {
         )
     }
 }
+
+#if DEBUG
+enum UITestFixtureIsolation {
+    static let dashboardMetricIDs = [0, 7, 14, 21, 35].map { "ui_test_full_dashboard_metric_\($0)" }
+
+    /// UI launches mint a new fixture user but reuse these ids. Remove the previous
+    /// fixture rows first. `saveBodyMetrics` must still refuse a different account.
+    static func seedDashboardMetrics(userId: String, photoURL: String?, now: Date) async throws {
+        let calendar = Calendar.current
+        let entries: [
+            (daysAgo: Int, weight: Double, bodyFat: Double?, muscle: Double, notes: String, source: String)
+        ] = [
+            (0, 82.1, 15.8, 66.2, "Latest check-in", "manual"),
+            (7, 82.8, 16.2, 66.0, "Weekly check-in", "healthkit"),
+            (14, 83.4, nil, 65.9, "Weight-only import", "healthkit"),
+            (21, 84.0, 16.9, 65.7, "DEXA baseline", "bodyspec_dexa"),
+            (35, 84.7, 17.4, 65.4, "Manual baseline", "manual")
+        ]
+        await removeBodyMetrics(ids: entries.map { "ui_test_full_dashboard_metric_\($0.daysAgo)" })
+
+        for entry in entries {
+            guard let date = calendar.date(byAdding: .day, value: -entry.daysAgo, to: now) else {
+                continue
+            }
+            let metric = BodyMetrics(
+                id: "ui_test_full_dashboard_metric_\(entry.daysAgo)",
+                userId: userId,
+                date: date,
+                weight: entry.weight,
+                weightUnit: "kg",
+                bodyFatPercentage: entry.bodyFat,
+                bodyFatMethod: entry.bodyFat == nil ? nil : entry.source,
+                muscleMass: entry.muscle,
+                boneMass: nil,
+                waistCm: nil,
+                hipCm: nil,
+                waistUnit: nil,
+                notes: entry.notes,
+                photoUrl: photoURL,
+                dataSource: entry.source,
+                createdAt: date,
+                updatedAt: now
+            )
+            try await CoreDataManager.shared.saveBodyMetricsAndWait(
+                metric,
+                userId: userId,
+                markAsSynced: entry.source != "manual"
+            )
+        }
+    }
+
+    static func removeBodyMetrics(ids: [String]) async {
+        guard !ids.isEmpty else { return }
+        let context = CoreDataManager.shared.viewContext
+        await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id IN %@", ids as NSArray)
+            guard let rows = try? context.fetch(request) else { return }
+            rows.forEach(context.delete)
+            if context.hasChanges {
+                try? context.save()
+            }
+        }
+    }
+}
+#endif

@@ -446,4 +446,159 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertNil(withoutVat.vatMassKg)
         XCTAssertNil(withoutVat.vatVolumeCm3)
     }
+
+    func testLogBodyMetricsDoesNotReassignAnotherAccountsRow() async throws {
+        let ownerId = "sync_test_owner_\(UUID().uuidString)"
+        let otherId = "sync_test_other_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(90)
+        let metric = BodyMetrics(
+            id: id,
+            userId: ownerId,
+            date: date,
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "owner-entry",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: ownerId, markAsSynced: true)
+
+        let authManager = AuthManager()
+        authManager.currentUser = LocalUser(
+            id: otherId,
+            email: "other@example.com",
+            name: "Other",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+        let manager = RealtimeSyncManager(
+            coreDataManager: CoreDataManager.shared,
+            authManager: authManager,
+            productAPIClient: StubProductAPIClient()
+        )
+        manager.isOnline = false
+        manager.logBodyMetrics(
+            BodyMetrics(
+                id: id,
+                userId: ownerId,
+                date: date,
+                weight: 55,
+                weightUnit: "kg",
+                bodyFatPercentage: nil,
+                bodyFatMethod: nil,
+                muscleMass: nil,
+                boneMass: nil,
+                notes: "stolen",
+                photoUrl: nil,
+                dataSource: "Manual",
+                createdAt: date,
+                updatedAt: date
+            )
+        )
+
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, ownerId)
+        XCTAssertEqual(row.weight, 80, accuracy: 0.001)
+        XCTAssertEqual(row.notes, "owner-entry")
+        XCTAssertTrue(row.isSynced)
+        XCTAssertFalse(row.isMarkedDeleted)
+    }
+
+    func testUpdateOrCreateBodyMetricDoesNotReassignAnotherAccountsRow() async throws {
+        let ownerId = "sync_test_owner_\(UUID().uuidString)"
+        let otherId = "sync_test_other_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(120)
+        let metric = BodyMetrics(
+            id: id,
+            userId: ownerId,
+            date: date,
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "owner-entry",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: ownerId, markAsSynced: true)
+
+        let formatter = ISO8601DateFormatter()
+        CoreDataManager.shared.updateOrCreateBodyMetric(from: [
+            "id": id,
+            "user_id": otherId,
+            "date": formatter.string(from: date),
+            "weight": 55.0,
+            "weight_unit": "kg",
+            "notes": "foreign-payload",
+            "data_source": "manual",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ])
+
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, ownerId)
+        XCTAssertEqual(row.weight, 80, accuracy: 0.001)
+        XCTAssertEqual(row.notes, "owner-entry")
+        XCTAssertFalse(row.isMarkedDeleted)
+    }
+
+    func testPhotoTimelineFixtureReseedKeepsTheNewUsersMeasurements() async throws {
+        let firstUser = "ui_test_photo_hud_user_first"
+        let secondUser = "ui_test_photo_hud_user_second"
+        let date = wholeSecondDate(180)
+        let unrelatedId = "unrelated-\(UUID().uuidString)"
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+            dashboardFixtureMetric(id: unrelatedId, userId: firstUser, date: date, notes: "unrelated"),
+            userId: firstUser,
+            markAsSynced: true
+        )
+
+        try await UITestFixtureIsolation.seedDashboardMetrics(userId: firstUser, photoURL: nil, now: date)
+        try await UITestFixtureIsolation.seedDashboardMetrics(userId: secondUser, photoURL: nil, now: date)
+
+        let saved = await CoreDataManager.shared.fetchBodyMetrics(for: secondUser)
+        let savedIds = Set(saved.compactMap { $0.toBodyMetrics()?.id })
+        XCTAssertEqual(savedIds, Set(UITestFixtureIsolation.dashboardMetricIDs))
+        let firstSaved = await CoreDataManager.shared.fetchBodyMetrics(for: firstUser)
+        let firstIds = Set(firstSaved.compactMap { $0.toBodyMetrics()?.id })
+        XCTAssertFalse(firstIds.contains("ui_test_full_dashboard_metric_0"))
+        let cachedUnrelated = await cachedBodyMetric(id: unrelatedId)
+        let unrelated = try XCTUnwrap(cachedUnrelated)
+        XCTAssertEqual(unrelated.userId, firstUser)
+        XCTAssertEqual(unrelated.notes, "unrelated")
+    }
+
+    private func dashboardFixtureMetric(id: String, userId: String, date: Date, notes: String) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 82.1,
+            weightUnit: "kg",
+            bodyFatPercentage: 15.8,
+            bodyFatMethod: "manual",
+            muscleMass: 66.2,
+            boneMass: nil,
+            notes: notes,
+            photoUrl: nil,
+            dataSource: "manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
 }
