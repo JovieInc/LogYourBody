@@ -1992,24 +1992,18 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 30),
-            "Without a photo the Home is metric first"
-        )
+        let card = app.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 30), "Without a photo, saved data fills the same editorial card")
+        let bodyFat = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+        XCTAssertTrue(bodyFat.exists)
+        XCTAssertTrue(bodyFat.label.contains("15.8 percent"))
         let value = app.descendants(matching: .any)["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
-
-        let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
-        XCTAssertTrue(chart.waitForExistence(timeout: 5), "Metric-first Home keeps the trend chart geometry even before 7 days")
-        XCTAssertGreaterThanOrEqual(chart.frame.minY, value.frame.maxY - 1, "The chart sits below the number")
-        XCTAssertTrue(
-            chart.label.contains("7 days") || chart.label.contains("7-day average"),
-            "The chart says whether it is a trend or still waiting for 7 days"
-        )
-        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Home keeps a fixed 30-day window; ranges live in Progress")
+        XCTAssertGreaterThanOrEqual(value.frame.minY, card.frame.maxY - 1, "Supporting weight sits below the card")
+        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Date ranges live in Progress")
         let viewProgress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 5), "Progress is one disclosure away")
-        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, chart.frame.maxY - 1)
+        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, value.frame.maxY - 1)
 
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")

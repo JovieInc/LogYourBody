@@ -117,6 +117,116 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Enter body fat percentage"].waitForExistence(timeout: 5))
     }
 
+    func testEditorialCardKeepsFullBleedGeometryWithPhotoDataAndNoMeasurements() {
+        var expected: CGSize?
+        let fixtures = ["-lybUITestHomeV2PhotoFixture", "-lybUITestHomeV2Fixture", "-lybUITestHomeV2EmptyFixture"]
+        for fixture in fixtures {
+            let app = launchEditorial(fixture: fixture)
+            let card = app.descendants(matching: .any)["home_v2_editorial_card"].firstMatch
+            XCTAssertTrue(card.waitForExistence(timeout: 30))
+            XCTAssertEqual(card.frame.minX, app.windows.firstMatch.frame.minX, accuracy: 1)
+            XCTAssertEqual(card.frame.width, app.windows.firstMatch.frame.width, accuracy: 1)
+            XCTAssertEqual(card.frame.height, card.frame.width / 0.8, accuracy: 1)
+            if let expected {
+                XCTAssertEqual(card.frame.width, expected.width, accuracy: 1)
+                XCTAssertEqual(card.frame.height, expected.height, accuracy: 1)
+            } else {
+                expected = card.frame.size
+            }
+            assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "editorial-\(fixture)")
+            app.terminate()
+        }
+    }
+
+    func testEditorialDataHeroLabelsVisualEstimate() {
+        let app = launchEditorial(extra: ["-lybUITestHomeV2EstimateHeroFixture"])
+        let graphic = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+        XCTAssertTrue(graphic.waitForExistence(timeout: 30))
+        XCTAssertTrue(graphic.label.contains("15.8 percent"))
+        XCTAssertTrue(graphic.label.contains("Visual estimate"))
+        XCTAssertFalse(graphic.label.contains("muscle"))
+        capture(app, named: "editorial-visual-estimate")
+        assertReachableByScrolling("home_v2_view_progress", in: app)
+        app.buttons["home_v2_view_progress"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_progress_value"].waitForExistence(timeout: 8))
+    }
+
+    func testEditorialWeightOnlyHeroShowsActualSparseReadings() {
+        for largestText in [false, true] {
+            let app = launchEditorial(extra: ["-lybUITestHomeV2WeightOnlyHeroFixture"], largestText: largestText)
+            let graphic = app.descendants(matching: .any)["home_v2_editorial_card"]
+            XCTAssertTrue(graphic.waitForExistence(timeout: 30))
+            let summary = app.descendants(matching: .any).matching(
+                NSPredicate(format: "label CONTAINS %@", "4 recorded weight entries")
+            ).firstMatch
+            XCTAssertTrue(summary.waitForExistence(timeout: 8), app.debugDescription)
+            XCTAssertTrue(summary.label.contains("Latest 181.0 lb"), summary.label)
+            XCTAssertEqual(graphic.frame.width, app.windows.firstMatch.frame.width, accuracy: 1)
+            XCTAssertEqual(graphic.frame.height, graphic.frame.width / 0.8, accuracy: 1)
+            XCTAssertFalse(app.descendants(matching: .any)["home_v2_body_fat_graphic"].exists)
+            capture(app, named: largestText ? "editorial-weight-only-ax5" : "editorial-weight-only")
+            assertReachableByScrolling("home_v2_today_details", in: app)
+            capture(app, named: largestText ? "editorial-weight-only-ax5-scrolled" : "editorial-weight-only-scrolled")
+            app.terminate()
+        }
+    }
+
+    func testEditorialSingleWeightDoesNotInventAHistory() {
+        let app = launchEditorial(extra: ["-lybUITestHomeV2SingleWeightHeroFixture"])
+        let graphic = app.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertTrue(graphic.waitForExistence(timeout: 30))
+        XCTAssertTrue(graphic.label.contains("1 recorded weight entry"))
+        XCTAssertEqual(app.staticTexts["home_v2_weight_value"].label, "181.0")
+        XCTAssertEqual(app.staticTexts["home_v2_change_sentence"].label, "No 30-day trend yet")
+        capture(app, named: "editorial-single-weight")
+        app.buttons["home_v2_log_weight"].tap()
+        XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
+    }
+
+    func testEditorialSingleReadingDoesNotClaimAWeightTrendBehindPhotoOrBodyFat() {
+        for photo in [false, true] {
+            let app = launchEditorial(
+                fixture: photo ? "-lybUITestHomeV2PhotoFixture" : "-lybUITestHomeV2Fixture",
+                extra: ["-lybUITestHomeV2SingleReadingFixture"]
+            )
+            XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
+            if photo {
+                XCTAssertTrue(app.buttons["home_v2_photo_stage"].exists)
+            } else {
+                let bodyFat = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+                XCTAssertTrue(bodyFat.label.contains("15.8 percent"))
+                XCTAssertTrue(bodyFat.label.contains("Entered by you"))
+            }
+            XCTAssertEqual(app.staticTexts["home_v2_weight_value"].label, "181.0")
+            XCTAssertEqual(app.staticTexts["home_v2_change_sentence"].label, "No 30-day trend yet")
+            XCTAssertFalse(app.staticTexts["No change in 30 days"].exists)
+            capture(app, named: photo ? "editorial-single-reading-photo" : "editorial-single-reading-body-fat")
+            app.terminate()
+        }
+    }
+
+    func testEditorialEmptyAtLargestTextKeepsHealthAndLoggingReachable() {
+        let app = launchEditorial(fixture: "-lybUITestHomeV2EmptyFixture", largestText: true)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_day_zero"].waitForExistence(timeout: 30))
+        assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "editorial-empty-largest-text")
+        assertReachableByScrolling("home_v2_connect_health", in: app)
+        capture(app, named: "editorial-empty-largest-text-scrolled")
+        app.buttons["home_v2_log_weight"].tap()
+        XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
+    }
+
+    private func launchEditorial(
+        fixture: String = "-lybUITestHomeV2Fixture", extra: [String] = [], largestText: Bool = false
+    ) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture", fixture, "-lybUITestSuppressWhatsNew"] + extra
+        if largestText {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        }
+        app.launch()
+        return app
+    }
+
     private func launch(photo: Bool, state: String, largestText: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -131,7 +241,7 @@ final class HomeV2LayoutUITests: XCTestCase {
             ]
         }
         app.launch()
-        let marker = photo ? "home_v2_photo_stage" : "home_v2_metric_first"
+        let marker = photo ? "home_v2_photo_stage" : "home_v2_editorial_card"
         XCTAssertTrue(app.descendants(matching: .any)[marker].waitForExistence(timeout: 30))
         return app
     }

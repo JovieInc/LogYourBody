@@ -318,3 +318,61 @@ enum HomeV2Layout {
         return min(fourByFive, available)
     }
 }
+
+/// Values for the editorial fallback come from stored readings, never photo
+/// appearance, a target, or interpolated chart caches.
+enum HomeV2EditorialPolicy {
+    struct BodyFatReading: Equatable {
+        let percentage: Double
+        let caption: String
+    }
+
+    struct WeightReading: Identifiable, Equatable {
+        let id: String
+        let date: Date
+        let kilograms: Double
+    }
+
+    static func bodyFat(in metric: BodyMetrics?) -> BodyFatReading? {
+        guard let metric, let value = metric.bodyFatPercentage,
+              value.isFinite, value > 0, value < 100 else { return nil }
+        let method = metric.bodyFatMethod?.lowercased()
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ") ?? ""
+        // Synthetic estimates must not be presented as recorded body fat.
+        guard !method.contains("interpolat"), !method.contains("derived") else { return nil }
+        let caption: String
+        // Only known stored methods establish provenance. Free-form or negated
+        // labels must not become scan claims merely because they mention one.
+        switch method {
+        case "visual_estimate": caption = "Visual estimate"
+        case "inbody": caption = "From your InBody scan"
+        case "dexa", "dexa (bodyspec)", "bodyspec_dexa": caption = "From your DEXA scan"
+        case "manual", "typed": caption = "Entered by you"
+        case "healthkit", "apple_health": caption = "From Apple Health"
+        case "body_scan": caption = "Body scan estimate"
+        case "bia_scale", "bioelectrical": caption = "Bioelectrical estimate"
+        case "caliper", "calipers": caption = "Caliper estimate"
+        default: caption = "Source not recorded"
+        }
+        return BodyFatReading(percentage: value, caption: caption)
+    }
+
+    static func supportsWeightComparison(in metrics: [BodyMetrics], selected: BodyMetrics?) -> Bool {
+        weights(in: metrics, selected: selected).count >= 2
+    }
+
+    static func weights(
+        in metrics: [BodyMetrics],
+        selected: BodyMetrics?,
+        calendar: Calendar = .current
+    ) -> [WeightReading] {
+        guard let selected,
+              let start = calendar.date(byAdding: .day, value: -30, to: selected.date) else { return [] }
+        return metrics.compactMap { metric in
+            guard metric.userId == selected.userId,
+                  metric.date >= start, metric.date <= selected.date,
+                  let weight = metric.weight, weight.isFinite, weight > 0 else { return nil }
+            return WeightReading(id: metric.id, date: metric.date, kilograms: weight)
+        }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date < $1.date }
+    }
+}
