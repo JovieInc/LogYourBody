@@ -119,7 +119,14 @@ func fetchTodayStepCount() async throws -> Int {
                     }
                     stepCount = noData
                 } else {
-                    stepCount = Int(statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0)
+                    do {
+                        stepCount = try HealthKitStepCountPolicy.stepCount(
+                            from: statistics?.sumQuantity()?.doubleValue(for: HKUnit.count())
+                        )
+                    } catch {
+                        continuation.resume(throwing: error)
+                        return
+                    }
                 }
 
                 Task {
@@ -163,8 +170,14 @@ func fetchStepCount(for date: Date) async throws -> Int {
                     return
                 }
 
-                let stepCount = statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
-                continuation.resume(returning: Int(stepCount))
+                do {
+                    let stepCount = try HealthKitStepCountPolicy.stepCount(
+                        from: statistics?.sumQuantity()?.doubleValue(for: HKUnit.count())
+                    )
+                    continuation.resume(returning: stepCount)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
 
             healthStore.execute(query)
@@ -791,6 +804,24 @@ func scheduleObservedBodyMetricSync() {
 /// nothing has been recorded for the predicate yet. For today's steps that is
 /// zero, not a failure, so it must not reach Sentry as a non-fatal error.
 enum HealthKitStepCountPolicy {
+    enum QuantityError: Error, LocalizedError {
+        case invalidStepCount
+
+        var errorDescription: String? { "Apple Health returned an invalid step count." }
+    }
+
+    /// Preserve HealthKit's existing truncation to a stored Int32 count, with
+    /// validation before conversion or publication. Missing data still means zero.
+    static func stepCount(from quantity: Double?) throws -> Int {
+        guard let quantity else { return 0 }
+        guard quantity.isFinite, quantity >= 0 else { throw QuantityError.invalidStepCount }
+        let wholeCount = quantity.rounded(.towardZero)
+        guard wholeCount <= Double(Int32.max), let count = Int(exactly: wholeCount) else {
+            throw QuantityError.invalidStepCount
+        }
+        return count
+    }
+
     static func stepCount(forNoData error: Error) -> Int? {
         let nsError = error as NSError
         guard nsError.domain == HKErrorDomain, nsError.code == HKError.Code.errorNoData.rawValue else {
