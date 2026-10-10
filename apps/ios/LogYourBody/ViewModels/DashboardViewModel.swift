@@ -204,6 +204,7 @@ final class DashboardViewModel: ObservableObject {
     ) async throws {
         guard let userId = authManager.currentUser?.id else { return }
 
+        _ = try DailyStepCountPolicy.storedSteps(steps)
         let today = Date()
 
         if let existingMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {

@@ -3,6 +3,7 @@
 // LogYourBody
 //
 import Foundation
+import CoreFoundation
 
 struct DailyMetrics: Identifiable, Codable {
     let id: String
@@ -21,5 +22,37 @@ struct DailyMetrics: Identifiable, Codable {
         case notes
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+}
+
+/// Matches CachedDailyMetrics.steps without rounding or silently discarding invalid input.
+enum DailyStepCountPolicy {
+    enum ValidationError: LocalizedError {
+        case invalidSteps
+
+        var errorDescription: String? {
+            "Step count must be a supported nonnegative whole number."
+        }
+    }
+
+    static func storedSteps(_ value: Int?) throws -> Int32 {
+        guard let value else { return 0 }
+        guard value >= 0, let steps = Int32(exactly: value) else {
+            throw ValidationError.invalidSteps
+        }
+        return steps
+    }
+
+    static func storedRemoteSteps(_ value: Any?) throws -> Int32 {
+        guard let value, !(value is NSNull) else { return 0 }
+        guard let number = value as? NSNumber,
+              CFGetTypeID(number) != CFBooleanGetTypeID(),
+              number.doubleValue.isFinite,
+              number.doubleValue >= 0,
+              let steps = Int32(exactly: number.doubleValue),
+              number.compare(NSDecimalNumber(value: steps)) == .orderedSame else {
+            throw ValidationError.invalidSteps
+        }
+        return steps
     }
 }
