@@ -96,13 +96,14 @@ struct DashboardViewLiquid: View {
     @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
-    @State var homeV2LogSheetDate = Date()
     @State var homeV2EditingMetric: BodyMetrics?
     @State var homeV2PhotoRoute: HomeV2PhotoRoute?
     @State var isHomeV2SettingsPresented = false
     @State var isHomeV2HelpPresented = false
     @State var isHomeV2AllPhotosPresented = false
     @State var homeV2Logged: HomeV2LoggedEntry?
+    @State var isHomeV2Undoing = false
+    @State var showsHomeV2UndoError = false
     @State var homeV2PhaseSentence: String?
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
@@ -121,9 +122,6 @@ struct DashboardViewLiquid: View {
     @State var addEntryInitialWeight: String?
     @State var addEntryInitialBodyFat: Double?
     @State var isHomeV2LoggingWeight = false
-    @State var homeV2LogHadExistingEntry = false
-    @State var homeV2LogPreviousWeightKilograms: Double?
-    @State var homeV2LogPreviousBodyFat: Double?
 
     init(
         layoutMode: LayoutMode = .photoTimelineHUD,

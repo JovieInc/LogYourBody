@@ -2040,6 +2040,103 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
     }
 
+    func testHomeV2ChangingLogDateDoesNotCreateATodayUndoReceipt() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 30))
+        logWeight.tap()
+        let datePicker = app.datePickers.firstMatch
+        XCTAssertTrue(datePicker.waitForExistence(timeout: 8))
+        datePicker.tap()
+
+        let calendar = Calendar.current
+        let yesterday = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: Date()))
+        if calendar.component(.day, from: Date()) == 1 {
+            app.buttons["Previous Month"].tap()
+        }
+        let day = app.staticTexts[String(calendar.component(.day, from: yesterday))].firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 5))
+        day.tap()
+        app.buttons["home_v2_log_sheet_plus"].tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 10), "Saving another day returns without a today receipt")
+        XCTAssertFalse(app.buttons["home_v2_undo"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
+        attachScreenshot(named: "home-v2-log-another-day", from: app)
+    }
+
+    func testHomeV2UndoRestoresPhotoOnlyDayAfterRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["LYB_UI_TEST_UNDO_ACCOUNT"] = UUID().uuidString
+        let arguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2UndoPhotoOnlyFixture"
+        ]
+        launch(app, with: arguments)
+        try logWeightOnPhotoOnlyDay(in: app)
+
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        undo.tap()
+        XCTAssertTrue(undo.waitForNonExistence(timeout: 10), "Undo clears only after the restore saves")
+        app.buttons["home_v2_context_button"].tap()
+        assertPhotoOnlyDay(in: app)
+        attachScreenshot(named: "home-v2-undo-photo-only", from: app)
+
+        launch(app, with: arguments + ["-lybUITestReuseUndoFixtureData"])
+        let details = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(details.waitForExistence(timeout: 30))
+        details.tap()
+        assertPhotoOnlyDay(in: app)
+        attachScreenshot(named: "home-v2-undo-photo-only-relaunched", from: app)
+    }
+
+    func testHomeV2UndoFailureKeepsTheReceiptAndSavedWeight() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["LYB_UI_TEST_UNDO_ACCOUNT"] = UUID().uuidString
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2UndoPhotoOnlyFixture", "-lybUITestHomeV2UndoFailureFixture"
+        ])
+        try logWeightOnPhotoOnlyDay(in: app)
+
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        undo.tap()
+        let failure = app.alerts["Couldn’t undo this entry"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 5))
+        attachScreenshot(named: "home-v2-undo-save-failed", from: app)
+        failure.buttons["OK"].tap()
+        XCTAssertTrue(undo.exists, "A failed save keeps Undo available")
+        XCTAssertTrue(undo.isHittable, "The retained receipt can be retried")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
+        app.buttons["home_v2_context_button"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["home_v2_context_photo"].exists)
+    }
+
+    private func logWeightOnPhotoOnlyDay(in app: XCUIApplication) throws {
+        let details = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(details.waitForExistence(timeout: 30))
+        details.tap()
+        assertPhotoOnlyDay(in: app)
+        app.buttons["home_v2_edit_entry"].tap()
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 8))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 10))
+        app.buttons["home_v2_context_close"].tap()
+    }
+
+    private func assertPhotoOnlyDay(in app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["home_v2_context_photo"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForNonExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_body_fat"].waitForNonExistence(timeout: 8))
+    }
+
     private func attachScreenshot(named name: String, from app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name

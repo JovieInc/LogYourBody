@@ -408,6 +408,211 @@ final class PhotoMetadataServiceTests: XCTestCase {
         XCTAssertEqual(persisted.dataSource, BodyMetricSource.manual.rawValue)
     }
 
+    @MainActor
+    func testWeightSaveReturnsUndoSnapshotFromTheActualDestinationDay() async throws {
+        let today = undoFixture(weight: nil, bodyFat: nil, method: nil)
+        let yesterday = undoFixture(weight: 80, bodyFat: 18, method: "dexa", daysAgo: 1, userId: today.userId)
+        for metric in [today, yesterday] {
+            try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: today.userId, markAsSynced: true)
+        }
+        let seededToday = await cachedMetric(id: today.id)
+        let todayBaseline = try XCTUnwrap(seededToday?.toBodyMetrics())
+        let seededYesterday = await cachedMetric(id: yesterday.id)
+        let yesterdayBaseline = try XCTUnwrap(seededYesterday?.toBodyMetrics())
+
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: yesterday.date, weight: 82, userId: today.userId
+        )
+        let previous = try XCTUnwrap(result.previousMetric)
+        XCTAssertEqual(previous, yesterdayBaseline, "Changing the destination must not reuse today's snapshot")
+        XCTAssertEqual(result.metrics.id, yesterday.id)
+        XCTAssertFalse(result.createdNewEntry)
+        try await PhotoMetadataService.shared.restoreMeasurements(
+            id: result.metrics.id, userId: today.userId, previous: previous
+        )
+
+        let restored = await cachedMetric(id: yesterday.id)
+        XCTAssertEqual(restored?.toBodyMetrics()?.weight, 80)
+        XCTAssertEqual(restored?.toBodyMetrics()?.bodyFatMethod, "dexa")
+        let unchanged = await cachedMetric(id: today.id)
+        XCTAssertEqual(unchanged?.toBodyMetrics(), todayBaseline, "Saving and undoing another day must leave today intact")
+
+        let todayResult = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: today.date, weight: 83, userId: today.userId
+        )
+        let previousToday = try XCTUnwrap(todayResult.previousMetric)
+        XCTAssertEqual(previousToday, todayBaseline, "Returning to today must capture today's existing photo-only row")
+        try await PhotoMetadataService.shared.restoreMeasurements(
+            id: todayResult.metrics.id, userId: today.userId, previous: previousToday
+        )
+        let restoredToday = await cachedMetric(id: today.id)
+        XCTAssertNil(restoredToday?.toBodyMetrics()?.weight)
+        XCTAssertEqual(restoredToday?.toBodyMetrics()?.photoUrl, today.photoUrl)
+    }
+
+    @MainActor
+    func testWeightSaveForANewDestinationDoesNotReuseAnotherDaysUndoSnapshot() async throws {
+        let today = undoFixture(weight: nil, bodyFat: nil, method: nil)
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(today, userId: today.userId, markAsSynced: true)
+        let seededToday = await cachedMetric(id: today.id)
+        let todayBaseline = try XCTUnwrap(seededToday?.toBodyMetrics())
+        let yesterday = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: -1, to: today.date))
+
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: yesterday, weight: 82, userId: today.userId
+        )
+
+        XCTAssertNil(result.previousMetric)
+        XCTAssertTrue(result.createdNewEntry)
+        XCTAssertNotEqual(result.metrics.id, today.id)
+        XCTAssertEqual(result.metrics.localDate, BodyMetricLocalDate.key(for: yesterday))
+        let unchanged = await cachedMetric(id: today.id)
+        XCTAssertEqual(unchanged?.toBodyMetrics(), todayBaseline)
+    }
+
+    @MainActor
+    func testUndoRestoresMissingMeasurementsWithoutChangingThePhotoOrSource() async throws {
+        let previous = undoFixture(weight: nil, bodyFat: nil, method: nil)
+        try await logOverUndoFixture(previous)
+
+        try await PhotoMetadataService.shared.restoreMeasurements(
+            id: previous.id, userId: previous.userId, previous: previous
+        )
+
+        let cached = await cachedMetric(id: previous.id)
+        let stored = try XCTUnwrap(cached?.toBodyMetrics())
+        XCTAssertNil(stored.weight)
+        XCTAssertNil(stored.bodyFatPercentage)
+        XCTAssertNil(stored.bodyFatMethod)
+        XCTAssertEqual(stored.id, previous.id)
+        XCTAssertEqual(stored.date, previous.date)
+        XCTAssertEqual(stored.localDate, previous.localDate)
+        XCTAssertEqual(stored.photoUrl, previous.photoUrl)
+        XCTAssertEqual(stored.sourceMetadata, previous.sourceMetadata)
+        XCTAssertEqual(stored.dataSource, previous.dataSource)
+        XCTAssertEqual(stored.notes, previous.notes)
+        XCTAssertEqual(stored.createdAt, previous.createdAt)
+        XCTAssertEqual(cached?.isSynced, false)
+        XCTAssertEqual(cached?.syncStatus, "pending")
+    }
+
+    @MainActor
+    func testUndoRestoresWeightAndClearsNewBodyFat() async throws {
+        let previous = undoFixture(weight: 80, bodyFat: nil, method: nil)
+        try await logOverUndoFixture(previous)
+
+        try await PhotoMetadataService.shared.restoreMeasurements(
+            id: previous.id, userId: previous.userId, previous: previous
+        )
+
+        let cached = await cachedMetric(id: previous.id)
+        let stored = try XCTUnwrap(cached?.toBodyMetrics())
+        XCTAssertEqual(stored.weight, previous.weight)
+        XCTAssertNil(stored.bodyFatPercentage)
+        XCTAssertNil(stored.bodyFatMethod)
+    }
+
+    @MainActor
+    func testUndoRestoresBodyFatMethodAndPreservesNewerUnrelatedFields() async throws {
+        let previous = undoFixture(weight: 80, bodyFat: 18, method: "dexa")
+        try await logOverUndoFixture(previous)
+        let context = CoreDataManager.shared.viewContext
+        try await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", previous.id)
+            let cached = try XCTUnwrap(context.fetch(request).first)
+            cached.photoUrl = "file:///newer-photo.jpg"
+            cached.waistCircumference = 84
+            cached.notes = "A newer note"
+            try context.save()
+        }
+
+        try await PhotoMetadataService.shared.restoreMeasurements(
+            id: previous.id, userId: previous.userId, previous: previous
+        )
+
+        let cached = await cachedMetric(id: previous.id)
+        let stored = try XCTUnwrap(cached?.toBodyMetrics())
+        XCTAssertEqual(stored.weight, previous.weight)
+        XCTAssertEqual(stored.bodyFatPercentage, previous.bodyFatPercentage)
+        XCTAssertEqual(stored.bodyFatMethod, "dexa")
+        XCTAssertEqual(stored.photoUrl, "file:///newer-photo.jpg")
+        XCTAssertEqual(stored.waistCm, 84)
+        XCTAssertEqual(stored.notes, "A newer note")
+    }
+
+    @MainActor
+    func testUndoRejectsAnotherAccountWithoutCreatingOrChangingAnyEntry() async throws {
+        let previous = undoFixture(weight: nil, bodyFat: nil, method: nil)
+        try await logOverUndoFixture(previous)
+
+        do {
+            try await PhotoMetadataService.shared.restoreMeasurements(
+                id: previous.id, userId: "another-account", previous: previous
+            )
+            XCTFail("Undo must reject a receipt belonging to another account")
+        } catch PhotoMetricsRestoreError.entryNotFound {
+            // Expected: no write is admitted.
+        }
+
+        let cached = await cachedMetric(id: previous.id)
+        XCTAssertEqual(cached?.toBodyMetrics()?.weight, 82)
+        let otherRows = await CoreDataManager.shared.fetchBodyMetrics(for: "another-account")
+        XCTAssertTrue(otherRows.isEmpty)
+    }
+
+    @MainActor
+    func testUndoSaveFailureThrowsAndKeepsTheLoggedValuesInMemoryAndStorage() async throws {
+        let previous = undoFixture(weight: nil, bodyFat: nil, method: nil)
+        try await logOverUndoFixture(previous)
+        let context = UndoFailingSaveContext(concurrencyType: .privateQueueConcurrencyType)
+        context.persistentStoreCoordinator = CoreDataManager.shared.persistentContainer.persistentStoreCoordinator
+
+        do {
+            try await PhotoMetadataService.shared.restoreMeasurements(
+                id: previous.id, userId: previous.userId, previous: previous, context: context
+            )
+            XCTFail("A failed save must not report a successful Undo")
+        } catch UndoTestSaveError.failed {
+            // Expected: the persistence error reaches the caller.
+        }
+
+        try await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", previous.id)
+            let cached = try XCTUnwrap(context.fetch(request).first)
+            XCTAssertEqual(cached.weight, 82, "Failed Undo must not leave unsaved cleared values")
+            XCTAssertEqual(cached.bodyFatPercentage, 23)
+        }
+        let cached = await cachedMetric(id: previous.id)
+        XCTAssertEqual(cached?.toBodyMetrics()?.weight, 82)
+        XCTAssertEqual(cached?.toBodyMetrics()?.bodyFatPercentage, 23)
+    }
+
+    private func undoFixture(
+        weight: Double?, bodyFat: Double?, method: String?, daysAgo: Int = 0, userId: String? = nil
+    ) -> BodyMetrics {
+        let calendar = Calendar.current
+        let baseline = calendar.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
+        let date = calendar.date(byAdding: .day, value: -daysAgo, to: baseline) ?? baseline
+        return BodyMetrics(
+            id: UUID().uuidString, userId: userId ?? "undo-\(UUID().uuidString)", date: date,
+            weight: weight, weightUnit: "kg", bodyFatPercentage: bodyFat, bodyFatMethod: method,
+            muscleMass: nil, boneMass: nil, notes: "Original note", photoUrl: "file:///original-photo.jpg",
+            dataSource: BodyMetricSource.healthKit.rawValue,
+            sourceMetadata: BodyMetricSourceMetadata(sourceName: "Test scale"),
+            createdAt: date, updatedAt: date
+        )
+    }
+
+    private func logOverUndoFixture(_ previous: BodyMetrics) async throws {
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(previous, userId: previous.userId, markAsSynced: true)
+        _ = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: previous.date, weight: 82, bodyFatPercentage: 23,
+            bodyFatMethod: "bioelectrical", userId: previous.userId
+        )
+    }
+
     private func cachedMetric(id: String) async -> CachedBodyMetrics? {
         let context = CoreDataManager.shared.viewContext
 
@@ -435,5 +640,15 @@ final class PhotoMetadataServiceTests: XCTestCase {
                 try context.save()
             }
         }
+    }
+}
+
+private enum UndoTestSaveError: Error {
+    case failed
+}
+
+private final class UndoFailingSaveContext: NSManagedObjectContext, @unchecked Sendable {
+    override func save() throws {
+        throw UndoTestSaveError.failed
     }
 }
