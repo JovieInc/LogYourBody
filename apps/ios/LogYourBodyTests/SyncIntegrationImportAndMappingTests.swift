@@ -146,8 +146,8 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         try await coreData.saveBodyMetricsAndWait(recentDeletedMetric, userId: userId, markAsSynced: true)
         try await coreData.saveBodyMetricsAndWait(oldLiveMetric, userId: userId, markAsSynced: true)
 
-        let didMarkOldDeleted = await coreData.markBodyMetricDeleted(id: oldDeletedId)
-        let didMarkRecentDeleted = await coreData.markBodyMetricDeleted(id: recentDeletedId)
+        let didMarkOldDeleted = await coreData.markBodyMetricDeleted(id: oldDeletedId, userId: userId)
+        let didMarkRecentDeleted = await coreData.markBodyMetricDeleted(id: recentDeletedId, userId: userId)
         XCTAssertTrue(didMarkOldDeleted)
         XCTAssertTrue(didMarkRecentDeleted)
 
