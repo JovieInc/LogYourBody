@@ -193,12 +193,21 @@ enum RevenueCatPurchasingError: Error, Equatable {
     }
 }
 
+enum RevenueCatCustomerInfoRead: Equatable {
+    case cached
+    case current(expectedAppUserID: String)
+}
+
+enum RevenueCatCustomerInfoError: Error {
+    case identityChanged
+}
+
 @MainActor
 protocol RevenueCatPurchasesProtocol: AnyObject {
     func configure(apiKey: String, delegate: PurchasesDelegate)
     func logIn(userId: String, entitlementID: String) async throws -> RevenueCatCustomerSnapshot
     func logOut() async throws
-    func customerInfo(entitlementID: String) async throws -> RevenueCatCustomerSnapshot
+    func customerInfo(entitlementID: String, read: RevenueCatCustomerInfoRead) async throws -> RevenueCatCustomerSnapshot
     func offerings() async throws -> Offerings
     func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot
     func restorePurchases(entitlementID: String) async throws -> RevenueCatCustomerSnapshot
@@ -221,9 +230,40 @@ final class LiveRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
         _ = try await Purchases.shared.logOut()
     }
 
-    func customerInfo(entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
-        let customerInfo = try await Purchases.shared.customerInfo()
-        return RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID)
+    func customerInfo(entitlementID: String, read: RevenueCatCustomerInfoRead) async throws -> RevenueCatCustomerSnapshot {
+        try await Self.readCustomerInfo(
+            read: read,
+            currentAppUserID: { Purchases.shared.appUserID },
+            fetch: { policy in
+                let customerInfo = try await Purchases.shared.customerInfo(fetchPolicy: policy)
+                return RevenueCatCustomerSnapshot(customerInfo: customerInfo, entitlementID: entitlementID)
+            }
+        )
+    }
+
+    static func readCustomerInfo(
+        read: RevenueCatCustomerInfoRead,
+        currentAppUserID: () -> String,
+        fetch: (CacheFetchPolicy) async throws -> RevenueCatCustomerSnapshot
+    ) async throws -> RevenueCatCustomerSnapshot {
+        let expectedAppUserID: String?
+        let policy: CacheFetchPolicy
+        switch read {
+        case .cached:
+            expectedAppUserID = nil
+            policy = .default
+        case .current(let subject):
+            expectedAppUserID = subject
+            policy = .fetchCurrent
+        }
+        if let expectedAppUserID, currentAppUserID() != expectedAppUserID {
+            throw RevenueCatCustomerInfoError.identityChanged
+        }
+        let customer = try await fetch(policy)
+        if let expectedAppUserID, currentAppUserID() != expectedAppUserID {
+            throw RevenueCatCustomerInfoError.identityChanged
+        }
+        return customer
     }
 
     func offerings() async throws -> Offerings {
@@ -307,6 +347,16 @@ class RevenueCatManager: NSObject, ObservableObject {
 
     private var billingSession = BillingSessionOwnership(subject: nil, generation: 0)
     private var pendingBillingSession: BillingSessionOwnership?
+    private var delegateRefresh: DelegateRefresh?
+
+    private final class DelegateRefresh {
+        let ownership: BillingSessionOwnership
+        var needsRefresh = false
+
+        init(ownership: BillingSessionOwnership) {
+            self.ownership = ownership
+        }
+    }
 
     func beginBillingSession(subject: String?) -> BillingSessionOwnership {
         // A fresh login, including the same subject, replaces pending billing work.
@@ -330,12 +380,44 @@ class RevenueCatManager: NSObject, ObservableObject {
         billingSession == ownership
     }
 
-    /// Applies a RevenueCat delegate update. `purchases(_:receivedUpdated:)` is the production caller.
-    /// The app user id is the SDK identity at callback time, not `CustomerInfo.originalAppUserId`.
-    func applyDelegateCustomerInfo(_ customer: RevenueCatCustomerSnapshot, appUserID: String) {
-        guard let ownership = captureBillingSession(), ownsBillingSession(ownership) else { return }
+    /// Delegate payloads can belong to an earlier SDK identity. Read the current owner instead.
+    func refreshForDelegate(appUserID: String) async {
+        guard isConfigured, !Task.isCancelled, let ownership = captureBillingSession() else { return }
         guard let subject = ownership.subject, !subject.isEmpty, subject == appUserID else { return }
-        updateSubscriptionStatus(customer: customer)
+        if let delegateRefresh, delegateRefresh.ownership == ownership {
+            delegateRefresh.needsRefresh = true
+            return
+        }
+        let refresh = DelegateRefresh(ownership: ownership)
+        delegateRefresh = refresh
+        defer {
+            if delegateRefresh === refresh { delegateRefresh = nil }
+        }
+        repeat {
+            refresh.needsRefresh = false
+            guard await performOwnedDelegateRefresh(refresh, subject: subject) else { return }
+        } while refresh.needsRefresh
+    }
+
+    private func performOwnedDelegateRefresh(_ refresh: DelegateRefresh, subject: String) async -> Bool {
+        guard ownsBillingSession(refresh.ownership), !Task.isCancelled, delegateRefresh === refresh else { return false }
+        do {
+            let customer = try await purchasesClient.customerInfo(
+                entitlementID: proEntitlementID,
+                read: .current(expectedAppUserID: subject)
+            )
+            guard ownsBillingSession(refresh.ownership), !Task.isCancelled, delegateRefresh === refresh else { return false }
+            updateSubscriptionStatus(customer: customer)
+            return true
+        } catch {
+            guard ownsBillingSession(refresh.ownership), !Task.isCancelled, delegateRefresh === refresh else { return false }
+            // Preserve access on failure and drain only an explicitly coalesced notification.
+            ErrorReporter.shared.capture(
+                AppError.billing(operation: "delegateCustomerInfo", underlying: error),
+                context: ErrorContext(feature: "billing", operation: "delegateCustomerInfo", screen: nil, userId: subject)
+            )
+            return true
+        }
     }
 
     #if DEBUG
@@ -376,14 +458,10 @@ typealias SubscriptionManager = RevenueCatManager
 // MARK: - PurchasesDelegate
 
 extension RevenueCatManager: PurchasesDelegate {
-    nonisolated func purchases(_ purchases: Purchases, receivedUpdated customerInfo: CustomerInfo) {
+    nonisolated func purchases(_ purchases: Purchases, receivedUpdated _: CustomerInfo) {
         let appUserID = purchases.appUserID
-        Task { @MainActor in
-            let snapshot = RevenueCatCustomerSnapshot(
-                customerInfo: customerInfo,
-                entitlementID: RevenueCatManager.entitlementID
-            )
-            self.applyDelegateCustomerInfo(snapshot, appUserID: appUserID)
+        Task { @MainActor [weak self] in
+            await self?.refreshForDelegate(appUserID: appUserID)
         }
     }
 }
