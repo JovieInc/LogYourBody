@@ -28,6 +28,21 @@ Tools:
 engine's plan, so `destructiveHint: false` is accurate. It previews the plan before
 starting a session, so a misheard exercise name writes nothing.
 
+Recovery check-ins contribute one latest observation per session, including legacy
+records and concurrent duplicate writes. Repeating that session's latest identical
+scores returns the original check-in and observation time; changed scores remain a
+valid update, including updated pain reports. Without a durable client request ID,
+a differing retry after that same session was updated is indistinguishable from a
+new change. Durable request identity and correction history remain LYB-123 work;
+this does not claim exactly-once feedback storage.
+
+When the newest check-ins share a timestamp, the higher pain report takes precedence
+so uncertain ordering cannot discard the existing pain stop. For a single session,
+contradictory scores at the same observation time remain unchanged in storage and
+responses, but cannot establish a confirmed multi-session decline until the recovery
+feedback is clarified. This does not freeze progression from logged sets. Identical
+duplicate scores are not ambiguous evidence.
+
 Every number the tools return comes from the deterministic training engine or from the
 user's own logs. Enrollment, adult confirmation and the safety consent stay in the iOS app;
 an unenrolled account gets a pointer to the app instead of a plan.
