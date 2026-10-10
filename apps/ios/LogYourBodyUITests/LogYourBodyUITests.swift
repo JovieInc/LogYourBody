@@ -1992,24 +1992,18 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 30),
-            "Without a photo the Home is metric first"
-        )
+        let card = app.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 30), "Without a photo, saved data fills the same editorial card")
+        let bodyFat = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+        XCTAssertTrue(bodyFat.exists)
+        XCTAssertTrue(bodyFat.label.contains("15.8 percent"))
         let value = app.descendants(matching: .any)["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
-
-        let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
-        XCTAssertTrue(chart.waitForExistence(timeout: 5), "Metric-first Home keeps the trend chart geometry even before 7 days")
-        XCTAssertGreaterThanOrEqual(chart.frame.minY, value.frame.maxY - 1, "The chart sits below the number")
-        XCTAssertTrue(
-            chart.label.contains("7 days") || chart.label.contains("7-day average"),
-            "The chart says whether it is a trend or still waiting for 7 days"
-        )
-        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Home keeps a fixed 30-day window; ranges live in Progress")
+        XCTAssertGreaterThanOrEqual(value.frame.minY, card.frame.maxY - 1, "Supporting weight sits below the card")
+        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Date ranges live in Progress")
         let viewProgress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 5), "Progress is one disclosure away")
-        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, chart.frame.maxY - 1)
+        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, value.frame.maxY - 1)
 
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")
@@ -2038,6 +2032,94 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(done.exists)
         done.tap()
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
+    }
+
+    func testHomeV2SwipeMovesPhotoDateAndMetricsTogether() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let stage = app.descendants(matching: .any)["home_v2_photo_stage"]
+        XCTAssertTrue(stage.waitForExistence(timeout: 30))
+
+        let caption = app.descendants(matching: .any)["home_v2_photo_caption"]
+        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 5))
+        XCTAssertTrue(value.waitForExistence(timeout: 5))
+        let beforeCaption = caption.label
+        let beforeValue = value.label
+
+        stage.swipeLeft()
+
+        let moved = expectation(
+            for: NSPredicate(format: "label != %@", beforeCaption),
+            evaluatedWith: caption
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [moved], timeout: 5),
+            .completed,
+            "Swiping left moves one day back through body history"
+        )
+        XCTAssertNotEqual(value.label, beforeValue, "The metric follows the selected day")
+        attachScreenshot(named: "home-v2-swipe-back", from: app)
+
+        stage.swipeRight()
+        let returned = expectation(
+            for: NSPredicate(format: "label == %@", beforeCaption),
+            evaluatedWith: caption
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [returned], timeout: 5),
+            .completed,
+            "Swiping right returns to the latest day"
+        )
+    }
+
+    func testHomeV2ScrubberJumpsThroughBodyHistory() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let scrubber = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(scrubber.waitForExistence(timeout: 30), "The bottom scrubber travels through time")
+
+        let caption = app.descendants(matching: .any)["home_v2_photo_caption"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 5))
+        let beforeCaption = caption.label
+
+        // Drag from the right edge to the left: fast scrub toward the oldest day.
+        let start = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.7))
+        let end = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.7))
+        start.press(forDuration: 0.05, thenDragTo: end)
+
+        let moved = expectation(
+            for: NSPredicate(format: "label != %@", beforeCaption),
+            evaluatedWith: caption
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [moved], timeout: 5),
+            .completed,
+            "Scrubbing resolves to the same selected day a swipe would reach"
+        )
+        attachScreenshot(named: "home-v2-scrubbed", from: app)
+    }
+
+    func testHomeV2TimelineCoachMarkDismissesPermanently() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestResetHomeV2TimelineCoach"
+        ])
+
+        let coach = app.buttons["home_v2_timeline_coach"]
+        XCTAssertTrue(coach.waitForExistence(timeout: 30), "First use teaches swipe and scrub once")
+        coach.tap()
+        XCTAssertTrue(coach.waitForNonExistence(timeout: 5), "Dismissal is immediate")
+
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_photo_stage"].waitForExistence(timeout: 30)
+        )
+        XCTAssertFalse(coach.exists, "The coach mark never occupies product space again")
     }
 
     private func attachScreenshot(named name: String, from app: XCUIApplication) {

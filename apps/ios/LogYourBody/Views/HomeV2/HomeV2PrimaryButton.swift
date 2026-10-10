@@ -22,9 +22,13 @@ struct HomeV2PrimaryButton: View {
                 }
                 Text(title)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.horizontal, HomeV2Tokens.Space.row)
+            .padding(.vertical, HomeV2Tokens.Space.tight)
             .foregroundStyle(HomeV2Tokens.Colors.ctaInk)
             .frame(maxWidth: .infinity, minHeight: JovieTokens.controlHeight)
             .background(HomeV2Tokens.Colors.ctaFill, in: Capsule())
@@ -83,32 +87,39 @@ struct HomeV2DayZero: View {
     let onLogWeight: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
-                Text(HomeV2Copy.firstCheckInTitle)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .bold, relativeTo: .largeTitle)
-                    .kerning(-1)
-                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("home_v2_day_zero")
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    HomeV2DataHero(metric: nil, metrics: [], unit: "")
+                        .frame(width: geometry.size.width,
+                               height: geometry.size.width / HomeV2Tokens.photoAspectRatio)
+                        .accessibilityIdentifier("home_v2_editorial_card")
 
-                Text(HomeV2Copy.firstCheckInBody)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HomeV2DisclosureLink(
-                    title: HomeV2Copy.connectHealthInstead,
-                    identifier: "home_v2_connect_health",
-                    action: onConnectHealth
-                )
+                    VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+                        Text("Start with what you have.")
+                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle,
+                                              weight: .semibold, relativeTo: .title2)
+                            .foregroundStyle(HomeV2Tokens.Colors.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("Log your weight or connect Apple Health. No body fat or photo required.")
+                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HomeV2DisclosureLink(
+                            title: HomeV2Copy.connectHealthInstead,
+                            identifier: "home_v2_connect_health",
+                            action: onConnectHealth
+                        )
+                    }
+                    .padding(HomeV2Tokens.Space.margin)
+                }
             }
-            .padding(.horizontal, HomeV2Tokens.Space.margin)
-            .padding(.top, HomeV2Tokens.Space.dayZeroTop)
-
-            Spacer(minLength: 0)
-
+            .scrollBounceBehavior(.basedOnSize)
+            .accessibilityIdentifier("home_v2_content_scroll")
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             HomeV2Dock(title: HomeV2Copy.logWeight, identifier: "home_v2_log_weight", action: onLogWeight)
+                .background(HomeV2Tokens.Colors.shell)
         }
     }
 }

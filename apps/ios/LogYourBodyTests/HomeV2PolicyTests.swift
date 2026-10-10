@@ -108,6 +108,86 @@ final class HomeV2PolicyTests: XCTestCase {
         )
     }
 
+    func testEditorialBodyFatKeepsEstimateAndUnknownOriginsDistinct() {
+        let now = Date()
+        let estimate = compositionMetric(date: now, bodyFat: 18.5, method: "visual_estimate")
+        let scan = compositionMetric(date: now, bodyFat: 18.5, method: "DEXA (BodySpec)")
+        let unknown = compositionMetric(date: now, bodyFat: 18.5, method: "")
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: estimate)?.caption, "Visual estimate")
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: scan)?.caption, "From your DEXA scan")
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: unknown)?.caption, "Source not recorded")
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: estimate)?.percentage, 18.5)
+    }
+
+    func testEditorialBodyFatAcceptsOnlyKnownSourceAliases() {
+        let known: [(String, String)] = [
+            ("  DEXA  (BodySpec)\n", "From your DEXA scan"),
+            ("DEXA", "From your DEXA scan"), ("bodyspec_dexa", "From your DEXA scan"),
+            (" InBody ", "From your InBody scan"), (" VISUAL_ESTIMATE ", "Visual estimate"),
+            ("Manual", "Entered by you"), ("typed", "Entered by you"),
+            ("HealthKit", "From Apple Health"), ("apple_health", "From Apple Health"),
+            ("body_scan", "Body scan estimate"), ("bia_scale", "Bioelectrical estimate"),
+            ("bioelectrical", "Bioelectrical estimate"), ("caliper", "Caliper estimate"),
+            ("calipers", "Caliper estimate")
+        ]
+        for (method, caption) in known {
+            XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in:
+                compositionMetric(date: Date(), bodyFat: 18, method: method))?.caption, caption, method)
+        }
+        for method in ["not dexa", "possibly inbody", "not_visual_estimate", "DEXA?", "unknown", ""] {
+            XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in:
+                compositionMetric(date: Date(), bodyFat: 18, method: method))?.caption,
+                "Source not recorded", method)
+        }
+    }
+
+    func testEditorialGraphicDoesNotInventBodyFatFromMissingOrSyntheticReadings() {
+        XCTAssertNil(HomeV2EditorialPolicy.bodyFat(in: nil))
+        for value in [Double.nan, .infinity, -2, 0, 100, 120] {
+            XCTAssertNil(HomeV2EditorialPolicy.bodyFat(in:
+                compositionMetric(date: Date(), bodyFat: value, method: "manual")))
+        }
+        for method in ["interpolated", "derived"] {
+            XCTAssertNil(HomeV2EditorialPolicy.bodyFat(in:
+                compositionMetric(date: Date(), bodyFat: 18, method: method)))
+        }
+    }
+
+    func testEditorialWeightHistoryUsesOnlyFiniteOwnedRecordedValuesThroughSelectedDate() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let selected = editorialMetric(id: "today", user: "A", date: now, weight: 80)
+        let previous = editorialMetric(id: "previous", user: "A", date: now.addingTimeInterval(-86_400), weight: 81)
+        let unrelated = [
+            editorialMetric(id: "foreign", user: "B", date: now, weight: 140),
+            editorialMetric(id: "future", user: "A", date: now.addingTimeInterval(86_400), weight: 79),
+            editorialMetric(id: "old", user: "A", date: now.addingTimeInterval(-40 * 86_400), weight: 90),
+            editorialMetric(id: "invalid", user: "A", date: now, weight: .nan),
+            editorialMetric(id: "missing", user: "A", date: now, weight: nil)
+        ]
+        let points = HomeV2EditorialPolicy.weights(in: unrelated + [selected, previous], selected: selected)
+        XCTAssertEqual(points.map(\.id), ["previous", "today"])
+        XCTAssertEqual(points.map(\.kilograms), [81, 80])
+        XCTAssertEqual(points.map(\.date), [previous.date, selected.date])
+    }
+
+    func testEditorialSingleWeightRemainsOneReadingAndNoSelectionHasNoHistory() {
+        let entry = editorialMetric(id: "only", user: "A", date: Date(), weight: 80)
+        XCTAssertEqual(HomeV2EditorialPolicy.weights(in: [entry], selected: entry).count, 1)
+        XCTAssertTrue(HomeV2EditorialPolicy.weights(in: [entry], selected: nil).isEmpty)
+        XCTAssertFalse(HomeV2EditorialPolicy.supportsWeightComparison(in: [], selected: entry))
+        XCTAssertFalse(HomeV2EditorialPolicy.supportsWeightComparison(in: [entry], selected: entry))
+        let excluded = editorialMetric(id: "foreign", user: "B", date: entry.date, weight: 90)
+        XCTAssertFalse(HomeV2EditorialPolicy.supportsWeightComparison(in: [entry, excluded], selected: entry))
+        let earlier = editorialMetric(id: "earlier", user: "A", date: entry.date.addingTimeInterval(-86_400), weight: 81)
+        XCTAssertTrue(HomeV2EditorialPolicy.supportsWeightComparison(in: [earlier, entry], selected: entry))
+    }
+
+    private func editorialMetric(id: String, user: String, date: Date, weight: Double?) -> BodyMetrics {
+        BodyMetrics(id: id, userId: user, date: date, weight: weight, weightUnit: "kg",
+                    bodyFatPercentage: nil, bodyFatMethod: nil, muscleMass: nil, boneMass: nil,
+                    notes: nil, photoUrl: nil, dataSource: "manual", createdAt: date, updatedAt: date)
+    }
+
     func testSinceSentenceAndPhotoPositionReadAsSentences() {
         XCTAssertEqual(HomeV2Copy.sinceSentence(delta: -12.8, unit: "lb", since: "Apr 2"), "Down 12.8 lb since Apr 2")
         XCTAssertEqual(HomeV2Copy.sinceSentence(delta: 0.3, unit: "kg", since: "Apr 2"), "Up 0.3 kg since Apr 2")
