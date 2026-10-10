@@ -6,10 +6,13 @@ import {
   parsePublicBaseUrl,
   progressPhotoObjectKey,
   progressPhotoOwnerPrefix,
+  progressPhotoAccountPrefix,
   publicProgressPhotoUrl,
   readR2PhotoStoreConfig,
 } from './r2-progress-photo-store';
 import { buildCanonicalRequest, formatAmzDate, presignS3Request } from './r2-aws-v4';
+
+const fixtureScope = { subject: 'owner-a', ownerId: '11111111-1111-4111-8111-111111111111' };
 
 const fixtureConfig = {
   accountId: 'a1b2c3d4e5f607182930aabbccddeeff',
@@ -65,19 +68,52 @@ describe('readR2PhotoStoreConfig', () => {
 });
 
 describe('progress photo object identity', () => {
+  it('separates account incarnations even with the same subject, metric and clock', () => {
+    const input = {
+      userId: 'owner-a',
+      metricsId: 'metric-owned',
+      contentType: 'image/jpeg' as const,
+      now: new Date('2026-08-17T18:00:00.000Z'),
+    };
+    const oldKey = progressPhotoObjectKey({
+      ...input,
+      ownerId: '11111111-1111-4111-8111-111111111111',
+    });
+    const newKey = progressPhotoObjectKey({
+      ...input,
+      ownerId: '22222222-2222-4222-8222-222222222222',
+    });
+    expect(oldKey).not.toBe(newKey);
+    expect(oldKey).toContain('/accounts/11111111-1111-4111-8111-111111111111/');
+    expect(newKey).toContain('/accounts/22222222-2222-4222-8222-222222222222/');
+  });
+
+  it.each(['', '../another-owner', 'not-a-uuid'])(
+    'rejects malformed account scope %s',
+    (ownerId) => {
+      expect(() => progressPhotoAccountPrefix({ subject: 'owner-a', ownerId })).toThrow(
+        'invalid_product_owner_id',
+      );
+    },
+  );
+
   it('scopes keys to the authenticated owner and rejects unsafe metric ids', () => {
     const now = new Date('2026-08-17T18:00:00.000Z');
     expect(
       progressPhotoObjectKey({
         userId: 'owner-a',
+        ownerId: '11111111-1111-4111-8111-111111111111',
         metricsId: 'metric-owned',
         contentType: 'image/jpeg',
         now,
       }),
-    ).toBe('progress-photos/owner-a/metric-owned_1786989600000.jpg');
+    ).toBe(
+      'progress-photos/owner-a/accounts/11111111-1111-4111-8111-111111111111/metric-owned_1786989600000.jpg',
+    );
     expect(() =>
       progressPhotoObjectKey({
         userId: 'owner-a',
+        ownerId: '11111111-1111-4111-8111-111111111111',
         metricsId: '../victim',
         contentType: 'image/jpeg',
         now,
@@ -108,6 +144,7 @@ describe('presigned R2 PUT tickets', () => {
     const ticket = createProgressPhotoUploadTicket({
       config: fixtureConfig,
       userId: 'owner-a',
+      ownerId: '11111111-1111-4111-8111-111111111111',
       metricsId: 'metric-owned',
       contentType: 'image/jpeg',
       now,
@@ -115,10 +152,12 @@ describe('presigned R2 PUT tickets', () => {
 
     expect(ticket.uploadMethod).toBe('PUT');
     expect(ticket.expiresIn).toBe(300);
-    expect(ticket.objectKey).toBe('progress-photos/owner-a/metric-owned_1786989600000.jpg');
+    expect(ticket.objectKey).toBe(
+      'progress-photos/owner-a/accounts/11111111-1111-4111-8111-111111111111/metric-owned_1786989600000.jpg',
+    );
     expect(ticket.storagePath).toBe(ticket.objectKey);
     expect(ticket.photoUrl).toBe(
-      'https://photos.logyourbody.com/progress-photos/owner-a/metric-owned_1786989600000.jpg',
+      'https://photos.logyourbody.com/progress-photos/owner-a/accounts/11111111-1111-4111-8111-111111111111/metric-owned_1786989600000.jpg',
     );
     expect(ticket.uploadHeaders).toEqual({ 'content-type': 'image/jpeg' });
 
@@ -126,7 +165,7 @@ describe('presigned R2 PUT tickets', () => {
     expect(upload.protocol).toBe('https:');
     expect(upload.host).toBe(fixtureConfig.apiHost);
     expect(upload.pathname).toBe(
-      '/lyb-progress-photos/progress-photos/owner-a/metric-owned_1786989600000.jpg',
+      '/lyb-progress-photos/progress-photos/owner-a/accounts/11111111-1111-4111-8111-111111111111/metric-owned_1786989600000.jpg',
     );
     expect(upload.searchParams.get('X-Amz-Algorithm')).toBe('AWS4-HMAC-SHA256');
     expect(upload.searchParams.get('X-Amz-SignedHeaders')).toBe('content-type;host');
@@ -199,6 +238,47 @@ describe('deleteOwnedProgressPhotos', () => {
     CLOUDFLARE_R2_PUBLIC_BASE_URL: fixtureConfig.publicBaseUrl,
   };
 
+  it('preserves a replacement account appearing during paginated old-account cleanup', async () => {
+    const oldScope = { subject: 'owner-a', ownerId: '11111111-1111-4111-8111-111111111111' };
+    const newScope = { subject: 'owner-a', ownerId: '22222222-2222-4222-8222-222222222222' };
+    const legacyKey = 'progress-photos/owner-a/legacy.jpg';
+    const oldKey = `${progressPhotoAccountPrefix(oldScope)}old.jpg`;
+    const newKey = `${progressPhotoAccountPrefix(newScope)}replacement.jpg`;
+    const remaining = new Set([legacyKey, oldKey]);
+    const deleted: string[] = [];
+    const fetcher = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (init?.method === 'DELETE') {
+        const key = decodeURIComponent(url.pathname.replace('/lyb-progress-photos/', ''));
+        deleted.push(key);
+        remaining.delete(key);
+        if (key === legacyKey) remaining.add(newKey);
+        return new Response(null, { status: 204 });
+      }
+      const secondPage = url.searchParams.has('continuation-token');
+      const keys = secondPage ? [oldKey, newKey] : [legacyKey];
+      return new Response(
+        '<ListBucketResult>' +
+          `<IsTruncated>${!secondPage}</IsTruncated>` +
+          (secondPage ? '' : '<NextContinuationToken>next</NextContinuationToken>') +
+          keys.map((key) => `<Contents><Key>${key}</Key></Contents>`).join('') +
+          '</ListBucketResult>',
+      );
+    });
+    await deleteOwnedProgressPhotos(oldScope, { env, fetcher: fetcher as typeof fetch });
+    expect(deleted).toEqual([legacyKey, oldKey]);
+    expect([...remaining]).toEqual([newKey]);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+  });
+
+  it('rejects an invalid account scope before contacting storage, including when unconfigured', async () => {
+    const fetcher = jest.fn();
+    await expect(
+      deleteOwnedProgressPhotos({ subject: 'owner-a', ownerId: '' }, { env: {}, fetcher }),
+    ).rejects.toThrow('invalid_product_owner_id');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it.each([
     '<ListBucketResult></ListBucketResult>',
     '<ListBucketResult><IsTruncated>unknown</IsTruncated></ListBucketResult>',
@@ -206,7 +286,7 @@ describe('deleteOwnedProgressPhotos', () => {
   ])('rejects an unqualified successful listing: %s', async (xml) => {
     const fetcher = jest.fn(async () => new Response(xml, { status: 200 }));
     await expect(
-      deleteOwnedProgressPhotos('owner-a', {
+      deleteOwnedProgressPhotos(fixtureScope, {
         env,
         fetcher: fetcher as unknown as typeof fetch,
       }),
@@ -240,12 +320,12 @@ describe('deleteOwnedProgressPhotos', () => {
     });
     const options = { env, fetcher: fetcher as unknown as typeof fetch };
 
-    await expect(deleteOwnedProgressPhotos('owner-a', options)).rejects.toThrow(
+    await expect(deleteOwnedProgressPhotos(fixtureScope, options)).rejects.toThrow(
       'r2_delete_failed_503',
     );
     expect([...remaining]).toEqual(['progress-photos/owner-a/two.jpg']);
     failSecondDelete = false;
-    await deleteOwnedProgressPhotos('owner-a', options);
+    await deleteOwnedProgressPhotos(fixtureScope, options);
     expect(remaining.size).toBe(0);
   });
 
@@ -258,7 +338,7 @@ describe('deleteOwnedProgressPhotos', () => {
     );
 
     await expect(
-      deleteOwnedProgressPhotos('owner-a', {
+      deleteOwnedProgressPhotos(fixtureScope, {
         env,
         fetcher: fetcher as unknown as typeof fetch,
       }),
@@ -278,7 +358,7 @@ describe('deleteOwnedProgressPhotos', () => {
     });
 
     await expect(
-      deleteOwnedProgressPhotos('owner-a', {
+      deleteOwnedProgressPhotos(fixtureScope, {
         env,
         fetcher: fetcher as unknown as typeof fetch,
       }),
@@ -305,7 +385,7 @@ describe('deleteOwnedProgressPhotos', () => {
       );
     });
 
-    await deleteOwnedProgressPhotos('owner-a', {
+    await deleteOwnedProgressPhotos(fixtureScope, {
       env,
       fetcher: fetcher as unknown as typeof fetch,
     });
@@ -319,7 +399,7 @@ describe('deleteOwnedProgressPhotos', () => {
 
   it('is a no-op when R2 is not configured', async () => {
     const fetcher = jest.fn();
-    await deleteOwnedProgressPhotos('owner-a', { env: {}, fetcher });
+    await deleteOwnedProgressPhotos(fixtureScope, { env: {}, fetcher });
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -338,7 +418,7 @@ describe('deleteOwnedProgressPhotos', () => {
       return new Response(null, { status: 204 });
     });
 
-    await deleteOwnedProgressPhotos('owner-a', {
+    await deleteOwnedProgressPhotos(fixtureScope, {
       env: {
         CLOUDFLARE_ACCOUNT_ID: fixtureConfig.accountId,
         CLOUDFLARE_R2_ACCESS_KEY_ID: fixtureConfig.accessKeyId,
@@ -362,7 +442,7 @@ describe('deleteOwnedProgressPhotos', () => {
     });
 
     await expect(
-      deleteOwnedProgressPhotos('owner-a', {
+      deleteOwnedProgressPhotos(fixtureScope, {
         env: {
           CLOUDFLARE_ACCOUNT_ID: fixtureConfig.accountId,
           CLOUDFLARE_R2_ACCESS_KEY_ID: fixtureConfig.accessKeyId,

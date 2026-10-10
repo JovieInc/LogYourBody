@@ -49,6 +49,8 @@ it('mobile deletion retains the captured owner across external cleanup', async (
   });
   const pending = mobileDelete(req());
   await entered.promise;
+  expect(deleteOwnedProgressPhotos).toHaveBeenCalledTimes(1);
+  expect(deleteOwnedProgressPhotos).toHaveBeenCalledWith(old);
   current = newer;
   release.resolve();
   expect((await pending).status).toBe(409);
