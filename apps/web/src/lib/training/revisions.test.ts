@@ -6,6 +6,7 @@ import {
 import { decisionBody, proposalBody, revisionHarness } from './revisions.testing';
 import { getOrCreateNextWorkout, storeProgramSetup } from './service';
 import { TRAINING_CONSENT_VERSION } from './types';
+import { storedProposalSchema } from './revision-contract';
 
 const now = new Date('2026-10-10T12:00:00Z');
 async function proposed(h = revisionHarness()) {
@@ -237,4 +238,105 @@ describe('reviewed initial training enrollment', () => {
     expect(trainingRequestHash({ b: 2, a: 1 })).toBe(trainingRequestHash({ a: 1, b: 2 }));
     expect(trainingRequestHash({ a: 1, b: 2 })).not.toBe(trainingRequestHash({ a: 1, b: 3 }));
   });
+});
+
+describe('historical training proposal incarnation', () => {
+  it('keeps an old proposal exportable while refusing a new apply', async () => {
+    const h = await proposed();
+    delete h.stored.proposal.context.ownerId;
+    expect(storedProposalSchema.parse(h.stored)).toEqual(h.stored);
+    expect(await h.port.exportForSubject('owner')).toMatchObject({ proposals: [h.stored] });
+    expect(
+      await decideInitialTrainingProposal({
+        revisions: h.port,
+        subject: 'owner',
+        body: decisionBody(h.id),
+        now,
+      }),
+    ).toEqual({ kind: 'stale_context' });
+    expect(h.port.decide).not.toHaveBeenCalled();
+  });
+  it('does not create a new proposal from a context missing owner incarnation', async () => {
+    const h = revisionHarness();
+    delete h.context.ownerId;
+    await expect(
+      createInitialTrainingProposal({
+        revisions: h.port,
+        subject: 'owner',
+        body: proposalBody,
+        now,
+      }),
+    ).rejects.toThrow('training_owner_incarnation_required');
+    expect(h.port.createProposal).not.toHaveBeenCalled();
+  });
+});
+
+it('reject cannot adopt a new owner context after a held old proposal read', async () => {
+  const h = await proposed();
+  let enter!: () => void;
+  let release!: () => void;
+  const entered = new Promise<void>((r) => {
+    enter = r;
+  });
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  jest.mocked(h.port.readProposal).mockImplementationOnce(async () => {
+    enter();
+    await gate;
+    return h.stored;
+  });
+  const decide = h.port.decide;
+  const originalDecide = jest.mocked(decide).getMockImplementation()!;
+  jest.mocked(decide).mockImplementation(async (input) => {
+    if (input.context.ownerId !== h.context.ownerId) return { kind: 'stale_context' };
+    return originalDecide(input);
+  });
+  const pending = decideInitialTrainingProposal({
+    revisions: h.port,
+    subject: 'owner',
+    body: decisionBody(h.id, 'reject'),
+    now,
+  });
+  await entered;
+  h.context.ownerId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const replacement = storedProposalSchema.parse(JSON.parse(JSON.stringify(h.stored)));
+  replacement.proposal.context.ownerId = h.context.ownerId;
+  h.proposals.set(h.id, replacement);
+  release();
+  expect(await pending).toEqual({ kind: 'stale_context' });
+  expect(h.proposals.get(h.id)?.status).toBe('proposed');
+});
+
+it('proposal creation retains its pre-read account context when a missing proposal read is held', async () => {
+  const h = revisionHarness();
+  let enter!: () => void;
+  let release!: () => void;
+  const entered = new Promise<void>((r) => {
+    enter = r;
+  });
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  jest.mocked(h.port.readProposal).mockImplementationOnce(async () => {
+    enter();
+    await gate;
+    return null;
+  });
+  const create = jest.mocked(h.port.createProposal).getMockImplementation()!;
+  jest.mocked(h.port.createProposal).mockImplementation(async (input) => {
+    if (input.proposal.context.ownerId !== h.context.ownerId) return { kind: 'stale_context' };
+    return create(input);
+  });
+  const pending = createInitialTrainingProposal({
+    revisions: h.port,
+    subject: 'owner',
+    body: proposalBody,
+    now,
+  });
+  await entered;
+  h.context.ownerId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  release();
+  expect(await pending).toEqual({ kind: 'stale_context' });
+  expect(h.proposals.size).toBe(0);
 });

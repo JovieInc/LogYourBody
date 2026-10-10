@@ -32,7 +32,9 @@ export function trainingRequestHash(value: unknown): string {
     .digest('hex');
 }
 function token(context: TrainingRevisionContext) {
+  if (!context.ownerId) throw new Error('training_owner_incarnation_required');
   return {
+    ownerId: context.ownerId,
     generation: context.generation,
     profileFingerprint: context.profileFingerprint,
     legacyFingerprint: context.legacyFingerprint,
@@ -81,13 +83,13 @@ export async function createInitialTrainingProposal(input: {
   const body = parsed.data;
   const id = stableTrainingUuid(input.subject, 'initial-training-proposal', body.requestId);
   const requestHash = trainingRequestHash(body);
+  const context = await input.revisions.readContext(input.subject);
+  if (!context) return { kind: 'owner_missing' as const };
   const previous = await input.revisions.readProposal(input.subject, id);
   if (previous)
     return previous.requestHash === requestHash
       ? { kind: 'stored' as const, stored: previous }
       : { kind: 'request_conflict' as const };
-  const context = await input.revisions.readContext(input.subject);
-  if (!context) return { kind: 'owner_missing' as const };
   if (body.expectedGeneration !== context.generation) return { kind: 'stale_context' as const };
   if (!profileConfirmsAdult(context.dateOfBirth, input.now))
     return { kind: 'adult_profile_required' as const };
@@ -145,13 +147,13 @@ export async function decideInitialTrainingProposal(input: {
   const parsed = decideProposalInputSchema.safeParse(input.body);
   if (!parsed.success) return { kind: 'invalid_request' as const };
   const body = parsed.data;
+  const context = await input.revisions.readContext(input.subject);
+  if (!context) return { kind: 'owner_missing' as const };
   const stored = await input.revisions.readProposal(input.subject, body.proposalId);
   if (!stored) return { kind: 'proposal_not_found' as const };
   const proposal = stored.proposal;
   const revisionId = stableTrainingUuid(input.subject, 'training-revision', proposal.id);
   const setup = setupFor(proposal, input.now, revisionId);
-  const context = await input.revisions.readContext(input.subject);
-  if (!context) return { kind: 'owner_missing' as const };
   if (stored.status === 'proposed' && body.decision === 'apply') {
     if (!profileConfirmsAdult(context.dateOfBirth, input.now))
       return { kind: 'adult_profile_required' as const };

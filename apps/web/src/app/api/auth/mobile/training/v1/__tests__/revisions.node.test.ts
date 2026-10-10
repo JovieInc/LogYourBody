@@ -116,7 +116,8 @@ describe('in-flight legacy enrollment consent fence', () => {
       }),
     };
     jest.mocked(h.port.storeLegacySetup).mockImplementation(async (subject, setup, context) => {
-      if (context.generation !== h.context.generation) throw new Error('stale context');
+      if (context.generation !== h.context.generation || context.ownerId !== h.context.ownerId)
+        throw new Error('stale context');
       await h.records.push(subject, 'training_feedback', [
         { ...setup, record_type: 'program_setup' },
       ]);
@@ -164,6 +165,24 @@ describe('in-flight legacy enrollment consent fence', () => {
       expect.objectContaining({ consentVersion: TRAINING_CONSENT_VERSION }),
       expect.objectContaining({ generation: 0 }),
     );
+  });
+  it('held enrollment cannot cross delete/recreate with the same consent generation', async () => {
+    const h = legacy();
+    const pending = h.handlers.enroll(request('POST', body));
+    await h.entered.promise;
+    const oldOwner = h.context.ownerId;
+    await h.records.deleteAllForSubject('owner');
+    h.context.ownerId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    expect(h.context.generation).toBe(0);
+    h.release.resolve();
+    expect((await pending).status).toBe(503);
+    expect((await h.records.pull('owner', 'training_feedback')).records).toHaveLength(0);
+    expect(h.port.storeLegacySetup).toHaveBeenCalledWith(
+      'owner',
+      expect.anything(),
+      expect.objectContaining({ ownerId: oldOwner, generation: 0 }),
+    );
+    expect((await h.handlers.enroll(request('POST', body))).status).toBe(201);
   });
   it('enrollment first is fully removed by a later revoke; new explicit request captures fresh consent', async () => {
     const h = legacy();

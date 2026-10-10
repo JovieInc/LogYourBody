@@ -6,6 +6,8 @@ const timestamp = z.string().datetime({ offset: true });
 const uuid = z.string().uuid();
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const revisionContextSchema = z.object({
+  // Historical proposals remain exportable; new admissions require this field.
+  ownerId: uuid.optional(),
   generation: integer,
   profileFingerprint: z.string().min(1),
   legacyFingerprint: z.string().min(1),

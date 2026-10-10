@@ -1,3 +1,4 @@
+import { TrainingMutationError } from '@/lib/training/mutation-admission';
 import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
 import { profileConfirmsAdult } from '@/lib/training/eligibility';
 import { NextRequest, NextResponse } from 'next/server';
@@ -136,7 +137,9 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             weeklyFractionalVolume: result.weeklyFractionalVolume,
           }),
         );
-      } catch {
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
         return apiError('training_unavailable', 503);
       }
     },
@@ -260,10 +263,14 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             return apiError('session_not_active', 409);
           case 'set_not_in_session':
             return apiError('set_not_in_session', 400);
+          case 'set_conflict':
+            return apiError('set_conflict', 409);
           case 'rejected':
             return apiError('training_unavailable', 503);
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
         return apiError('training_unavailable', 503);
       }
     },
@@ -296,7 +303,9 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
           case 'rejected':
             return apiError('training_unavailable', 503);
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
         return apiError('training_unavailable', 503);
       }
     },

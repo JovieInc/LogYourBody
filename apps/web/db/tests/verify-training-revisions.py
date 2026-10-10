@@ -52,6 +52,8 @@ def main():
                 run(client + ['-f', str(web/'db/migrations'/migration)])
             run(client + ['-f', str(args.migration or web / 'db/migrations/20261010090000_training_revision_foundation.sql')])
 
+            run(client + ['-f', str(web / 'db/migrations/20261010103000_training_mutation_admission.sql')])
+
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
                 sql(f"insert into app_users(id,identity_provider,identity_subject,profile_data) values('{uuid.uuid4()}','jovie',{quote(subject)},'{{\"date_of_birth\":\"1990-01-01\"}}');")
@@ -70,7 +72,7 @@ def main():
                 ctx = context(subject)
                 proposal = dict(id=str(uuid.uuid4()), programId=str(uuid.uuid4()),
                     actor=dict(kind='self', subject=subject), createdAt='2026-10-10T12:00:00Z',
-                    context={k: ctx[k] for k in ['generation','profileFingerprint','legacyFingerprint']})
+                    context={k: ctx[k] for k in ['ownerId','generation','profileFingerprint','legacyFingerprint']})
                 body = dict(requestId=str(uuid.uuid4()), requestHash='original-create-body', proposal=proposal)
                 assert command(subject, 'create', body)['kind'] == 'stored'
                 return body
@@ -78,7 +80,7 @@ def main():
             def decision(created, action='apply', request_id=None):
                 proposal = created['proposal']
                 revision = str(uuid.uuid4())
-                return dict(requestId=request_id or str(uuid.uuid4()), proposalId=proposal['id'],
+                return dict(requestId=request_id or str(uuid.uuid4()), proposalId=proposal['id'], context=proposal['context'],
                     requestHash='body-' + action, now='2026-10-10T12:01:00Z', revisionId=revision,
                     setup=dict(id=proposal['programId'], programRevisionId=revision,
                         programPolicyVersion='hypertrophy-baseline-v1', consentVersion='hypertrophy-coach-v1',
@@ -248,10 +250,10 @@ def main():
             assert json.loads(result)['kind']=='stale_context' and counts(subject)==[1,0,1]
             # Existing no-head legacy enrollment remains replaceable, including old-consent state.
             legacy['consentVersion']='old-consent'; legacy['id']=str(uuid.uuid4())
-            assert command(subject,'legacy_enroll',{'setup':legacy,'context':{k:v for k,v in context(subject).items() if k in ['generation','profileFingerprint','legacyFingerprint']}})['kind']=='enrolled'
+            assert command(subject,'legacy_enroll',{'setup':legacy,'context':{k:v for k,v in context(subject).items() if k in ['ownerId','generation','profileFingerprint','legacyFingerprint']}})['kind']=='enrolled'
             subject=owner(); a=new_proposal(subject)
             assert command(subject,'apply',decision(a))['kind']=='decided'
-            assert command(subject,'legacy_enroll',{'setup':legacy,'context':{k:v for k,v in context(subject).items() if k in ['generation','profileFingerprint','legacyFingerprint']}})['kind']=='program_already_enrolled'
+            assert command(subject,'legacy_enroll',{'setup':legacy,'context':{k:v for k,v in context(subject).items() if k in ['ownerId','generation','profileFingerprint','legacyFingerprint']}})['kind']=='program_already_enrolled'
             check('legacy enrollment invalidates proposals; existing legacy replacement retained; canonical head cannot be bypassed')
             print(json.dumps({'passed':len(checks),'checks':checks,'scope':'disposable PostgreSQL16; synthetic rows; actual migration and extracted delete transaction'}))
         finally:

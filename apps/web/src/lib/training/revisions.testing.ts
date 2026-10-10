@@ -9,6 +9,7 @@ import { revisionReceiptSchema, type StoredTrainingProposal } from './revision-c
 export function revisionHarness() {
   const records = new MemoryTrainingRecords();
   const context: TrainingRevisionContext = {
+    ownerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     generation: 0,
     profileFingerprint: 'profile-v1',
     legacyFingerprint: 'empty',

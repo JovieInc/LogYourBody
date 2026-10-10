@@ -9,6 +9,7 @@ import {
 } from '@/lib/training/revision-contract';
 
 const contextSchema = revisionContextSchema.extend({
+  ownerId: z.string().uuid(),
   dateOfBirth: z.unknown(),
   legacySetups: z.array(z.unknown()),
   headRevision: z.string().uuid().nullable(),

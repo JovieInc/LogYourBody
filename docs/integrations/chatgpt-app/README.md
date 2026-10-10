@@ -26,7 +26,10 @@ Tools:
 
 `log_sets` only adds sets. It never overwrites a logged set and never logs beyond the
 engine's plan, so `destructiveHint: false` is accurate. It previews the plan before
-starting a session, so a misheard exercise name writes nothing.
+starting a session, so a misheard exercise name writes nothing. The shared set writer
+atomically keeps the first saved value for a session/exercise/set identity. Identical
+retries return that original record; different values return `set_conflict` (HTTP 409
+on the mobile route). A correction requires a separate, explicit update contract.
 
 Every number the tools return comes from the deterministic training engine or from the
 user's own logs. Enrollment, adult confirmation and the safety consent stay in the iOS app;
