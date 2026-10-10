@@ -158,13 +158,19 @@ struct ExportDataView: View {
         }
         .navigationTitle("Export Data")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
-                    dismiss()
-                }
-                .accessibilityLabel("Cancel export")
+        // The navigation-bar Cancel accessibility frame stays 36 points tall.
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                dismiss()
+            } label: {
+                Text("Cancel")
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .accessibilityLabel("Cancel export")
+            .padding(.horizontal, 24)
+            .padding(.bottom, 8)
         }
         .alert("Export failed", isPresented: $showError) {
             Button("Try Again") {

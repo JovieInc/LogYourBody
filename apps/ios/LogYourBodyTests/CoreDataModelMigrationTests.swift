@@ -4,6 +4,7 @@
 //
 import XCTest
 import CoreData
+import SQLite3
 @testable import LogYourBody
 
 final class CoreDataModelMigrationTests: XCTestCase {
@@ -324,4 +325,290 @@ final class CoreDataModelMigrationTests: XCTestCase {
         XCTAssertEqual(loadAttempts, 2)
         XCTAssertTrue(manager.persistentContainer.persistentStoreCoordinator.persistentStores.isEmpty)
     }
+
+    func testKilledMidMigrationKeepsCommittedMeasurementOnIsolatedStore() throws {
+        let seededURL = try seedRepresentativeV1Store()
+        defer { removeSQLiteFamily(seededURL) }
+
+        let snapshotURL = try interruptedUncommittedWriteSnapshot(of: seededURL)
+        defer { removeSQLiteFamily(snapshotURL) }
+        let walSize = sqliteFileSize(snapshotURL.path + "-wal")
+        XCTAssertGreaterThan(
+            walSize,
+            32,
+            "The isolated snapshot needs a real WAL frame from the killed write"
+        )
+
+        let description = NSPersistentStoreDescription(url: snapshotURL)
+        let manager = CoreDataManager(persistentStoreDescriptions: [description])
+        let settled = NSPredicate { _, _ in
+            manager.persistentStoreLoadState != .loading
+        }
+        wait(
+            for: [expectation(for: settled, evaluatedWith: manager, handler: nil)],
+            timeout: 15
+        )
+
+        guard manager.persistentStoreLoadState == .ready else {
+            XCTFail("Killed store did not recover: \(manager.persistentStoreLoadState)")
+            return
+        }
+        let stores = manager.persistentContainer.persistentStoreCoordinator.persistentStores
+        XCTAssertEqual(stores.map(\.url), [snapshotURL])
+        assertCommittedMeasurement(in: manager.persistentContainer.viewContext)
+        for store in stores {
+            try manager.persistentContainer.persistentStoreCoordinator.remove(store)
+        }
+    }
+
+    private func seedRepresentativeV1Store() throws -> URL {
+        let isolatedURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("KilledMidMigration-seed-\(UUID().uuidString).sqlite")
+        let appBundle = Bundle(for: CoreDataManager.self)
+        let modelBundle = try XCTUnwrap(
+            appBundle.url(forResource: "LogYourBody", withExtension: "momd")
+        )
+        let v1Model = try XCTUnwrap(
+            NSManagedObjectModel(contentsOf: modelBundle.appendingPathComponent("LogYourBody.mom"))
+        )
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: v1Model)
+        let store = try coordinator.addPersistentStore(
+            ofType: NSSQLiteStoreType,
+            configurationName: nil,
+            at: isolatedURL
+        )
+        let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+        context.persistentStoreCoordinator = coordinator
+        let legacyDate = Date(timeIntervalSince1970: 1_700_000_000)
+        var saveError: Error?
+        context.performAndWait {
+            do {
+                let syncMetadata = NSEntityDescription.insertNewObject(
+                    forEntityName: "SyncMetadata",
+                    into: context
+                )
+                syncMetadata.setPrimitiveValue("CachedBodyMetrics", forKey: "entityName")
+                syncMetadata.setValue("legacy-id", forKey: "entityId")
+
+                let bodyMetric = NSEntityDescription.insertNewObject(
+                    forEntityName: "CachedBodyMetrics",
+                    into: context
+                )
+                bodyMetric.setValue(Self.committedMeasurementID, forKey: "id")
+                bodyMetric.setValue(Self.committedUserID, forKey: "userId")
+                bodyMetric.setValue(legacyDate, forKey: "createdAt")
+                bodyMetric.setValue(legacyDate, forKey: "date")
+                bodyMetric.setValue(legacyDate, forKey: "lastModified")
+                bodyMetric.setValue(legacyDate, forKey: "updatedAt")
+                bodyMetric.setValue(Self.committedWeight, forKey: "weight")
+                bodyMetric.setValue(Self.committedWeightUnit, forKey: "weightUnit")
+                bodyMetric.setValue(Self.committedSource, forKey: "dataSource")
+                bodyMetric.setValue(Self.committedLocalDate, forKey: "localDate")
+                bodyMetric.setValue(Self.committedNote, forKey: "notes")
+                try context.save()
+            } catch {
+                saveError = error
+            }
+        }
+        try coordinator.remove(store)
+        if let saveError {
+            throw saveError
+        }
+        return isolatedURL
+    }
+
+    private func interruptedUncommittedWriteSnapshot(of storeURL: URL) throws -> URL {
+        var database: OpaquePointer?
+        let opened = sqlite3_open_v2(storeURL.path, &database, SQLITE_OPEN_READWRITE, nil)
+        guard opened == SQLITE_OK, let database else {
+            throw MigrationFixtureError.message("sqlite open failed \(opened)")
+        }
+
+        do {
+            try executeSQL(database, "PRAGMA journal_mode=WAL")
+            try executeSQL(database, "PRAGMA synchronous=FULL")
+            try executeSQL(database, "PRAGMA wal_autocheckpoint=0")
+            try executeSQL(database, "PRAGMA cache_size=1")
+            try executeSQL(database, "PRAGMA wal_checkpoint(TRUNCATE)")
+            try executeSQL(database, "BEGIN IMMEDIATE")
+            let changed = try writeTornMeasurement(database)
+            guard changed == 1 else {
+                throw MigrationFixtureError.message("torn update changed \(changed) rows")
+            }
+            let flushed = sqlite3_db_cacheflush(database)
+            guard flushed == SQLITE_OK else {
+                throw MigrationFixtureError.message("cache flush failed \(flushed)")
+            }
+            let walBytes = sqliteFileSize(storeURL.path + "-wal")
+            guard walBytes > 32 else {
+                throw MigrationFixtureError.message(
+                    "uncommitted write stayed in memory (\(walBytes) WAL bytes)"
+                )
+            }
+            let snapshotURL = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("KilledMidMigration-\(UUID().uuidString).sqlite")
+            try copySQLiteFamily(from: storeURL, to: snapshotURL)
+            try executeSQL(database, "ROLLBACK")
+            sqlite3_close(database)
+            return snapshotURL
+        } catch {
+            sqlite3_close(database)
+            throw error
+        }
+    }
+
+    private func writeTornMeasurement(_ database: OpaquePointer) throws -> Int {
+        var catalog: OpaquePointer?
+        let catalogSQL = "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+        guard sqlite3_prepare_v2(database, catalogSQL, -1, &catalog, nil) == SQLITE_OK, let catalog else {
+            throw MigrationFixtureError.message("unable to list sqlite tables")
+        }
+        defer { sqlite3_finalize(catalog) }
+
+        while sqlite3_step(catalog) == SQLITE_ROW {
+            guard let rawName = sqlite3_column_text(catalog, 0) else { continue }
+            let table = String(cString: rawName)
+            guard Self.isSafeSQLIdentifier(table) else { continue }
+            let names = try columnNames(database, table: table)
+            guard let target = try measurementColumns(database, table: table, names: names) else {
+                continue
+            }
+            let sql = """
+            UPDATE \(table)
+            SET \(target.weight) = 1.0, \(target.notes) = 'torn-write'
+            WHERE \(target.id) = '\(Self.committedMeasurementID)'
+            """
+            try executeSQL(database, sql)
+            return Int(sqlite3_changes(database))
+        }
+        return 0
+    }
+
+    private func columnNames(_ database: OpaquePointer, table: String) throws -> [String] {
+        var statement: OpaquePointer?
+        let sql = "PRAGMA table_info(\(table))"
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
+            throw MigrationFixtureError.message("unable to read columns for \(table)")
+        }
+        defer { sqlite3_finalize(statement) }
+        var names: [String] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let rawName = sqlite3_column_text(statement, 1) else { continue }
+            names.append(String(cString: rawName))
+        }
+        return names
+    }
+
+    private func measurementColumns(
+        _ database: OpaquePointer,
+        table: String,
+        names: [String]
+    ) throws -> (id: String, weight: String, notes: String)? {
+        var statement: OpaquePointer?
+        let sql = "SELECT * FROM \(table)"
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK, let statement else {
+            throw MigrationFixtureError.message("unable to read \(table)")
+        }
+        defer { sqlite3_finalize(statement) }
+        while sqlite3_step(statement) == SQLITE_ROW {
+            var idColumn: String?
+            var weightColumn: String?
+            var notesColumn: String?
+            for index in names.indices {
+                let name = names[index]
+                let column = Int32(index)
+                if sqlite3_column_type(statement, column) == SQLITE_TEXT,
+                   let raw = sqlite3_column_text(statement, column) {
+                    let text = String(cString: raw)
+                    if text == Self.committedMeasurementID {
+                        idColumn = name
+                    } else if text == Self.committedNote {
+                        notesColumn = name
+                    }
+                } else if sqlite3_column_type(statement, column) == SQLITE_FLOAT {
+                    let value = sqlite3_column_double(statement, column)
+                    if abs(value - Self.committedWeight) < 0.000001 {
+                        weightColumn = name
+                    }
+                }
+            }
+            if let idColumn, let weightColumn, let notesColumn,
+               Self.isSafeSQLIdentifier(idColumn),
+               Self.isSafeSQLIdentifier(weightColumn),
+               Self.isSafeSQLIdentifier(notesColumn) {
+                return (idColumn, weightColumn, notesColumn)
+            }
+        }
+        return nil
+    }
+
+    private func assertCommittedMeasurement(in context: NSManagedObjectContext) {
+        var fetched: [NSManagedObject] = []
+        context.performAndWait {
+            let request = NSFetchRequest<NSManagedObject>(entityName: "CachedBodyMetrics")
+            fetched = (try? context.fetch(request)) ?? []
+        }
+        XCTAssertEqual(fetched.count, 1)
+        guard let row = fetched.first else { return }
+        XCTAssertEqual(row.value(forKey: "id") as? String, Self.committedMeasurementID)
+        XCTAssertEqual(row.value(forKey: "userId") as? String, Self.committedUserID)
+        XCTAssertEqual(row.value(forKey: "notes") as? String, Self.committedNote)
+        XCTAssertEqual(row.value(forKey: "weightUnit") as? String, Self.committedWeightUnit)
+        XCTAssertEqual(row.value(forKey: "dataSource") as? String, Self.committedSource)
+        XCTAssertEqual(row.value(forKey: "localDate") as? String, Self.committedLocalDate)
+        let weight = (row.value(forKey: "weight") as? Double)
+            ?? (row.value(forKey: "weight") as? NSNumber)?.doubleValue
+        XCTAssertEqual(weight ?? -1, Self.committedWeight, accuracy: 0.000001)
+        XCTAssertEqual(row.value(forKey: "date") as? Date, Date(timeIntervalSince1970: 1_700_000_000))
+        XCTAssertNotEqual(row.value(forKey: "notes") as? String, "torn-write")
+    }
+
+    private func executeSQL(_ database: OpaquePointer, _ sql: String) throws {
+        var errorMessage: UnsafeMutablePointer<Int8>?
+        let result = sqlite3_exec(database, sql, nil, nil, &errorMessage)
+        guard result == SQLITE_OK else {
+            let detail = errorMessage.map { String(cString: $0) } ?? "sqlite \(result)"
+            sqlite3_free(errorMessage)
+            throw MigrationFixtureError.message(detail)
+        }
+    }
+
+    private func copySQLiteFamily(from source: URL, to destination: URL) throws {
+        let manager = FileManager.default
+        try manager.copyItem(at: source, to: destination)
+        for suffix in ["-wal", "-shm", "-journal"] {
+            let side = URL(fileURLWithPath: source.path + suffix)
+            guard manager.fileExists(atPath: side.path) else { continue }
+            try manager.copyItem(at: side, to: URL(fileURLWithPath: destination.path + suffix))
+        }
+    }
+
+    private func removeSQLiteFamily(_ storeURL: URL) {
+        for suffix in ["", "-wal", "-shm", "-journal"] {
+            try? FileManager.default.removeItem(at: URL(fileURLWithPath: storeURL.path + suffix))
+        }
+    }
+
+    private func sqliteFileSize(_ path: String) -> Int {
+        let size = try? FileManager.default.attributesOfItem(atPath: path)[.size] as? NSNumber
+        return size?.intValue ?? 0
+    }
+
+    private static func isSafeSQLIdentifier(_ value: String) -> Bool {
+        value.allSatisfy { character in
+            character.isLetter || character.isNumber || character == "_"
+        }
+    }
+
+    private static let committedMeasurementID = "body-metric-id"
+    private static let committedUserID = "user-id"
+    private static let committedWeight = 80.5
+    private static let committedWeightUnit = "kg"
+    private static let committedSource = "Manual"
+    private static let committedLocalDate = "2026-03-08"
+    private static let committedNote = "committed-note"
+}
+
+private enum MigrationFixtureError: Error {
+    case message(String)
 }

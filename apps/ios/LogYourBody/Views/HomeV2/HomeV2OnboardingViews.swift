@@ -18,7 +18,7 @@ enum HomeV2OnboardingCopy {
     static let terms = "Terms"
     static let privacy = "Privacy Policy"
     static let connectHealthTitle = "Connect Apple Health"
-    static let connectHealthBody = "We read your data so you don’t have to log it. Nothing is written back."
+    static let connectHealthBody = "We read your data so you don’t have to log it. Entries you add here are saved to Health too."
     static let readWeight = "Weight"
     static let readWeightDetail = "Measured, from your scale or app"
     static let readBodyFat = "Body fat"

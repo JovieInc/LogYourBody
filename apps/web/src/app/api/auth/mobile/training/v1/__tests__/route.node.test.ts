@@ -2,97 +2,11 @@
 
 import { NextRequest } from 'next/server';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
-import {
-  NATIVE_PRODUCT_RECORD_COLLECTIONS,
-  type NativeProductRecord,
-  type NativeProductRecordCollection,
-  type NativeProductRecordsPort,
-} from '@/lib/ports/native-product-records';
+import { MemoryTrainingRecords } from '@/lib/training/memory-records.testing';
 import { createTrainingRouteHandlers } from '../route-handlers';
 import { TRAINING_API_VERSION } from '../route-handlers';
 
 const tokens: Record<string, string> = { 'token-a': 'subject-a', 'token-b': 'subject-b' };
-
-class MemoryTrainingRecords implements NativeProductRecordsPort {
-  private readonly data = Object.fromEntries(
-    NATIVE_PRODUCT_RECORD_COLLECTIONS.map((collection) => [
-      collection,
-      new Map<string, NativeProductRecord>(),
-    ]),
-  ) as Record<NativeProductRecordCollection, Map<string, NativeProductRecord>>;
-
-  async push(
-    subject: string,
-    collection: NativeProductRecordCollection,
-    records: Array<Record<string, unknown>>,
-  ) {
-    const accepted: NativeProductRecord[] = [];
-    const rejected_ids: string[] = [];
-    for (const record of records) {
-      const id = typeof record.id === 'string' ? record.id : '';
-      if (!id) continue;
-      const existing = this.data[collection].get(id);
-      if (existing && existing.user_id !== subject) {
-        rejected_ids.push(id);
-        continue;
-      }
-      const stored = {
-        ...record,
-        id,
-        user_id: subject,
-        deleted_at: null,
-        server_updated_at: '2026-01-10T12:00:00.000Z',
-      } as NativeProductRecord;
-      this.data[collection].set(id, stored);
-      accepted.push(stored);
-    }
-    return { records: accepted, rejected_ids };
-  }
-
-  async pull(subject: string, collection: NativeProductRecordCollection) {
-    const records = [...this.data[collection].values()].filter(
-      (record) => record.user_id === subject,
-    );
-    return {
-      records,
-      deleted_ids: records.filter((record) => record.deleted_at).map((record) => record.id),
-      next_cursor: null,
-    };
-  }
-
-  async remove(subject: string, collection: NativeProductRecordCollection, ids: string[]) {
-    const deleted_ids: string[] = [];
-    for (const id of ids) {
-      const record = this.data[collection].get(id);
-      if (record?.user_id === subject) {
-        this.data[collection].set(id, { ...record, deleted_at: '2026-01-10T12:01:00.000Z' });
-        deleted_ids.push(id);
-      }
-    }
-    return { deleted_ids };
-  }
-
-  async endActiveGlp1Medications() {
-    return { updated: 0 };
-  }
-
-  async listAll(subject: string) {
-    return Object.fromEntries(
-      NATIVE_PRODUCT_RECORD_COLLECTIONS.map((collection) => [
-        collection,
-        [...this.data[collection].values()].filter(
-          (record) => record.user_id === subject && !record.deleted_at,
-        ),
-      ]),
-    ) as Record<NativeProductRecordCollection, NativeProductRecord[]>;
-  }
-
-  async deleteAllForSubject(subject: string) {
-    for (const records of Object.values(this.data)) {
-      for (const [id, record] of records) if (record.user_id === subject) records.delete(id);
-    }
-  }
-}
 
 function makeHarness(options: { enabled?: boolean; rateLimited?: boolean } = {}) {
   const records = new MemoryTrainingRecords();
@@ -308,5 +222,184 @@ describe('authenticated training API', () => {
       });
       expect(remaining.records.every((record) => record.deleted_at !== null)).toBe(true);
     }
+  });
+
+  it('restores acknowledged sets and their entered values when reopening an active session', async () => {
+    const { handlers } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const set = {
+      sessionId: session.id,
+      exerciseId: session.exercises[0].id,
+      setNumber: 1,
+      reps: 11,
+      loadKg: 22.5,
+      rir: 2,
+    };
+    expect((await handlers.logSet(request('POST', 'log-set', 'token-a', set))).status).toBe(201);
+    const reopened = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(reopened.session.id).toBe(session.id);
+    expect(reopened.session.loggedSets).toEqual([expect.objectContaining(set)]);
+    const otherAccount = await (await handlers.next(request('GET', 'next', 'token-b'))).json();
+    expect(otherAccount.session).toBeUndefined();
+  });
+
+  it('reports rejected check-ins as unavailable instead of saved', async () => {
+    const { handlers, records } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const push = records.push.bind(records);
+    jest
+      .spyOn(records, 'push')
+      .mockImplementation(async (subject, collection, rows) =>
+        rows.some((row) => row.record_type === 'session_feedback')
+          ? { records: [], rejected_ids: rows.map((row) => String(row.id)) }
+          : push(subject, collection, rows),
+      );
+    const response = await handlers.feedback(
+      request('POST', 'feedback', 'token-a', {
+        sessionId: session.id,
+        soreness: 3,
+        pump: 1,
+        performance: 'stable',
+        jointPain: 5,
+      }),
+    );
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ error: 'training_unavailable' });
+    expect(
+      (await records.pull('subject-a', 'training_feedback')).records.filter(
+        (row) => row.record_type === 'session_feedback',
+      ),
+    ).toEqual([]);
+  });
+
+  it('allows retry after a rejected completion and reports completion only after acknowledgment', async () => {
+    const { handlers, records } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const push = records.push.bind(records);
+    jest
+      .spyOn(records, 'push')
+      .mockImplementation(async (subject, collection, rows) =>
+        rows.some((row) => row.status === 'completed')
+          ? { records: [], rejected_ids: rows.map((row) => String(row.id)) }
+          : push(subject, collection, rows),
+      );
+    let lastSet;
+    let response;
+    for (const exercise of session.exercises) {
+      for (let setNumber = 1; setNumber <= exercise.sets; setNumber++) {
+        lastSet = {
+          sessionId: session.id,
+          exerciseId: exercise.id,
+          setNumber,
+          reps: 10,
+          loadKg: 15,
+          rir: 3,
+        };
+        response = await handlers.logSet(request('POST', 'log-set', 'token-a', lastSet));
+      }
+    }
+    expect(response?.status).toBe(503);
+    expect((await records.pull('subject-a', 'training_sessions')).records[0].status).toBe(
+      'in_progress',
+    );
+    jest.restoreAllMocks();
+    const retry = await handlers.logSet(request('POST', 'log-set', 'token-a', lastSet));
+    expect(retry.status).toBe(201);
+    await expect(retry.json()).resolves.toMatchObject({ sessionComplete: true });
+    expect((await records.pull('subject-a', 'training_sessions')).records[0].status).toBe(
+      'completed',
+    );
+    expect((await records.pull('subject-a', 'logged_sets')).records).toHaveLength(
+      session.exercises.reduce(
+        (total: number, exercise: { sets: number }) => total + exercise.sets,
+        0,
+      ),
+    );
+    // A lost successful response must be retryable after the session has completed.
+    const repeated = await handlers.logSet(request('POST', 'log-set', 'token-a', lastSet));
+    expect(repeated.status).toBe(201);
+    await expect(repeated.json()).resolves.toMatchObject({ sessionComplete: true });
+    const changed = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', { ...lastSet, reps: 12 }),
+    );
+    expect(changed.status).toBe(409);
+  });
+
+  it.each(['in_progress', 'completed'])(
+    'rejects a replay of a deleted %s session without recreating records',
+    async (status) => {
+      const { handlers, records } = makeHarness();
+      await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+      const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+      const sets = session.exercises.flatMap((exercise: { id: string; sets: number }) =>
+        Array.from({ length: exercise.sets }, (_, index) => ({
+          sessionId: session.id,
+          exerciseId: exercise.id,
+          setNumber: index + 1,
+          reps: 10,
+          loadKg: 15,
+          rir: 3,
+        })),
+      );
+      for (const set of status === 'completed' ? sets : sets.slice(0, 1)) {
+        expect((await handlers.logSet(request('POST', 'log-set', 'token-a', set))).status).toBe(
+          201,
+        );
+      }
+      expect((await records.pull('subject-a', 'training_sessions')).records[0].status).toBe(status);
+      const originalLogs = (await records.pull('subject-a', 'logged_sets')).records;
+      // Revocation can stop after deleting sessions, before removing logs and setup.
+      await records.remove('subject-a', 'training_sessions', [session.id]);
+      const tombstone = (await records.pull('subject-a', 'training_sessions')).records[0];
+      expect(tombstone.deleted_at).not.toBeNull();
+      const push = jest.spyOn(records, 'push');
+      expect((await handlers.logSet(request('POST', 'log-set', 'token-a', sets[0]))).status).toBe(
+        404,
+      );
+      expect(push).not.toHaveBeenCalled();
+      expect((await records.pull('subject-a', 'training_sessions')).records).toEqual([tombstone]);
+      expect((await records.pull('subject-a', 'logged_sets')).records).toEqual(originalLogs);
+    },
+  );
+
+  it('reconciles a saved final set after interruption before reopening the next session', async () => {
+    const { handlers, records } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const push = records.push.bind(records);
+    const reject = jest
+      .spyOn(records, 'push')
+      .mockImplementation(async (subject, collection, rows) =>
+        rows.some((row) => row.status === 'completed')
+          ? { records: [], rejected_ids: rows.map((row) => String(row.id)) }
+          : push(subject, collection, rows),
+      );
+    for (const exercise of session.exercises) {
+      for (let setNumber = 1; setNumber <= exercise.sets; setNumber++) {
+        await handlers.logSet(
+          request('POST', 'log-set', 'token-a', {
+            sessionId: session.id,
+            exerciseId: exercise.id,
+            setNumber,
+            reps: 10,
+            loadKg: 15,
+            rir: 3,
+          }),
+        );
+      }
+    }
+    expect((await handlers.next(request('GET', 'next', 'token-a'))).status).toBe(503);
+    reject.mockRestore();
+    const reopened = await handlers.next(request('GET', 'next', 'token-a'));
+    expect(reopened.status).toBe(200);
+    const body = await reopened.json();
+    expect(body.session.id).not.toBe(session.id);
+    expect(body.session.loggedSets).toEqual([]);
+    const sessions = (await records.pull('subject-a', 'training_sessions')).records;
+    expect(sessions.find((row) => row.id === session.id)?.status).toBe('completed');
+    expect(sessions.filter((row) => row.status === 'in_progress')).toHaveLength(1);
   });
 });

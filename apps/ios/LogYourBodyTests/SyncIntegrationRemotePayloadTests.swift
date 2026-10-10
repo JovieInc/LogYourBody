@@ -13,14 +13,46 @@ import UIKit
 
 @MainActor
 final class SyncIntegrationRemotePayloadTests: XCTestCase {
+    private var suiteName = ""
+    private var defaults: UserDefaults!
+    private var auth: AuthManager!
+    private var coreData: CoreDataManager!
+    private var networkSession: URLSession!
+
     override func setUp() async throws {
         try await super.setUp()
-        try await CoreDataManager.shared.deleteAllDataAndWait()
+        suiteName = "SyncIntegrationRemotePayloadTests.\(UUID().uuidString)"
+        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [HealthImportNoNetworkProtocol.self]
+        networkSession = URLSession(configuration: configuration)
+        auth = AuthManager(userDefaults: defaults, urlSession: networkSession)
+        let store = NSPersistentStoreDescription()
+        store.type = NSInMemoryStoreType
+        store.shouldAddStoreAsynchronously = false
+        coreData = CoreDataManager(persistentStoreDescriptions: [store])
     }
 
     override func tearDown() async throws {
-        try await CoreDataManager.shared.deleteAllDataAndWait()
+        defaults?.removePersistentDomain(forName: suiteName)
+        auth = nil
+        coreData = nil
+        defaults = nil
+        networkSession?.invalidateAndCancel()
+        networkSession = nil
         try await super.tearDown()
+    }
+
+    private func healthKitManager() -> HealthKitManager {
+        HealthKitManager(
+            userDefaults: defaults, authManager: auth, coreDataManager: coreData,
+            syncTrigger: {}, importCompletion: { _ in }
+        )
+    }
+
+    private func setAccount(_ user: LocalUser) {
+        auth.authSession = .localFixture(subject: user.id, email: user.email, accessToken: "synthetic")
+        auth.currentUser = user
     }
 
     private func wholeSecondDate(_ offset: TimeInterval = 0) -> Date {
@@ -28,7 +60,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     private func cachedBodyMetric(id: String) async -> CachedBodyMetrics? {
-        let context = CoreDataManager.shared.viewContext
+        let context = coreData.viewContext
 
         return await context.perform {
             let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
@@ -40,7 +72,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     private func cachedProfiles(id: String) async -> [CachedProfile] {
-        let context = CoreDataManager.shared.viewContext
+        let context = coreData.viewContext
 
         return await context.perform {
             let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
@@ -83,7 +115,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testUpdateOrCreateDailyMetric_MapsProductAPIPayload() async throws {
-        let coreData = CoreDataManager.shared
+        let coreData = self.coreData!
 
         let id = UUID().uuidString
         let userId = "sync_test_user_daily_\(UUID().uuidString)"
@@ -118,7 +150,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testUpdateOrCreateProfile_IsIdempotentForSameId() async throws {
-        let coreData = CoreDataManager.shared
+        let coreData = self.coreData!
 
         let userId = "sync_test_user_profile_\(UUID().uuidString)"
         let firstPayload: [String: Any] = [
@@ -158,7 +190,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testSyncLocalChanges_OmitsMissingProfileHeight() async throws {
-        let coreData = CoreDataManager.shared
+        let coreData = self.coreData!
 
         let userId = "sync_test_user_profile_no_height_\(UUID().uuidString)"
         let profile = UserProfile(
@@ -188,9 +220,10 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         XCTAssertNil(pendingProfile.height)
 
         let stubProductAPI = StubProductAPIClient()
+        stubProductAPI.session = networkSession
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
-            authManager: AuthManager.shared,
+            authManager: auth,
             productAPIClient: stubProductAPI
         )
 
@@ -208,7 +241,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testUpdateOrCreateBodyMetric_PreservesDateWhenServerSendsFractionalISO8601() async throws {
-        let coreData = CoreDataManager.shared
+        let coreData = self.coreData!
         let id = UUID().uuidString
         let userId = "sync_test_user_fractional_iso_\(UUID().uuidString)"
         let measuredAt = Date(timeIntervalSince1970: 1_776_082_500) // 2026-04-13T12:15:00Z
@@ -265,7 +298,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testUpdateOrCreateBodyMetric_IsIdempotentForSameId() async throws {
-        let coreData = CoreDataManager.shared
+        let coreData = self.coreData!
 
         let id = UUID().uuidString
         let userId = "sync_test_user_body_idempotent_\(UUID().uuidString)"
@@ -308,7 +341,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testUpdateOrCreateBodyMetric_DoesNotOverwriteDeletedLocalTombstone() async throws {
-        let coreData = CoreDataManager.shared
+        let coreData = self.coreData!
 
         let id = UUID().uuidString
         let userId = "sync_test_user_body_deleted_payload_\(UUID().uuidString)"
@@ -372,7 +405,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testUpdateOrCreateDailyMetric_IsIdempotentForSameId() async throws {
-        let coreData = CoreDataManager.shared
+        let coreData = self.coreData!
 
         let id = UUID().uuidString
         let userId = "sync_test_user_daily_idempotent_\(UUID().uuidString)"
@@ -414,8 +447,8 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testProcessBatchHealthKitData_RespectsExistingEntriesWithinSameHour() async throws {
-        let coreData = CoreDataManager.shared
-        let healthKitManager = HealthKitManager.shared
+        let coreData = self.coreData!
+        let healthKitManager = healthKitManager()
 
         let userId = "healthkit_test_user_existing_\(UUID().uuidString)"
         let user = LocalUser(
@@ -426,7 +459,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
             profile: nil,
             onboardingCompleted: false
         )
-        AuthManager.shared.currentUser = user
+        setAccount(user)
 
         let calendar = Calendar.current
         let day = calendar.startOfDay(for: Date())
@@ -483,8 +516,8 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testProcessBatchHealthKitData_DeduplicatesMultipleWeightsInSameHour() async throws {
-        let coreData = CoreDataManager.shared
-        let healthKitManager = HealthKitManager.shared
+        let coreData = self.coreData!
+        let healthKitManager = healthKitManager()
 
         let userId = "healthkit_test_user_batch_\(UUID().uuidString)"
         let user = LocalUser(
@@ -495,7 +528,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
             profile: nil,
             onboardingCompleted: false
         )
-        AuthManager.shared.currentUser = user
+        setAccount(user)
 
         let calendar = Calendar.current
         let day = calendar.startOfDay(for: Date())
@@ -522,8 +555,8 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testProcessBatchHealthKitData_AssignsBodyFatForMatchingDate() async throws {
-        let coreData = CoreDataManager.shared
-        let healthKitManager = HealthKitManager.shared
+        let coreData = self.coreData!
+        let healthKitManager = healthKitManager()
 
         let userId = "healthkit_test_user_bodyfat_\(UUID().uuidString)"
         let user = LocalUser(
@@ -534,7 +567,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
             profile: nil,
             onboardingCompleted: false
         )
-        AuthManager.shared.currentUser = user
+        setAccount(user)
 
         let calendar = Calendar.current
         let day = calendar.startOfDay(for: Date())
@@ -568,8 +601,8 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testProcessBatchHealthKitData_AttachesSourceMetadataToImportedMetrics() async throws {
-        let coreData = CoreDataManager.shared
-        let healthKitManager = HealthKitManager.shared
+        let coreData = self.coreData!
+        let healthKitManager = healthKitManager()
 
         let userId = "healthkit_test_user_metadata_\(UUID().uuidString)"
         let user = LocalUser(
@@ -580,7 +613,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
             profile: nil,
             onboardingCompleted: false
         )
-        AuthManager.shared.currentUser = user
+        setAccount(user)
 
         let calendar = Calendar.current
         let day = calendar.startOfDay(for: Date())

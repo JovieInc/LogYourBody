@@ -137,8 +137,8 @@ export async function POST(request: NextRequest) {
             method: 'pdf-lib-extraction',
           });
         }
-      } catch (pdfLibError) {
-        console.error('pdf-lib also failed:', pdfLibError);
+      } catch {
+        console.error('pdf-lib extraction failed');
       }
     }
 
@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
       // Weight should be reasonable (20-300 kg or 44-660 lbs)
       const weightInKg = scan.weight_unit === 'lbs' ? scan.weight * 0.453592 : scan.weight;
       if (weightInKg < 20 || weightInKg > 300) {
-        console.warn('Invalid weight detected:', scan.weight, scan.weight_unit);
+        console.warn('Invalid weight detected');
         return false;
       }
 
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
           scan.body_fat_percentage < 3 ||
           scan.body_fat_percentage > 60)
       ) {
-        console.warn('Invalid body fat percentage:', scan.body_fat_percentage);
+        console.warn('Invalid body fat percentage');
         return false;
       }
 

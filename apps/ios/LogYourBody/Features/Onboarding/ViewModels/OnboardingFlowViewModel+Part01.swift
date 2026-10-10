@@ -58,10 +58,8 @@ func goToNextStep() {
             currentStep = .loading
         case .loading:
             currentStep = .bodyScore
-        case .bodyScore:
-            currentStep = .defaultHomeMode
-        case .defaultHomeMode:
-            advanceFromDefaultHomeMode()
+        case .bodyScore, .defaultHomeMode:
+            advanceFromReveal()
         case .emailCapture:
             advanceFromEmailCapture()
         case .account:
@@ -125,11 +123,11 @@ func goBack() {
         case .defaultHomeMode:
             currentStep = .bodyScore
         case .emailCapture:
-            currentStep = .defaultHomeMode
+            currentStep = .bodyScore
         case .account:
             currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .emailCapture
         case .profileDetails:
-            currentStep = hasAuthenticatedAccountEmail ? .defaultHomeMode : .account
+            currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .account
         case .firstPhoto: currentStep = .profileDetails
         case .paywall: currentStep = includesFirstPhotoStep ? .firstPhoto : .profileDetails
         }
@@ -143,7 +141,9 @@ func advanceFromBodyFatChoice() {
         }
     }
 
-func advanceFromDefaultHomeMode() {
+/// Leaves the fat-vs-muscle reveal. Home opens on its default view; people
+/// change it in Settings instead of answering a question before they've seen Home.
+func advanceFromReveal() {
         UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
 
         if entryContext == .preAuth {
@@ -265,10 +265,8 @@ func progressMilestone(for step: Step) -> ProgressMilestone? {
             return .basics
         case .healthConnect, .healthConfirmation, .manualWeight, .bodyFatChoice, .bodyFatNumeric, .bodyFatVisual:
             return .measurements
-        case .bodyScore:
+        case .bodyScore, .defaultHomeMode:
             return .score
-        case .defaultHomeMode:
-            return .home
         case .emailCapture, .account, .profileDetails:
             return .profile
         case .firstPhoto:
@@ -293,17 +291,21 @@ func progressMilestone(for step: Step) -> ProgressMilestone? {
             return
         }
 
-        let granted = await healthKitManager.requestAuthorization()
-        if granted {
+        _ = await healthKitManager.requestAuthorization()
+        let followUp = HealthKitAuthorizationPolicy.onboardingFollowUp(
+            healthKitManager.lastAuthorizationResolution
+        )
+        switch followUp {
+        case .importHealth:
             didRequestHealthSync = true
             AppServicePorts.analyticsTracker.track(
-                event: "onboarding_health_import_authorized"
+                event: HealthKitAuthorizationPolicy.onboardingAnalyticsEvent(followUp)
             )
             currentStep = .healthConfirmation
             await fetchHealthMetrics()
-        } else {
+        case .manualAfterEmptyRead, .manualAfterRequestFailure:
             AppServicePorts.analyticsTracker.track(
-                event: "onboarding_health_import_denied"
+                event: HealthKitAuthorizationPolicy.onboardingAnalyticsEvent(followUp)
             )
             currentStep = .manualWeight
         }

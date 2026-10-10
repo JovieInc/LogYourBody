@@ -468,7 +468,7 @@ struct LiquidPhotoAnchor: View {
                     AsyncImage(url: URL(string: photoUrl)) { image in
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .scaledToFill()
                             .frame(width: 24, height: 24)
                             .clipShape(Circle())
                             .onAppear { imageLoaded = true }

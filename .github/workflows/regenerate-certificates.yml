@@ -1,23 +1,38 @@
 name: Regenerate Certificates
 
+# Manual only. There is no schedule. LYB-74: a monthly cron failed every month
+# since at least March at "Clean certificates repository" (JovieInc/certificates
+# is not reachable), and the first lane runs match_nuke on distribution and
+# development certificates while swallowing errors. A repository variable must
+# not be enough to turn that back on.
+# https://linear.app/jovie/issue/LYB-74
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "REGENERATE" to confirm certificate regeneration'
+        description: 'Type NUKE-AND-REGENERATE to destroy and recreate certificates'
         required: true
         type: string
-  schedule:
-    # Run on the 1st of every month at 2 AM UTC
-    - cron: '0 2 1 * *'
+
+concurrency:
+  group: regenerate-certificates
+  cancel-in-progress: false
 
 jobs:
   regenerate-certificates:
     name: Regenerate Match Certificates
     runs-on: macos-14
-    if: github.event_name == 'schedule' || github.event.inputs.confirm == 'REGENERATE'
-    
     steps:
+      - name: Require NUKE-AND-REGENERATE
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM" != "NUKE-AND-REGENERATE" ]; then
+            echo "::error::Refusing to nuke certificates. Dispatch confirm must be NUKE-AND-REGENERATE."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -179,20 +194,36 @@ jobs:
           
           echo "✅ Certificates regenerated successfully!"
 
+      - name: Detect Slack webhook
+        id: slack
+        if: always() && vars.CERT_REGEN_SLACK_ENABLED == 'true'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${SLACK_WEBHOOK_URL}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CERT_REGEN_SLACK_ENABLED is true but SLACK_WEBHOOK_URL is unset; skipping Slack."
+          fi
+
       - name: Send notification on failure
-        if: failure()
+        if: failure() && vars.CERT_REGEN_SLACK_ENABLED == 'true' && steps.slack.outputs.enabled == 'true'
         uses: 8398a7/action-slack@v3
         with:
           status: failure
           text: '❌ Certificate regeneration failed! Check the workflow logs.'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         continue-on-error: true
 
       - name: Send notification on success
-        if: success()
+        if: success() && vars.CERT_REGEN_SLACK_ENABLED == 'true' && steps.slack.outputs.enabled == 'true'
         uses: 8398a7/action-slack@v3
         with:
           status: success
           text: '✅ Certificates regenerated successfully!'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         continue-on-error: true

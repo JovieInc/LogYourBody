@@ -247,12 +247,17 @@ describe('PDF Parsing API', () => {
         body: formData,
       });
 
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
       const response = await POST(request);
       const data = await response.json();
+      const logged = warn.mock.calls.flat().join(' ');
+      warn.mockRestore();
 
       expect(response.status).toBe(200);
       expect(data.success).toBe(false);
       expect(data.error).toBe('No valid scan data found');
+      expect(logged).not.toContain('700');
+      expect(logged).not.toContain('15.5');
     });
 
     it('should reject invalid body fat percentage', async () => {

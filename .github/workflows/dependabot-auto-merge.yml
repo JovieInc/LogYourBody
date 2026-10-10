@@ -10,3 +10,7 @@ permissions: {}
 jobs:
   call:
     uses: JovieInc/ci/.github/workflows/dependabot-auto-merge.yml@main
+    with:
+      # Enrollment itself is exact-head and does not read this label.
+      # The shared workflow still applies it to patch and minor Dependabot PRs.
+      certification_labels: 'machine-certified'

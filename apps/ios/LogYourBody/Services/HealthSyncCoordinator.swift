@@ -5,6 +5,27 @@
 
 import Foundation
 
+enum HealthKitAccountSyncPolicy {
+    static let accountIdKey = "healthKitSyncAccountId"
+
+    static func admitsImport(currentUserId: String, boundAccountId: String?) -> Bool {
+        guard let boundAccountId, !boundAccountId.isEmpty else { return true }
+        return boundAccountId == currentUserId
+    }
+
+    static func bindIfUnbound(userId: String?, syncEnabled: Bool, defaults: UserDefaults) {
+        guard syncEnabled, let userId, !userId.isEmpty else { return }
+        let existing = defaults.string(forKey: accountIdKey)
+        guard existing == nil || existing?.isEmpty == true else { return }
+        defaults.set(userId, forKey: accountIdKey)
+    }
+
+    static func claim(userId: String?, defaults: UserDefaults) {
+        guard let userId, !userId.isEmpty else { return }
+        defaults.set(userId, forKey: accountIdKey)
+    }
+}
+
 protocol HealthKitSyncManaging: AnyObject {
     var isHealthKitAvailable: Bool { get }
     var isAuthorized: Bool { get }
@@ -16,10 +37,19 @@ protocol HealthKitSyncManaging: AnyObject {
     func setupBackgroundDelivery() async throws
     func setupStepCountBackgroundDelivery() async throws
     func resetForCurrentUser() async
+    func suspendAutomaticImportAfterSignOut() async
+    func admitsAutomaticImportForCurrentAccount() -> Bool
+    func claimAutomaticImportAccount() async
     func syncWeightFromHealthKit() async throws
     func syncStepsFromHealthKit() async throws
     func fetchTodayStepCount() async throws -> Int
     func forceFullHealthKitSync() async -> Bool
+}
+
+extension HealthKitSyncManaging {
+    func suspendAutomaticImportAfterSignOut() async {}
+    func admitsAutomaticImportForCurrentAccount() -> Bool { true }
+    func claimAutomaticImportAccount() async {}
 }
 
 extension HealthKitManager: HealthKitSyncManaging {}
@@ -71,6 +101,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
 
         guard syncEnabled else { return }
         guard healthKitManager.isHealthKitAvailable else { return }
+        guard healthKitManager.admitsAutomaticImportForCurrentAccount() else { return }
 
         if hasBootstrappedObservers {
             return
@@ -100,6 +131,14 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         await healthKitManager.resetForCurrentUser()
     }
 
+    /// Stop observers after sign-out without erasing the account that owns
+    /// automatic import. The same account can bootstrap again. Another
+    /// account cannot inherit this device's HealthKit sync.
+    func suspendAutomaticImportAfterSignOut() async {
+        hasBootstrappedObservers = false
+        await healthKitManager.suspendAutomaticImportAfterSignOut()
+    }
+
     /// Ensure observers and background delivery are configured after the
     /// user has granted authorization, then kick off an initial weight sync
     /// in the background. Intended for settings-based toggles.
@@ -109,6 +148,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
             category: "healthKitCoordinator"
         )
 
+        await healthKitManager.claimAutomaticImportAccount()
         guard healthKitManager.isAuthorized else { return }
 
         bootstrapIfNeeded(syncEnabled: true)
@@ -128,6 +168,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
             category: "healthKitCoordinator"
         )
 
+        await healthKitManager.claimAutomaticImportAccount()
         guard healthKitManager.isAuthorized else { return }
 
         bootstrapIfNeeded(syncEnabled: true)
@@ -169,6 +210,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
             category: "healthKitCoordinator"
         )
 
+        await healthKitManager.claimAutomaticImportAccount()
         bootstrapIfNeeded(syncEnabled: true)
         try await healthKitManager.setupBackgroundDelivery()
         try await healthKitManager.setupStepCountBackgroundDelivery()
@@ -188,6 +230,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
             ]
         )
 
+        await healthKitManager.claimAutomaticImportAccount()
         guard healthKitManager.isAuthorized else { return }
 
         bootstrapIfNeeded(syncEnabled: true)

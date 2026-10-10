@@ -56,6 +56,20 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: version,
   },
 
+  // RFC 9728 protected-resource metadata for the MCP server (see src/lib/mcp/contract.ts).
+  async rewrites() {
+    return [
+      {
+        source: '/.well-known/oauth-protected-resource/api/mcp',
+        destination: '/api/mcp/oauth-protected-resource',
+      },
+      {
+        source: '/.well-known/oauth-protected-resource',
+        destination: '/api/mcp/oauth-protected-resource',
+      },
+    ];
+  },
+
   // Headers for apple-app-site-association
   async headers() {
     return [

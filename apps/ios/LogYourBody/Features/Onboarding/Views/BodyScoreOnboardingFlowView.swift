@@ -35,10 +35,8 @@ struct BodyScoreOnboardingFlowView: View {
                 BodyScoreBodyFatVisualView(viewModel: viewModel)
             case .loading:
                 BodyScoreLoadingView(viewModel: viewModel)
-            case .bodyScore:
+            case .bodyScore, .defaultHomeMode:
                 BodyScoreRevealView(viewModel: viewModel)
-            case .defaultHomeMode:
-                BodyScoreDefaultHomeModeView(viewModel: viewModel)
             case .emailCapture:
                 BodyScoreEmailCaptureView(viewModel: viewModel)
             case .account:
@@ -67,42 +65,6 @@ struct BodyScoreOnboardingFlowView: View {
                 ]
             )
         }
-    }
-}
-
-private struct BodyScoreDefaultHomeModeView: View {
-    @ObservedObject var viewModel: OnboardingFlowViewModel
-
-    var body: some View {
-        OnboardingPageTemplate(
-            title: "What should Home answer first?",
-            subtitle: "Choose a quick answer or visual timeline. You can switch anytime in Settings.",
-            onBack: { viewModel.goBack() },
-            progress: viewModel.progress(for: .defaultHomeMode),
-            screen: .chooseHomeView,
-            content: {
-                VStack(spacing: 12) {
-                    ForEach(DefaultHomeMode.allCases) { mode in
-                        OnboardingOptionButton(
-                            title: mode.title,
-                            subtitle: mode.subtitle,
-                            isSelected: viewModel.defaultHomeMode == mode,
-                            action: {
-                                viewModel.updateDefaultHomeMode(mode)
-                                HapticManager.shared.selection()
-                            }
-                        )
-                    }
-                }
-            },
-            footer: {
-                Button("Continue") {
-                    viewModel.goToNextStep()
-                }
-                .buttonStyle(OnboardingPrimaryButtonStyle())
-                .disabled(!viewModel.canContinueDefaultHomeMode)
-            }
-        )
     }
 }
 

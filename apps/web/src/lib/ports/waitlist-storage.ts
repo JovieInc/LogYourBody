@@ -4,5 +4,9 @@ export interface WaitlistEntryInput {
 }
 
 export interface WaitlistStoragePort {
-  accept(entry: WaitlistEntryInput): Promise<void>;
+  accept(entry: WaitlistEntryInput): Promise<{ created: boolean }>;
+  countRegistrations(window: { from: string; to: string }): Promise<{
+    count: number;
+    observedAt: string;
+  }>;
 }

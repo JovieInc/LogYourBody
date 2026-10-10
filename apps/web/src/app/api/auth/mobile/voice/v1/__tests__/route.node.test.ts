@@ -19,7 +19,7 @@ function createHandlers(overrides: Partial<Parameters<typeof createVoiceRouteHan
   };
   const dependencies: Parameters<typeof createVoiceRouteHandlers>[0] = {
     authenticate: jest.fn(async () => ({ sub: 'user-1' }) as never),
-    enabled: () => true,
+    access: () => 'ok',
     provider: () => provider,
     voiceId: () => 'A4j35F5T4XsPMeXd06Pm',
     reserveRequest: jest.fn(async () => ({
@@ -53,7 +53,7 @@ describe('mobile voice routes', () => {
   });
 
   it('does not call a provider when voice is disabled', async () => {
-    const { handlers, provider } = createHandlers({ enabled: () => false });
+    const { handlers, provider } = createHandlers({ access: () => 'disabled' });
     const request = new NextRequest('http://localhost/api/auth/mobile/voice/v1/speak', {
       method: 'POST',
       headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
@@ -62,6 +62,40 @@ describe('mobile voice routes', () => {
 
     expect((await handlers.speak(request)).status).toBe(404);
     expect(provider.tts).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-allowlisted caller before speech or intent work', async () => {
+    const reserveRequest = jest.fn(async () => ({
+      allowed: true,
+      remainingInWindow: 11,
+      remainingToday: 99,
+    }));
+    const { handlers, provider } = createHandlers({
+      access: () => 'forbidden',
+      reserveRequest,
+    });
+    const headers = { authorization: 'Bearer test-token', 'content-type': 'application/json' };
+
+    const speak = await handlers.speak(
+      new NextRequest('http://localhost/api/auth/mobile/voice/v1/speak', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ text: 'A short spoken response.' }),
+      }),
+    );
+    const intent = await handlers.intent(
+      new NextRequest('http://localhost/api/auth/mobile/voice/v1/intent', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ transcript: 'Log 8 reps at 185' }),
+      }),
+    );
+
+    expect(speak.status).toBe(403);
+    await expect(speak.json()).resolves.toEqual({ version: 1, error: 'forbidden' });
+    expect(intent.status).toBe(403);
+    expect(provider.tts).not.toHaveBeenCalled();
+    expect(reserveRequest).not.toHaveBeenCalled();
   });
 
   it('returns a confirmed-only set proposal and never writes a set', async () => {

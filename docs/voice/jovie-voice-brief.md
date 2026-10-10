@@ -4,7 +4,7 @@
 
 Jovie v1 uses ElevenLabs voice ID `A4j35F5T4XsPMeXd06Pm`, promoted from the round-four B-1 preview after explicit owner selection. Do not create or promote another voice without a new selection. Runtime TTS prefers `eleven_flash_v2_5` for gym latency; multilingual v2 was also used for a transport smoke check.
 
-`LYB_VOICE_ID` is configured in the LYB Vercel Preview and Production environments. Keep `LYB_VOICE_ENABLED=false` and the Statsig voice gate off until an explicit rollout.
+`LYB_VOICE_ID` is configured in the LYB Vercel Preview and Production environments. Keep `LYB_VOICE_ENABLED=false` and the Statsig gate `hypertrophy_coach_voice_v1` off until an explicit rollout. The gate and the ElevenLabs provider also require `LYB_VOICE_ALLOWLIST` (Jovie subject ids or emails). That list defaults empty, so voice stays off for every account until the owner's subject or email is set in Doppler or Vercel. Do not commit the identifier.
 
 ## Voice and spoken-copy direction
 
@@ -24,7 +24,7 @@ Rejected preview IDs and audio files are intentionally not stored in the public 
 
 ## Credential handling
 
-The ElevenLabs API key is configured as a sensitive Vercel environment variable for Preview and Production. For authorized local CLI work, retrieve only this key from Doppler and never print or commit it:
+The ElevenLabs API key is configured as a sensitive Vercel environment variable for Preview and Production. For authorized local CLI work, retrieve only this existing key from Doppler and never print or commit it. New secrets follow the [secrets policy](../engineering/secrets-policy.md): Doppler stays the secrets manager, and new values are added directly to GitHub Actions and Vercel.
 
 ```sh
 export ELEVENLABS_API_KEY="$(doppler secrets get ELEVENLABS_API_KEY --project jovie-web --config prd_agent_ops --plain)"

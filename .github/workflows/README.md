@@ -8,8 +8,8 @@ This directory supports fast trunk-based shipping. Required checks should prove 
 
 Primary pull request workflow for `main`.
 
-- Pull requests target `main`; `preview`, `production`, and `dev` are not active development branches.
-- `Detect Changes`: path filter for web/package and iOS changes.
+- Pull requests target `main`; `preview`, `production`, and `dev` are not active development branches. Pull requests and merge groups targeting `production` also run so the active "Production" ruleset's required `CI Summary` check cannot deadlock.
+- `Detect Changes`: path filter for web/package and iOS changes. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`.
 - `JavaScript/TypeScript`: runs `pnpm install`, `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` when web, package, or CI harness files change. The job uses no privileged data-provider configuration, so pull request CI can verify buildability without credentials.
 - `iOS`: runs the iOS Fastlane CI lane when iOS files change.
 - `CI Summary`: aggregate required status. Branch protection should depend on this stable aggregate name rather than individual implementation jobs.
@@ -26,6 +26,10 @@ Primary pull request workflow for `main`.
 `ALLGREEN` batches every queued entry, so one bot-owned entry blocks the batch. Manual recovery while the secret is absent: `gh pr merge <n> --merge --auto` with a user token (a user-token enqueue starts merge-group CI natively); a stuck entry can be removed with the `dequeuePullRequest` mutation first.
 
 ## Advisory Automation
+
+### `codeowners-check.yml`
+
+Weekly and manual CODEOWNERS drift check. Upserts JOV-7549 (`remediation:codeowners-drift`) with a comment for this repository when the file is missing or an owner is invalid. Live filing requires repository variable `REMEDIATION_TRIGGERS_ENABLED` to be `true` and `LINEAR_API_KEY`. Otherwise the job dry-runs.
 
 ### `advisory-ai-review.yml`
 
@@ -103,7 +107,7 @@ Attempts to auto-merge Dependabot patch/minor updates after CI passes.
 
 ### `regenerate-certificates.yml`
 
-iOS certificate and provisioning maintenance.
+Manual iOS certificate regeneration. No schedule. The job fails immediately unless the dispatch confirm is `NUKE-AND-REGENERATE` (LYB-74). Slack runs only when repository variable `CERT_REGEN_SLACK_ENABLED` is `true`.
 
 ## Blocking vs Advisory
 

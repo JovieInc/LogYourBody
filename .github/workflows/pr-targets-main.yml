@@ -1,0 +1,55 @@
+name: PR targets main
+
+# Fail-closed trunk guard, mirroring JovieInc/Jovie.
+#
+# `.github/BRANCH_FLOW.md` makes `main` the single trunk, but nothing enforced
+# it: dependabot and agent branches kept landing on `dev`. This job runs on
+# every PR base so a side-branch PR cannot "succeed" by avoiding the guard.
+#
+# merge_group only exists for the main queue, so it passes.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-targets-main-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  pr-targets-main:
+    name: PR targets main
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Refuse any base other than main
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$BASE_REF" != "main" ]]; then
+            echo "::error::PRs must target main. Base '$BASE_REF' is forbidden. Retarget the pull request base to main, fetch origin/main, and rebase."
+            exit 1
+          fi
+          echo "PR targets main"
+
+      - name: Advise on branch naming
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          case "$HEAD_REF" in
+            feat/* | fix/* | refactor/* | chore/* | docs/* | test/* | agent/* | codex/* | devin/* | dependabot/*)
+              echo "Branch '$HEAD_REF' matches the documented taxonomy"
+              ;;
+            *)
+              echo "::warning::Branch '$HEAD_REF' is outside the .github/BRANCH_FLOW.md taxonomy (feat/, fix/, refactor/, chore/, docs/, test/, agent/, codex/, devin/)."
+              ;;
+          esac

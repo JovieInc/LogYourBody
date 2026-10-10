@@ -595,7 +595,7 @@ struct PhotoGridItem: View {
                 if let thumbnail = thumbnail {
                     Image(uiImage: thumbnail)
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .scaledToFill()
                         .frame(height: 120)
                         .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous))

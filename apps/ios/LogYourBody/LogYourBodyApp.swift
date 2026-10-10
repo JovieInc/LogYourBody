@@ -230,7 +230,7 @@ struct LogYourBodyApp: App {
         WindowGroup {
             switch persistenceController.persistentStoreLoadState {
             case .ready:
-                ContentView()
+                appContent
 #if DEBUG
                 .modifier(UITestViewportModifier())
 #endif
@@ -266,6 +266,9 @@ struct LogYourBodyApp: App {
                     // bundle. Do not let real startup race test-owned Keychain
                     // fixtures or external-service stubs in that environment.
                     guard !Self.isRunningUnitTests else { return }
+#if DEBUG
+                    guard !ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") else { return }
+#endif
                     await performStartupSequence()
                     resolvePendingEntryDeepLinkIfPossible()
                 }
@@ -311,6 +314,19 @@ struct LogYourBodyApp: App {
         }
     }
 
+    @ViewBuilder
+    private var appContent: some View {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") {
+            TrainingLiveSessionFixtureView()
+        } else {
+            ContentView()
+        }
+#else
+        ContentView()
+#endif
+    }
+
     // MARK: - Startup Helpers
 
     @MainActor
@@ -339,6 +355,7 @@ struct LogYourBodyApp: App {
         }
 
         Task { @MainActor in
+            await authInitializationTask.value
             await bootstrapHealthKit()
         }
 
@@ -364,6 +381,11 @@ struct LogYourBodyApp: App {
     @MainActor
     private func bootstrapHealthKit() async {
         let syncEnabled = UserDefaults.standard.bool(forKey: Constants.healthKitSyncEnabledKey)
+        HealthKitAccountSyncPolicy.bindIfUnbound(
+            userId: authManager.currentUser?.id,
+            syncEnabled: syncEnabled,
+            defaults: .standard
+        )
         HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: syncEnabled)
     }
 

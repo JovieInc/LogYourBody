@@ -44,7 +44,7 @@ export async function parsePDFWithPdfJs(arrayBuffer: ArrayBuffer): Promise<strin
 
     return fullText;
   } catch (error) {
-    console.error('Error parsing with PDF.js:', error);
+    console.error('PDF.js text extraction failed');
     throw error;
   }
 }
