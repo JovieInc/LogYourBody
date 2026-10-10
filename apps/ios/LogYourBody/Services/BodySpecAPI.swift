@@ -106,8 +106,9 @@ struct BodySpecDexaCompositionResponse: Decodable {
 
 /// Token source for `BodySpecAPI`. Mirrors the `BodySpecDexaAPIClient` seam so
 /// tests can inject a stub instead of the keychain-backed `BodySpecAuthManager`.
+@MainActor
 protocol BodySpecAuthTokenProviding {
-    func ensureValidToken() async throws -> String?
+    func connectionSnapshot(for expectedOwner: AuthManager.ProfileSessionOwnership?) throws -> BodySpecConnectionSnapshot
 }
 
 extension BodySpecAuthManager: BodySpecAuthTokenProviding {}
@@ -125,22 +126,27 @@ final class BodySpecAPI {
     private let baseURL: URL
     private let urlSession: URLSession
     private let authManager: BodySpecAuthTokenProviding
+    private let boundConnection: BodySpecConnectionSnapshot?
 
     init(
         baseURL: URL = BodySpecAPI.defaultBaseURL,
         urlSession: URLSession = .shared,
-        authManager: BodySpecAuthTokenProviding
+        authManager: BodySpecAuthTokenProviding,
+        boundConnection: BodySpecConnectionSnapshot? = nil
     ) {
         self.baseURL = baseURL
         self.urlSession = urlSession
         self.authManager = authManager
+        self.boundConnection = boundConnection
     }
 
     func getUser() async throws -> BodySpecUser {
-        let token = try await requireToken()
+        let connection = try await requireConnection()
+        let token = try await connection.admittedToken()
         let url = baseURL.appendingPathComponent("/api/v1/users/me")
         let request = try makeRequest(url: url, token: token)
         let (data, response) = try await urlSession.data(for: request)
+        try await connection.validate()
         try validateResponse(response)
 
         let decoder = JSONDecoder()
@@ -149,7 +155,8 @@ final class BodySpecAPI {
     }
 
     func listResults(page: Int = 1, pageSize: Int = 20) async throws -> BodySpecResultsListResponse {
-        let token = try await requireToken()
+        let connection = try await requireConnection()
+        let token = try await connection.admittedToken()
 
         var components = URLComponents(
             url: baseURL.appendingPathComponent("/api/v1/users/me/results/"),
@@ -167,6 +174,7 @@ final class BodySpecAPI {
 
         let request = try makeRequest(url: url, token: token)
         let (data, response) = try await urlSession.data(for: request)
+        try await connection.validate()
         try validateResponse(response)
 
         let decoder = JSONDecoder()
@@ -175,11 +183,13 @@ final class BodySpecAPI {
     }
 
     func getDexaScanInfo(resultId: String) async throws -> BodySpecDexaScanInfoResponse {
-        let token = try await requireToken()
+        let connection = try await requireConnection()
+        let token = try await connection.admittedToken()
         let path = "/api/v1/users/me/results/\(resultId)/dexa/scan-info"
         let url = baseURL.appendingPathComponent(path)
         let request = try makeRequest(url: url, token: token)
         let (data, response) = try await urlSession.data(for: request)
+        try await connection.validate()
         try validateResponse(response)
 
         let decoder = JSONDecoder()
@@ -188,11 +198,13 @@ final class BodySpecAPI {
     }
 
     func getDexaComposition(resultId: String) async throws -> BodySpecDexaCompositionResponse {
-        let token = try await requireToken()
+        let connection = try await requireConnection()
+        let token = try await connection.admittedToken()
         let path = "/api/v1/users/me/results/\(resultId)/dexa/composition"
         let url = baseURL.appendingPathComponent(path)
         let request = try makeRequest(url: url, token: token)
         let (data, response) = try await urlSession.data(for: request)
+        try await connection.validate()
         try validateResponse(response)
 
         let decoder = JSONDecoder()
@@ -200,12 +212,15 @@ final class BodySpecAPI {
         return try decoder.decode(BodySpecDexaCompositionResponse.self, from: data)
     }
 
-    private func requireToken() async throws -> String {
-        guard let token = try await authManager.ensureValidToken() else {
-            throw BodySpecAPIError.notConnected
-        }
+    func importSession(for ownership: AuthManager.ProfileSessionOwnership) async throws -> BodySpecDexaImportSession {
+        let snapshot = try await authManager.connectionSnapshot(for: ownership)
+        let client = BodySpecAPI(baseURL: baseURL, urlSession: urlSession, authManager: authManager, boundConnection: snapshot)
+        return BodySpecDexaImportSession(api: client, admission: { try snapshot.validate() })
+    }
 
-        return token
+    private func requireConnection() async throws -> BodySpecConnectionSnapshot {
+        if let boundConnection { return boundConnection }
+        return try await authManager.connectionSnapshot(for: nil)
     }
 
     private func makeRequest(url: URL, token: String) throws -> URLRequest {

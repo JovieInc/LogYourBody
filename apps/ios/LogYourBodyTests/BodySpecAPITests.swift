@@ -17,6 +17,7 @@ private final class BodySpecStubURLProtocol: URLProtocol {
 
     static var stub: Stub = .http(statusCode: 200, body: Data())
     static var recordedRequests: [URLRequest] = []
+    static var beforeResponse: (() async -> Void)?
     static var recordedRequestBody: Data?
 
     // swiftlint:disable:next static_over_final_class
@@ -37,6 +38,17 @@ private final class BodySpecStubURLProtocol: URLProtocol {
         Self.recordedRequests.append(request)
         Self.recordedRequestBody = request.httpBody ?? request.httpBodyStream.flatMap(Self.readBody)
 
+        if let beforeResponse = Self.beforeResponse {
+            Task {
+                await beforeResponse()
+                sendResponse(client: client, url: url)
+            }
+        } else {
+            sendResponse(client: client, url: url)
+        }
+    }
+
+    private func sendResponse(client: URLProtocolClient, url: URL) {
         switch Self.stub {
         case .http(let statusCode, let body):
             let response = HTTPURLResponse(
@@ -67,6 +79,7 @@ private final class BodySpecStubURLProtocol: URLProtocol {
     static func reset() {
         stub = .http(statusCode: 200, body: Data())
         recordedRequests = []
+        beforeResponse = nil
         recordedRequestBody = nil
     }
 
@@ -77,9 +90,9 @@ private final class BodySpecStubURLProtocol: URLProtocol {
         var body = Data()
         var buffer = [UInt8](repeating: 0, count: 8_192)
         while stream.hasBytesAvailable {
-            let count = stream.read(&buffer, maxLength: buffer.count)
-            guard count > 0 else { break }
-            body.append(buffer, count: count)
+            let byteCount = stream.read(&buffer, maxLength: buffer.count)
+            guard byteCount > 0 else { break }
+            body.append(buffer, count: byteCount)
         }
         return body
     }
@@ -88,8 +101,19 @@ private final class BodySpecStubURLProtocol: URLProtocol {
 private struct StubBodySpecAuthProvider: BodySpecAuthTokenProviding {
     let token: String?
 
-    func ensureValidToken() async throws -> String? {
-        token
+    @MainActor
+    func connectionSnapshot(for expectedOwner: AuthManager.ProfileSessionOwnership?) throws -> BodySpecConnectionSnapshot {
+        guard let token else { throw BodySpecAPIError.notConnected }
+        return BodySpecConnectionSnapshot(token: token, admission: {})
+    }
+}
+
+@MainActor
+private final class RotatingSyntheticBodySpecAuthorization: BodySpecAuthTokenProviding {
+    var captures = 0
+    func connectionSnapshot(for expectedOwner: AuthManager.ProfileSessionOwnership?) throws -> BodySpecConnectionSnapshot {
+        captures += 1
+        return BodySpecConnectionSnapshot(token: "synthetic-connection-\(captures)", admission: {})
     }
 }
 
@@ -431,6 +455,52 @@ final class BodySpecAPITests: XCTestCase {
         XCTAssertEqual(scans[0].date, "2026-09-20")
         XCTAssertEqual(scans[0].source, "InBody 770")
         XCTAssertEqual(scans[0].bodyFatPercentage, 21.2)
+    }
+
+    @MainActor
+    func testImportSessionUsesOneImmutableAuthorizationAcrossAllRequests() async throws {
+        let auth = RotatingSyntheticBodySpecAuthorization()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BodySpecStubURLProtocol.self]
+        let api = BodySpecAPI(baseURL: baseURL, urlSession: URLSession(configuration: configuration), authManager: auth)
+        let session = try await api.importSession(for: .init(subject: "synthetic-owner", generation: 1))
+        stubJSON(BodySpecAPIFixture.resultsJSON)
+        _ = try await session.api.listResults(page: 1, pageSize: 50)
+        stubJSON(BodySpecAPIFixture.scanInfoJSON)
+        _ = try await session.api.getDexaScanInfo(resultId: "result-123")
+        stubJSON(BodySpecAPIFixture.compositionJSON)
+        _ = try await session.api.getDexaComposition(resultId: "result-123")
+        XCTAssertEqual(auth.captures, 1)
+        XCTAssertEqual(BodySpecStubURLProtocol.recordedRequests.count, 3)
+        XCTAssertTrue(BodySpecStubURLProtocol.recordedRequests.allSatisfy {
+            $0.value(forHTTPHeaderField: "Authorization") == "Bearer synthetic-connection-1"
+        })
+    }
+
+    @MainActor
+    func testDisconnectedConnectionRejectsHeldResponseAndCannotSendAnotherImportRequest() async throws {
+        let account = BodySpecSyntheticAccount()
+        let manager = BodySpecAuthManager(
+            tokenStore: BodySpecMemoryTokenStore(token: syntheticBodySpecToken()), account: account.access,
+            configuration: { ("synthetic", "lyb-test://oauth") }
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BodySpecStubURLProtocol.self]
+        let api = BodySpecAPI(baseURL: baseURL, urlSession: URLSession(configuration: configuration), authManager: manager)
+        let session = try await api.importSession(for: try XCTUnwrap(account.ownership))
+        stubJSON(BodySpecAPIFixture.resultsJSON)
+        BodySpecStubURLProtocol.beforeResponse = { @MainActor in try? manager.disconnect() }
+        do {
+            _ = try await session.api.listResults(page: 1, pageSize: 50)
+            XCTFail("A response after disconnect must not reach the importer")
+        } catch { XCTAssertTrue(error is CancellationError) }
+        XCTAssertThrowsError(try session.admission())
+        BodySpecStubURLProtocol.beforeResponse = nil
+        do {
+            _ = try await session.api.getDexaScanInfo(resultId: "result-123")
+            XCTFail("The old client must not reacquire another connection")
+        } catch { XCTAssertTrue(error is CancellationError) }
+        XCTAssertEqual(BodySpecStubURLProtocol.recordedRequests.count, 1)
     }
 
     // MARK: - Helpers

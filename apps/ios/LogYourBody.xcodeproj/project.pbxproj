@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5A1AE51CD34B4A8E812811B2 /* CoreDataManager+BodySpecImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */; };
+		D7B509EA4FE543A7A3E32A1F /* BodySpecAtomicImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */; };
 		A62E114302EC00A5A0070201 /* HealthKitImportOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */; };
 		E9A811932F40800000C0A701 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */; };
 		0183C845E0301D4B10100ACE /* BodyMetricAppIntentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */; };
@@ -260,11 +262,13 @@
 		ADA6002C2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */; };
 		ADA600302ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */; };
 		ADA600312ED25F6700088042 /* BodySpecIntegrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */; };
+		BAA76179221F4B5C885A1143 /* BodySpecIntegrationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA76179221F4B5C885A1142 /* BodySpecIntegrationState.swift */; };
 		ADA600322ED25F6700088042 /* DashboardViewLiquid+Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */; };
 		ADA600372ED2602F00088042 /* BodySpecDexaImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */; };
 		ADA600382ED2602F00088042 /* BodySpecAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600332ED2602F00088042 /* BodySpecAPI.swift */; };
 		ADA600392ED2602F00088042 /* ErrorTrackingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600362ED2602F00088042 /* ErrorTrackingService.swift */; };
 		ADA6003A2ED2602F00088042 /* BodySpecAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */; };
+		BAA76179221F4B5C885A1141 /* BodySpecConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA76179221F4B5C885A1140 /* BodySpecConnection.swift */; };
 		ADA6003C2ED27D0000088042 /* PreAuthOnboardingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */; };
 		ADA6003E2ED2BC9100088042 /* Glp1DoseLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */; };
 		ADA600402ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADA6003F2ED2D32C00088042 /* DashboardViewLiquid+HeroAndActions.swift */; };
@@ -364,6 +368,7 @@
 		B12671012F16000100ABCDEF /* BodyScoreEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12671002F16000100ABCDEF /* BodyScoreEngineTests.swift */; };
 		B12671032F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B12671022F16000100ABCDEF /* BodyScoreHealthKitTriggerTests.swift */; };
 		B13F1CC0CFEB9076519101DB /* BodySpecAuthManagerTokenStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE9C6D5CF67D9E4FA0995EC1 /* BodySpecAuthManagerTokenStateTests.swift */; };
+		BAA76179221F4B5C885A1145 /* BodySpecConnectionLifecycleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA76179221F4B5C885A1144 /* BodySpecConnectionLifecycleTests.swift */; };
 		B1F00834695D3233B62404FD /* BodyMetricLoggingServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C639B8116483011892C95543 /* BodyMetricLoggingServiceTests.swift */; };
 		B235D5D59330A1F3BBB5ABC6 /* GlobalTimelineModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82ED4CD357E3259042DCF901 /* GlobalTimelineModelsTests.swift */; };
 		B3C4D0114A77000100ABCDEF /* DexaPDFImportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D0104A77000100ABCDEF /* DexaPDFImportSheet.swift */; };
@@ -450,6 +455,11 @@
 		FE20A0A300000000000000B3 /* WorldClassScreenInventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */; };
 		FEEA241F6B0A6F9819E7BBF7 /* HomeV2OnboardingPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA535A0684FDFFAF479F14AB /* HomeV2OnboardingPolicyTests.swift */; };
 		FFC041175CAD1871B45B8FE6 /* RevenueCatPurchaseRestoreFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F9119B26AB2A527AA6E344 /* RevenueCatPurchaseRestoreFlowTests.swift */; };
+		2DB2C8F582E3823A58973EC9 /* ReportedMeasurements.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F2A97E0DC1E8AB1DB030D6 /* ReportedMeasurements.swift */; };
+		377F3B5263A3F5C8274A0BD4 /* ReportedMeasurementsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C099761C4FC8CFBB0454CC70 /* ReportedMeasurementsTests.swift */; };
+		7F3682C47FFCDC96AC7171E2 /* DexaReportedMeasurementsPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4240D5F0129EC16E29C2259 /* DexaReportedMeasurementsPersistenceTests.swift */; };
+		91EF9EABCFA5B86B70872411 /* ReportedMeasurementsMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 006434E8EF977B41ED40B4EA /* ReportedMeasurementsMigrationTests.swift */; };
+		7585611558F46F5B8916E402 /* DexaReportedMeasurementsCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 812F1687F7FE1C0FB873CD40 /* DexaReportedMeasurementsCompatibilityTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -470,6 +480,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CoreDataManager+BodySpecImport.swift"; sourceTree = "<group>"; };
+		435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecAtomicImportTests.swift; sourceTree = "<group>"; };
 		A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitImportOwnershipTests.swift; sourceTree = "<group>"; };
 		E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSTrendIndicator.swift; path = DesignSystem/Atoms/DSTrendIndicator.swift; sourceTree = "<group>"; };
@@ -803,10 +815,12 @@
 		ADA600292ED25F1F00088042 /* DashboardViewLiquid+HeroAndActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HeroAndActions.swift"; sourceTree = "<group>"; };
 		ADA6002B2ED25F5600088042 /* DashboardViewLiquid+CoreAccessors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+CoreAccessors.swift"; sourceTree = "<group>"; };
 		ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecIntegrationView.swift; sourceTree = "<group>"; };
+		BAA76179221F4B5C885A1142 /* BodySpecIntegrationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecIntegrationState.swift; sourceTree = "<group>"; };
 		ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+Components.swift"; sourceTree = "<group>"; };
 		ADA6002F2ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DashboardViewLiquid+HeaderAndSync.swift"; sourceTree = "<group>"; };
 		ADA600332ED2602F00088042 /* BodySpecAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecAPI.swift; sourceTree = "<group>"; };
 		ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecAuthManager.swift; sourceTree = "<group>"; };
+		BAA76179221F4B5C885A1140 /* BodySpecConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecConnection.swift; sourceTree = "<group>"; };
 		ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecDexaImporter.swift; sourceTree = "<group>"; };
 		ADA600362ED2602F00088042 /* ErrorTrackingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorTrackingService.swift; sourceTree = "<group>"; };
 		ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreAuthOnboardingStore.swift; sourceTree = "<group>"; };
@@ -963,7 +977,9 @@
 		F7A2B3C4D5E6F70809101112 /* LogYourBodyV2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV2.xcdatamodel; sourceTree = "<group>"; };
 		F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV2.xcdatamodel; sourceTree = "<group>"; };
 		F7A2B3C4D5E6F70809101114 /* LogYourBodyV3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV3.xcdatamodel; sourceTree = "<group>"; };
+		F7A2B3C4D5E6F70809101116 /* LogYourBodyV4.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV4.xcdatamodel; sourceTree = "<group>"; };
 		F7A2B3C4D5E6F70809101115 /* LogYourBodyV3.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV3.xcdatamodel; sourceTree = "<group>"; };
+		F7A2B3C4D5E6F70809101117 /* LogYourBodyV4.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV4.xcdatamodel; sourceTree = "<group>"; };
 		F8E9499CD258290C5363D52A /* AuthManagerSessionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthManagerSessionTests.swift; sourceTree = "<group>"; };
 		FA535A0684FDFFAF479F14AB /* HomeV2OnboardingPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2OnboardingPolicyTests.swift; sourceTree = "<group>"; };
 		FB947FE422689993FD02B4F6 /* AuthHeader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthHeader.swift; path = DesignSystem/Molecules/AuthHeader.swift; sourceTree = "<group>"; };
@@ -987,9 +1003,15 @@
 		FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JovieGlassSurfaceTests.swift; sourceTree = "<group>"; };
 		FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldClassScreenInventoryTests.swift; sourceTree = "<group>"; };
 		FE9C6D5CF67D9E4FA0995EC1 /* BodySpecAuthManagerTokenStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodySpecAuthManagerTokenStateTests.swift; sourceTree = "<group>"; };
+		BAA76179221F4B5C885A1144 /* BodySpecConnectionLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecConnectionLifecycleTests.swift; sourceTree = "<group>"; };
 		FECEBC7B2B956D26BF45822F /* DSLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLogo.swift; path = DesignSystem/Atoms/DSLogo.swift; sourceTree = "<group>"; };
 		FEE8DE6FD2A76A65AF63D2D9 /* DebugResetManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugResetManagerTests.swift; sourceTree = "<group>"; };
 		FF0B649CA62200DAACE12AA8 /* AddEntrySheet+Part03.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AddEntrySheet+Part03.swift"; path = "AddEntrySheet+Part03.swift"; sourceTree = "<group>"; };
+		B1F2A97E0DC1E8AB1DB030D6 /* ReportedMeasurements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportedMeasurements.swift; sourceTree = "<group>"; };
+		C099761C4FC8CFBB0454CC70 /* ReportedMeasurementsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportedMeasurementsTests.swift; sourceTree = "<group>"; };
+		C4240D5F0129EC16E29C2259 /* DexaReportedMeasurementsPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaReportedMeasurementsPersistenceTests.swift; sourceTree = "<group>"; };
+		006434E8EF977B41ED40B4EA /* ReportedMeasurementsMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportedMeasurementsMigrationTests.swift; sourceTree = "<group>"; };
+		812F1687F7FE1C0FB873CD40 /* DexaReportedMeasurementsCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaReportedMeasurementsCompatibilityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1226,6 +1248,10 @@
 				C639B8116483011892C95543 /* BodyMetricLoggingServiceTests.swift */,
 				3F2E34BC49376B87D43D81AD /* BodyMetricPhotoUpdateTests.swift */,
 				6EBD5BF3F1671BC8D17ABE5D /* BodyMetricSourceContractTests.swift */,
+				812F1687F7FE1C0FB873CD40 /* DexaReportedMeasurementsCompatibilityTests.swift */,
+				006434E8EF977B41ED40B4EA /* ReportedMeasurementsMigrationTests.swift */,
+				C4240D5F0129EC16E29C2259 /* DexaReportedMeasurementsPersistenceTests.swift */,
+				C099761C4FC8CFBB0454CC70 /* ReportedMeasurementsTests.swift */,
 				060DD24271B0B2120CB0AA33 /* BulkProgressPhotoImportPolicyTests.swift */,
 				AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */,
 				AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */,
@@ -1265,6 +1291,7 @@
 				5F1996527170EC15B242FF4B /* RevenueCatSubscriptionAnalyticsTransitionTests.swift */,
 				8EA82A71E77423D56A70AA46 /* ProductAPIProfilePayloadTests.swift */,
 				C0AE830DA0CFDB1735F6894C /* SyncIntegrationBodyMetricSyncTests.swift */,
+				435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */,
 				CA338579090538FBCCA21785 /* SyncIntegrationImportAndMappingTests.swift */,
 				128B0622423D7E7711DCD94D /* SyncIntegrationRemotePayloadTests.swift */,
 				245B5601A048FDB45C7F4042 /* SyncIntegrationSupplementalSyncTests.swift */,
@@ -1285,6 +1312,7 @@
 				8A2D877BFA93E04F9E168FA7 /* BodySpecAPITests.swift */,
 				4F614C8BD21F414268DB7829 /* BodySpecAuthManagerPKCETests.swift */,
 				FE9C6D5CF67D9E4FA0995EC1 /* BodySpecAuthManagerTokenStateTests.swift */,
+				BAA76179221F4B5C885A1144 /* BodySpecConnectionLifecycleTests.swift */,
 				BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */,
 				6D2732D288C61F35059E6C4D /* OnboardingFlowValidationTests.swift */,
 				9F72F9E9548064844D56AD75 /* OnboardingScoreDisplayPolicyTests.swift */,
@@ -1347,6 +1375,7 @@
 				ADA600462ED375EE00088042 /* Glp1Medication.swift */,
 				ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */,
 				ADA600212ED2594200088042 /* DexaResult.swift */,
+				B1F2A97E0DC1E8AB1DB030D6 /* ReportedMeasurements.swift */,
 				AD050C422EBFFEE50082A313 /* DashboardDisplayMode.swift */,
 				ADDC48642E2D8A33003C97E7 /* LogYourBody.xcdatamodeld */,
 				AD85525F2E19DC44003552EE /* Changelog.swift */,
@@ -1394,6 +1423,7 @@
 				ADA6003B2ED27D0000088042 /* PreAuthOnboardingStore.swift */,
 				ADA600332ED2602F00088042 /* BodySpecAPI.swift */,
 				ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */,
+				BAA76179221F4B5C885A1140 /* BodySpecConnection.swift */,
 				ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */,
 				ADA600362ED2602F00088042 /* ErrorTrackingService.swift */,
 				ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */,
@@ -1433,6 +1463,7 @@
 				2EECFD68955AD0F3633D8B32 /* CoreDataManager+Part02.swift */,
 				A88D7AC2C7FF4E14A3BB8168 /* CoreDataManager+Part03.swift */,
 				62F02AB81FF64BBC27043BB9 /* CoreDataManager+Part04.swift */,
+				12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */,
 				4CD612A21566CB070FFC0086 /* CoreDataManager+Part05.swift */,
 				3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */,
 				7A1DE682AE51BF7A3EFF75FF /* HealthKitManager+Part02.swift */,
@@ -1488,6 +1519,7 @@
 				AD3145B32F0A010300ABCDEF /* DashboardViewLiquid+PhotoTimelineInsights.swift */,
 				AD3145E12F0A030100ABCDEF /* DashboardMetricsSection.swift */,
 				ADA6002D2ED25F6700088042 /* BodySpecIntegrationView.swift */,
+				BAA76179221F4B5C885A1142 /* BodySpecIntegrationState.swift */,
 				B3C4D0104A77000100ABCDEF /* DexaPDFImportSheet.swift */,
 				ADA6002E2ED25F6700088042 /* DashboardViewLiquid+Components.swift */,
 				AD3145F12F0A040100ABCDEF /* DashboardViewLiquid+FullScreenMetricData.swift */,
@@ -2068,6 +2100,10 @@
 				B1F00834695D3233B62404FD /* BodyMetricLoggingServiceTests.swift in Sources */,
 				D5F71D2685408ED4D599FC28 /* BodyMetricPhotoUpdateTests.swift in Sources */,
 				04EB1D7AD1947D32BDE7AD70 /* BodyMetricSourceContractTests.swift in Sources */,
+				7585611558F46F5B8916E402 /* DexaReportedMeasurementsCompatibilityTests.swift in Sources */,
+				91EF9EABCFA5B86B70872411 /* ReportedMeasurementsMigrationTests.swift in Sources */,
+				7F3682C47FFCDC96AC7171E2 /* DexaReportedMeasurementsPersistenceTests.swift in Sources */,
+				377F3B5263A3F5C8274A0BD4 /* ReportedMeasurementsTests.swift in Sources */,
 				46D2D60CC0C168272E5B0A14 /* BulkProgressPhotoImportPolicyTests.swift in Sources */,
 				AD9E00112F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift in Sources */,
 				AD9E00132F20001100ABCDEF /* BulkImportManagerBoundsTests.swift in Sources */,
@@ -2107,6 +2143,7 @@
 				E251E204A77F2161E880A19E /* RevenueCatSubscriptionAnalyticsTransitionTests.swift in Sources */,
 				0922CA98E79021C4CB2595A5 /* ProductAPIProfilePayloadTests.swift in Sources */,
 				F5BBD3CA8052B53CA70ADDA1 /* SyncIntegrationBodyMetricSyncTests.swift in Sources */,
+				D7B509EA4FE543A7A3E32A1F /* BodySpecAtomicImportTests.swift in Sources */,
 				DB19A6EC4AA997A0EF4C5791 /* SyncIntegrationImportAndMappingTests.swift in Sources */,
 				C5C96F424F3D65A1180A3EA7 /* SyncIntegrationRemotePayloadTests.swift in Sources */,
 				FE090848E956D28A4C72FAD1 /* SyncIntegrationSupplementalSyncTests.swift in Sources */,
@@ -2132,6 +2169,7 @@
 				93335DCBFB7D09586F330149 /* BodySpecAPITests.swift in Sources */,
 				CD05B6509260D3FC351104B4 /* BodySpecAuthManagerPKCETests.swift in Sources */,
 				B13F1CC0CFEB9076519101DB /* BodySpecAuthManagerTokenStateTests.swift in Sources */,
+				BAA76179221F4B5C885A1145 /* BodySpecConnectionLifecycleTests.swift in Sources */,
 				0183C845E0301D4B10100ACE /* BodyMetricAppIntentsTests.swift in Sources */,
 				1C6CAB83A8724849F1FC5804 /* OnboardingFlowValidationTests.swift in Sources */,
 				77AE209CC221E82496CC8771 /* OnboardingScoreDisplayPolicyTests.swift in Sources */,
@@ -2327,6 +2365,7 @@
 				ADA600382ED2602F00088042 /* BodySpecAPI.swift in Sources */,
 				ADA600392ED2602F00088042 /* ErrorTrackingService.swift in Sources */,
 				ADA6003A2ED2602F00088042 /* BodySpecAuthManager.swift in Sources */,
+				BAA76179221F4B5C885A1141 /* BodySpecConnection.swift in Sources */,
 				ADA4B7542ED0E61600F4262A /* AppError.swift in Sources */,
 				ADA4B7552ED0E61600F4262A /* AppLogger.swift in Sources */,
 				AD9E000B2F20000100ABCDEF /* PerfSignpost.swift in Sources */,
@@ -2358,6 +2397,7 @@
 				ADA4B7582ED0E7D700F4262A /* DashboardFFMITile.swift in Sources */,
 				ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */,
 				ADA600222ED2594300088042 /* DexaResult.swift in Sources */,
+				2DB2C8F582E3823A58973EC9 /* ReportedMeasurements.swift in Sources */,
 				AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */,
 				AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */,
 				ADF1F6B82ED4C63900745F33 /* GlobalTimelineHeader.swift in Sources */,
@@ -2379,6 +2419,7 @@
 				ADA4B73F2ECFAB0B00F4262A /* TimelineCalculator.swift in Sources */,
 				ADA600302ED25F6700088042 /* DashboardViewLiquid+HeaderAndSync.swift in Sources */,
 				ADA600312ED25F6700088042 /* BodySpecIntegrationView.swift in Sources */,
+				BAA76179221F4B5C885A1143 /* BodySpecIntegrationState.swift in Sources */,
 				B3C4D0114A77000100ABCDEF /* DexaPDFImportSheet.swift in Sources */,
 				ADA600322ED25F6700088042 /* DashboardViewLiquid+Components.swift in Sources */,
 				AD8872B72EB946BE0041C426 /* AuthConsentCheckbox.swift in Sources */,
@@ -2425,6 +2466,7 @@
 				E8BE69C83DC3F20913970568 /* CoreDataManager+Part02.swift in Sources */,
 				2117B18E82C133B5150AB357 /* CoreDataManager+Part03.swift in Sources */,
 				DC51280D16A74D3E38D4B798 /* CoreDataManager+Part04.swift in Sources */,
+				5A1AE51CD34B4A8E812811B2 /* CoreDataManager+BodySpecImport.swift in Sources */,
 				5346F8338497DE5F23D6F20D /* CoreDataManager+Part05.swift in Sources */,
 				841527E772D0CA94BE0D3F96 /* HealthKitManager+Part01.swift in Sources */,
 				CB4A7A11426D64B74959C447 /* HealthKitManager+Part02.swift in Sources */,
@@ -2894,8 +2936,9 @@
 				AD723B142E15FA5C002376C6 /* LogYourBody.xcdatamodel */,
 				F7A2B3C4D5E6F70809101112 /* LogYourBodyV2.xcdatamodel */,
 				F7A2B3C4D5E6F70809101114 /* LogYourBodyV3.xcdatamodel */,
+				F7A2B3C4D5E6F70809101116 /* LogYourBodyV4.xcdatamodel */,
 			);
-			currentVersion = F7A2B3C4D5E6F70809101114 /* LogYourBodyV3.xcdatamodel */;
+			currentVersion = F7A2B3C4D5E6F70809101116 /* LogYourBodyV4.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
@@ -2906,8 +2949,9 @@
 				ADDC48652E2D8A33003C97E7 /* LogYourBody.xcdatamodel */,
 				F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */,
 				F7A2B3C4D5E6F70809101115 /* LogYourBodyV3.xcdatamodel */,
+				F7A2B3C4D5E6F70809101117 /* LogYourBodyV4.xcdatamodel */,
 			);
-			currentVersion = F7A2B3C4D5E6F70809101115 /* LogYourBodyV3.xcdatamodel */;
+			currentVersion = F7A2B3C4D5E6F70809101117 /* LogYourBodyV4.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
