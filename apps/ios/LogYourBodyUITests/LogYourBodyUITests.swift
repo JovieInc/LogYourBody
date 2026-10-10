@@ -28,6 +28,45 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["login_email_field"].exists)
     }
 
+    func testTrainingStopConfirmationIncludesCancel() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+
+        let open = app.buttons["training_fixture_stop_card"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.tap()
+        let revoke = app.buttons["training_revoke_button"]
+        XCTAssertTrue(revoke.waitForExistence(timeout: 5))
+        revoke.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Delete your training sessions, set logs, and feedback?"].waitForExistence(timeout: 3),
+            "Stop coaching must present its confirmation."
+        )
+        let cancel = app.buttons.matching(identifier: "training_revoke_cancel").firstMatch
+        XCTAssertTrue(
+            cancel.waitForExistence(timeout: 3),
+            "Training stop confirmation must include a reachable Cancel control."
+        )
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        let stops = app.staticTexts["training_fixture_stop_count"]
+        XCTAssertTrue(stops.waitForExistence(timeout: 3))
+        XCTAssertEqual(stops.label, "Stops: 0", "Cancel must not delete training data")
+        XCTAssertTrue(revoke.waitForExistence(timeout: 3))
+
+        revoke.tap()
+        let confirm = app.buttons.matching(identifier: "training_revoke_confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        confirm.tap()
+        XCTAssertEqual(stops.label, "Stops: 1")
+    }
+
     func testTrainingManualLoadAndAcknowledgedSetSurviveRelaunch() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
@@ -309,6 +348,53 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(logoutButton.isHittable)
     }
 
+    func testPaywallLogoutCancelStaysOnPaywall() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPaywallFixture"])
+
+        XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 10))
+        let moreMenu = app.buttons["paywall_more_menu"]
+        XCTAssertTrue(moreMenu.waitForExistence(timeout: 5))
+        moreMenu.tap()
+        let logoutButton = app.buttons["paywall_logout_button"]
+        XCTAssertTrue(logoutButton.waitForExistence(timeout: 3))
+        logoutButton.tap()
+
+        let confirm = app.buttons.matching(identifier: "paywall_logout_confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        let cancel = app.buttons.matching(identifier: "paywall_logout_cancel").firstMatch
+        XCTAssertTrue(
+            cancel.waitForExistence(timeout: 3),
+            "Paywall logout confirmation must include a reachable Cancel control."
+        )
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["continueWithAppleButton"].exists)
+    }
+
+    func testPaywallLogoutConfirmReachesSignIn() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPaywallFixture"])
+
+        XCTAssertTrue(app.staticTexts["paywall_title"].waitForExistence(timeout: 10))
+        let moreMenu = app.buttons["paywall_more_menu"]
+        XCTAssertTrue(moreMenu.waitForExistence(timeout: 5))
+        moreMenu.tap()
+        let logoutButton = app.buttons["paywall_logout_button"]
+        XCTAssertTrue(logoutButton.waitForExistence(timeout: 3))
+        logoutButton.tap()
+
+        let confirm = app.buttons.matching(identifier: "paywall_logout_confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(app.buttons["continueWithAppleButton"].waitForExistence(timeout: 8))
+    }
+
     func testPaywallPlansFixtureShowsMonthlyAnnualAndSavings() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPaywallPlansFixture", "-lybUITestOnboardingV2Fixture"])
@@ -373,7 +459,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(restoreButton.exists)
     }
 
-    func testProfileLogoutSignsOutFromPushedDetail() throws {
+    func testProfileLogoutCancelStaysOnProfile() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
 
@@ -388,6 +474,37 @@ final class LogYourBodyUITests: XCTestCase {
         logoutButton.tap()
 
         let confirmLogout = app.buttons["Log Out"]
+        XCTAssertTrue(confirmLogout.waitForExistence(timeout: 5))
+        let cancel = app.buttons.matching(identifier: "settings_logout_cancel").firstMatch
+        XCTAssertTrue(
+            cancel.waitForExistence(timeout: 3),
+            "Logout confirmation must include a reachable Cancel control."
+        )
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["continueWithAppleButton"].exists)
+    }
+
+    func testProfileLogoutSignsOutFromPushedDetail() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+
+        try openSettings(in: app)
+
+        let profileLink = app.descendants(matching: .any)["settings_profile_link"]
+        XCTAssertTrue(profileLink.waitForExistence(timeout: 5))
+        profileLink.tap()
+
+        let logoutButton = app.descendants(matching: .any)["settings_logout_button"]
+        XCTAssertTrue(logoutButton.waitForExistence(timeout: 5))
+        logoutButton.tap()
+
+        let confirmLogout = app.buttons.matching(identifier: "settings_logout_confirm").firstMatch
         XCTAssertTrue(confirmLogout.waitForExistence(timeout: 5))
         confirmLogout.tap()
 
@@ -1572,6 +1689,43 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(
             app.buttons["home_v2_done"].exists || app.buttons["home_v2_log_weight"].exists,
             "Home shows the logged state for today's edit, or the check-in"
+        )
+    }
+
+    func testHomeV2EditEntryDeleteCancelKeepsTheEntry() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let contextButton = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(contextButton.waitForExistence(timeout: 30))
+        contextButton.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 8))
+
+        let edit = app.buttons["home_v2_edit_entry"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 8))
+        edit.tap()
+        let delete = app.buttons["home_v2_log_sheet_delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 8))
+        delete.tap()
+
+        let confirm = app.buttons.matching(identifier: "home_v2_log_sheet_delete_confirm").firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        let cancel = app.buttons.matching(identifier: "home_v2_log_sheet_delete_cancel").firstMatch
+        XCTAssertTrue(
+            cancel.waitForExistence(timeout: 3),
+            "Edit-entry delete confirmation must include a reachable Cancel control."
+        )
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 5))
+        app.buttons["home_v2_log_sheet_save"].tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 8),
+            "Cancel must keep the entry"
         )
     }
 

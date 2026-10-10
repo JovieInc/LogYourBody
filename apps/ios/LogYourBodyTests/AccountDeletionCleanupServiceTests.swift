@@ -238,4 +238,25 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
         }
         XCTAssertTrue(Set(removedKeys).isSuperset(of: keys))
     }
+
+    func testAccountDeletionReleasesTheHealthKitAccountBinding() {
+        let suiteName = "AccountDeletionCleanupServiceTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        defaults.set(true, forKey: Constants.healthKitSyncEnabledKey)
+        defaults.set("deleted-user", forKey: HealthKitAccountSyncPolicy.accountIdKey)
+
+        _ = AccountDeletionCleanupService.clearAccountUserDefaults(in: defaults)
+        HealthKitAccountSyncPolicy.bindIfUnbound(
+            userId: "deleted-user",
+            syncEnabled: defaults.bool(forKey: Constants.healthKitSyncEnabledKey),
+            defaults: defaults
+        )
+
+        XCTAssertFalse(defaults.bool(forKey: Constants.healthKitSyncEnabledKey))
+        XCTAssertNil(defaults.string(forKey: HealthKitAccountSyncPolicy.accountIdKey))
+    }
 }

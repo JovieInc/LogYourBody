@@ -161,17 +161,20 @@ final class ChatServiceTests: XCTestCase {
         let proposal = try XCTUnwrap(response.proposal)
         var loggedRequests: [TrainingSetLogRequest] = []
 
+        let session = engineTrainingSession()
         try await VoiceSetLogger.commit(
             proposal,
             isConfirmed: false,
-            accessToken: "access-token"
+            accessToken: "access-token",
+            session: session
         ) { _, request in loggedRequests.append(request) }
         XCTAssertTrue(loggedRequests.isEmpty)
 
         try await VoiceSetLogger.commit(
             proposal,
             isConfirmed: true,
-            accessToken: "access-token"
+            accessToken: "access-token",
+            session: session
         ) { token, request in
             XCTAssertEqual(token, "access-token")
             loggedRequests.append(request)
@@ -188,6 +191,124 @@ final class ChatServiceTests: XCTestCase {
                     rir: 2
                 )
             ]
+        )
+    }
+
+    func testVoiceLogRejectsAProposalOutsideTheEngineSession() {
+        let invented = voiceProposal(exerciseId: "invented_curl", exerciseName: "Invented curl")
+        let route = VoiceSetAdmission.route(
+            proposal: invented,
+            heard: nil,
+            missingFields: [],
+            session: engineTrainingSession()
+        )
+        XCTAssertEqual(route, .clarify(fields: [], rejected: true))
+        XCTAssertTrue(VoiceSetAdmission.rejectedLogMessage.contains("Nothing was logged"))
+    }
+
+    func testVoiceLogDoesNotConfirmWhenNoEngineSessionIsLoaded() {
+        let route = VoiceSetAdmission.route(
+            proposal: voiceProposal(),
+            heard: nil,
+            missingFields: [],
+            session: nil
+        )
+        XCTAssertEqual(route, .clarify(fields: [], rejected: true))
+    }
+
+    func testVoiceLogConfirmsAProposalThatMatchesTheEngineSession() {
+        let matching = voiceProposal()
+        XCTAssertEqual(
+            VoiceSetAdmission.route(
+                proposal: matching,
+                heard: nil,
+                missingFields: [],
+                session: engineTrainingSession()
+            ),
+            .confirm(matching)
+        )
+    }
+
+    func testVoiceLogRejectsQuantitiesTheEngineSessionDoesNotAllow() {
+        let session = engineTrainingSession()
+        let rejected = [
+            voiceProposal(reps: 80),
+            voiceProposal(reps: 0),
+            voiceProposal(setNumber: 4),
+            voiceProposal(loadKg: 501),
+            voiceProposal(rir: 7),
+            voiceProposal(sessionId: "other-session"),
+            voiceProposal(exerciseName: "Not the engine name")
+        ]
+        for bad in rejected {
+            XCTAssertEqual(
+                VoiceSetAdmission.route(proposal: bad, heard: nil, missingFields: [], session: session),
+                .clarify(fields: [], rejected: true)
+            )
+        }
+        let bodyweight = voiceProposal(loadKg: nil)
+        XCTAssertEqual(
+            VoiceSetAdmission.route(proposal: bodyweight, heard: nil, missingFields: [], session: session),
+            .confirm(bodyweight)
+        )
+    }
+
+    func testVoiceLogStillReviewsAHeardSetWhenOnlyExerciseOrSetIsMissing() {
+        let heard = VoiceHeardIntent(
+            setNumber: nil, reps: 8, loadValue: 80, weightUnit: "kg", loadKg: 80, rir: 2
+        )
+        XCTAssertEqual(
+            VoiceSetAdmission.route(
+                proposal: nil,
+                heard: heard,
+                missingFields: ["exercise"],
+                session: engineTrainingSession()
+            ),
+            .review(heard)
+        )
+    }
+
+    func testVoiceLogRejectsHeardValuesOutsideTheLoggedSetBounds() {
+        let heard = VoiceHeardIntent(
+            setNumber: 1, reps: 0, loadValue: nil, weightUnit: nil, loadKg: nil, rir: 2
+        )
+        XCTAssertEqual(
+            VoiceSetAdmission.route(
+                proposal: nil,
+                heard: heard,
+                missingFields: ["set_number"],
+                session: engineTrainingSession()
+            ),
+            .clarify(fields: [], rejected: true)
+        )
+    }
+
+    func testConfirmedVoiceLogDoesNotWriteASetOutsideTheEngineSession() async throws {
+        var logged = 0
+        do {
+            try await VoiceSetLogger.commit(
+                voiceProposal(exerciseId: "invented_curl", exerciseName: "Invented curl"),
+                isConfirmed: true,
+                accessToken: "access-token",
+                session: engineTrainingSession()
+            ) { _, _ in logged += 1 }
+            XCTFail("An invented exercise must not be logged")
+        } catch let error as VoiceSetLogRejection {
+            XCTAssertEqual(error, .outsideEngineSession)
+            XCTAssertEqual(error.errorDescription, VoiceSetAdmission.rejectedLogMessage)
+        }
+        XCTAssertEqual(logged, 0)
+    }
+
+    func testVoiceLogKeepsClarificationWhenRepsAreMissing() {
+        XCTAssertEqual(
+            VoiceSetAdmission.route(
+                proposal: nil,
+                heard: nil,
+                missingFields: ["reps"],
+                session: engineTrainingSession()
+            ),
+            .clarify(fields: ["reps"], rejected: false)
         )
     }
 
@@ -485,6 +606,56 @@ final class ChatServiceTests: XCTestCase {
         } catch let error as ChatServiceError {
             XCTAssertEqual(error, .rateLimited(retryAfterSeconds: 120))
         }
+    }
+
+    private func engineTrainingSession() -> TrainingSession {
+        TrainingSession(
+            id: "11111111-1111-4111-8111-111111111111",
+            week: 1,
+            slot: 0,
+            pattern: "A",
+            title: "Full body A",
+            exercises: [
+                TrainingExercisePrescription(
+                    id: "bench_press",
+                    name: "Bench Press",
+                    primaryMuscle: "chest",
+                    muscleContribution: ["chest": 1],
+                    sets: 3,
+                    repRange: .init(min: 6, max: 10),
+                    targetReps: 8,
+                    targetRir: 2,
+                    targetLoadKg: 80,
+                    loadInstruction: nil,
+                    progression: "hold",
+                    evidenceIds: ["k:81c218db"]
+                )
+            ],
+            safetyStop: false,
+            explanation: nil,
+            evidenceIds: ["k:81c218db"],
+            loggedSets: nil
+        )
+    }
+
+    private func voiceProposal(
+        sessionId: String = "11111111-1111-4111-8111-111111111111",
+        exerciseId: String = "bench_press",
+        exerciseName: String = "Bench Press",
+        setNumber: Int = 1,
+        reps: Int = 8,
+        loadKg: Double? = 80,
+        rir: Int = 2
+    ) -> VoiceSetProposal {
+        VoiceSetProposal(
+            sessionId: sessionId,
+            exerciseId: exerciseId,
+            exerciseName: exerciseName,
+            setNumber: setNumber,
+            reps: reps,
+            loadKg: loadKg,
+            rir: rir
+        )
     }
 
     private func makeSession() -> URLSession {

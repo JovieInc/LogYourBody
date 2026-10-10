@@ -85,6 +85,8 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
     }
 
     func testProcessBatchHealthKitData_DeduplicatesLateNightWeightsAndPreservesLocalDate() async throws {
+        let previousHealthAccount = isolateSharedHealthAccountBinding()
+        defer { restoreSharedHealthAccountBinding(previousHealthAccount) }
         let coreData = CoreDataManager.shared
         let healthKitManager = HealthKitManager(
             authManager: AuthManager.shared, coreDataManager: coreData,
@@ -138,6 +140,8 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
     }
 
     func testProcessBatchHealthKitData_PairsBodyFatByLocalDateAcrossMidnight() async throws {
+        let previousHealthAccount = isolateSharedHealthAccountBinding()
+        defer { restoreSharedHealthAccountBinding(previousHealthAccount) }
         let coreData = CoreDataManager.shared
         let healthKitManager = HealthKitManager(
             authManager: AuthManager.shared, coreDataManager: coreData,
@@ -202,6 +206,24 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertEqual(nextDayMetric.weight, 83.8)
         XCTAssertEqual(nextDayMetric.bodyFatPercentage, 22.5)
         XCTAssertEqual(nextDayMetric.bodyFatMethod, "HealthKit")
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: HealthKitAccountSyncPolicy.accountIdKey),
+            userId
+        )
+    }
+
+    private func isolateSharedHealthAccountBinding() -> String? {
+        let previous = UserDefaults.standard.string(forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        UserDefaults.standard.removeObject(forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        return previous
+    }
+
+    private func restoreSharedHealthAccountBinding(_ previous: String?) {
+        if let previous {
+            UserDefaults.standard.set(previous, forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        }
     }
 
     func testSyncLocalChanges_UsesProductAPIAndMarksBodyMetricSynced() async throws {

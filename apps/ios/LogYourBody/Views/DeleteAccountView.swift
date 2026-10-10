@@ -219,6 +219,7 @@ struct AccountDeletionCleanupService {
         Constants.revenueCatIsSubscribedKey,
         "revenuecat_lastFetchTimestamp",
         Constants.healthKitSyncEnabledKey,
+        HealthKitAccountSyncPolicy.accountIdKey,
         HealthKitDefaultsKey.authorizationConfirmed.rawValue,
         HealthKitDefaultsKey.lastObserverSyncDate.rawValue,
         HealthKitDefaultsKey.fullSyncCompleted.rawValue,

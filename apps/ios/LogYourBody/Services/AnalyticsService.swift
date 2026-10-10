@@ -129,6 +129,7 @@ private enum AnalyticsEventPolicy {
         "onboarding_health_import_attempt": [:],
         "onboarding_health_import_authorized": [:],
         "onboarding_health_import_denied": [:],
+        "onboarding_health_import_no_samples": [:],
         "onboarding_health_import_unavailable": [:],
         "onboarding_pre_auth_completed": [:],
         "onboarding_started": context,
