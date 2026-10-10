@@ -734,6 +734,25 @@ final class AuthManagerSessionTests: XCTestCase {
         XCTAssertFalse(accepted)
     }
 
+    func testValidatedTokenRotationKeepsTheBoundBillingLifetime() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        let client = MockRevenueCatPurchasesClient()
+        let billing = RevenueCatManager(purchasesClient: client, userDefaults: defaults)
+        billing.markAsConfigured()
+        manager.bindBillingLifecycle(billing)
+        await billing.waitForBillingReconciliation()
+        let owner = try XCTUnwrap(billing.captureBillingSession())
+        stubSessionSuccess()
+
+        let token = await manager.getAccessToken()
+        await billing.waitForBillingReconciliation()
+
+        XCTAssertEqual(token, "new-access")
+        XCTAssertEqual(billing.captureBillingSession(), owner)
+        XCTAssertEqual(client.identifiedUserIDs, ["user-123"])
+    }
+
     func testProfileWriteStillSucceedsAfterValidTokenRotation() async throws {
         let manager = makeManager()
         applyProfileAccount(manager, subject: "user-123", name: "Test User")

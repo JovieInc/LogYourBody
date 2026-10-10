@@ -307,6 +307,7 @@ final class AuthManager: NSObject, ObservableObject {
         manager.suspendHealthImport = {
             await HealthSyncCoordinator.shared.suspendAutomaticImportAfterSignOut()
         }
+        manager.bindBillingLifecycle(RevenueCatManager.shared)
         return manager
     }()
 
@@ -320,6 +321,7 @@ final class AuthManager: NSObject, ObservableObject {
             if !isRotatingProfileSession {
                 profileGeneration &+= 1
                 bootstrappedProfileSessions.removeAll()
+                billingLifecycle?.authenticationDidChange(resolvedBillingSession)
             }
             refreshTask?.cancel()
             refreshTask = nil
@@ -330,7 +332,13 @@ final class AuthManager: NSObject, ObservableObject {
     /// Signed-in means a first-party Jovie access token is present.
     /// This is not Clerk in-memory session state and is not stored in UserDefaults.
     var isAuthenticated: Bool { JovieSessionPolicy.isSignedIn(authSession) }
-    @Published var isAuthProviderLoaded = false
+    @Published var isAuthProviderLoaded = false {
+        didSet {
+            if isAuthProviderLoaded {
+                billingLifecycle?.authenticationDidChange(resolvedBillingSession)
+            }
+        }
+    }
     @Published var authProviderInitError: String?
     @Published var needsLegalConsent = false
     @Published var lastExitReason: AuthExitReason = .none
@@ -342,6 +350,21 @@ final class AuthManager: NSObject, ObservableObject {
     let legalConsentGate = AsyncGate()
     var prepareHealthAccountHandoff: ((String?) -> Void)?
     var suspendHealthImport: (() async -> Void)?
+    private weak var billingLifecycle: AuthBillingLifecycle?
+
+    func bindBillingLifecycle(_ lifecycle: AuthBillingLifecycle) {
+        billingLifecycle = lifecycle
+        let session = authSession == nil && !isAuthProviderLoaded
+            ? AuthBillingSession.restoring : resolvedBillingSession
+        lifecycle.authenticationDidChange(session)
+    }
+
+    private var resolvedBillingSession: AuthBillingSession {
+        if isAuthenticated, let subject = authSession?.subject {
+            return .authenticated(ProfileSessionOwnership(subject: subject, generation: profileGeneration))
+        }
+        return .signedOut(generation: profileGeneration)
+    }
 
     private let storedSessionKey = "productAuth.jovieOAuthSession"
     private var initializationTask: Task<Void, Never>?

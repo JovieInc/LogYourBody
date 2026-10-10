@@ -38,85 +38,31 @@ var cachedTrialExpirationTimestamp: Double {
 
     /// Configure RevenueCat SDK - call this on app launch
     /// Note: Does NOT fetch customer info immediately to avoid blocking UI
-    nonisolated func configure(apiKey: String) {
-        Task { @MainActor in
-            // print("💰 Configuring RevenueCat SDK")
-
-            purchasesClient.configure(apiKey: apiKey, delegate: self)
-
-            // Mark configured only after delegate wiring finishes to avoid race conditions
-            self.markAsConfigured()
-
-            // print("💰 RevenueCat SDK configured successfully")
-        }
+    func configure(apiKey: String) {
+        guard !isConfigured else { return }
+        purchasesClient.configure(apiKey: apiKey, delegate: self)
+        markAsConfigured()
     }
 
 /// Mark SDK as configured after delegate setup completes
     @MainActor
     func markAsConfigured() {
         isConfigured = true
+        startBillingIdentityWorkerIfNeeded()
         // print("✅ SDK marked as configured")
     }
 
 /// Identify the customer with the shared identity subject.
     func identifyUser(userId: String) async {
-        guard isConfigured else {
-            // print("⚠️ SDK not configured yet, skipping identifyUser()")
-            return
-        }
-
-        let ownership = beginBillingSession(subject: userId)
-        defer { finishBillingSession(ownership) }
-
-        do {
-            let customer = try await purchasesClient.logIn(userId: userId, entitlementID: proEntitlementID)
-            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
-            updateSubscriptionStatus(customer: customer)
-            // print("💰 User identified successfully")
-        } catch {
-            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
-            let appError = AppError.billing(operation: "identifyUser", underlying: error)
-            let context = ErrorContext(
-                feature: "billing",
-                operation: "identifyUser",
-                screen: nil,
-                userId: userId
-            )
-            ErrorReporter.shared.capture(appError, context: context)
-
-            errorMessage = "Failed to link account: \(error.localizedDescription)"
-        }
+        guard isConfigured, !Task.isCancelled else { return }
+        let ownership = requestBillingIdentity(subject: userId)
+        await waitForBillingIdentity(ownership)
     }
 
-/// Log out the current user (call this on sign out)
+/// Log out the current user (call this on sign out).
     func logoutUser() async {
-        let ownership = beginBillingSession(subject: nil)
-        defer {
-            // Keep the completion clear for SDK updates received during logout,
-            // while protecting any replacement login from the old completion.
-            if ownsBillingSession(ownership) { clearLocalSubscriptionState() }
-            finishBillingSession(ownership)
-        }
-        // Local access ends immediately; a delayed SDK reply cannot clear a new login.
-        clearLocalSubscriptionState()
-
-        guard isConfigured else {
-            return
-        }
-
-        do {
-            try await purchasesClient.logOut()
-        } catch {
-            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
-            let appError = AppError.billing(operation: "logoutUser", underlying: error)
-            let context = ErrorContext(
-                feature: "billing",
-                operation: "logoutUser",
-                screen: nil,
-                userId: nil
-            )
-            ErrorReporter.shared.capture(appError, context: context)
-        }
+        let ownership = requestBillingIdentity(subject: nil)
+        await waitForBillingIdentity(ownership)
     }
 
 // MARK: - Subscription Status
@@ -128,7 +74,10 @@ var cachedTrialExpirationTimestamp: Double {
             return
         }
 
-        guard let ownership = captureBillingSession() else { return }
+        guard let ownership = captureBillingSession() else {
+            await retryPendingBillingIdentityIfNeeded()
+            return
+        }
 
         do {
             let customer = try await purchasesClient.customerInfo(entitlementID: proEntitlementID, read: .cached)

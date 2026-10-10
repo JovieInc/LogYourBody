@@ -227,7 +227,18 @@ final class LiveRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
     }
 
     func logOut() async throws {
-        _ = try await Purchases.shared.logOut()
+        try await Self.logOutIfIdentified(
+            isAnonymous: { Purchases.shared.isAnonymous },
+            logOut: { _ = try await Purchases.shared.logOut() }
+        )
+    }
+
+    static func logOutIfIdentified(
+        isAnonymous: () -> Bool,
+        logOut: () async throws -> Void
+    ) async throws {
+        guard !isAnonymous() else { return }
+        try await logOut()
     }
 
     func customerInfo(entitlementID: String, read: RevenueCatCustomerInfoRead) async throws -> RevenueCatCustomerSnapshot {
@@ -299,6 +310,7 @@ class RevenueCatManager: NSObject, ObservableObject {
         static let subscriptionAnalyticsPhase = "revenuecat_subscriptionAnalyticsPhase"
         static let subscriptionAnalyticsAppUserId = "revenuecat_subscriptionAnalyticsAppUserId"
         static let trialExpirationTimestamp = "revenuecat_trialExpirationTimestamp"
+        static let subscriptionOwner = "revenuecat_subscriptionOwner"
         static let cachedPaywallOfferingDisplay = "revenuecat_cachedPaywallOfferingDisplay"
     }
 
@@ -348,6 +360,13 @@ class RevenueCatManager: NSObject, ObservableObject {
     private var billingSession = BillingSessionOwnership(subject: nil, generation: 0)
     private var pendingBillingSession: BillingSessionOwnership?
     private var delegateRefresh: DelegateRefresh?
+    var lastAuthBillingSession: AuthBillingSession?
+    var desiredBillingIdentity: BillingIdentityRequest?
+    var attemptedBillingIdentity: BillingSessionOwnership?
+    var billingIdentityWorker: Task<Void, Never>?
+    var billingIdentityWaiters: [UInt64: [UUID: CheckedContinuation<Void, Never>]] = [:]
+
+    var billingAccountSubject: String? { billingSession.subject }
 
     private final class DelegateRefresh {
         let ownership: BillingSessionOwnership
@@ -373,6 +392,7 @@ class RevenueCatManager: NSObject, ObservableObject {
     func captureBillingSession() -> BillingSessionOwnership? {
         // The SDK may still hold the previous identity during login/logout.
         guard pendingBillingSession == nil else { return nil }
+        guard lastAuthBillingSession == nil || billingSession.subject != nil else { return nil }
         return billingSession
     }
 
@@ -441,7 +461,8 @@ class RevenueCatManager: NSObject, ObservableObject {
         // print("💰 RevenueCatManager initialized")
 
         // Load cached subscription status for instant UI update
-        self.isSubscribed = cachedIsSubscribed
+        // A cached Boolean does not establish the authenticated account at launch.
+        self.isSubscribed = false
         self.cachedPaywallOfferingDisplay = loadCachedPaywallOfferingDisplay()
         // print("💰 Loaded cached subscription status: \(cachedIsSubscribed)")
     }

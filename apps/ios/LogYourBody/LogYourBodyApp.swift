@@ -371,11 +371,8 @@ struct LogYourBodyApp: App {
 
         await authTask.value
 
-        if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
-            await subscriptionManager.identifyUser(userId: userId)
-        } else {
-            await subscriptionManager.refreshCustomerInfo()
-        }
+        // AuthManager's bound lifecycle owns every account transition, including cold restore.
+        await subscriptionManager.waitForBillingReconciliation()
     }
 
     @MainActor
