@@ -88,6 +88,36 @@ final class ProfileSettingsPolicyTests: XCTestCase {
         XCTAssertEqual(ProfileSettingsPolicy.formattedHeight(heightCm: 152, useMetric: false), "4'11\"")
     }
 
+    func testStoredHeightRejectsInvalidAndUnrepresentableValuesWithoutInventingAHeight() {
+        for height in [Double.nan, .infinity, -.infinity, 0, -170, 0.1, 1e20, Double(Int.max)] {
+            XCTAssertNil(ProfileSettingsPolicy.roundedStoredHeight(height))
+            XCTAssertNil(ProfileSettingsPolicy.storedHeightText(height, useMetric: true))
+            XCTAssertNil(ProfileSettingsPolicy.storedHeightText(height, useMetric: false))
+        }
+        XCTAssertNil(ProfileSettingsPolicy.roundedStoredHeight(nil))
+    }
+
+    func testStoredHeightPreservesDisplayRoundingAndImperialSpacing() {
+        XCTAssertEqual(ProfileSettingsPolicy.storedHeightText(170.4, useMetric: true), "170 cm")
+        XCTAssertEqual(ProfileSettingsPolicy.storedHeightText(182.8, useMetric: true), "183 cm")
+        XCTAssertEqual(ProfileSettingsPolicy.storedHeightText(182.8, useMetric: false), "6'0\"")
+        XCTAssertEqual(ProfileSettingsPolicy.storedHeightText(170, useMetric: false), "5'7\"")
+        XCTAssertEqual(ProfileSettingsPolicy.storedHeightText(170, useMetric: false, spaces: true), "5' 7\"")
+    }
+
+    func testHeightEditorSeedPreservesValidStoredHeights() {
+        for height in [Double.nan, .infinity, -.infinity, -1, 0, 1e20, Double(Int.max)] {
+            XCTAssertEqual(ProfileSettingsPolicy.heightEditorSeed(height), 170)
+        }
+        XCTAssertEqual(ProfileSettingsPolicy.heightEditorSeed(nil), 170)
+        XCTAssertEqual(ProfileSettingsPolicy.heightEditorSeed(100), 100)
+        XCTAssertEqual(ProfileSettingsPolicy.heightEditorSeed(182.8), 183)
+        XCTAssertEqual(ProfileSettingsPolicy.heightEditorSeed(250), 250)
+        for height in [50, 91, 99, 251, 259, 272, 275] {
+            XCTAssertEqual(ProfileSettingsPolicy.heightEditorSeed(Double(height)), height)
+        }
+    }
+
     // MARK: - formattedAge
 
     private func makeFixedCalendar() -> Calendar {
