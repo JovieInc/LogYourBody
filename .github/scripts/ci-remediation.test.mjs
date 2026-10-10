@@ -18,7 +18,7 @@ import {
   planCodeownersIssue,
   shouldAddRepoComment,
 } from './codeowners-check.mjs';
-import { linearIssueLookupFilter, upsertLinearIssue } from './lib/linear-issue-intake.mjs';
+import { LYB_TEAM_KEY, linearIssueLookupFilter, upsertLinearIssue } from './lib/linear-issue-intake.mjs';
 import {
   NO_REVIEWER_FINGERPRINT,
   NO_REVIEWER_WAIT_MS,
@@ -69,6 +69,7 @@ test('log matcher accepts the App Store Connect agreements 403 and rejects other
   assert.equal(plan.priority, 1);
   assert.equal(plan.createStateName, 'Todo');
   assert.equal(plan.reopenTerminal, true);
+  assert.equal(plan.teamKey, LYB_TEAM_KEY);
   assert.match(plan.title, /remediation:asc-agreements/);
   assert.match(plan.description, /actions\/runs\/9/);
   assert.equal(planAscAgreementsIssue('build failed', 'https://example.com/no-match'), null);
@@ -122,6 +123,7 @@ test('reviewer selection keeps only green auto-merge PRs with no reviewer for mo
   assert.equal(issue.priority, 1);
   assert.equal(issue.createStateName, 'Todo');
   assert.equal(issue.reopenTerminal, true);
+  assert.equal(issue.teamKey, LYB_TEAM_KEY);
   assert.match(issue.description, /pull\/1/);
   assert.match(issue.description, /actions\/runs\/4/);
   const dryRun = formatNoReviewerDryRun(
@@ -192,7 +194,8 @@ test('CODEOWNERS drift is missing file or invalid owner, and stays a dry-run unl
   assert.equal(missing.label, CODEOWNERS_LABEL);
   assert.equal(missing.label, 'remediation:codeowners-drift');
   assert.equal(missing.identifier, CODEOWNERS_ISSUE);
-  assert.equal(missing.identifier, 'JOV-7549');
+  assert.equal(missing.identifier, 'LYB-147');
+  assert.equal(missing.teamKey, LYB_TEAM_KEY);
   assert.equal(missing.createStateName, 'Todo');
   assert.equal(missing.reopenTerminal, true);
   assert.match(missing.comment, /repo: JovieInc\/LogYourBody/);
@@ -225,7 +228,7 @@ test('CODEOWNERS drift is missing file or invalid owner, and stays a dry-run unl
     reason: 'REMEDIATION_TRIGGERS_ENABLED is not true or LINEAR_API_KEY is unset',
   });
   assert.match(dryRun, /would upsert Linear issue/);
-  assert.match(dryRun, /JOV-7549/);
+  assert.match(dryRun, /LYB-147/);
   assert.match(formatCodeownersDryRun(null, { reason: 'ok' }), /No Linear issue filed/);
 
   const workflow = readFileSync(resolve(root, '.github/workflows/codeowners-check.yml'), 'utf8');
