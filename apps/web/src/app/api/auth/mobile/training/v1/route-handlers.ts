@@ -1,3 +1,5 @@
+import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
+import { profileConfirmsAdult } from '@/lib/training/eligibility';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
@@ -50,6 +52,7 @@ const FeedbackBodySchema = z
 type RouteDependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   records: NativeProductRecordsPort;
+  revisions?: TrainingRevisionsPort;
   users: UserDirectoryPort;
   reserveRequest: (subject: string) => Promise<ChatRateLimitResult>;
   createId: () => string;
@@ -77,28 +80,6 @@ function rateLimitError(result: Extract<ChatRateLimitResult, { allowed: false }>
 
 function withVersion(payload: Record<string, unknown>) {
   return { version: TRAINING_API_VERSION, ...payload };
-}
-
-function profileConfirmsAdult(dateOfBirth: unknown, today: Date): boolean {
-  if (typeof dateOfBirth !== 'string') return false;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth.slice(0, 10));
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  )
-    return false;
-  let age = today.getUTCFullYear() - year;
-  const birthdayPassed =
-    today.getUTCMonth() + 1 > month ||
-    (today.getUTCMonth() + 1 === month && today.getUTCDate() >= day);
-  if (!birthdayPassed) age -= 1;
-  return age >= 18;
 }
 
 async function collectionRecords(
@@ -164,6 +145,16 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const identity = await authorized(request);
       if (!identity) return apiError('unauthorized', 401);
       if (!featureEnabled()) return apiError('not_found', 404);
+      // Capture before body/profile/rate-limit awaits: a request already in flight
+      // cannot restore consent after a concurrent revoke or canonical input edit.
+      let enrollmentContext;
+      try {
+        enrollmentContext = await dependencies.revisions?.readContext(identity.sub);
+        if (dependencies.revisions && !enrollmentContext)
+          return apiError('training_unavailable', 503);
+      } catch {
+        return apiError('training_unavailable', 503);
+      }
       const denied = await allowed(identity.sub);
       if (denied) return denied;
       const parsed = EnrollBodySchema.safeParse(await request.json().catch(() => null));
@@ -177,6 +168,8 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
         }
         const setup = await storeProgramSetup({
           records: dependencies.records,
+          revisions: dependencies.revisions,
+          expectedContext: enrollmentContext ?? undefined,
           subject: identity.sub,
           setup: {
             adultConfirmed: true,
@@ -210,6 +203,10 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const denied = await allowed(identity.sub);
       if (denied) return denied;
       try {
+        if (dependencies.revisions) {
+          const deleted = await dependencies.revisions.revoke(identity.sub);
+          return json(withVersion({ revoked: true, deletedRecords: deleted }));
+        }
         const [sessions, sets, feedback] = await Promise.all([
           collectionRecords(dependencies.records, identity.sub, 'training_sessions'),
           collectionRecords(dependencies.records, identity.sub, 'logged_sets'),

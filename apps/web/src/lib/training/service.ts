@@ -1,3 +1,5 @@
+import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
+import { TRAINING_BASELINE_POLICY, type RevisionContextToken } from './revision-contract';
 import { createHash } from 'node:crypto';
 import type {
   NativeProductRecord,
@@ -142,6 +144,8 @@ export async function getOrCreateNextWorkout(input: {
   const snapshot = await loadTrainingRecords(input.records, input.subject);
   const setup = snapshot.setup;
   if (!setup) return { kind: 'not_enrolled' };
+  if (setup.programRevisionId && setup.programPolicyVersion !== TRAINING_BASELINE_POLICY)
+    throw new Error('training_program_policy_requires_review');
 
   const block = createMesoBlock(setup.startedAt, input.now.toISOString());
   let periodSessions = snapshot.sessions as SessionRecord[];
@@ -270,6 +274,7 @@ export async function getOrCreateNextWorkout(input: {
     id: session.id,
     record_type: 'workout_session',
     programSetupId: setup.id,
+    ...(setup.programRevisionId ? { programRevisionId: setup.programRevisionId } : {}),
     blockId: block.id,
     weekNumber: block.currentWeek,
     slot,
@@ -292,6 +297,8 @@ export async function getOrCreateNextWorkout(input: {
 
 export async function storeProgramSetup(input: {
   records: NativeProductRecordsPort;
+  revisions?: TrainingRevisionsPort;
+  expectedContext?: RevisionContextToken;
   subject: string;
   setup: Omit<TrainingProgramSetup, 'id' | 'consentVersion' | 'startedAt'>;
   now: Date;
@@ -303,6 +310,16 @@ export async function storeProgramSetup(input: {
     consentVersion: 'hypertrophy-coach-v1',
     startedAt: input.now.toISOString(),
   };
+  if (input.revisions) {
+    if (!input.expectedContext) throw new Error('training_enrollment_context_required');
+    const { generation, profileFingerprint, legacyFingerprint } = input.expectedContext;
+    await input.revisions.storeLegacySetup(input.subject, setup, {
+      generation,
+      profileFingerprint,
+      legacyFingerprint,
+    });
+    return setup;
+  }
   const result = await input.records.push(input.subject, 'training_feedback', [
     {
       ...setup,
