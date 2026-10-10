@@ -175,6 +175,11 @@ enum FormatterCache {
         return formatter
     }()
 
+    static func formattedSteps(_ value: Double) -> String? {
+        guard value.isFinite else { return nil }
+        return stepsFormatter.string(from: NSNumber(value: value.rounded()))
+    }
+
     static let shortTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.timeStyle = .short

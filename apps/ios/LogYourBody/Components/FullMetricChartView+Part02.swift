@@ -287,15 +287,15 @@ var activeSeries: [MetricChartDataPoint] {
 var visiblePresenceLegendItems: [ChartPresenceLegendItem] {
         let counts = chartPresenceCounts
         return MetricPresence.allCases.compactMap { presence in
-            let count = counts[presence] ?? 0
-            if count == 0 && !(presence == .missing && chartData.isEmpty) {
+            let total = counts[presence] ?? 0
+            if total == 0 && !(presence == .missing && chartData.isEmpty) {
                 return nil
             }
 
             return ChartPresenceLegendItem(
                 presence: presence,
                 label: presenceLabel(for: presence),
-                total: count
+                total: total
             )
         }
     }
@@ -409,8 +409,7 @@ var chartDataFingerprint: String {
 
     func formatHeadlineValue(_ value: Double) -> String {
         if isStepsMetric {
-            let steps = Int(value.rounded())
-            return FormatterCache.stepsFormatter.string(from: NSNumber(value: steps)) ?? "\(steps)"
+            return FormatterCache.formattedSteps(value) ?? "—"
         }
 
         if unit == "%" {
@@ -421,8 +420,7 @@ var chartDataFingerprint: String {
 
 func formatStatValue(_ value: Double) -> String {
         if isStepsMetric {
-            let steps = Int(value.rounded())
-            return FormatterCache.stepsFormatter.string(from: NSNumber(value: steps)) ?? "\(steps)"
+            return FormatterCache.formattedSteps(value) ?? "—"
         }
 
         if unit == "%" {
