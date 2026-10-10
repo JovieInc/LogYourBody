@@ -81,7 +81,20 @@ export async function logTrainingSet(input: {
     return { kind: 'session_not_active' };
   }
   const completedAt = input.now.toISOString();
-  if (!session || !validateSetLog({ id: 'server-generated', ...set, completedAt }, session))
+  const hasSavedIdentity = snapshot.logs.some(
+    (prior) =>
+      prior.id === logId &&
+      prior.sessionId === set.sessionId &&
+      prior.exerciseId === set.exerciseId &&
+      prior.setNumber === set.setNumber,
+  );
+  // Recovery can reduce the effective set count after a set was already saved.
+  // Let the atomic read below acknowledge that row or reject a changed payload;
+  // only a genuinely new identity must fit the current prescription.
+  if (
+    !session ||
+    (!hasSavedIdentity && !validateSetLog({ id: 'server-generated', ...set, completedAt }, session))
+  )
     return { kind: 'set_not_in_session' };
 
   const log: SetLog & { record_type: string } = {

@@ -266,6 +266,108 @@ describe('authenticated training API', () => {
     expect((await records.pull('subject-a', 'logged_sets')).records).toEqual([]);
   });
 
+  it('acknowledges saved sets after effective volume changes without accepting edits or new out-of-plan sets', async () => {
+    const { handlers, records, setNow } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const set = {
+      sessionId: session.id,
+      exerciseId: session.exercises[0].id,
+      setNumber: 2,
+      reps: 10,
+      loadKg: 20,
+      rir: 3,
+    };
+    const original = await (
+      await handlers.logSet(request('POST', 'log-set', 'token-a', set))
+    ).json();
+    const storedSession = (await records.pull('subject-a', 'training_sessions')).records[0]!;
+    await records.push('subject-a', 'training_sessions', [
+      {
+        ...storedSession,
+        prescription: {
+          ...session,
+          exercises: session.exercises.map((exercise: { sets: number }) => ({
+            ...exercise,
+            sets: 1,
+          })),
+        },
+      },
+    ]);
+    setNow('2026-01-10T12:02:00.000Z');
+    const retry = await handlers.logSet(request('POST', 'log-set', 'token-a', set));
+    expect(retry.status).toBe(201);
+    await expect(retry.json()).resolves.toMatchObject({
+      log: original.log,
+      sessionComplete: false,
+    });
+    const changed = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', { ...set, reps: 8 }),
+    );
+    expect(changed.status).toBe(409);
+    await expect(changed.json()).resolves.toMatchObject({ error: 'set_conflict' });
+    const newSet = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', { ...set, exerciseId: session.exercises[1].id }),
+    );
+    expect(newSet.status).toBe(400);
+    await expect(newSet.json()).resolves.toMatchObject({ error: 'set_not_in_session' });
+    await handlers.enroll(request('POST', 'enroll', 'token-b', eligibleSetup));
+    expect((await handlers.logSet(request('POST', 'log-set', 'token-b', set))).status).toBe(404);
+    expect((await records.pull('subject-a', 'logged_sets')).records).toEqual([original.log]);
+  });
+
+  it.each(['deleted-before-read', 'deleted-before-insert', 'unsupported'])(
+    'does not bypass atomic safety for an out-of-plan saved set retry (%s)',
+    async (state) => {
+      const { handlers, records } = makeHarness();
+      await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+      const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+      const set = {
+        sessionId: session.id,
+        exerciseId: session.exercises[0].id,
+        setNumber: 2,
+        reps: 10,
+        loadKg: 20,
+        rir: 3,
+      };
+      const { log } = await (
+        await handlers.logSet(request('POST', 'log-set', 'token-a', set))
+      ).json();
+      const storedSession = (await records.pull('subject-a', 'training_sessions')).records[0]!;
+      await records.push('subject-a', 'training_sessions', [
+        {
+          ...storedSession,
+          prescription: {
+            ...session,
+            exercises: session.exercises.map((exercise: { sets: number }) => ({
+              ...exercise,
+              sets: 1,
+            })),
+          },
+        },
+      ]);
+      if (state === 'deleted-before-read') {
+        await records.remove('subject-a', 'logged_sets', [log.id]);
+      } else if (state === 'deleted-before-insert') {
+        const insert = records.insertTrainingSet.bind(records);
+        records.insertTrainingSet = async (subject, value) => {
+          await records.remove(subject, 'logged_sets', [log.id]);
+          return insert(subject, value);
+        };
+      } else {
+        Object.defineProperty(records, 'insertTrainingSet', { value: undefined });
+      }
+      const response = await handlers.logSet(request('POST', 'log-set', 'token-a', set));
+      expect(response.status).toBe(state === 'deleted-before-read' ? 400 : 503);
+      const saved = (await records.pull('subject-a', 'logged_sets')).records;
+      expect(saved).toHaveLength(1);
+      expect(saved[0]).toEqual({
+        ...log,
+        deleted_at: state === 'unsupported' ? null : expect.any(String),
+      });
+    },
+  );
+
   it('uses feedback conservatively and revokes all program records on opt-out', async () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
