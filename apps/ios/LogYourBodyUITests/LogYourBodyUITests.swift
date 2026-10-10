@@ -695,6 +695,40 @@ final class LogYourBodyUITests: XCTestCase {
         )
     }
 
+    func testHomeChatStarterPromptPaddedAreaSendsAndExpands() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture"
+        ])
+        try waitForHomeChatComposer(in: app)
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        XCTAssertTrue(prompt.isHittable)
+        let targetHeight = prompt.frame.height
+        attachScreenshot(named: "home-chat-prompt-padding-before-tap", from: app)
+
+        // The existing pill is visibly 38pt tall, while its glyph target is about 16pt.
+        // At the horizontal center, 14pt below the midpoint is inside the pill's
+        // visible padding and outside the text. A normal button tap only tests the text.
+        let paddedPoint = prompt.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .withOffset(CGVector(dx: 0, dy: 14))
+        XCTAssertTrue(app.frame.contains(paddedPoint.screenPoint))
+        paddedPoint.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8),
+            "Tapping the visible starter pill padding must expand chat"
+        )
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 8), "The padded tap must send the prompt")
+        attachScreenshot(named: "home-chat-prompt-padding-reply", from: app)
+        XCTAssertGreaterThanOrEqual(targetHeight, 44, "The native prompt target must include its label padding")
+    }
+
     func testHomePinsChatComposerWithoutTabBar() throws {
         let app = XCUIApplication()
         launch(app, with: [
@@ -863,23 +897,32 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertGreaterThan(explanation.frame.height, 50, "Recovery text must grow with accessibility text size")
         XCTAssertGreaterThanOrEqual(reload.frame.width, 44)
         XCTAssertGreaterThanOrEqual(reload.frame.height, 44)
-        XCTAssertLessThanOrEqual(explanation.frame.maxY, reload.frame.minY + 1, "Large text action needs its own row")
+        assertRecoveryExplanationAccessible(explanation, above: reload, in: app, capture: "legacy-pending-before-keyboard")
 
         let composer = app.textFields["chat_composer"]
         composer.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
+        composer.typeText("Trend")
         let settled = NSPredicate { _, _ in
-            reload.frame.maxY <= composer.frame.minY && explanation.frame.minY >= app.frame.minY
+            let scroll = app.scrollViews["chat_recovery_message_scroll"]
+            let visibleTop = scroll.exists ? scroll.frame.minY : explanation.frame.minY
+            return reload.frame.maxY <= composer.frame.minY && visibleTop >= app.frame.minY
         }
         expectation(for: settled, evaluatedWith: reload)
         waitForExpectations(timeout: 5)
         XCTAssertTrue(reload.isHittable)
-        XCTAssertLessThanOrEqual(explanation.frame.maxY, reload.frame.minY + 1)
+        let explanationScroll = app.scrollViews["chat_recovery_message_scroll"]
+        let explanationBottom = explanationScroll.exists ? explanationScroll.frame.maxY : explanation.frame.maxY
+        XCTAssertLessThanOrEqual(explanationBottom, reload.frame.minY + 1)
         attachScreenshot(named: "chat-recovery-pending-largest-text-keyboard", from: app)
         reload.tap()
         XCTAssertTrue(reload.waitForExistence(timeout: 8))
         XCTAssertFalse(app.buttons["chat_retry_button"].exists)
         XCTAssertTrue(explanation.exists, "Reload checks the pending original turn without resending")
+        XCTAssertEqual(composer.value as? String, "Trend", "Reload must preserve the unsent draft")
+        XCTAssertTrue(app.keyboards.firstMatch.exists, "Reload must keep the focused composer available")
+        app.typeText(" next")
+        XCTAssertEqual(composer.value as? String, "Trend next", "Typing continues without refocusing the composer")
     }
 
     func testFailedChatRecoveryRemainsReachableAtLargestText() throws {
@@ -900,7 +943,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertGreaterThan(explanation.frame.height, 50)
         XCTAssertGreaterThanOrEqual(retry.frame.width, 44)
         XCTAssertGreaterThanOrEqual(retry.frame.height, 44)
-        XCTAssertLessThanOrEqual(explanation.frame.maxY, retry.frame.minY + 1)
+        assertRecoveryExplanationAccessible(explanation, above: retry, in: app, capture: "legacy-failed-before-keyboard")
         XCTAssertLessThanOrEqual(retry.frame.maxY, app.textFields["chat_composer"].frame.minY)
         XCTAssertTrue(retry.isHittable)
         attachScreenshot(named: "chat-recovery-failed-largest-text", from: app)
@@ -945,8 +988,157 @@ final class LogYourBodyUITests: XCTestCase {
         expectation(for: settled, evaluatedWith: reload)
         waitForExpectations(timeout: 5)
         XCTAssertTrue(reload.isHittable)
-        XCTAssertLessThanOrEqual(explanation.frame.maxY, reload.frame.minY + 1)
+        let explanationScroll = app.scrollViews["chat_recovery_message_scroll"]
+        let explanationBottom = explanationScroll.exists ? explanationScroll.frame.maxY : explanation.frame.maxY
+        XCTAssertLessThanOrEqual(explanationBottom, reload.frame.minY + 1)
         attachScreenshot(named: "home-v2-recovery-pending-largest-text-keyboard", from: app)
+    }
+
+    func testHomeV2PendingComposerClearsKeyboardAtLargestText() throws {
+        try assertPendingComposerClearsKeyboard(homeV2: true, largestText: true)
+    }
+
+    func testLegacyPendingComposerClearsKeyboardAtLargestText() throws {
+        try assertPendingComposerClearsKeyboard(homeV2: false, largestText: true)
+    }
+
+    func testHomeV2PendingComposerClearsKeyboardAtDefaultText() throws {
+        try assertPendingComposerClearsKeyboard(homeV2: true, largestText: false)
+    }
+
+    private func assertPendingComposerClearsKeyboard(homeV2: Bool, largestText: Bool) throws {
+        let app = XCUIApplication()
+        var arguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryPendingFixture"
+        ]
+        if homeV2 { arguments.append("-lybUITestHomeV2Fixture") }
+        if largestText {
+            arguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        }
+        launch(app, with: arguments)
+        if homeV2 {
+            XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+            app.buttons["photo_timeline_root_menu"].tap()
+            let ask = app.buttons["home_v2_sidebar_ask"]
+            XCTAssertTrue(ask.waitForExistence(timeout: 8))
+            ask.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8))
+        } else {
+            try waitForHomeChatComposer(in: app)
+        }
+
+        let composer = app.textFields["chat_composer"]
+        let shell = app.descendants(matching: .any)["chat_composer_shell"]
+        let send = app.buttons["chat_send_button"]
+        let reload = app.buttons["chat_reload_button"]
+        let explanation = app.staticTexts["An answer is still in progress. Reload to check it."]
+        XCTAssertTrue(reload.waitForExistence(timeout: 8))
+        composer.tap()
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 8))
+        // The key grid excludes the predictive accessory row. Use its actual input container.
+        let keyboardSurface = app.otherElements["inputView"].firstMatch
+        XCTAssertTrue(keyboardSurface.waitForExistence(timeout: 8))
+        composer.typeText("Trend")
+        XCTAssertTrue(send.isEnabled, "Exercise the actionable Send control, not its empty-draft state")
+
+        let clearsKeyboard = NSPredicate { _, _ in
+            let visible = app.windows.firstMatch.frame
+            let frames = [shell.frame, send.frame, keyboard.frame, keyboardSurface.frame]
+            let hasUsableFrames = frames.allSatisfy { frame in
+                [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite) &&
+                    frame.width > 0 && frame.height > 0
+            }
+            return keyboard.exists && keyboardSurface.exists && hasUsableFrames &&
+                keyboardSurface.frame.contains(keyboard.frame) &&
+                visible.contains(shell.frame) && visible.contains(send.frame) &&
+                shell.frame.maxY <= keyboardSurface.frame.minY + 0.01 &&
+                send.frame.maxY <= keyboardSurface.frame.minY + 0.01
+        }
+        let clearance = XCTNSPredicateExpectation(predicate: clearsKeyboard, object: shell)
+        let result = XCTWaiter.wait(for: [clearance], timeout: 5)
+        let capture = "chat-composer-\(homeV2 ? "home-v2" : "legacy")-\(largestText ? "ax5" : "default")"
+        attachScreenshot(named: capture, from: app)
+        let geometry = XCTAttachment(string:
+            "shell=\(shell.frame); send=\(send.frame); keys=\(keyboard.frame); " +
+            "input=\(keyboardSurface.frame); reload=\(reload.frame)")
+        geometry.name = capture + "-geometry"
+        geometry.lifetime = .keepAlways
+        add(geometry)
+        if !homeV2 { attachRecoveryLayoutGeometry(named: capture + "-parent", from: app) }
+        XCTAssertEqual(result, .completed,
+                       "Full composer \(shell.frame) and Send \(send.frame) must clear input surface \(keyboardSurface.frame)")
+        XCTAssertTrue(send.isHittable)
+        XCTAssertTrue(reload.isHittable)
+        XCTAssertGreaterThanOrEqual(send.frame.width, 44 - 0.01)
+        XCTAssertGreaterThanOrEqual(send.frame.height, 44 - 0.01)
+        XCTAssertGreaterThanOrEqual(reload.frame.width, 44 - 0.01)
+        XCTAssertGreaterThanOrEqual(reload.frame.height, 44 - 0.01)
+        XCTAssertLessThanOrEqual(reload.frame.maxY, shell.frame.minY)
+
+        if largestText {
+            let scroll = app.scrollViews["chat_recovery_message_scroll"]
+            if scroll.exists, explanation.frame.height > scroll.frame.height + 1 {
+                XCTAssertGreaterThanOrEqual(scroll.frame.height, reload.frame.height,
+                                            "Recovery scrolling needs at least a full action-row height")
+                let originalTop = explanation.frame.minY
+                scroll.swipeUp()
+                XCTAssertLessThan(explanation.frame.minY, originalTop, "The explanation must actually scroll")
+                XCTAssertLessThanOrEqual(explanation.frame.maxY, scroll.frame.maxY + 1,
+                                         "The final recovery line must be reachable")
+                XCTAssertTrue(keyboard.exists, "Reading recovery text must not dismiss the keyboard to hide overflow")
+                XCTAssertTrue(reload.isHittable, "Reload stays outside the explanation's scrolling area")
+                XCTAssertLessThanOrEqual(shell.frame.maxY, keyboardSurface.frame.minY + 0.01)
+                attachScreenshot(named: capture + "-recovery-scrolled", from: app)
+            }
+        }
+        send.tap()
+        XCTAssertTrue(app.buttons["chat_retry_button"].waitForExistence(timeout: 8),
+                      "The pending-history fixture must receive the new turn and expose its provider failure")
+        XCTAssertFalse(reload.exists)
+    }
+
+    private func assertRecoveryExplanationAccessible(
+        _ explanation: XCUIElement, above action: XCUIElement, in app: XCUIApplication, capture: String
+    ) {
+        attachScreenshot(named: capture, from: app)
+        attachRecoveryLayoutGeometry(named: capture, from: app)
+        let scroll = app.scrollViews["chat_recovery_message_scroll"]
+        if scroll.exists, explanation.frame.height > scroll.frame.height + 1 {
+            XCTAssertGreaterThanOrEqual(scroll.frame.height, 44 - 0.01, "Overflow needs a readable viewport")
+            XCTAssertGreaterThanOrEqual(scroll.frame.minY, app.windows.firstMatch.frame.minY)
+            XCTAssertLessThanOrEqual(scroll.frame.maxY, action.frame.minY + 1)
+            let originalTop = explanation.frame.minY
+            for _ in 0..<6 {
+                if explanation.frame.maxY <= scroll.frame.maxY + 1 { break }
+                scroll.swipeUp()
+            }
+            XCTAssertLessThan(explanation.frame.minY, originalTop, "Overflowing prose must actually scroll")
+            XCTAssertLessThanOrEqual(explanation.frame.maxY, scroll.frame.maxY + 1,
+                                     "The final recovery line must be reachable")
+            XCTAssertTrue(action.isHittable)
+            attachScreenshot(named: capture + "-scrolled", from: app)
+            attachRecoveryLayoutGeometry(named: capture + "-scrolled", from: app)
+        } else {
+            XCTAssertLessThanOrEqual(explanation.frame.maxY, action.frame.minY + 1,
+                                     "Fitting prose must stay fully above its action")
+        }
+    }
+
+    private func attachRecoveryLayoutGeometry(named name: String, from app: XCUIApplication) {
+        let scroll = app.scrollViews["chat_recovery_message_scroll"]
+        let explanation = app.staticTexts["chat_recovery_message"]
+        let action = app.buttons["chat_reload_button"].exists ?
+            app.buttons["chat_reload_button"] : app.buttons["chat_retry_button"]
+        let scrollFrame = scroll.exists ? scroll.frame : .zero
+        let geometry = XCTAttachment(string:
+            "window=\(app.windows.firstMatch.frame); scroll=\(scrollFrame); " +
+            "explanation=\(explanation.frame); action=\(action.frame)\n" + app.debugDescription)
+        geometry.name = name
+        geometry.lifetime = .keepAlways
+        add(geometry)
     }
 
     func testChatOfflineStateIsVisibleAndRetryable() throws {

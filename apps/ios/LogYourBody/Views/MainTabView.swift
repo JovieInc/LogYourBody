@@ -858,6 +858,7 @@ struct ChatTabView: View {
                 chatMessages
             }
             starterPrompts
+                .layoutPriority(dynamicTypeSize.isAccessibilitySize && chatErrorMessage != nil ? 1 : 0)
         }
         .frame(maxHeight: showsTranscript ? .infinity : nil)
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -1031,7 +1032,7 @@ struct ChatTabView: View {
         Group {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 8) {
-                    recoveryMessage(message)
+                    accessibleRecoveryMessage(message)
                     if failedTurn != nil || isConversationLoadRetryAvailable {
                         HStack {
                             Spacer(minLength: 0)
@@ -1051,6 +1052,22 @@ struct ChatTabView: View {
         .padding(.vertical, 12)
         .background(theme.colors.surface.opacity(0.92))
         .accessibilityElement(children: .contain)
+    }
+
+    private func accessibleRecoveryMessage(_ message: String) -> some View {
+        ChatRecoveryMessageLayout {
+            recoveryMessage(message)
+                .hidden()
+                .accessibilityHidden(true)
+                .allowsHitTesting(false)
+            ScrollView(.vertical) {
+                recoveryMessage(message)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.never)
+            .accessibilityIdentifier("chat_recovery_message_scroll")
+        }
     }
 
     private func recoveryMessage(_ message: String) -> some View {
@@ -1259,17 +1276,20 @@ struct ChatTabView: View {
     }
 
     private func starterPrompt(_ text: String) -> some View {
-        Button(text) {
+        Button {
             send(text)
-        }
-        .font(.system(size: starterPromptFontSize, weight: .medium))
-        .foregroundStyle(theme.colors.text)
-        .padding(.horizontal, 12)
-        .frame(minHeight: 38)
-        .background(theme.colors.surface, in: Capsule())
-        .overlay {
-            Capsule()
-                .stroke(theme.colors.border, lineWidth: 1)
+        } label: {
+            Text(text)
+                .font(.system(size: starterPromptFontSize, weight: .medium))
+                .foregroundStyle(theme.colors.text)
+                .padding(.horizontal, 12)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
+                .background(theme.colors.surface, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(theme.colors.border, lineWidth: 1)
+                }
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -1845,6 +1865,28 @@ struct ChatTabView: View {
         }
         #endif
         return await authManager.getAccessToken()
+    }
+}
+
+/// Uses the text's intrinsic height for a compact dock, while respecting the
+/// finite space offered by a parent above the keyboard. The first child only
+/// measures text; the second is the visible scrolling explanation.
+private struct ChatRecoveryMessageLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width.flatMap { $0.isFinite ? max(0, $0) : nil }
+        guard width != 0, proposal.height != 0 else { return .zero }
+        let textSize = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil))
+        let availableHeight = proposal.height.flatMap { $0.isFinite ? max(0, $0) : nil } ?? textSize.height
+        return CGSize(width: width ?? textSize.width, height: min(textSize.height, availableHeight))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard bounds.width.isFinite, bounds.height.isFinite, bounds.width > 0, bounds.height > 0 else { return }
+        subviews[1].place(
+            at: bounds.origin,
+            anchor: .topLeading,
+            proposal: ProposedViewSize(width: bounds.width, height: bounds.height)
+        )
     }
 }
 

@@ -77,6 +77,7 @@ extension DashboardViewLiquid {
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? .infinity : nil)
+                .layoutPriority(!isHomeChatExpanded && dynamicTypeSize.isAccessibilitySize ? 1 : 0)
             }
         }
         .worldClassScreen(
