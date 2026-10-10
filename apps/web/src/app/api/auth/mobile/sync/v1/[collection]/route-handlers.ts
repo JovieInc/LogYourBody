@@ -19,6 +19,12 @@ const NativeRecordSchema = z
   })
   .passthrough();
 
+// Match the native CachedDailyMetrics Int32 storage contract without imposing
+// a health-related limit. Keep existing omitted/null counts unchanged.
+const DailyMetricRecordSchema = z
+  .object({ steps: z.number().int().min(0).max(2147483647).nullable().optional() })
+  .passthrough();
+
 const PushBodySchema = z.union([
   z.object({ records: z.array(NativeRecordSchema).min(1).max(100) }).strict(),
   z.array(NativeRecordSchema).min(1).max(100),
@@ -137,7 +143,13 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
       }
 
       const parsed = PushBodySchema.safeParse(payload);
-      if (!parsed.success) {
+      if (
+        !parsed.success ||
+        (collection === 'daily_metrics' &&
+          pushRecords(parsed.data).some(
+            (record) => !DailyMetricRecordSchema.safeParse(record).success,
+          ))
+      ) {
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_records' }, 400);
       }
 
