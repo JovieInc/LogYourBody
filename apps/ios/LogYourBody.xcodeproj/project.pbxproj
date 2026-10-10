@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DB6F742008744039AA49CA01 /* HomeV2ShareRecoveryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6F742008744039AA49CA02 /* HomeV2ShareRecoveryUITests.swift */; };
 		A62E114302EC00A5A0070201 /* HealthKitImportOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */; };
 		E9A811932F40800000C0A701 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */; };
 		0183C845E0301D4B10100ACE /* BodyMetricAppIntentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */; };
@@ -470,6 +471,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		DB6F742008744039AA49CA02 /* HomeV2ShareRecoveryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2ShareRecoveryUITests.swift; sourceTree = "<group>"; };
 		A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitImportOwnershipTests.swift; sourceTree = "<group>"; };
 		E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSTrendIndicator.swift; path = DesignSystem/Atoms/DSTrendIndicator.swift; sourceTree = "<group>"; };
@@ -1645,6 +1647,7 @@
 			children = (
 				AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */,
 				AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */,
+				DB6F742008744039AA49CA02 /* HomeV2ShareRecoveryUITests.swift */,
 			);
 			path = LogYourBodyUITests;
 			sourceTree = "<group>";
@@ -2180,6 +2183,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AD7D30B32E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift in Sources */,
+				DB6F742008744039AA49CA01 /* HomeV2ShareRecoveryUITests.swift in Sources */,
 				AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */,
 				401055DB589E0EF494FCBB1E /* OnboardingGoldenPathUITests.swift in Sources */,
 				542F8AAE22D916390F4ACA2D /* ChaosMonkeyUITests.swift in Sources */,

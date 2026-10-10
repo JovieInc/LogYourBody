@@ -45,6 +45,7 @@ struct HomeV2PhotoViewer: View {
 
     @State private var showsDetails = false
     @State private var showsTools = false
+    @State private var pendingTool: HomeV2PhotoTool?
 
     private static let detailsCollapsedHeight: CGFloat = 64
     private static let detailsExpandedHeight: CGFloat = 250
@@ -97,21 +98,25 @@ struct HomeV2PhotoViewer: View {
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
         }
         .background(Color.black.ignoresSafeArea())
-        .sheet(isPresented: $showsTools) {
+        .sheet(isPresented: $showsTools, onDismiss: {
+            guard let tool = pendingTool else { return }
+            pendingTool = nil
+            onTool(tool)
+        }, content: {
             HomeV2PhotoToolsSheet(
                 dateText: current.map(formatters.dateText) ?? "",
                 positionText: HomeV2Copy.photoPosition(position(of: selectedIndex), of: photoIndices.count),
                 onSelect: { tool in
-                    showsTools = false
                     if tool == .timeline {
                         showsDetails = true
                     } else {
-                        onTool(tool)
+                        pendingTool = tool
                     }
+                    showsTools = false
                 },
                 onDone: { showsTools = false }
             )
-        }
+        })
     }
 
     private var topBar: some View {
@@ -209,6 +214,7 @@ struct HomeV2PhotoViewer: View {
                     Text(HomeV2PhotoCopy.bodyFatChange(bodyFatDelta(for: metric)))
                         .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                         .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .accessibilityIdentifier("home_v2_viewer_body_fat_change")
                 }
             }
             .padding(.horizontal, HomeV2Tokens.Space.margin)
