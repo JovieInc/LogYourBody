@@ -9,3 +9,8 @@ overrides:
   fflate: ">=0.8.3"
   postcss: ">=8.5.23"
   vite: "7.3.6"
+
+# Dependabot's pnpm updater applies a mature-release gate. This provider is
+# intentionally kept current and is already reviewed through Dependabot PRs.
+minimumReleaseAgeExclude:
+  - "@ai-sdk/elevenlabs"
