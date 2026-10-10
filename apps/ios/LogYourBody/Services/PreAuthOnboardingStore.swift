@@ -13,18 +13,18 @@ final class PreAuthOnboardingStore {
 
     struct StoredSnapshot: Equatable {
         let input: BodyScoreInput
-        let result: BodyScoreResult
+        let result: BodyScoreResult?
         let defaultHomeMode: DefaultHomeMode
     }
 
     func save(
         input: BodyScoreInput,
-        result: BodyScoreResult,
+        result: BodyScoreResult?,
         defaultHomeMode: DefaultHomeMode = .default
     ) {
         let snapshot = Snapshot(
             input: input,
-            result: PreAuthBodyScoreResultCodable(result: result),
+            result: result.map(PreAuthBodyScoreResultCodable.init),
             defaultHomeMode: defaultHomeMode,
             lastUpdated: Date()
         )
@@ -44,7 +44,7 @@ final class PreAuthOnboardingStore {
             guard let snapshot = try? decoder.decode(Snapshot.self, from: data) else { return nil }
             return StoredSnapshot(
                 input: snapshot.input,
-                result: snapshot.result.result,
+                result: snapshot.result?.result,
                 defaultHomeMode: snapshot.defaultHomeMode
             )
         }
@@ -58,7 +58,7 @@ final class PreAuthOnboardingStore {
 
     private struct Snapshot: Codable {
         let input: BodyScoreInput
-        let result: PreAuthBodyScoreResultCodable
+        let result: PreAuthBodyScoreResultCodable?
         let defaultHomeMode: DefaultHomeMode
         let lastUpdated: Date
 
@@ -71,7 +71,7 @@ final class PreAuthOnboardingStore {
 
         init(
             input: BodyScoreInput,
-            result: PreAuthBodyScoreResultCodable,
+            result: PreAuthBodyScoreResultCodable?,
             defaultHomeMode: DefaultHomeMode,
             lastUpdated: Date
         ) {
@@ -84,7 +84,7 @@ final class PreAuthOnboardingStore {
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             input = try container.decode(BodyScoreInput.self, forKey: .input)
-            result = try container.decode(PreAuthBodyScoreResultCodable.self, forKey: .result)
+            result = try container.decodeIfPresent(PreAuthBodyScoreResultCodable.self, forKey: .result)
             defaultHomeMode = try container.decodeIfPresent(DefaultHomeMode.self, forKey: .defaultHomeMode) ?? .default
             lastUpdated = try container.decode(Date.self, forKey: .lastUpdated)
         }

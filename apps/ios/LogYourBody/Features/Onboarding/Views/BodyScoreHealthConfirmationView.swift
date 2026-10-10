@@ -1,22 +1,104 @@
 import SwiftUI
 
 enum HealthConfirmationDisplayPolicy {
+    enum Source: Equatable {
+        case healthKit
+        case entered
+        case scan
+        case visualEstimate
+        case unknown
+    }
+
+    struct ResolvedMetric: Equatable {
+        let value: Double
+        let source: Source
+        let date: Date?
+    }
+
+    /// Explicit entries override older Health snapshots; legacy inputs without
+    /// provenance retain snapshot priority. The value uses the requested unit.
+    static func weight(
+        input: BodyScoreInput, preferredUnit: WeightUnit = .kilograms
+    ) -> ResolvedMetric? {
+        let stored = preferredUnit == .kilograms ? input.weight.inKilograms : input.weight.inPounds
+        if let stored {
+            switch input.weightSource {
+            case .manual:
+                return ResolvedMetric(value: stored, source: .entered, date: nil)
+            case .scan:
+                return ResolvedMetric(value: stored, source: .scan, date: nil)
+            case .healthKit, nil:
+                break
+            }
+        }
+        if let kilograms = input.healthSnapshot.weightKg {
+            let value = preferredUnit == .kilograms ? kilograms : kilograms * 2.2046226218
+            return ResolvedMetric(value: value, source: .healthKit, date: input.healthSnapshot.weightDate)
+        }
+        guard let stored else { return nil }
+        let source: Source = input.weightSource == .healthKit ? .healthKit : .unknown
+        return ResolvedMetric(value: stored, source: source, date: nil)
+    }
+
+    static func bodyFat(input: BodyScoreInput) -> ResolvedMetric? {
+        if let percentage = input.bodyFat.percentage {
+            switch input.bodyFat.source {
+            case .manualValue:
+                return ResolvedMetric(value: percentage, source: .entered, date: nil)
+            case .scan:
+                return ResolvedMetric(value: percentage, source: .scan, date: nil)
+            case .visualEstimate:
+                return ResolvedMetric(value: percentage, source: .visualEstimate, date: nil)
+            case .healthKit, .unspecified:
+                break
+            }
+        }
+        if let percentage = input.healthSnapshot.bodyFatPercentage {
+            return ResolvedMetric(value: percentage, source: .healthKit, date: input.healthSnapshot.bodyFatDate)
+        }
+        guard let percentage = input.bodyFat.percentage else { return nil }
+        let source: Source = input.bodyFat.source == .healthKit ? .healthKit : .unknown
+        return ResolvedMetric(value: percentage, source: source, date: nil)
+    }
+
+    static func sourceText(for metric: ResolvedMetric, now: Date = Date()) -> String {
+        switch metric.source {
+        case .healthKit:
+            guard let date = metric.date else { return "From Apple Health" }
+            let formatter = RelativeDateTimeFormatter()
+            formatter.unitsStyle = .full
+            let relativeDate = formatter.localizedString(for: date, relativeTo: now)
+            return "From Apple Health · Last logged \(relativeDate)"
+        case .entered:
+            return "Entered by you"
+        case .scan:
+            return "From your scan"
+        case .visualEstimate:
+            return "Visual estimate"
+        case .unknown:
+            return "Source not recorded"
+        }
+    }
+
     /// Renders a centimeter height as feet/inches, e.g. 178 cm → 5' 10".
     static func imperialHeightString(fromCentimeters centimeters: Double) -> String {
-        let inchesTotal = centimeters / 2.54
-        let feet = Int(inchesTotal) / 12
-        let inches = Int(round(inchesTotal)) % 12
+        guard centimeters > 0, HeightEntryPolicy.isRepresentableCentimeters(centimeters),
+              let inchesTotal = Int(exactly: (centimeters / 2.54).rounded()) else { return "—" }
+        let feet = inchesTotal / 12
+        let inches = inchesTotal % 12
         return "\(feet)' \(inches)\""
     }
 
     /// Shows the preferred unit first with the converted value in parentheses.
     static func formattedHeight(centimeters: Double, system: MeasurementSystem) -> String {
+        guard centimeters > 0, HeightEntryPolicy.isRepresentableCentimeters(centimeters),
+              let roundedCentimeters = Int(exactly: centimeters.rounded()) else { return "—" }
         switch system {
         case .metric:
-            return "\(Int(round(centimeters))) cm (\(imperialHeightString(fromCentimeters: centimeters)))"
+            return "\(roundedCentimeters) cm (\(imperialHeightString(fromCentimeters: centimeters)))"
         case .imperial:
             let imperial = imperialHeightString(fromCentimeters: centimeters)
-            return "\(imperial) (\(Int(round(centimeters))) cm)"
+            return "\(imperial) (\(roundedCentimeters) cm)"
         }
     }
 
@@ -40,49 +122,22 @@ enum HealthConfirmationDisplayPolicy {
         }
     }
 
-    /// Health-imported values win over the stored entry; nil when neither exists.
     static func preferredWeightString(input: BodyScoreInput, preferredUnit: WeightUnit) -> String? {
-        if let kilograms = input.healthSnapshot.weightKg {
-            return formatWeight(fromKilograms: kilograms, unit: preferredUnit)
-        }
-
-        let stored: Double?
-        switch preferredUnit {
-        case .kilograms:
-            stored = input.weight.inKilograms
-        case .pounds:
-            stored = input.weight.inPounds
-        }
-
-        if let stored {
-            return formatWeight(value: stored, unit: preferredUnit)
-        }
-
-        if let fallbackKilograms = input.weight.inKilograms {
-            return formatWeight(fromKilograms: fallbackKilograms, unit: preferredUnit)
-        }
-
-        return nil
+        guard let metric = weight(input: input, preferredUnit: preferredUnit) else { return nil }
+        return formatWeight(value: metric.value, unit: preferredUnit)
     }
 
     /// Health-imported height wins over the stored entry; nil when neither exists.
     static func preferredHeightString(input: BodyScoreInput, system: MeasurementSystem) -> String? {
         let centimeters = input.healthSnapshot.heightCm ?? input.height.inCentimeters
-        guard let centimeters else { return nil }
+        guard let centimeters, centimeters > 0,
+              HeightEntryPolicy.isRepresentableCentimeters(centimeters) else { return nil }
         return formattedHeight(centimeters: centimeters, system: system)
     }
 
-    /// Health-imported body fat wins over the manual estimate; nil when neither exists.
     static func preferredBodyFatString(input: BodyScoreInput) -> String? {
-        if let percentage = input.healthSnapshot.bodyFatPercentage {
-            return String(format: "%.1f%%", percentage)
-        }
-
-        if let percentage = input.bodyFat.percentage {
-            return String(format: "%.1f%%", percentage)
-        }
-
-        return nil
+        guard let metric = bodyFat(input: input) else { return nil }
+        return String(format: "%.1f%%", metric.value)
     }
 }
 
@@ -103,7 +158,7 @@ struct BodyScoreHealthConfirmationView: View {
     var body: some View {
         OnboardingPageTemplate(
             title: "Here’s what we found.",
-            subtitle: "Review the measurements we’ll use for your first score.",
+            subtitle: "Review the measurements we’ll use for your body composition.",
             onBack: { viewModel.goBack() },
             progress: viewModel.progress(for: .healthConfirmation),
             screen: .confirmImportedData,
@@ -212,23 +267,27 @@ struct BodyScoreHealthConfirmationView: View {
             )
         }
 
-        if let weightString = formattedWeight {
+        if let weight = HealthConfirmationDisplayPolicy.weight(
+            input: viewModel.bodyScoreInput, preferredUnit: preferredWeightUnit
+        ) {
             items.append(
                 Metric(
                     title: "Weight",
-                    value: weightString,
-                    subtitle: weightSubtitle,
+                    value: HealthConfirmationDisplayPolicy.formatWeight(
+                        value: weight.value, unit: preferredWeightUnit
+                    ),
+                    subtitle: HealthConfirmationDisplayPolicy.sourceText(for: weight),
                     icon: "scalemass.fill"
                 )
             )
         }
 
-        if let bodyFatString = formattedBodyFat {
+        if let bodyFat = HealthConfirmationDisplayPolicy.bodyFat(input: viewModel.bodyScoreInput) {
             items.append(
                 Metric(
                     title: "Body Fat",
-                    value: bodyFatString,
-                    subtitle: bodyFatSubtitle,
+                    value: String(format: "%.1f%%", bodyFat.value),
+                    subtitle: HealthConfirmationDisplayPolicy.sourceText(for: bodyFat),
                     icon: "percent"
                 )
             )
@@ -253,17 +312,6 @@ struct BodyScoreHealthConfirmationView: View {
             input: viewModel.bodyScoreInput,
             system: preferredMeasurementSystem
         )
-    }
-
-    private var formattedWeight: String? {
-        HealthConfirmationDisplayPolicy.preferredWeightString(
-            input: viewModel.bodyScoreInput,
-            preferredUnit: preferredWeightUnit
-        )
-    }
-
-    private var formattedBodyFat: String? {
-        HealthConfirmationDisplayPolicy.preferredBodyFatString(input: viewModel.bodyScoreInput)
     }
 
     private var snapshotNote: String? {
@@ -309,26 +357,6 @@ struct BodyScoreHealthConfirmationView: View {
             return "From Apple Health"
         }
         return "From your profile"
-    }
-
-    private var weightSubtitle: String {
-        if let date = viewModel.bodyScoreInput.healthSnapshot.weightDate {
-            return "Last logged \(relativeDateString(from: date))"
-        }
-        if viewModel.bodyScoreInput.healthSnapshot.weightKg != nil {
-            return "From Apple Health"
-        }
-        return "From your profile"
-    }
-
-    private var bodyFatSubtitle: String {
-        if let date = viewModel.bodyScoreInput.healthSnapshot.bodyFatDate {
-            return "Last logged \(relativeDateString(from: date))"
-        }
-        if viewModel.bodyScoreInput.healthSnapshot.bodyFatPercentage != nil {
-            return "Imported from Health"
-        }
-        return "From your estimate"
     }
 }
 

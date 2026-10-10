@@ -305,18 +305,12 @@ struct ContentView: View {
     private var authenticatedContent: some View {
         Group {
             if shouldShowOnboarding {
-                if HomeV2Policy.isOnboardingV2Enabled() {
-                    HomeV2FirstRunView()
-                        .environmentObject(authManager)
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                } else {
-                    BodyScoreOnboardingFlowView()
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                }
+                // One first run for everyone: the onboarding_v2_focus gate now
+                // only picks the sign-in screen.
+                BodyScoreOnboardingFlowView()
+                    .onAppear {
+                        AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                    }
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
             } else if !subscriptionManager.isSubscribed {

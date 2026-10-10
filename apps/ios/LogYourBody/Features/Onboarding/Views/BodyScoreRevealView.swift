@@ -76,9 +76,8 @@ enum BodyScoreRevealPolicy {
     }
 }
 
-/// The first-run answer to "am I losing fat or muscle?": weight split into
-/// fat mass and lean mass, with the body-fat source named so an estimate is
-/// never presented as a measurement.
+/// The first-run composition summary: weight split into fat mass and lean mass,
+/// with the body-fat source named so an estimate is never presented as a measurement.
 struct FatVsMuscleSummary: Equatable {
     let fatText: String
     let leanText: String
@@ -112,12 +111,16 @@ struct FatVsMuscleSummary: Equatable {
 
     static func sourceText(for source: BodyFatInputSource) -> String {
         switch source {
+        case .scan:
+            return "Body fat from your scan"
         case .healthKit:
             return "Body fat from Apple Health"
         case .manualValue:
             return "Body fat you entered"
-        case .visualEstimate, .unspecified:
+        case .visualEstimate:
             return "Body fat is a visual estimate"
+        case .unspecified:
+            return "Body fat source not recorded"
         }
     }
 
@@ -139,10 +142,10 @@ struct BodyScoreRevealView: View {
 
     var body: some View {
         Group {
-            if viewModel.bodyScoreResult != nil, let summary = FatVsMuscleSummary(input: viewModel.bodyScoreInput) {
+            if let summary = FatVsMuscleSummary(input: viewModel.bodyScoreInput) {
                 OnboardingPageTemplate(
-                    title: "Here’s your fat vs muscle.",
-                    subtitle: "Log again and LogYourBody shows which one is changing.",
+                    title: "Here’s your fat vs lean mass.",
+                    subtitle: "Calculated from weight and body fat. Lean mass includes more than muscle.",
                     showsBackButton: false,
                     progress: viewModel.progress(for: .bodyScore),
                     screen: .bodyScoreReveal
@@ -157,6 +160,12 @@ struct BodyScoreRevealView: View {
                         compositionBar(summary: summary)
                             .opacity(isRevealed ? 1 : 0)
                             .animation(reduceMotion ? nil : theme.animation.fast.delay(0.1), value: isRevealed)
+
+                        if let changeText {
+                            changeLine(changeText)
+                                .opacity(isRevealed ? 1 : 0)
+                                .animation(reduceMotion ? nil : theme.animation.fast.delay(0.12), value: isRevealed)
+                        }
 
                         sourceLine(summary: summary)
                             .opacity(isRevealed ? 1 : 0)
@@ -180,16 +189,26 @@ struct BodyScoreRevealView: View {
             }
         }
         .onAppear {
-            guard viewModel.bodyScoreResult != nil else { return }
+            guard FatVsMuscleSummary(input: viewModel.bodyScoreInput) != nil else { return }
             triggerRevealFeedback()
         }
-        .onChange(of: viewModel.bodyScoreResult) { _, newValue in
-            if newValue != nil {
-                triggerRevealFeedback()
-            } else {
-                isRevealed = false
-            }
+    }
+
+    private var changeText: String? {
+        viewModel.scanImport.flatMap {
+            ScanChangePolicy.changeText(for: $0, system: viewModel.bodyScoreInput.measurementPreference)
         }
+    }
+
+    private func changeLine(_ text: String) -> some View {
+        OnboardingCard {
+            Text(text)
+                .font(OnboardingTypography.body)
+                .foregroundStyle(theme.colors.text)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("body_score_reveal_scan_change")
     }
 
     private func massRow(summary: FatVsMuscleSummary) -> some View {
