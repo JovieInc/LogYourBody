@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 import CoreData
 import HealthKit
@@ -62,6 +63,27 @@ final class HeldStepHistoryQuery {
     }
 }
 
+@MainActor
+final class HeldTodayStepQuantityQuery {
+    let started = XCTestExpectation(description: "Synthetic today-step query started")
+    private var continuation: CheckedContinuation<Double?, Error>?
+    private var result: Result<Double?, Error>?
+
+    func fetch() async throws -> Double? {
+        started.fulfill()
+        return try await withCheckedThrowingContinuation { continuation in
+            if let result { continuation.resume(with: result) } else { self.continuation = continuation }
+        }
+    }
+
+    func complete(_ result: Result<Double?, Error>) {
+        guard self.result == nil else { return }
+        self.result = result
+        continuation?.resume(with: result)
+        continuation = nil
+    }
+}
+
 /// Synthetic samples use an isolated in-memory store; no live HealthKit or provider transport executes.
 @MainActor
 final class HealthKitImportOwnershipTests: XCTestCase {
@@ -107,6 +129,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
     private func manager(
         query: HeldWeightImportQuery? = nil,
         stepQuery: HeldStepHistoryQuery? = nil,
+        todayQuery: HeldTodayStepQuantityQuery? = nil,
         earliestQuery: (() async throws -> Date?)? = nil,
         metricStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil,
         rawStore: (([HKRawSample]) async -> Void)? = nil
@@ -118,6 +141,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
                 return []
             },
             bodyFatImportQuery: { _ in [] },
+            todayStepQuantityQuery: todayQuery.map { held in { _, _ in try await held.fetch() } },
             stepHistoryQuery: stepQuery.map { held in { _ in try await held.fetch() } },
             earliestImportDateQuery: earliestQuery,
             syncTrigger: { self.syncTriggers += 1 },
@@ -174,6 +198,146 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertTrue(recordsA.isEmpty, "In-flight step import must not land for the starting account")
         XCTAssertTrue(recordsB.isEmpty, "In-flight step import must not land for the replacement account")
         XCTAssertEqual(syncTriggers, 0)
+    }
+
+    private func assertHeldTodayQueryIsRejected(replace: () -> Void, cancel: Bool = false) async throws {
+        let query = HeldTodayStepQuantityQuery()
+        let manager = manager(todayQuery: query)
+        let task = Task { try await manager.fetchTodayStepCount() }
+        defer { query.complete(.success(nil)) }
+        await fulfillment(of: [query.started], timeout: 3)
+        replace()
+        let replacementOwner = auth.captureAccountSession()
+        let replacementDate = Date(timeIntervalSince1970: 123)
+        manager.todayStepCountOwner = replacementOwner
+        manager.todayStepCount = 77
+        manager.latestStepCount = 77
+        manager.latestStepCountDate = replacementDate
+        if cancel { task.cancel() }
+        query.complete(.success(4_321.75))
+        do {
+            _ = try await task.value
+            XCTFail("A stale or cancelled today query must not return a usable count")
+        } catch {
+            XCTAssertTrue(error is HealthKitError || error is CancellationError)
+        }
+        XCTAssertEqual(manager.todayStepCountOwner, replacementOwner)
+        XCTAssertEqual(manager.todayStepCount, 77)
+        XCTAssertEqual(manager.latestStepCount, 77)
+        XCTAssertEqual(manager.latestStepCountDate, replacementDate)
+    }
+
+    func testHeldTodayQueryCannotPublishUnderReplacementAccount() async throws {
+        try await assertHeldTodayQueryIsRejected { setAccount("synthetic-health-B") }
+    }
+
+    func testHeldTodayQueryCannotPublishAfterLogout() async throws {
+        try await assertHeldTodayQueryIsRejected {
+            auth.authSession = nil
+            auth.currentUser = nil
+        }
+    }
+
+    func testHeldTodayQueryCannotPublishAfterSameAccountRelogin() async throws {
+        try await assertHeldTodayQueryIsRejected {
+            auth.authSession = nil
+            auth.currentUser = nil
+            setAccount("synthetic-health-A")
+        }
+    }
+
+    func testCancelledTodayQueryCannotPublishForCurrentAccount() async throws {
+        try await assertHeldTodayQueryIsRejected(replace: {}, cancel: true)
+    }
+
+    func testCurrentTodayQueryPublishesFractionalCountBeforeReturning() async throws {
+        let query = HeldTodayStepQuantityQuery()
+        let manager = manager(todayQuery: query)
+        let owner = try XCTUnwrap(auth.captureAccountSession())
+        let before = Date()
+        query.complete(.success(4_321.75))
+        let count = try await manager.fetchTodayStepCount()
+        XCTAssertEqual(count, 4_321)
+        XCTAssertEqual(manager.todayStepCount, count)
+        XCTAssertEqual(manager.latestStepCount, count)
+        XCTAssertEqual(manager.todayStepCountOwner, owner)
+        let date = try XCTUnwrap(manager.latestStepCountDate)
+        XCTAssertGreaterThanOrEqual(date, before)
+        XCTAssertLessThanOrEqual(date, Date())
+    }
+
+    func testTodayMissingQuantityAndHealthKitNoDataStillPublishZero() async throws {
+        let noData = NSError(domain: HKErrorDomain, code: HKError.Code.errorNoData.rawValue)
+        for result: Result<Double?, Error> in [.success(nil), .failure(noData)] {
+            let query = HeldTodayStepQuantityQuery()
+            let manager = manager(todayQuery: query)
+            query.complete(result)
+            let count = try await manager.fetchTodayStepCount()
+            XCTAssertEqual(count, 0)
+            XCTAssertEqual(manager.todayStepCount, 0)
+            XCTAssertEqual(manager.latestStepCount, 0)
+            XCTAssertNotNil(manager.latestStepCountDate)
+            XCTAssertEqual(manager.todayStepCountOwner, auth.captureAccountSession())
+        }
+    }
+
+    func testTodaySDKAndQuantityErrorsDoNotPublish() async {
+        let denied = NSError(domain: HKErrorDomain, code: HKError.Code.errorAuthorizationDenied.rawValue)
+        for result: Result<Double?, Error> in [.failure(denied), .success(.nan)] {
+            let query = HeldTodayStepQuantityQuery()
+            let manager = manager(todayQuery: query)
+            query.complete(result)
+            do {
+                _ = try await manager.fetchTodayStepCount()
+                XCTFail("An SDK or invalid quantity error must remain an error")
+            } catch {
+                XCTAssertTrue((error as NSError) == denied || error is HealthKitStepCountPolicy.QuantityError)
+            }
+            XCTAssertEqual(manager.todayStepCount, 0)
+            XCTAssertNil(manager.latestStepCount)
+            XCTAssertNil(manager.latestStepCountDate)
+            XCTAssertNil(manager.todayStepCountOwner)
+        }
+    }
+
+    private func assertCachedTodayCountIsRejected(replace: () -> Void) async throws {
+        let query = HeldTodayStepQuantityQuery()
+        let manager = manager(todayQuery: query)
+        let published = expectation(description: "A's synthetic today count was published")
+        let observer = manager.$todayStepCount.filter { $0 == 4_321 }.first().sink { _ in published.fulfill() }
+        defer { observer.cancel() }
+        query.complete(.success(4_321))
+        _ = try await manager.fetchTodayStepCount()
+        await fulfillment(of: [published], timeout: 3)
+        replace()
+        await manager.claimAutomaticImportAccount()
+        let owner = try XCTUnwrap(auth.currentUser?.id)
+        await manager.syncStepsToProductAPI(userId: owner)
+        let rows = await coreData.fetchDailyMetrics(for: owner)
+        XCTAssertTrue(rows.isEmpty, "A replacement session must not adopt a prior session's cached count")
+        XCTAssertEqual(syncTriggers, 0)
+    }
+
+    func testCachedTodayCountCannotPersistAfterReplacementClaimsHealth() async throws {
+        try await assertCachedTodayCountIsRejected { setAccount("synthetic-health-B") }
+    }
+
+    func testCachedTodayCountCannotPersistAfterSameAccountRelogin() async throws {
+        try await assertCachedTodayCountIsRejected { setAccount("synthetic-health-A") }
+    }
+
+    func testCurrentOwnerCachedTodayCountStillPersists() async throws {
+        let query = HeldTodayStepQuantityQuery()
+        let manager = manager(todayQuery: query)
+        query.complete(.success(4_321.75))
+        _ = try await manager.fetchTodayStepCount()
+        await manager.syncStepsToProductAPI(userId: "synthetic-health-A")
+        let rows = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
+        let row = try XCTUnwrap(rows.first)
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(row.steps, 4_321)
+        XCTAssertEqual(row.userId, "synthetic-health-A")
+        XCTAssertEqual(syncTriggers, 1)
     }
 
     func testCurrentOwnerStepImportPreservesCountAndAccount() async throws {

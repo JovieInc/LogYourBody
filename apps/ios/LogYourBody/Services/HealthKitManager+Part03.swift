@@ -141,9 +141,13 @@ func setupStepCountBackgroundDelivery() async throws {
 
     func syncStepsToProductAPI(userId: String) async {
         guard let ownership = await captureImportOwnership(), ownership.subject == userId else { return }
-        // Get today's steps
-        let todaySteps = todayStepCount
-        guard todaySteps > 0 else { return }
+        // A current account cannot adopt a count produced by an earlier session.
+        let ownedSteps = await MainActor.run { () -> Int? in
+            guard self.isAuthorized, self.todayStepCountOwner == ownership,
+                  (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return nil }
+            return self.todayStepCount
+        }
+        guard let todaySteps = ownedSteps, todaySteps > 0 else { return }
         guard await ownsImport(ownership) else { return }
 
         // Get or create today's daily metrics
