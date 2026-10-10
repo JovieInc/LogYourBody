@@ -34,6 +34,13 @@ export type NativeProductRecordsPullCursor = {
 };
 
 export interface NativeProductRecordsPort {
+  /** Insert a set once, or return its existing owned, active row without changing it.
+   * Missing capability must fail closed; callers must never fall back to push.
+   */
+  insertTrainingSet?(
+    subject: string,
+    record: Record<string, unknown>,
+  ): Promise<NativeProductRecord | null>;
   push(
     subject: string,
     collection: NativeProductRecordCollection,
