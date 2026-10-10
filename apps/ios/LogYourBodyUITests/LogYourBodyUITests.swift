@@ -2174,37 +2174,6 @@ final class LogYourBodyUITests: XCTestCase {
         )
     }
 
-    private func assertAndCaptureTimelineAnalytics(in app: XCUIApplication) throws {
-        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
-        let homeFFMI = try homeFFMIValue(in: app)
-        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
-
-        openStatsPage(in: app)
-
-        let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
-        XCTAssertTrue(analyticsPage.exists || analyticsPage.waitForExistence(timeout: 10),
-                      "Stats must be reached through the menu without relaunching the app")
-        XCTAssertFalse(app.staticTexts["Body trends"].exists)
-        XCTAssertFalse(
-            app.staticTexts["Four measurements. One direction. Open any metric for source, chart, and history."].exists
-        )
-        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_stats_presence_summary"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_stats_presence_legend"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_stack"].exists)
-        let weightCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
-        XCTAssertTrue(weightCard.exists || weightCard.waitForExistence(timeout: 10))
-        let bodyFatCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_body_fat"]
-        XCTAssertTrue(bodyFatCard.exists || bodyFatCard.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["Timeline states"].exists)
-        attachScreenshot(named: "launch-quality-analytics", from: app)
-        let ffmiCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_ffmi"]
-        scrollUntilExists(ffmiCard, in: app)
-        XCTAssertTrue(ffmiCard.exists || ffmiCard.waitForExistence(timeout: 5))
-        XCTAssertEqual(try ffmiValue(from: ffmiCard), homeFFMI, "Stats must use the same snapshot FFMI as Home")
-        XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
-    }
-
     func testRecoveryEmailKeyboardDoneMeetsMinimumHitTarget() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -2289,6 +2258,37 @@ final class LogYourBodyUITests: XCTestCase {
         done.tap()
         XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Add a recovery email."].exists)
+    }
+
+    private func assertAndCaptureTimelineAnalytics(in app: XCUIApplication) throws {
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        let homeFFMI = try homeFFMIValue(in: app)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists)
+
+        openStatsPage(in: app)
+
+        let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
+        XCTAssertTrue(analyticsPage.exists || analyticsPage.waitForExistence(timeout: 10),
+                      "Stats must be reached through the menu without relaunching the app")
+        XCTAssertFalse(app.staticTexts["Body trends"].exists)
+        XCTAssertFalse(
+            app.staticTexts["Four measurements. One direction. Open any metric for source, chart, and history."].exists
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_stats_presence_summary"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_stats_presence_legend"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_stats_metric_stack"].exists)
+        let weightCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
+        XCTAssertTrue(weightCard.exists || weightCard.waitForExistence(timeout: 10))
+        let bodyFatCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_body_fat"]
+        XCTAssertTrue(bodyFatCard.exists || bodyFatCard.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["Timeline states"].exists)
+        attachScreenshot(named: "launch-quality-analytics", from: app)
+        let ffmiCard = app.descendants(matching: .any)["photo_timeline_stats_metric_card_ffmi"]
+        scrollUntilExists(ffmiCard, in: app)
+        XCTAssertTrue(ffmiCard.exists || ffmiCard.waitForExistence(timeout: 5))
+        XCTAssertEqual(try ffmiValue(from: ffmiCard), homeFFMI, "Stats must use the same snapshot FFMI as Home")
+        XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
     }
 
     private func homeFFMIValue(in app: XCUIApplication) throws -> String {
