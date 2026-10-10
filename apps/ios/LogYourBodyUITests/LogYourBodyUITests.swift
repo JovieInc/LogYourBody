@@ -827,6 +827,128 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "chat-reloaded-pending", from: app)
     }
 
+    func testChatRecoveryActionsKeepMinimumTouchTargets() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryFailedFixture"
+        ])
+        try waitForHomeChatComposer(in: app)
+        let retry = app.buttons["chat_retry_button"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 8))
+        attachScreenshot(named: "chat-recovery-failed-compact", from: app)
+        XCTAssertGreaterThanOrEqual(retry.frame.width, 44, "Retry needs a full native touch target")
+        XCTAssertGreaterThanOrEqual(retry.frame.height, 44, "Retry needs a full native touch target")
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertLessThanOrEqual(retry.frame.maxY, app.textFields["chat_composer"].frame.minY)
+    }
+
+    func testPendingChatRecoveryScalesAndClearsKeyboard() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryPendingFixture",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 45))
+        try waitForHomeChatComposer(in: app)
+        let reload = app.buttons["chat_reload_button"]
+        let explanation = app.staticTexts["An answer is still in progress. Reload to check it."]
+        XCTAssertTrue(reload.waitForExistence(timeout: 8))
+        XCTAssertTrue(explanation.exists)
+        attachScreenshot(named: "chat-recovery-pending-largest-text", from: app)
+        XCTAssertGreaterThan(explanation.frame.height, 50, "Recovery text must grow with accessibility text size")
+        XCTAssertGreaterThanOrEqual(reload.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(reload.frame.height, 44)
+        XCTAssertLessThanOrEqual(explanation.frame.maxY, reload.frame.minY + 1, "Large text action needs its own row")
+
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
+        let settled = NSPredicate { _, _ in
+            reload.frame.maxY <= composer.frame.minY && explanation.frame.minY >= app.frame.minY
+        }
+        expectation(for: settled, evaluatedWith: reload)
+        waitForExpectations(timeout: 5)
+        XCTAssertTrue(reload.isHittable)
+        XCTAssertLessThanOrEqual(explanation.frame.maxY, reload.frame.minY + 1)
+        attachScreenshot(named: "chat-recovery-pending-largest-text-keyboard", from: app)
+        reload.tap()
+        XCTAssertTrue(reload.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        XCTAssertTrue(explanation.exists, "Reload checks the pending original turn without resending")
+    }
+
+    func testFailedChatRecoveryRemainsReachableAtLargestText() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryFailedFixture",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 45))
+        try waitForHomeChatComposer(in: app)
+        let retry = app.buttons["chat_retry_button"]
+        let explanation = app.staticTexts["The answer could not be completed. Retry when you’re ready."]
+        XCTAssertTrue(retry.waitForExistence(timeout: 8))
+        XCTAssertTrue(explanation.exists)
+        XCTAssertGreaterThan(explanation.frame.height, 50)
+        XCTAssertGreaterThanOrEqual(retry.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(retry.frame.height, 44)
+        XCTAssertLessThanOrEqual(explanation.frame.maxY, retry.frame.minY + 1)
+        XCTAssertLessThanOrEqual(retry.frame.maxY, app.textFields["chat_composer"].frame.minY)
+        XCTAssertTrue(retry.isHittable)
+        attachScreenshot(named: "chat-recovery-failed-largest-text", from: app)
+        retry.tap()
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 8), "Retry must still reuse the original message identity")
+        XCTAssertFalse(retry.exists)
+        attachScreenshot(named: "chat-recovery-largest-text-retry-completed", from: app)
+    }
+
+    func testHomeV2PendingRecoveryClearsKeyboardAtLargestText() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryPendingFixture",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        app.buttons["photo_timeline_root_menu"].tap()
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 8))
+        ask.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8))
+        let reload = app.buttons["chat_reload_button"]
+        let explanation = app.staticTexts["An answer is still in progress. Reload to check it."]
+        XCTAssertTrue(reload.waitForExistence(timeout: 8))
+        XCTAssertTrue(explanation.exists)
+        XCTAssertGreaterThanOrEqual(reload.frame.height, 44)
+        XCTAssertLessThanOrEqual(explanation.frame.maxY, reload.frame.minY + 1)
+        attachScreenshot(named: "home-v2-recovery-pending-largest-text", from: app)
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
+        let settled = NSPredicate { _, _ in
+            reload.frame.maxY <= composer.frame.minY && explanation.frame.minY >= app.frame.minY
+        }
+        expectation(for: settled, evaluatedWith: reload)
+        waitForExpectations(timeout: 5)
+        XCTAssertTrue(reload.isHittable)
+        XCTAssertLessThanOrEqual(explanation.frame.maxY, reload.frame.minY + 1)
+        attachScreenshot(named: "home-v2-recovery-pending-largest-text-keyboard", from: app)
+    }
+
     func testChatOfflineStateIsVisibleAndRetryable() throws {
         let app = XCUIApplication()
         launch(app, with: [

@@ -652,6 +652,23 @@ private struct PaidWeightLoggerMVPView: View {
     }
 }
 
+struct ChatRecoveryPresentation: Equatable {
+    enum Kind: Equatable {
+        case pending
+        case warning
+    }
+
+    var message: String? {
+        didSet { kind = .warning }
+    }
+    private(set) var kind: Kind = .warning
+
+    mutating func restore(_ recovery: ChatHistoryRecovery?) {
+        message = recovery?.errorMessage
+        kind = recovery?.shouldReload == true ? .pending : .warning
+    }
+}
+
 private struct ChatMessage: Identifiable, Equatable {
     enum Role: Equatable {
         case assistant
@@ -707,6 +724,7 @@ struct ChatTabView: View {
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     // Approved sizes at the default text setting; they scale only with the user's Dynamic Type choice.
     @ScaledMetric(relativeTo: .footnote) private var starterPromptFontSize: CGFloat = 13
     @ScaledMetric(relativeTo: .body) private var composerFontSize: CGFloat = 16
@@ -724,7 +742,7 @@ struct ChatTabView: View {
     @State private var activeClientMessageId: String?
     @State private var requestGeneration: UUID?
     @State private var failedTurn: FailedChatTurn?
-    @State private var chatErrorMessage: String?
+    @State private var chatRecoveryPresentation = ChatRecoveryPresentation()
     @State private var isConversationLoadRetryAvailable = false
     @State private var isDeleteConfirmationPresented = false
     @State private var trainingResponse: TrainingNextResponse?
@@ -741,6 +759,11 @@ struct ChatTabView: View {
     @State private var pendingSpokenReply = PendingSpokenReply()
     private let trainingService: TrainingServicing = URLSessionTrainingService()
     @FocusState private var isComposerFocused: Bool
+
+    private var chatErrorMessage: String? {
+        get { chatRecoveryPresentation.message }
+        nonmutating set { chatRecoveryPresentation.message = newValue }
+    }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -986,37 +1009,7 @@ struct ChatTabView: View {
     private var starterPrompts: some View {
         VStack(spacing: 0) {
             if let chatErrorMessage {
-                HStack(alignment: .center, spacing: 12) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(Color.appWarning)
-
-                    Text(chatErrorMessage)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(theme.colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Spacer(minLength: 0)
-
-                    if failedTurn != nil {
-                        Button("Retry", action: retryFailedTurn)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(theme.colors.text)
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("chat_retry_button")
-                    } else if isConversationLoadRetryAvailable {
-                        Button("Reload") {
-                            Task { await loadLatestConversation() }
-                        }
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(theme.colors.text)
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("chat_reload_button")
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(theme.colors.surface.opacity(0.92))
-                .accessibilityElement(children: .contain)
+                recoveryNotice(message: chatErrorMessage)
             }
 
             if messages == [.welcome] && !isComposerFocused && !isLoadingConversation {
@@ -1032,6 +1025,75 @@ struct ChatTabView: View {
                 .transition(.opacity)
             }
         }
+    }
+
+    private func recoveryNotice(message: String) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    recoveryMessage(message)
+                    if failedTurn != nil || isConversationLoadRetryAvailable {
+                        HStack {
+                            Spacer(minLength: 0)
+                            recoveryAction
+                        }
+                    }
+                }
+            } else {
+                HStack(alignment: .center, spacing: 12) {
+                    recoveryMessage(message)
+                    Spacer(minLength: 0)
+                    recoveryAction
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(theme.colors.surface.opacity(0.92))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func recoveryMessage(_ message: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: chatRecoveryPresentation.kind == .pending ? "clock" : "exclamationmark.circle.fill")
+                .foregroundStyle(
+                    chatRecoveryPresentation.kind == .pending ? theme.colors.textSecondary : Color.appWarning
+                )
+                .accessibilityHidden(true)
+            Text(message)
+                .foregroundStyle(theme.colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("chat_recovery_message")
+        }
+        .font(.subheadline.weight(.medium))
+    }
+
+    @ViewBuilder
+    private var recoveryAction: some View {
+        if failedTurn != nil {
+            Button(action: retryFailedTurn) {
+                recoveryActionLabel("Retry")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chat_retry_button")
+        } else if isConversationLoadRetryAvailable {
+            Button {
+                Task { await loadLatestConversation() }
+            } label: {
+                recoveryActionLabel("Reload")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chat_reload_button")
+        }
+    }
+
+    private func recoveryActionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(theme.colors.text)
+            .padding(.horizontal, 8)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
     }
 
     private var trainingCoachEnabled: Bool {
@@ -1456,15 +1518,20 @@ struct ChatTabView: View {
         }
     }
 
-    private func speakResponse(_ text: String) async {
-        guard !text.isEmpty, let accessToken = await chatAccessToken() else {
+    private func speakResponse(_ text: String, ownership: AuthManager.ProfileSessionOwnership) async {
+        guard !text.isEmpty, authManager.ownsAccountSession(ownership) else { return }
+        let accessToken = await chatAccessToken()
+        guard authManager.ownsAccountSession(ownership) else { return }
+        guard let accessToken else {
             voicePlayback.speakOffline(text)
             return
         }
         do {
             let audio = try await URLSessionVoiceService().speak(text: text, accessToken: accessToken)
+            guard authManager.ownsAccountSession(ownership) else { return }
             try voicePlayback.play(audio)
         } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
             voicePlayback.speakOffline(text)
         }
     }
@@ -1495,6 +1562,12 @@ struct ChatTabView: View {
     }
 
     private func startTurn(message: String, clientMessageId: String) {
+        guard let ownership = authManager.captureAccountSession() else {
+            applyTurnFailure(.authenticationExpired, message: message, clientMessageId: clientMessageId)
+            return
+        }
+        let turnConversationId = conversationId
+        let voiceMode = pendingSpokenReply.shouldSpeakReply(for: clientMessageId)
         currentRequestTask?.cancel()
         messages.removeAll { $0.replyToClientMessageId == clientMessageId }
         if let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) {
@@ -1517,6 +1590,9 @@ struct ChatTabView: View {
         activeClientMessageId = clientMessageId
         let generation = UUID()
         requestGeneration = generation
+        func isCurrent() -> Bool {
+            requestGeneration == generation && authManager.ownsAccountSession(ownership)
+        }
         AppServicePorts.analyticsTracker.track(event: "chat_first_message_sent")
 
         currentRequestTask = Task { @MainActor in
@@ -1529,60 +1605,54 @@ struct ChatTabView: View {
                 }
             }
 
-            guard let accessToken = await chatAccessToken() else {
-                applyTurnFailure(
-                    ChatServiceError.authenticationExpired,
-                    message: message,
-                    clientMessageId: clientMessageId
-                )
-                return
-            }
-
             do {
-                var completed = false
-                let stream = chatService.streamMessage(
-                    accessToken: accessToken,
-                    conversationId: conversationId,
-                    clientMessageId: clientMessageId,
-                    message: message,
-                    voiceMode: pendingSpokenReply.shouldSpeakReply(for: clientMessageId)
+                try await ChatTurnExecutor.run(
+                    accessToken: { await chatAccessToken() },
+                    makeStream: { accessToken in
+                        chatService.streamMessage(
+                            accessToken: accessToken,
+                            conversationId: turnConversationId,
+                            clientMessageId: clientMessageId,
+                            message: message,
+                            voiceMode: voiceMode
+                        )
+                    },
+                    isCurrent: isCurrent,
+                    receive: { event in
+                        switch event {
+                        case .metadata(let serverConversationId, _, _):
+                            conversationId = serverConversationId
+                        case .delta(let text):
+                            mutateAssistant(clientMessageId: clientMessageId) { assistant in
+                                assistant.text += text
+                            }
+                        case .completed(let messageId, _, _):
+                            mutateAssistant(clientMessageId: clientMessageId) { assistant in
+                                assistant.id = messageId
+                                assistant.delivery = .complete
+                            }
+                            if let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) {
+                                messages[userIndex].delivery = .complete
+                            }
+                            if let spokenResponse = messages.first(where: { $0.replyToClientMessageId == clientMessageId })?.text,
+                               pendingSpokenReply.consumeIfMatching(clientMessageId: clientMessageId) {
+                                Task { @MainActor in await speakResponse(spokenResponse, ownership: ownership) }
+                            }
+                        case .failure(_, let message, let retryable):
+                            throw ChatServiceError.server(message: message, retryable: retryable)
+                        }
+                    }
                 )
 
-                for try await event in stream {
-                    try Task.checkCancellation()
-                    switch event {
-                    case .metadata(let serverConversationId, _, _):
-                        conversationId = serverConversationId
-                    case .delta(let text):
-                        mutateAssistant(clientMessageId: clientMessageId) { assistant in
-                            assistant.text += text
-                        }
-                    case .completed(let messageId, _, _):
-                        mutateAssistant(clientMessageId: clientMessageId) { assistant in
-                            assistant.id = messageId
-                            assistant.delivery = .complete
-                        }
-                        if let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) {
-                            messages[userIndex].delivery = .complete
-                        }
-                        completed = true
-                        if let spokenResponse = messages.first(where: { $0.replyToClientMessageId == clientMessageId })?.text,
-                           pendingSpokenReply.consumeIfMatching(clientMessageId: clientMessageId) {
-                            Task { @MainActor in await speakResponse(spokenResponse) }
-                        }
-                    case .failure(_, let message, let retryable):
-                        throw ChatServiceError.server(message: message, retryable: retryable)
-                    }
-                }
-
-                try Task.checkCancellation()
-                guard completed else { throw ChatServiceError.invalidResponse }
+                guard isCurrent() else { return }
                 AppServicePorts.analyticsTracker.track(event: "chat_first_answer_completed")
             } catch is CancellationError {
                 return
             } catch let error as ChatServiceError {
+                guard isCurrent() else { return }
                 applyTurnFailure(error, message: message, clientMessageId: clientMessageId)
             } catch {
+                guard isCurrent() else { return }
                 applyTurnFailure(
                     ChatServiceError.server(
                         message: "Chat is temporarily unavailable. Please try again.",
@@ -1725,7 +1795,7 @@ struct ChatTabView: View {
             if let recovery, recovery.retryable {
                 failedTurn = FailedChatTurn(message: recovery.message, clientMessageId: recovery.clientMessageId)
             }
-            chatErrorMessage = recovery?.errorMessage
+            chatRecoveryPresentation.restore(recovery)
             isConversationLoadRetryAvailable = recovery?.shouldReload == true
         } catch is CancellationError {
             return

@@ -172,6 +172,39 @@ protocol ChatServicing {
     func deleteConversation(accessToken: String, conversationId: String) async throws
 }
 
+/// Checks account and turn ownership at every suspension before publishing stream state.
+@MainActor
+enum ChatTurnExecutor {
+    static func run(
+        accessToken: () async -> String?,
+        makeStream: (String) -> AsyncThrowingStream<ChatStreamEvent, Error>,
+        isCurrent: () -> Bool,
+        receive: (ChatStreamEvent) throws -> Void
+    ) async throws {
+        func requireCurrent() throws {
+            try Task.checkCancellation()
+            guard isCurrent() else { throw CancellationError() }
+        }
+        try requireCurrent()
+        let token = await accessToken()
+        try requireCurrent()
+        guard let token else { throw ChatServiceError.authenticationExpired }
+        do {
+            var completed = false
+            for try await event in makeStream(token) {
+                try requireCurrent()
+                try receive(event)
+                if case .completed = event { completed = true }
+            }
+            try requireCurrent()
+            guard completed else { throw ChatServiceError.invalidResponse }
+        } catch {
+            try requireCurrent()
+            throw error
+        }
+    }
+}
+
 struct ChatSSEParser {
     private var eventName = ""
     private var dataLines: [String] = []
