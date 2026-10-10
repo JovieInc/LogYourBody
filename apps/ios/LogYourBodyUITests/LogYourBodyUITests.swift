@@ -2174,6 +2174,92 @@ final class LogYourBodyUITests: XCTestCase {
         )
     }
 
+    func testRecoveryEmailKeyboardDoneMeetsMinimumHitTarget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestRecoveryEmailPath",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        app.tap()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        app.buttons["body_score_onboarding_basics_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        app.buttons["CM"].tap()
+        let heightField = app.textFields["Height in centimeters"]
+        XCTAssertTrue(heightField.waitForExistence(timeout: 5))
+        heightField.tap()
+        heightField.typeText("178")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_height_continue_button"].tap()
+
+        let manual = app.buttons["body_score_onboarding_enter_manually_button"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 8))
+        manual.tap()
+        XCTAssertTrue(app.staticTexts["What’s your current weight?"].waitForExistence(timeout: 8))
+        app.buttons["LBS"].tap()
+        let weightField = app.textFields["Weight (lbs)"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        weightField.typeText("182")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_manual_weight_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How do you know your body fat?"].waitForExistence(timeout: 8))
+        app.buttons["body_score_onboarding_body_fat_manual_button"].tap()
+        XCTAssertTrue(app.staticTexts["Enter your body fat."].waitForExistence(timeout: 8))
+        let bodyFatField = app.textFields["Body fat percentage"]
+        XCTAssertTrue(bodyFatField.waitForExistence(timeout: 5))
+        bodyFatField.tap()
+        bodyFatField.typeText("18")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_body_fat_numeric_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs muscle."].waitForExistence(timeout: 15))
+        app.buttons["body_score_reveal_continue_button"].tap()
+        XCTAssertTrue(app.staticTexts["Add a recovery email."].waitForExistence(timeout: 8))
+
+        let emailField = app.textFields["you@domain.com"]
+        XCTAssertTrue(emailField.waitForExistence(timeout: 5))
+        emailField.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5))
+
+        let window = app.windows.firstMatch.frame
+        let done = app.buttons.matching(identifier: "body_score_email_keyboard_done_button").firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(done.frame), "email Done \(done.frame) window \(window)")
+        XCTAssertGreaterThanOrEqual(done.frame.width, 44, "email Done \(done.frame)")
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, "email Done \(done.frame)")
+
+        let labeledDones = app.buttons.matching(NSPredicate(format: "label == 'Done'"))
+        for index in 0..<labeledDones.count {
+            let control = labeledDones.element(boundBy: index)
+            guard control.exists, control.frame.width > 1, control.frame.height > 1 else { continue }
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "email Done \(control.frame)")
+        }
+
+        done.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Add a recovery email."].exists)
+    }
+
     private func assertAndCaptureTimelineAnalytics(in app: XCUIApplication) throws {
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         let homeFFMI = try homeFFMIValue(in: app)
