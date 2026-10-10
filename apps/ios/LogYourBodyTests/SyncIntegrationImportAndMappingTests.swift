@@ -420,6 +420,166 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         XCTAssertEqual(metric.waistUnit, "cm")
     }
 
+    private func provenanceScan(source: String?) -> DexaPDFScan {
+        DexaPDFScan(
+            date: "2026-09-20", weight: 82.4, weightUnit: "kg",
+            bodyFatPercentage: 21.2, muscleMass: nil, boneMass: nil, source: source
+        )
+    }
+
+    private func legacyPDFResult(sourceLabel: String) -> DexaResult {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        return DexaResult(
+            id: "legacy-result", userId: "pdf-user", bodyMetricsId: "legacy-metric",
+            externalSource: "dexa_pdf",
+            externalResultId: "442b94e3684e5af7e8e7daba5bd8b1b4d89ef71662c7317d9cac4e898cc27e50",
+            externalUpdateTime: nil, scannerModel: sourceLabel, locationId: nil, locationName: nil,
+            acquireTime: date, analyzeTime: nil, vatMassKg: nil, vatVolumeCm3: nil,
+            scanWeight: 82.4, scanWeightUnit: "kg", bodyFatPercentage: 21.2,
+            resultPdfUrl: nil, resultPdfName: nil, createdAt: date, updatedAt: date
+        )
+    }
+
+    func testPDFPreviewUsesTheReportedLabelOrAnUnidentifiedFallback() {
+        XCTAssertEqual(PDFScanProvenance(source: nil).displayLabel, "Source not identified")
+        XCTAssertEqual(PDFScanProvenance(source: "  ").displayLabel, "Source not identified")
+        XCTAssertEqual(PDFScanProvenance(source: "Other").displayLabel, "Other")
+        XCTAssertEqual(PDFScanProvenance(source: " InBody 770 ").displayLabel, "InBody 770")
+    }
+
+    func testUnidentifiedPDFsDoNotInventDexaProvenance() throws {
+        let sources: [String?] = [
+            nil, "", "  ", "Other", "Unidentified device", "Not DEXA", "DEXA / InBody",
+            "DEXA not confirmed", "InBody unknown", "DXA unconfirmed", "In Body possibly",
+            "DEXA?", "InBody (method uncertain)", "DEXA confirmation pending", "DXA cannot confirm"
+        ]
+        for source in sources {
+            let plan = DexaPDFScanMapper.makePlan(
+                scans: [provenanceScan(source: source)], userId: "pdf-user", existingResults: []
+            )
+            let metric = try XCTUnwrap(plan.metrics.first)
+            XCTAssertEqual(metric.dataSource, "pdf_import", "Source: \(source ?? "nil")")
+            XCTAssertNil(metric.bodyFatMethod)
+            XCTAssertEqual(metric.notes, "Imported from PDF")
+            let reportedLabel = source?.trimmingCharacters(in: .whitespacesAndNewlines)
+            XCTAssertEqual(metric.sourceMetadata?.sourceName, reportedLabel?.isEmpty == false ? reportedLabel : nil)
+            XCTAssertEqual(plan.results.first?.externalSource, "pdf_import")
+        }
+    }
+
+    func testExplicitPDFMethodsAndRawLabelsArePreserved() throws {
+        let cases = [
+            ("DEXA Scan", "dexa_pdf", "dexa"), ("DXA (Hologic)", "dexa_pdf", "dexa"),
+            ("InBody 770", "inbody_pdf", "inbody"), ("In Body 770", "inbody_pdf", "inbody"),
+            ("In-Body 770", "inbody_pdf", "inbody")
+        ]
+        for (label, source, method) in cases {
+            let plan = DexaPDFScanMapper.makePlan(
+                scans: [provenanceScan(source: label)], userId: "pdf-user", existingResults: []
+            )
+            let metric = try XCTUnwrap(plan.metrics.first)
+            XCTAssertEqual(metric.dataSource, source)
+            XCTAssertEqual(metric.bodyFatMethod, method)
+            XCTAssertEqual(metric.sourceMetadata?.sourceName, label)
+            XCTAssertNil(plan.results.first?.scannerModel, "A report label is not a scanner-model field")
+        }
+    }
+
+    func testKnownPDFStableIdentifiersRemainCompatible() throws {
+        let cases = [
+            ("DEXA Scan", "442b94e3684e5af7e8e7daba5bd8b1b4d89ef71662c7317d9cac4e898cc27e50"),
+            ("InBody 770", "13829dde213f237873778139a889ac40ca88922eead9f4ab957b5e530054a970")
+        ]
+        for (label, expected) in cases {
+            let plan = DexaPDFScanMapper.makePlan(
+                scans: [provenanceScan(source: label)], userId: "pdf-user", existingResults: []
+            )
+            XCTAssertEqual(plan.results.first?.externalResultId, expected)
+        }
+    }
+
+    func testLegacyPDFImportsAreSkippedWithoutRelabelingTheExistingResult() {
+        let cases: [(String?, String)] = [("Other", "Other"), (nil, "DEXA Scan"), ("In Body 770", "In Body 770")]
+        for (source, oldLabel) in cases {
+            let legacy = legacyPDFResult(sourceLabel: oldLabel)
+            let plan = DexaPDFScanMapper.makePlan(
+                scans: [provenanceScan(source: source)], userId: "pdf-user", existingResults: [legacy]
+            )
+            XCTAssertTrue(plan.metrics.isEmpty)
+            XCTAssertTrue(plan.results.isEmpty)
+            XCTAssertEqual(plan.skippedDuplicateCount, 1)
+            XCTAssertEqual(legacy.externalSource, "dexa_pdf")
+            XCTAssertEqual(legacy.scannerModel, oldLabel)
+        }
+    }
+
+    func testLegacyAliasDoesNotHideADifferentReportedSource() {
+        let plan = DexaPDFScanMapper.makePlan(
+            scans: [provenanceScan(source: "Other")], userId: "pdf-user",
+            existingResults: [legacyPDFResult(sourceLabel: "DEXA Scan")]
+        )
+        XCTAssertEqual(plan.metrics.count, 1)
+        XCTAssertEqual(plan.results.first?.externalSource, "pdf_import")
+        XCTAssertEqual(plan.skippedDuplicateCount, 0)
+    }
+
+    func testNewKnownAndUnknownPDFImportsDoNotCollideThroughLegacyAliases() {
+        let unknown = provenanceScan(source: nil)
+        let known = provenanceScan(source: "DEXA Scan")
+        for scans in [[unknown, known], [known, unknown]] {
+            let first = DexaPDFScanMapper.makePlan(scans: scans, userId: "pdf-user", existingResults: [])
+            XCTAssertEqual(first.results.count, 2)
+            XCTAssertEqual(Set(first.results.map(\.externalSource)), ["pdf_import", "dexa_pdf"])
+            let repeated = DexaPDFScanMapper.makePlan(
+                scans: scans, userId: "pdf-user", existingResults: first.results
+            )
+            XCTAssertTrue(repeated.results.isEmpty)
+            XCTAssertEqual(repeated.skippedDuplicateCount, 2)
+        }
+        let knownPlan = DexaPDFScanMapper.makePlan(scans: [known], userId: "pdf-user", existingResults: [])
+        let unknownPlan = DexaPDFScanMapper.makePlan(
+            scans: [unknown], userId: "pdf-user", existingResults: knownPlan.results
+        )
+        XCTAssertEqual(unknownPlan.results.count, 1)
+        XCTAssertEqual(unknownPlan.results.first?.externalSource, "pdf_import")
+    }
+
+    func testPDFImportProvenanceSurvivesLocalStorageAndPendingSync() async throws {
+        let plan = DexaPDFScanMapper.makePlan(
+            scans: [provenanceScan(source: "Unidentified device")], userId: "pdf-user", existingResults: []
+        )
+        let metric = try XCTUnwrap(plan.metrics.first)
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: "pdf-user", markAsSynced: false)
+        let cached = await cachedBodyMetric(id: metric.id)
+        let saved = try XCTUnwrap(cached)
+        XCTAssertEqual(saved.dataSource, "pdf_import")
+        XCTAssertEqual(saved.toBodyMetrics()?.dataSource, "pdf_import")
+        let pending = saved.pendingSyncItem()
+        XCTAssertEqual(pending.dataSource, "pdf_import")
+        XCTAssertNil(pending.bodyFatMethod)
+        XCTAssertEqual(
+            BodyMetricSourceMetadata(jsonString: pending.sourceMetadataJSON)?.sourceName, "Unidentified device"
+        )
+    }
+
+    func testPDFImportProvenanceSurvivesRemotePullMapping() async throws {
+        let id = UUID().uuidString
+        CoreDataManager.shared.updateOrCreateBodyMetric(from: [
+            "id": id, "user_id": "pdf-user", "date": "2026-09-20T12:00:00Z",
+            "created_at": "2026-09-20T12:00:00Z", "updated_at": "2026-09-20T12:00:00Z",
+            "local_date": "2026-09-20", "weight": 82.4, "weight_unit": "kg",
+            "data_source": "pdf_import",
+            "source_metadata": ["vendor": "pdf_import", "source_name": "Unidentified device"]
+        ])
+        let cached = await cachedBodyMetric(id: id)
+        let saved = try XCTUnwrap(cached)
+        XCTAssertEqual(saved.dataSource, "pdf_import")
+        let metric = try XCTUnwrap(saved.toBodyMetrics())
+        XCTAssertEqual(metric.dataSource, "pdf_import")
+        XCTAssertNil(metric.bodyFatMethod)
+        XCTAssertEqual(metric.sourceMetadata?.sourceName, "Unidentified device")
+    }
+
     func testInBodyScanMapsToDatedMetricAndDurableDexaRecord() throws {
         let scan = DexaPDFScan(
             date: "2026-09-20",
@@ -445,7 +605,7 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         XCTAssertEqual(metric.localDate, "2026-09-20")
         XCTAssertEqual(metric.dataSource, "inbody_pdf")
         XCTAssertEqual(metric.bodyFatPercentage, 21.2)
-        XCTAssertEqual(metric.sourceMetadata?.sourceName, "InBody PDF")
+        XCTAssertEqual(metric.sourceMetadata?.sourceName, "InBody 770")
         XCTAssertEqual(result.externalSource, "inbody_pdf")
         XCTAssertEqual(result.scanWeight, 82.4)
         XCTAssertEqual(result.muscleMass, 61.8)

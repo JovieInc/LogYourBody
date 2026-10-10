@@ -101,7 +101,7 @@ struct DexaPDFImportSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(scan.date)
                 .font(.headline)
-            Text(scan.source ?? "DEXA scan")
+            Text(PDFScanProvenance(source: scan.source).displayLabel)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Text(measurementSummary(for: scan))
