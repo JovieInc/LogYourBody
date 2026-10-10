@@ -71,11 +71,36 @@ describe('createNeonNativeProductRecords', () => {
     });
   });
 
+  it('rejects an explicit null DEXA payload even for an internal caller', async () => {
+    const query = jest.fn();
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    await expect(
+      store.push('owner-subject', 'dexa_results', [{ id: morningId, reported_measurements: null }]),
+    ).resolves.toEqual({ records: [], rejected_ids: [morningId] });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('retains an uninterpreted future envelope in both database parameters and returned records', async () => {
+    const envelope = {
+      schema_version: 2,
+      items: [{ kind: 'future', payload: { observed: 'unknown' } }],
+    };
+    const input = { id: morningId, reported_measurements: envelope };
+    const query = jest.fn().mockResolvedValue([row(input)]);
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    const result = await store.push('owner-subject', 'dexa_results', [input]);
+    expect(JSON.parse(String(query.mock.calls[0]?.[1]?.[3]))).toEqual(input);
+    expect(result.records[0]?.reported_measurements).toEqual(envelope);
+    expect(result.records[0]).not.toHaveProperty('muscle_mass');
+  });
+
   it('pulls incrementally for the authenticated subject including tombstones', async () => {
-    const query = jest.fn().mockResolvedValue([
-      row(morning),
-      row({ id: eveningId }, { deleted_at: '2026-08-13T23:50:00.000Z' }),
-    ]);
+    const query = jest
+      .fn()
+      .mockResolvedValue([
+        row(morning),
+        row({ id: eveningId }, { deleted_at: '2026-08-13T23:50:00.000Z' }),
+      ]);
     const store = createNeonNativeProductRecords(databaseWith(query));
 
     const result = await store.pull('owner-subject', 'daily_metrics', {
@@ -84,7 +109,9 @@ describe('createNeonNativeProductRecords', () => {
       limit: 200,
     });
 
-    expect(normalized(query.mock.calls[0]?.[0])).toContain('where user_subject = $1 and collection = $2');
+    expect(normalized(query.mock.calls[0]?.[0])).toContain(
+      'where user_subject = $1 and collection = $2',
+    );
     expect(query.mock.calls[0]?.[1]).toEqual([
       'owner-subject',
       'daily_metrics',
