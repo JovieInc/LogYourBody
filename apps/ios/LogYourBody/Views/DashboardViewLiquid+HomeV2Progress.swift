@@ -14,11 +14,6 @@ extension DashboardViewLiquid {
             formatValue: { homeV2ProgressValueText($0, $1) },
             onLogWeight: { presentHomeV2LogSheet() }
         )
-        .task(id: bodyMetrics.count) {
-            if fullChartCache[.weight] == nil {
-                await prewarmMetricCaches()
-            }
-        }
     }
 
     func openHomeV2Progress(metric: HomeV2ProgressMetric = .weight) {

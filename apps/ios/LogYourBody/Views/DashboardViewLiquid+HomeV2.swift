@@ -59,13 +59,9 @@ extension DashboardViewLiquid {
             onDone: { homeV2Logged = nil },
             onUndo: { Task { await undoHomeV2Logged() } }
         )
-        // The whole-history chart series are built off the main actor by
-        // prewarmMetricCaches; never regenerate them inside body. The caches
-        // reset to [:] whenever metrics change, so this re-warms on demand.
-        .task(id: bodyMetrics.count) {
-            if fullChartCache[.weight] == nil {
-                await prewarmMetricCaches()
-            }
+        // Chart caches refresh centrally when measurements change. Phase copy
+        // must also follow edits to an existing day, not just added rows.
+        .task(id: bodyMetrics) {
             let insight = PhaseInsightPolicy.insight(for: bodyMetrics)
             homeV2PhaseSentence = HomeV2Copy.phaseSentence(
                 kind: insight.kind,
