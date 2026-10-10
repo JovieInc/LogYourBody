@@ -160,7 +160,7 @@ status="$(jq -r '.status' <<<"$run_record")"
 conclusion="$(jq -r '.conclusion // ""' <<<"$run_record")"
 observed_at="$(jq -r '.updated_at' <<<"$run_record")"
 run_url="$(jq -r '.html_url' <<<"$run_record")"
-if [[ "$run_url" != "https://github.com/$GH_REPO/actions/runs/$run_id" ]]; then
+if [[ "$run_url" != "https://github.com/${GH_REPO}/actions/runs/${run_id}" ]]; then
   degrade uncertain "latest heartbeat run URL is malformed"
 fi
 

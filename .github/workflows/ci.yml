@@ -102,7 +102,7 @@ jobs:
       - name: Test heartbeat routing with shell coverage
         run: |
           rm -f coverage/mac-runner-routing/.resultset.json
-          bashcov --command-name mac-runner-routing -- -c 'python3 -m pytest scripts/tests/test_runner_routing.py -q'
+          bashcov --command-name mac-runner-routing -- -c 'python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q'
           python3 scripts/tests/test_runner_routing.py
 
   detect-changes:
