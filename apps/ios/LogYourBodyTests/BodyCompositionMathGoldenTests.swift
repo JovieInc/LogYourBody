@@ -197,8 +197,20 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         ])
 
         XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 365 * 10))).value, 104, accuracy: 0.001)
-        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 1))).value, 104, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 1))).value, 101, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 2))).value, 101.8, accuracy: 0.001)
+    }
+
+    func testTrendWeightFarFutureTailUsesRoundedFinalKnownWeight() throws {
+        let context = try makeWeightContext([
+            (dayOffset: 0, weight: 100),
+            (dayOffset: 1, weight: 104.04)
+        ])
+
+        let result = try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 4)))
+
+        XCTAssertEqual(result.value, 102.7, accuracy: 0.001)
+        XCTAssertTrue(result.isLastKnown)
     }
 
     private func makeWeightContext(

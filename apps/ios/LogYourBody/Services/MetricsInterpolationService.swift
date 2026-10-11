@@ -160,7 +160,11 @@ class MetricsInterpolationService {
                let anchorValue = trendRawValues[processingEndDay],
                let days = calendar.dateComponents([.day], from: processingEndDay, to: targetDay).day,
                days > 0 {
-                let finalWeight = metrics[metrics.count - 1].weight ?? anchorValue
+                // Match the established estimate path for the final known
+                // value. It rounds measurements to one decimal before the
+                // analytical tail continues the EMA, while anchorValue stays
+                // unrounded for numerical continuity.
+                let finalWeight = estimate(for: metrics[metrics.count - 1].date)?.value ?? anchorValue
                 let decay = pow(1 - trendAlpha, Double(days))
                 return InterpolatedMetric(
                     value: round((finalWeight + (anchorValue - finalWeight) * decay) * 10) / 10,
