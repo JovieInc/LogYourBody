@@ -62,16 +62,16 @@ enum HomeChatChromePolicy {
             return .menu
         }
 
+        if translationX > 0, isChatExpanded {
+            return .collapseChat
+        }
+
         if translationX < 0, !isOnStats {
             return .stats
         }
 
         if translationX > 0, isOnStats {
             return .home
-        }
-
-        if translationX > 0, isChatExpanded {
-            return .collapseChat
         }
 
         return .none
