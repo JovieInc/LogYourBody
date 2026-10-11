@@ -96,7 +96,6 @@ export function ExperimentWaitlistLanding({
         audience: variant.audience,
         goal: variant.goal,
         assignment_source: assignmentSource,
-        status: payload.status,
       });
       setSubmitState(payload.status === 'existing' ? 'duplicate' : 'success');
     } catch {

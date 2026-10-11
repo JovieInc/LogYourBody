@@ -319,6 +319,31 @@ run_with_timeout() {
         self.assertEqual(log.read_text().count('Running fixture (attempt '), 2)
         self.assertIn('first attempt evidence', (result_bundle.with_name('retry.attempt-1.xcresult') / 'receipt').read_text())
 
+    def test_shell_does_not_retry_xcodebuild_command_timeout(self):
+        source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
+        functions = source[source.index('is_simulator_infra_failure() {'):source.index('assert_xcresult_evidence() {')]
+        result_bundle = self.root / 'timeout.xcresult'
+        log = self.root / 'timeout.log'
+        command = r"""
+set -euo pipefail
+COMMON_XCODEBUILD_ARGS=(fixture)
+XCODEBUILD_SETTINGS_ARRAY=(fixture)
+XCODEBUILD_COMMAND_TIMEOUT_SECONDS=10
+cleanup_booted_simulator_apps() { :; }
+sleep() { :; }
+run_with_timeout() {
+  mkdir -p "$RESULT_BUNDLE"
+  echo 'xcodebuild command timed out after 720s'
+  return 124
+}
+""" + functions + '\nrun_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"\n'
+        result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
+                                env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
+        self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
+        self.assertNotIn('Retrying fixture', log.read_text())
+
 
 if __name__ == '__main__':
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(EvidenceTests)

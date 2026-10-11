@@ -26,26 +26,16 @@ function loadCases(): KnowledgeCase[] {
 
 export function knowledgeEvalFixtureModel() {
   const cases = new Map(loadCases().map((row) => [row.question, row]));
-  let activeQuestion: string | undefined;
-  let loadRequested = false;
   return mockModel(({ lastUserMessage, toolResults }) => {
     const row = cases.get(lastUserMessage);
     if (!row) return 'No matching knowledge eval case.';
 
-    if (activeQuestion !== lastUserMessage) {
-      activeQuestion = lastUserMessage;
-      loadRequested = false;
-    }
-    if (!loadRequested) {
-      loadRequested = true;
+    const loadedContent = JSON.stringify(toolResults);
+    const citations = row.expected_fact_ids.map((id) => '[' + id + ']');
+    if (!citations.every((citation) => loadedContent.includes(citation))) {
       return { toolCalls: [{ name: 'load_skill', input: { skill: row.topic } }] };
     }
 
-    const citations = row.expected_fact_ids.map((id) => '[' + id + ']');
-    const loadedContent = JSON.stringify(toolResults);
-    if (citations.every((citation) => loadedContent.includes(citation))) {
-      return 'Engine evidence ' + citations.join(' ');
-    }
-    return 'Authorized evidence is unavailable in the loaded skill.';
+    return 'Engine evidence ' + citations.join(' ');
   });
 }

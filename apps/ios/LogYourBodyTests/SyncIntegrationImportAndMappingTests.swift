@@ -453,6 +453,42 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         XCTAssertEqual(result.bodyMetricsId, metric.id)
     }
 
+    func testDexaImportExplainsEmptyAndUnusableReports() {
+        XCTAssertEqual(
+            DexaPDFImportMessagePolicy.readErrorMessage(for: []),
+            DexaPDFImportMessagePolicy.noScansFound
+        )
+
+        let undatedScan = DexaPDFScan(
+            date: "not a date",
+            weight: 82.4,
+            weightUnit: "kg",
+            bodyFatPercentage: 21.2,
+            muscleMass: nil,
+            boneMass: nil,
+            source: "DEXA"
+        )
+        XCTAssertNil(DexaPDFImportMessagePolicy.readErrorMessage(for: [undatedScan]))
+
+        let plan = DexaPDFScanMapper.makePlan(scans: [undatedScan], userId: "pdf-import-user", existingResults: [])
+        XCTAssertEqual(
+            DexaPDFImportMessagePolicy.savedSummary(
+                resultCount: plan.results.count,
+                metricCount: plan.metrics.count,
+                skippedDuplicateCount: plan.skippedDuplicateCount
+            ),
+            DexaPDFImportMessagePolicy.unusableScans
+        )
+        XCTAssertEqual(
+            DexaPDFImportMessagePolicy.savedSummary(resultCount: 0, metricCount: 0, skippedDuplicateCount: 2),
+            "These scans were already imported."
+        )
+        XCTAssertEqual(
+            DexaPDFImportMessagePolicy.savedSummary(resultCount: 1, metricCount: 1, skippedDuplicateCount: 0),
+            "Added 1 scan and 1 new dated timeline entry."
+        )
+    }
+
     func testSameDayEntryIsPreservedAndRepeatImportIsDeduplicated() throws {
         let scan = DexaPDFScan(
             date: "2026-09-20",

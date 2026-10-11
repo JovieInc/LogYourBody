@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
+import { applyClinicalGuardrail, holdCoachReplyForReview } from '@/lib/chat/coach-scaffold';
 import { buildChatModelMessages, isTrainingQuestion } from '@/lib/chat/context';
 import { hasUnauthorizedTrainingQuantity } from '@/lib/chat/training-number-boundary';
+import { coachPersonaGuardrailsEnabled } from '@/lib/flags/coach-persona';
 import type { NextWorkoutResult } from '@/lib/training/service';
 import {
   CHAT_PROTOCOL_VERSION,
@@ -189,19 +191,29 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
         return jsonError('conversation_not_found', 404);
       }
 
+      const abortController = new AbortController();
+      const abortFromRequest = () => abortController.abort();
+      request.signal.addEventListener('abort', abortFromRequest, { once: true });
+      if (request.signal.aborted) abortFromRequest();
+
       let model: ChatModelPort;
       let modelMessages: ChatModelMessage[];
       const trainingTurn = isTrainingQuestion(input.message);
+      const guardrailsEnabled = coachPersonaGuardrailsEnabled();
+      const holdForReview = holdCoachReplyForReview(trainingTurn, guardrailsEnabled);
       let trainingOutput: NextWorkoutResult | null = null;
       try {
+        abortController.signal.throwIfAborted();
         const [user, metrics] = await Promise.all([
           dependencies.users.getUser(identity.sub),
           dependencies.bodyMetrics.list(identity.sub, 30),
         ]);
+        abortController.signal.throwIfAborted();
         trainingOutput =
           trainingTurn && dependencies.getTrainingOutput
             ? await dependencies.getTrainingOutput(identity.sub)
             : null;
+        abortController.signal.throwIfAborted();
         modelMessages = buildChatModelMessages({
           user,
           metrics,
@@ -211,19 +223,24 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
         });
         model = dependencies.createModel();
       } catch {
-        await dependencies.conversations.failTurn({
-          subject: identity.sub,
-          turnId: turn.turnId,
-          leaseToken,
-          status: 'failed',
-          failureCode: 'context_unavailable',
-        });
+        request.signal.removeEventListener('abort', abortFromRequest);
+        const cancelled = abortController.signal.aborted;
+        if (cancelled) reportStreamOutcome('client_cancelled');
+        try {
+          await dependencies.conversations.failTurn({
+            subject: identity.sub,
+            turnId: turn.turnId,
+            leaseToken,
+            status: cancelled ? 'cancelled' : 'failed',
+            failureCode: cancelled ? 'client_cancelled' : 'context_unavailable',
+          });
+        } catch {
+          reportStreamOutcome('failure_persistence_error');
+        }
+        if (cancelled) return jsonError('client_cancelled', 499);
         return jsonError('chat_unavailable', 503, { 'Retry-After': '5' });
       }
 
-      const abortController = new AbortController();
-      const abortFromRequest = () => abortController.abort();
-      request.signal.addEventListener('abort', abortFromRequest, { once: true });
       let finalized = false;
 
       const body = new ReadableStream<Uint8Array>({
@@ -244,15 +261,17 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
           let outputTokens: number | null = null;
 
           try {
+            abortController.signal.throwIfAborted();
             for await (const modelEvent of model.streamText({
               messages: modelMessages,
               maxOutputTokens: 600,
               signal: abortController.signal,
             })) {
+              abortController.signal.throwIfAborted();
               if (modelEvent.type === 'text_delta') {
                 content += modelEvent.text;
                 if (content.length > 12_000) throw new Error('CHAT_RESPONSE_TOO_LONG');
-                if (!trainingTurn) {
+                if (!holdForReview) {
                   controller.enqueue(
                     event('delta', {
                       version: CHAT_PROTOCOL_VERSION,
@@ -266,12 +285,14 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
               }
             }
 
+            abortController.signal.throwIfAborted();
             if (!content.trim()) throw new Error('CHAT_EMPTY_RESPONSE');
-            const deliveredContent =
+            const trainingSafe =
               trainingTurn && hasUnauthorizedTrainingQuantity(content, trainingOutput)
                 ? TRAINING_NUMBER_FALLBACK
                 : content;
-            if (trainingTurn) {
+            const deliveredContent = applyClinicalGuardrail(trainingSafe, guardrailsEnabled);
+            if (holdForReview) {
               controller.enqueue(
                 event('delta', {
                   version: CHAT_PROTOCOL_VERSION,

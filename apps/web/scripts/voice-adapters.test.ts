@@ -45,9 +45,47 @@ test('ElevenLabs SDK transport generates speech and transcribes audio', async ()
 
   assert.equal(requests.length, 2);
   assert.match(requests[0].url, /\/text-to-speech\/test-voice/);
+  assert.equal(requests[0].url.includes('enable_logging'), false);
   assert.equal(requests[0].headers.get('xi-api-key'), 'test-elevenlabs-key');
   assert.match(requests[1].url, /\/speech-to-text/);
   assert.equal(requests[1].headers.get('xi-api-key'), 'test-elevenlabs-key');
+});
+
+test('zero-retention flag sets ElevenLabs no-log and gateway ZDR options', async () => {
+  const previous = process.env.LYB_AI_ZERO_RETENTION;
+  process.env.LYB_AI_ZERO_RETENTION = '1';
+  try {
+    const requests: Array<{ url: string; body: string }> = [];
+    const mockFetch: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests.push({ url: request.url, body: await request.text() });
+      return new Response(new Uint8Array([1]), {
+        status: 200,
+        headers: { 'content-type': 'audio/mpeg' },
+      });
+    };
+    const eleven = createElevenLabsVoiceProvider({
+      apiKey: 'test-elevenlabs-key',
+      fetch: mockFetch,
+    });
+    await readStream(await eleven.tts('A measured response.', 'test-voice'));
+    assert.match(requests[0].url, /enable_logging=false/);
+
+    const gatewayRequests: Array<Record<string, unknown>> = [];
+    const gatewayFetch: typeof fetch = async (input, init) => {
+      const request = new Request(input, init);
+      gatewayRequests.push((await request.json()) as Record<string, unknown>);
+      return Response.json({ audio: Buffer.from([4]).toString('base64') });
+    };
+    const fish = createFishAudioVoiceProvider({ apiKey: 'test-gateway-key', fetch: gatewayFetch });
+    await readStream(await fish.tts('A measured response.', 'test-voice'));
+    assert.deepEqual(gatewayRequests[0].providerOptions, {
+      gateway: { zeroDataRetention: true },
+    });
+  } finally {
+    if (previous === undefined) delete process.env.LYB_AI_ZERO_RETENTION;
+    else process.env.LYB_AI_ZERO_RETENTION = previous;
+  }
 });
 
 test('Fish Audio uses the AI Gateway speech model transport', async () => {

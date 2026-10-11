@@ -75,6 +75,7 @@ struct ContentView: View {
     private let onboardingStateManager = OnboardingStateManager.shared
     @State private var currentUserId: String?
     @State private var hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion
+    @State private var finishedOnboardingThisLaunch = false
     @State private var lastProfileCompletionSync: ProfileCompletionSyncKey?
     @State private var isLoadingComplete = false
     @State private var isUnlocked = false
@@ -216,14 +217,17 @@ struct ContentView: View {
                 completeLaunchOverlayIfReady()
             }
         }
-        .task(id: "\(authManager.isAuthenticated)-\(isLoadingComplete)-\(hasCompletedOnboarding)-\(isProfileComplete)") {
-            let isEligible = authManager.isAuthenticated &&
-                isLoadingComplete &&
-                hasCompletedOnboarding &&
-                !shouldShowProfileCompletion &&
-                subscriptionManager.isSubscribed &&
-                !shouldShowDailyReminderPrompt &&
-                !suppressWhatsNewForUITests
+        .task(id: "\(authManager.isAuthenticated)-\(isLoadingComplete)-\(hasCompletedOnboarding)-\(isProfileComplete)-\(finishedOnboardingThisLaunch)") {
+            let isEligible = ReleaseReviewLaunchState(
+                isAuthenticated: authManager.isAuthenticated,
+                isLoadingComplete: isLoadingComplete,
+                hasCompletedOnboarding: hasCompletedOnboarding,
+                needsProfileCompletion: shouldShowProfileCompletion,
+                isSubscribed: subscriptionManager.isSubscribed,
+                showsDailyReminderPrompt: shouldShowDailyReminderPrompt,
+                isSuppressedForUITests: suppressWhatsNewForUITests,
+                finishedOnboardingThisLaunch: finishedOnboardingThisLaunch
+            ).isEligibleForWhatsNew
             releaseReviewItems = ReleaseReviewPresentationPolicy.pendingItems(
                 from: currentReleaseReviewCatalog,
                 installedVersion: AppVersion.current,
@@ -264,7 +268,10 @@ struct ContentView: View {
             // Sync onboarding status from profile when it changes
             applyProfileCompletionIfNeeded(newValue)
         }
-        .onChange(of: hasCompletedOnboarding) { _, newValue in
+        .onChange(of: hasCompletedOnboarding) { oldValue, newValue in
+            if newValue && !oldValue {
+                finishedOnboardingThisLaunch = true
+            }
             if newValue && isLoadingComplete {
                 // print("🎯 Onboarding completed, transitioning to main app...")
                 // Add a small delay to ensure smooth transition
@@ -282,6 +289,14 @@ struct ContentView: View {
         .onShake {
             bugReportManager.handleShakeGesture()
         }
+        #if DEBUG
+        .onAppear {
+            // XCUIDevice has no shake in this SDK. The UI test uses the same handler as the gesture.
+            if ProcessInfo.processInfo.arguments.contains("-lybUITestPresentBugReport") {
+                bugReportManager.handleShakeGesture()
+            }
+        }
+        #endif
     }
 
     private var mainContent: some View {
@@ -298,18 +313,12 @@ struct ContentView: View {
     private var authenticatedContent: some View {
         Group {
             if shouldShowOnboarding {
-                if HomeV2Policy.isOnboardingV2Enabled() {
-                    HomeV2FirstRunView()
-                        .environmentObject(authManager)
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                } else {
-                    BodyScoreOnboardingFlowView()
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                }
+                // One first run for everyone: the onboarding_v2_focus gate now
+                // only picks the sign-in screen.
+                BodyScoreOnboardingFlowView()
+                    .onAppear {
+                        AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                    }
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
             } else if !subscriptionManager.isSubscribed {

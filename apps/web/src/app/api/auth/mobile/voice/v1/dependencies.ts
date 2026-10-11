@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
 import { neonChatConversations } from '@/lib/neon/chat-conversations-adapter';
+import { parseVoiceAllowlist, selectVoiceProvider, voiceCoachAccess } from '@/lib/voice/access';
 import { createVoiceProviders, getVoiceProviderId } from '@/lib/voice/providers';
 import { createVoiceRouteHandlers } from './route-handlers';
 
@@ -18,11 +19,14 @@ const providers = createVoiceProviders({
 export const voiceHandlers = createVoiceRouteHandlers({
   authenticate,
   createRequestId: randomUUID,
-  enabled: () => process.env.LYB_VOICE_ENABLED === 'true',
-  provider: () => {
-    const providerId = getVoiceProviderId(process.env.LYB_VOICE_PROVIDER);
-    return providerId ? providers[providerId] : null;
-  },
+  access: (user) => voiceCoachAccess(user, process.env),
+  provider: (user) =>
+    selectVoiceProvider({
+      providers,
+      providerId: getVoiceProviderId(process.env.LYB_VOICE_PROVIDER),
+      actor: user,
+      allowlist: parseVoiceAllowlist(process.env.LYB_VOICE_ALLOWLIST),
+    }),
   voiceId: () => process.env.LYB_VOICE_ID ?? 'A4j35F5T4XsPMeXd06Pm',
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
 });
