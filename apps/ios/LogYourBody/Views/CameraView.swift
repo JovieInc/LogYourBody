@@ -74,11 +74,11 @@ struct CameraView: View {
                     Text("Same spot, same light, every time")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 9)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
                         .background(.black.opacity(0.55), in: Capsule())
                         .accessibilityIdentifier("progress_photo_camera_tip")
-                        .padding(.bottom, 18)
+                        .padding(.bottom, 16)
                 }
             }
             .aspectRatio(4.0 / 5.0, contentMode: .fit)
@@ -92,7 +92,7 @@ struct CameraView: View {
     }
 
     private var captureBar: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
             HStack {
                 Button("Library") { showsLibrary = true }
                     .font(.system(size: 13, weight: .semibold))
@@ -104,7 +104,7 @@ struct CameraView: View {
                     Circle()
                         .fill(.white)
                         .frame(width: 76, height: 76)
-                        .overlay(Circle().stroke(.white.opacity(0.45), lineWidth: 4).padding(5))
+                        .overlay(Circle().stroke(.white.opacity(0.45), lineWidth: 4).padding(4))
                 }
                 .accessibilityLabel("Capture photo")
                 .accessibilityIdentifier("progress_photo_camera_shutter")
@@ -125,7 +125,7 @@ struct CameraView: View {
                         Button(pose) { selectedPose = pose }
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(selectedPose == pose ? .black : .white)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                             .background(selectedPose == pose ? .white : .white.opacity(0.12), in: Capsule())
                     }
@@ -154,7 +154,7 @@ struct CameraView: View {
                 .padding(.horizontal, 16)
                 .accessibilityLabel("Photo review")
                 .accessibilityIdentifier("progress_photo_review_plate")
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("\(selectedPose) · \(HomeV2Copy.todayDateText(Date()))")
                     .font(.system(size: 16, weight: .semibold))
                 Text("Not saved · Pose matched to \(matchedDateText)")
@@ -182,7 +182,7 @@ struct CameraView: View {
             }
             .accessibilityIdentifier("progress_photo_review_save")
             .padding(.horizontal, 20)
-            .padding(.top, 14)
+            .padding(.top, 16)
         }
         .padding(.top, 8)
         .padding(.bottom, 20)

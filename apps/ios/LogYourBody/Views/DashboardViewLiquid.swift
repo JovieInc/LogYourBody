@@ -111,7 +111,6 @@ struct DashboardViewLiquid: View {
     @State private var isStatsDestinationActive = false
     @State var isProgressPhotoAttachPresented = false
     @State var progressPhotoAttachTarget: BodyMetrics?
-    @State var progressPhotoAttachStartsInCamera = false
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
@@ -317,7 +316,6 @@ struct DashboardViewLiquid: View {
                 ProgressPhotoAttachSheet(
                     targetMetric: progressPhotoAttachTarget,
                     fallbackDate: progressPhotoAttachFallbackDate,
-                    startsInCamera: progressPhotoAttachStartsInCamera,
                     onComplete: {
                         await handleProgressPhotoAttachComplete()
                     }

@@ -87,7 +87,6 @@ struct ProgressPhotoAttachSheet: View {
 
     let targetMetric: BodyMetrics?
     let fallbackDate: Date
-    let startsInCamera: Bool = false
     let onComplete: () async -> Void
 
     @State private var selectedImage: UIImage?
@@ -169,9 +168,6 @@ struct ProgressPhotoAttachSheet: View {
             .interactiveDismissDisabled(!ProgressPhotoAttachPolicy.canDismiss(status: attachStatus))
             .onAppear {
                 updateInitialPermissionState()
-                if startsInCamera {
-                    DispatchQueue.main.async { startCameraCapture() }
-                }
             }
             .onChange(of: attachStatus) { status in
                 announceStatusChange(status)
