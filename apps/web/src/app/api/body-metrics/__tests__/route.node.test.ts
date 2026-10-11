@@ -60,7 +60,16 @@ describe('/api/body-metrics', () => {
     });
   });
 
-  it.each(['dexa_pdf', 'inbody_pdf'] as const)('accepts PDF scan source %s', async (dataSource) => {
+  it.each([
+    'manual',
+    'healthkit',
+    'smart_scale',
+    'bodyspec_dexa',
+    'dexa_pdf',
+    'inbody_pdf',
+    'caliper',
+    'photo',
+  ] as const)('retains support for source %s', async (dataSource) => {
     mockedMetrics.upsert.mockResolvedValue({ id: 'metric-1' } as never);
     const response = await POST(
       request({ date: '2026-09-20', weight: 80, weightUnit: 'kg', dataSource }),
@@ -69,6 +78,50 @@ describe('/api/body-metrics', () => {
     expect(mockedMetrics.upsert).toHaveBeenCalledWith(
       'jovie-user-1',
       expect.objectContaining({ data_source: dataSource }),
+    );
+  });
+  it('accepts explicit unknown-method PDF provenance without inventing a measurement method', async () => {
+    const sourceMetadata = { vendor: 'pdf_import', source_name: 'Unidentified device' };
+    mockedMetrics.upsert.mockResolvedValue({ id: 'metric-pdf' } as never);
+    const response = await POST(
+      request({
+        date: '2026-10-09',
+        weight: 80,
+        weightUnit: 'kg',
+        dataSource: 'pdf_import',
+        sourceMetadata,
+      }),
+    );
+    expect(response.status).toBe(201);
+    expect(mockedMetrics.upsert).toHaveBeenCalledWith(
+      'jovie-user-1',
+      expect.objectContaining({
+        data_source: 'pdf_import',
+        source_metadata: sourceMetadata,
+        body_fat_method: null,
+        muscle_mass: null,
+      }),
+    );
+  });
+
+  it.each(['unknown', 'PDF Import', ''])(
+    'does not accept noncanonical source %j',
+    async (dataSource) => {
+      const response = await POST(request({ date: '2026-10-09', weight: 80, dataSource }));
+      expect(response.status).toBe(400);
+      expect(mockedMetrics.upsert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('preserves the manual default when no source is supplied', async () => {
+    mockedMetrics.upsert.mockResolvedValue({ id: 'metric-manual' } as never);
+    expect((await POST(request({ date: '2026-10-09', weight: 80 }))).status).toBe(201);
+    expect(mockedMetrics.upsert).toHaveBeenCalledWith(
+      'jovie-user-1',
+      expect.objectContaining({
+        data_source: 'manual',
+        source_metadata: {},
+      }),
     );
   });
 });
