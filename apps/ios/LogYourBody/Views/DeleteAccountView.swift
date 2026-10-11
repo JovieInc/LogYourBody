@@ -217,6 +217,7 @@ struct AccountDeletionCleanupService {
         "dashboard_weight_uses_trend",
         "biometricLockEnabled",
         Constants.revenueCatIsSubscribedKey,
+        RevenueCatManager.DefaultsKey.subscriptionOwner,
         "revenuecat_lastFetchTimestamp",
         Constants.healthKitSyncEnabledKey,
         HealthKitAccountSyncPolicy.accountIdKey,
@@ -245,7 +246,11 @@ struct AccountDeletionCleanupService {
             dependencies: Dependencies(
                 logoutSubscriptionProvider: {
                     // Dissociates subscription state from the deleted account; subscriptions expire normally.
-                    await SubscriptionManager.shared.logoutUser()
+                    await logoutSubscriptionIfOwned(
+                        authManager: authManager,
+                        ownership: ownership,
+                        subscriptionManager: .shared
+                    )
                 },
                 resetHealthKitAnchors: {
                     await HealthSyncCoordinator.shared.resetForCurrentUser()
@@ -279,6 +284,18 @@ struct AccountDeletionCleanupService {
                 }
             )
         )
+    }
+
+    @MainActor
+    static func logoutSubscriptionIfOwned(
+        authManager: AuthManager,
+        ownership: AuthManager.ProfileSessionOwnership?,
+        subscriptionManager: RevenueCatManager
+    ) async {
+        guard let ownership, authManager.ownsAccountSession(ownership) else { return }
+        // Ownership admission and local billing invalidation are one synchronous actor step.
+        let request = subscriptionManager.requestBillingIdentity(subject: nil)
+        await subscriptionManager.waitForBillingIdentity(request)
     }
 
     func performDeletion() async throws {

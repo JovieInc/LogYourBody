@@ -153,6 +153,30 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         )
     }
 
+    func testAskOverProgressCollapsesBeforeNavigatingItsUnderlyingPage() {
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 90,
+                translationY: 8,
+                startX: 180,
+                isOnStats: true,
+                isChatExpanded: true
+            ),
+            .collapseChat
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 90,
+                translationY: 8,
+                startX: 20,
+                isOnStats: true,
+                isChatExpanded: true
+            ),
+            .collapseChat,
+            "Ask must collapse to its owning workspace before navigation changes"
+        )
+    }
+
     func testJovieSessionPolicyRequiresNonEmptyAccessToken() {
         XCTAssertFalse(JovieSessionPolicy.isSignedIn(nil))
         XCTAssertFalse(
