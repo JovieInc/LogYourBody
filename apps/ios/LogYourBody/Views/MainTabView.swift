@@ -149,21 +149,6 @@ private struct PaidWeightLoggerMVPView: View {
                 .accessibilityLabel("Account")
                 .accessibilityIdentifier("mvp_account_menu_button")
             }
-
-            ToolbarItemGroup(placement: .keyboard) {
-                Button("Done") {
-                    isWeightFieldFocused = false
-                }
-                .accessibilityIdentifier("mvp_keyboard_done_button")
-
-                Spacer()
-
-                Button(isSaving ? "Saving" : "Save weight") {
-                    saveWeight()
-                }
-                .disabled(isSaveDisabled)
-                .accessibilityIdentifier("mvp_keyboard_save_weight_button")
-            }
         }
         .safeAreaInset(edge: .bottom) {
             if isWeightFieldFocused {
@@ -279,11 +264,17 @@ private struct PaidWeightLoggerMVPView: View {
                 .background(Color.appBorder)
 
             HStack(spacing: 12) {
-                Button("Done") {
+                Button {
                     isWeightFieldFocused = false
+                } label: {
+                    Text("Done")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.appTextSecondary)
+                        .frame(
+                            minWidth: JovieTokens.minimumHitTarget,
+                            minHeight: JovieTokens.minimumHitTarget
+                        )
                 }
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.appTextSecondary)
                 .accessibilityIdentifier("mvp_keyboard_bottom_done_button")
 
                 Button(action: saveWeight) {
