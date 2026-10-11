@@ -5,6 +5,7 @@
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import UIKit
+import Vision
 
 /// The progress-photo treatment: the person stays sharp while the background is
 /// blurred, desaturated and dimmed, so every photo reads the same no matter the
@@ -64,6 +65,70 @@ enum SubjectPlateRenderer {
     }
 }
 
+/// On-device torso anchor for the photo stage. A Vision body-pose pass finds
+/// the midpoint between the shoulders and hips; the crop holds that point on
+/// `stageAnchor` so the torso stays in frame and the dimmed band below stays
+/// clear for the stat overlay. A nil anchor means "frame the center" — the
+/// stage still works on the simulator and on photos without a detected pose.
+enum TorsoFocusService {
+    /// Where the torso midpoint lands in the stage, as a fraction from the
+    /// top-left. Slightly above center leaves the lower band free for stats.
+    static let stageAnchor = CGPoint(x: 0.5, y: 0.42)
+    static let minimumConfidence: Float = 0.3
+
+    /// Torso midpoint normalized in display space: x right, y down, 0–1.
+    static func torsoCenter(in image: UIImage) async -> CGPoint? {
+        guard let cgImage = image.cgImage else { return nil }
+        let orientation = CGImagePropertyOrientation(image.imageOrientation)
+
+        return await Task.detached(priority: .userInitiated) {
+            let request = VNDetectHumanBodyPoseRequest()
+            let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
+            guard (try? handler.perform([request])) != nil,
+                  let observation = request.results?.first else {
+                return nil
+            }
+            return torsoCenter(of: observation)
+        }.value
+    }
+
+    /// Torso midpoint from a pose observation, converted from Vision's
+    /// bottom-left origin into display space (y down).
+    static func torsoCenter(of observation: VNHumanBodyPoseObservation) -> CGPoint? {
+        guard let points = try? observation.recognizedPoints(.all) else { return nil }
+
+        guard let shoulders = jointMidpoint(.leftShoulder, .rightShoulder, in: points)
+                ?? jointLocation(.neck, in: points),
+              let hips = jointMidpoint(.leftHip, .rightHip, in: points)
+                ?? jointLocation(.root, in: points) else {
+            return nil
+        }
+
+        return CGPoint(
+            x: (shoulders.x + hips.x) / 2,
+            y: 1 - (shoulders.y + hips.y) / 2
+        )
+    }
+
+    private static func jointLocation(
+        _ joint: VNHumanBodyPoseObservation.JointName,
+        in points: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]
+    ) -> CGPoint? {
+        guard let point = points[joint], point.confidence > minimumConfidence else { return nil }
+        return point.location
+    }
+
+    private static func jointMidpoint(
+        _ firstJoint: VNHumanBodyPoseObservation.JointName,
+        _ secondJoint: VNHumanBodyPoseObservation.JointName,
+        in points: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]
+    ) -> CGPoint? {
+        guard let first = jointLocation(firstJoint, in: points),
+              let second = jointLocation(secondJoint, in: points) else { return nil }
+        return CGPoint(x: (first.x + second.x) / 2, y: (first.y + second.y) / 2)
+    }
+}
+
 /// Plates cost a Vision pass plus CoreImage, so each photo URL is rendered once
 /// and shared by every surface that shows it.
 @MainActor
@@ -72,6 +137,8 @@ final class SubjectPlateStore: ObservableObject {
 
     private let cache = NSCache<NSString, UIImage>()
     private var tasks: [String: Task<UIImage?, Never>] = [:]
+    private var focusAnchors: [String: CGPoint] = [:]
+    private var focusTasks: [String: Task<CGPoint?, Never>] = [:]
 
     init(countLimit: Int = 24) {
         cache.countLimit = countLimit
@@ -79,6 +146,28 @@ final class SubjectPlateStore: ObservableObject {
 
     func cachedPlate(for urlString: String) -> UIImage? {
         cache.object(forKey: NSString(string: urlString))
+    }
+
+    /// Torso anchors cost one body-pose pass per photo; cache them next to the
+    /// plate so every surface frames the same photo the same way.
+    func cachedFocus(for urlString: String) -> CGPoint? {
+        focusAnchors[urlString]
+    }
+
+    func focus(for urlString: String, image: UIImage) async -> CGPoint? {
+        if let cached = focusAnchors[urlString] { return cached }
+        if let running = focusTasks[urlString] { return await running.value }
+
+        let task = Task<CGPoint?, Never> {
+            await TorsoFocusService.torsoCenter(in: image)
+        }
+        focusTasks[urlString] = task
+        let anchor = await task.value
+        focusTasks.removeValue(forKey: urlString)
+        if let anchor {
+            focusAnchors[urlString] = anchor
+        }
+        return anchor
     }
 
     func plate(for urlString: String, image: UIImage) async -> UIImage? {
