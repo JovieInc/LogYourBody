@@ -11,7 +11,6 @@ extension PreferencesView {
             footer: "Set targets that reflect your goals."
         ) {
             measurementSystemSection
-            stepGoalRow
             goalRow(for: .weight)
             goalRow(for: .bodyFat)
             goalRow(for: .ffmi)
@@ -32,10 +31,14 @@ extension PreferencesView {
         )
     }
 
-    func goalRow(for goal: PreferenceGoalKind) -> some View {
+    func goalRow(
+        for goal: PreferenceGoalKind,
+        titleAccessibilityIdentifier: String? = nil
+    ) -> some View {
         PreferenceGoalRow(
             goal: goal,
             valueText: goalValueText(for: goal),
+            titleAccessibilityIdentifier: titleAccessibilityIdentifier,
             edit: {
                 activeGoalEditor = goal
             }

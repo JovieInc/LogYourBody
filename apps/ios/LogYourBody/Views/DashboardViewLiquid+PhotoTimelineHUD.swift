@@ -6,6 +6,7 @@ extension DashboardViewLiquid {
     var photoTimelineHUD: some View {
         ZStack(alignment: .topLeading) {
             timelineAccessibilityMarker(id: "photo_timeline_hud", label: "Timeline overview")
+            timelineAccessibilityMarker(id: "world_class_screen_photoTimeline", label: "Today timeline")
 
             Group {
                 if let metric = currentMetric {
@@ -101,9 +102,6 @@ extension DashboardViewLiquid {
         .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
             homeV2AllPhotosFromHome
         }
-        .sheet(isPresented: $isHomeV2LogSheetPresented) {
-            homeV2LogWeightSheet
-        }
         .sheet(item: $homeV2EditingMetric) { metric in
             homeV2EditEntrySheet(for: metric)
         }
@@ -114,6 +112,26 @@ extension DashboardViewLiquid {
             homeV2EntriesView
         }
         .fullScreenCover(isPresented: $isShowingPhotoTimelineMenu) {
+            if HomeV2Policy.isEnabled() {
+                homeV2Sidebar
+            } else {
+                photoTimelineNavigationMenuCover
+            }
+        }
+        .navigationDestination(isPresented: $isHomeV2SettingsPresented) {
+            homeV2SettingsView
+        }
+        .sheet(isPresented: $isHomeV2HelpPresented) {
+            BugReportPromptSheet()
+                .environmentObject(BugReportManager.shared)
+        }
+        .navigationDestination(isPresented: $isPhotoTimelineSettingsPresented) {
+            PreferencesView()
+                .environmentObject(authManager)
+        }
+    }
+
+    private var photoTimelineNavigationMenuCover: some View {
             PhotoTimelineNavigationMenu(
                 selected: selectedPhotoTimelineRootPage,
                 onSelect: { page in
@@ -131,11 +149,6 @@ extension DashboardViewLiquid {
                     isShowingPhotoTimelineMenu = false
                 }
             )
-        }
-        .navigationDestination(isPresented: $isPhotoTimelineSettingsPresented) {
-            PreferencesView()
-                .environmentObject(authManager)
-        }
     }
 
     @ViewBuilder
@@ -148,7 +161,9 @@ extension DashboardViewLiquid {
                         id: "photo_timeline_root_page_timeline",
                         label: "Timeline page"
                     )
-                    if bodyMetrics.isEmpty {
+                    if isHomeV2CheckIn, homeV2SystemState == .loading {
+                        HomeV2LoadingHome()
+                    } else if bodyMetrics.isEmpty {
                         if isHomeV2CheckIn {
                             homeV2DayZero
                         } else {
@@ -178,7 +193,7 @@ extension DashboardViewLiquid {
 
     private var photoTimelineToolbarTitle: String {
         if isHomeChatExpanded {
-            return "Chat"
+            return HomeV2Policy.isEnabled() ? HomeV2AskCopy.title : "Chat"
         }
 
         switch selectedPhotoTimelineRootPage {
@@ -240,12 +255,20 @@ extension DashboardViewLiquid {
                 Button {
                     isHomeChatExpanded = false
                 } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(theme.colors.text)
-                        .frame(width: 32, height: 32)
-                        .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
-                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    if isHomeV2Chrome {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(HomeV2Tokens.Colors.ink)
+                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                            .contentShape(Rectangle())
+                    } else {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(theme.colors.text)
+                            .frame(width: 32, height: 32)
+                            .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close chat")

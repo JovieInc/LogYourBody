@@ -32,12 +32,18 @@ var entryScreen: WorldClassScreen {
 var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                if isHomeV2LogEntry {
+                    Text(selectedTab == 0 ? "Log weight" : entryTitle)
+                        .accessibilityIdentifier("home_v2_log_sheet")
+                        .accessibilityAddTraits(.isHeader)
+                }
                 Text(selectedDate.formatted(date: .complete, time: .shortened))
                     .font(.subheadline)
                     .foregroundStyle(Color.jovieTextSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, JovieTokens.screenInset)
                     .padding(.top, 8)
+                    .accessibilityIdentifier(isHomeV2LogEntry ? "home_v2_log_sheet_date" : "add_entry_date")
 
                 Picker("Entry Type", selection: $selectedTab) {
                     Label("Weight", systemImage: "scalemass").tag(0)
@@ -97,12 +103,12 @@ var body: some View {
                     ),
                     action: saveEntry
                 )
-                .accessibilityIdentifier("add_entry_save_button")
+                .accessibilityIdentifier(isHomeV2LogEntry ? "home_v2_log_sheet_save" : "add_entry_save_button")
                 .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.vertical, 12)
             }
             .worldClassScreen(entryScreen)
-            .navigationTitle(entryTitle)
+            .navigationTitle(isHomeV2LogEntry && selectedTab == 0 ? "Log weight" : entryTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .cancellationAction) {
@@ -163,6 +169,11 @@ var body: some View {
                 .font(.appHeadline)
                 .padding(.top)
 
+            Text(Glp1DoseLogCopy.trackingNotice)
+                .font(.appCaption)
+                .foregroundColor(.appTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
             if glp1IsLoadingMedications {
                 HStack {
                     ProgressView()
@@ -177,7 +188,7 @@ var body: some View {
                     Text("Add your GLP-1 medication")
                         .font(.appBody)
 
-                    Text("Select the medication you're taking so logging is just a quick dose pick.")
+                    Text("Choose the medication you track to make logging and reminders easier.")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextSecondary)
 
@@ -268,7 +279,7 @@ var body: some View {
                                 }
 
                             if glp1IsRestDay {
-                                Text("Record this date as a planned no-dose day.")
+                                Text(Glp1DoseLogCopy.noDoseTaken)
                                     .font(.appBodySmall)
                                     .foregroundColor(.appTextTertiary)
                             } else if !glp1UseCustomDose && !options.isEmpty {
@@ -306,7 +317,7 @@ var body: some View {
                                     .accessibilityIdentifier("glp1_last_logged_dose_status")
                             }
 
-                            if !glp1IsRestDay {
+                            if !glp1IsRestDay && !options.isEmpty {
                                 Toggle("Custom dose", isOn: $glp1UseCustomDose)
                                     .font(.appBodySmall)
                                     .foregroundColor(.appTextSecondary)
@@ -317,7 +328,7 @@ var body: some View {
                                     }
                             }
 
-                            if glp1UseCustomDose && !glp1IsRestDay {
+                            if (glp1UseCustomDose || options.isEmpty) && !glp1IsRestDay {
                                 HStack(spacing: 12) {
                                     TextField("0.0", text: $glp1Dose)
                                         .keyboardType(.decimalPad)
@@ -343,7 +354,7 @@ var body: some View {
                                     .font(.appBodySmall)
                                     .foregroundColor(.error)
                             } else {
-                                Text("Pick your dose from the wheel or enter a custom dose if needed.")
+                                Text(options.isEmpty ? Glp1DoseLogCopy.enterRecordedDose : Glp1DoseLogCopy.usePreviousDose)
                                     .font(.appBodySmall)
                                     .foregroundColor(.appTextTertiary)
                             }
@@ -383,18 +394,19 @@ var body: some View {
                     }
             }
         }
-        .confirmationDialog(
+        // The confirmation-dialog Cancel button measured 36 points wide.
+        .alert(
             "Delete dose?",
-            isPresented: glp1DeleteConfirmationBinding,
-            titleVisibility: .visible
+            isPresented: glp1DeleteConfirmationBinding
         ) {
             if let log = pendingDeleteGlp1DoseLog {
                 Button("Delete dose", role: .destructive) {
                     deleteGlp1Dose(log)
                 }
+                .accessibilityIdentifier("glp1_dose_delete_confirm")
             }
-
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("glp1_dose_delete_cancel")
         } message: {
             if let log = pendingDeleteGlp1DoseLog {
                 Text("This removes \(Glp1DoseHistoryFormatter.doseText(log)) from your dose history.")
@@ -503,6 +515,16 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
+                    if isHomeV2LogEntry {
+                        Button { stepWeight(by: -1) } label: {
+                            Image(systemName: "minus")
+                                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                                .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("Decrease weight")
+                        .accessibilityIdentifier("home_v2_log_sheet_minus")
+                    }
+
                     TextField("0.0", text: $weight)
                         .keyboardType(.decimalPad)
                         .font(.system(size: 48, weight: .bold, design: .rounded))
@@ -515,6 +537,16 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                         .onChange(of: weight) { _, newValue in
                             validateWeight(newValue)
                         }
+
+                    if isHomeV2LogEntry {
+                        Button { stepWeight(by: 1) } label: {
+                            Image(systemName: "plus")
+                                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                                .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("Increase weight")
+                        .accessibilityIdentifier("home_v2_log_sheet_plus")
+                    }
 
                     Picker("Unit", selection: $weightUnit) {
                         Text("kg").tag("kg")
@@ -538,6 +570,13 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                     Text("Use today's scale weight.")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextTertiary)
+                }
+
+                if isHomeV2LogEntry {
+                    Button("Body fat and more") {
+                        selectedTab = 1
+                    }
+                    .accessibilityIdentifier("home_v2_log_sheet_details")
                 }
             }
 

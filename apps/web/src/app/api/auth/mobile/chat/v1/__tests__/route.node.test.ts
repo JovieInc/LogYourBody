@@ -2,6 +2,7 @@
 
 import { NextRequest } from 'next/server';
 import { createChatRouteHandlers } from '../route-handlers';
+import { COACH_PERSONA_GUARDRAILS_FLAG } from '@/lib/flags/coach-persona';
 import type {
   BeginChatTurnInput,
   ChatConversationPort,
@@ -17,6 +18,7 @@ import type {
 } from '@/lib/ports/chat-model';
 import type { BodyMetricsPort, ProductBodyMetric } from '@/lib/ports/body-metrics';
 import type { ProductUserRecord, UserDirectoryPort } from '@/lib/ports/user-directory';
+import type { NextWorkoutResult } from '@/lib/training/service';
 
 const now = '2026-08-02T22:00:00.000Z';
 const conversationId = '11111111-1111-4111-8111-111111111111';
@@ -234,13 +236,14 @@ function metric(subject: string): ProductBodyMetric {
   };
 }
 
-function makeHarness() {
+function makeHarness(trainingOutput?: NextWorkoutResult) {
   const store = new MemoryConversationStore();
   const model = new FixtureModel();
   const getUser = jest.fn(async (subject: string) => user(subject));
   const listMetrics = jest.fn(async (subject: string) => [metric(subject)]);
   let lease = 0;
   const reportStreamOutcome = jest.fn();
+  const getTrainingOutput = jest.fn(async () => trainingOutput ?? null);
   const handlers = createChatRouteHandlers({
     authenticate: async (request) => {
       const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
@@ -260,10 +263,11 @@ function makeHarness() {
     } as UserDirectoryPort,
     createModel: () => model,
     reportStreamOutcome,
+    getTrainingOutput,
     modelName: 'fixture-model',
     createLeaseToken: () => `33333333-3333-4333-8333-${String(++lease).padStart(12, '0')}`,
   });
-  return { handlers, store, model, getUser, listMetrics, reportStreamOutcome };
+  return { handlers, store, model, getUser, listMetrics, reportStreamOutcome, getTrainingOutput };
 }
 
 function request(method: 'GET' | 'POST' | 'DELETE', token = 'user-a', body?: unknown, query = '') {
@@ -293,7 +297,9 @@ describe('/api/auth/mobile/chat/v1', () => {
 
   it('streams, persists, reloads, and scopes authorized body context', async () => {
     const { handlers, model, getUser, listMetrics } = makeHarness();
-    const response = await handlers.POST(request('POST', 'user-a', chatBody()));
+    const response = await handlers.POST(
+      request('POST', 'user-a', { ...chatBody(), voiceMode: true }),
+    );
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     const stream = await response.text();
@@ -305,6 +311,7 @@ describe('/api/auth/mobile/chat/v1', () => {
     expect(listMetrics).toHaveBeenCalledWith('user-a', 30);
 
     const modelContext = model.calls[0].messages as ChatModelMessage[];
+    expect(modelContext[0].content).toContain('Voice reply mode is active');
     expect(modelContext[0].content).toContain('"weight":80');
     expect(modelContext[0].content).not.toContain('must not enter model context');
     expect(modelContext[0].content).not.toContain('example.com');
@@ -323,6 +330,169 @@ describe('/api/auth/mobile/chat/v1', () => {
         ],
       },
     });
+  });
+
+  it('loads engine output only for training questions and keeps it server-scoped', async () => {
+    const engineOutput: NextWorkoutResult = {
+      kind: 'workout',
+      week: 1,
+      weekCount: 2,
+      weeklyFractionalVolume: { chest: 4 },
+      session: {
+        id: conversationId,
+        week: 1,
+        slot: 0,
+        pattern: 'A',
+        title: 'Full body A',
+        safetyStop: false,
+        explanation: null,
+        evidenceIds: ['k:81c218db'],
+        exercises: [
+          {
+            id: 'goblet_squat',
+            name: 'Goblet squat',
+            primaryMuscle: 'quads',
+            muscleContribution: { quads: 1 },
+            sets: 2,
+            repRange: { min: 8, max: 12 },
+            targetReps: 9,
+            targetRir: 4,
+            targetLoadKg: null,
+            loadInstruction: null,
+            progression: 'add_reps',
+            evidenceIds: ['k:1795aef0'],
+          },
+        ],
+      },
+    };
+    const { handlers, model, getTrainingOutput } = makeHarness(engineOutput);
+    await (
+      await handlers.POST(request('POST', 'user-a', chatBody('What is my next training session?')))
+    ).text();
+    expect(getTrainingOutput).toHaveBeenCalledWith('user-a');
+    expect(model.calls[0]?.messages[0]?.content).toContain('"targetReps":9');
+    expect(model.calls[0]?.messages[0]?.content).toContain('[k:1795aef0]');
+
+    const nonTraining = makeHarness(engineOutput);
+    await (
+      await nonTraining.handlers.POST(
+        request('POST', 'user-a', chatBody('Summarize my body trend.')),
+      )
+    ).text();
+    expect(nonTraining.getTrainingOutput).not.toHaveBeenCalled();
+    expect(nonTraining.model.calls[0]?.messages[0]?.content).not.toContain('targetReps');
+  });
+
+  it('withholds unsupported set, rep, and load numbers before streaming or persistence', async () => {
+    const engineOutput: NextWorkoutResult = {
+      kind: 'workout',
+      week: 1,
+      weekCount: 4,
+      weeklyFractionalVolume: { chest: 4 },
+      session: {
+        id: conversationId,
+        week: 1,
+        slot: 0,
+        pattern: 'A',
+        title: 'Full body A',
+        safetyStop: false,
+        explanation: null,
+        evidenceIds: ['k:81c218db'],
+        exercises: [
+          {
+            id: 'goblet_squat',
+            name: 'Goblet squat',
+            primaryMuscle: 'quads',
+            muscleContribution: { quads: 1 },
+            sets: 2,
+            repRange: { min: 8, max: 12 },
+            targetReps: 9,
+            targetRir: 4,
+            targetLoadKg: null,
+            loadInstruction: null,
+            progression: 'add_reps',
+            evidenceIds: ['k:1795aef0'],
+          },
+        ],
+      },
+    };
+    const { handlers, model, store } = makeHarness(engineOutput);
+    model.chunks = ['Try 3 sets of 12 reps at 20 kg.'];
+
+    const response = await handlers.POST(
+      request('POST', 'user-a', chatBody('How many reps should I do for my workout?')),
+    );
+    const stream = await response.text();
+    expect(stream).not.toContain('Try 3 sets');
+    expect(stream).toContain('I cannot add quantities the engine did not return.');
+    expect([...store.turns.values()][0]?.assistantMessage?.content).toContain(
+      'I cannot add quantities the engine did not return.',
+    );
+  });
+
+  it('withholds diagnosis and drug direction before streaming when the persona gate is on', async () => {
+    const previous = process.env[COACH_PERSONA_GUARDRAILS_FLAG];
+    process.env[COACH_PERSONA_GUARDRAILS_FLAG] = '1';
+    try {
+      const { handlers, model, store } = makeHarness();
+      model.chunks = ['You have diabetes. ', 'Increase your semaglutide to 1 mg.'];
+      const stream = await (
+        await handlers.POST(request('POST', 'user-a', chatBody('What is wrong with me?')))
+      ).text();
+      expect(stream).not.toContain('You have diabetes');
+      expect(stream).not.toContain('semaglutide');
+      expect(stream).toContain("I can't diagnose a condition or prescribe medication");
+      expect(model.calls[0]?.messages[0]?.content).toContain('Never diagnose a condition');
+      expect(model.calls[0]?.messages[0]?.content).not.toContain('must not enter model context');
+      expect([...store.turns.values()][0]?.assistantMessage?.content).toContain(
+        "I can't diagnose a condition or prescribe medication",
+      );
+    } finally {
+      if (previous === undefined) delete process.env[COACH_PERSONA_GUARDRAILS_FLAG];
+      else process.env[COACH_PERSONA_GUARDRAILS_FLAG] = previous;
+    }
+  });
+
+  it('streams engine-returned training quantities when the answer stays within the result', async () => {
+    const engineOutput: NextWorkoutResult = {
+      kind: 'workout',
+      week: 1,
+      weekCount: 4,
+      weeklyFractionalVolume: { chest: 4 },
+      session: {
+        id: conversationId,
+        week: 1,
+        slot: 0,
+        pattern: 'A',
+        title: 'Full body A',
+        safetyStop: false,
+        explanation: null,
+        evidenceIds: ['k:81c218db'],
+        exercises: [
+          {
+            id: 'goblet_squat',
+            name: 'Goblet squat',
+            primaryMuscle: 'quads',
+            muscleContribution: { quads: 1 },
+            sets: 2,
+            repRange: { min: 8, max: 12 },
+            targetReps: 9,
+            targetRir: 4,
+            targetLoadKg: null,
+            loadInstruction: null,
+            progression: 'add_reps',
+            evidenceIds: ['k:1795aef0'],
+          },
+        ],
+      },
+    };
+    const { handlers, model } = makeHarness(engineOutput);
+    model.chunks = ['The engine returns 2 sets of 9 reps at 4 RIR.'];
+
+    const stream = await (
+      await handlers.POST(request('POST', 'user-a', chatBody('What is in my workout?')))
+    ).text();
+    expect(stream).toContain('The engine returns 2 sets of 9 reps at 4 RIR.');
   });
 
   it('isolates conversations across authenticated subjects', async () => {
@@ -378,6 +548,154 @@ describe('/api/auth/mobile/chat/v1', () => {
     expect(conflict.status).toBe(409);
     await expect(conflict.json()).resolves.toMatchObject({ error: 'idempotency_conflict' });
   });
+
+  it('does not start the provider when a request is cancelled while context loads', async () => {
+    const { handlers, model, store, getUser } = makeHarness();
+    let releaseUser!: (value: ProductUserRecord) => void;
+    let contextStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      contextStarted = resolve;
+    });
+    getUser.mockImplementationOnce(
+      () =>
+        new Promise<ProductUserRecord>((resolve) => {
+          releaseUser = resolve;
+          contextStarted();
+        }),
+    );
+    const abort = new AbortController();
+    const cancelledRequest = new NextRequest(request('POST', 'user-a', chatBody()), {
+      signal: abort.signal,
+    });
+    const pending = handlers.POST(cancelledRequest);
+    await started;
+    abort.abort();
+    releaseUser(user('user-a'));
+    const response = await pending;
+    const body = await response.text();
+
+    expect(model.calls).toHaveLength(0);
+    expect(response.status).toBe(499);
+    expect(body).not.toContain('event: done');
+    expect([...store.turns.values()][0]?.status).toBe('cancelled');
+    expect((await store.getLatest('user-a'))?.messages.map(({ role }) => role)).toEqual(['user']);
+
+    const retried = await handlers.POST(request('POST', 'user-a', chatBody()));
+    expect(await retried.text()).toContain('event: done');
+    expect(model.calls).toHaveLength(1);
+    expect((await store.getLatest('user-a'))?.messages.map(({ role }) => role)).toEqual([
+      'user',
+      'assistant',
+    ]);
+    expect(await store.getLatest('user-b')).toBeNull();
+  });
+
+  it('cancels an already-aborted request before reading context', async () => {
+    const { handlers, model, store, getUser, listMetrics, reportStreamOutcome } = makeHarness();
+    const abort = new AbortController();
+    abort.abort();
+    const response = await handlers.POST(
+      new NextRequest(request('POST', 'user-a', chatBody()), {
+        signal: abort.signal,
+      }),
+    );
+
+    expect(response.status).toBe(499);
+    expect(getUser).not.toHaveBeenCalled();
+    expect(listMetrics).not.toHaveBeenCalled();
+    expect(model.calls).toHaveLength(0);
+    expect([...store.turns.values()][0]?.status).toBe('cancelled');
+    expect(reportStreamOutcome.mock.calls).toEqual([['client_cancelled']]);
+  });
+
+  it('does not start the provider when training context finishes after cancellation', async () => {
+    const { handlers, model, store, getTrainingOutput } = makeHarness();
+    let releaseTraining!: (value: NextWorkoutResult | null) => void;
+    let contextStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      contextStarted = resolve;
+    });
+    getTrainingOutput.mockImplementationOnce(
+      () =>
+        new Promise<NextWorkoutResult | null>((resolve) => {
+          releaseTraining = resolve;
+          contextStarted();
+        }),
+    );
+    const abort = new AbortController();
+    const pending = handlers.POST(
+      new NextRequest(request('POST', 'user-a', chatBody('What workout should I do?')), {
+        signal: abort.signal,
+      }),
+    );
+    await started;
+    abort.abort();
+    releaseTraining(null);
+    const response = await pending;
+
+    expect(response.status).toBe(499);
+    expect(model.calls).toHaveLength(0);
+    expect([...store.turns.values()][0]?.status).toBe('cancelled');
+    expect((await store.getLatest('user-a'))?.messages.map(({ role }) => role)).toEqual(['user']);
+  });
+
+  it('keeps cancellation terminal when recording it fails', async () => {
+    const { handlers, model, store, reportStreamOutcome } = makeHarness();
+    jest.spyOn(store, 'failTurn').mockRejectedValue(new Error('private persistence detail'));
+    const abort = new AbortController();
+    abort.abort();
+    const response = await handlers.POST(
+      new NextRequest(request('POST', 'user-a', chatBody()), {
+        signal: abort.signal,
+      }),
+    );
+
+    expect(response.status).toBe(499);
+    await expect(response.json()).resolves.toEqual({ version: 1, error: 'client_cancelled' });
+    expect(model.calls).toHaveLength(0);
+    expect(reportStreamOutcome.mock.calls).toEqual([
+      ['client_cancelled'],
+      ['failure_persistence_error'],
+    ]);
+  });
+
+  it('retains context-failure recovery for a request that was not cancelled', async () => {
+    const { handlers, model, store, getUser } = makeHarness();
+    getUser.mockRejectedValueOnce(new Error('private context detail'));
+    const response = await handlers.POST(request('POST', 'user-a', chatBody()));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('5');
+    await expect(response.json()).resolves.toEqual({ version: 1, error: 'chat_unavailable' });
+    expect(model.calls).toHaveLength(0);
+    expect([...store.turns.values()][0]?.status).toBe('failed');
+    const retry = await handlers.POST(request('POST', 'user-a', chatBody()));
+    expect(await retry.text()).toContain('event: done');
+  });
+
+  it.each([false, true])(
+    'does not complete a provider that ends after cancellation (late delta: %s)',
+    async (lateDelta) => {
+      const { handlers, model, store, reportStreamOutcome } = makeHarness();
+      const abort = new AbortController();
+      jest.spyOn(model, 'streamText').mockImplementation(async function* () {
+        yield { type: 'text_delta', text: 'Partial answer' };
+        abort.abort();
+        if (lateDelta) yield { type: 'text_delta', text: ' stale continuation' };
+      });
+      const response = await handlers.POST(
+        new NextRequest(request('POST', 'user-a', chatBody()), { signal: abort.signal }),
+      );
+      const body = await response.text();
+
+      expect(body).not.toContain('event: done');
+      expect(body).not.toContain('stale continuation');
+      expect([...store.turns.values()][0]?.status).toBe('cancelled');
+      expect((await store.getLatest('user-a'))?.messages.map(({ role }) => role)).toEqual(['user']);
+      expect(reportStreamOutcome).toHaveBeenCalledWith('client_cancelled');
+      expect(reportStreamOutcome).not.toHaveBeenCalledWith('completed');
+    },
+  );
 
   it('marks a disconnected stream as cancelled', async () => {
     const { handlers, model, store } = makeHarness();
