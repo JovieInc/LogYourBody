@@ -1,9 +1,12 @@
 name: Codex Auto-Fix on Failure
 
+# Retired as the automatic PR repair owner: the Jovie lanes harness (LYB binding) repairs every
+# open PR here (red required checks, conflicts, twice-failed merge groups, requested changes)
+# on subscription seats. This job never repaired anything (its action inputs were misnamed), it
+# needs a raw OPENAI_API_KEY, and the repair PR it opens with GITHUB_TOKEN would get no CI.
+# Kept dispatch-only so its history stays; the job condition skips a manual dispatch.
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: write

@@ -20,10 +20,10 @@ Primary pull request workflow for `main`.
 
 `main` uses GitHub's native merge queue (ruleset "Main - Protect", `ALLGREEN`, `MERGE`, required check `CI Summary`, 60-minute check timeout). Two secret-boundaried workflows make landing hands-off:
 
-1. **`native-merge-queue.yml` — enrollment.** After `CI` completes on a same-repo, non-draft PR (or when a draft is marked ready), it enqueues the PR at its exact green head with `enqueuePullRequest`. It runs in the pull-request-triggered context, so it must never checkout code or receive secrets (`.github/scripts/verify-merge-queue-policy.mjs` enforces this).
+1. **`native-merge-queue.yml` — enrollment.** After `CI` completes on a same-repo, non-draft PR (or when a draft is marked ready), it enqueues the PR at its exact green head with `enqueuePullRequest`. When the queue drops a PR (`dequeued`) whose head is unchanged and green, it re-enqueues it if the removal was a check timeout or the head's first failed merge group; a second failed group at one head is a poison and stays out for the lanes repair owner, and manual or merge-conflict removals are left alone. It runs in the pull-request-triggered context, so it must never checkout code or receive secrets (`.github/scripts/verify-merge-queue-policy.mjs` enforces this).
 2. **`merge-queue-token-enrollment.yml` — token re-enqueue.** GitHub creates no workflow runs for events caused by `GITHUB_TOKEN`, and the queue only honours checks from the `merge_group` event's own run, so a bot-owned entry never gets merge-group CI and times out. After enrollment completes (`workflow_run`), this job dequeues bot-owned entries and re-enqueues them with the machine-user secret `MERGE_QUEUE_TOKEN` after re-proving `CI Summary` on the exact head. It never checks out code and never runs on pull-request events; without the secret it is a no-op.
 
-`ALLGREEN` batches every queued entry, so one bot-owned entry blocks the batch. Manual recovery while the secret is absent: `gh pr merge <n> --merge --auto` with a user token (a user-token enqueue starts merge-group CI natively); a stuck entry can be removed with the `dequeuePullRequest` mutation first.
+`ALLGREEN` batches every queued entry, so one bot-owned entry blocks the batch. Manual recovery while the secret is absent: `gh pr merge <n> --merge --auto` with a user token (a user-token enqueue starts merge-group CI natively); a stuck entry can be removed with the `dequeuePullRequest` mutation first. While the secret is absent the Jovie lanes LYB binding does this automatically: it re-enqueues green bot-owned entries and dropped green PRs with its user token.
 
 ## Advisory Automation
 
@@ -61,7 +61,8 @@ Required secret:
 
 ### `codex-auto-fix-ci.yml`
 
-Opens a repair pull request when the primary `CI` workflow fails on a pull request.
+Retired to `workflow_dispatch` only; the Jovie lanes LYB binding owns PR repair (see `BRANCH_FLOW.md`).
+Historically it opened a repair pull request when the primary `CI` workflow failed on a pull request.
 
 - Uses `openai/codex-action`.
 - Requires `OPENAI_API_KEY`.
@@ -127,6 +128,7 @@ Advisory checks:
 - Follow-up cleanup and test coverage ideas.
 
 When advisory review finds a noncritical issue, open a focused follow-up PR or issue instead of delaying a landable PR.
+
 ### Shared Mac qualification
 
 The required `iOS` and `iOS Launch Quality Gate` jobs always use standard hosted
