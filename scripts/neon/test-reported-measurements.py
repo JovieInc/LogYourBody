@@ -48,6 +48,11 @@ def regression_sql():
         r"`(insert into public\.native_records .*?returning id, payload, deleted_at, updated_at)`",
         ADAPTER.read_text(), re.S,
     )
+    # The adapter also has an insert-only training-set command. Exercise the
+    # generic sync upsert that owns legacy DEXA preservation, not that command.
+    statements = [statement for statement in statements if re.search(
+        r"on conflict\s*\(collection,\s*id\)\s+do update set", statement,
+    )]
     if len(statements) != 1:
         raise RuntimeError("Expected one actual native-records upsert in the adapter")
     lookup = ("(SELECT payload FROM public.native_records WHERE collection='dexa_results' "
