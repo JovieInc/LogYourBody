@@ -177,7 +177,7 @@ async function hydrateProvenanceIssues(found, request) {
 async function reconcileProvenanceState({ result, provenance, color, teamId, apiKey, fetchImpl }) {
   if (!provenance) return result;
   const request = { apiKey, fetchImpl };
-  for (let round = 0; round < 4; round += 1) {
+  for (let round = 0; round <= 4; round += 1) {
     const fresh = await linearGraphql({ ...request, query: `
       query RemediationIssueForReconciliation($id: String!, $teamId: String!) {
         team(id: $teamId) { states { nodes { id name type } } }
@@ -210,6 +210,9 @@ async function reconcileProvenanceState({ result, provenance, color, teamId, api
     if (Boolean(greenWins) === complete) {
       return { ...result, ...(authoritative ? {} : { action: 'superseded' }) };
     }
+    // Reserve the last read for verification, so even exhaustion cannot end
+    // immediately after an unverified correction.
+    if (round === 4) return { ok: false, reason: 'source_provenance_reconciliation_busy' };
     const states = fresh.data.team?.states?.nodes ?? [];
     const target = greenWins
       ? states.find((state) => state.name === 'Done') ?? states.find((state) => state.type === 'completed')

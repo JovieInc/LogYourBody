@@ -571,6 +571,20 @@ test('missing red state and unavailable final verification never record continui
   assert.equal((await intakeCi(unavailable, 'success', 101, 1002)).state, 'green');
 });
 
+test('bounded exhaustion verifies the last correction and never records continuity', async () => {
+  const store = linearStore();
+  await intakeCi(store, 'failure', 100, 1001);
+  store.hooks.afterWrite = async () => {
+    // Another actor changes state after each acknowledged write.
+    store.issues[0].state = { id: 'done', type: 'completed' };
+  };
+  const result = await intakeCi(store, 'failure', 101, 1002);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'source_provenance_reconciliation_busy');
+  assert.equal(result.state, null);
+  assert.match(store.calls.at(-1).query, /RemediationIssueForReconciliation/);
+});
+
 test('kill switch is exact and unset files', () => {
   assert.equal(remediationIntakeDisabled({}), false);
   assert.equal(remediationIntakeDisabled({ REMEDIATION_INTAKE_DISABLED: '' }), false);
