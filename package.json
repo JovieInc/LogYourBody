@@ -86,7 +86,7 @@
       "prettier --write"
     ],
     "*.{json,md,css,scss}": [
-      "node -e \"process.exit(0)\""
+      "prettier --write"
     ],
     "apps/ios/**/*.{swift}": [
       "swiftlint lint --strict --config apps/ios/.swiftlint.yml"
