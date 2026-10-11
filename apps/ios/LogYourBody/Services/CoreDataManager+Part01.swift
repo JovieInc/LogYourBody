@@ -53,11 +53,20 @@ var viewContext: NSManagedObjectContext {
 func saveDailyMetrics(
         _ metrics: DailyMetrics,
         userId: String,
+        writeAdmission: WriteAdmission? = nil,
         completion: ((Result<Void, Error>) -> Void)? = nil
     ) {
         let context = viewContext
 
         context.perform {
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?(.failure(error))
+                    return
+                }
+            }
             let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "id == %@", metrics.id)
             fetchRequest.fetchLimit = 1
@@ -65,6 +74,16 @@ func saveDailyMetrics(
             let cached: CachedDailyMetrics
 
             if let existing = try? context.fetch(fetchRequest).first {
+                if let owner = existing.userId, !owner.isEmpty, owner != userId {
+                    completion?(.failure(NSError(
+                        domain: "CoreDataManager",
+                        code: 4,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "Cannot save daily metrics owned by another account"
+                        ]
+                    )))
+                    return
+                }
                 cached = existing
             } else {
                 cached = CachedDailyMetrics(context: context)
@@ -104,9 +123,13 @@ func saveDailyMetrics(
         }
     }
 
-func saveDailyMetricsAndWait(_ metrics: DailyMetrics, userId: String) async throws {
+func saveDailyMetricsAndWait(
+        _ metrics: DailyMetrics,
+        userId: String,
+        writeAdmission: WriteAdmission? = nil
+    ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            saveDailyMetrics(metrics, userId: userId) { result in
+            saveDailyMetrics(metrics, userId: userId, writeAdmission: writeAdmission) { result in
                 continuation.resume(with: result)
             }
         }
@@ -251,7 +274,7 @@ func fetchDexaResults(for userId: String, limit: Int) async -> [DexaResult] {
         }
     }
 
-func saveDexaResults(
+    func saveDexaResults(
         _ results: [DexaResult],
         userId: String,
         markAsSynced: Bool = false,
@@ -273,6 +296,9 @@ func saveDexaResults(
 
                 let cached: CachedDexaResult
                 if let existing = try? context.fetch(fetchRequest).first {
+                    if let owner = existing.userId, !owner.isEmpty, owner != userId {
+                        continue
+                    }
                     cached = existing
                 } else {
                     cached = CachedDexaResult(context: context)
@@ -433,12 +459,23 @@ func saveAndWait() {
         _ metrics: BodyMetrics,
         userId: String,
         markAsSynced: Bool = false,
+        writeAdmission: WriteAdmission? = nil,
         completion: ((Result<Void, Error>) -> Void)? = nil
     ) {
         let context = viewContext
 
         // Ensure all Core Data operations happen on the context's queue
         context.perform {
+            // viewContext is the container's main-queue context. Admission and
+            // this synchronous write share the executor with auth replacement.
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?(.failure(error))
+                    return
+                }
+            }
             // Check if entry already exists
             let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "id == %@", metrics.id)
@@ -509,9 +546,14 @@ func saveAndWait() {
         }
     }
 
-func saveBodyMetricsAndWait(_ metrics: BodyMetrics, userId: String, markAsSynced: Bool = false) async throws {
+func saveBodyMetricsAndWait(
+        _ metrics: BodyMetrics, userId: String, markAsSynced: Bool = false,
+        writeAdmission: WriteAdmission? = nil
+    ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            saveBodyMetrics(metrics, userId: userId, markAsSynced: markAsSynced) { result in
+            saveBodyMetrics(
+                metrics, userId: userId, markAsSynced: markAsSynced, writeAdmission: writeAdmission
+            ) { result in
                 continuation.resume(with: result)
             }
         }

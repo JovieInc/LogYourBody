@@ -21,14 +21,14 @@ func observeStepChanges() {
                 // New step data available, sync it
                 Task { @MainActor [weak self] in
                     guard let self = self else { return }
+                    let owner = self.importAuthManager ?? .shared
+                    guard let ownership = owner.captureAccountSession() else { return }
 
-                    // Sync today's steps
+                    // Sync today's steps for the session that observed them.
                     try? await self.syncStepsFromHealthKit()
 
-                    // Notify sync manager to sync with remote
-                    if let userId = AuthManager.shared.currentUser?.id {
-                        await self.syncStepsToProductAPI(userId: userId)
-                    }
+                    guard owner.ownsAccountSession(ownership) else { return }
+                    await self.syncStepsToProductAPI(userId: ownership.subject)
                 }
             }
             completionHandler()
@@ -66,6 +66,10 @@ func enableBackgroundStepDelivery() async {
 func fetchStepCountHistory(days: Int = 30) async throws -> [(stepCount: Int, date: Date)] {
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
+        }
+
+        if let stepHistoryQuery {
+            return try await stepHistoryQuery(days)
         }
 
         let calendar = Calendar.current
@@ -124,20 +128,21 @@ func setupStepCountBackgroundDelivery() async throws {
 // MARK: - Step Syncing to ProductAPI
 
     func syncStepsToProductAPI(userId: String) async {
+        guard let ownership = await captureImportOwnership(), ownership.subject == userId else { return }
         // Get today's steps
         let todaySteps = todayStepCount
         guard todaySteps > 0 else { return }
+        guard await ownsImport(ownership) else { return }
 
         // Get or create today's daily metrics
         let today = Date()
-        var metrics = await Task.detached {
-            await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today)?.toDailyMetrics()
-        }.value
+        let store = importCoreDataManager ?? .shared
+        var metrics = await store.fetchDailyMetrics(for: ownership.subject, date: today)?.toDailyMetrics()
 
         if metrics == nil {
             // Create new daily metrics
             metrics = makeNewDailyMetrics(
-                userId: userId,
+                userId: ownership.subject,
                 date: today,
                 steps: todaySteps,
                 createdAt: today,
@@ -152,32 +157,54 @@ func setupStepCountBackgroundDelivery() async throws {
             )
         }
 
-        // Save to Core Data
+        // Save to Core Data only while the observing session still owns the account.
         if let metrics = metrics {
-            CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
-
-            // Trigger sync to remote
-            Task.detached {
-                await RealtimeSyncManager.shared.syncIfNeeded()
+            guard await ownsImport(ownership) else { return }
+            let cancellation = HealthKitImportCancellation()
+            let admission: CoreDataManager.WriteAdmission = { [self] in
+                guard !cancellation.isCancelled,
+                      (importAuthManager ?? .shared).ownsAccountSession(ownership) else {
+                    throw HealthKitError.notAuthorized
+                }
+            }
+            try? await withTaskCancellationHandler {
+                try await store.saveDailyMetricsAndWait(
+                    metrics, userId: ownership.subject, writeAdmission: admission
+                )
+            } onCancel: {
+                cancellation.cancel()
+            }
+            guard await ownsImport(ownership) else { return }
+            await MainActor.run {
+                guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return }
+                if let importSyncTrigger {
+                    importSyncTrigger()
+                } else {
+                    RealtimeSyncManager.shared.syncIfNeeded()
+                }
             }
         }
     }
 
 func syncHistoricalSteps(userId: String, days: Int = 30) async throws {
+        guard let ownership = await captureImportOwnership(), ownership.subject == userId else {
+            throw HealthKitError.notAuthorized
+        }
         let historicalData = try await fetchStepCountHistory(days: days)
+        try await requireImportOwnership(ownership)
+        let store = importCoreDataManager ?? .shared
 
         for (stepCount, date) in historicalData {
             guard stepCount > 0 else { continue }
+            try await requireImportOwnership(ownership)
 
             // Check if we already have data for this date
-            var metrics = await Task.detached {
-                await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: date)?.toDailyMetrics()
-            }.value
+            var metrics = await store.fetchDailyMetrics(for: ownership.subject, date: date)?.toDailyMetrics()
 
             if metrics == nil {
                 // Create new daily metrics for historical date
                 metrics = makeNewDailyMetrics(
-                    userId: userId,
+                    userId: ownership.subject,
                     date: date,
                     steps: stepCount,
                     createdAt: Date(),
@@ -197,13 +224,21 @@ func syncHistoricalSteps(userId: String, days: Int = 30) async throws {
 
             // Save to Core Data
             if let metrics = metrics {
-                CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
+                try await requireImportOwnership(ownership)
+                try await store.saveDailyMetricsAndWait(metrics, userId: ownership.subject)
             }
         }
 
-        // Sync all historical data to remote
-        Task.detached {
-            await RealtimeSyncManager.shared.syncAll()
+        guard await ownsImport(ownership) else { return }
+        await MainActor.run {
+            guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return }
+            if let importSyncTrigger {
+                importSyncTrigger()
+            } else {
+                Task.detached {
+                    await RealtimeSyncManager.shared.syncAll()
+                }
+            }
         }
     }
 
@@ -258,29 +293,52 @@ func makeUpdatedDailyMetrics(
         return !metrics.isEmpty
     }
 
-func dailyMetricsExists(for date: Date) async -> Bool {
-        guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else { return false }
-
-        return await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: date) != nil
+func dailyMetricsExists(for date: Date, userId: String) async -> Bool {
+        await (importCoreDataManager ?? .shared).fetchDailyMetrics(for: userId, date: date) != nil
     }
 
-func saveDailySteps(steps: Int, date: Date) async throws {
-        guard let userId = await MainActor.run(body: { AuthManager.shared.currentUser?.id }) else {
+func saveDailySteps(
+        steps: Int,
+        date: Date,
+        ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async throws {
+        guard let ownership = await captureImportOwnership(ownership) else {
             throw HealthKitError.notAuthorized
         }
+        try await requireImportOwnership(ownership)
 
         let metrics = DailyMetrics(
             id: UUID().uuidString,
-            userId: userId,
+            userId: ownership.subject,
             date: date,
             steps: steps,
             notes: "Imported from HealthKit",
             createdAt: Date(),
             updatedAt: Date()
         )
-
-        CoreDataManager.shared.saveDailyMetrics(metrics, userId: userId)
-        await RealtimeSyncManager.shared.syncIfNeeded()
+        let cancellation = HealthKitImportCancellation()
+        let admission: CoreDataManager.WriteAdmission = { [self] in
+            guard !cancellation.isCancelled,
+                  (importAuthManager ?? .shared).ownsAccountSession(ownership) else {
+                throw HealthKitError.notAuthorized
+            }
+        }
+        try await withTaskCancellationHandler {
+            try await (importCoreDataManager ?? .shared).saveDailyMetricsAndWait(
+                metrics, userId: ownership.subject, writeAdmission: admission
+            )
+        } onCancel: {
+            cancellation.cancel()
+        }
+        guard await ownsImport(ownership) else { return }
+        await MainActor.run {
+            guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return }
+            if let importSyncTrigger {
+                importSyncTrigger()
+            } else {
+                RealtimeSyncManager.shared.syncIfNeeded()
+            }
+        }
     }
 
 func captureHealthKitError(

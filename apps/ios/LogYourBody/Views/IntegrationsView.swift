@@ -32,17 +32,20 @@ struct IntegrationsView: View {
         .scrollBounceBehavior(.basedOnSize)
         .navigationTitle("Integrations")
         .navigationBarTitleDisplayMode(.inline)
-        .alert(isDirectoryEnabled ? "Apple Health access" : "Apple Health access is needed", isPresented: $showHealthKitConnect) {
-            if !isDirectoryEnabled {
-                Button("Open Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+        .alert(
+            isDirectoryEnabled ? "Apple Health access" : "Apple Health could not be opened",
+            isPresented: $showHealthKitConnect
+        ) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
                 }
             }
             Button(isDirectoryEnabled ? "Done" : "Not Now", role: .cancel) {}
         } message: {
             Text(isDirectoryEnabled
                 ? "Review LogYourBody’s data access in the Health app on your iPhone or iPad."
-                : "Allow Health access in Settings to sync weight and body-composition data.")
+                : "You can log manually and try again. This is not a denial of read access.")
         }
         .task(id: "\(authManager.currentUser?.id ?? ""):\(historyRefreshVersion)") {
             healthKitManager.checkAuthorizationStatus()
@@ -151,14 +154,29 @@ struct IntegrationsView: View {
             .onChange(of: healthKitSyncEnabled) { _, newValue in
                 if newValue {
                     Task {
-                        let authorized = await healthKitManager.requestAuthorization()
-                        if authorized {
+                        _ = await healthKitManager.requestAuthorization()
+                        let followUp = HealthKitAuthorizationPolicy.connectFollowUp(
+                            healthKitManager.lastAuthorizationResolution
+                                ?? HealthKitAuthorizationPolicy.resolve(
+                                    writeAuthorized: false,
+                                    probes: [:],
+                                    requestSucceeded: false
+                                )
+                        )
+                        switch followUp {
+                        case .startSync:
                             await HealthSyncCoordinator.shared
                                 .configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
-                        } else {
+                        case .showRequestFailure:
                             await MainActor.run {
                                 healthKitSyncEnabled = false
                                 showHealthKitConnect = true
+                            }
+                        case .showInconclusiveRead:
+                            await MainActor.run {
+                                healthKitSyncEnabled = false
+                                healthSyncStatusMessage = healthKitManager.authorizationStatusText
+                                showHealthKitConnect = false
                             }
                         }
                     }
@@ -218,28 +236,43 @@ struct IntegrationsView: View {
 
     @ViewBuilder
     private var healthConnectionStatus: some View {
-        if healthKitManager.isAuthorized {
+        if !healthKitManager.authorizationStatusText.isEmpty {
+            VStack(alignment: .trailing, spacing: 8) {
+                Text(healthKitManager.authorizationStatusText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !healthKitManager.isAuthorized {
+                    connectAppleHealthButton
+                }
+            }
+        } else if healthKitManager.isAuthorized {
             Label("Connected", systemImage: "checkmark.circle.fill")
                 .font(.subheadline)
                 .foregroundStyle(Color.appSuccess)
                 .labelStyle(.titleAndIcon)
                 .accessibilityLabel("Apple Health connected")
         } else {
-            Button {
-                Task { @MainActor in
-                    await connectAppleHealth()
-                }
-            } label: {
-                if isConnectingHealthKit {
-                    ProgressView()
-                } else {
-                    Text("Connect")
-                }
-            }
-            .disabled(isConnectingHealthKit)
-            .accessibilityLabel("Connect Apple Health")
-            .accessibilityHint("Requests Apple Health access to sync your data.")
+            connectAppleHealthButton
         }
+    }
+
+    private var connectAppleHealthButton: some View {
+        Button {
+            Task { @MainActor in
+                await connectAppleHealth()
+            }
+        } label: {
+            if isConnectingHealthKit {
+                ProgressView()
+            } else {
+                Text(healthKitManager.authorizationStatusText.isEmpty ? "Connect" : "Try again")
+            }
+        }
+        .disabled(isConnectingHealthKit)
+        .accessibilityLabel("Connect Apple Health")
+        .accessibilityHint("Requests Apple Health access to sync your data. An empty read is not a denial.")
     }
 
     private var photoImportSection: some View {
@@ -335,13 +368,23 @@ extension IntegrationsView {
         healthSyncStatusMessage = nil
         healthSyncStatusIsError = false
 
-        let authorized = await healthKitManager.requestAuthorization()
-        if authorized {
+        _ = await healthKitManager.requestAuthorization()
+        let resolution = healthKitManager.lastAuthorizationResolution
+            ?? HealthKitAuthorizationPolicy.resolve(
+                writeAuthorized: false,
+                probes: [:],
+                requestSucceeded: false
+            )
+        switch HealthKitAuthorizationPolicy.connectFollowUp(resolution) {
+        case .startSync:
             await HealthSyncCoordinator.shared
                 .configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
-            healthSyncStatusMessage = isDirectoryEnabled ? "Permission request finished" : "Apple Health sync is on"
-        } else {
+            healthSyncStatusMessage = resolution.statusText
+        case .showRequestFailure:
             showHealthKitConnect = true
+        case .showInconclusiveRead:
+            healthSyncStatusMessage = resolution.statusText
+            showHealthKitConnect = false
         }
 
         isConnectingHealthKit = false

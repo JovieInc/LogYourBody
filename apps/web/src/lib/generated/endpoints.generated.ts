@@ -48,6 +48,7 @@ export const endpoints = {
     'chat_usage_limits',
     'waitlist_entries',
     'native_records',
+    'revenuecat_events',
     'progress_photos',
     'data_exports',
     'dexa_results',
@@ -171,6 +172,12 @@ export const endpoints = {
     {
       value: 'https://github.com/getsentry/sentry-cli/releases/download/',
       reason: 'Pinned sentry-cli binary for release dSYM upload in CI.',
+    },
+    {
+      value:
+        'https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz',
+      reason:
+        'Official Gitleaks 8.30.1 Linux x64 archive, verified by pinned SHA256 before CI execution.',
     },
     {
       value: 'https://github.com/statsig-io/statsig-kit',
@@ -410,6 +417,16 @@ export const endpoints = {
     {
       value: 'https://docs.revenuecat.com',
       reason: 'RevenueCat docs links.',
+    },
+    {
+      value:
+        'https://www.six-group.com/en/products-services/financial-information/market-reference-data/data-standards.html',
+      reason: 'Official ISO 4217 maintenance source for revenue currency qualification.',
+    },
+    {
+      value:
+        'https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml',
+      reason: 'Official ISO 4217 currency snapshot source for the revenue report.',
     },
     {
       value: 'https://fastlane.tools',

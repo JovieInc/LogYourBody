@@ -731,6 +731,8 @@ struct ChatTabView: View {
     @State private var isConversationLoadRetryAvailable = false
     @State private var isDeleteConfirmationPresented = false
     @State private var trainingResponse: TrainingNextResponse?
+    @State private var trainingOwner: AuthManager.ProfileSessionOwnership?
+    @State private var trainingLoadId: UUID?
     @State private var isTrainingLoading = false
     @State private var trainingEnrollmentRequired = false
     @State private var trainingErrorMessage: String?
@@ -759,6 +761,11 @@ struct ChatTabView: View {
         .modifier(ChatTabWorldClassScreenModifier(isEnabled: showsTranscript))
         .task(id: authManager.currentUser?.id) {
             await loadLatestConversation()
+        }
+        .task(id: authManager.captureAccountSession()) {
+            trainingResponse = nil
+            trainingOwner = nil
+            trainingPresentation = nil
             await loadTrainingNext()
         }
         .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
@@ -791,21 +798,23 @@ struct ChatTabView: View {
                 TrainingEnrollmentView { sessionsPerWeek, equipment in
                     try await enrollTraining(sessionsPerWeek: sessionsPerWeek, equipment: equipment)
                 }
-            case .session(let session):
+            case .session(let session, let ownership):
                 TrainingLiveSessionView(
                     session: session,
+                    ownerId: ownership.subject,
+                    isCurrent: { authManager.ownsAccountSession(ownership) },
                     onLogSet: { exercise, setNumber, reps, loadKg, rir in
                         try await logTrainingSet(
-                            sessionId: session.id,
-                            exercise: exercise,
-                            setNumber: setNumber,
-                            reps: reps,
-                            loadKg: loadKg,
-                            rir: rir
+                            ownership: ownership,
+                            request: TrainingSetLogRequest(
+                                sessionId: session.id, exerciseId: exercise.id, setNumber: setNumber,
+                                reps: reps, loadKg: loadKg, rir: rir
+                            )
                         )
                     },
                     onFeedback: { soreness, pump, performance, jointPain in
                         try await recordTrainingFeedback(
+                            ownership: ownership,
                             sessionId: session.id,
                             soreness: soreness,
                             pump: pump,
@@ -1050,11 +1059,15 @@ struct ChatTabView: View {
             .accessibilityIdentifier("training_loading_card")
         } else if trainingEnrollmentRequired {
             TrainingSetupCard { trainingPresentation = .setup }
-        } else if let session = trainingResponse?.session {
+        } else if let session = trainingResponse?.session, let ownership = trainingOwner,
+                  authManager.ownsAccountSession(ownership) {
             TrainingCoachCard(
                 session: session,
-                onStart: { trainingPresentation = .session(session) },
-                onStop: { Task { await revokeTraining() } }
+                onStart: {
+                    guard authManager.ownsAccountSession(ownership) else { return }
+                    trainingPresentation = .session(session, ownership)
+                },
+                onStop: { Task { await revokeTraining(ownership: ownership) } }
             )
         } else if let week = trainingResponse?.week {
             TrainingWeekCompleteCard(week: week)
@@ -1070,24 +1083,34 @@ struct ChatTabView: View {
     }
 
     private func loadTrainingNext() async {
-        guard showsTranscript, trainingCoachEnabled else {
+        let loadId = UUID()
+        trainingLoadId = loadId
+        guard showsTranscript, trainingCoachEnabled,
+              let ownership = authManager.captureAccountSession() else {
+            isTrainingLoading = false
             trainingResponse = nil
+            trainingOwner = nil
             trainingEnrollmentRequired = false
             trainingErrorMessage = nil
             return
         }
         isTrainingLoading = true
-        defer { isTrainingLoading = false }
-        guard let accessToken = await chatAccessToken() else {
+        defer { if trainingLoadId == loadId { isTrainingLoading = false } }
+        guard let accessToken = await chatAccessToken(),
+              authManager.ownsAccountSession(ownership), trainingLoadId == loadId else {
+            guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
             trainingErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
             return
         }
         do {
             let response = try await trainingService.loadNext(accessToken: accessToken)
+            guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
             trainingResponse = response
+            trainingOwner = ownership
             trainingEnrollmentRequired = false
             trainingErrorMessage = nil
         } catch let error as TrainingServiceError {
+            guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
             if error == .server(code: "program_not_enrolled") {
                 trainingResponse = nil
                 trainingEnrollmentRequired = true
@@ -1096,6 +1119,7 @@ struct ChatTabView: View {
                 trainingErrorMessage = error.localizedDescription
             }
         } catch {
+            guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
             trainingErrorMessage = "Training is temporarily unavailable. Please try again."
         }
     }
@@ -1112,62 +1136,64 @@ struct ChatTabView: View {
     }
 
     private func logTrainingSet(
-        sessionId: String,
-        exercise: TrainingExercisePrescription,
-        setNumber: Int,
-        reps: Int,
-        loadKg: Double?,
-        rir: Int
+        ownership: AuthManager.ProfileSessionOwnership,
+        request: TrainingSetLogRequest
     ) async throws {
-        guard let accessToken = await chatAccessToken() else { throw TrainingServiceError.authenticationExpired }
-        try await trainingService.logSet(
-            accessToken: accessToken,
-            request: TrainingSetLogRequest(
-                sessionId: sessionId,
-                exerciseId: exercise.id,
-                setNumber: setNumber,
-                reps: reps,
-                loadKg: loadKg,
-                rir: rir
-            )
+        try await TrainingOwnedRequest.perform(
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            getToken: { await chatAccessToken() },
+            send: { accessToken in
+                try await trainingService.logSet(accessToken: accessToken, request: request)
+            }
         )
         await loadTrainingNext()
     }
 
     private func recordTrainingFeedback(
+        ownership: AuthManager.ProfileSessionOwnership,
         sessionId: String,
         soreness: Int,
         pump: Int,
         performance: String,
         jointPain: Int
     ) async throws {
-        guard let accessToken = await chatAccessToken() else { throw TrainingServiceError.authenticationExpired }
-        try await trainingService.recordFeedback(
-            accessToken: accessToken,
-            request: TrainingFeedbackRequest(
-                sessionId: sessionId,
-                soreness: soreness,
-                pump: pump,
-                performance: performance,
-                jointPain: jointPain
-            )
+        try await TrainingOwnedRequest.perform(
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            getToken: { await chatAccessToken() },
+            send: { accessToken in
+                try await trainingService.recordFeedback(
+                    accessToken: accessToken,
+                    request: TrainingFeedbackRequest(
+                        sessionId: sessionId, soreness: soreness, pump: pump,
+                        performance: performance, jointPain: jointPain
+                    )
+                )
+            }
         )
         await loadTrainingNext()
     }
 
-    private func revokeTraining() async {
-        guard let accessToken = await chatAccessToken() else {
-            trainingErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
-            return
-        }
+    private func revokeTraining(ownership: AuthManager.ProfileSessionOwnership) async {
         do {
-            _ = try await trainingService.revoke(accessToken: accessToken)
+            try await TrainingOwnedRequest.perform(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { accessToken in
+                    let response = try await trainingService.revoke(accessToken: accessToken)
+                    guard response.revoked else { throw TrainingServiceError.invalidResponse }
+                }
+            )
+            try TrainingDraftStore.shared.purge(ownerId: ownership.subject)
             trainingResponse = nil
+            trainingOwner = nil
+            trainingPresentation = nil
             trainingEnrollmentRequired = true
             trainingErrorMessage = nil
         } catch let error as LocalizedError {
+            guard authManager.ownsAccountSession(ownership) else { return }
             trainingErrorMessage = error.errorDescription ?? "Training data could not be deleted."
         } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
             trainingErrorMessage = "Training data could not be deleted."
         }
     }
@@ -1354,22 +1380,28 @@ struct ChatTabView: View {
             if intent.kind == "message" {
                 send(transcript, shouldSpeakReply: true)
             } else if intent.kind == "log_set" {
-                guard let proposal = intent.proposal, intent.missingFields?.isEmpty == true else {
-                    if let session = trainingResponse?.session,
-                       let heard = intent.heard,
-                       let missingFields = intent.missingFields,
-                       !missingFields.isEmpty,
-                       missingFields.allSatisfy({ $0 == "exercise" || $0 == "set_number" }) {
-                        trainingPresentation = .voiceSetReview(session, heard)
+                switch VoiceSetAdmission.route(
+                    proposal: intent.proposal,
+                    heard: intent.heard,
+                    missingFields: intent.missingFields,
+                    session: trainingResponse?.session
+                ) {
+                case .confirm(let proposal):
+                    pendingVoiceSet = proposal
+                    isVoiceSetConfirmationPresented = true
+                case .review(let heard):
+                    guard let session = trainingResponse?.session else {
+                        draft = transcript
+                        chatErrorMessage = VoiceSetAdmission.rejectedLogMessage
                         return
                     }
+                    trainingPresentation = .voiceSetReview(session, heard)
+                case .clarify(let fields, let rejected):
                     draft = transcript
-                    let fields = intent.missingFields ?? []
-                    chatErrorMessage = voiceClarification(for: fields)
-                    return
+                    chatErrorMessage = rejected
+                        ? VoiceSetAdmission.rejectedLogMessage
+                        : voiceClarification(for: fields)
                 }
-                pendingVoiceSet = proposal
-                isVoiceSetConfirmationPresented = true
             } else {
                 draft = transcript
                 chatErrorMessage = voiceClarification(for: intent.missingFields ?? [])
@@ -1411,7 +1443,8 @@ struct ChatTabView: View {
                 try await VoiceSetLogger.commit(
                     proposal,
                     isConfirmed: true,
-                    accessToken: accessToken
+                    accessToken: accessToken,
+                    session: trainingResponse?.session
                 ) { token, request in
                     try await trainingService.logSet(accessToken: token, request: request)
                 }
