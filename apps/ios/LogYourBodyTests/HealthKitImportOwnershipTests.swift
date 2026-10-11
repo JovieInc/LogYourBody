@@ -134,11 +134,12 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         // the test's priority, ahead of triggerFullHealthKitSyncIfNeeded's
         // Task.detached(priority: .background) hop into MainActor.run. A busy
         // runner then never starts the weight query. Sleep off the main actor
-        // so that import can enter. The deadline is only a ceiling.
-        let deadline = Date().addingTimeInterval(30)
+        // so that import can enter. The sleeper runs above .background so it
+        // cannot starve the import it is waiting on. The deadline is only a ceiling.
+        let deadline = Date().addingTimeInterval(60)
         while !query.hasStarted, Date() < deadline {
-            await Task.detached(priority: .background) {
-                try? await Task.sleep(nanoseconds: 50_000_000)
+            await Task.detached {
+                try? await Task.sleep(nanoseconds: 25_000_000)
             }.value
         }
     }
