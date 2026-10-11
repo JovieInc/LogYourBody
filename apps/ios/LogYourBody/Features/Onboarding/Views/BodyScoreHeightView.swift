@@ -1,17 +1,25 @@
 import SwiftUI
 
 enum HeightEntryPolicy {
-    /// Inline validation for the centimeters field: empty input clears the
-    /// error; anything below the 100 cm floor (including unparseable text,
-    /// which reads as 0) shows the floor message.
+    /// Only empty drafts can reuse an existing value. The legacy editor keeps
+    /// its 100 cm floor; representability prevents integer-conversion traps.
+    static func validatedCentimeters(for text: String, storedValue: Double? = nil) -> Double? {
+        let value = text.isEmpty ? storedValue : Double(text)
+        guard let value, value >= 100, isRepresentableCentimeters(value) else { return nil }
+        return value
+    }
+
+    static func isRepresentableCentimeters(_ value: Double) -> Bool {
+        value.isFinite && Int(exactly: value.rounded()) != nil &&
+            Int(exactly: (value / 2.54).rounded()) != nil
+    }
+
     static func centimetersError(for text: String) -> String? {
         guard !text.isEmpty else { return nil }
-
-        let numeric = Double(text) ?? 0
-        if numeric < 100 {
-            return "Enter at least 100 cm."
-        }
-        return nil
+        // Preserve the existing message for unparseable and below-floor drafts.
+        guard let numeric = Double(text) else { return "Enter at least 100 cm." }
+        guard isRepresentableCentimeters(numeric) else { return "Enter a valid number." }
+        return numeric < 100 ? "Enter at least 100 cm." : nil
     }
 }
 
