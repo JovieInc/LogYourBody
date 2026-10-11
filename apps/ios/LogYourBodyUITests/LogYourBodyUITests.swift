@@ -1334,6 +1334,43 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Save GLP-1"].exists)
     }
 
+    func testGlp1DoseDeleteCancelLeavesTheSeededDose() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+        openStatsPage(in: app)
+
+        let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
+        scrollUntilExists(prompt, in: app)
+        scrollUntilHittable(prompt, in: app)
+        prompt.tap()
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
+
+        let delete = app.buttons["Delete dose"].firstMatch
+        XCTAssertTrue(delete.waitForExistence(timeout: 8))
+        if !delete.isHittable {
+            scrollUntilHittable(delete, in: app)
+        }
+        delete.tap()
+
+        XCTAssertTrue(app.staticTexts["Delete dose?"].waitForExistence(timeout: 5))
+        let cancel = app.buttons.matching(identifier: "glp1_dose_delete_cancel").firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 3), "GLP-1 dose delete must show Cancel")
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        let dialogGone = NSPredicate(format: "exists == false")
+        expectation(for: dialogGone, evaluatedWith: app.staticTexts["Delete dose?"])
+        waitForExpectations(timeout: 3)
+        XCTAssertTrue(app.staticTexts["UI test weekly check-in seed"].waitForExistence(timeout: 5))
+    }
+
     func testGlp1WeeklyCheckInFixtureOpensMedicationSelectorWhenEmpty() throws {
         let app = XCUIApplication()
         launch(app, with: [
@@ -2040,6 +2077,56 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
     }
 
+    func testHomeV2ProgressRefreshesAfterEditingAnExistingDay() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture",
+            "-lybUITestHomeV2OfflineFixture"
+        ])
+
+        let viewProgress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
+        viewProgress.tap()
+        let value = app.staticTexts["home_v2_progress_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+        let loaded = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label != %@", "—"), object: value
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+        let originalValue = value.label
+        attachScreenshot(named: "home-v2-progress-before-edit", from: app)
+
+        app.buttons["photo_timeline_root_menu"].tap()
+        let today = app.buttons["home_v2_sidebar_today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 5))
+        today.tap()
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 8))
+        logWeight.tap()
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        let savedValue = try XCTUnwrap(app.textFields["Weight value"].value as? String)
+        XCTAssertNotEqual(savedValue, originalValue)
+        app.buttons["home_v2_log_sheet_save"].tap()
+        let done = app.buttons["home_v2_done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        done.tap()
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 8))
+        viewProgress.tap()
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+
+        let refreshed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", savedValue),
+            object: value
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [refreshed], timeout: 10), .completed,
+            "Progress must show the saved edit even when the number of measurement rows is unchanged"
+        )
+        attachScreenshot(named: "home-v2-progress-after-edit", from: app)
+    }
+
     private func attachScreenshot(named name: String, from app: XCUIApplication) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name
@@ -2203,6 +2290,80 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(ffmiCard.exists || ffmiCard.waitForExistence(timeout: 5))
         XCTAssertEqual(try ffmiValue(from: ffmiCard), homeFFMI, "Stats must use the same snapshot FFMI as Home")
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
+    }
+
+    func testBodyFatKeyboardDoneMeetsMinimumHitTarget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        app.tap()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        app.buttons["body_score_onboarding_basics_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        app.buttons["CM"].tap()
+        let heightField = app.textFields["Height in centimeters"]
+        XCTAssertTrue(heightField.waitForExistence(timeout: 5))
+        heightField.tap()
+        heightField.typeText("178")
+        let heightDone = app.buttons["Done"]
+        if heightDone.waitForExistence(timeout: 2) {
+            heightDone.tap()
+        }
+        app.buttons["body_score_onboarding_height_continue_button"].tap()
+
+        let manual = app.buttons["body_score_onboarding_enter_manually_button"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 8))
+        manual.tap()
+        XCTAssertTrue(app.staticTexts["What’s your current weight?"].waitForExistence(timeout: 8))
+        app.buttons["LBS"].tap()
+        let weightField = app.textFields["Weight (lbs)"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        weightField.typeText("182")
+        let weightDone = app.buttons["Done"]
+        if weightDone.waitForExistence(timeout: 2) {
+            weightDone.tap()
+        }
+        app.buttons["body_score_onboarding_manual_weight_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How do you know your body fat?"].waitForExistence(timeout: 8))
+        app.buttons["body_score_onboarding_body_fat_manual_button"].tap()
+        XCTAssertTrue(app.staticTexts["Enter your body fat."].waitForExistence(timeout: 8))
+        let bodyFatField = app.textFields["Body fat percentage"]
+        XCTAssertTrue(bodyFatField.waitForExistence(timeout: 5))
+        bodyFatField.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5))
+
+        let window = app.windows.firstMatch.frame
+        let done = app.buttons.matching(identifier: "body_score_body_fat_keyboard_done_button").firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(done.frame), "body fat Done \(done.frame) window \(window)")
+        XCTAssertGreaterThanOrEqual(done.frame.width, 44, "body fat Done \(done.frame)")
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, "body fat Done \(done.frame)")
+
+        let labeledDones = app.buttons.matching(NSPredicate(format: "label == 'Done'"))
+        for index in 0..<labeledDones.count {
+            let control = labeledDones.element(boundBy: index)
+            guard control.exists, control.frame.width > 1, control.frame.height > 1 else { continue }
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "body fat Done \(control.frame)")
+        }
+
+        done.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Enter your body fat."].exists)
     }
 
     private func homeFFMIValue(in app: XCUIApplication) throws -> String {

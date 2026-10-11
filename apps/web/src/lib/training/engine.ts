@@ -235,8 +235,42 @@ export function createMesoBlock(startDate: string, today: string): MesoBlock {
   };
 }
 
+/** Retries and later check-in updates are evidence from the same session.
+ * Equal-time pain reports take precedence because their recency cannot be distinguished.
+ */
+export function latestFeedbackPerSession(feedback: TrainingFeedback[]): TrainingFeedback[] {
+  const seen = new Set<string>();
+  return [...feedback]
+    .sort(
+      (a, b) =>
+        Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+        b.jointPain - a.jointPain ||
+        a.id.localeCompare(b.id),
+    )
+    .filter((item) => {
+      if (seen.has(item.sessionId)) return false;
+      seen.add(item.sessionId);
+      return true;
+    });
+}
+
+function hasConflictingFeedbackAtSameTime(
+  observation: TrainingFeedback,
+  feedback: TrainingFeedback[],
+): boolean {
+  return feedback.some(
+    (item) =>
+      item.sessionId === observation.sessionId &&
+      Date.parse(item.createdAt) === Date.parse(observation.createdAt) &&
+      (item.soreness !== observation.soreness ||
+        item.pump !== observation.pump ||
+        item.performance !== observation.performance ||
+        item.jointPain !== observation.jointPain),
+  );
+}
+
 export function evaluateDeload(feedback: TrainingFeedback[]): DeloadState {
-  const ordered = [...feedback].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const ordered = latestFeedbackPerSession(feedback);
   const latest = ordered[0];
   if (!latest) {
     return {
@@ -253,13 +287,21 @@ export function evaluateDeload(feedback: TrainingFeedback[]): DeloadState {
       evidenceIds: ['k:220190f8', 'k:e95f2199'],
     };
   }
+  if (ordered.slice(0, 2).some((item) => hasConflictingFeedbackAtSameTime(item, feedback))) {
+    return {
+      action: 'none',
+      explanation:
+        'Conflicting check-ins were recorded at the same time for a session, so recovery feedback cannot establish a repeated decline yet.',
+      evidenceIds: RECOVERY_EVIDENCE,
+    };
+  }
   const sustainedDecline =
     ordered.length >= 2 && ordered[0]?.performance === 'down' && ordered[1]?.performance === 'down';
   if (sustainedDecline && latest.soreness >= 7) {
     return {
       action: 'reduce_volume',
       explanation:
-        'Performance has declined across two check-ins while soreness is high, so this session uses one set per movement. Volume is not increased automatically.',
+        'Performance has declined across two sessions while soreness is high, so this session uses one set per movement. Volume is not increased automatically.',
       evidenceIds: ['k:0b3ea5bb', 'k:76bf778c', 'k:a6ae7fd4'],
     };
   }
