@@ -98,7 +98,8 @@ export const LANDING_EXPERIMENTS = {
     status: 'active',
     hypothesis:
       'Campaign-matched editorial creative will increase confirmed waitlist conversion versus unmatched creative.',
-    primaryMetric: 'web_waitlist_submitted / unique web_landing_viewed',
+    primaryMetric: 'unique_persisted_waitlist_registrations / eligible_unique_landing_sessions',
+    measurementStatus: 'blocked_pending_qualified_session_denominator',
     baselineConversionRate: 0.15,
     minimumDetectableAbsoluteLift: 0.05,
     sampleSizePerArm: 903,
