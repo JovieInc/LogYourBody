@@ -208,11 +208,18 @@ final class DashboardViewModel: ObservableObject {
         let today = Date()
 
         if let existingMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {
-            existingMetrics.steps = Int32(steps)
-            existingMetrics.updatedAt = Date()
-
-            let metrics = existingMetrics.toDailyMetrics()
-            dailyMetrics = metrics
+            let current = existingMetrics.toDailyMetrics()
+            let updated = DailyMetrics(
+                id: current.id,
+                userId: userId,
+                date: current.date,
+                steps: steps,
+                notes: current.notes,
+                createdAt: current.createdAt,
+                updatedAt: Date()
+            )
+            try await CoreDataManager.shared.saveDailyMetricsAndWait(updated, userId: userId)
+            dailyMetrics = updated
         } else {
             let newMetrics = DailyMetrics(
                 id: UUID().uuidString,
