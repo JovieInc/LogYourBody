@@ -48,6 +48,7 @@ export const endpoints = {
     'chat_usage_limits',
     'waitlist_entries',
     'native_records',
+    'revenuecat_events',
     'progress_photos',
     'data_exports',
     'dexa_results',
@@ -96,8 +97,53 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://github.com/ChatPRD/lennys-podcast-transcripts',
+      reason: 'Podcast transcript citation in docs/research; not a dependency.',
+    },
+    {
+      value: 'https://threadreaderapp.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://www.lennysnewsletter.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://techcrunch.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://m.ebrun.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://app.dealroom.co',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://x.com',
+      reason: 'Public post citations in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://www.skillsdirectory.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://techiegamers.com',
+      reason: 'Research-note citation links in docs/research; not runtime endpoints.',
+    },
+    {
+      value: 'https://docs.developer.apple.com',
+      reason: 'Apple developer documentation links in docs/research.',
+    },
+    {
       value: 'https://edpb.europa.eu',
       reason: 'Legal-doc link (EDPB) referenced by privacy copy.',
+    },
+    {
+      value: 'https://chatgpt.com',
+      reason:
+        'ChatGPT OAuth redirect for the LogYourBody MCP connector (docs/integrations/chatgpt-app).',
     },
     {
       value: 'https://apps.apple.com',
@@ -126,6 +172,12 @@ export const endpoints = {
     {
       value: 'https://github.com/getsentry/sentry-cli/releases/download/',
       reason: 'Pinned sentry-cli binary for release dSYM upload in CI.',
+    },
+    {
+      value:
+        'https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz',
+      reason:
+        'Official Gitleaks 8.30.1 Linux x64 archive, verified by pinned SHA256 before CI execution.',
     },
     {
       value: 'https://github.com/statsig-io/statsig-kit',
@@ -249,6 +301,35 @@ export const endpoints = {
       reason: 'GitHub REST API used by CI scripts.',
     },
     {
+      value: 'https://api.linear.app',
+      reason: 'Linear GraphQL API used by CI remediation intake.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-74',
+      reason:
+        'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-95',
+      reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-97',
+      reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-33',
+      reason: 'LYB-33, related issue cited by the LYB-97 trial audit.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/JOV-7237',
+      reason: 'JOV-7237, Doppler to GitHub sync capacity work cited by the secrets policy.',
+    },
+    {
+      value: 'https://itunes.apple.com',
+      reason: 'iTunes lookup API cited by the LYB-97 storefront audit.',
+    },
+    {
       value: 'jov.ie',
       reason: 'First-party Jovie identity host (issuer contract is endpoints.auth).',
     },
@@ -336,6 +417,16 @@ export const endpoints = {
     {
       value: 'https://docs.revenuecat.com',
       reason: 'RevenueCat docs links.',
+    },
+    {
+      value:
+        'https://www.six-group.com/en/products-services/financial-information/market-reference-data/data-standards.html',
+      reason: 'Official ISO 4217 maintenance source for revenue currency qualification.',
+    },
+    {
+      value:
+        'https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml',
+      reason: 'Official ISO 4217 currency snapshot source for the revenue report.',
     },
     {
       value: 'https://fastlane.tools',
@@ -440,6 +531,69 @@ export const endpoints = {
     {
       value: 'https://smpl-x.is.tue.mpg.de',
       reason: 'SMPL-X body-model reference in avatar docs.',
+    },
+    {
+      value: 'https://threadreaderapp.com/thread/1481118406749220868.html',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value: 'https://threadreaderapp.com/thread/1798372438960730423.html',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value: 'https://threadreaderapp.com/thread/1820660351366738276.html',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value: 'https://threadreaderapp.com/thread/1857896428317630893.html',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value:
+        'https://github.com/ChatPRD/lennys-podcast-transcripts/blob/main/episodes/nikita-bier/transcript.md',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value: 'https://www.lennysnewsletter.com/p/how-to-consistently-go-viral-nikita-bier',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value:
+        'https://techcrunch.com/2024/06/12/ios-18-cracks-down-on-apps-asking-for-full-address-book-access/',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value: 'https://m.ebrun.com/571975.html',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value:
+        'https://app.dealroom.co/news/note/nikita-bier-advises-protector-launch-with-viral-growth-playbook',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value: 'https://x.com/nikitabier/status/1813735668276928682',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value: 'https://www.skillsdirectory.com/skills/heyimjames-nikita-bier-consumer-apps',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
+    },
+    {
+      value: 'https://techiegamers.com/nikita-bier-viral-success/',
+      reason:
+        'Research citation in docs/research/growth-playbook-2026-09-27.md; not a product endpoint.',
     },
     {
       value: 'https://e',

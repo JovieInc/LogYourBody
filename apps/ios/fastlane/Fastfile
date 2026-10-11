@@ -617,7 +617,6 @@ platform :ios do
     # so the gate survives Xcode/simulator image changes on runners.
     destination = options[:destination].to_s.strip
     device = destination.empty? ? (options[:device] || "iPhone 16") : nil
-
     run_tests(
       project: proj_path,
       scheme: "LogYourBodyTiers",
@@ -634,6 +633,7 @@ platform :ios do
       xcargs: "CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO",
       xcodebuild_formatter: ENV["CI"] ? "xcbeautify --renderer github-actions" : "xcbeautify"
     )
+
   end
 
   desc "PR verification - lint, build, and test"
