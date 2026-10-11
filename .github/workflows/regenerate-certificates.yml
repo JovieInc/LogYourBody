@@ -107,29 +107,30 @@ jobs:
           MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
           MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
         run: |
+          set -euo pipefail
           echo "🗑️ Cleaning certificates repository..."
-          
-          # Clone the configured Match repository with its Basic auth header.
-          # Use MATCH_GIT_URL so this workflow follows the same repository
-          # configuration as fastlane match and does not expose credentials in
-          # the clone URL.
+
+          # Clone and push the configured Match repository with its Basic auth
+          # header. git -c does not persist onto the remote, so the push must
+          # send the header too. Credentials stay out of the clone URL.
           git -c "http.extraheader=Authorization: Basic ${MATCH_GIT_BASIC_AUTHORIZATION}" \
             clone "$MATCH_GIT_URL" certificates-temp
           cd certificates-temp
-          git checkout $MATCH_GIT_BRANCH || git checkout -b $MATCH_GIT_BRANCH
-          
+          git checkout "$MATCH_GIT_BRANCH" || git checkout -b "$MATCH_GIT_BRANCH"
+
           # Clean all certificate files
           rm -rf certs profiles
           mkdir -p certs profiles
           touch certs/.gitkeep profiles/.gitkeep
-          
+
           # Commit and push
           git add -A
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "GitHub Actions"
           git commit -m "Clean repository for certificate regeneration" || echo "Nothing to commit"
-          git push origin $MATCH_GIT_BRANCH
-          
+          git -c "http.extraheader=Authorization: Basic ${MATCH_GIT_BASIC_AUTHORIZATION}" \
+            push origin "$MATCH_GIT_BRANCH"
+
           cd ..
           rm -rf certificates-temp
 
