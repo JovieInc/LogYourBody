@@ -162,6 +162,13 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
             do {
                 let steps = try DailyStepCountPolicy.storedRemoteSteps(data["steps"])
                 let results = try context.fetch(request)
+                let payloadUserId = data["user_id"] as? String
+                if let existing = results.first,
+                   let owner = existing.userId,
+                   !owner.isEmpty,
+                   payloadUserId != owner {
+                    return
+                }
                 let metric = results.first ?? CachedDailyMetrics(context: context)
 
                 // Update fields
@@ -555,6 +562,9 @@ func saveGlp1DoseLogs(
                 let cached: CachedGlp1DoseLog
 
                 if let existing = try? context.fetch(request).first {
+                    if let owner = existing.userId, !owner.isEmpty, owner != userId {
+                        continue
+                    }
                     cached = existing
                 } else {
                     cached = CachedGlp1DoseLog(context: context)
@@ -563,6 +573,11 @@ func saveGlp1DoseLogs(
                 }
 
                 if markAsSynced, cached.isMarkedDeleted {
+                    continue
+                }
+
+                // Keep a strictly newer local edit. An equal or newer payload still applies.
+                if let storedUpdatedAt = cached.updatedAt, storedUpdatedAt > log.updatedAt {
                     continue
                 }
 
