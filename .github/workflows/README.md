@@ -127,6 +127,7 @@ Advisory checks:
 - Follow-up cleanup and test coverage ideas.
 
 When advisory review finds a noncritical issue, open a focused follow-up PR or issue instead of delaying a landable PR.
+
 ### Shared Mac qualification
 
 The required `iOS` and `iOS Launch Quality Gate` jobs always use standard hosted
