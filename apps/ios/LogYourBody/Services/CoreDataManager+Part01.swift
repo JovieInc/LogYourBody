@@ -74,6 +74,16 @@ func saveDailyMetrics(
             let cached: CachedDailyMetrics
 
             if let existing = try? context.fetch(fetchRequest).first {
+                if let owner = existing.userId, !owner.isEmpty, owner != userId {
+                    completion?(.failure(NSError(
+                        domain: "CoreDataManager",
+                        code: 4,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: "Cannot save daily metrics owned by another account"
+                        ]
+                    )))
+                    return
+                }
                 cached = existing
             } else {
                 cached = CachedDailyMetrics(context: context)
@@ -286,6 +296,9 @@ func fetchDexaResults(for userId: String, limit: Int) async -> [DexaResult] {
 
                 let cached: CachedDexaResult
                 if let existing = try? context.fetch(fetchRequest).first {
+                    if let owner = existing.userId, !owner.isEmpty, owner != userId {
+                        continue
+                    }
                     cached = existing
                 } else {
                     cached = CachedDexaResult(context: context)

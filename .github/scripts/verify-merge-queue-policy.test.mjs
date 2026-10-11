@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { verifyPolicy, verifyRepository } from './verify-merge-queue-policy.mjs';
+import './merge-queue-enrollment.test.mjs';
 
 const validPolicy = {
   schema_version: 1,
