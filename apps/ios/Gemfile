@@ -2,3 +2,7 @@ source "https://rubygems.org"
 
 gem "fastlane"
 gem "cocoapods"
+
+# erb 5.x+ and rdoc 8.x+ require Ruby >= 3.2, but iOS CI runs Ruby 3.1.
+gem "erb", "< 5.0"
+gem "rdoc", "< 8.0"
