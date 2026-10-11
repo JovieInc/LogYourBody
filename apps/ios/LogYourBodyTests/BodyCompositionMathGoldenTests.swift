@@ -184,7 +184,10 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
 
         let result = try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 365 * 10)))
 
-        XCTAssertEqual(result.value, 104, accuracy: 0.001)
+        // The final-known value is still passed through the existing EMA. The
+        // first two days produce 100 and 101; the synthetic final-known day
+        // produces 101.75, rounded by the context to 101.8.
+        XCTAssertEqual(result.value, 101.8, accuracy: 0.001)
         XCTAssertTrue(result.isLastKnown)
     }
 
