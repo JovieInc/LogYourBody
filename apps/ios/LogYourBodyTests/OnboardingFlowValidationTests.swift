@@ -376,10 +376,6 @@ final class OnboardingFlowValidationTests: XCTestCase {
         XCTAssertEqual(viewModel.profileDetailsActiveSubstep, .firstName)
 
         viewModel.profileFirstName = "Avery"
-        viewModel.recomputeProfileDetailsActiveSubstep()
-        XCTAssertEqual(viewModel.profileDetailsActiveSubstep, .lastName)
-
-        viewModel.profileLastName = "Stone"
         viewModel.profileDateOfBirth = Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date()
         viewModel.recomputeProfileDetailsActiveSubstep()
         XCTAssertEqual(viewModel.profileDetailsActiveSubstep, .dateOfBirth)

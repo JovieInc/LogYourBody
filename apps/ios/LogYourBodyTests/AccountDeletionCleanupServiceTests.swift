@@ -18,6 +18,40 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
         case coreDataCleanupFailed
     }
 
+    func testTrainingDraftCleanupRequiresProductDeletionAndStillRunsWhenCoreDataFails() async {
+        for failure in [nil, TestError.productDeletionFailed, TestError.coreDataCleanupFailed] {
+            var events: [String] = []
+            let service = AccountDeletionCleanupService(dependencies: .init(
+                logoutSubscriptionProvider: { events.append("provider") },
+                resetHealthKitAnchors: { events.append("health") },
+                deleteProductAccount: {
+                    events.append("product")
+                    if failure == .productDeletionFailed { throw TestError.productDeletionFailed }
+                },
+                deleteCoreData: {
+                    events.append("coredata")
+                    if failure == .coreDataCleanupFailed { throw TestError.coreDataCleanupFailed }
+                },
+                clearKeychain: { events.append("keychain") },
+                deleteSpotlightMetrics: { events.append("spotlight") },
+                clearUserDefaults: { events.append("defaults"); return [] },
+                logoutAuthSession: { events.append("auth") },
+                deleteTrainingDrafts: { events.append("drafts") }
+            ))
+            do {
+                try await service.performDeletion()
+                XCTAssertNil(failure)
+            } catch { XCTAssertEqual(error as? TestError, failure) }
+            if failure == .productDeletionFailed {
+                XCTAssertEqual(events, ["provider", "health", "product"])
+            } else {
+                XCTAssertEqual(events, [
+                    "provider", "health", "product", "drafts", "coredata", "keychain", "defaults", "spotlight", "auth"
+                ])
+            }
+        }
+    }
+
     func testPerformDeletionRunsProviderAndLocalCleanupInOrder() async throws {
         var events: [String] = []
         let service = AccountDeletionCleanupService(
@@ -203,5 +237,26 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
             XCTAssertNil(defaults.object(forKey: key), "\(key) should be removed")
         }
         XCTAssertTrue(Set(removedKeys).isSuperset(of: keys))
+    }
+
+    func testAccountDeletionReleasesTheHealthKitAccountBinding() {
+        let suiteName = "AccountDeletionCleanupServiceTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        defaults.set(true, forKey: Constants.healthKitSyncEnabledKey)
+        defaults.set("deleted-user", forKey: HealthKitAccountSyncPolicy.accountIdKey)
+
+        _ = AccountDeletionCleanupService.clearAccountUserDefaults(in: defaults)
+        HealthKitAccountSyncPolicy.bindIfUnbound(
+            userId: "deleted-user",
+            syncEnabled: defaults.bool(forKey: Constants.healthKitSyncEnabledKey),
+            defaults: defaults
+        )
+
+        XCTAssertFalse(defaults.bool(forKey: Constants.healthKitSyncEnabledKey))
+        XCTAssertNil(defaults.string(forKey: HealthKitAccountSyncPolicy.accountIdKey))
     }
 }

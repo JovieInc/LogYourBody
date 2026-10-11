@@ -247,6 +247,7 @@ class PhotoUploadManager: ObservableObject {
             updateUploadStatus(.processing, progress: 0.8)
             try await updateMetricsWithPhoto(
                 metricsId: metricsId,
+                userId: userId,
                 storagePath: storagePath,
                 processedUrl: ticket.photoUrl
             )
@@ -446,13 +447,10 @@ class PhotoUploadManager: ObservableObject {
 
     private func updateMetricsWithPhoto(
         metricsId: String,
+        userId: String,
         storagePath: String,
         processedUrl: String
     ) async throws {
-        guard let userId = authManager.currentUser?.id else {
-            throw PhotoError.notAuthenticated
-        }
-
         let didUpdate = try await coreDataManager.updateBodyMetricPhoto(
             id: metricsId,
             userId: userId,
@@ -464,7 +462,9 @@ class PhotoUploadManager: ObservableObject {
             throw PhotoError.processingFailed("Could not save photo locally")
         }
 
-        RealtimeSyncManager.shared.syncIfNeeded()
+        if authManager.currentUser?.id == userId {
+            RealtimeSyncManager.shared.syncIfNeeded()
+        }
     }
 
     private func updateUploadStatus(_ status: UploadStatus, progress: Double) {

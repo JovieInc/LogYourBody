@@ -49,6 +49,8 @@ struct DashboardViewLiquid: View {
     @State var metricEntriesCache: [MetricType: MetricEntriesPayload] = [:]
     @State var fullChartCache: [MetricType: [MetricChartDataPoint]] = [:]
     @State var fullTrendChartCache: [MetricType: [MetricChartDataPoint]] = [:]
+    @State var metricCacheBuildID = UUID()
+    @State private var metricCacheRefreshTask: Task<Void, Never>?
     @State var glp1DoseLogs: [Glp1DoseLog] = []
     @State var glp1Medications: [Glp1Medication] = []
     @State var dailyMetricsLookupCache: [Date: DailyMetrics] = [:]
@@ -229,10 +231,17 @@ struct DashboardViewLiquid: View {
                 Task { @MainActor in
                     await Task.yield()
                     handleOnAppear()
+                    // A full-screen cover can cancel a cache build after it
+                    // clears the previous values, without emitting new metrics.
+                    if fullChartCache.isEmpty {
+                        scheduleMetricCacheRefresh()
+                    }
                 }
             }
             .onDisappear {
                 syncBannerDismissTask?.cancel()
+                metricCacheRefreshTask?.cancel()
+                metricCacheBuildID = UUID()
             }
 
         let withSyncAndState = withLifecycle
@@ -245,9 +254,11 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(viewModel.$recentDailyMetrics) { _ in
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
+                scheduleMetricCacheRefresh()
             }
             .onReceive(viewModel.$bodyMetrics) { _ in
                 scheduleDashboardDerivedStateRefresh()
+                scheduleMetricCacheRefresh()
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
@@ -260,9 +271,7 @@ struct DashboardViewLiquid: View {
                 fullChartCache = [:]
                 fullTrendChartCache = [:]
                 metricEntriesCache = [:]
-                Task { @MainActor in
-                    await prewarmMetricCaches()
-                }
+                scheduleMetricCacheRefresh()
             }
             .onChange(of: selectedIndex) { _, newIndex in
                 scheduleDashboardDerivedStateRefresh(animatedIndex: newIndex)
@@ -479,6 +488,19 @@ struct DashboardViewLiquid: View {
                 selectedIndex: selectedIndex
             )
             scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
+        }
+    }
+
+    @MainActor
+    private func scheduleMetricCacheRefresh() {
+        // Published values arrive before the model finishes updating its sorted
+        // history. Coalesce that burst and snapshot only after the update completes.
+        metricCacheBuildID = UUID()
+        metricCacheRefreshTask?.cancel()
+        metricCacheRefreshTask = Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            await prewarmMetricCaches()
         }
     }
 

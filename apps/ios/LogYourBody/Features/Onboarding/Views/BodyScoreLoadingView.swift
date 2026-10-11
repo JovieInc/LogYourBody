@@ -17,16 +17,16 @@ struct BodyScoreLoadingView: View {
                     .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                     .accessibilityHidden(true)
 
-                OnboardingTitleText(text: "Building your Body Score", alignment: .center)
+                OnboardingTitleText(text: "Splitting fat from muscle", alignment: .center)
 
                 OnboardingSubtitleText(
-                    text: "Combining lean mass, body fat, and validated reference ranges.",
+                    text: "Working out your fat mass and lean mass.",
                     alignment: .center
                 )
             }
             .padding(JovieTokens.screenInset)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Calculating your Body Score")
+            .accessibilityLabel("Working out your fat and lean mass")
             .accessibilityValue("Please wait")
         }
         .task {

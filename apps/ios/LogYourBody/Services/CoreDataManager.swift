@@ -184,6 +184,7 @@ struct PendingDexaResultSyncItem {
 }
 
 class CoreDataManager: ObservableObject {
+    typealias WriteAdmission = @MainActor () throws -> Void
     typealias PersistentStoreLoader = (
         NSPersistentContainer,
         @escaping (NSPersistentStoreDescription, Error?) -> Void
