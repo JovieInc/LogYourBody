@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { logYourBody } from '@jovieinc/product-registry';
 import { launchLandingCopy, launchLandingFeatures } from '../launch-landing-copy';
 import { waitlistLandingCopy } from '../waitlist-copy';
+import { LANDING_PRODUCT_PROOF } from '@/lib/marketing/landing-registry';
 
 jest.mock('@/lib/analytics', () => ({
   analytics: { track: jest.fn() },
@@ -33,9 +34,9 @@ describe('LaunchLanding', () => {
       logYourBody.messages.landing.headline,
     );
     expect(screen.getByText(launchLandingCopy.subheading)).toBeInTheDocument();
-    expect(screen.getByAltText(launchLandingCopy.heroImageAlt)).toHaveAttribute(
+    expect(screen.getByAltText(LANDING_PRODUCT_PROOF.alt)).toHaveAttribute(
       'src',
-      expect.stringContaining('home-metric-first'),
+      expect.stringContaining('weight-log'),
     );
 
     for (const feature of launchLandingFeatures) {

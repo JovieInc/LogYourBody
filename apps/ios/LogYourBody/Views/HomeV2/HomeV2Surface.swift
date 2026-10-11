@@ -15,6 +15,7 @@ struct HomeV2Surface: View {
     let weightValue: String
     let weightUnit: String
     let changeSentence: String
+    let compositionSentence: String
     let phaseSentence: String?
     let loggedSentence: String?
     let latestPhotoCaption: String?
@@ -107,6 +108,8 @@ struct HomeV2Surface: View {
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .accessibilityIdentifier("home_v2_change_sentence")
+
+            compositionLine
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
@@ -145,6 +148,8 @@ struct HomeV2Surface: View {
                         .foregroundStyle(HomeV2Tokens.Colors.secondary)
                         .accessibilityIdentifier("home_v2_change_sentence")
 
+                    compositionLine
+
                     statusLine
                 }
                 .padding(.top, HomeV2Tokens.Space.heroTop)
@@ -163,6 +168,14 @@ struct HomeV2Surface: View {
             rangeRow
             todayDetailsRow
         }
+    }
+
+    private var compositionLine: some View {
+        Text(compositionSentence)
+            .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("home_v2_composition_sentence")
     }
 
     private var todayDetailsRow: some View {
@@ -345,7 +358,7 @@ struct HomeV2Filmstrip: View {
             CachedAsyncImage(urlString: bodyMetrics[index].photoUrl ?? "") { image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
             } placeholder: {
                 HomeV2Tokens.Colors.card
             }
@@ -388,7 +401,7 @@ struct SubjectPlateView: View {
     private func stagePhoto(_ image: UIImage) -> some View {
         Image(uiImage: AspectFillCropper.crop(image, to: size))
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .frame(width: size.width, height: size.height)
     }
 

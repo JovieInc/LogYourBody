@@ -6,6 +6,7 @@ extension DashboardViewLiquid {
     var photoTimelineHUD: some View {
         ZStack(alignment: .topLeading) {
             timelineAccessibilityMarker(id: "photo_timeline_hud", label: "Timeline overview")
+            timelineAccessibilityMarker(id: "world_class_screen_photoTimeline", label: "Today timeline")
 
             Group {
                 if let metric = currentMetric {
@@ -100,9 +101,6 @@ extension DashboardViewLiquid {
         }
         .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
             homeV2AllPhotosFromHome
-        }
-        .sheet(isPresented: $isHomeV2LogSheetPresented) {
-            homeV2LogWeightSheet
         }
         .sheet(item: $homeV2EditingMetric) { metric in
             homeV2EditEntrySheet(for: metric)

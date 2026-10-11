@@ -61,10 +61,12 @@ public extension Color {
     static let metricGridMajor = Color(hex: "#242830")
     static let metricGridMinor = Color(hex: "#1C1F26")
     static let metricAccentSteps = Color(hex: "#FF9F0A")
+    // Explicit values keep chart/icon accents above the WCAG AA contrast
+    // floor on the canonical metric card surface in light and dark contexts.
     static let metricAccentWeight = Color(hex: "#A873FF")
-    static let metricAccentBodyFat = Color(hex: "#FF5FA2")
-    static let metricAccentFFMI = Color(hex: "#0F9B8E")
-    static let metricAccentWaist = Color(hex: "#64A5FF")
+    static let metricAccentBodyFat = Color(hex: "#FF2D55")
+    static let metricAccentFFMI = Color(hex: "#54D9CE")
+    static let metricAccentWaist = Color(hex: "#6EA8FF")
 
     // MARK: - State Colors
     static let linearDisabled = Color(hex: "#3A3A3A")

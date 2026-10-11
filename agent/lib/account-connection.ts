@@ -21,7 +21,7 @@ export function connectionInstruction(state: LogYourBodyConnectionState): string
 
 export function smokeReply(state: LogYourBodyConnectionState, turn: number): string {
   if (state === 'connected') {
-    return `Connected boundary verified on turn ${turn}; no health-data tool is enabled.`;
+    return `Connected boundary verified on turn ${turn}; typed training tools remain fail-closed and cannot access records until first-party bearer authorization and session ownership are enforced.`;
   }
 
   return `Connect LogYourBody before health-data work. No health data was accessed on turn ${turn}.`;
