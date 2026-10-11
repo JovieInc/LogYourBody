@@ -79,7 +79,7 @@ enum TorsoFocusService {
     /// Torso midpoint normalized in display space: x right, y down, 0–1.
     static func torsoCenter(in image: UIImage) async -> CGPoint? {
         guard let cgImage = image.cgImage else { return nil }
-        let orientation = CGImagePropertyOrientation(image.imageOrientation)
+        let orientation = cgImagePropertyOrientation(of: image.imageOrientation)
 
         return await Task.detached(priority: .userInitiated) {
             let request = VNDetectHumanBodyPoseRequest()
@@ -126,6 +126,22 @@ enum TorsoFocusService {
         guard let first = jointLocation(firstJoint, in: points),
               let second = jointLocation(secondJoint, in: points) else { return nil }
         return CGPoint(x: (first.x + second.x) / 2, y: (first.y + second.y) / 2)
+    }
+
+    private static func cgImagePropertyOrientation(
+        of orientation: UIImage.Orientation
+    ) -> CGImagePropertyOrientation {
+        switch orientation {
+        case .up: return .up
+        case .upMirrored: return .upMirrored
+        case .down: return .down
+        case .downMirrored: return .downMirrored
+        case .left: return .left
+        case .leftMirrored: return .leftMirrored
+        case .right: return .right
+        case .rightMirrored: return .rightMirrored
+        @unknown default: return .up
+        }
     }
 }
 
