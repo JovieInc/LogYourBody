@@ -19,7 +19,7 @@
 ### Quality bar for every test added here
 
 1. Behavior assertions on observable outcomes — no implementation wiring checks.
-2. Mocks/stubs only at external boundaries: Supabase/HTTP, Clerk REST,
+2. Mocks/stubs only at external boundaries: first-party HTTP, Clerk REST,
    HealthKit, RevenueCat, Photos/Camera, UserNotifications, Sentry, Statsig.
 3. Deterministic: fixed clocks, seeded data, temp-dir Core Data stores.
 4. Independent: no global state, no cross-test coupling.
@@ -211,14 +211,14 @@ candidate (propose deletion, not tests).
 
 ### A.7 Settings / preferences
 
-| Surface                                                                       | File                                | Risk | Layer           | Status / existing                                                                                               |
-| ----------------------------------------------------------------------------- | ----------------------------------- | ---- | --------------- | --------------------------------------------------------------------------------------------------------------- |
-| `PreferencesView` (hub)                                                       | `Views/PreferencesView.swift`       | M    | unit + XCUITest | 🔶 UI settings fixtures, `DailyReminderPolicyTests`                                                             |
+| Surface                                                                       | File                                      | Risk | Layer           | Status / existing                                                                                                       |
+| ----------------------------------------------------------------------------- | ----------------------------------------- | ---- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `PreferencesView` (hub)                                                       | `Views/PreferencesView.swift`             | M    | unit + XCUITest | 🔶 UI settings fixtures, `DailyReminderPolicyTests`                                                                     |
 | `PreferencesView` profile editor sheets                                       | `Views/ProfileSettingsEditorSheets.swift` | M    | unit            | 🔶 `ProfileSettingsPolicyTests`, `SettingsSurfacePolicyTests` (live name/DOB/height + `world_class_screen_editProfile`) |
-| `PreferenceGoalEditorSheet`                                                   | `Views/PreferenceGoalEditing.swift` | M    | unit            | 🔶 `PreferenceGoalValidatorTests`, UI goal-editor tests                                                         |
-| `SecuritySessionsView`                                                        | `Views/SecuritySessionsView.swift`  | M    | unit            | 🔶 `SessionListOrderingTests` (view states declarative; no HTTP boundary — sessions synthesized locally)        |
-| `DeleteAccountView`                                                           | `Views/DeleteAccountView.swift`     | H    | integration     | 🔶 `AccountDeletionCleanupServiceTests` (service-level), `AccountDeletionConfirmationPolicyTests` (view gating) |
-| `LegalView`, `WhatsNewView`, `SyncStatusView`/`SyncDetailsView`, `VersionRow` | `Views/`                            | —    | —               | 🗑 all orphaned                                                                                                 |
+| `PreferenceGoalEditorSheet`                                                   | `Views/PreferenceGoalEditing.swift`       | M    | unit            | 🔶 `PreferenceGoalValidatorTests`, UI goal-editor tests                                                                 |
+| `SecuritySessionsView`                                                        | `Views/SecuritySessionsView.swift`        | M    | unit            | 🔶 `SessionListOrderingTests` (view states declarative; no HTTP boundary — sessions synthesized locally)                |
+| `DeleteAccountView`                                                           | `Views/DeleteAccountView.swift`           | H    | integration     | 🔶 `AccountDeletionCleanupServiceTests` (service-level), `AccountDeletionConfirmationPolicyTests` (view gating)         |
+| `LegalView`, `WhatsNewView`, `SyncStatusView`/`SyncDetailsView`, `VersionRow` | `Views/`                                  | —    | —               | 🗑 all orphaned                                                                                                         |
 
 ### A.8 HealthKit / integrations
 
@@ -264,14 +264,14 @@ candidate (propose deletion, not tests).
 | `Glp1AddMedicationView`                            | `Views/AddEntrySheet.swift`                  | M    | unit                          | 🔶 `Glp1CardAndCatalogTests`, UI fixture                            |
 | `EditEntrySheet`                                   | `Views/EditEntrySheet.swift`                 | —    | —                             | 🗑 orphaned (GLP-1 dose editing lives in AddEntrySheet)             |
 | `BugReportPromptSheet`/`BugReportFormView`         | `Views/BugReportViews.swift`                 | L    | unit                          | ❌                                                                  |
-| `LoadingScreen`                                    | `DesignSystem/Organisms/LoadingScreen.swift`  | L    | unit                          | 🔶 manager-level only; launch overlay uses LoadingScreen directly   |
+| `LoadingScreen`                                    | `DesignSystem/Organisms/LoadingScreen.swift` | L    | unit                          | 🔶 manager-level only; launch overlay uses LoadingScreen directly   |
 | `ImageProcessingStatusView`                        | `Components/ImageProcessingStatusView.swift` | —    | —                             | 🗑 orphaned                                                         |
 
 ---
 
 ## B. Business-logic inventory (110 files; 54 full, 9 partial, 47 untested)
 
-Fully/partially covered areas (verify only): Supabase manager + payload
+Fully/partially covered areas (verify only): first-party API client + payload
 contracts, RevenueCat manager, RealtimeSyncManager + sync integration,
 CoreDataManager (+migration tests), HealthKitManager + coordinator,
 BodyScore engine/cache/recalc, OnboardingFlowViewModel, DashboardViewModel,
@@ -285,8 +285,8 @@ VisionOrientationService, PhotoLibraryScanner criteria/auth mapping).
 | File                                                        | Responsibility                                           | Boundaries                             | Layer                             |
 | ----------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------- | --------------------------------- |
 | `Services/KeychainManager.swift`                            | Auth-token keychain storage                              | Keychain                               | unit (keychain-backed, sandboxed) |
-| `Services/PhotoUploadManager.swift`                         | Progress-photo upload to Supabase Storage                | Supabase, Photos                       | integration (stubbed HTTP)        |
-| `Services/BackgroundPhotoUploadService.swift` (+Processing) | Background photo pipeline                                | Supabase, Core Data, Photos            | integration                       |
+| `Services/PhotoUploadManager.swift`                         | Progress-photo upload through first-party API            | HTTP, Photos                           | integration (stubbed HTTP)        |
+| `Services/BackgroundPhotoUploadService.swift` (+Processing) | Background photo pipeline                                | First-party API, Core Data, Photos     | integration                       |
 | `Services/ExternalServicePorts.swift`                       | Vendor ports/adapters (biometrics, photos, camera)       | LocalAuthentication, Photos            | unit (fake adapters)              |
 | `Services/AppVersionManager.swift`                          | Upgrade migrations, defaults seeding (data-loss risk)    | Core Data, UserDefaults                | integration                       |
 | `Services/AuthManager.swift` gaps                           | Session/token lifecycle beyond current local-state tests | Clerk REST, Keychain                   | integration (stubbed HTTP)        |

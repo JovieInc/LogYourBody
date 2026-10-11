@@ -13,7 +13,7 @@ jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
 }));
 jest.mock('@/hooks/use-media-query');
-// Supabase mocks are already in jest.setup.js
+// Shared browser mocks are configured in jest.setup.js.
 
 jest.mock('../page', () => {
   const React = require('react') as typeof import('react');

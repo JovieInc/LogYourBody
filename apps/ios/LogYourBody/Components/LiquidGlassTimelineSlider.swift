@@ -51,7 +51,7 @@ struct LiquidGlassTimelineSlider: View {
 
                     Spacer()
 
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "camera.fill")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.appPrimary)
@@ -60,8 +60,8 @@ struct LiquidGlassTimelineSlider: View {
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.white)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                     .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
                     .fixedSize()
 
@@ -468,7 +468,7 @@ struct LiquidPhotoAnchor: View {
                     AsyncImage(url: URL(string: photoUrl)) { image in
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .scaledToFill()
                             .frame(width: 24, height: 24)
                             .clipShape(Circle())
                             .onAppear { imageLoaded = true }
@@ -512,7 +512,7 @@ struct GlassNavigationButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 if isLeading {
                     Image(systemName: icon)
                         .font(.system(size: 12, weight: .semibold))

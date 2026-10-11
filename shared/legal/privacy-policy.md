@@ -87,12 +87,13 @@ We do not sell, trade, or rent your personal information. We may share your info
 2. **Service Providers**: Third-party services that help operate our Service:
    - Jovie (authentication)
    - Neon (database hosting)
-   - Supabase (legacy photo processing and account-deletion helpers)
    - Cloudflare R2 (progress-photo storage)
    - Vercel (web hosting)
    - RevenueCat (subscription and purchase entitlements)
    - Sentry (error tracking and crash reporting)
    - Statsig (feature experimentation and product analytics)
+   - Apple Speech for voice input; recognition stays on device when supported and may use network recognition otherwise
+   - The selected speech provider receives response text only when voice playback is requested
 3. **Legal Requirements**: If required by law or to protect rights and safety
 4. **Business Transfers**: In connection with a merger or acquisition (with notice)
 

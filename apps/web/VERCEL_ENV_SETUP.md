@@ -1,50 +1,17 @@
-# Vercel Environment Setup
+# Vercel environment setup
 
-Configure web RevenueCat values in Vercel. Do not commit real keys to docs.
-
-## Prerequisites
-
-1. Install dependencies with `pnpm install`.
-2. Authenticate the Vercel CLI.
-3. Link the Vercel project.
+Use the Vercel CLI from `apps/web` after linking the `log-your-body` project.
 
 ```bash
 pnpm dlx vercel login
 pnpm dlx vercel link
 ```
 
-## Environment Variables
-
-Add these values through the Vercel dashboard or CLI:
-
-- `NEXT_PUBLIC_SUPABASE_URL` - required for Supabase initialization
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - required for Supabase initialization
-- `VITE_REVENUECAT_IOS_KEY`
-- `VITE_REVENUECAT_WEB_KEY`
-- `VITE_REVENUECAT_PUBLIC_KEY` if a legacy web path still reads it
-
-RevenueCat public SDK keys are not private secrets, but they should still be
-managed through environment configuration so the docs never drift from the
-configured project.
-
-## CLI Flow
-
-```bash
-pnpm dlx vercel env add NEXT_PUBLIC_SUPABASE_URL production
-pnpm dlx vercel env add NEXT_PUBLIC_SUPABASE_URL preview
-pnpm dlx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
-pnpm dlx vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY preview
-pnpm dlx vercel env add VITE_REVENUECAT_IOS_KEY production
-pnpm dlx vercel env add VITE_REVENUECAT_IOS_KEY preview
-pnpm dlx vercel env add VITE_REVENUECAT_WEB_KEY production
-pnpm dlx vercel env add VITE_REVENUECAT_WEB_KEY preview
-```
-
-## Verification
+Set production `DATABASE_URL` to the pooled Neon connection string. The app also needs its server-side Jovie auth, RevenueCat, Statsig, Sentry, and Cloudflare R2 values when those integrations are enabled. Keep every credential server-only unless the value is explicitly designed for browser use.
 
 ```bash
 pnpm dlx vercel env ls
-pnpm --filter apps/web build
+pnpm --filter logyourbody build
 ```
 
-Redeploy after environment changes so the app receives the latest values.
+After changing an environment value, deploy a new production artifact and verify the canonical hostname.

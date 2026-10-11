@@ -116,8 +116,8 @@ enum Configuration {
         return false
     }
 
-    /// Checks whether a URL-shaped value is invalid (corrupt/redacted or bad host).
-    /// Applied ONLY where a URL/host is expected (SUPABASE_URL, API_BASE_URL).
+    /// Checks whether a URL-shaped value is invalid (corrupt/redacted or missing host).
+    /// Applied only where a URL or host is expected.
     static func isInvalidURLValue(_ value: String) -> Bool {
         let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
@@ -126,15 +126,16 @@ enum Configuration {
             return true
         }
 
-        // Host validation: treat as invalid if the host fails service-host checks.
+        // URL validation accepts explicit development localhost values and production hosts.
         if let url = URL(string: normalized),
            let scheme = url.scheme,
            ["http", "https"].contains(scheme),
-           let host = url.host {
-            return !SupabaseURLBuilder.isValidServiceHost(host)
+           let host = url.host,
+           !host.isEmpty {
+            return false
         }
 
-        return false
+        return true
     }
 
     // MARK: - API Configuration
@@ -166,20 +167,6 @@ enum Configuration {
 
     static var authCallbackScheme: String {
         URL(string: authRedirectURI)?.scheme ?? "logyourbody"
-    }
-
-    // MARK: - Supabase Configuration
-
-    static var supabaseURL: String {
-        stringValue(for: "SUPABASE_URL")
-    }
-
-    static var supabaseExpectedHost: String {
-        stringValue(for: "SUPABASE_EXPECTED_HOST")
-    }
-
-    static var supabaseAnonKey: String {
-        stringValue(for: "SUPABASE_ANON_KEY")
     }
 
     // MARK: - RevenueCat Configuration

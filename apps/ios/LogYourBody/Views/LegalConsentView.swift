@@ -93,7 +93,7 @@ struct LegalConsentView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Your data stays yours.")
                 .font(.title2.weight(.bold))
                 .foregroundColor(.jovieText)

@@ -49,27 +49,30 @@ struct BodyScoreHeightView: View {
                 }
             },
             footer: {
-                Button {
-                    viewModel.persistHeightEntry()
-                    viewModel.goToNextStep()
-                } label: {
-                    Text("Continue")
+                VStack(spacing: JovieTokens.itemGap) {
+                    if centimetersFocused {
+                        Button {
+                            centimetersFocused = false
+                        } label: {
+                            Text("Done")
+                                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .accessibilityIdentifier("body_score_height_keyboard_done_button")
+                    }
+                    Button {
+                        viewModel.persistHeightEntry()
+                        viewModel.goToNextStep()
+                    } label: {
+                        Text("Continue")
+                    }
+                    .accessibilityIdentifier("body_score_onboarding_height_continue_button")
+                    .buttonStyle(OnboardingPrimaryButtonStyle())
+                    .disabled(!viewModel.canContinueHeight)
                 }
-                .accessibilityIdentifier("body_score_onboarding_height_continue_button")
-                .buttonStyle(OnboardingPrimaryButtonStyle())
-                .disabled(!viewModel.canContinueHeight)
             }
         )
-        .toolbar {
-            ToolbarItem(placement: .keyboard) {
-                HStack {
-                    Spacer()
-                    Button("Done") {
-                        centimetersFocused = false
-                    }
-                }
-            }
-        }
         .onChange(of: heightError) { _, error in
             heightErrorFocused = error != nil
         }
@@ -105,7 +108,7 @@ struct BodyScoreHeightView: View {
             .onChange(of: viewModel.heightCentimetersText) { _, newValue in
                 validateHeightCentimeters(newValue)
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 20)
             .frame(minHeight: JovieTokens.controlHeight)
             .systemBGlassSurface(
                 cornerRadius: JovieTokens.controlHeight,

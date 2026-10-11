@@ -76,7 +76,7 @@ struct SecondaryMetricsRow: View {
                 )
                 .scaleEffect(displayMode == .ffmiChart ? 1.05 : 1.0)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18)
+                    RoundedRectangle(cornerRadius: 20)
                         .stroke(displayMode == .ffmiChart ? Color.liquidAccent : Color.clear, lineWidth: 2)
                 )
             }

@@ -52,7 +52,7 @@ struct DSIcon: View {
         DSIcon(name: "star.fill", size: .medium)
         DSIcon(name: "star.fill", size: .large)
         DSIcon(name: "star.fill", size: .xlarge)
-        DSIcon(name: "heart.fill", size: .large, color: .red)
+        DSIcon(name: "heart.fill", size: .large, color: Color.appError)
     }
     .padding()
     .background(Color.appBackground)

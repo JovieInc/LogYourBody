@@ -42,14 +42,20 @@ final class GlobalTimelineService {
         )
 
         var buckets: [GlobalTimelineBucket] = []
+        var metricIndex = 0
+        var dailyMetricIndex = 0
 
         while bucketStart <= latestBucketStart {
             guard let bucketEnd = endOfBucket(startingAt: bucketStart, scale: scale) else {
                 break
             }
 
-            let bucketMetrics = sortedMetrics.filter { $0.date >= bucketStart && $0.date < bucketEnd }
-            let bucketDailyMetrics = sortedDailyMetrics.filter { $0.date >= bucketStart && $0.date < bucketEnd }
+            let bucketMetrics = takeBucketValues(
+                sortedMetrics, index: &metricIndex, start: bucketStart, end: bucketEnd, date: \.date
+            )
+            let bucketDailyMetrics = takeBucketValues(
+                sortedDailyMetrics, index: &dailyMetricIndex, start: bucketStart, end: bucketEnd, date: \.date
+            )
             let midpoint = midpoint(start: bucketStart, end: bucketEnd)
 
             let snapshot = makeMetricsSnapshot(
@@ -79,6 +85,20 @@ final class GlobalTimelineService {
         }
 
         return buckets
+    }
+
+    /// Each sorted input advances once across the contiguous, half-open buckets.
+    private func takeBucketValues<Value>(
+        _ values: [Value], index: inout Int, start: Date, end: Date, date: KeyPath<Value, Date>
+    ) -> [Value] {
+        while index < values.count && values[index][keyPath: date] < start {
+            index += 1
+        }
+        let firstIndex = index
+        while index < values.count && values[index][keyPath: date] < end {
+            index += 1
+        }
+        return Array(values[firstIndex..<index])
     }
 
     func makeInitialCursor(
@@ -201,9 +221,13 @@ final class GlobalTimelineService {
            bodyFat.presence == .present || bodyFat.presence == .estimated,
            let weightKg = weight.value,
            let bodyFatPercentage = bodyFat.value {
-            let heightMeters = heightInches * 0.0254
-            let leanMassKg = weightKg * (1 - bodyFatPercentage / 100)
-            let ffmi = leanMassKg / (heightMeters * heightMeters)
+            guard let ffmi = UnitConversion.calculateFFMI(
+                weightKg: weightKg,
+                bodyFatPercentage: bodyFatPercentage,
+                heightCm: heightInches * 2.54
+            ) else {
+                return missingValue()
+            }
 
             return GlobalTimelineMetricValue(
                 value: roundedOneDecimal(ffmi),

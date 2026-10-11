@@ -10,17 +10,17 @@ extension PreferencesView {
             SettingsToggleRow(
                 icon: "bell.badge.fill",
                 title: "Daily weigh-in",
+                titleAccessibilityIdentifier: "home_v2_reminders_toggle",
                 isOn: dailyWeighInReminderBinding,
                 subtitle: dailyReminderSubtitle
             )
             .accessibilityIdentifier("settings_daily_weigh_in_reminder_toggle")
 
             if notificationManager.isDailyWeighInReminderEnabled {
-                DatePicker(
-                    "Reminder time",
-                    selection: $dailyReminderDate,
-                    displayedComponents: .hourAndMinute
-                )
+                DatePicker(selection: $dailyReminderDate, displayedComponents: .hourAndMinute) {
+                    Text("Reminder time")
+                        .accessibilityIdentifier("home_v2_reminders_time")
+                }
                 .datePickerStyle(.compact)
                 .onChange(of: dailyReminderDate) { _, newValue in
                     Task {
@@ -28,7 +28,18 @@ extension PreferencesView {
                     }
                 }
                 .accessibilityIdentifier("settings_daily_weigh_in_reminder_time_picker")
+
+                SettingsRow(
+                    title: HomeV2SettingsCopy.days,
+                    titleAccessibilityIdentifier: "home_v2_reminders_days",
+                    value: HomeV2SettingsCopy.everyDay
+                )
             }
+
+            Text(HomeV2SettingsCopy.remindersNote)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("home_v2_reminders_note")
         }
     }
 
@@ -36,7 +47,9 @@ extension PreferencesView {
         SettingsNavigationLink(
             icon: "square.stack.3d.up.fill",
             title: "Integrations",
-            subtitle: "Apple Health, imports, and export"
+            subtitle: "Apple Health and body-composition imports",
+            accessibilityIdentifier: "settings_integrations_link",
+            titleAccessibilityIdentifier: "home_v2_settings_health"
         ) {
             IntegrationsView()
         }

@@ -44,6 +44,8 @@ function collectLocalModuleGraph(entryPath: string): string[] {
 
 const requiredVariables = ['DATABASE_URL', 'OPENAI_API_KEY', 'CRON_SECRET'] as const;
 const ripgrepInvocation = /(^|[\s;`])rg(\s|$)/m;
+const vercelOrgId = 'team_bpNDbti6srVLYPKdmQLu4UgT';
+const vercelProjectId = 'prj_6seYBdTtY3TuFqrJek1puaFG6Trj';
 
 function hasRequiredVariable(envFile: string, requiredVariable: string): boolean {
   try {
@@ -76,6 +78,15 @@ describe('deploy Vercel env verify uses POSIX grep', () => {
     expect(deployWorkflow).toContain(`for required_variable in ${requiredVariables.join(' ')}`);
     for (const requiredVariable of requiredVariables) {
       expect(deployWorkflow).toContain(requiredVariable);
+    }
+  });
+
+  it('targets the canonical Vercel team and project in noninteractive CI', () => {
+    for (const workflow of [deployWorkflow, webReleaseLoop]) {
+      expect(workflow).toContain(`VERCEL_ORG_ID: ${vercelOrgId}`);
+      expect(workflow).toContain(`VERCEL_PROJECT_ID: ${vercelProjectId}`);
+      expect(workflow).toContain('--scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"');
+      expect(workflow).not.toContain('--token="$VERCEL_TOKEN"');
     }
   });
 
@@ -125,9 +136,19 @@ describe('deploy neon migrate CLI stays runnable from GitHub Actions', () => {
     const migrateCli = readFileSync(neonMigrateCliPath, 'utf8');
     expect(migrateCli).toContain('process.env.DATABASE_URL');
     expect(migrateCli).toContain("throw new Error('Missing DATABASE_URL')");
-    expect(migrateCli).toContain("await sql.query('begin')");
-    expect(migrateCli).toContain("await sql.query('commit')");
-    expect(migrateCli).toContain("await sql.query('rollback')");
+    expect(migrateCli).toContain('assertDirectNeonMigrationConnection(connectionString)');
+    expect(migrateCli).toContain('neonConfig.webSocketConstructor = WebSocket');
+    expect(migrateCli).toContain('new Client(connectionString)');
+    // The neon() HTTP driver uses prepared statements, which reject the
+    // multi-statement .sql files; the entry must keep the ws Client path.
+    expect(migrateCli).not.toMatch(
+      /import\s*\{[^}]*\bneon\b[^}]*\}\s*from\s*['"]@neondatabase\/serverless['"]/,
+    );
+    expect(migrateCli).not.toContain('neon(connectionString');
+    expect(migrateCli).toContain("await client.query('BEGIN')");
+    expect(migrateCli).toContain('await client.query(contents)');
+    expect(migrateCli).toContain("await client.query('COMMIT')");
+    expect(migrateCli).toContain("await client.query('ROLLBACK')");
 
     expect(deployWorkflow).toContain('Apply product database migrations');
     expect(deployWorkflow).toContain('test -n "$DATABASE_URL"');
@@ -159,8 +180,6 @@ describe('deploy neon migrate CLI stays runnable from GitHub Actions', () => {
     const output = `${stdout}\n${stderr}`;
     expect(status).not.toBe(0);
     expect(output).toContain('Missing DATABASE_URL');
-    expect(output).not.toContain(
-      'This module cannot be imported from a Client Component module',
-    );
+    expect(output).not.toContain('This module cannot be imported from a Client Component module');
   });
 });

@@ -9,11 +9,9 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 
 - `AUTH_ISSUER=https://jov.ie/api/auth`, `AUTH_CLIENT_ID=logyourbody-ios`, and `AUTH_REDIRECT_URI=logyourbody://oauth` are configured.
 - Phone OTP is the only signed-out auth path.
-- Supabase production URL and anon key are configured in `Config.xcconfig`.
-- GitHub `Production` environment has `NEXT_PUBLIC_SUPABASE_URL`.
-- GitHub `Production` environment has either `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`.
+- The first-party API base URL and expected host are configured in `Config.xcconfig`.
 - Jovie has the `logyourbody-ios` public OAuth client with the exact native redirect and PKCE required.
-- Supabase RLS policies accept its product session `sub` for `profiles`, `user_profiles`, `body_metrics`, and `daily_metrics`.
+- Neon migrations and first-party API authorization accept the Jovie subject for product data.
 - RevenueCat production public key is configured.
 - GitHub `Production` environment has `REVENUE_CAT_PUBLIC_KEY`.
 - RevenueCat `Premium` entitlement matches `Constants.proEntitlementID`.
@@ -66,7 +64,7 @@ Follow the exact local, PR, main, TestFlight, and App Store evidence sequence in
 - HealthKit allow, deny, and skip paths all lead to a usable app state.
 - Sync retries after the device returns online.
 - Product-data rows use the Jovie Better Auth subject as the stable `user_id`
-  or profile `id`; no Supabase auth principal is created.
+  or profile `id`; no secondary auth principal is created.
 - Sync failure shows recoverable UI and does not block local logging.
 
 ## Legal And Store Review
@@ -132,5 +130,5 @@ xcodebuild -project LogYourBody.xcodeproj \
   are acceptable for PR confidence, but frame and hitch budgets require a
   reliable simulator metrics payload or a physical-device Instruments/ETTrace
   artifact before they are reported as passed.
-- Include Supabase sync test results.
+- Include first-party Neon sync test results.
 - Include validation command output and known risks.

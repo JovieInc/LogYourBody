@@ -1,26 +1,52 @@
 import XCTest
+import CoreData
 @testable import LogYourBody
 
 @MainActor
 final class BodyScoreHealthKitTriggerTests: XCTestCase {
+    private var suiteName = ""
+    private var defaults: UserDefaults!
+    private var auth: AuthManager!
+    private var coreData: CoreDataManager!
+    private var cacheOwners: [String] = []
+
     override func setUp() async throws {
         try await super.setUp()
-        AuthManager.shared.currentUser = nil
-        BodyScoreCache.shared.removeAll()
-        try await CoreDataManager.shared.deleteAllDataAndWait()
+        suiteName = "BodyScoreHealthKitTriggerTests.\(UUID().uuidString)"
+        defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [HealthImportNoNetworkProtocol.self]
+        auth = AuthManager(userDefaults: defaults, urlSession: URLSession(configuration: configuration))
+        let store = NSPersistentStoreDescription()
+        store.type = NSInMemoryStoreType
+        store.shouldAddStoreAsynchronously = false
+        coreData = CoreDataManager(persistentStoreDescriptions: [store])
+        cacheOwners = []
     }
 
     override func tearDown() async throws {
-        AuthManager.shared.currentUser = nil
-        BodyScoreCache.shared.removeAll()
-        try await CoreDataManager.shared.deleteAllDataAndWait()
+        for owner in cacheOwners { BodyScoreCache.shared.invalidate(for: owner) }
+        defaults?.removePersistentDomain(forName: suiteName)
+        auth = nil
+        coreData = nil
+        defaults = nil
         try await super.tearDown()
+    }
+
+    private func manager(for user: LocalUser) -> HealthKitManager {
+        auth.authSession = .localFixture(subject: user.id, email: user.email, accessToken: "synthetic")
+        auth.currentUser = user
+        return HealthKitManager(
+            userDefaults: defaults, authManager: auth, coreDataManager: coreData,
+            syncTrigger: {}, bodyScoreRecalculationTrigger: {}
+        )
     }
 
     func testHealthKitNoOpBatchDoesNotInvalidateBodyScoreCache() async throws {
         let userId = "healthkit_test_user_noop_cache_\(UUID().uuidString)"
         let otherUserId = "healthkit_test_user_other_cache_\(UUID().uuidString)"
-        AuthManager.shared.currentUser = makeUser(id: userId, email: "hk_noop_cache@example.com")
+        let healthKitManager = manager(for: makeUser(id: userId, email: "hk_noop_cache@example.com"))
+        cacheOwners = [userId, otherUserId]
 
         let day = Calendar.current.startOfDay(for: Date())
         let existingDate = Calendar.current.date(
@@ -32,7 +58,7 @@ final class BodyScoreHealthKitTriggerTests: XCTestCase {
             to: day
         ) ?? day
 
-        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+        try await coreData.saveBodyMetricsAndWait(
             makeBodyMetrics(userId: userId, date: existingDate),
             userId: userId
         )
@@ -42,7 +68,7 @@ final class BodyScoreHealthKitTriggerTests: XCTestCase {
         BodyScoreCache.shared.store(cachedScore, for: userId)
         BodyScoreCache.shared.store(otherCachedScore, for: otherUserId)
 
-        let result = await HealthKitManager.shared.processBatchHealthKitData(
+        let result = await healthKitManager.processBatchHealthKitData(
             weightHistory: [(weight: 81.0, date: skippedDate)],
             bodyFatHistory: []
         )
@@ -56,14 +82,15 @@ final class BodyScoreHealthKitTriggerTests: XCTestCase {
     func testHealthKitImportInvalidatesOnlyAffectedBodyScoreCache() async {
         let userId = "healthkit_test_user_import_cache_\(UUID().uuidString)"
         let otherUserId = "healthkit_test_user_other_cache_\(UUID().uuidString)"
-        AuthManager.shared.currentUser = makeUser(id: userId, email: "hk_import_cache@example.com")
+        let healthKitManager = manager(for: makeUser(id: userId, email: "hk_import_cache@example.com"))
+        cacheOwners = [userId, otherUserId]
 
         let cachedScore = makeBodyScoreResult(score: 91)
         let otherCachedScore = makeBodyScoreResult(score: 73)
         BodyScoreCache.shared.store(cachedScore, for: userId)
         BodyScoreCache.shared.store(otherCachedScore, for: otherUserId)
 
-        let result = await HealthKitManager.shared.processBatchHealthKitData(
+        let result = await healthKitManager.processBatchHealthKitData(
             weightHistory: [(weight: 79.0, date: Date())],
             bodyFatHistory: []
         )

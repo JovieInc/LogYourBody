@@ -14,12 +14,12 @@ struct ModernTextFieldModifier: ViewModifier {
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(Color.appCard.opacity(0.5))
             )
             .foregroundColor(.appText)
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 8)
                     .stroke(
                         isFocused ? Color.appPrimary : Color.appBorder,
                         lineWidth: 1
@@ -45,7 +45,7 @@ struct ModernPrimaryButtonModifier: ViewModifier {
             .background(
                 Color.appPrimary.opacity(isEnabled ? 1 : 0.5)
             )
-            .cornerRadius(6)
+            .cornerRadius(8)
     }
 }
 
@@ -58,13 +58,13 @@ struct ModernSecondaryButtonModifier: ViewModifier {
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.appBorder, lineWidth: 1)
             )
             .background(
                 Color.appCard.opacity(0.3)
             )
-            .cornerRadius(6)
+            .cornerRadius(8)
     }
 }
 

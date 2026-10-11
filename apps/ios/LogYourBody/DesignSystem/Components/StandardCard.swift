@@ -157,9 +157,9 @@ struct MetricCard: View {
 
         var color: Color {
             switch self {
-            case .up: return Color(hex: "#4CAF50")
-            case .down: return Color(hex: "#F44336")
-            case .neutral: return Color(hex: "#9CA0A8")
+            case .up: return Color.appSuccess
+            case .down: return Color.appError
+            case .neutral: return Color.appTextSecondary
             }
         }
     }
@@ -209,7 +209,7 @@ struct MetricCard: View {
                     if isEstimated {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 12))
-                            .foregroundColor(.orange)
+                            .foregroundColor(Color.appWarning)
                     }
                 }
 
@@ -394,7 +394,7 @@ struct StandardCard_Previews: PreviewProvider {
                     // Info card
                     InfoCard(
                         icon: "lightbulb.fill",
-                        iconColor: .yellow,
+                        iconColor: Color.appWarning,
                         title: "Pro Tip",
                         description: "Track your measurements at the same time each day for more consistent results."
                     )

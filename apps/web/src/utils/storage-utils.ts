@@ -1,8 +1,8 @@
 const PHOTO_STORE_UNAVAILABLE =
-  'Progress photo cloud storage is not available after the Supabase hard cut.';
+  'Progress photo cloud storage is unavailable for retired legacy records.';
 
 /**
- * Ensures a legacy Supabase storage URL uses the public format.
+ * Ensures a legacy object-storage URL uses the public format.
  * Kept for abandoned URL parsing; new uploads do not use this store.
  */
 export function ensurePublicUrl(url: string): string {

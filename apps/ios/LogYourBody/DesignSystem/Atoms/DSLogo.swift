@@ -87,8 +87,8 @@ struct DSLogoAnimated: View {
         // Different colors
         HStack(spacing: 40) {
             DSLogo(size: 60, color: .appPrimary, textSize: 20)
-            DSLogo(size: 60, color: .orange, textSize: 20)
-            DSLogo(size: 60, color: .green, textSize: 20)
+            DSLogo(size: 60, color: Color.appWarning, textSize: 20)
+            DSLogo(size: 60, color: Color.appSuccess, textSize: 20)
         }
 
         // Animated version

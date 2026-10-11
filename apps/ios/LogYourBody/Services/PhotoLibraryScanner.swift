@@ -80,10 +80,33 @@ class PhotoLibraryScanner: ObservableObject {
     @Published var scannedPhotos: [ScannedPhoto] = []
     @Published var photoGroups: [PhotoGroup] = []
 
-    private let imageManager = PHCachingImageManager()
+    private let imageManager: PHImageManager
+    private let metadataProvider: ((PHAsset) -> ScannedPhoto.PhotoMetadata)?
+    private let metadataScanEnabled: @MainActor () -> Bool
+    private let monotonicTime: () -> TimeInterval
+    private let fetchAssets: (PhotoScanCriteria) async throws -> [PHAsset]
+    private let beforePublish: () async -> Void
     private var scanTask: Task<Void, Never>?
+    private var scanGeneration = 0
 
-    private init() {
+    init(
+        imageManager: PHImageManager = PHCachingImageManager(),
+        metadataProvider: ((PHAsset) -> ScannedPhoto.PhotoMetadata)? = nil,
+        metadataScanEnabled: @escaping @MainActor () -> Bool = {
+            AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: "photo_scan_metadata_v1")
+        },
+        monotonicTime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        fetchAssets: ((PhotoScanCriteria) async throws -> [PHAsset])? = nil,
+        beforePublish: @escaping () async -> Void = {}
+    ) {
+        self.imageManager = imageManager
+        self.metadataProvider = metadataProvider
+        self.metadataScanEnabled = metadataScanEnabled
+        self.monotonicTime = monotonicTime
+        self.fetchAssets = fetchAssets ?? { criteria in
+            try await Self.libraryAssets(matching: criteria)
+        }
+        self.beforePublish = beforePublish
         checkAuthorizationStatus()
     }
 
@@ -117,25 +140,35 @@ class PhotoLibraryScanner: ObservableObject {
             return
         }
 
-        await MainActor.run {
+        let generation = await MainActor.run { () -> Int in
+            scanGeneration += 1
             isScanning = true
             scanProgress = 0
             scannedPhotos = []
             photoGroups = []
+            return scanGeneration
         }
 
-        scanTask = Task {
+        let task = Task {
             do {
                 // Fetch photos matching initial criteria
-                let photos = try await fetchPhotos(matching: criteria)
+                let photos = try await fetchAssets(criteria)
 
                 // Analyze photos for progress photo likelihood
-                let analyzed = await analyzePhotos(photos, criteria: criteria)
+                let analyzed = await analyzePhotos(photos, criteria: criteria, generation: generation)
+                // Cancel is cooperative. Stop before a cancelled scan is published
+                // as finished, including progress 1.
+                guard !Task.isCancelled else {
+                    await self.clearScanIfCurrent(generation)
+                    return
+                }
 
                 // Group photos by date
                 let grouped = groupPhotosByDate(analyzed, minimumDaysBetween: criteria.minimumDaysBetween)
+                await beforePublish()
 
                 await MainActor.run {
+                    guard self.scanGeneration == generation else { return }
                     self.scannedPhotos = analyzed
                     self.photoGroups = grouped
                     self.isScanning = false
@@ -143,19 +176,27 @@ class PhotoLibraryScanner: ObservableObject {
                 }
             } catch {
                 // print("❌ Error scanning photo library: \(error)")
-                await MainActor.run {
-                    self.isScanning = false
-                    self.scanProgress = 0
-                }
+                await self.clearScanIfCurrent(generation)
             }
         }
+        scanTask = task
+        await task.value
     }
 
     func cancelScan() {
+        scanGeneration += 1
         scanTask?.cancel()
         scanTask = nil
         isScanning = false
         scanProgress = 0
+    }
+
+    private func clearScanIfCurrent(_ generation: Int) async {
+        await MainActor.run {
+            guard self.scanGeneration == generation else { return }
+            self.isScanning = false
+            self.scanProgress = 0
+        }
     }
 
     static func appAuthorizationState(from status: PHAuthorizationStatus) -> AppAuthorizationState {
@@ -175,7 +216,7 @@ class PhotoLibraryScanner: ObservableObject {
 
     // MARK: - Private Methods
 
-    private func fetchPhotos(matching criteria: PhotoScanCriteria) async throws -> [PHAsset] {
+    private static func libraryAssets(matching criteria: PhotoScanCriteria) async throws -> [PHAsset] {
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
 
@@ -202,60 +243,62 @@ class PhotoLibraryScanner: ObservableObject {
         return assets
     }
 
-    private func analyzePhotos(_ assets: [PHAsset], criteria: PhotoScanCriteria) async -> [ScannedPhoto] {
+    func analyzePhotos(
+        _ assets: [PHAsset], criteria: PhotoScanCriteria, generation: Int? = nil
+    ) async -> [ScannedPhoto] {
         var analyzed: [ScannedPhoto] = []
-        let totalCount = assets.count
+        let usesMetadata = await metadataScanEnabled()
+        var lastProgressUpdate = monotonicTime()
 
-        // Process in batches to avoid memory issues
-        let batchSize = 20
         for (index, asset) in assets.enumerated() {
             if Task.isCancelled { break }
-
-            // Update progress
-            await MainActor.run {
-                self.scanProgress = Double(index) / Double(totalCount)
-            }
-
-            // Get metadata
-            let metadata = extractMetadata(from: asset)
-
-            // Skip if doesn't meet basic criteria
-            if criteria.excludeScreenshots && metadata.isScreenshot { continue }
-            if criteria.excludeEdited && metadata.hasBeenEdited { continue }
-            let minSize = criteria.minimumResolution
-            if asset.pixelWidth < Int(minSize.width) || asset.pixelHeight < Int(minSize.height) {
-                continue
-            }
-
-            // Skip landscape photos if preferred
-            if criteria.excludeLandscape && criteria.preferPortraitOrientation {
-                let isLandscape = asset.pixelWidth > asset.pixelHeight
-                if isLandscape { continue }
-            }
-
-            // Analyze image content
-            if let confidence = await analyzeImageContent(asset: asset) {
-                if confidence >= criteria.minimumConfidence {
-                    let scannedPhoto = ScannedPhoto(
-                        asset: asset,
-                        date: asset.creationDate ?? Date(),
-                        confidence: confidence,
-                        metadata: metadata
-                    )
-                    analyzed.append(scannedPhoto)
+            let now = monotonicTime()
+            if !usesMetadata || now - lastProgressUpdate >= 0.1 {
+                lastProgressUpdate = now
+                await MainActor.run {
+                    guard generation == nil || self.scanGeneration == generation else { return }
+                    self.scanProgress = Double(index) / Double(assets.count)
                 }
             }
 
-            // Yield to prevent blocking
-            if index.isMultiple(of: batchSize) {
-                await Task.yield()
+            let metadata = extractMetadata(from: asset)
+            if matchesCriteria(asset, metadata: metadata, criteria: criteria),
+               let confidence = await photoConfidence(asset, usesMetadata: usesMetadata),
+               confidence >= criteria.minimumConfidence {
+                analyzed.append(ScannedPhoto(
+                    asset: asset, date: asset.creationDate ?? Date(),
+                    confidence: confidence, metadata: metadata
+                ))
             }
+            // Yield even when every candidate is filtered out.
+            if index.isMultiple(of: 20) { await Task.yield() }
         }
-
         return analyzed
     }
 
+    private func matchesCriteria(
+        _ asset: PHAsset, metadata: ScannedPhoto.PhotoMetadata, criteria: PhotoScanCriteria
+    ) -> Bool {
+        if criteria.excludeScreenshots && metadata.isScreenshot { return false }
+        if criteria.excludeEdited && metadata.hasBeenEdited { return false }
+        if asset.pixelWidth < Int(criteria.minimumResolution.width) ||
+            asset.pixelHeight < Int(criteria.minimumResolution.height) { return false }
+        return !(criteria.excludeLandscape && criteria.preferPortraitOrientation &&
+                 asset.pixelWidth > asset.pixelHeight)
+    }
+
+    private func photoConfidence(_ asset: PHAsset, usesMetadata: Bool) async -> Float? {
+        if usesMetadata {
+            return Self.heuristicConfidence(
+                isPortrait: asset.pixelHeight > asset.pixelWidth,
+                creationDate: asset.creationDate, hasLocation: asset.location != nil
+            )
+        }
+        return await analyzeImageContent(asset: asset)
+    }
+
     private func extractMetadata(from asset: PHAsset) -> ScannedPhoto.PhotoMetadata {
+        if let metadataProvider { return metadataProvider(asset) }
         // Check if screenshot
         let isScreenshot = asset.mediaSubtypes.contains(.photoScreenshot)
 
@@ -309,37 +352,28 @@ class PhotoLibraryScanner: ObservableObject {
                     return
                 }
 
-                // For now, return a mock confidence based on heuristics
-                // TODO: Integrate actual CoreML model for progress photo detection
-
-                // Calculate mock confidence based on typical progress photo characteristics
-                var confidence: Float = 0.5
-
-                // Portrait orientation photos get higher score
-                if image.size.height > image.size.width {
-                    confidence += 0.2
-                }
-
-                // Photos taken in the morning or evening (typical workout times) get higher score
-                if let creationDate = asset.creationDate {
-                    let hour = Calendar.current.component(.hour, from: creationDate)
-                    if (6...9).contains(hour) || (17...21).contains(hour) {
-                        confidence += 0.1
-                    }
-                }
-
-                // Indoor photos (no location) often indicate gym or home photos
-                if asset.location == nil {
-                    confidence += 0.1
-                }
-
-                // Add some randomness for demo purposes
-                confidence += Float.random(in: -0.1...0.1)
-                confidence = max(0.0, min(1.0, confidence))
-
+                let confidence = Self.heuristicConfidence(
+                    isPortrait: image.size.height > image.size.width,
+                    creationDate: asset.creationDate, hasLocation: asset.location != nil,
+                    variation: Float.random(in: -0.1...0.1)
+                )
                 continuation.resume(returning: confidence)
             }
         }
+    }
+
+    /// A metadata ranking heuristic, not an image-content or calibrated probability model.
+    private static func heuristicConfidence(
+        isPortrait: Bool, creationDate: Date?, hasLocation: Bool, variation: Float = 0
+    ) -> Float {
+        var confidence: Float = 0.5
+        if isPortrait { confidence += 0.2 }
+        if let creationDate {
+            let hour = Calendar.current.component(.hour, from: creationDate)
+            if (6...9).contains(hour) || (17...21).contains(hour) { confidence += 0.1 }
+        }
+        if !hasLocation { confidence += 0.1 }
+        return max(0, min(1, confidence + variation))
     }
 
     private func groupPhotosByDate(_ photos: [ScannedPhoto], minimumDaysBetween: Int) -> [PhotoGroup] {

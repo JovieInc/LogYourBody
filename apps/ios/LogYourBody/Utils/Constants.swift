@@ -34,15 +34,6 @@ struct Constants {
         Configuration.isAuthConfigured
     }
 
-    // MARK: - Supabase Configuration (from Config.xcconfig via Info.plist)
-    static var supabaseURL: String {
-        Configuration.supabaseURL
-    }
-
-    static var supabaseAnonKey: String {
-        Configuration.supabaseAnonKey
-    }
-
     // MARK: - RevenueCat Configuration (from Config.xcconfig via Info.plist)
     static var revenueCatAPIKey: String {
         Configuration.revenueCatAPIKey
@@ -150,6 +141,13 @@ enum PhotoTimelineHUDPolicy {
 
     static func shouldShowPhotoTimelineHUD() -> Bool {
         true
+    }
+
+    static let noRecentTrendCaption = "No 30d trend"
+
+    // Metric captions show the 30-day trend; never fall back to a bare unit that repeats the value's own unit.
+    static func metricCaption(trend: String?) -> String {
+        trend ?? noRecentTrendCaption
     }
 
     static func stateText(

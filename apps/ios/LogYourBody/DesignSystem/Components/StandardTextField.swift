@@ -230,9 +230,9 @@ struct TextArea: View {
             }
             .padding(8)
             .background(Color.appCard)
-            .cornerRadius(6)
+            .cornerRadius(8)
             .overlay(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 8)
                     .stroke(borderColor, lineWidth: borderWidth)
             )
 
@@ -246,7 +246,7 @@ struct TextArea: View {
                         Text(error)
                             .font(.caption)
                     }
-                    .foregroundColor(.red)
+                    .foregroundColor(Color.appError)
                 }
 
                 Spacer()
@@ -256,7 +256,7 @@ struct TextArea: View {
                     Text("\(text.count)/\(limit)")
                         .font(.caption2)
                         .foregroundColor(
-                            text.count > limit ? .red : Color.secondary.opacity(0.6)
+                            text.count > limit ? Color.appError : Color.secondary.opacity(0.6)
                         )
                 }
             }
@@ -265,7 +265,7 @@ struct TextArea: View {
 
     private var borderColor: Color {
         if errorMessage != nil {
-            return .red
+            return Color.appError
         } else if isFocused {
             return Color.appPrimary
         } else {

@@ -156,20 +156,20 @@ extension DashboardViewLiquid {
 
     var syncStatusColor: Color {
         if realtimeSyncManager.isSyncing {
-            return .yellow
+            return Color.appWarning
         }
 
         switch realtimeSyncManager.syncStatus {
         case .offline:
             return .gray
         case .error:
-            return .red
+            return Color.appError
         case .success:
-            return .green
+            return Color.appSuccess
         case .syncing:
-            return .yellow
+            return Color.appWarning
         case .idle:
-            return .green
+            return Color.appSuccess
         }
     }
 

@@ -83,7 +83,7 @@ struct BodyScoreManualWeightView: View {
                             .onChange(of: viewModel.manualWeightText) { _, newValue in
                                 validateWeight(newValue)
                             }
-                            .padding(.horizontal, 18)
+                            .padding(.horizontal, 20)
                             .frame(minHeight: JovieTokens.controlHeight)
                             .systemBGlassSurface(
                                 cornerRadius: JovieTokens.controlHeight,

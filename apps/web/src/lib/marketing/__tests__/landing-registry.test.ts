@@ -36,6 +36,8 @@ describe('landing marketing registry', () => {
     expect(LANDING_EXPERIMENTS.audienceCreativeV1).toEqual(
       expect.objectContaining({
         status: 'active',
+        primaryMetric: 'unique_persisted_waitlist_registrations / eligible_unique_landing_sessions',
+        measurementStatus: 'blocked_pending_qualified_session_denominator',
         sampleSizePerArm: 903,
         allocation: { men: 50, women: 50 },
       }),
