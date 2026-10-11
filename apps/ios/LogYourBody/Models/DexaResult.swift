@@ -14,6 +14,11 @@ struct DexaResult: Identifiable, Codable, Equatable {
     let analyzeTime: Date?
     let vatMassKg: Double?
     let vatVolumeCm3: Double?
+    let scanWeight: Double?
+    let scanWeightUnit: String?
+    let bodyFatPercentage: Double?
+    let muscleMass: Double?
+    let boneMass: Double?
     let resultPdfUrl: String?
     let resultPdfName: String?
     let createdAt: Date
@@ -33,9 +38,62 @@ struct DexaResult: Identifiable, Codable, Equatable {
         case analyzeTime = "analyze_time"
         case vatMassKg = "vat_mass_kg"
         case vatVolumeCm3 = "vat_volume_cm3"
+        case scanWeight = "scan_weight"
+        case scanWeightUnit = "scan_weight_unit"
+        case bodyFatPercentage = "body_fat_percentage"
+        case muscleMass = "muscle_mass"
+        case boneMass = "bone_mass"
         case resultPdfUrl = "result_pdf_url"
         case resultPdfName = "result_pdf_name"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+
+    init(
+        id: String,
+        userId: String,
+        bodyMetricsId: String?,
+        externalSource: String,
+        externalResultId: String,
+        externalUpdateTime: Date?,
+        scannerModel: String?,
+        locationId: String?,
+        locationName: String?,
+        acquireTime: Date?,
+        analyzeTime: Date?,
+        vatMassKg: Double?,
+        vatVolumeCm3: Double?,
+        scanWeight: Double? = nil,
+        scanWeightUnit: String? = nil,
+        bodyFatPercentage: Double? = nil,
+        muscleMass: Double? = nil,
+        boneMass: Double? = nil,
+        resultPdfUrl: String?,
+        resultPdfName: String?,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.userId = userId
+        self.bodyMetricsId = bodyMetricsId
+        self.externalSource = externalSource
+        self.externalResultId = externalResultId
+        self.externalUpdateTime = externalUpdateTime
+        self.scannerModel = scannerModel
+        self.locationId = locationId
+        self.locationName = locationName
+        self.acquireTime = acquireTime
+        self.analyzeTime = analyzeTime
+        self.vatMassKg = vatMassKg
+        self.vatVolumeCm3 = vatVolumeCm3
+        self.scanWeight = scanWeight
+        self.scanWeightUnit = scanWeightUnit
+        self.bodyFatPercentage = bodyFatPercentage
+        self.muscleMass = muscleMass
+        self.boneMass = boneMass
+        self.resultPdfUrl = resultPdfUrl
+        self.resultPdfName = resultPdfName
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }

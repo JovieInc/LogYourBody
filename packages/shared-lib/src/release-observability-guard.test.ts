@@ -68,7 +68,7 @@ describe('iOS release observability guard', () => {
             GITHUB_STEP_SUMMARY: summaryPath,
             IOS_CONFIG_OUTPUT_DIR: outputDir,
             REVENUE_CAT_PUBLIC_KEY: 'appl_redacted',
-            SENTRY_DSN: '',
+            SENTRY_DSN: 'https://public@example.ingest.sentry.io/123',
             SENTRY_ENVIRONMENT: 'production',
             SENTRY_TRACES_SAMPLE_RATE: '0.1',
             STATSIG_CLIENT_SDK_KEY: '',
@@ -106,23 +106,27 @@ describe('iOS release observability guard', () => {
     }
   });
 
-  it('records false booleans when optional observability providers are absent', () => {
+  it('records Statsig as unconfigured when only the optional provider is absent', () => {
     const result = runReleaseConfig({
-      SENTRY_DSN: '',
+      SENTRY_DSN: 'https://public@example.ingest.sentry.io/123',
       STATSIG_CLIENT_SDK_KEY: '',
     });
 
     try {
       for (const source of [result.observability, result.summary]) {
-        expect(source).toContain('Sentry configured: false');
+        expect(source).toContain('Sentry configured: true');
         expect(source).toContain('Statsig configured: false');
         expect(source).toContain('Sentry traces sample rate valid: true');
-        expect(source).toContain('Provider smoke proof required: false');
         expect(source).toContain('Values redacted: true');
       }
     } finally {
       rmSync(result.outputDir, { force: true, recursive: true });
     }
+  });
+
+  // Crash reporting is required: an empty DSN once shipped every TestFlight build without Sentry.
+  it('fails closed when SENTRY_DSN is missing', () => {
+    expectReleaseConfigFailure({ SENTRY_DSN: '' });
   });
 
   it.each(['-0.01', '1.01', 'not-a-number'])(

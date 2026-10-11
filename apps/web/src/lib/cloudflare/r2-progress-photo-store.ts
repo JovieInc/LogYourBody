@@ -152,6 +152,7 @@ export async function deleteOwnedProgressPhotos(
   const now = options.now ?? new Date();
   const prefix = progressPhotoOwnerPrefix(userId);
   let continuationToken: string | undefined;
+  const seenContinuationTokens = new Set<string>();
   do {
     const listed = await listR2Objects({
       config,
@@ -160,6 +161,12 @@ export async function deleteOwnedProgressPhotos(
       fetcher,
       now,
     });
+    if (listed.nextContinuationToken) {
+      if (seenContinuationTokens.has(listed.nextContinuationToken)) {
+        throw new Error('r2_list_repeated_continuation_token');
+      }
+      seenContinuationTokens.add(listed.nextContinuationToken);
+    }
     for (const key of listed.keys) {
       if (!key.startsWith(prefix)) {
         throw new Error('r2_list_returned_unowned_object');
@@ -211,12 +218,24 @@ async function listR2Objects(input: {
     throw new Error(`r2_list_failed_${response.status}`);
   }
   const xml = await response.text();
+  const truncation = xml.match(/<IsTruncated>\s*(true|false)\s*<\/IsTruncated>/i)?.[1];
+  if (
+    !/<ListBucketResult\b[^>]*>/.test(xml) ||
+    !xml.trimEnd().endsWith('</ListBucketResult>') ||
+    !truncation
+  ) {
+    throw new Error('r2_list_invalid_response');
+  }
   const keys = [...xml.matchAll(/<Key>([^<]+)<\/Key>/g)].map((match) => decodeXml(match[1] ?? ''));
-  const truncated = /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml);
+  const truncated = truncation.toLowerCase() === 'true';
   const next = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)?.[1];
+  const nextContinuationToken = truncated ? decodeXml(next ?? '') || undefined : undefined;
+  if (truncated && !nextContinuationToken) {
+    throw new Error('r2_list_missing_continuation_token');
+  }
   return {
     keys,
-    nextContinuationToken: truncated ? decodeXml(next ?? '') || undefined : undefined,
+    nextContinuationToken,
   };
 }
 

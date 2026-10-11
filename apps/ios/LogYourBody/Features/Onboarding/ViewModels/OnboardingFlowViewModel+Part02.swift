@@ -45,6 +45,7 @@ func hydrateProfileDetailsDraftIfNeeded(from user: User?) {
             }
 
             profileShouldAskSex = profileBiologicalSex == nil
+            planProfileDetailsFromEarlierAnswers(knownDateOfBirth: nil, knownHeightCentimeters: nil)
             recomputeProfileDetailsActiveSubstep()
             isRestoringProgress = false
             persistProgress()
@@ -73,6 +74,10 @@ func hydrateProfileDetailsDraftIfNeeded(from user: User?) {
         }
 
         profileShouldAskSex = profileBiologicalSex == nil
+        planProfileDetailsFromEarlierAnswers(
+            knownDateOfBirth: user.profile?.dateOfBirth,
+            knownHeightCentimeters: user.profile?.height
+        )
         recomputeProfileDetailsActiveSubstep()
         hasHydratedProfileDetailsDraft = true
 
@@ -220,8 +225,8 @@ func prepareFirstPhotoBaselineMetric() async -> BodyMetrics? {
         do {
             let metric = try await PhotoMetadataService.shared.createOrUpdateMetrics(
                 for: Date(),
-                weight: bodyScoreInput.weight.inKilograms,
-                bodyFatPercentage: bodyScoreInput.bodyFat.percentage,
+                weight: firstPhotoBaselineWeight,
+                bodyFatPercentage: firstPhotoBaselineBodyFat,
                 bodyFatMethod: firstPhotoBaselineBodyFatMethod,
                 userId: userId,
                 dataSource: firstPhotoBaselineDataSource,
@@ -235,7 +240,22 @@ func prepareFirstPhotoBaselineMetric() async -> BodyMetrics? {
         }
     }
 
+// Imported scans are already saved on their actual dates. A new photo must
+// not turn their historical values into a measurement taken today.
+var firstPhotoBaselineWeight: Double? {
+        let isScan = bodyScoreInput.weightSource == .scan ||
+            (bodyScoreInput.weightSource == nil && bodyScoreInput.bodyFat.source == .scan)
+        return isScan ? nil : bodyScoreInput.weight.inKilograms
+    }
+
+var firstPhotoBaselineBodyFat: Double? {
+        bodyScoreInput.bodyFat.source == .scan ? nil : bodyScoreInput.bodyFat.percentage
+    }
+
 var firstPhotoBaselineDataSource: String {
+        if firstPhotoBaselineWeight == nil, firstPhotoBaselineBodyFat == nil {
+            return BodyMetricSource.photo.rawValue
+        }
         if didRequestHealthSync || bodyScoreInput.bodyFat.source == .healthKit {
             return BodyMetricSource.healthKit.rawValue
         }
@@ -338,7 +358,8 @@ func updateImperialFields(fromCentimeters centimeters: Double) {
     }
 
 func updateImperialFields(fromInches inches: Double) {
-        let totalInches = max(0, Int(round(inches)))
+        guard let roundedInches = Int(exactly: inches.rounded()) else { return }
+        let totalInches = max(0, roundedInches)
         heightFeet = max(3, min(8, totalInches / 12))
         heightInches = max(0, min(11, totalInches % 12))
     }
@@ -406,9 +427,10 @@ func hydrateProfileName(from user: User) {
     }
 
 func hydrateProfileHeight(centimeters: Double, storedUnit: String?) {
+        guard centimeters > 0, HeightEntryPolicy.isRepresentableCentimeters(centimeters),
+              let totalInches = Int(exactly: (centimeters / 2.54).rounded()) else { return }
         if storedUnit?.lowercased() == "in" {
             profileHeightUnit = .inches
-            let totalInches = Int((centimeters / 2.54).rounded())
             profileHeightFeet = max(3, min(8, totalInches / 12))
             profileHeightInches = max(0, min(11, totalInches % 12))
         } else {
@@ -437,15 +459,48 @@ var profileHeightUnitStorageValue: String {
         }
     }
 
+/// Carries the birth year and height given earlier in onboarding into the
+/// profile draft, then plans only the substeps that are still unanswered.
+func planProfileDetailsFromEarlierAnswers(knownDateOfBirth: Date?, knownHeightCentimeters: Double?) {
+        var hasDateOfBirth = knownDateOfBirth != nil
+        if !hasDateOfBirth,
+           let birthYear = bodyScoreInput.birthYear,
+           let dateOfBirth = Calendar.current.date(from: DateComponents(year: birthYear, month: 1, day: 1)) {
+            profileDateOfBirth = dateOfBirth
+            hasDateOfBirth = true
+        }
+
+        if (knownHeightCentimeters ?? 0) <= 0, let centimeters = bodyScoreInput.height.inCentimeters {
+            hydrateProfileHeight(centimeters: centimeters, storedUnit: heightUnit == .inches ? "in" : "cm")
+        }
+
+        let heightInput = ProfileDetailsValidationPolicy.ProfileHeightInput(
+            unit: profileHeightUnit,
+            centimetersText: profileHeightCentimetersText,
+            feet: profileHeightFeet,
+            inches: profileHeightInches
+        )
+
+        profileDetailsPlan = ProfileDetailsSubstepPlanPolicy.substeps(
+            askFirstName: !ProfileDetailsValidationPolicy.isNameValid(profileFirstName),
+            askDateOfBirth: !hasDateOfBirth ||
+                !ProfileDetailsValidationPolicy.isDateOfBirthWithinValidRange(profileDateOfBirth),
+            askSex: profileShouldAskSex,
+            askHeight: !ProfileDetailsValidationPolicy.isHeightValid(heightInput)
+        )
+    }
+
 func recomputeProfileDetailsActiveSubstep() {
+        if let firstPlannedSubstep = profileDetailsPlan?.first {
+            profileDetailsActiveSubstep = firstPlannedSubstep
+            return
+        }
+
         let trimmedFirstName = profileFirstName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedLastName = profileLastName.trimmingCharacters(in: .whitespacesAndNewlines)
         let age = Calendar.current.dateComponents([.year], from: profileDateOfBirth, to: Date()).year
 
         if trimmedFirstName.isEmpty {
             profileDetailsActiveSubstep = .firstName
-        } else if trimmedLastName.isEmpty {
-            profileDetailsActiveSubstep = .lastName
         } else if (age ?? 0) < 16 || (age ?? 0) > 80 {
             profileDetailsActiveSubstep = .dateOfBirth
         } else if profileShouldAskSex && profileBiologicalSex == nil {
@@ -459,66 +514,84 @@ func applyMeasurementSystem(_ system: MeasurementSystem, skipHeight: Bool = fals
         let desiredHeightUnit: HeightUnit = system == .metric ? .centimeters : .inches
         let desiredWeightUnit: WeightUnit = system == .metric ? .kilograms : .pounds
 
-        if !skipHeight {
-            convertHeightFields(to: desiredHeightUnit)
-        }
-
-        if !skipWeight {
-            convertWeightFields(to: desiredWeightUnit)
-        }
+        // Validate both drafts before either conversion can mutate fields.
+        if !skipHeight, !canConvertHeightFields(to: desiredHeightUnit) { return }
+        if !skipWeight, !convertWeightFields(to: desiredWeightUnit) { return }
+        if !skipHeight { convertHeightFields(to: desiredHeightUnit) }
 
         bodyScoreInput.measurementPreference = system
         persistMeasurementPreference(system)
     }
 
-func convertHeightFields(to unit: HeightUnit) {
-        guard heightUnit != unit else {
-            heightUnit = unit
-            return
+func canConvertHeightFields(to unit: HeightUnit) -> Bool {
+        guard heightUnit != unit else { return true }
+        switch unit {
+        case .centimeters:
+            let totalInches = Double(heightFeet) * 12 + Double(heightInches)
+            return HeightEntryPolicy.isRepresentableCentimeters(totalInches * 2.54)
+        case .inches:
+            if heightCentimetersText.isEmpty, bodyScoreInput.height.inCentimeters == nil { return true }
+            return HeightEntryPolicy.validatedCentimeters(
+                for: heightCentimetersText, storedValue: bodyScoreInput.height.inCentimeters
+            ) != nil
         }
+    }
+
+@discardableResult
+func convertHeightFields(to unit: HeightUnit) -> Bool {
+        guard heightUnit != unit else { return true }
+        guard canConvertHeightFields(to: unit) else { return false }
 
         switch unit {
         case .centimeters:
-            let totalInches = Double((heightFeet * 12) + heightInches)
+            let totalInches = Double(heightFeet) * 12 + Double(heightInches)
             if totalInches > 0 {
-                let centimeters = totalInches * 2.54
-                heightCentimetersText = Self.formatHeight(centimeters)
-            } else if let centimeters = bodyScoreInput.height.inCentimeters {
+                heightCentimetersText = Self.formatHeight(totalInches * 2.54)
+            } else if let centimeters = bodyScoreInput.height.inCentimeters,
+                      HeightEntryPolicy.isRepresentableCentimeters(centimeters) {
                 heightCentimetersText = Self.formatHeight(centimeters)
             }
         case .inches:
-            let centimeters = Double(bodyScoreInput.height.inCentimeters ?? Double(heightCentimetersText) ?? 0)
-            if centimeters > 0 {
+            if let centimeters = HeightEntryPolicy.validatedCentimeters(
+                for: heightCentimetersText, storedValue: bodyScoreInput.height.inCentimeters
+            ) {
                 updateImperialFields(fromCentimeters: centimeters)
             }
         }
 
         heightUnit = unit
+        return true
     }
 
-func convertWeightFields(to unit: WeightUnit) {
-        guard weightUnit != unit else { return }
+@discardableResult
+func convertWeightFields(to unit: WeightUnit) -> Bool {
+        guard weightUnit != unit else { return true }
         let previousUnit = weightUnit
 
-        if let value = Double(manualWeightText) {
+        if !manualWeightText.isEmpty {
+            guard let value = Double(manualWeightText), value.isFinite else { return false }
             let converted: Double
             if unit == .kilograms {
                 converted = previousUnit == .kilograms ? value : value * 0.45359237
             } else {
                 converted = previousUnit == .pounds ? value : value * 2.2046226218
             }
+            guard converted.isFinite else { return false }
             manualWeightText = Self.formatNumber(converted)
-        } else if let stored = unit == .kilograms ? bodyScoreInput.weight.inKilograms : bodyScoreInput.weight.inPounds {
+        } else if let stored = unit == .kilograms ? bodyScoreInput.weight.inKilograms : bodyScoreInput.weight.inPounds,
+                  stored.isFinite {
             manualWeightText = Self.formatNumber(stored)
         }
 
-        if let stored = unit == .kilograms ? bodyScoreInput.weight.inKilograms : bodyScoreInput.weight.inPounds {
+        if let stored = unit == .kilograms ? bodyScoreInput.weight.inKilograms : bodyScoreInput.weight.inPounds,
+           stored.isFinite {
             bodyScoreInput.weight = WeightValue(value: stored, unit: unit)
-        } else if let value = Double(manualWeightText) {
+        } else if let value = Double(manualWeightText), value.isFinite {
             bodyScoreInput.weight = WeightValue(value: value, unit: unit)
         }
 
         weightUnit = unit
+        return true
     }
 
 func persistMeasurementPreference(_ system: MeasurementSystem) {
@@ -613,9 +686,16 @@ func restore(_ snapshot: OnboardingProgressSnapshot) {
         profileHeightCentimetersText = snapshot.profileHeightCentimetersText
         profileHeightFeet = snapshot.profileHeightFeet
         profileHeightInches = snapshot.profileHeightInches
-        profileDetailsActiveSubstep = snapshot.profileDetailsActiveSubstep
+        // Drafts saved before the last name was dropped resume at the birthday.
+        profileDetailsActiveSubstep = snapshot.profileDetailsActiveSubstep == .lastName
+            ? .dateOfBirth
+            : snapshot.profileDetailsActiveSubstep
         profileShouldAskSex = snapshot.profileShouldAskSex
         hasHydratedProfileDetailsDraft = snapshot.hasHydratedProfileDetailsDraft
+        // The Home-mode question was removed; drafts parked on it resume at the reveal.
+        if currentStep == .defaultHomeMode {
+            currentStep = .bodyScore
+        }
         if hasAuthenticatedAccountEmail,
            currentStep == .emailCapture || currentStep == .account {
             currentStep = .profileDetails
@@ -639,7 +719,9 @@ func restorePreAuthSnapshotIfNeeded(for userId: String) {
         currentStep = hasAuthenticatedAccountEmail ? .profileDetails : .emailCapture
         isRestoringProgress = false
 
-        BodyScoreCache.shared.store(snapshot.result, for: userId)
+        if let result = snapshot.result {
+            BodyScoreCache.shared.store(result, for: userId)
+        }
         persistProgress()
         PreAuthOnboardingStore.shared.clear()
     }

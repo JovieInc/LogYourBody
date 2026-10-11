@@ -33,11 +33,35 @@ enum JoviePalette {
     static let raisedHex = "#1C1C1E"
 }
 
+/// Jovie design-system palette for the v2 surfaces (mirrors the LogYourBody
+/// iOS .pen tokens). `JoviePalette` keeps serving the gate-off screens.
+enum HomeV2Palette {
+    static let canvas = Color(hex: "#030406")
+    static let shell = Color(hex: "#07080A")
+    static let card = Color(hex: "#131417")
+    static let elevated = Color(hex: "#1A1B1E")
+    static let floating = Color(hex: "#232427")
+    static let ink = Color(hex: "#F5F7FB")
+    static let secondary = Color(hex: "#A0A5AF")
+    static let muted = Color(hex: "#8F95A0")
+    static let quiet = Color(hex: "#7D8593")
+    static let border = Color(hex: "#A8B0C3").opacity(0.10)
+    static let borderStrong = Color(hex: "#A8B0C3").opacity(0.20)
+    static let ion = Color(hex: "#11AFFF")
+    static let ultra = Color(hex: "#8E56F5")
+    static let mint = Color(hex: "#3FFA8B")
+    static let orange = Color(hex: "#FF7800")
+    static let red = Color(hex: "#F72A36")
+    static let ctaFill = Color(hex: "#F8FAFD")
+    static let ctaInk = Color(hex: "#030407")
+}
+
 enum ChatComposerGeometry {
     static let multilineTextHeightThreshold = JovieTokens.sectionGap
 
-    static func isMultiline(textHeight: CGFloat) -> Bool {
-        textHeight > multilineTextHeightThreshold
+    // Pass a Dynamic Type-scaled threshold so one line of large text isn't treated as multiline.
+    static func isMultiline(textHeight: CGFloat, threshold: CGFloat = multilineTextHeightThreshold) -> Bool {
+        textHeight > threshold
     }
 
     static func cornerRadius(isMultiline: Bool) -> CGFloat {
@@ -560,14 +584,15 @@ extension View {
         }
     }
 
-    /// Expands a visual control to Apple's minimum recommended hit target without
-    /// forcing surrounding layout to use a one-off frame.
+    /// Expands the view it is applied to, up to at least 44 points, and makes that
+    /// whole rectangle tappable. Apply it to a button label. A frame wrapped
+    /// around the button does not grow the button's accessibility frame.
     func jovieTouchTarget() -> some View {
-        contentShape(Rectangle())
-            .frame(
-                minWidth: JovieTokens.minimumHitTarget,
-                minHeight: JovieTokens.minimumHitTarget
-            )
+        frame(
+            minWidth: JovieTokens.minimumHitTarget,
+            minHeight: JovieTokens.minimumHitTarget
+        )
+        .contentShape(Rectangle())
     }
 
     func worldClassScreen(_ screen: WorldClassScreen) -> some View {
@@ -686,4 +711,25 @@ extension Font {
         size: JovieTokens.displayTypeSize,
         weight: JovieTokens.displayTypeWeight
     )
+}
+
+/// System font at the approved point size by default, scaled with the user's Dynamic Type setting.
+private struct ScaledSystemFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+    private let weight: Font.Weight
+
+    init(size: CGFloat, weight: Font.Weight, relativeTo textStyle: Font.TextStyle) {
+        _size = ScaledMetric(wrappedValue: size, relativeTo: textStyle)
+        self.weight = weight
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: weight))
+    }
+}
+
+extension View {
+    func scaledSystemFont(size: CGFloat, weight: Font.Weight = .regular, relativeTo textStyle: Font.TextStyle) -> some View {
+        modifier(ScaledSystemFont(size: size, weight: weight, relativeTo: textStyle))
+    }
 }

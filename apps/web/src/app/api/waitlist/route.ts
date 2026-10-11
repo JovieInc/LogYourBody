@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const MAX_BODY_BYTES = 4_096;
-const SOURCE_PATTERN = /^[a-z0-9:_-]{1,120}$/i;
+const SOURCE_PATTERN = /^[a-z0-9:_-]{1,64}$/i;
 
 function response(body: Record<string, unknown>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
       return response({ success: false, error: 'Invalid email address' }, 400);
     }
 
-    console.error('[api/waitlist] Failed to persist waitlist entry', error);
+    // Database errors may contain email values or connection details.
+    console.error('[api/waitlist] Failed to persist waitlist entry');
     return response({ success: false, error: 'Internal server error' }, 500);
   }
 }

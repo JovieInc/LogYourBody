@@ -48,7 +48,8 @@ From the repo root (pnpm + Turborepo):
 - `pnpm product:check` after registry or public-copy changes
 - `pnpm ios` to open the Xcode project
 - `pnpm eve:info` / `eve:build` / `eve:dev` run the external eve.dev core-chat
-  backend definition through isolated Node 24; the web app remains on Node 20.
+  backend definition through isolated Node 24; the web app uses its own
+  pinned engine (see `.nvmrc`).
 - `pnpm eve:smoke` runs credential-free connected and unconnected boundary
   evals. See [the migration boundary](docs/architecture/eve-core-chat-migration.md).
 
