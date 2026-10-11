@@ -221,7 +221,7 @@ struct ProgressPhotoAttachSheet: View {
             if let selectedImage {
                 Image(uiImage: selectedImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
                     .frame(maxWidth: .infinity)
                     .frame(height: height)
                     .clipShape(RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous))

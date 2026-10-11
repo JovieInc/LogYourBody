@@ -197,7 +197,10 @@ enum HomeV2EntriesPolicy {
             let parts = calendar.dateComponents([.year, .month], from: metric.date)
             return "\(parts.year ?? 0)-\(parts.month ?? 0)"
         }
-        return grouped.keys.sorted(by: >).compactMap { key -> HomeV2EntriesSection? in
+        let monthsNewestFirst = grouped.keys.sorted {
+            $0.compare($1, options: .numeric) == .orderedDescending
+        }
+        return monthsNewestFirst.compactMap { key -> HomeV2EntriesSection? in
             guard let monthMetrics = grouped[key], let newest = monthMetrics.first else { return nil }
             let chronological = monthMetrics.reversed().compactMap(weightValue)
             let rows = monthMetrics.map { metric -> HomeV2EntriesRow in
