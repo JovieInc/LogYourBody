@@ -13,6 +13,24 @@ import UIKit
 
 
 final class LaunchSurfacePolicyTests: XCTestCase {
+    // Regression: Home chrome text (title, date pill, empty states) used fixed point sizes.
+    @MainActor
+    func testScaledSystemFontMatchesApprovedSizeByDefaultAndGrowsWithDynamicType() {
+        func height<V: View>(_ view: V, _ size: DynamicTypeSize) -> CGFloat {
+            UIHostingController(rootView: view.environment(\.dynamicTypeSize, size))
+                .sizeThatFits(in: CGSize(width: CGFloat(390), height: CGFloat.greatestFiniteMagnitude))
+                .height
+        }
+
+        let fixed = Text("Home").font(.system(size: 16, weight: .semibold))
+        let scaled = Text("Home").scaledSystemFont(size: 16, weight: .semibold, relativeTo: .headline)
+
+        XCTAssertEqual(height(scaled, .large), height(fixed, .large), accuracy: 0.5,
+                       "At the default text size the approved design must be unchanged")
+        XCTAssertGreaterThan(height(scaled, .accessibility3), height(fixed, .accessibility3) * 1.3,
+                             "Text must grow with Dynamic Type where fixed sizes do not")
+    }
+
     func testChatComposerGeometryUsesOnlyCanonicalPillAndMultilineRadii() {
         XCTAssertFalse(
             ChatComposerGeometry.isMultiline(
@@ -22,6 +40,14 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         XCTAssertTrue(
             ChatComposerGeometry.isMultiline(
                 textHeight: ChatComposerGeometry.multilineTextHeightThreshold + 1
+            )
+        )
+        // A Dynamic Type-scaled threshold keeps one line of large text in the single-line layout.
+        let scaledThreshold = ChatComposerGeometry.multilineTextHeightThreshold * 2
+        XCTAssertFalse(
+            ChatComposerGeometry.isMultiline(
+                textHeight: ChatComposerGeometry.multilineTextHeightThreshold + 1,
+                threshold: scaledThreshold
             )
         )
         XCTAssertEqual(
@@ -124,6 +150,30 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isChatExpanded: false
             ),
             .none
+        )
+    }
+
+    func testAskOverProgressCollapsesBeforeNavigatingItsUnderlyingPage() {
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 90,
+                translationY: 8,
+                startX: 180,
+                isOnStats: true,
+                isChatExpanded: true
+            ),
+            .collapseChat
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 90,
+                translationY: 8,
+                startX: 20,
+                isOnStats: true,
+                isChatExpanded: true
+            ),
+            .menu,
+            "The edge swipe still opens navigation while Ask is expanded"
         )
     }
 

@@ -19,6 +19,12 @@ final class BodyMetricSourceContractTests: XCTestCase {
         XCTAssertEqual(BodyMetricSource.normalizedRawValue("HealthKit"), "healthkit")
         XCTAssertEqual(BodyMetricSource.normalizedRawValue("smart scale"), "smart_scale")
         XCTAssertEqual(BodyMetricSource.normalizedRawValue("partner:bodyspec"), "bodyspec_dexa")
+        XCTAssertEqual(BodyMetricSource.normalizedRawValue("DEXA PDF"), "dexa_pdf")
+        XCTAssertEqual(BodyMetricSource.normalizedRawValue("InBody PDF"), "inbody_pdf")
+        XCTAssertEqual(BodyMetricSource.dexaPDF.rawValue, "dexa_pdf")
+        XCTAssertEqual(BodyMetricSource.inbodyPDF.rawValue, "inbody_pdf")
+        XCTAssertTrue(BodyMetricSource.allowedRawValues.contains("dexa_pdf"))
+        XCTAssertTrue(BodyMetricSource.allowedRawValues.contains("inbody_pdf"))
         XCTAssertEqual(BodyMetricSource.normalizedRawValue("skinfold caliper"), "caliper")
         XCTAssertEqual(BodyMetricSource.normalizedRawValue("Photo Import"), "photo")
     }

@@ -2,17 +2,12 @@
 // BackgroundRemovalServiceTests.swift
 // LogYourBodyTests
 //
-// KNOWN APP BUG (reported, not fixed): on the iOS simulator,
-// removeBackground(from:) crashes the process. Measured on iPhone 17 /
-// iOS 26.5 (2026-07): VNGeneratePersonSegmentationRequest delivers
-// com.apple.VisionCore Code=1 ("E5RT is not supported") — and BOTH the request
-// completion handler and handler.perform report the failure, so the
-// withCheckedThrowingContinuation in removeBackground is resumed twice and the
-// runtime traps ("attempted to resume a continuation more than once"). The
-// Vision path of removeBackground is therefore deliberately untested here:
-// any test calling it would kill the test host. On-device (where person
-// segmentation is supported) perform does not throw after a completion, so
-// the double-resume is latent there but still structurally possible.
+// removeBackground(from:) runs Vision synchronously off the main actor and
+// reads `request.results` after `perform` returns. There is no completion
+// handler, so an unsupported platform (the simulator reports
+// com.apple.VisionCore Code=1, "E5RT is not supported") surfaces as a thrown
+// error instead of the double-resumed continuation that used to trap the
+// test host.
 //
 import XCTest
 import UIKit
@@ -21,9 +16,18 @@ import UIKit
 final class BackgroundRemovalServiceTests: XCTestCase {
     // MARK: - Input validation
 
+    func testRemoveBackgroundSurfacesUnsupportedSegmentationAsAnErrorNotATrap() async throws {
+        let cgImage = try XCTUnwrap(SyntheticImage.solidCGImage(width: 32, height: 40, red: 120, green: 120, blue: 120))
+
+        do {
+            let output = try await BackgroundRemovalService.shared.removeBackground(from: UIImage(cgImage: cgImage))
+            XCTAssertEqual(output.cgImage?.width, 32, "when segmentation is supported the output keeps its size")
+        } catch {
+            XCTAssertFalse(error.localizedDescription.isEmpty, "unsupported segmentation must throw, never trap")
+        }
+    }
+
     func testRemoveBackgroundRejectsImageWithoutCGImage() async throws {
-        // This guard runs before the Vision continuation, so it is safe to
-        // exercise despite the simulator crash documented in the file header.
         let ciBacked = UIImage(ciImage: CIImage(color: .red))
 
         do {

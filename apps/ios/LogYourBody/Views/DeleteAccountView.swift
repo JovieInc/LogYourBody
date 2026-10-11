@@ -193,6 +193,7 @@ struct AccountDeletionCleanupService {
         var deleteSpotlightMetrics: () -> Void
         var clearUserDefaults: () -> [String]
         var logoutAuthSession: () async -> Void
+        var deleteTrainingDrafts: () async throws -> Void = {}
     }
 
     static let accountUserDefaultsKeys: [String] = [
@@ -216,8 +217,10 @@ struct AccountDeletionCleanupService {
         "dashboard_weight_uses_trend",
         "biometricLockEnabled",
         Constants.revenueCatIsSubscribedKey,
+        RevenueCatManager.DefaultsKey.subscriptionOwner,
         "revenuecat_lastFetchTimestamp",
         Constants.healthKitSyncEnabledKey,
+        HealthKitAccountSyncPolicy.accountIdKey,
         HealthKitDefaultsKey.authorizationConfirmed.rawValue,
         HealthKitDefaultsKey.lastObserverSyncDate.rawValue,
         HealthKitDefaultsKey.fullSyncCompleted.rawValue,
@@ -233,20 +236,31 @@ struct AccountDeletionCleanupService {
         self.dependencies = dependencies
     }
 
+    @MainActor
     static func live(
         authManager: AuthManager,
         deleteProductAccount: @escaping () async throws -> Void
     ) -> AccountDeletionCleanupService {
-        AccountDeletionCleanupService(
+        let ownership = authManager.captureAccountSession()
+        return AccountDeletionCleanupService(
             dependencies: Dependencies(
                 logoutSubscriptionProvider: {
                     // Dissociates subscription state from the deleted account; subscriptions expire normally.
-                    await SubscriptionManager.shared.logoutUser()
+                    await logoutSubscriptionIfOwned(
+                        authManager: authManager,
+                        ownership: ownership,
+                        subscriptionManager: .shared
+                    )
                 },
                 resetHealthKitAnchors: {
                     await HealthSyncCoordinator.shared.resetForCurrentUser()
                 },
-                deleteProductAccount: deleteProductAccount,
+                deleteProductAccount: {
+                    guard let ownership, await authManager.ownsAccountSession(ownership) else {
+                        throw AuthError.invalidToken
+                    }
+                    try await deleteProductAccount()
+                },
                 deleteCoreData: {
                     try await CoreDataManager.shared.deleteAllDataAndWait()
                 },
@@ -261,9 +275,27 @@ struct AccountDeletionCleanupService {
                 },
                 logoutAuthSession: {
                     await authManager.logout()
+                },
+                deleteTrainingDrafts: {
+                    guard let ownership else { throw AuthError.invalidToken }
+                    try await MainActor.run {
+                        try TrainingDraftStore.shared.purge(ownerId: ownership.subject)
+                    }
                 }
             )
         )
+    }
+
+    @MainActor
+    static func logoutSubscriptionIfOwned(
+        authManager: AuthManager,
+        ownership: AuthManager.ProfileSessionOwnership?,
+        subscriptionManager: RevenueCatManager
+    ) async {
+        guard let ownership, authManager.ownsAccountSession(ownership) else { return }
+        // Ownership admission and local billing invalidation are one synchronous actor step.
+        let request = subscriptionManager.requestBillingIdentity(subject: nil)
+        await subscriptionManager.waitForBillingIdentity(request)
     }
 
     func performDeletion() async throws {
@@ -273,9 +305,14 @@ struct AccountDeletionCleanupService {
 
         var localCleanupError: Error?
         do {
-            try await dependencies.deleteCoreData()
+            try await dependencies.deleteTrainingDrafts()
         } catch {
             localCleanupError = error
+        }
+        do {
+            try await dependencies.deleteCoreData()
+        } catch {
+            localCleanupError = localCleanupError ?? error
         }
 
         dependencies.clearKeychain()

@@ -56,6 +56,7 @@ jobs:
       contents: read
       checks: read
       statuses: read
+      actions: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
@@ -69,11 +70,11 @@ jobs:
           RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
         run: .github/scripts/validate-release-source.sh
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install auth contract dependencies
@@ -233,6 +234,15 @@ jobs:
 
           echo "📱 Building iOS app for release..."
 
+      - name: Install sentry-cli (pinned)
+        env:
+          SENTRY_CLI_VERSION: '3.8.0'
+        run: |
+          curl -fsSL -o /usr/local/bin/sentry-cli \
+            "https://github.com/getsentry/sentry-cli/releases/download/${SENTRY_CLI_VERSION}/sentry-cli-Darwin-universal"
+          chmod +x /usr/local/bin/sentry-cli
+          sentry-cli --version
+
       - name: Archive and export
         run: |
           set -o pipefail
@@ -241,6 +251,7 @@ jobs:
           # Use Fastlane to build while preserving its exit status through tee.
           bundle exec fastlane build_release 2>&1 | tee fastlane.log
         env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
@@ -448,32 +459,22 @@ jobs:
             echo "version=$VERSION"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Tag release
+      - name: Check for an existing release tag
         id: tag_release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.release_metadata.outputs.tag }}"
-
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "created=false" >> "$GITHUB_OUTPUT"
             echo "Tag already exists: $TAG"
-            exit 0
+          else
+            # The tag itself is created by the release below (Releases API,
+            # pinned to the built commit). A git push of the tag with
+            # GITHUB_TOKEN is refused whenever the tagged commit's workflow
+            # files differ from main's ("create or update workflow without
+            # workflows permission"), which broke the evidence for build
+            # 20260926135712.
+            echo "created=true" >> "$GITHUB_OUTPUT"
           fi
-
-          # Create git tag
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag -a "$TAG" -m "iOS Release $TAG
-
-          Build: ${{ needs.validate-release.outputs.build_number }}
-          Deployment: ${{ steps.release_metadata.outputs.deployment_type }}"
-
-          # Push tag
-          git push origin "$TAG"
-
-          echo "created=true" >> "$GITHUB_OUTPUT"
-          echo "Tagged release: $TAG"
 
       - name: Create GitHub release
         env:
@@ -496,6 +497,7 @@ jobs:
 
           # Generate release notes
           gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
             --title "iOS Release $TAG" \
             "${RELEASE_ARGS[@]}" \
             --notes "## 📱 iOS Release $TAG

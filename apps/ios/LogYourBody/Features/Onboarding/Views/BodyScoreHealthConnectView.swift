@@ -28,7 +28,7 @@ struct BodyScoreHealthConnectView: View {
         if viewModel.isHealthKitConnected {
             return "Keeps height, weight, and body fat in sync."
         }
-        return "Reads only the basics you allow. You stay in control."
+        return "Reads height, weight, and body fat. Entries you log here are saved to Health too."
     }
 
     private var connectButtonTitle: String {

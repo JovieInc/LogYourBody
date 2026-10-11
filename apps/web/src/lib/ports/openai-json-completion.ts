@@ -16,7 +16,8 @@ class OpenAIJsonCompletionAdapter implements JsonCompletionPort {
   private readonly client: OpenAI;
 
   constructor(apiKey: string) {
-    this.client = new OpenAI({ apiKey });
+    // logLevel off: the SDK debug logger prints request bodies, including health prompts.
+    this.client = new OpenAI({ apiKey, logLevel: 'off' });
   }
 
   async createJsonObjectCompletion({
@@ -29,6 +30,7 @@ class OpenAIJsonCompletionAdapter implements JsonCompletionPort {
       messages,
       response_format: { type: 'json_object' },
       temperature,
+      store: false,
     });
 
     return completion.choices[0].message.content || '{}';
@@ -45,6 +47,7 @@ class OpenAIJsonCompletionAdapter implements JsonCompletionPort {
       messages,
       temperature,
       max_tokens: maxTokens,
+      store: false,
     });
 
     return completion.choices[0]?.message?.content || '';

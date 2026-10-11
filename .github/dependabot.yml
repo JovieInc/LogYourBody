@@ -1,37 +1,61 @@
 version: 2
 updates:
-  # NPM dependencies
-  - package-ecosystem: "npm"
-    directory: "/"
+  # Node dependencies (pnpm workspace)
+  - package-ecosystem: 'npm'
+    directories:
+      - '/'
+      - '/apps/web'
     schedule:
-      interval: "weekly"
-    target-branch: "dev"
-    groups:
-      # Group all minor and patch updates together
-      minor-and-patch:
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
-    # Exclude major updates for critical packages
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+      timezone: 'Etc/UTC'
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 1
+    reviewers:
+      - 'itstimwhite'
+    assignees:
+      - 'itstimwhite'
+    commit-message:
+      prefix: 'deps'
+      prefix-development: 'deps-dev'
+      include: 'scope'
+    labels:
+      - 'dependencies'
+      - 'automated'
     ignore:
-      - dependency-name: "next"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major"]
-    labels:
-      - "dependencies"
-      - "automated"
-    
+      - dependency-name: 'next'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-dom'
+        update-types: ['version-update:semver-major']
+
   # GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "weekly"
-    target-branch: "dev"
+      interval: 'weekly'
+      day: 'monday'
+      time: '09:00'
+    open-pull-requests-limit: 5
+    reviewers:
+      - 'itstimwhite'
+    assignees:
+      - 'itstimwhite'
+    commit-message:
+      prefix: 'ci'
+      include: 'scope'
     labels:
-      - "dependencies"
-      - "automated"
+      - 'dependencies'
+      - 'github-actions'
+      - 'automated'
+    groups:
+      # init/analyze load one shared bundle and must move in the same PR.
+      codeql-action:
+        patterns:
+          - 'github/codeql-action'
