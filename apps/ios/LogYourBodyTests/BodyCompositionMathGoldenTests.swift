@@ -176,6 +176,18 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         XCTAssertNil(context.trendWeight(for: date(daysAfterStart: 15)))
     }
 
+    func testTrendWeightUsesFinalKnownTrendForFarFutureDates() throws {
+        let context = try makeWeightContext([
+            (dayOffset: 0, weight: 100),
+            (dayOffset: 1, weight: 104)
+        ])
+
+        let result = try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 365 * 10)))
+
+        XCTAssertEqual(result.value, 104, accuracy: 0.001)
+        XCTAssertTrue(result.isLastKnown)
+    }
+
     private func makeWeightContext(
         _ points: [(dayOffset: Int, weight: Double)]
     ) throws -> MetricsInterpolationService.WeightInterpolationContext {

@@ -73,6 +73,20 @@ class MetricsInterpolationService {
                 return cached
             }
 
+            // There is no new measurement after the final metric. Walking the
+            // EMA one day at a time all the way to a far-future query date can
+            // block the main thread for seconds (for example, when the last
+            // weigh-in is months or years before today). Process one day past
+            // the final metric so timestamped final-day measurements are
+            // included, then reuse that last-known trend for later dates.
+            let lastMetricDay = calendar.startOfDay(for: metrics[metrics.count - 1].date)
+            let processingEndDay: Date
+            if targetDay > lastMetricDay {
+                processingEndDay = calendar.date(byAdding: .day, value: 1, to: lastMetricDay) ?? lastMetricDay
+            } else {
+                processingEndDay = targetDay
+            }
+
             var ema = trendLastValue
             var currentDay: Date
 
@@ -84,7 +98,7 @@ class MetricsInterpolationService {
                 ema = nil
             }
 
-            while currentDay <= targetDay {
+            while currentDay <= processingEndDay {
                 // Seed the first day at its actual measurement time, not an earlier midnight.
                 let sampleDate = currentDay == firstDay ? firstMetric.date : currentDay
                 guard let weightResult = estimate(for: sampleDate) else {
@@ -122,6 +136,15 @@ class MetricsInterpolationService {
                     break
                 }
                 currentDay = nextDay
+            }
+
+            if targetDay > lastMetricDay, let lastKnown = trendWeightCache[processingEndDay] {
+                return InterpolatedMetric(
+                    value: lastKnown.value,
+                    isInterpolated: lastKnown.isInterpolated,
+                    isLastKnown: true,
+                    confidenceLevel: lastKnown.confidenceLevel
+                )
             }
 
             return trendWeightCache[targetDay]
