@@ -94,13 +94,15 @@ struct TrainingCoachCard: View {
             RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous)
                 .stroke(theme.colors.border.opacity(0.7), lineWidth: 1)
         }
-        .confirmationDialog(
+        // confirmationDialog presents without Cancel, so stopping coaching has no reachable escape hatch.
+        .alert(
             "Delete your training sessions, set logs, and feedback?",
-            isPresented: $isStopConfirmationPresented,
-            titleVisibility: .visible
+            isPresented: $isStopConfirmationPresented
         ) {
             Button("Stop coaching and delete data", role: .destructive, action: onStop)
+                .accessibilityIdentifier("training_revoke_confirm")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("training_revoke_cancel")
         } message: {
             Text("This removes training records from your account. It does not delete your body-composition data or chat.")
         }
@@ -646,6 +648,8 @@ struct TrainingLiveSessionFixtureView: View {
     )
     @State private var savedSets: [TrainingSavedSet]
     @State private var presented = false
+    @State private var showStopCard = false
+    @State private var stopCount = 0
     @State private var offline = false
     @State private var submissionCount = 0
 
@@ -681,6 +685,13 @@ struct TrainingLiveSessionFixtureView: View {
         VStack(spacing: 20) {
             Button("Open fixture session") { presented = true }
                 .accessibilityIdentifier("training_fixture_open")
+            Button("Open stop card") { showStopCard = true }
+                .accessibilityIdentifier("training_fixture_stop_card")
+            if showStopCard {
+                TrainingCoachCard(session: session, onStart: {}, onStop: { stopCount += 1 })
+            }
+            Text("Stops: \(stopCount)")
+                .accessibilityIdentifier("training_fixture_stop_count")
             Toggle("Offline fixture", isOn: $offline)
                 .accessibilityIdentifier("training_fixture_offline")
             Text("Acknowledged sets: \(savedSets.count)")
