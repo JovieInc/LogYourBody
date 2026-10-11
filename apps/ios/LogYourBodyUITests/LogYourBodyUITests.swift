@@ -1334,6 +1334,43 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Save GLP-1"].exists)
     }
 
+    func testGlp1DoseDeleteCancelLeavesTheSeededDose() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+        openStatsPage(in: app)
+
+        let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
+        scrollUntilExists(prompt, in: app)
+        scrollUntilHittable(prompt, in: app)
+        prompt.tap()
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
+
+        let delete = app.buttons["Delete dose"].firstMatch
+        XCTAssertTrue(delete.waitForExistence(timeout: 8))
+        if !delete.isHittable {
+            scrollUntilHittable(delete, in: app)
+        }
+        delete.tap()
+
+        XCTAssertTrue(app.staticTexts["Delete dose?"].waitForExistence(timeout: 5))
+        let cancel = app.buttons.matching(identifier: "glp1_dose_delete_cancel").firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 3), "GLP-1 dose delete must show Cancel")
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+
+        let dialogGone = NSPredicate(format: "exists == false")
+        expectation(for: dialogGone, evaluatedWith: app.staticTexts["Delete dose?"])
+        waitForExpectations(timeout: 3)
+        XCTAssertTrue(app.staticTexts["UI test weekly check-in seed"].waitForExistence(timeout: 5))
+    }
+
     func testGlp1WeeklyCheckInFixtureOpensMedicationSelectorWhenEmpty() throws {
         let app = XCUIApplication()
         launch(app, with: [
@@ -1764,8 +1801,8 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(weightTab.waitForExistence(timeout: 5))
         XCTAssertTrue(weightTab.isSelected, "Weight is selected on arrival")
         XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_progress_keep_logging"].waitForExistence(timeout: 5),
-            "Five logged days is not yet a trend; the honest state says so"
+            app.descendants(matching: .any)["home_v2_trend_chart"].waitForExistence(timeout: 5),
+            "Sparse history keeps a compact explanation in the metric workspace"
         )
         XCTAssertTrue(app.buttons["home_v2_progress_log_weight"].exists, "Not-enough-data keeps the one action")
         attachScreenshot(named: "home-v2-progress-weight", from: app)
@@ -1787,6 +1824,116 @@ final class LogYourBodyUITests: XCTestCase {
             app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8),
             "Swiping back on the header returns to Today"
         )
+    }
+
+    func testHomeV2SparseProgressKeepsRangesAndNamesEachMetric() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+
+        let viewProgress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
+        viewProgress.tap()
+
+        let month = app.buttons["home_v2_range_1M"]
+        let all = app.buttons["home_v2_range_All"]
+        XCTAssertTrue(month.waitForExistence(timeout: 8), "Sparse history must still offer a date range")
+        month.tap()
+        XCTAssertTrue(month.isSelected)
+        let sparseContext = app.descendants(matching: .any)["home_v2_trend_chart"]
+        XCTAssertTrue(sparseContext.waitForExistence(timeout: 5))
+        XCTAssertLessThan(sparseContext.frame.height, 140, "Sparse history uses a compact explanation, not an empty plot")
+        XCTAssertLessThanOrEqual(month.frame.maxY, sparseContext.frame.minY, "Ranges precede the sparse explanation")
+        XCTAssertTrue(app.buttons["home_v2_progress_log_weight"].isHittable)
+        attachScreenshot(named: "home-v2-sparse-progress-compact", from: app)
+        XCTAssertTrue(all.waitForExistence(timeout: 5), "A sparse recent range must not hide access to older history")
+        all.tap()
+        XCTAssertTrue(all.isSelected)
+
+        let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
+        for (identifier, title) in [("body_fat", "Body fat"), ("ffmi", "FFMI"), ("steps", "Steps")] {
+            app.buttons["home_v2_progress_tab_\(identifier)"].tap()
+            XCTAssertTrue(chart.waitForExistence(timeout: 5))
+            XCTAssertTrue(chart.label.hasPrefix(title), "VoiceOver must identify the selected metric")
+            XCTAssertFalse(chart.label.contains("Weight"))
+            XCTAssertFalse(chart.label.contains("7-day average"), "These metrics show raw history, not a rolling average")
+            XCTAssertTrue(month.exists, "Ranges remain available across sparse metric changes")
+        }
+        attachScreenshot(named: "home-v2-sparse-progress-ranges", from: app)
+    }
+
+    func testHomeV2EmptyProgressKeepsMetricRangesAndLoggingReachable() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2EmptyFixture"])
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        let progress = app.buttons["home_v2_sidebar_progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 5))
+        progress.tap()
+
+        let value = app.descendants(matching: .any)["home_v2_progress_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+        XCTAssertEqual(value.label, "—", "An empty range cannot invent a latest value")
+        for identifier in ["weight", "body_fat", "ffmi", "steps"] {
+            app.buttons["home_v2_progress_tab_\(identifier)"].tap()
+            XCTAssertEqual(value.label, "—")
+            XCTAssertTrue(app.buttons["home_v2_range_All"].isHittable)
+        }
+        app.buttons["home_v2_progress_tab_weight"].tap()
+        attachScreenshot(named: "home-v2-empty-progress", from: app)
+        let logWeight = app.buttons["home_v2_progress_log_weight"]
+        XCTAssertTrue(logWeight.isHittable)
+        logWeight.tap()
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].waitForExistence(timeout: 5))
+    }
+
+    func testHomeV2SparseProgressAtLargestTextKeepsRangeAndLogActionsReachable() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 30))
+        menu.tap()
+        let progress = app.buttons["home_v2_sidebar_progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 5))
+        progress.tap()
+
+        let bodyFat = app.buttons["home_v2_progress_tab_body_fat"]
+        XCTAssertTrue(bodyFat.waitForExistence(timeout: 8))
+        XCTAssertTrue(bodyFat.isHittable)
+        bodyFat.tap()
+        XCTAssertTrue(bodyFat.isSelected)
+        app.buttons["home_v2_progress_tab_weight"].tap()
+        attachScreenshot(named: "home-v2-sparse-progress-largest-text-initial", from: app)
+
+        let all = app.buttons["home_v2_range_All"]
+        XCTAssertTrue(all.waitForExistence(timeout: 8))
+        let scroll = app.scrollViews["home_v2_progress_scroll"]
+        for _ in 0..<4 where !all.isHittable {
+            scroll.swipeUp()
+        }
+        let ranges = app.scrollViews["home_v2_range_selector"]
+        for _ in 0..<4 where !all.isHittable {
+            ranges.swipeLeft()
+        }
+        XCTAssertTrue(all.isHittable, "Every range remains reachable at the largest text size")
+        all.tap()
+        XCTAssertTrue(all.isSelected)
+        let logWeight = app.buttons["home_v2_progress_log_weight"]
+        XCTAssertTrue(logWeight.isHittable)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(logWeight.frame))
+        attachScreenshot(named: "home-v2-sparse-progress-largest-text", from: app)
+        let explanation = app.descendants(matching: .any)["home_v2_trend_chart"]
+        for _ in 0..<4 where explanation.frame.maxY > logWeight.frame.minY {
+            scroll.swipeUp()
+        }
+        XCTAssertTrue(scroll.frame.contains(explanation.frame), "The entire sparse explanation is reachable by scrolling")
+        XCTAssertLessThanOrEqual(explanation.frame.maxY, logWeight.frame.minY, "The explanation clears the pinned dock")
+        attachScreenshot(named: "home-v2-sparse-progress-largest-text-scrolled", from: app)
+        logWeight.tap()
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].waitForExistence(timeout: 5))
     }
 
     func testHomeV2ViewerDisclosesDetailsToolsAndAllPhotos() throws {
@@ -1988,6 +2135,44 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-ask", from: app)
     }
 
+    func testHomeV2AskOpensFromProgressAndReturnsToProgress() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+
+        let viewProgress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
+        viewProgress.tap()
+        XCTAssertTrue(app.buttons["home_v2_progress_tab_weight"].waitForExistence(timeout: 8))
+        app.buttons["photo_timeline_root_menu"].tap()
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 8))
+        ask.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Ask"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["chat_composer"].exists)
+        let close = app.buttons["home_chat_collapse"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "Ask must remain expanded after navigating from Progress")
+        attachScreenshot(named: "home-v2-ask-from-progress", from: app)
+        close.tap()
+        XCTAssertTrue(app.buttons["home_v2_progress_tab_weight"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["home_chat_collapse"].exists)
+
+        app.buttons["photo_timeline_root_menu"].tap()
+        XCTAssertTrue(ask.waitForExistence(timeout: 8))
+        ask.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 8))
+        let header = app.descendants(matching: .any)["photo_timeline_root_nav"]
+        let start = header.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 120, dy: 12))
+        let end = start.withOffset(CGVector(dx: 180, dy: 0))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertTrue(
+            app.buttons["home_v2_progress_tab_weight"].waitForExistence(timeout: 8),
+            "Swiping Ask closed must return to the same workspace as the close button"
+        )
+        XCTAssertFalse(app.buttons["home_chat_collapse"].exists)
+    }
+
     func testHomeV2MetricFirstLogsWeightAndConfirmsInPlace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
@@ -2038,6 +2223,56 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(done.exists)
         done.tap()
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
+    }
+
+    func testHomeV2ProgressRefreshesAfterEditingAnExistingDay() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture",
+            "-lybUITestHomeV2OfflineFixture"
+        ])
+
+        let viewProgress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
+        viewProgress.tap()
+        let value = app.staticTexts["home_v2_progress_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+        let loaded = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label != %@", "—"), object: value
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+        let originalValue = value.label
+        attachScreenshot(named: "home-v2-progress-before-edit", from: app)
+
+        app.buttons["photo_timeline_root_menu"].tap()
+        let today = app.buttons["home_v2_sidebar_today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 5))
+        today.tap()
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 8))
+        logWeight.tap()
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        let savedValue = try XCTUnwrap(app.textFields["Weight value"].value as? String)
+        XCTAssertNotEqual(savedValue, originalValue)
+        app.buttons["home_v2_log_sheet_save"].tap()
+        let done = app.buttons["home_v2_done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 10))
+        done.tap()
+        XCTAssertTrue(viewProgress.waitForExistence(timeout: 8))
+        viewProgress.tap()
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+
+        let refreshed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", savedValue),
+            object: value
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [refreshed], timeout: 10), .completed,
+            "Progress must show the saved edit even when the number of measurement rows is unchanged"
+        )
+        attachScreenshot(named: "home-v2-progress-after-edit", from: app)
     }
 
     private func attachScreenshot(named name: String, from app: XCUIApplication) {
@@ -2203,6 +2438,80 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(ffmiCard.exists || ffmiCard.waitForExistence(timeout: 5))
         XCTAssertEqual(try ffmiValue(from: ffmiCard), homeFFMI, "Stats must use the same snapshot FFMI as Home")
         XCTAssertFalse(app.descendants(matching: .any)["legacy_full_dashboard_beta"].exists)
+    }
+
+    func testBodyFatKeyboardDoneMeetsMinimumHitTarget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        app.tap()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        app.buttons["body_score_onboarding_basics_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        app.buttons["CM"].tap()
+        let heightField = app.textFields["Height in centimeters"]
+        XCTAssertTrue(heightField.waitForExistence(timeout: 5))
+        heightField.tap()
+        heightField.typeText("178")
+        let heightDone = app.buttons["Done"]
+        if heightDone.waitForExistence(timeout: 2) {
+            heightDone.tap()
+        }
+        app.buttons["body_score_onboarding_height_continue_button"].tap()
+
+        let manual = app.buttons["body_score_onboarding_enter_manually_button"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 8))
+        manual.tap()
+        XCTAssertTrue(app.staticTexts["What’s your current weight?"].waitForExistence(timeout: 8))
+        app.buttons["LBS"].tap()
+        let weightField = app.textFields["Weight (lbs)"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        weightField.typeText("182")
+        let weightDone = app.buttons["Done"]
+        if weightDone.waitForExistence(timeout: 2) {
+            weightDone.tap()
+        }
+        app.buttons["body_score_onboarding_manual_weight_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How do you know your body fat?"].waitForExistence(timeout: 8))
+        app.buttons["body_score_onboarding_body_fat_manual_button"].tap()
+        XCTAssertTrue(app.staticTexts["Enter your body fat."].waitForExistence(timeout: 8))
+        let bodyFatField = app.textFields["Body fat percentage"]
+        XCTAssertTrue(bodyFatField.waitForExistence(timeout: 5))
+        bodyFatField.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5))
+
+        let window = app.windows.firstMatch.frame
+        let done = app.buttons.matching(identifier: "body_score_body_fat_keyboard_done_button").firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(done.frame), "body fat Done \(done.frame) window \(window)")
+        XCTAssertGreaterThanOrEqual(done.frame.width, 44, "body fat Done \(done.frame)")
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, "body fat Done \(done.frame)")
+
+        let labeledDones = app.buttons.matching(NSPredicate(format: "label == 'Done'"))
+        for index in 0..<labeledDones.count {
+            let control = labeledDones.element(boundBy: index)
+            guard control.exists, control.frame.width > 1, control.frame.height > 1 else { continue }
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "body fat Done \(control.frame)")
+        }
+
+        done.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Enter your body fat."].exists)
     }
 
     private func homeFFMIValue(in app: XCUIApplication) throws -> String {

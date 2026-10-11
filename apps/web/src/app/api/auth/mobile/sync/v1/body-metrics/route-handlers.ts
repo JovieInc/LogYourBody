@@ -18,6 +18,7 @@ const DATA_SOURCES = [
   'bodyspec_dexa',
   'dexa_pdf',
   'inbody_pdf',
+  'pdf_import',
   'caliper',
   'photo',
 ] as const;

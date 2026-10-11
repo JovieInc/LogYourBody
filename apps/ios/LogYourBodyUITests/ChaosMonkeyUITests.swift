@@ -1091,6 +1091,64 @@ final class ChaosMonkeyUITests: XCTestCase {
         return hasher.finalize()
     }
 
+    func testActiveSessionsScreenShowsCurrentDeviceWithoutRevoke() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestWeightLoggerMVPFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 20))
+        let settingsButton = app.buttons["mvp_settings_button"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 8))
+        settingsButton.tap()
+        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_settings"].waitForExistence(timeout: 5)
+        )
+
+        let subscription = app.buttons["settings_account_subscription_link"]
+        XCTAssertTrue(subscription.waitForExistence(timeout: 8))
+        subscription.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_subscription"].waitForExistence(timeout: 8)
+        )
+
+        let sessionsRow = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Active sessions")
+        ).firstMatch
+        var swipes = 0
+        while !sessionsRow.exists && swipes < 3 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(sessionsRow.waitForExistence(timeout: 8), "Active sessions row must be on the subscription screen")
+        let rowFrame = sessionsRow.frame
+        XCTAssertGreaterThanOrEqual(rowFrame.width, 44, "Active sessions row width \(rowFrame)")
+        XCTAssertGreaterThanOrEqual(rowFrame.height, 44, "Active sessions row height \(rowFrame)")
+        sessionsRow.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_activeSessions"].waitForExistence(timeout: 8)
+        )
+        XCTAssertTrue(app.navigationBars["Active Sessions"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["THIS DEVICE"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Current device"].exists)
+        XCTAssertTrue(app.staticTexts["Signed-in devices"].exists)
+        XCTAssertFalse(app.staticTexts["Only this device"].exists)
+        XCTAssertFalse(app.buttons["Revoke"].exists)
+        XCTAssertFalse(app.staticTexts["Revoke Session?"].exists)
+
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "Active sessions current device"
+        tree.lifetime = .keepAlways
+        add(tree)
+    }
+
     // MARK: - Layout defect detection
 
     /// Scans the given candidates (buttons + static texts `snapshotElements`
