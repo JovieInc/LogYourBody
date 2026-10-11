@@ -236,6 +236,31 @@ final class ReleaseReviewStateStore {
     }
 }
 
+/// Launch state that decides whether What's New may appear.
+struct ReleaseReviewLaunchState {
+    var isAuthenticated: Bool
+    var isLoadingComplete: Bool
+    var hasCompletedOnboarding: Bool
+    var needsProfileCompletion: Bool
+    var isSubscribed: Bool
+    var showsDailyReminderPrompt: Bool
+    var isSuppressedForUITests: Bool
+    /// What's New is for people updating the app. Someone who finished
+    /// onboarding in this launch has never seen the old build, so it waits.
+    var finishedOnboardingThisLaunch: Bool
+
+    var isEligibleForWhatsNew: Bool {
+        isAuthenticated &&
+            isLoadingComplete &&
+            hasCompletedOnboarding &&
+            !needsProfileCompletion &&
+            isSubscribed &&
+            !showsDailyReminderPrompt &&
+            !isSuppressedForUITests &&
+            !finishedOnboardingThisLaunch
+    }
+}
+
 enum ReleaseReviewPresentationPolicy {
     static func pendingItems(
         from items: [ReleaseReviewItem],

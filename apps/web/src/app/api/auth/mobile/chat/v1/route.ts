@@ -5,6 +5,8 @@ import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
 import { neonBodyMetrics } from '@/lib/neon/body-metrics-adapter';
 import { neonChatConversations } from '@/lib/neon/chat-conversations-adapter';
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
+import { neonNativeProductRecords } from '@/lib/neon/native-product-records-adapter';
+import { getOrCreateNextWorkout } from '@/lib/training/service';
 import { createChatRouteHandlers } from './route-handlers';
 
 export const runtime = 'nodejs';
@@ -24,6 +26,10 @@ const handlers = createChatRouteHandlers({
   modelName: process.env.LYB_CHAT_MODEL || 'gpt-4o-mini',
   createLeaseToken: randomUUID,
   reportStreamOutcome: (outcome) => console.info('LYB_CHAT_STREAM', { outcome }),
+  getTrainingOutput: async (subject) => {
+    if (process.env.LYB_HYPERTROPHY_COACH_API_ENABLED !== 'true') return null;
+    return getOrCreateNextWorkout({ records: neonNativeProductRecords, subject, now: new Date() });
+  },
 });
 
 export const GET = handlers.GET;

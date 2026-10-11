@@ -56,6 +56,9 @@ export async function applyNeonMigrations(
     log(`Applying ${file}`);
     try {
       await client.query('BEGIN');
+      // Valueless queries take Postgres' simple protocol — the only path that
+      // accepts multi-statement files; bound parameters would use prepared
+      // statements and fail, as would the neon() HTTP driver.
       await client.query(contents);
       await client.query(
         `

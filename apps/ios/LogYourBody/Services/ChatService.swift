@@ -83,7 +83,8 @@ protocol ChatServicing {
         accessToken: String,
         conversationId: String,
         clientMessageId: String,
-        message: String
+        message: String,
+        voiceMode: Bool
     ) -> AsyncThrowingStream<ChatStreamEvent, Error>
     func deleteConversation(accessToken: String, conversationId: String) async throws
 }
@@ -184,7 +185,8 @@ final class URLSessionChatService: ChatServicing {
         accessToken: String,
         conversationId: String,
         clientMessageId: String,
-        message: String
+        message: String,
+        voiceMode: Bool
     ) -> AsyncThrowingStream<ChatStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -199,7 +201,8 @@ final class URLSessionChatService: ChatServicing {
                             protocolVersion: ChatAPIContract.protocolVersion,
                             conversationId: conversationId,
                             clientMessageId: clientMessageId,
-                            message: message
+                            message: message,
+                            voiceMode: voiceMode
                         )
                     )
 
@@ -326,6 +329,7 @@ private struct SendMessagePayload: Encodable {
     let conversationId: String
     let clientMessageId: String
     let message: String
+    let voiceMode: Bool
 }
 
 private struct MetadataPayload: Decodable {
@@ -379,7 +383,8 @@ private struct FixtureChatService: ChatServicing {
         accessToken: String,
         conversationId: String,
         clientMessageId: String,
-        message: String
+        message: String,
+        voiceMode: Bool
     ) -> AsyncThrowingStream<ChatStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
