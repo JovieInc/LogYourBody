@@ -32,6 +32,32 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         continueFromRevealToProfile(in: app)
     }
 
+    /// The "Why we ask" disclosure is a compact caption. Its effective target
+    /// must still be at least 44 points, including a tap at the top edge.
+    func testWhyWeAskDisclosureKeepsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture"]
+        app.launch()
+
+        let startButton = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(startButton.waitForExistence(timeout: 10))
+        startButton.tap()
+
+        let whyWeAsk = app.buttons["Why we ask"]
+        XCTAssertTrue(whyWeAsk.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(whyWeAsk.frame.width, 44, "Why we ask width \(whyWeAsk.frame.width)")
+        XCTAssertGreaterThanOrEqual(whyWeAsk.frame.height, 44, "Why we ask height \(whyWeAsk.frame.height)")
+        XCTAssertTrue(whyWeAsk.isHittable)
+
+        whyWeAsk.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05)).tap()
+
+        XCTAssertTrue(
+            app.staticTexts["We use sex at birth only to match you to the right comparison group—never for marketing."]
+                .waitForExistence(timeout: 3),
+            "A tap at the top of the 44-point target must expand the disclosure"
+        )
+    }
+
     // MARK: - Steps
 
     private func assertHookStep(in app: XCUIApplication) {
@@ -183,6 +209,48 @@ final class OnboardingGoldenPathUITests: XCTestCase {
         )
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_completeProfile"].waitForExistence(timeout: 8))
         XCTAssertFalse(app.textFields["Last name"].exists)
+    }
+
+    func testBugReportFormOpensAndCancelDismissesIt() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestWeightLoggerMVPFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock",
+            "-lybUITestPresentBugReport"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 20))
+
+        let report = app.buttons["Report a problem"]
+        XCTAssertTrue(report.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.navigationBars["Report a problem"].waitForExistence(timeout: 5))
+        let reportFrame = report.frame
+        XCTAssertGreaterThanOrEqual(reportFrame.width, 44, "Report button width \(reportFrame)")
+        XCTAssertGreaterThanOrEqual(reportFrame.height, 44, "Report button height \(reportFrame)")
+        report.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_bugReport"].waitForExistence(timeout: 8)
+        )
+        let cancel = app.buttons["Cancel"]
+        let send = app.buttons["Send"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertTrue(send.waitForExistence(timeout: 5))
+        let cancelFrame = cancel.frame
+        let sendFrame = send.frame
+        XCTAssertGreaterThanOrEqual(cancelFrame.width, 44, "Cancel \(cancelFrame) Send \(sendFrame)")
+        XCTAssertGreaterThanOrEqual(cancelFrame.height, 44, "Cancel \(cancelFrame) Send \(sendFrame)")
+        XCTAssertGreaterThanOrEqual(sendFrame.width, 44, "Send \(sendFrame)")
+        XCTAssertGreaterThanOrEqual(sendFrame.height, 44, "Send \(sendFrame)")
+        cancel.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_bugReport"].waitForNonExistence(timeout: 5)
+        )
+        XCTAssertFalse(app.buttons["Send"].exists)
+        XCTAssertTrue(app.staticTexts["Weight log"].exists)
     }
 
     // MARK: - Field helpers
