@@ -437,22 +437,34 @@ struct Glp1AddMedicationView: View {
             }
             .navigationTitle("Select GLP-1")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .cancellationAction) {
-                    Button("Cancel") {
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HStack(spacing: JovieTokens.itemGap) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Text("Cancel")
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
                     .disabled(isSaving)
-                }
+                    .accessibilityIdentifier("glp1_medication_selector_cancel_button")
 
-                ToolbarItemGroup(placement: .confirmationAction) {
-                    Button("Save medication") {
+                    Button {
                         if let preset = selectedPreset {
                             createMedication(from: preset)
                         }
+                    } label: {
+                        Text("Save medication")
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
                     .disabled(selectedPreset == nil || isSaving)
+                    .accessibilityIdentifier("glp1_medication_selector_save_button")
                 }
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.vertical, JovieTokens.itemGap)
             }
             .alert("Couldn't save", isPresented: glp1SaveErrorBinding) {
                 Button("Try again") {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Weekly CODEOWNERS drift check. Upserts JOV-7549 on the Jovie team when the
+// Weekly CODEOWNERS drift check. Upserts LYB-147 on the LYB team when the
 // file is missing or an owner is invalid, matched by label
 // remediation:codeowners-drift, and adds a comment for this repository.
 // Live filing requires REMEDIATION_TRIGGERS_ENABLED=true and LINEAR_API_KEY.
@@ -9,11 +9,13 @@ import { pathToFileURL } from 'node:url';
 import {
   addLinearIssueComment,
   listLinearIssueComments,
+  findTeamIdByKey,
+  LYB_TEAM_KEY,
   upsertLinearIssue,
 } from './lib/linear-issue-intake.mjs';
 
 export const CODEOWNERS_LABEL = 'remediation:codeowners-drift';
-export const CODEOWNERS_ISSUE = 'JOV-7549';
+export const CODEOWNERS_ISSUE = 'LYB-147';
 
 export function isInvalidOwnerError(error) {
   const kind = String(error?.kind ?? '').toLowerCase();
@@ -69,6 +71,7 @@ export function planCodeownersIssue({ repo, classification, runUrl }) {
     createStateName: 'Todo',
     reopenTerminal: true,
     comment,
+    teamKey: LYB_TEAM_KEY,
   };
 }
 
@@ -114,6 +117,8 @@ export async function fetchCodeownersErrors(repo, { token, fetchImpl = fetch }) 
 }
 
 async function filePlan(plan, apiKey) {
+  const team = await findTeamIdByKey({ teamKey: plan.teamKey, apiKey });
+  if (!team.ok) return team;
   const upserted = await upsertLinearIssue({
     label: plan.label,
     identifier: plan.identifier,
@@ -121,6 +126,7 @@ async function filePlan(plan, apiKey) {
     description: plan.description,
     createStateName: plan.createStateName,
     reopenTerminal: plan.reopenTerminal,
+    teamId: team.id,
     apiKey,
   });
   if (!upserted.ok) return upserted;

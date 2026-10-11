@@ -23,6 +23,86 @@ final class PhotoMetadataServiceTests: XCTestCase {
         try await super.tearDown()
     }
 
+    @MainActor
+    func testRestoredScanOnboardingDoesNotTurnHistoricalMeasurementsIntoTodaysPhotoBaseline() async throws {
+        let previousUser = AuthManager.shared.currentUser
+        let previousSession = AuthManager.shared.authSession
+        defer {
+            AuthManager.shared.currentUser = previousUser
+            AuthManager.shared.authSession = previousSession
+        }
+        typealias BaselineCase = (scanBodyFat: Double?, todayWeight: Double?, todayBodyFat: Double?,
+                                  manualWeight: Double?, legacyDraft: Bool)
+        let cases: [BaselineCase] = [
+            (19, nil, nil, nil, false), (19, 77, nil, nil, false), (19, 77, 17, nil, false),
+            (nil, nil, nil, nil, false), (19, nil, nil, 82, false), (19, nil, nil, nil, true)
+        ]
+        for values in cases {
+            let userId = "scan-photo-truth-\(UUID().uuidString)"
+            AuthManager.shared.currentUser = User(id: userId, email: "scan-photo@example.com", name: "Scan Photo")
+            AuthManager.shared.authSession = .localFixture(
+                subject: userId, email: "scan-photo@example.com", name: "Scan Photo"
+            )
+            let historicalDate = try XCTUnwrap(BodyMetricLocalDate.startOfDay(for: "2026-06-02"))
+            let historical = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                for: historicalDate, weight: 84, bodyFatPercentage: values.scanBodyFat,
+                userId: userId, dataSource: BodyMetricSource.dexaPDF.rawValue
+            )
+            var genuineToday: BodyMetrics?
+            if let weight = values.todayWeight {
+                genuineToday = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                    for: Date(), weight: weight, bodyFatPercentage: values.todayBodyFat,
+                    userId: userId, dataSource: BodyMetricSource.healthKit.rawValue
+                )
+            }
+            let original = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+            original.applyImportedScans([
+                DexaPDFScan(date: "2026-06-02", weight: 84, weightUnit: "kg",
+                            bodyFatPercentage: values.scanBodyFat,
+                            muscleMass: nil, boneMass: nil, source: "BodySpec")
+            ])
+            original.setWeightUnit(.kilograms)
+            if let manualWeight = values.manualWeight {
+                original.manualWeightText = String(manualWeight)
+                original.persistManualWeightEntry()
+            }
+            if values.scanBodyFat == nil {
+                original.bodyFatPercentageText = "20"
+                original.persistBodyFatPercentageEntry()
+            }
+            var storedInput = try JSONEncoder().encode(original.bodyScoreInput)
+            if values.legacyDraft {
+                var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: storedInput) as? [String: Any])
+                legacy.removeValue(forKey: "weightSource")
+                storedInput = try JSONSerialization.data(withJSONObject: legacy)
+            }
+            let restored = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+            restored.bodyScoreInput = try JSONDecoder().decode(BodyScoreInput.self, from: storedInput)
+            restored.scanImport = nil // Relaunch restores the durable input, not the transient comparison.
+            let result = await restored.prepareFirstPhotoBaselineMetric()
+            let today = try XCTUnwrap(result)
+            XCTAssertEqual(today.weight, values.todayWeight ?? values.manualWeight,
+                           "Only an actual new entry may supply today's weight")
+            XCTAssertEqual(today.bodyFatPercentage, values.scanBodyFat == nil ? 20 : values.todayBodyFat)
+            XCTAssertEqual(today.localDate, BodyMetricLocalDate.key(for: Date()))
+            if let genuineToday {
+                XCTAssertEqual(today.id, genuineToday.id)
+                XCTAssertEqual(today.dataSource, BodyMetricSource.healthKit.rawValue)
+            } else {
+                XCTAssertEqual(today.dataSource, values.scanBodyFat == nil || values.manualWeight != nil
+                    ? BodyMetricSource.manual.rawValue : BodyMetricSource.photo.rawValue)
+            }
+            let stored = await CoreDataManager.shared.fetchBodyMetrics(
+                for: userId, localDate: historical.localDate
+            ).first?.toBodyMetrics()
+            XCTAssertEqual(stored?.id, historical.id)
+            XCTAssertEqual(stored?.weight, 84)
+            XCTAssertEqual(stored?.bodyFatPercentage, values.scanBodyFat)
+            XCTAssertEqual(stored?.dataSource, BodyMetricSource.dexaPDF.rawValue)
+            OnboardingProgressStore.shared.clearProgress(for: userId)
+        }
+    }
+
     func testCreateOrUpdateMetricsPreservesExistingMeasurementsForFirstPhotoBaseline() async throws {
         let userId = "photo_baseline_existing_\(UUID().uuidString)"
         let date = Date(timeIntervalSince1970: 1_764_000_000)

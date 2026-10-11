@@ -549,6 +549,154 @@ describe('/api/auth/mobile/chat/v1', () => {
     await expect(conflict.json()).resolves.toMatchObject({ error: 'idempotency_conflict' });
   });
 
+  it('does not start the provider when a request is cancelled while context loads', async () => {
+    const { handlers, model, store, getUser } = makeHarness();
+    let releaseUser!: (value: ProductUserRecord) => void;
+    let contextStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      contextStarted = resolve;
+    });
+    getUser.mockImplementationOnce(
+      () =>
+        new Promise<ProductUserRecord>((resolve) => {
+          releaseUser = resolve;
+          contextStarted();
+        }),
+    );
+    const abort = new AbortController();
+    const cancelledRequest = new NextRequest(request('POST', 'user-a', chatBody()), {
+      signal: abort.signal,
+    });
+    const pending = handlers.POST(cancelledRequest);
+    await started;
+    abort.abort();
+    releaseUser(user('user-a'));
+    const response = await pending;
+    const body = await response.text();
+
+    expect(model.calls).toHaveLength(0);
+    expect(response.status).toBe(499);
+    expect(body).not.toContain('event: done');
+    expect([...store.turns.values()][0]?.status).toBe('cancelled');
+    expect((await store.getLatest('user-a'))?.messages.map(({ role }) => role)).toEqual(['user']);
+
+    const retried = await handlers.POST(request('POST', 'user-a', chatBody()));
+    expect(await retried.text()).toContain('event: done');
+    expect(model.calls).toHaveLength(1);
+    expect((await store.getLatest('user-a'))?.messages.map(({ role }) => role)).toEqual([
+      'user',
+      'assistant',
+    ]);
+    expect(await store.getLatest('user-b')).toBeNull();
+  });
+
+  it('cancels an already-aborted request before reading context', async () => {
+    const { handlers, model, store, getUser, listMetrics, reportStreamOutcome } = makeHarness();
+    const abort = new AbortController();
+    abort.abort();
+    const response = await handlers.POST(
+      new NextRequest(request('POST', 'user-a', chatBody()), {
+        signal: abort.signal,
+      }),
+    );
+
+    expect(response.status).toBe(499);
+    expect(getUser).not.toHaveBeenCalled();
+    expect(listMetrics).not.toHaveBeenCalled();
+    expect(model.calls).toHaveLength(0);
+    expect([...store.turns.values()][0]?.status).toBe('cancelled');
+    expect(reportStreamOutcome.mock.calls).toEqual([['client_cancelled']]);
+  });
+
+  it('does not start the provider when training context finishes after cancellation', async () => {
+    const { handlers, model, store, getTrainingOutput } = makeHarness();
+    let releaseTraining!: (value: NextWorkoutResult | null) => void;
+    let contextStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      contextStarted = resolve;
+    });
+    getTrainingOutput.mockImplementationOnce(
+      () =>
+        new Promise<NextWorkoutResult | null>((resolve) => {
+          releaseTraining = resolve;
+          contextStarted();
+        }),
+    );
+    const abort = new AbortController();
+    const pending = handlers.POST(
+      new NextRequest(request('POST', 'user-a', chatBody('What workout should I do?')), {
+        signal: abort.signal,
+      }),
+    );
+    await started;
+    abort.abort();
+    releaseTraining(null);
+    const response = await pending;
+
+    expect(response.status).toBe(499);
+    expect(model.calls).toHaveLength(0);
+    expect([...store.turns.values()][0]?.status).toBe('cancelled');
+    expect((await store.getLatest('user-a'))?.messages.map(({ role }) => role)).toEqual(['user']);
+  });
+
+  it('keeps cancellation terminal when recording it fails', async () => {
+    const { handlers, model, store, reportStreamOutcome } = makeHarness();
+    jest.spyOn(store, 'failTurn').mockRejectedValue(new Error('private persistence detail'));
+    const abort = new AbortController();
+    abort.abort();
+    const response = await handlers.POST(
+      new NextRequest(request('POST', 'user-a', chatBody()), {
+        signal: abort.signal,
+      }),
+    );
+
+    expect(response.status).toBe(499);
+    await expect(response.json()).resolves.toEqual({ version: 1, error: 'client_cancelled' });
+    expect(model.calls).toHaveLength(0);
+    expect(reportStreamOutcome.mock.calls).toEqual([
+      ['client_cancelled'],
+      ['failure_persistence_error'],
+    ]);
+  });
+
+  it('retains context-failure recovery for a request that was not cancelled', async () => {
+    const { handlers, model, store, getUser } = makeHarness();
+    getUser.mockRejectedValueOnce(new Error('private context detail'));
+    const response = await handlers.POST(request('POST', 'user-a', chatBody()));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBe('5');
+    await expect(response.json()).resolves.toEqual({ version: 1, error: 'chat_unavailable' });
+    expect(model.calls).toHaveLength(0);
+    expect([...store.turns.values()][0]?.status).toBe('failed');
+    const retry = await handlers.POST(request('POST', 'user-a', chatBody()));
+    expect(await retry.text()).toContain('event: done');
+  });
+
+  it.each([false, true])(
+    'does not complete a provider that ends after cancellation (late delta: %s)',
+    async (lateDelta) => {
+      const { handlers, model, store, reportStreamOutcome } = makeHarness();
+      const abort = new AbortController();
+      jest.spyOn(model, 'streamText').mockImplementation(async function* () {
+        yield { type: 'text_delta', text: 'Partial answer' };
+        abort.abort();
+        if (lateDelta) yield { type: 'text_delta', text: ' stale continuation' };
+      });
+      const response = await handlers.POST(
+        new NextRequest(request('POST', 'user-a', chatBody()), { signal: abort.signal }),
+      );
+      const body = await response.text();
+
+      expect(body).not.toContain('event: done');
+      expect(body).not.toContain('stale continuation');
+      expect([...store.turns.values()][0]?.status).toBe('cancelled');
+      expect((await store.getLatest('user-a'))?.messages.map(({ role }) => role)).toEqual(['user']);
+      expect(reportStreamOutcome).toHaveBeenCalledWith('client_cancelled');
+      expect(reportStreamOutcome).not.toHaveBeenCalledWith('completed');
+    },
+  );
+
   it('marks a disconnected stream as cancelled', async () => {
     const { handlers, model, store } = makeHarness();
     model.waitForCancellation = true;
