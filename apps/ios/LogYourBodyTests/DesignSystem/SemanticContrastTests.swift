@@ -122,9 +122,20 @@ final class SemanticContrastTests: XCTestCase {
     // MARK: - Primary action pair
 
     func testPrimaryActionPairMeetsAA() {
-        assertContrast(Color.jovieActionText, "jovieActionText", on: [(Color.jovieAction, "jovieAction")], minimum: 4.5)
-        assertContrast(Color.jovieText, "jovieText", on: [(Color.jovieCanvas, "jovieCanvas"), (Color.jovieSurface, "jovieSurface")], minimum: 4.5)
-        assertContrast(Color.jovieTextSecondary, "jovieTextSecondary", on: [(Color.jovieCanvas, "jovieCanvas"), (Color.jovieSurface, "jovieSurface")], minimum: 4.5)
+        assertContrast(
+            Color.jovieActionText, "jovieActionText",
+            on: [(Color.jovieAction, "jovieAction")], minimum: 4.5
+        )
+        assertContrast(
+            Color.jovieText, "jovieText",
+            on: [(Color.jovieCanvas, "jovieCanvas"), (Color.jovieSurface, "jovieSurface")],
+            minimum: 4.5
+        )
+        assertContrast(
+            Color.jovieTextSecondary, "jovieTextSecondary",
+            on: [(Color.jovieCanvas, "jovieCanvas"), (Color.jovieSurface, "jovieSurface")],
+            minimum: 4.5
+        )
     }
 
     // MARK: - Negative fixture: the guard must fail black-on-black
@@ -144,7 +155,7 @@ final class SemanticContrastTests: XCTestCase {
             "MetricSummaryCard must render its accent label at full opacity"
         )
         XCTAssertFalse(
-            source.contains("secondaryTextColor.opacity("),
+            source.contains("foregroundStyle(secondaryTextColor.opacity("),
             "MetricSummaryCard must not dim secondary text or the affordance chevron"
         )
     }
