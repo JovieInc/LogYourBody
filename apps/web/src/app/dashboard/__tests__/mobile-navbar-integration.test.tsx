@@ -3,16 +3,10 @@ import { render, screen } from '@testing-library/react';
 import DashboardPage from '../page';
 import { useAuth } from '@/contexts/ProductAuthContext';
 import { useRouter, usePathname } from 'next/navigation';
-import { getProfile } from '@/lib/profile';
-import { createClient } from '@/lib/supabase/client';
 
 // Mock dependencies
 jest.mock('@/contexts/ProductAuthContext');
 jest.mock('next/navigation');
-jest.mock('@/lib/profile');
-jest.mock('@/lib/supabase/client', () => ({
-  createClient: jest.fn(),
-}));
 
 // Don't mock MobileNavbar to test actual integration
 jest.mock('@/components/MobileNavbar', () => {
@@ -75,16 +69,6 @@ describe('Mobile Navbar Integration', () => {
     });
     (useRouter as jest.Mock).mockReturnValue({
       push: jest.fn(),
-    });
-    (getProfile as jest.Mock).mockResolvedValue(null);
-    (createClient as jest.Mock).mockReturnValue({
-      from: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            order: jest.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        }),
-      }),
     });
   });
 

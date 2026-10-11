@@ -80,7 +80,7 @@ console.log('✅ All tests completed!\n')
 
 // Display migration instructions
 console.log('📝 Migration Instructions:')
-console.log('1. Run the TypeScript migration: npm run tsx scripts/migrate-avatars-to-pravatar.ts')
-console.log('2. Or apply the SQL migration: npx supabase db push')
+console.log('1. Add a reviewed SQL migration under apps/web/db/migrations when data changes are needed')
+console.log('2. Apply it with a direct Neon connection: pnpm --filter logyourbody db:apply:neon')
 console.log('3. New users will automatically get Pravatar URLs')
-console.log('4. Existing DiceBear URLs will be replaced with Pravatar URLs\n')
+console.log('4. Existing DiceBear URLs can be updated through the first-party profile API\n')

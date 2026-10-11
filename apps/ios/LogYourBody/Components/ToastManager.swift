@@ -32,9 +32,9 @@ struct Toast: Identifiable, Equatable {
         var color: Color {
             switch self {
             case .info: return .appPrimary
-            case .success: return .green
-            case .error: return .red
-            case .warning: return .orange
+            case .success: return Color.appSuccess
+            case .error: return Color.appError
+            case .warning: return Color.appWarning
             }
         }
     }
@@ -148,7 +148,7 @@ struct ToastView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.appCard)

@@ -30,9 +30,9 @@ struct DietPhaseCard: View {
 
         var color: Color {
             switch self {
-            case .bulk: return Color.blue
-            case .cut: return Color.orange
-            case .maintenance: return Color.green
+            case .bulk: return Color.appPrimary
+            case .cut: return Color.appWarning
+            case .maintenance: return Color.appSuccess
             }
         }
     }
@@ -76,7 +76,7 @@ struct DietPhaseCard: View {
             // Header with phase type and duration
             HStack {
                 // Phase type badge
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: phaseType.icon)
                         .font(.system(size: 14, weight: .medium))
                     Text(phaseType.rawValue)
@@ -84,7 +84,7 @@ struct DietPhaseCard: View {
                 }
                 .foregroundColor(phaseType.color)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .padding(.vertical, 8)
                 .background(
                     Capsule()
                         .fill(phaseType.color.opacity(0.15))
@@ -223,7 +223,7 @@ private struct ChangeItem: View {
 
     private var changeColor: Color {
         guard let isPositive = isPositive else { return .appTextSecondary }
-        return isPositive ? .green : .red
+        return isPositive ? Color.appSuccess : Color.appError
     }
 
     private var changeIcon: String {

@@ -70,8 +70,10 @@ public extension Color {
     static let metricAccentSteps = Color(hex: JoviePalette.goldHex)
     static let metricAccentWeight = Color(hex: JoviePalette.ultraHex)
     static let metricAccentBodyFat = Color(hex: JoviePalette.pulseHex)
-    static let metricAccentFFMI = Color(hex: JoviePalette.ultraHex)
-    static let metricAccentWaist = Color(hex: JoviePalette.ionHex)
+    // Explicit values keep chart/icon accents above the non-text contrast
+    // floor on the canonical metric card surface in light and dark contexts.
+    static let metricAccentFFMI = Color(hex: "#54D9CE")
+    static let metricAccentWaist = Color(hex: "#6EA8FF")
 
     // MARK: - State Colors
     static let linearDisabled = Color(hex: JoviePalette.floatingHex)

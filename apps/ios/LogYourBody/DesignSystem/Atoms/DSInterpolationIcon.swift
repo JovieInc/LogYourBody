@@ -30,20 +30,20 @@ struct DSInterpolationIcon: View {
 
     private var iconColor: Color {
         if isLastKnown {
-            return Color(hex: "#6EE7F0").opacity(0.7)  // Accent color, dimmed
+            return Color.appPrimary.opacity(0.7)  // Accent color, dimmed
         }
 
         guard let level = confidenceLevel else {
-            return .orange
+            return Color.appWarning
         }
 
         switch level {
         case .high:
-            return .green.opacity(0.8)
+            return Color.appSuccess.opacity(0.8)
         case .medium:
-            return .orange.opacity(0.8)
+            return Color.appWarning.opacity(0.8)
         case .low:
-            return .red.opacity(0.7)
+            return Color.appError.opacity(0.7)
         }
     }
 
@@ -101,10 +101,10 @@ struct DSInterpolationIcon: View {
 
 #Preview {
     ZStack {
-        Color(hex: "#0B0D10")
+        Color.appBackground
             .ignoresSafeArea()
 
-        VStack(spacing: 30) {
+        VStack(spacing: 32) {
             HStack {
                 Text("18.5%")
                     .font(.system(size: 40, weight: .bold))

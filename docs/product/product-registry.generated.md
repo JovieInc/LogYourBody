@@ -4,22 +4,18 @@
 
 > Answer “How am I doing?” with one private body-composition timeline.
 
-Canonical source: `packages/product-registry/src/products/logyourbody.mjs`. Web and docs import the typed package. iOS consumes the generated Swift registry. Run `pnpm product:generate` after changing product truth.
+Canonical source: packages/product-registry/src/products/logyourbody.mjs. Web and docs import the typed package. iOS consumes the generated Swift registry.
 
 ## Brand and messaging
 
-- Slogan: **Know if the work is working.**
+- Slogan: Know if the work is working.
 - Description: Weight, body fat, lean mass, HealthKit data, and progress photos in one private timeline that shows the trend.
 - Voice: clear, concise, evidence-based, non-judgmental, private
 - Support: support@logyourbody.com
 
 ## Plan and pricing
 
-The source of live purchase price display is App Store Connect through RevenueCat. These reference prices and identifiers define web/docs copy and release drift checks.
-
-| Plan | Entitlement |  Trial | Monthly | Annual |
-| ---- | ----------- | -----: | ------: | -----: |
-| Pro  | `Premium`   | 3 days |   $9.99 | $69.99 |
+- Pro: Premium; 3-day trial; USD 9.99/month or USD 69.99/year.
 
 ## Features
 
@@ -53,17 +49,12 @@ The source of live purchase price display is App Store Connect through RevenueCa
 
 ## Endpoints
 
-Canonical hosts and the auth contract. `scripts/url-drift.test.mjs` fails CI on any unregistered URL literal; register new endpoints in `packages/product-registry/src/products/logyourbody.mjs`.
+| api | `https://www.logyourbody.com` | `www.logyourbody.com` | |
+| marketing | `https://logyourbody.com` | `logyourbody.com` | Apex domain 307-redirects to www; never use it for API or auth traffic. |
+| status | `https://status.logyourbody.com` | `status.logyourbody.com` | |
+| dev | `http://localhost:3000` | `localhost:3000` | |
 
-| Host      | URL                              | Value                    | Note                                                                    |
-| --------- | -------------------------------- | ------------------------ | ----------------------------------------------------------------------- |
-| api       | `https://www.logyourbody.com`    | `www.logyourbody.com`    |                                                                         |
-| marketing | `https://logyourbody.com`        | `logyourbody.com`        | Apex domain 307-redirects to www; never use it for API or auth traffic. |
-| status    | `https://status.logyourbody.com` | `status.logyourbody.com` |                                                                         |
-| dev       | `http://localhost:3000`          | `localhost:3000`         |                                                                         |
-
-- Auth issuer: `https://jov.ie/api/auth`
-- iOS client: `logyourbody-ios`, redirect `logyourbody://oauth`, scheme `logyourbody`
-- Web client: `logyourbody-web`, redirect `https://www.logyourbody.com/api/auth/callback`
-- Deep links: `applinks:logyourbody.com`, `applinks:www.logyourbody.com`, scheme `logyourbody`
-- Supabase project: `https://ihivupqpctpkrgqgxfjf.supabase.co`
+- Auth issuer: https://jov.ie/api/auth
+- iOS client: logyourbody-ios, redirect logyourbody://oauth, scheme logyourbody
+- Web client: logyourbody-web, redirect https://www.logyourbody.com/api/auth/callback
+- Deep links: applinks:logyourbody.com, applinks:www.logyourbody.com, scheme logyourbody

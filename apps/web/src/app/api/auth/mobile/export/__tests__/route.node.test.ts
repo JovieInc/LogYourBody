@@ -48,6 +48,9 @@ describe('/api/auth/mobile/export', () => {
       glp1_dose_logs: [],
       dexa_results: [],
       progress_photos: [],
+      training_sessions: [],
+      logged_sets: [],
+      training_feedback: [],
     } as never);
 
     const response = await GET(
@@ -60,9 +63,12 @@ describe('/api/auth/mobile/export', () => {
     expect(mockedDirectory.getUser).toHaveBeenCalledWith('owner-a');
   });
 
-  it('dumps the authenticated subject Neon rows without a Supabase path', async () => {
+  it('dumps the authenticated subject Neon rows without a legacy provider path', async () => {
     mockedFetchUserInfo.mockResolvedValue({ sub: 'owner-a' } as never);
-    mockedDirectory.getUser.mockResolvedValue({ subject: 'owner-a', email: 'a@example.com' } as never);
+    mockedDirectory.getUser.mockResolvedValue({
+      subject: 'owner-a',
+      email: 'a@example.com',
+    } as never);
     mockedMetrics.list.mockResolvedValue([{ id: 'metric-1' }] as never);
     mockedRecords.listAll.mockResolvedValue({
       daily_metrics: [{ id: 'daily-1' }],
@@ -70,6 +76,9 @@ describe('/api/auth/mobile/export', () => {
       glp1_dose_logs: [],
       dexa_results: [],
       progress_photos: [],
+      training_sessions: [],
+      logged_sets: [],
+      training_feedback: [],
     } as never);
 
     const response = await POST(request('POST', 'access-a'));

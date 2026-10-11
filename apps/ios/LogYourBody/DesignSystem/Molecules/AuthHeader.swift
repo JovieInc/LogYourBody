@@ -73,7 +73,7 @@ struct AuthServiceStatusBanner: View {
                 )
                 .accessibilityHint("Tries to reconnect to the sign-in service.")
             } else {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: theme.colors.info))
                         .accessibilityHidden(true)

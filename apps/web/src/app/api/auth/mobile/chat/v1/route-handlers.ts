@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
-import { buildChatModelMessages } from '@/lib/chat/context';
+import { applyClinicalGuardrail, holdCoachReplyForReview } from '@/lib/chat/coach-scaffold';
+import { buildChatModelMessages, isTrainingQuestion } from '@/lib/chat/context';
+import { hasUnauthorizedTrainingQuantity } from '@/lib/chat/training-number-boundary';
+import { coachPersonaGuardrailsEnabled } from '@/lib/flags/coach-persona';
+import type { NextWorkoutResult } from '@/lib/training/service';
 import {
   CHAT_PROTOCOL_VERSION,
   type ChatConversationPort,
@@ -17,8 +21,17 @@ const ChatRequestSchema = z
     conversationId: z.string().uuid(),
     clientMessageId: z.string().uuid(),
     message: z.string().trim().min(1).max(2_000),
+    voiceMode: z.boolean().optional().default(false),
   })
   .strict();
+
+type ChatStreamOutcome =
+  | 'started'
+  | 'completed'
+  | 'provider_error'
+  | 'completion_persistence_error'
+  | 'client_cancelled'
+  | 'failure_persistence_error';
 
 type ChatRouteDependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
@@ -28,9 +41,13 @@ type ChatRouteDependencies = {
   createModel: () => ChatModelPort;
   modelName: string;
   createLeaseToken: () => string;
+  reportStreamOutcome?: (outcome: ChatStreamOutcome) => void;
+  getTrainingOutput?: (subject: string) => Promise<NextWorkoutResult | null>;
 };
 
 const encoder = new TextEncoder();
+const TRAINING_NUMBER_FALLBACK =
+  'Use the workout shown in your app. I can explain the plan, but I cannot add quantities the engine did not return.';
 
 function event(name: string, payload: Record<string, unknown>): Uint8Array {
   return encoder.encode(`event: ${name}\ndata: ${JSON.stringify(payload)}\n\n`);
@@ -87,6 +104,15 @@ function replayResponse(input: {
 }
 
 export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
+  function reportStreamOutcome(outcome: ChatStreamOutcome) {
+    // Diagnostics receive only a fixed category, never messages, identity, or raw errors.
+    try {
+      dependencies.reportStreamOutcome?.(outcome);
+    } catch {
+      // An unavailable diagnostic sink must not interrupt the answer lifecycle.
+    }
+  }
+
   async function authorized(request: NextRequest) {
     return dependencies.authenticate(request);
   }
@@ -165,33 +191,56 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
         return jsonError('conversation_not_found', 404);
       }
 
+      const abortController = new AbortController();
+      const abortFromRequest = () => abortController.abort();
+      request.signal.addEventListener('abort', abortFromRequest, { once: true });
+      if (request.signal.aborted) abortFromRequest();
+
       let model: ChatModelPort;
       let modelMessages: ChatModelMessage[];
+      const trainingTurn = isTrainingQuestion(input.message);
+      const guardrailsEnabled = coachPersonaGuardrailsEnabled();
+      const holdForReview = holdCoachReplyForReview(trainingTurn, guardrailsEnabled);
+      let trainingOutput: NextWorkoutResult | null = null;
       try {
+        abortController.signal.throwIfAborted();
         const [user, metrics] = await Promise.all([
           dependencies.users.getUser(identity.sub),
           dependencies.bodyMetrics.list(identity.sub, 30),
         ]);
+        abortController.signal.throwIfAborted();
+        trainingOutput =
+          trainingTurn && dependencies.getTrainingOutput
+            ? await dependencies.getTrainingOutput(identity.sub)
+            : null;
+        abortController.signal.throwIfAborted();
         modelMessages = buildChatModelMessages({
           user,
           metrics,
           conversationMessages: turn.conversation.messages,
+          trainingOutput,
+          voiceMode: input.voiceMode,
         });
         model = dependencies.createModel();
       } catch {
-        await dependencies.conversations.failTurn({
-          subject: identity.sub,
-          turnId: turn.turnId,
-          leaseToken,
-          status: 'failed',
-          failureCode: 'context_unavailable',
-        });
+        request.signal.removeEventListener('abort', abortFromRequest);
+        const cancelled = abortController.signal.aborted;
+        if (cancelled) reportStreamOutcome('client_cancelled');
+        try {
+          await dependencies.conversations.failTurn({
+            subject: identity.sub,
+            turnId: turn.turnId,
+            leaseToken,
+            status: cancelled ? 'cancelled' : 'failed',
+            failureCode: cancelled ? 'client_cancelled' : 'context_unavailable',
+          });
+        } catch {
+          reportStreamOutcome('failure_persistence_error');
+        }
+        if (cancelled) return jsonError('client_cancelled', 499);
         return jsonError('chat_unavailable', 503, { 'Retry-After': '5' });
       }
 
-      const abortController = new AbortController();
-      const abortFromRequest = () => abortController.abort();
-      request.signal.addEventListener('abort', abortFromRequest, { once: true });
       let finalized = false;
 
       const body = new ReadableStream<Uint8Array>({
@@ -205,37 +254,58 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
             }),
           );
 
+          reportStreamOutcome('started');
           let content = '';
+          let persistingCompletion = false;
           let inputTokens: number | null = null;
           let outputTokens: number | null = null;
 
           try {
+            abortController.signal.throwIfAborted();
             for await (const modelEvent of model.streamText({
               messages: modelMessages,
               maxOutputTokens: 600,
               signal: abortController.signal,
             })) {
+              abortController.signal.throwIfAborted();
               if (modelEvent.type === 'text_delta') {
                 content += modelEvent.text;
                 if (content.length > 12_000) throw new Error('CHAT_RESPONSE_TOO_LONG');
-                controller.enqueue(
-                  event('delta', {
-                    version: CHAT_PROTOCOL_VERSION,
-                    text: modelEvent.text,
-                  }),
-                );
+                if (!holdForReview) {
+                  controller.enqueue(
+                    event('delta', {
+                      version: CHAT_PROTOCOL_VERSION,
+                      text: modelEvent.text,
+                    }),
+                  );
+                }
               } else {
                 inputTokens = modelEvent.inputTokens;
                 outputTokens = modelEvent.outputTokens;
               }
             }
 
+            abortController.signal.throwIfAborted();
             if (!content.trim()) throw new Error('CHAT_EMPTY_RESPONSE');
+            const trainingSafe =
+              trainingTurn && hasUnauthorizedTrainingQuantity(content, trainingOutput)
+                ? TRAINING_NUMBER_FALLBACK
+                : content;
+            const deliveredContent = applyClinicalGuardrail(trainingSafe, guardrailsEnabled);
+            if (holdForReview) {
+              controller.enqueue(
+                event('delta', {
+                  version: CHAT_PROTOCOL_VERSION,
+                  text: deliveredContent,
+                }),
+              );
+            }
+            persistingCompletion = true;
             const stored = await dependencies.conversations.completeTurn({
               subject: identity.sub,
               turnId: turn.turnId,
               leaseToken,
-              content,
+              content: deliveredContent,
               model: dependencies.modelName,
               inputTokens,
               outputTokens,
@@ -249,15 +319,28 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
                 replayed: false,
               }),
             );
+            reportStreamOutcome('completed');
           } catch {
             const cancelled = abortController.signal.aborted;
-            await dependencies.conversations.failTurn({
-              subject: identity.sub,
-              turnId: turn.turnId,
-              leaseToken,
-              status: cancelled ? 'cancelled' : 'failed',
-              failureCode: cancelled ? 'client_cancelled' : 'provider_error',
-            });
+            reportStreamOutcome(
+              cancelled
+                ? 'client_cancelled'
+                : persistingCompletion
+                  ? 'completion_persistence_error'
+                  : 'provider_error',
+            );
+            try {
+              await dependencies.conversations.failTurn({
+                subject: identity.sub,
+                turnId: turn.turnId,
+                leaseToken,
+                status: cancelled ? 'cancelled' : 'failed',
+                failureCode: cancelled ? 'client_cancelled' : 'provider_error',
+              });
+            } catch {
+              // Persistence failure cannot suppress the terminal client error.
+              reportStreamOutcome('failure_persistence_error');
+            }
             if (!cancelled) {
               controller.enqueue(
                 event('error', {

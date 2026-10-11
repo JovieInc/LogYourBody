@@ -82,7 +82,7 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         )
     }
 
-    func testSyncLocalChanges_UsesSupabaseAndMarksDailyMetricSynced() async throws {
+    func testSyncLocalChanges_UsesProductAPIAndMarksDailyMetricSynced() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -103,18 +103,18 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
 
         try await coreData.saveDailyMetricsAndWait(dailyModel, userId: userId)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        // Verify Supabase payload
-        XCTAssertEqual(stubSupabase.dailyMetricsBatches.count, 1)
-        guard let batch = stubSupabase.dailyMetricsBatches.first,
+        // Verify ProductAPI payload
+        XCTAssertEqual(stubProductAPI.dailyMetricsBatches.count, 1)
+        guard let batch = stubProductAPI.dailyMetricsBatches.first,
               let payload = batch.first else {
             XCTFail("No daily metrics batch captured")
             return
@@ -147,7 +147,7 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertTrue(unsyncedForUser.isEmpty)
     }
 
-    func testSyncLocalChanges_UsesSupabaseAndMarksGlp1DoseLogSynced() async throws {
+    func testSyncLocalChanges_UsesProductAPIAndMarksGlp1DoseLogSynced() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -173,17 +173,17 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
 
         try await coreData.saveGlp1DoseLogsAndWait([log], userId: userId, markAsSynced: false)
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        XCTAssertEqual(stubSupabase.glp1DoseLogPayloads.count, 1)
-        let payload = try XCTUnwrap(stubSupabase.glp1DoseLogPayloads.first)
+        XCTAssertEqual(stubProductAPI.glp1DoseLogPayloads.count, 1)
+        let payload = try XCTUnwrap(stubProductAPI.glp1DoseLogPayloads.first)
         XCTAssertEqual(payload["id"] as? String, id)
         XCTAssertEqual(payload["user_id"] as? String, userId)
         XCTAssertEqual(payload["medication_id"] as? String, medicationId)
@@ -195,7 +195,7 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertTrue(remaining.isEmpty)
     }
 
-    func testSyncLocalChanges_UsesSupabaseAndMarksGlp1MedicationSynced() async throws {
+    func testSyncLocalChanges_UsesProductAPIAndMarksGlp1MedicationSynced() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -230,19 +230,19 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             }
         }
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        XCTAssertEqual(stubSupabase.endedActiveMedicationRequests.count, 1)
-        XCTAssertEqual(stubSupabase.endedActiveMedicationRequests.first?.userId, userId)
-        XCTAssertEqual(stubSupabase.glp1MedicationPayloads.count, 1)
-        let payload = try XCTUnwrap(stubSupabase.glp1MedicationPayloads.first)
+        XCTAssertEqual(stubProductAPI.endedActiveMedicationRequests.count, 1)
+        XCTAssertEqual(stubProductAPI.endedActiveMedicationRequests.first?.userId, userId)
+        XCTAssertEqual(stubProductAPI.glp1MedicationPayloads.count, 1)
+        let payload = try XCTUnwrap(stubProductAPI.glp1MedicationPayloads.first)
         XCTAssertEqual(payload["id"] as? String, id)
         XCTAssertEqual(payload["user_id"] as? String, userId)
         XCTAssertEqual(payload["display_name"] as? String, "Semaglutide")
@@ -253,7 +253,7 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertTrue(remaining.isEmpty)
     }
 
-    func testSyncLocalChanges_UsesSupabaseAndMarksDexaResultsSynced() async throws {
+    func testSyncLocalChanges_UsesProductAPIAndMarksDexaResultsSynced() async throws {
         let coreData = CoreDataManager.shared
 
         let id = UUID().uuidString
@@ -281,6 +281,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             result.analyzeTime = analyzeTime
             result.vatMassKg = 1.23
             result.vatVolumeCm3 = 456.0
+            result.scanWeight = 79.2
+            result.scanWeightUnit = "kg"
+            result.bodyFatPercentage = 18.4
+            result.muscleMass = 62.0
+            result.boneMass = 3.2
             result.resultPdfUrl = "https://example.com/result.pdf"
             result.resultPdfName = "result.pdf"
             result.createdAt = createdAt
@@ -293,18 +298,18 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             }
         }
 
-        let stubSupabase = StubSupabaseManager()
+        let stubProductAPI = StubProductAPIClient()
         let manager = RealtimeSyncManager(
             coreDataManager: coreData,
             authManager: AuthManager.shared,
-            supabaseManager: stubSupabase
+            productAPIClient: stubProductAPI
         )
 
         try await manager.syncLocalChanges(token: "test-token")
 
-        // Verify Supabase payload
-        XCTAssertEqual(stubSupabase.dexaPayloads.count, 1)
-        guard let payload = stubSupabase.dexaPayloads.first else {
+        // Verify ProductAPI payload
+        XCTAssertEqual(stubProductAPI.dexaPayloads.count, 1)
+        guard let payload = stubProductAPI.dexaPayloads.first else {
             XCTFail("No Dexa payload captured")
             return
         }
@@ -315,6 +320,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertEqual(payload["external_source"] as? String, "BodySpec")
         XCTAssertEqual(payload["result_pdf_url"] as? String, "https://example.com/result.pdf")
         XCTAssertEqual(payload["result_pdf_name"] as? String, "result.pdf")
+        XCTAssertEqual(payload["scan_weight"] as? Double, 79.2)
+        XCTAssertEqual(payload["scan_weight_unit"] as? String, "kg")
+        XCTAssertEqual(payload["body_fat_percentage"] as? Double, 18.4)
+        XCTAssertEqual(payload["muscle_mass"] as? Double, 62.0)
+        XCTAssertEqual(payload["bone_mass"] as? Double, 3.2)
 
         if let vatMass = payload["vat_mass_kg"] as? Double {
             XCTAssertEqual(vatMass, 1.23, accuracy: 0.001)
@@ -372,6 +382,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             withVat.analyzeTime = now.addingTimeInterval(-1_800)
             withVat.vatMassKg = 2.5
             withVat.vatVolumeCm3 = 789.0
+            withVat.scanWeight = 80.1
+            withVat.scanWeightUnit = "kg"
+            withVat.bodyFatPercentage = 18.5
+            withVat.muscleMass = 63.0
+            withVat.boneMass = 3.3
             withVat.resultPdfUrl = "https://example.com/result.pdf"
             withVat.resultPdfName = "result.pdf"
             withVat.createdAt = createdAt
@@ -413,6 +428,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
 
         let vatVolume = try XCTUnwrap(withVat.vatVolumeCm3)
         XCTAssertEqual(vatVolume, 789.0, accuracy: 0.001)
+        XCTAssertEqual(withVat.scanWeight, 80.1)
+        XCTAssertEqual(withVat.scanWeightUnit, "kg")
+        XCTAssertEqual(withVat.bodyFatPercentage, 18.5)
+        XCTAssertEqual(withVat.muscleMass, 63.0)
+        XCTAssertEqual(withVat.boneMass, 3.3)
 
         XCTAssertEqual(withVat.resultPdfUrl, "https://example.com/result.pdf")
         XCTAssertEqual(withVat.resultPdfName, "result.pdf")

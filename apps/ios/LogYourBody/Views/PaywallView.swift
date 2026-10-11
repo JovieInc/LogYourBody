@@ -60,15 +60,11 @@ struct PaywallView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Menu {
-                        Button("Restore Purchases", systemImage: "arrow.clockwise") {
-                            Task { await restorePurchases() }
-                        }
-                        .disabled(subscriptionManager.isPurchasing)
-
                         Button("Log out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
                             showLogoutConfirmation = true
                         }
                         .disabled(subscriptionManager.isPurchasing)
+                        .accessibilityIdentifier("paywall_logout_button")
 
                         Button("Terms of Service", systemImage: "doc.text") {
                             showTermsSheet = true
@@ -81,6 +77,7 @@ struct PaywallView: View {
                         Label("More", systemImage: "ellipsis.circle")
                     }
                     .accessibilityLabel("Paywall account and legal actions")
+                    .accessibilityIdentifier("paywall_more_menu")
                 }
             }
         }
@@ -88,22 +85,23 @@ struct PaywallView: View {
         .alert("Purchase Error", isPresented: $showPurchaseError) {
             Button("OK", role: .cancel) { subscriptionManager.errorMessage = nil }
         } message: {
-            Text(subscriptionManager.errorMessage ?? "An error occurred")
+            paywallStatusMessage(subscriptionManager.errorMessage ?? "An error occurred")
         }
         .alert("Restore Successful", isPresented: $showRestoreSuccess) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Your subscription has been restored.")
+            paywallStatusMessage("Your subscription has been restored.")
         }
         .alert("No Subscription Found", isPresented: $showRestoreError) {
             Button("OK", role: .cancel) { subscriptionManager.errorMessage = nil }
         } message: {
-            Text(subscriptionManager.errorMessage ?? "No active subscription found")
+            paywallStatusMessage(subscriptionManager.errorMessage ?? "No active subscription found")
         }
-        .confirmationDialog(
+        // confirmationDialog presents without Cancel, so paywall logout has no
+        // reachable escape hatch.
+        .alert(
             "Log out of \(ProductRegistry.appName)?",
-            isPresented: $showLogoutConfirmation,
-            titleVisibility: .visible
+            isPresented: $showLogoutConfirmation
         ) {
             Button("Log Out", role: .destructive) {
                 Task {
@@ -111,7 +109,9 @@ struct PaywallView: View {
                     await authManager.logout()
                 }
             }
+            .accessibilityIdentifier("paywall_logout_confirm")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("paywall_logout_cancel")
         } message: {
             Text("Use this to switch accounts on this device.")
         }
@@ -145,7 +145,7 @@ struct PaywallView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(.title, design: .default).weight(.semibold))
                 .foregroundStyle(theme.colors.text)
@@ -163,6 +163,8 @@ struct PaywallView: View {
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home_v2_paywall")
     }
 
     private var valueProposition: some View {
@@ -198,11 +200,12 @@ struct PaywallView: View {
             selectedPackageIdentifier = package.packageIdentifier
             HapticManager.shared.impact(style: .light)
         } label: {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(package.planTitle)
                         .font(theme.typography.labelLarge)
                         .foregroundStyle(theme.colors.text)
+                        .accessibilityIdentifier("home_v2_paywall_plan_\(package.accessibilityIdentifierSuffix)")
 
                     Spacer(minLength: 4)
 
@@ -263,19 +266,24 @@ struct PaywallView: View {
 
     private func purchaseButton(package: PaywallPackageDisplay) -> some View {
         BaseButton(
-            subscriptionManager.isPurchasing ? "Processing…" : package.purchaseButtonTitle,
             configuration: ButtonConfiguration(
                 style: .custom(background: .jovieAction, foreground: .jovieActionText),
                 size: .large,
                 isLoading: subscriptionManager.isPurchasing,
                 isEnabled: !subscriptionManager.isPurchasing,
                 fullWidth: true,
-                icon: subscriptionManager.isPurchasing ? nil : "checkmark",
-                iconPosition: .leading,
                 cornerRadius: 9_999
             ),
             action: {
                 Task { await purchase(package) }
+            },
+            label: {
+                Label {
+                    Text(package.purchaseButtonTitle)
+                        .accessibilityIdentifier("home_v2_paywall_purchase")
+                } icon: {
+                    Image(systemName: "checkmark")
+                }
             }
         )
         .accessibilityIdentifier("paywall_purchase_button")
@@ -292,6 +300,7 @@ struct PaywallView: View {
                 .font(theme.typography.bodySmall)
                 .foregroundStyle(theme.colors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("home_v2_paywall_plans_unavailable")
 
             unavailablePlanActions
         }
@@ -355,27 +364,20 @@ struct PaywallView: View {
             Button {
                 Task { await restorePurchases() }
             } label: {
-                Label("Restore Purchases", systemImage: "arrow.clockwise")
-                    .font(theme.typography.labelLarge)
-                    .foregroundStyle(theme.colors.text)
-                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                Label {
+                    Text("Restore Purchases")
+                        .accessibilityIdentifier("home_v2_paywall_restore")
+                } icon: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .font(theme.typography.labelLarge)
+                .foregroundStyle(theme.colors.text)
+                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
             }
             .buttonStyle(.plain)
             .disabled(subscriptionManager.isPurchasing)
             .accessibilityIdentifier("paywall_restore_purchases_button")
             .worldClassScreen(.restorePurchases)
-
-            Button(role: .destructive) {
-                showLogoutConfirmation = true
-            } label: {
-                Label("Log out", systemImage: "rectangle.portrait.and.arrow.right")
-                    .font(theme.typography.labelMedium)
-                    .foregroundStyle(theme.colors.error)
-                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
-            }
-            .buttonStyle(.plain)
-            .disabled(subscriptionManager.isPurchasing)
-            .accessibilityIdentifier("paywall_logout_button")
         }
     }
 
@@ -432,6 +434,11 @@ struct PaywallView: View {
             showRestoreError = true
         }
         AppServicePorts.analyticsTracker.track(event: success ? "restore_success" : "restore_failed")
+    }
+
+    private func paywallStatusMessage(_ message: String) -> some View {
+        Text(message)
+            .accessibilityIdentifier("home_v2_paywall_status")
     }
 
     private func legalDocumentSheet(_ documentType: LegalDocumentView.LegalDocumentType) -> some View {

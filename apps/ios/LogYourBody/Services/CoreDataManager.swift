@@ -172,6 +172,11 @@ struct PendingDexaResultSyncItem {
     let analyzeTime: Date?
     let vatMassKg: Double
     let vatVolumeCm3: Double
+    let scanWeight: Double?
+    let scanWeightUnit: String?
+    let bodyFatPercentage: Double?
+    let muscleMass: Double?
+    let boneMass: Double?
     let resultPdfUrl: String?
     let resultPdfName: String?
     let createdAt: Date
@@ -179,6 +184,7 @@ struct PendingDexaResultSyncItem {
 }
 
 class CoreDataManager: ObservableObject {
+    typealias WriteAdmission = @MainActor () throws -> Void
     typealias PersistentStoreLoader = (
         NSPersistentContainer,
         @escaping (NSPersistentStoreDescription, Error?) -> Void
@@ -379,6 +385,11 @@ extension CachedDexaResult {
             analyzeTime: analyzeTime,
             vatMassKg: vatMassKg,
             vatVolumeCm3: vatVolumeCm3,
+            scanWeight: scanWeight > 0 ? scanWeight : nil,
+            scanWeightUnit: scanWeightUnit,
+            bodyFatPercentage: bodyFatPercentage > 0 ? bodyFatPercentage : nil,
+            muscleMass: muscleMass > 0 ? muscleMass : nil,
+            boneMass: boneMass > 0 ? boneMass : nil,
             resultPdfUrl: resultPdfUrl,
             resultPdfName: resultPdfName,
             createdAt: createdAt ?? Date(),
@@ -424,6 +435,11 @@ extension CachedDexaResult {
             analyzeTime: analyzeTime,
             vatMassKg: resolvedVatMass,
             vatVolumeCm3: resolvedVatVolume,
+            scanWeight: scanWeight > 0 ? scanWeight : nil,
+            scanWeightUnit: scanWeightUnit,
+            bodyFatPercentage: bodyFatPercentage > 0 ? bodyFatPercentage : nil,
+            muscleMass: muscleMass > 0 ? muscleMass : nil,
+            boneMass: boneMass > 0 ? boneMass : nil,
             resultPdfUrl: resultPdfUrl,
             resultPdfName: resultPdfName,
             createdAt: createdAt,

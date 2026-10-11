@@ -95,7 +95,7 @@ struct MarkdownSectionView: View {
                 color: .appText
             )
             .padding(.top, 20)
-            .padding(.bottom, 10)
+            .padding(.bottom, 12)
 
         case .h2:
             DSText(

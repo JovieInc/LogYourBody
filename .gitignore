@@ -58,6 +58,7 @@ apps/web/scripts/*
 !apps/web/scripts/test-seeded-users.ts
 !apps/web/scripts/next-build.cjs
 !apps/web/scripts/tsconfig.json
+!apps/web/scripts/voice-adapters.test.ts
 !apps/web/scripts/README.md
 # Note: Root scripts/ folder contains CI/CD tools and should be committed
 next-env.d.ts
@@ -113,7 +114,6 @@ apps/ios/LogYourBody/Config.xcconfig
 apps/ios/LogYourBody/Config-Development.xcconfig
 apps/ios/LogYourBody/Config-Production.xcconfig
 apps/ios/LogYourBody/release-observability.md
-apps/ios/Supabase.xcconfig
 !apps/ios/LogYourBody/Config-Template.xcconfig
 !apps/ios/LogYourBody/*.xcconfig.example
 !apps/ios/LogYourBody/*.xcconfig.template
@@ -135,3 +135,4 @@ sentry-wizard
 # gbrain (brain-first knowledge) local artifacts — see scripts/setup-gbrain.sh
 .gbrain-source
 .gbrain/
+.env*

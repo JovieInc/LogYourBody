@@ -41,7 +41,6 @@ export interface ProductEndpoints {
   readonly tables: readonly string[];
   readonly buckets: readonly string[];
   readonly vendor: {
-    readonly supabaseProjectRef: string;
     readonly cloudinary: {
       readonly apiHost: string;
       readonly deliveryHost: string;

@@ -56,7 +56,7 @@
   - App initialization
   - Product-session authentication check
   - Local profile loading from Core Data (if authenticated)
-- HealthKit setup, local sync metadata, and Supabase sync now run as a **background warm-up** once the root view is visible.
+- HealthKit setup, local sync metadata, and first-party sync now run as a **background warm-up** once the root view is visible.
 
 ### 2. Dashboard Loading UX
 

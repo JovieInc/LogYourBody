@@ -18,7 +18,7 @@ LogYourBody/
 │   ├── design-tokens/ # Shared design tokens
 │   ├── product-registry/ # Canonical product identity and endpoints
 │   └── shared-lib/    # CI policy / migration guards
-├── supabase/          # Legacy photo/export/deletion functions (JOV-4831 owns cutover)
+├── apps/web/db/       # Canonical Neon migrations
 ├── .github/           # GitHub Actions workflows and configurations
 └── docs/              # Project documentation
 ```
@@ -64,8 +64,8 @@ The canonical product and brand standards are:
 - Do not build a web app before the product has at least 1,000 activated iOS users, or 250 paying subscribers plus repeated web-access requests. Web work before then is limited to marketing, legal, support, and billing/account surfaces that unblock iOS.
 - Do not build an Apple Watch app unless users explicitly ask for it. Initial Watch scope is read-only basic stats and trend direction.
 - Do not build iPad-specific layouts unless there is clear user pull, a measurable kiosk experiment, or enough active iPad usage to justify it. Target future landscape layout: photo left, stats right, timeline along the bottom.
-- AI starts as short deterministic insight, not chat: classify cutting, maintenance, or gaining from trends and warn when a phase has likely gone too long. Jovie-style chat comes later only after the timeline is retained and users ask for recommendations.
-- Do not build a food logger or workout tracker. This app is a body-composition heads-up display for people who already have those systems.
+- The product includes an evidence-grounded hypertrophy coach. A deterministic programming engine owns all training prescriptions; the conversation model may explain only engine-returned output and cite the opaque evidence IDs supplied with it. It must not create, calculate, or adjust numeric prescriptions.
+- Do not build a food logger or a general-purpose workout tracker. Hypertrophy programming is in scope as an engine-led product capability alongside the body-composition heads-up display.
 
 ---
 
@@ -415,7 +415,6 @@ The sections below provide platform-specific details for iOS and web development
 ### Important Files
 
 - `LogYourBody.xcodeproj` - Xcode project file
-- `Supabase.xcconfig` - Supabase configuration (not in git)
 - `LogYourBody/Config.xcconfig` - App configuration (not in git)
 - `CLAUDE.md` - Legacy iOS-specific AI assistant context (all guidance now mirrored here)
 
@@ -531,7 +530,6 @@ pnpm --filter apps/web build
 
 - iOS: Core Data is the device source of truth
 - Cloud: Neon via first-party bearer APIs (native never talks to Postgres)
-- Legacy Supabase remains only for photo processing / export / account-deletion helpers until JOV-4831 completes cutover
 
 ## Testing
 
@@ -656,10 +654,14 @@ All external services (feature flags, analytics, email/notifications, payments, 
 
 ### Secrets Management
 
-- Never commit secrets or API keys
-- Use `.xcconfig` files for iOS configuration (not in git)
-- Use environment variables for web configuration
-- All secrets are stored in GitHub Secrets for CI/CD
+Doppler remains the secrets manager. Operating rules are in [docs/engineering/secrets-policy.md](docs/engineering/secrets-policy.md) ([LYB-95](https://linear.app/jovie/issue/LYB-95)).
+
+- Never commit secrets or API keys, and never print secret values.
+- Use `.xcconfig` files for iOS configuration (not in git).
+- Use environment variables for web configuration.
+- Add new secrets directly to GitHub Actions and Vercel. Grok Bot performs the add after Tim supplies the value through a secure input.
+- Leave Doppler sync changes and Doppler billing to Tim.
+- Keep existing Doppler reads, including gbrain setup against `jovie-web/dev`.
 
 ### Code Security
 
@@ -680,13 +682,13 @@ All external services (feature flags, analytics, email/notifications, payments, 
 
 - iOS: Use Xcode debugger and Instruments
 - Web: Chrome DevTools, React Developer Tools
-- Both: Check Supabase logs for backend issues
+- Both: Check first-party API and Neon logs for backend issues
 
 ### Performance
 
 - iOS: Profile with Instruments, optimize Core Data queries
 - Web: Use Lighthouse, optimize bundle size
-- Both: Monitor Supabase query performance
+- Both: Monitor Neon query performance
 
 ---
 

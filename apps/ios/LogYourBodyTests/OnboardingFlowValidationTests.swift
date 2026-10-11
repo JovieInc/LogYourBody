@@ -161,6 +161,34 @@ final class OnboardingFlowValidationTests: XCTestCase {
         XCTAssertTrue(viewModel.canContinueAccountCreation)
     }
 
+    func testSharedAppleActionContinuesAuthenticatedAccountStep() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .authenticated)
+        viewModel.currentStep = .account
+        viewModel.emailAddress = "user@example.com"
+
+        viewModel.beginAccountCreation()
+        XCTAssertTrue(viewModel.isCreatingAccount)
+        XCTAssertEqual(viewModel.accountCreationStage, .creatingAccount)
+
+        viewModel.completeAccountCreation(didSignIn: false)
+
+        XCTAssertFalse(viewModel.isCreatingAccount)
+        XCTAssertEqual(viewModel.currentStep, .profileDetails)
+        XCTAssertNil(viewModel.accountCreationError)
+    }
+
+    func testSharedAppleActionFailureRestoresAccountAction() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .authenticated)
+        viewModel.emailAddress = "user@example.com"
+        viewModel.beginAccountCreation()
+
+        viewModel.failAccountCreation(NSError(domain: "Auth", code: 1, userInfo: nil))
+
+        XCTAssertFalse(viewModel.isCreatingAccount)
+        XCTAssertEqual(viewModel.accountCreationStage, .idle)
+        XCTAssertNotNil(viewModel.accountCreationError)
+    }
+
     // MARK: - Entry persistence & formatting
 
     func testPersistManualWeightEntryStoresOnlyNumericInput() {
@@ -348,10 +376,6 @@ final class OnboardingFlowValidationTests: XCTestCase {
         XCTAssertEqual(viewModel.profileDetailsActiveSubstep, .firstName)
 
         viewModel.profileFirstName = "Avery"
-        viewModel.recomputeProfileDetailsActiveSubstep()
-        XCTAssertEqual(viewModel.profileDetailsActiveSubstep, .lastName)
-
-        viewModel.profileLastName = "Stone"
         viewModel.profileDateOfBirth = Calendar.current.date(byAdding: .year, value: -15, to: Date()) ?? Date()
         viewModel.recomputeProfileDetailsActiveSubstep()
         XCTAssertEqual(viewModel.profileDetailsActiveSubstep, .dateOfBirth)

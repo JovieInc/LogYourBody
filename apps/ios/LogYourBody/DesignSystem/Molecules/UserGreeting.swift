@@ -74,7 +74,7 @@ struct UserGreeting: View {
 // MARK: - Preview
 
 #Preview {
-    VStack(spacing: 30) {
+    VStack(spacing: 32) {
         // Standard greetings
         VStack(alignment: .leading, spacing: 16) {
             Text("Standard Mode").font(.headline).foregroundColor(.appText)

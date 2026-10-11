@@ -74,7 +74,7 @@ describe('IndexedDBManager daily metrics', () => {
     );
   });
 
-  it('normalizes Supabase SQL date strings as local-day keys', async () => {
+  it('normalizes server SQL date strings as local-day keys', async () => {
     const db = createDbMock();
     const localIndexedDB = await loadIndexedDBWith(db);
     const expectedLocalDate = new Date(2026, 5, 23);

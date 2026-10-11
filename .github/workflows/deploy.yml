@@ -40,14 +40,16 @@ jobs:
     timeout-minutes: 15
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: team_bpNDbti6srVLYPKdmQLu4UgT
+      VERCEL_PROJECT_ID: prj_6seYBdTtY3TuFqrJek1puaFG6Trj
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -66,7 +68,7 @@ jobs:
         run: cd apps/web && pnpm build
 
       - name: Pull Vercel environment
-        run: pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@latest pull --yes --environment=production --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
 
       - name: Verify authenticated chat runtime configuration
         run: |
@@ -89,12 +91,12 @@ jobs:
           pnpm --filter logyourbody db:apply:neon
 
       - name: Build Vercel output
-        run: pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@latest build --prod --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
 
       - name: Deploy to Vercel
         id: vercel-deploy
         run: |
-          DEPLOYMENT_URL=$(pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN")
+          DEPLOYMENT_URL=$(pnpm dlx vercel@latest deploy --prebuilt --prod --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID")
           echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
           echo "Deployed to $DEPLOYMENT_URL"
 
@@ -186,26 +188,47 @@ jobs:
     steps:
       - name: Generate summary
         run: |
+          detect_result="${{ needs.detect-changes.result }}"
+          web_changed="${{ needs.detect-changes.outputs.web }}"
+          ios_changed="${{ needs.detect-changes.outputs.ios }}"
+          web_result="${{ needs.web.result }}"
+          ios_result="${{ needs.ios-beta.result }}"
+          summary_status=0
+
+          expected_web="skipped"
+          if [[ "$web_changed" == "true" ]]; then
+            expected_web="success"
+          fi
+          # ios-beta is explicitly disabled above. Enabling it must also update
+          # this expectation and the dependency-propagation tests.
+          expected_ios="skipped"
+
           {
             echo "## Deployment Summary"
             echo ""
-            echo "- Web changed: ${{ needs.detect-changes.outputs.web }}"
-            echo "- iOS changed: ${{ needs.detect-changes.outputs.ios }}"
-            echo ""
+            echo "- Change detection: $detect_result"
+            echo "- Web changed: $web_changed"
+            echo "- iOS changed: $ios_changed"
+            echo "- Web deployment: $web_result (expected $expected_web)"
+            echo "- iOS deployment: $ios_result (expected $expected_ios; beta deployment disabled)"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [[ "${{ needs.web.result }}" == "success" ]]; then
-            echo "✅ Web deployment completed" >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ needs.web.result }}" == "skipped" ]]; then
-            echo "⏭️ Web deployment skipped (no changes)" >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ needs.web.result }}" == "failure" ]]; then
-            echo "❌ Web deployment failed" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$detect_result" != "success" ]]; then
+            echo "::error::Deployment change detection did not succeed: $detect_result"
+            summary_status=1
           fi
-
-          if [[ "${{ needs.ios-beta.result }}" == "success" ]]; then
-            echo "✅ iOS deployment completed" >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ needs.ios-beta.result }}" == "skipped" ]]; then
-            echo "⏭️ iOS deployment skipped (disabled or no changes)" >> "$GITHUB_STEP_SUMMARY"
-          elif [[ "${{ needs.ios-beta.result }}" == "failure" ]]; then
-            echo "❌ iOS deployment failed" >> "$GITHUB_STEP_SUMMARY"
+          for changed in "$web_changed" "$ios_changed"; do
+            if [[ "$changed" != "true" && "$changed" != "false" ]]; then
+              echo "::error::Missing or invalid deployment change-detection output"
+              summary_status=1
+            fi
+          done
+          if [[ "$web_result" != "$expected_web" ]]; then
+            echo "::error::Web deployment result was '$web_result'; expected '$expected_web'"
+            summary_status=1
           fi
+          if [[ "$ios_result" != "$expected_ios" ]]; then
+            echo "::error::iOS deployment result was '$ios_result'; expected '$expected_ios'"
+            summary_status=1
+          fi
+          exit "$summary_status"

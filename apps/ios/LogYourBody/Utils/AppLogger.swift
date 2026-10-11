@@ -28,7 +28,7 @@ struct AppLogger {
 extension AppLogger {
     static let auth = AppLogger(category: "auth")
     static let sync = AppLogger(category: "sync")
-    static let supabase = AppLogger(category: "supabase")
+    static let productAPI = AppLogger(category: "product-api")
     static let photos = AppLogger(category: "photos")
     static let coreData = AppLogger(category: "coreData")
     static let billing = AppLogger(category: "billing")

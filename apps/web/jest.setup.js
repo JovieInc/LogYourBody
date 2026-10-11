@@ -19,46 +19,6 @@ jest.mock('next/navigation', () => ({
   redirect: jest.fn(),
 }));
 
-// Mock Supabase client
-jest.mock('@/lib/supabase/client', () => {
-  const client = {
-    auth: {
-      getSession: jest.fn(() => Promise.resolve({ data: { session: null } })),
-      getUser: jest.fn(() => Promise.resolve({ data: { user: null } })),
-      signUp: jest.fn(),
-      signOut: jest.fn(() => Promise.resolve({ error: null })),
-      signInWithOAuth: jest.fn(() => Promise.resolve({ error: null })),
-      exchangeCodeForSession: jest.fn(() => Promise.resolve({ error: null })),
-      updateUser: jest.fn(() => Promise.resolve({ error: null })),
-      onAuthStateChange: jest.fn(() => ({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      })),
-    },
-    storage: {
-      from: jest.fn(() => ({
-        upload: jest.fn(() => Promise.resolve({ error: null })),
-        getPublicUrl: jest.fn(() => ({ data: { publicUrl: 'https://example.com/avatar.jpg' } })),
-      })),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({ limit: jest.fn(() => Promise.resolve({ error: null })) })),
-    })),
-  };
-
-  return {
-    createClient: jest.fn(() => client),
-    supabase: client,
-    getSupabaseEnvironment: jest.fn(() => 'test'),
-    validateSupabaseKeys: jest.fn(() => ({
-      url: { exists: true, valid: true, value: 'https://test.supabase.co' },
-      anonKey: { exists: true, valid: true, value: 'test-key' },
-    })),
-    testSupabaseConnection: jest.fn(() =>
-      Promise.resolve({ success: true, message: 'Connected successfully' }),
-    ),
-  };
-});
-
 // Mock indexedDB and related APIs
 if (typeof globalThis !== 'undefined') {
   // Create a mock IDBRequest with event listener support
@@ -208,21 +168,4 @@ jest.mock('framer-motion', () => ({
     },
   },
   AnimatePresence: ({ children }) => children,
-}));
-
-// Mock createClient from Supabase
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => ({
-    from: jest.fn(() => ({
-      insert: jest.fn().mockResolvedValue({ error: null }),
-      select: jest.fn().mockReturnThis(),
-      update: jest.fn().mockReturnThis(),
-      delete: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn().mockReturnThis(),
-    })),
-    auth: {
-      getSession: jest.fn(() => Promise.resolve({ data: { session: null } })),
-    },
-  })),
 }));

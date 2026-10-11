@@ -68,7 +68,7 @@ The app has reached feature-complete status with major functionality implemented
 - [x] ✅ Photo capture/upload with background removal
 - [x] ✅ HealthKit integration (weight & steps)
 - [x] ✅ Data persistence with Core Data
-- [x] ✅ Cloud sync with Supabase
+- [x] ✅ Cloud sync through the first-party Neon data plane
 - [x] ✅ Offline mode support
 
 ### 5. Legal Compliance & GDPR

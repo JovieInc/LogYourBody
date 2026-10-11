@@ -1,0 +1,16 @@
+{
+  "repository": "JovieInc/Jovie",
+  "revision": "7641ffa76d03326542541c62080735c28190a1f0",
+  "source": "apps/web/styles/design-system.css",
+  "decision": "decisions/shared-jovie-design-system-founder-2026-09-04",
+  "fonts": {
+    "Inter-Latin.woff2": {
+      "source": "apps/web/public/fonts/Inter-Latin.woff2",
+      "sha256": "5cb6c62c78b6337d765a0eed0693186f12126c701ea2e870d1c1fcee7026ed79"
+    },
+    "Satoshi-Latin.woff2": {
+      "source": "apps/web/public/fonts/Satoshi-Latin.woff2",
+      "sha256": "2c14d829ad194a834b96333d7531e3d94608e0ee3f67e47f2a8d7a54095a2e0c"
+    }
+  }
+}

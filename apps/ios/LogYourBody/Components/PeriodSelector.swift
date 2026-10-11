@@ -202,7 +202,7 @@ struct PeriodSelector: View {
                     Text(period.rawValue)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(
-                            selectedPeriod == period ? Color.metricTextPrimary : Color(hex: "#C7CBD3")
+                            selectedPeriod == period ? Color.metricTextPrimary : Color.appTextSecondary
                         )
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -212,7 +212,7 @@ struct PeriodSelector: View {
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)
                                         .stroke(
-                                            selectedPeriod == period ? Color.clear : Color(hex: "#2A2E36"),
+                                            selectedPeriod == period ? Color.clear : Color.jovieHairline,
                                             lineWidth: selectedPeriod == period ? 0 : 1
                                         )
                                 )

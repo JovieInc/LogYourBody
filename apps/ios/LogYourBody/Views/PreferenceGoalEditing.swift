@@ -164,7 +164,7 @@ struct PreferenceGoalEditorSheet: View {
                 } footer: {
                     if let message = validation.errorMessage {
                         Label(message, systemImage: "exclamationmark.circle.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Color.appError)
                             .accessibilityIdentifier("settings_goal_editor_error")
                             .accessibilityFocused($errorFocused)
                     } else {

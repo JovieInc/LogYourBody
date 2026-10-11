@@ -29,7 +29,7 @@ struct GlobalTimelineHeader: View {
             Button(action: onTodayTap) {
                 Text("Today")
                     .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 4)
                     .dashboardChromeGlass(in: Capsule(style: .continuous), cornerRadius: 999)
             }
@@ -58,7 +58,7 @@ struct GlobalTimelineHeader: View {
             let visualHeight: CGFloat = 24
 
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3)
+                RoundedRectangle(cornerRadius: 4)
                     .fill(Color.white.opacity(0.10))
                     .frame(height: visualHeight)
 

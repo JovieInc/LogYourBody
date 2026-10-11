@@ -242,7 +242,7 @@ struct HeaderActionButton: View {
                             .padding(.horizontal, 4)
                             .background(
                                 Capsule()
-                                    .fill(.red)
+                                    .fill(Color.appError)
                             )
                             .offset(x: 6, y: -6)
                     }

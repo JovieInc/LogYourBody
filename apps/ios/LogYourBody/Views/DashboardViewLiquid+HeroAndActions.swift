@@ -144,10 +144,9 @@ extension DashboardViewLiquid {
     }
 
     func heroBodyFatCaption() -> String {
-        if let delta = heroBodyFatDelta30d() {
-            return heroTrendCaption(delta: delta, unit: "%")
-        }
-        return "%"
+        PhotoTimelineHUDPolicy.metricCaption(
+            trend: heroBodyFatDelta30d().map { heroTrendCaption(delta: $0, unit: "%") }
+        )
     }
 
     func heroWeightValue() -> String {
@@ -159,11 +158,9 @@ extension DashboardViewLiquid {
     }
 
     func heroWeightCaption() -> String {
-        if let delta = heroWeightDelta30d() {
-            let system = currentMeasurementSystem
-            return heroTrendCaption(delta: delta, unit: system.weightUnit)
-        }
-        return weightUnit
+        PhotoTimelineHUDPolicy.metricCaption(
+            trend: heroWeightDelta30d().map { heroTrendCaption(delta: $0, unit: currentMeasurementSystem.weightUnit) }
+        )
     }
 
     func latestBodyScoreResult() -> BodyScoreResult? {
@@ -325,7 +322,7 @@ extension DashboardViewLiquid {
         return "\(directionSymbol) \(formatted) last 30d"
     }
 
-    private func heroWeightDelta30d() -> Double? {
+    func heroWeightDelta30d() -> Double? {
         let system = currentMeasurementSystem
         let recentMetrics = filteredMetrics(for: .month1)
 
@@ -344,7 +341,7 @@ extension DashboardViewLiquid {
         return stats.delta
     }
 
-    private func heroBodyFatDelta30d() -> Double? {
+    func heroBodyFatDelta30d() -> Double? {
         let interpolationContext = MetricsInterpolationService.shared
             .makeBodyFatInterpolationContext(for: bodyMetrics)
         let recentMetrics = filteredMetrics(for: .month1)
@@ -366,7 +363,7 @@ extension DashboardViewLiquid {
         return stats.delta
     }
 
-    private func heroFFMIDelta30d() -> Double? {
+    func heroFFMIDelta30d() -> Double? {
         let heightInches = convertHeightToInches(
             height: authManager.currentUser?.profile?.height,
             heightUnit: authManager.currentUser?.profile?.heightUnit

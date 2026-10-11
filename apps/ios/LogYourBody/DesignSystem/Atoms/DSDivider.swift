@@ -46,7 +46,7 @@ extension DSDivider {
         DSDivider()
         DSDivider().insetted()
         DSDivider().insetted(40)
-        DSDivider().colored(.red)
+        DSDivider().colored(Color.appError)
     }
     .padding()
     .background(Color.black)

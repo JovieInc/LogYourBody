@@ -18,7 +18,7 @@ export interface PhotoUploadResult {
 }
 
 const PHOTO_STORE_UNAVAILABLE =
-  'Progress photo cloud storage is not available after the Supabase hard cut. Photos were not migrated.';
+  'Progress photo cloud storage is unavailable for retired legacy records.';
 
 export async function loadUserPhotos(): Promise<PhotoData[]> {
   return [];

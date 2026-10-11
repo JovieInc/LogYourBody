@@ -213,10 +213,26 @@ def main() -> int:
             violations=violations,
         )
 
+    # Stats delegates card rendering to MetricSummaryCard; the page itself
+    # owns only its canvas after removal of the aggregate legend card.
+    for relative_path, token in [
+        ("Views/DashboardViewLiquid+PhotoTimelineAnalytics.swift", "metricsView"),
+        ("Views/DashboardViewLiquid+PhotoTimelineAnalytics.swift", "theme.colors.background.ignoresSafeArea()"),
+        ("Views/DashboardViewLiquid+MetricViews.swift", "DashboardMetricsSection("),
+        ("Views/DashboardMetricsSection.swift", "MetricSummaryCard("),
+    ]:
+        require_token(
+            root=root,
+            path=app_dir / relative_path,
+            token=token,
+            check="dashboard.stats_card_composition",
+            detail=f"Stats must retain its themed canvas and metric-card composition `{token}`.",
+            violations=violations,
+        )
+
     system_b_surface_files = [
         app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
         app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift",
-        app_dir / "Views/DashboardViewLiquid+PhotoTimelineAnalytics.swift",
         app_dir / "Views/DashboardViewLiquid+HomeTimelineControls.swift",
         app_dir / "DesignSystem/Organisms/MetricSummaryCard.swift",
     ]
