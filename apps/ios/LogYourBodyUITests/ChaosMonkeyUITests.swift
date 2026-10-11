@@ -569,6 +569,57 @@ final class ChaosMonkeyUITests: XCTestCase {
         "open settings"
     ]
 
+    func testHeightKeyboardDoneMeetsMinimumHitTarget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        app.tap()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        let basicsContinue = app.buttons["body_score_onboarding_basics_continue_button"]
+        XCTAssertTrue(basicsContinue.waitForExistence(timeout: 5))
+        basicsContinue.tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        let centimeters = app.buttons["CM"]
+        XCTAssertTrue(centimeters.waitForExistence(timeout: 5))
+        centimeters.tap()
+        let field = app.textFields["Height in centimeters"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5))
+
+        let window = app.windows.firstMatch.frame
+        let done = app.buttons.matching(identifier: "body_score_height_keyboard_done_button").firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(done.frame), "height Done \(done.frame) window \(window)")
+        XCTAssertGreaterThanOrEqual(done.frame.width, 44, "height Done \(done.frame)")
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, "height Done \(done.frame)")
+
+        let labeledDones = app.buttons.matching(NSPredicate(format: "label == 'Done'"))
+        for index in 0..<labeledDones.count {
+            let control = labeledDones.element(boundBy: index)
+            guard control.exists, control.frame.width > 1, control.frame.height > 1 else { continue }
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "height Done \(control.frame)")
+        }
+
+        done.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["How tall are you?"].exists)
+    }
+
     override func setUpWithError() throws {
         // The monkey must survive individual bad taps; only a hard app-death
         // check below stops the run early.
@@ -1038,6 +1089,64 @@ final class ChaosMonkeyUITests: XCTestCase {
             hasher.combine(element.isEnabled)
         }
         return hasher.finalize()
+    }
+
+    func testActiveSessionsScreenShowsCurrentDeviceWithoutRevoke() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestWeightLoggerMVPFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 20))
+        let settingsButton = app.buttons["mvp_settings_button"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 8))
+        settingsButton.tap()
+        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_settings"].waitForExistence(timeout: 5)
+        )
+
+        let subscription = app.buttons["settings_account_subscription_link"]
+        XCTAssertTrue(subscription.waitForExistence(timeout: 8))
+        subscription.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_subscription"].waitForExistence(timeout: 8)
+        )
+
+        let sessionsRow = app.buttons.matching(
+            NSPredicate(format: "label CONTAINS %@", "Active sessions")
+        ).firstMatch
+        var swipes = 0
+        while !sessionsRow.exists && swipes < 3 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(sessionsRow.waitForExistence(timeout: 8), "Active sessions row must be on the subscription screen")
+        let rowFrame = sessionsRow.frame
+        XCTAssertGreaterThanOrEqual(rowFrame.width, 44, "Active sessions row width \(rowFrame)")
+        XCTAssertGreaterThanOrEqual(rowFrame.height, 44, "Active sessions row height \(rowFrame)")
+        sessionsRow.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_activeSessions"].waitForExistence(timeout: 8)
+        )
+        XCTAssertTrue(app.navigationBars["Active Sessions"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["THIS DEVICE"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["Current device"].exists)
+        XCTAssertTrue(app.staticTexts["Signed-in devices"].exists)
+        XCTAssertFalse(app.staticTexts["Only this device"].exists)
+        XCTAssertFalse(app.buttons["Revoke"].exists)
+        XCTAssertFalse(app.staticTexts["Revoke Session?"].exists)
+
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "Active sessions current device"
+        tree.lifetime = .keepAlways
+        add(tree)
     }
 
     // MARK: - Layout defect detection
