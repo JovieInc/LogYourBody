@@ -14,6 +14,24 @@ export class MemoryTrainingRecords implements NativeProductRecordsPort {
     ]),
   ) as Record<NativeProductRecordCollection, Map<string, NativeProductRecord>>;
 
+  async insertTrainingSet(subject: string, record: Record<string, unknown>) {
+    const id = typeof record.id === 'string' ? record.id : '';
+    if (!id) return null;
+    const existing = this.data.logged_sets.get(id);
+    if (existing) {
+      return existing.user_id === subject && existing.deleted_at === null ? existing : null;
+    }
+    const stored = {
+      ...record,
+      id,
+      user_id: subject,
+      deleted_at: null,
+      server_updated_at: '2026-01-10T12:00:00.000Z',
+    } as NativeProductRecord;
+    this.data.logged_sets.set(id, stored);
+    return stored;
+  }
+
   async push(
     subject: string,
     collection: NativeProductRecordCollection,
