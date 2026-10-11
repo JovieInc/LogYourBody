@@ -46,6 +46,7 @@ class MetricsInterpolationService {
 
         // Cached trend-weight series for efficiency when querying multiple dates
         private var trendWeightCache: [Date: InterpolatedMetric] = [:]
+        private var trendRawValues: [Date: Double] = [:]
         private var trendLastDay: Date?
         private var trendLastValue: Double?
         // Smoothing factor for exponential moving average (EMA).
@@ -87,10 +88,15 @@ class MetricsInterpolationService {
                 processingEndDay = targetDay
             }
 
-            var ema = trendLastValue
+            let cachedAnchor = trendRawValues
+                .filter { $0.key <= targetDay }
+                .max { $0.key < $1.key }
+            var ema = cachedAnchor?.value ?? trendLastValue
             var currentDay: Date
 
-            if let lastDay = trendLastDay, let lastValue = ema, lastDay >= firstDay {
+            if let cachedAnchor {
+                currentDay = calendar.date(byAdding: .day, value: 1, to: cachedAnchor.key) ?? cachedAnchor.key
+            } else if let lastDay = trendLastDay, let lastValue = ema, lastDay >= firstDay, targetDay >= lastDay {
                 currentDay = calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay
                 ema = lastValue
             } else {
@@ -102,6 +108,16 @@ class MetricsInterpolationService {
                 // Seed the first day at its actual measurement time, not an earlier midnight.
                 let sampleDate = currentDay == firstDay ? firstMetric.date : currentDay
                 guard let weightResult = estimate(for: sampleDate) else {
+                    // A gap larger than the interpolation limit cannot yield a
+                    // result on any intervening day. Jump to the next known
+                    // measurement instead of scanning every calendar day.
+                    if let nextMetric = metrics.first(where: { $0.date > sampleDate }) {
+                        let nextDay = calendar.startOfDay(for: nextMetric.date)
+                        if nextDay > currentDay {
+                            currentDay = nextDay
+                            continue
+                        }
+                    }
                     guard let nextDay = calendar.date(byAdding: .day, value: 1, to: currentDay) else {
                         break
                     }
@@ -125,6 +141,7 @@ class MetricsInterpolationService {
                 )
 
                 trendWeightCache[currentDay] = trendMetric
+                trendRawValues[currentDay] = emaValue
                 trendLastDay = currentDay
                 trendLastValue = emaValue
 
@@ -138,12 +155,18 @@ class MetricsInterpolationService {
                 currentDay = nextDay
             }
 
-            if targetDay > lastMetricDay, let lastKnown = trendWeightCache[processingEndDay] {
+            if targetDay > processingEndDay,
+               let lastKnown = trendWeightCache[processingEndDay],
+               let anchorValue = trendRawValues[processingEndDay],
+               let days = calendar.dateComponents([.day], from: processingEndDay, to: targetDay).day,
+               days > 0 {
+                let finalWeight = metrics[metrics.count - 1].weight ?? anchorValue
+                let decay = pow(1 - trendAlpha, Double(days))
                 return InterpolatedMetric(
-                    value: lastKnown.value,
-                    isInterpolated: lastKnown.isInterpolated,
+                    value: round((finalWeight + (anchorValue - finalWeight) * decay) * 10) / 10,
+                    isInterpolated: false,
                     isLastKnown: true,
-                    confidenceLevel: lastKnown.confidenceLevel
+                    confidenceLevel: nil
                 )
             }
 
