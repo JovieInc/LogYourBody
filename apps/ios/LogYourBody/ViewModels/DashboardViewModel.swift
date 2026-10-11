@@ -181,7 +181,7 @@ final class DashboardViewModel: ObservableObject {
     ) async {
         do {
             let stepCount = try await healthKitManager.fetchTodayStepCount()
-            await updateStepCount(
+            try await updateStepCount(
                 steps: stepCount,
                 authManager: authManager,
                 realtimeSyncManager: realtimeSyncManager
@@ -189,7 +189,7 @@ final class DashboardViewModel: ObservableObject {
         } catch {
             let context = ErrorContext(
                 feature: "healthKit",
-                operation: "fetchTodayStepCount",
+                operation: "syncStepsFromHealthKit",
                 screen: "Dashboard",
                 userId: authManager.currentUser?.id
             )
@@ -197,21 +197,28 @@ final class DashboardViewModel: ObservableObject {
         }
     }
 
-    private func updateStepCount(
+    func updateStepCount(
         steps: Int,
         authManager: AuthManager,
         realtimeSyncManager: RealtimeSyncManager
-    ) async {
+    ) async throws {
         guard let userId = authManager.currentUser?.id else { return }
 
         let today = Date()
 
         if let existingMetrics = await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: today) {
-            existingMetrics.steps = Int32(steps)
-            existingMetrics.updatedAt = Date()
-
-            let metrics = existingMetrics.toDailyMetrics()
-            dailyMetrics = metrics
+            let current = existingMetrics.toDailyMetrics()
+            let updated = DailyMetrics(
+                id: current.id,
+                userId: userId,
+                date: current.date,
+                steps: steps,
+                notes: current.notes,
+                createdAt: current.createdAt,
+                updatedAt: Date()
+            )
+            try await CoreDataManager.shared.saveDailyMetricsAndWait(updated, userId: userId)
+            dailyMetrics = updated
         } else {
             let newMetrics = DailyMetrics(
                 id: UUID().uuidString,
