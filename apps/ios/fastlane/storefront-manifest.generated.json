@@ -34,8 +34,15 @@
       "label": "Private progress photos",
       "audience": "People who want visual progress without a social feed.",
       "priority": 1,
-      "terms": ["progress photos", "photo tracker", "private timeline"],
-      "featureIds": ["progress-photos", "private-timeline"],
+      "terms": [
+        "progress photos",
+        "photo tracker",
+        "private timeline"
+      ],
+      "featureIds": [
+        "progress-photos",
+        "private-timeline"
+      ],
       "customProductPageStatus": "candidate"
     },
     {
@@ -43,8 +50,16 @@
       "label": "Body composition trends",
       "audience": "People tracking body fat, lean mass, FFMI, or recomposition.",
       "priority": 2,
-      "terms": ["body composition", "body fat", "lean mass", "ffmi"],
-      "featureIds": ["body-metrics", "private-timeline"],
+      "terms": [
+        "body composition",
+        "body fat",
+        "lean mass",
+        "ffmi"
+      ],
+      "featureIds": [
+        "body-metrics",
+        "private-timeline"
+      ],
       "customProductPageStatus": "candidate"
     },
     {
@@ -52,8 +67,15 @@
       "label": "Weight and Apple Health context",
       "audience": "People who want weight trends with supported Apple Health data.",
       "priority": 3,
-      "terms": ["weight tracker", "apple health", "healthkit"],
-      "featureIds": ["body-metrics", "healthkit-sync"],
+      "terms": [
+        "weight tracker",
+        "apple health",
+        "healthkit"
+      ],
+      "featureIds": [
+        "body-metrics",
+        "healthkit-sync"
+      ],
       "customProductPageStatus": "candidate"
     }
   ],
@@ -107,7 +129,11 @@
           "headline": "Know if the work is working.",
           "supportingCopy": "One private timeline for the signal that matters.",
           "captureStateId": "timeline-overview",
-          "featureIds": ["progress-photos", "private-timeline", "body-metrics"]
+          "featureIds": [
+            "progress-photos",
+            "private-timeline",
+            "body-metrics"
+          ]
         },
         {
           "id": "trend-not-one-day",
@@ -115,7 +141,10 @@
           "headline": "See the trend, not one day.",
           "supportingCopy": "Keep daily noise in the context of your longer-term direction.",
           "captureStateId": "stats-trend",
-          "featureIds": ["body-metrics", "private-timeline"]
+          "featureIds": [
+            "body-metrics",
+            "private-timeline"
+          ]
         },
         {
           "id": "photos-and-metrics",
@@ -123,7 +152,11 @@
           "headline": "Photos and metrics, together.",
           "supportingCopy": "See each photo beside the measurements from the same moment.",
           "captureStateId": "timeline-photo-metrics",
-          "featureIds": ["progress-photos", "body-metrics", "private-timeline"]
+          "featureIds": [
+            "progress-photos",
+            "body-metrics",
+            "private-timeline"
+          ]
         },
         {
           "id": "log-in-seconds",
@@ -131,7 +164,9 @@
           "headline": "Log weight in seconds.",
           "supportingCopy": "Add the measurement and get back to the work.",
           "captureStateId": "weight-entry",
-          "featureIds": ["body-metrics"]
+          "featureIds": [
+            "body-metrics"
+          ]
         },
         {
           "id": "composition-in-context",
@@ -139,7 +174,9 @@
           "headline": "Body composition, in context.",
           "supportingCopy": "Review supported body-fat, lean-mass, and derived metrics over time.",
           "captureStateId": "stats-composition",
-          "featureIds": ["body-metrics"]
+          "featureIds": [
+            "body-metrics"
+          ]
         },
         {
           "id": "apple-health",
@@ -147,7 +184,10 @@
           "headline": "Bring in Apple Health.",
           "supportingCopy": "Add supported weight and activity context to your timeline.",
           "captureStateId": "healthkit-context",
-          "featureIds": ["healthkit-sync", "private-timeline"]
+          "featureIds": [
+            "healthkit-sync",
+            "private-timeline"
+          ]
         },
         {
           "id": "private-by-design",
@@ -155,7 +195,10 @@
           "headline": "Private by design.",
           "supportingCopy": "Track your body without a public feed or social comparison.",
           "captureStateId": "timeline-private",
-          "featureIds": ["progress-photos", "private-timeline"]
+          "featureIds": [
+            "progress-photos",
+            "private-timeline"
+          ]
         }
       ]
     }
