@@ -75,6 +75,7 @@ struct ContentView: View {
     private let onboardingStateManager = OnboardingStateManager.shared
     @State private var currentUserId: String?
     @State private var hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion
+    @State private var finishedOnboardingThisLaunch = false
     @State private var lastProfileCompletionSync: ProfileCompletionSyncKey?
     @State private var isLoadingComplete = false
     @State private var isUnlocked = false
@@ -82,11 +83,20 @@ struct ContentView: View {
     @State private var showWhatsNew = false
     @State private var releaseReviewItems: [ReleaseReviewItem] = []
     @State private var releaseReviewDestination: ReleaseReviewDestination?
+    @State private var pendingDexaPDF: DexaPDFFileSelection?
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     private let releaseReviewStateStore = ReleaseReviewStateStore()
 
     private var suppressWhatsNewForUITests: Bool {
         ProcessInfo.processInfo.arguments.contains("-lybUITestSuppressWhatsNew")
+    }
+
+    private var disableBiometricLockForUITests: Bool {
+        BiometricLockPolicy.shouldDisableForUITests(
+            arguments: ProcessInfo.processInfo.arguments,
+            environment: ProcessInfo.processInfo.environment,
+            userId: authManager.currentUser?.id
+        )
     }
 
     init() {
@@ -183,6 +193,14 @@ struct ContentView: View {
                 onReview: reviewReleaseItem
             )
         }
+        .sheet(item: unlockedDexaPDFSelection) { selection in
+            DexaPDFImportSheet(fileURL: selection.url)
+                .environmentObject(authManager)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .dexaPDFReceived)) { notification in
+            guard let url = notification.object as? URL else { return }
+            pendingDexaPDF = DexaPDFFileSelection(url: url)
+        }
         .onAppear {
             // Initialize onboarding status
             currentUserId = authManager.currentUser?.id
@@ -199,14 +217,17 @@ struct ContentView: View {
                 completeLaunchOverlayIfReady()
             }
         }
-        .task(id: "\(authManager.isAuthenticated)-\(isLoadingComplete)-\(hasCompletedOnboarding)-\(isProfileComplete)") {
-            let isEligible = authManager.isAuthenticated &&
-                isLoadingComplete &&
-                hasCompletedOnboarding &&
-                !shouldShowProfileCompletion &&
-                subscriptionManager.isSubscribed &&
-                !shouldShowDailyReminderPrompt &&
-                !suppressWhatsNewForUITests
+        .task(id: "\(authManager.isAuthenticated)-\(isLoadingComplete)-\(hasCompletedOnboarding)-\(isProfileComplete)-\(finishedOnboardingThisLaunch)") {
+            let isEligible = ReleaseReviewLaunchState(
+                isAuthenticated: authManager.isAuthenticated,
+                isLoadingComplete: isLoadingComplete,
+                hasCompletedOnboarding: hasCompletedOnboarding,
+                needsProfileCompletion: shouldShowProfileCompletion,
+                isSubscribed: subscriptionManager.isSubscribed,
+                showsDailyReminderPrompt: shouldShowDailyReminderPrompt,
+                isSuppressedForUITests: suppressWhatsNewForUITests,
+                finishedOnboardingThisLaunch: finishedOnboardingThisLaunch
+            ).isEligibleForWhatsNew
             releaseReviewItems = ReleaseReviewPresentationPolicy.pendingItems(
                 from: currentReleaseReviewCatalog,
                 installedVersion: AppVersion.current,
@@ -247,7 +268,10 @@ struct ContentView: View {
             // Sync onboarding status from profile when it changes
             applyProfileCompletionIfNeeded(newValue)
         }
-        .onChange(of: hasCompletedOnboarding) { _, newValue in
+        .onChange(of: hasCompletedOnboarding) { oldValue, newValue in
+            if newValue && !oldValue {
+                finishedOnboardingThisLaunch = true
+            }
             if newValue && isLoadingComplete {
                 // print("🎯 Onboarding completed, transitioning to main app...")
                 // Add a small delay to ensure smooth transition
@@ -265,6 +289,14 @@ struct ContentView: View {
         .onShake {
             bugReportManager.handleShakeGesture()
         }
+        #if DEBUG
+        .onAppear {
+            // XCUIDevice has no shake in this SDK. The UI test uses the same handler as the gesture.
+            if ProcessInfo.processInfo.arguments.contains("-lybUITestPresentBugReport") {
+                bugReportManager.handleShakeGesture()
+            }
+        }
+        #endif
     }
 
     private var mainContent: some View {
@@ -281,6 +313,8 @@ struct ContentView: View {
     private var authenticatedContent: some View {
         Group {
             if shouldShowOnboarding {
+                // One first run for everyone: the onboarding_v2_focus gate now
+                // only picks the sign-in screen.
                 BodyScoreOnboardingFlowView()
                     .onAppear {
                         AppServicePorts.analyticsTracker.track(event: "onboarding_view")
@@ -304,17 +338,34 @@ struct ContentView: View {
 
     private var loginContent: some View {
         NavigationStack {
-            LoginView()
+            if HomeV2Policy.isOnboardingV2Enabled() {
+                HomeV2SignInView()
+                    .environmentObject(authManager)
+            } else {
+                LoginView()
+            }
         }
     }
 
     private var biometricLockOverlay: some View {
         Group {
-            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked {
+            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked
+                && !disableBiometricLockForUITests {
                 BiometricLockView(isUnlocked: $isUnlocked)
                     .transition(AnyTransition.opacity)
             }
         }
+    }
+
+    private var unlockedDexaPDFSelection: Binding<DexaPDFFileSelection?> {
+        Binding(
+            get: {
+                biometricLockEnabled && !isUnlocked && !disableBiometricLockForUITests
+                    ? nil
+                    : pendingDexaPDF
+            },
+            set: { if $0 == nil { pendingDexaPDF = nil } }
+        )
     }
 
     private var loadingOverlay: some View {

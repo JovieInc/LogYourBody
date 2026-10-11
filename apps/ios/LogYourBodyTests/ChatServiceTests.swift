@@ -64,6 +64,425 @@ final class ChatServiceTests: XCTestCase {
         XCTAssertEqual(conversation?.messages.first?.clientMessageId, "client-1")
     }
 
+    func testTrainingLoadFieldStartsAtTheEngineLoad() {
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 60), "60")
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 62.5), "62.5")
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 22.6796), "22.68")
+        XCTAssertEqual(Double(TrainingLoadPrefillPolicy.text(for: 1_002.5)), 1_002.5, "Parses back when the set is logged")
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: nil), "", "increase_load keeps the field empty")
+        XCTAssertEqual(TrainingLoadPrefillPolicy.text(for: 0), "")
+    }
+
+    func testTrainingLoadInputPreservesDecimalOverridesAndRejectsInvalidLoads() throws {
+        for text in ["22.5", "22,5", " 22,5 "] {
+            XCTAssertEqual(try TrainingLoadInputPolicy.loadKg(from: text), 22.5)
+        }
+        XCTAssertNil(try TrainingLoadInputPolicy.loadKg(from: "  "))
+        XCTAssertEqual(try TrainingLoadInputPolicy.loadKg(from: "0"), 0)
+        XCTAssertEqual(try TrainingLoadInputPolicy.loadKg(from: "500"), 500)
+        XCTAssertEqual(TrainingLoadInputPolicy.savedText(for: 22.6796), "22.6796")
+        XCTAssertEqual(TrainingLoadInputPolicy.savedText(for: 0), "0")
+        XCTAssertEqual(TrainingLoadInputPolicy.savedText(for: nil), "")
+        for text in ["-1", "501", "abc", "1,000.5", "NaN", "inf", "22,,5"] {
+            XCTAssertThrowsError(try TrainingLoadInputPolicy.loadKg(from: text), text)
+            XCTAssertFalse(TrainingLoadInputPolicy.isValid(text), text)
+        }
+    }
+
+    func testTrainingCoachVisibilityRequiresTheStatsigGate() {
+        var checkedKey: String?
+        XCTAssertFalse(TrainingCoachPolicy.isEnabled { checkedKey = $0; return false })
+        XCTAssertEqual(checkedKey, "hypertrophy_coach_v1")
+        XCTAssertTrue(TrainingCoachPolicy.isEnabled { $0 == "hypertrophy_coach_v1" })
+    }
+
+    func testVoiceCoachVisibilityRequiresItsStatsigGate() {
+        var checkedKey: String?
+        XCTAssertFalse(VoiceCoachPolicy.isEnabled { checkedKey = $0; return false })
+        XCTAssertEqual(checkedKey, "hypertrophy_coach_voice_v1")
+        XCTAssertTrue(VoiceCoachPolicy.isEnabled { $0 == "hypertrophy_coach_voice_v1" })
+    }
+
+    func testPendingSpokenReplyIsBoundToAndConsumedByOneVoiceReply() {
+        var pending = PendingSpokenReply()
+        pending.track(clientMessageId: "voice-turn", shouldSpeakReply: true)
+
+        XCTAssertTrue(pending.shouldSpeakReply(for: "voice-turn"))
+        XCTAssertFalse(pending.shouldSpeakReply(for: "different-turn"))
+        XCTAssertFalse(pending.consumeIfMatching(clientMessageId: "different-turn"))
+        XCTAssertEqual(pending.clientMessageId, "voice-turn")
+        XCTAssertTrue(pending.consumeIfMatching(clientMessageId: "voice-turn"))
+        XCTAssertFalse(pending.consumeIfMatching(clientMessageId: "voice-turn"))
+    }
+
+    func testNonSpokenRequestClearsPendingSpokenReply() {
+        var pending = PendingSpokenReply()
+        pending.track(clientMessageId: "voice-turn", shouldSpeakReply: true)
+        pending.track(clientMessageId: "manual-turn", shouldSpeakReply: false)
+
+        XCTAssertNil(pending.clientMessageId)
+        XCTAssertFalse(pending.consumeIfMatching(clientMessageId: "voice-turn"))
+    }
+
+    func testCancellingPendingSpokenReplyOnlyClearsMatchingTurn() {
+        var pending = PendingSpokenReply()
+        pending.track(clientMessageId: "voice-turn", shouldSpeakReply: true)
+
+        pending.cancel(clientMessageId: "different-turn")
+        XCTAssertEqual(pending.clientMessageId, "voice-turn")
+
+        pending.cancel(clientMessageId: "voice-turn")
+        XCTAssertNil(pending.clientMessageId)
+    }
+
+    func testVoiceTranscriptFixtureLogsASetOnlyAfterExplicitConfirmation() async throws {
+        let response = try JSONDecoder().decode(
+            VoiceIntentResponse.self,
+            from: Data(
+                #"""
+                {
+                  "version": 1,
+                  "kind": "log_set",
+                  "requiresConfirmation": true,
+                  "missingFields": [],
+                  "proposal": {
+                    "sessionId": "11111111-1111-4111-8111-111111111111",
+                    "exerciseId": "bench_press",
+                    "exerciseName": "Bench Press",
+                    "setNumber": 1,
+                    "reps": 8,
+                    "loadKg": 83.91,
+                    "rir": 2
+                  }
+                }
+                """#.utf8
+            )
+        )
+        let proposal = try XCTUnwrap(response.proposal)
+        var loggedRequests: [TrainingSetLogRequest] = []
+
+        let session = engineTrainingSession()
+        try await VoiceSetLogger.commit(
+            proposal,
+            isConfirmed: false,
+            accessToken: "access-token",
+            session: session
+        ) { _, request in loggedRequests.append(request) }
+        XCTAssertTrue(loggedRequests.isEmpty)
+
+        try await VoiceSetLogger.commit(
+            proposal,
+            isConfirmed: true,
+            accessToken: "access-token",
+            session: session
+        ) { token, request in
+            XCTAssertEqual(token, "access-token")
+            loggedRequests.append(request)
+        }
+        XCTAssertEqual(
+            loggedRequests,
+            [
+                TrainingSetLogRequest(
+                    sessionId: "11111111-1111-4111-8111-111111111111",
+                    exerciseId: "bench_press",
+                    setNumber: 1,
+                    reps: 8,
+                    loadKg: 83.91,
+                    rir: 2
+                )
+            ]
+        )
+    }
+
+    func testVoiceLogRejectsAProposalOutsideTheEngineSession() {
+        let invented = voiceProposal(exerciseId: "invented_curl", exerciseName: "Invented curl")
+        let route = VoiceSetAdmission.route(
+            proposal: invented,
+            heard: nil,
+            missingFields: [],
+            session: engineTrainingSession()
+        )
+        XCTAssertEqual(route, .clarify(fields: [], rejected: true))
+        XCTAssertTrue(VoiceSetAdmission.rejectedLogMessage.contains("Nothing was logged"))
+    }
+
+    func testVoiceLogDoesNotConfirmWhenNoEngineSessionIsLoaded() {
+        let route = VoiceSetAdmission.route(
+            proposal: voiceProposal(),
+            heard: nil,
+            missingFields: [],
+            session: nil
+        )
+        XCTAssertEqual(route, .clarify(fields: [], rejected: true))
+    }
+
+    func testVoiceLogConfirmsAProposalThatMatchesTheEngineSession() {
+        let matching = voiceProposal()
+        XCTAssertEqual(
+            VoiceSetAdmission.route(
+                proposal: matching,
+                heard: nil,
+                missingFields: [],
+                session: engineTrainingSession()
+            ),
+            .confirm(matching)
+        )
+    }
+
+    func testVoiceLogRejectsQuantitiesTheEngineSessionDoesNotAllow() {
+        let session = engineTrainingSession()
+        let rejected = [
+            voiceProposal(reps: 80),
+            voiceProposal(reps: 0),
+            voiceProposal(setNumber: 4),
+            voiceProposal(loadKg: 501),
+            voiceProposal(rir: 7),
+            voiceProposal(sessionId: "other-session"),
+            voiceProposal(exerciseName: "Not the engine name")
+        ]
+        for bad in rejected {
+            XCTAssertEqual(
+                VoiceSetAdmission.route(proposal: bad, heard: nil, missingFields: [], session: session),
+                .clarify(fields: [], rejected: true)
+            )
+        }
+        let bodyweight = voiceProposal(loadKg: nil)
+        XCTAssertEqual(
+            VoiceSetAdmission.route(proposal: bodyweight, heard: nil, missingFields: [], session: session),
+            .confirm(bodyweight)
+        )
+    }
+
+    func testVoiceLogStillReviewsAHeardSetWhenOnlyExerciseOrSetIsMissing() {
+        let heard = VoiceHeardIntent(
+            setNumber: nil, reps: 8, loadValue: 80, weightUnit: "kg", loadKg: 80, rir: 2
+        )
+        XCTAssertEqual(
+            VoiceSetAdmission.route(
+                proposal: nil,
+                heard: heard,
+                missingFields: ["exercise"],
+                session: engineTrainingSession()
+            ),
+            .review(heard)
+        )
+    }
+
+    func testVoiceLogRejectsHeardValuesOutsideTheLoggedSetBounds() {
+        let heard = VoiceHeardIntent(
+            setNumber: 1, reps: 0, loadValue: nil, weightUnit: nil, loadKg: nil, rir: 2
+        )
+        XCTAssertEqual(
+            VoiceSetAdmission.route(
+                proposal: nil,
+                heard: heard,
+                missingFields: ["set_number"],
+                session: engineTrainingSession()
+            ),
+            .clarify(fields: [], rejected: true)
+        )
+    }
+
+    func testConfirmedVoiceLogDoesNotWriteASetOutsideTheEngineSession() async throws {
+        var logged = 0
+        do {
+            try await VoiceSetLogger.commit(
+                voiceProposal(exerciseId: "invented_curl", exerciseName: "Invented curl"),
+                isConfirmed: true,
+                accessToken: "access-token",
+                session: engineTrainingSession()
+            ) { _, _ in logged += 1 }
+            XCTFail("An invented exercise must not be logged")
+        } catch let error as VoiceSetLogRejection {
+            XCTAssertEqual(error, .outsideEngineSession)
+            XCTAssertEqual(error.errorDescription, VoiceSetAdmission.rejectedLogMessage)
+        }
+        XCTAssertEqual(logged, 0)
+    }
+
+    func testVoiceLogKeepsClarificationWhenRepsAreMissing() {
+        XCTAssertEqual(
+            VoiceSetAdmission.route(
+                proposal: nil,
+                heard: nil,
+                missingFields: ["reps"],
+                session: engineTrainingSession()
+            ),
+            .clarify(fields: ["reps"], rejected: false)
+        )
+    }
+
+    func testTrainingNextUsesBearerTokenAndDecodesEngineOutput() async throws {
+        let session = makeSession()
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/next")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access-token")
+            let body = """
+            {
+              "version": 1,
+              "week": 1,
+              "weekCount": 2,
+              "weeklyFractionalVolume": {"chest": 4},
+              "session": {
+                "id": "11111111-1111-4111-8111-111111111111",
+                "week": 1,
+                "slot": 0,
+                "pattern": "A",
+                "title": "Full body A",
+                "safetyStop": false,
+                "explanation": null,
+                "evidenceIds": ["k:81c218db"],
+                "exercises": [{
+                  "id": "goblet_squat",
+                  "name": "Goblet squat",
+                  "primaryMuscle": "quads",
+                  "muscleContribution": {"quads": 1},
+                  "sets": 2,
+                  "repRange": {"min": 8, "max": 12},
+                  "targetReps": 8,
+                  "targetRir": 4,
+                  "targetLoadKg": null,
+                  "loadInstruction": null,
+                  "progression": "hold",
+                  "evidenceIds": ["k:1795aef0"]
+                }]
+              }
+            }
+            """
+            return (200, ["Content-Type": "application/json"], Data(body.utf8))
+        }
+
+        let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        let output = try await service.loadNext(accessToken: "access-token")
+        XCTAssertEqual(output.session?.exercises.first?.targetReps, 8)
+        XCTAssertEqual(output.session?.exercises.first?.evidenceIds, ["k:1795aef0"])
+        XCTAssertNil(output.session?.exercises.first?.targetLoadKg)
+    }
+
+    func testTrainingEnrollmentSendsExplicitAdultAndSafetyOptIn() async throws {
+        let session = makeSession()
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/enroll")
+            let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
+            XCTAssertEqual(body["adultConfirmed"] as? Bool, true)
+            XCTAssertEqual(body["safetyConfirmed"] as? Bool, true)
+            XCTAssertEqual(body["sessionsPerWeek"] as? Int, 2)
+            XCTAssertEqual(body["equipment"] as? String, "dumbbells")
+            return (201, ["Content-Type": "application/json"], Data("""
+              {"version":1,"program":{
+                "id":"setup-id","consentVersion":"hypertrophy-coach-v1",
+                "sessionsPerWeek":2,"equipment":"dumbbells"
+              }}
+            """.utf8))
+        }
+
+        let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        let output = try await service.enroll(accessToken: "access-token", sessionsPerWeek: 2, equipment: "dumbbells")
+        XCTAssertEqual(output.program.consentVersion, TrainingAPIContract.consentVersion)
+    }
+
+    func testTrainingSetLogUsesTheEngineSessionRouteAndUserValues() async throws {
+        let session = makeSession()
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/log-set")
+            let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
+            XCTAssertEqual(body["sessionId"] as? String, "session-id")
+            XCTAssertEqual(body["exerciseId"] as? String, "goblet_squat")
+            XCTAssertEqual(body["setNumber"] as? Int, 1)
+            XCTAssertEqual(body["reps"] as? Int, 10)
+            XCTAssertEqual(body["loadKg"] as? Double, 15)
+            XCTAssertEqual(body["rir"] as? Int, 3)
+            return (201, ["Content-Type": "application/json"], Data("""
+              {"version":1,"sessionComplete":false,"log":{
+                "sessionId":"session-id","exerciseId":"goblet_squat","setNumber":1,"reps":10,"loadKg":15,"rir":3
+              }}
+            """.utf8))
+        }
+
+        let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        try await service.logSet(
+            accessToken: "access-token",
+            request: TrainingSetLogRequest(
+                sessionId: "session-id",
+                exerciseId: "goblet_squat",
+                setNumber: 1,
+                reps: 10,
+                loadKg: 15,
+                rir: 3
+            )
+        )
+    }
+
+    func testTrainingSetRejectsMissingAcknowledgement() async throws {
+        try await assertTrainingAcknowledgementRejected(#"{"version":1,"sessionComplete":false}"#)
+    }
+
+    func testTrainingSetRejectsAnotherSetsAcknowledgement() async throws {
+        try await assertTrainingAcknowledgementRejected(
+            """
+            {"version":1,"sessionComplete":false,"log":{
+              "sessionId":"another-session","exerciseId":"press","setNumber":1,"reps":10,"loadKg":22.5,"rir":3
+            }}
+            """
+        )
+    }
+
+    func testTrainingSetRejectsEveryMismatchedAcknowledgedValue() async throws {
+        let matching: [String: Any] = [
+            "sessionId": "fixture-session", "exerciseId": "press", "setNumber": 1, "reps": 10, "loadKg": 22.5, "rir": 3
+        ]
+        for (field, value) in [
+            ("exerciseId", "squat" as Any), ("setNumber", 2), ("reps", 11), ("loadKg", 0), ("rir", 4)
+        ] {
+            var log = matching
+            log[field] = value
+            let data = try JSONSerialization.data(withJSONObject: ["version": 1, "sessionComplete": false, "log": log])
+            try await assertTrainingAcknowledgementRejected(try XCTUnwrap(String(data: data, encoding: .utf8)))
+        }
+    }
+
+    func testTrainingSetRejectsNilLoadAcknowledgementForExplicitZero() async throws {
+        ChatURLProtocol.handler = { _ in
+            let body = """
+            {"version":1,"sessionComplete":true,"log":{
+              "sessionId":"fixture-session","exerciseId":"press","setNumber":1,"reps":10,"loadKg":null,"rir":3
+            }}
+            """
+            return (201, ["Content-Type": "application/json"], Data(body.utf8))
+        }
+        let service = URLSessionTrainingService(urlSession: makeSession(), baseURL: URL(string: "https://localhost")!)
+        do {
+            try await service.logSet(
+                accessToken: "fixture-token",
+                request: TrainingSetLogRequest(
+                    sessionId: "fixture-session", exerciseId: "press", setNumber: 1, reps: 10, loadKg: 0, rir: 3
+                )
+            )
+            XCTFail("Explicit zero must remain distinct from bodyweight")
+        } catch { XCTAssertEqual(error as? TrainingServiceError, .invalidResponse) }
+    }
+
+    private func assertTrainingAcknowledgementRejected(_ body: String) async throws {
+        ChatURLProtocol.handler = { _ in
+            (201, ["Content-Type": "application/json"], Data(body.utf8))
+        }
+        let service = URLSessionTrainingService(urlSession: makeSession(), baseURL: URL(string: "https://localhost")!)
+        do {
+            try await service.logSet(
+                accessToken: "fixture-token",
+                request: TrainingSetLogRequest(
+                    sessionId: "fixture-session", exerciseId: "press", setNumber: 1, reps: 10, loadKg: 22.5, rir: 3
+                )
+            )
+            XCTFail("A success status without this exact saved set must not acknowledge the draft")
+        } catch let error as TrainingServiceError {
+            XCTAssertEqual(error, .invalidResponse)
+        }
+    }
+
     func testLoadLatestRejectsAnUnsupportedProtocolVersion() async throws {
         let session = makeSession()
         ChatURLProtocol.handler = { _ in
@@ -98,6 +517,7 @@ final class ChatServiceTests: XCTestCase {
             XCTAssertEqual(json["conversationId"] as? String, "conversation-1")
             XCTAssertEqual(json["clientMessageId"] as? String, "client-1")
             XCTAssertEqual(json["message"] as? String, "How am I doing?")
+            XCTAssertEqual(json["voiceMode"] as? Bool, true)
 
             let body = """
             event: meta
@@ -125,7 +545,8 @@ final class ChatServiceTests: XCTestCase {
             accessToken: "access-token",
             conversationId: "conversation-1",
             clientMessageId: "client-1",
-            message: "How am I doing?"
+            message: "How am I doing?",
+            voiceMode: true
         ) {
             events.append(event)
         }
@@ -178,12 +599,63 @@ final class ChatServiceTests: XCTestCase {
                 accessToken: "access-token",
                 conversationId: "conversation-1",
                 clientMessageId: "client-1",
-                message: "Retry"
+                message: "Retry",
+                voiceMode: false
             ) {}
             XCTFail("Expected rate-limit failure")
         } catch let error as ChatServiceError {
             XCTAssertEqual(error, .rateLimited(retryAfterSeconds: 120))
         }
+    }
+
+    private func engineTrainingSession() -> TrainingSession {
+        TrainingSession(
+            id: "11111111-1111-4111-8111-111111111111",
+            week: 1,
+            slot: 0,
+            pattern: "A",
+            title: "Full body A",
+            exercises: [
+                TrainingExercisePrescription(
+                    id: "bench_press",
+                    name: "Bench Press",
+                    primaryMuscle: "chest",
+                    muscleContribution: ["chest": 1],
+                    sets: 3,
+                    repRange: .init(min: 6, max: 10),
+                    targetReps: 8,
+                    targetRir: 2,
+                    targetLoadKg: 80,
+                    loadInstruction: nil,
+                    progression: "hold",
+                    evidenceIds: ["k:81c218db"]
+                )
+            ],
+            safetyStop: false,
+            explanation: nil,
+            evidenceIds: ["k:81c218db"],
+            loggedSets: nil
+        )
+    }
+
+    private func voiceProposal(
+        sessionId: String = "11111111-1111-4111-8111-111111111111",
+        exerciseId: String = "bench_press",
+        exerciseName: String = "Bench Press",
+        setNumber: Int = 1,
+        reps: Int = 8,
+        loadKg: Double? = 80,
+        rir: Int = 2
+    ) -> VoiceSetProposal {
+        VoiceSetProposal(
+            sessionId: sessionId,
+            exerciseId: exerciseId,
+            exerciseName: exerciseName,
+            setNumber: setNumber,
+            reps: reps,
+            loadKg: loadKg,
+            rir: rir
+        )
     }
 
     private func makeSession() -> URLSession {
@@ -201,10 +673,10 @@ final class ChatServiceTests: XCTestCase {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 1_024)
         while stream.hasBytesAvailable {
-            let count = stream.read(&buffer, maxLength: buffer.count)
-            if count < 0 { throw try XCTUnwrap(stream.streamError) }
-            if count == 0 { break }
-            data.append(buffer, count: count)
+            let bytesRead = stream.read(&buffer, maxLength: buffer.count)
+            if bytesRead < 0 { throw try XCTUnwrap(stream.streamError) }
+            if bytesRead == 0 { break }
+            data.append(buffer, count: bytesRead)
         }
         return data
     }

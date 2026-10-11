@@ -4,6 +4,7 @@ import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import { NATIVE_BODY_METRICS_SYNC_VERSION } from '@/lib/ports/native-body-metrics-sync';
 import {
   collectionFromPath,
+  isTrainingRecordCollection,
   type NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
 
@@ -74,6 +75,12 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
           { version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unknown_collection' },
           404,
         );
+      if (isTrainingRecordCollection(collection)) {
+        return json(
+          { version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'training_api_required' },
+          403,
+        );
+      }
 
       const parsed = PullQuerySchema.safeParse({
         since: request.nextUrl.searchParams.get('since') ?? undefined,
@@ -102,6 +109,12 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
           { version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unknown_collection' },
           404,
         );
+      if (isTrainingRecordCollection(collection)) {
+        return json(
+          { version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'training_api_required' },
+          403,
+        );
+      }
 
       const payload = await request.json().catch(() => null);
       if (
@@ -142,6 +155,12 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
           { version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'unknown_collection' },
           404,
         );
+      if (isTrainingRecordCollection(collection)) {
+        return json(
+          { version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'training_api_required' },
+          403,
+        );
+      }
 
       const parsed = DeleteBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) {

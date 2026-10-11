@@ -211,4 +211,116 @@ extension PhotoLibraryScannerTests {
         XCTAssertNotNil(fullImage)
         XCTAssertEqual(manager.requests, 2)
     }
+
+    @MainActor
+    func testCancelDuringFetchDoesNotPublishACompletedScan() async {
+        let gate = ScanFetchGate()
+        let scanner = PhotoLibraryScanner(
+            metadataProvider: { _ in
+                ScannedPhoto.PhotoMetadata(
+                    location: nil, cameraType: .unknown, isScreenshot: false, hasBeenEdited: false
+                )
+            },
+            metadataScanEnabled: { true },
+            fetchAssets: { _ in
+                await gate.wait()
+                return [SyntheticScanAsset()]
+            }
+        )
+        scanner.authorizationStatus = .authorized
+        let task = Task { await scanner.scanPhotoLibrary(with: PhotoScanCriteria(dateRange: nil)) }
+        await fulfillment(of: [gate.started], timeout: 3)
+        scanner.cancelScan()
+        gate.resume()
+        await task.value
+        XCTAssertFalse(scanner.isScanning)
+        XCTAssertEqual(scanner.scanProgress, 0, accuracy: 0.0001)
+        XCTAssertTrue(scanner.scannedPhotos.isEmpty)
+        XCTAssertTrue(scanner.photoGroups.isEmpty)
+    }
+
+    @MainActor
+    func testCancelAfterAdmissionDoesNotPublishACompletedScan() async {
+        let gate = ScanFetchGate()
+        let scanner = PhotoLibraryScanner(
+            metadataScanEnabled: { false },
+            fetchAssets: { _ in [] },
+            beforePublish: { await gate.wait() }
+        )
+        scanner.authorizationStatus = .authorized
+        let task = Task { await scanner.scanPhotoLibrary(with: PhotoScanCriteria(dateRange: nil)) }
+        await fulfillment(of: [gate.started], timeout: 3)
+        scanner.cancelScan()
+        gate.resume()
+        await task.value
+        XCTAssertFalse(scanner.isScanning)
+        XCTAssertEqual(scanner.scanProgress, 0, accuracy: 0.0001)
+        XCTAssertTrue(scanner.scannedPhotos.isEmpty)
+        XCTAssertTrue(scanner.photoGroups.isEmpty)
+    }
+
+    @MainActor
+    func testCancelledScanCannotClearANewerScan() async {
+        let first = ScanFetchGate()
+        let second = ScanFetchGate()
+        var fetches = 0
+        let scanner = PhotoLibraryScanner(
+            metadataScanEnabled: { false },
+            fetchAssets: { _ in
+                fetches += 1
+                if fetches == 1 {
+                    await first.wait()
+                } else {
+                    await second.wait()
+                }
+                return []
+            }
+        )
+        scanner.authorizationStatus = .authorized
+        let firstScan = Task { await scanner.scanPhotoLibrary(with: PhotoScanCriteria(dateRange: nil)) }
+        await fulfillment(of: [first.started], timeout: 3)
+        scanner.cancelScan()
+        let secondScan = Task { await scanner.scanPhotoLibrary(with: PhotoScanCriteria(dateRange: nil)) }
+        await fulfillment(of: [second.started], timeout: 3)
+        first.resume()
+        await firstScan.value
+        XCTAssertTrue(scanner.isScanning)
+        XCTAssertEqual(scanner.scanProgress, 0, accuracy: 0.0001)
+        scanner.cancelScan()
+        second.resume()
+        await secondScan.value
+        XCTAssertFalse(scanner.isScanning)
+        XCTAssertTrue(scanner.scannedPhotos.isEmpty)
+    }
+}
+
+/// Suspends the production photo fetch until the test cancels the scan.
+private final class ScanFetchGate: @unchecked Sendable {
+    let started = XCTestExpectation(description: "Synthetic photo fetch started")
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var resumed = false
+
+    func wait() async {
+        started.fulfill()
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if resumed {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                self.continuation = continuation
+                lock.unlock()
+            }
+        }
+    }
+
+    func resume() {
+        lock.lock()
+        resumed = true
+        let continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume()
+    }
 }

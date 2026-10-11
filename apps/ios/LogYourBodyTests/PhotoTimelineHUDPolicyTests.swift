@@ -119,6 +119,74 @@ final class PhotoTimelineHUDPolicyTests: XCTestCase {
         XCTAssertNotEqual(PaidAppSurfacePolicy.surface(), .legacyFullDashboardBeta)
     }
 
+    // Regression: the FFMI caption ("↓ −0.2 last 30d · Athletic") was clamped to one line and
+    // truncated with an ellipsis in its 1/3-width cell. It must wrap (grow the cell) instead.
+    @MainActor
+    func testLaunchMetricCellWrapsLongCaptionInsteadOfTruncating() {
+        // Narrowest supported phone (375pt) split into three cells with 16pt gutters and 8pt spacing.
+        let cellWidth: CGFloat = (375 - 32 - 16) / 3
+
+        func fittedHeight(caption: String) -> CGFloat {
+            let host = UIHostingController(
+                rootView: LaunchTimelineMetricCell(
+                    title: "FFMI",
+                    value: "22.0",
+                    caption: caption,
+                    accent: .teal,
+                    action: {}
+                )
+            )
+            return host.sizeThatFits(in: CGSize(width: cellWidth, height: .greatestFiniteMagnitude)).height
+        }
+
+        let singleLine = fittedHeight(caption: "Athletic")
+        let longCaption = fittedHeight(caption: "↓ −0.2 last 30d · Athletic")
+
+        XCTAssertGreaterThan(
+            longCaption,
+            singleLine,
+            "A caption wider than its cell must wrap to a second line rather than truncate"
+        )
+    }
+
+    // Regression: the paid Home metric cells used fixed point sizes, so Dynamic Type had no effect.
+    @MainActor
+    func testLaunchMetricCellTextScalesWithDynamicType() {
+        func fittedHeight(_ size: DynamicTypeSize) -> CGFloat {
+            let host = UIHostingController(
+                rootView: LaunchTimelineMetricCell(
+                    title: "Weight",
+                    value: "181.0 lbs",
+                    caption: "↓ −4.2 lbs last 30d",
+                    accent: .purple,
+                    action: {}
+                )
+                .environment(\.dynamicTypeSize, size)
+            )
+            return host.sizeThatFits(in: CGSize(width: CGFloat(360), height: CGFloat.greatestFiniteMagnitude)).height
+        }
+
+        let defaultHeight = fittedHeight(.large)
+        let accessibilityHeight = fittedHeight(.accessibility3)
+
+        XCTAssertGreaterThan(
+            accessibilityHeight,
+            defaultHeight * 1.3,
+            "Metric cell text must grow with Dynamic Type, not stay at fixed point sizes"
+        )
+    }
+
+    // Regression: on device, Weight and Body Fat captions read "lbs" and "%" (repeating the value's unit)
+    // whenever there was no 30-day trend.
+    func testMetricCaptionNeverFallsBackToABareUnit() {
+        XCTAssertEqual(PhotoTimelineHUDPolicy.metricCaption(trend: "↓ −4.2 lbs last 30d"), "↓ −4.2 lbs last 30d")
+        let fallback = PhotoTimelineHUDPolicy.metricCaption(trend: nil)
+        XCTAssertEqual(fallback, "No 30d trend")
+        for unit in ["lbs", "kg", "%"] {
+            XCTAssertNotEqual(fallback, unit)
+        }
+    }
+
     func testPhotoTimelineHUDMetricStateCopyIsExplicit() {
         XCTAssertEqual(PhotoTimelineHUDPolicy.stateText(presence: .present), "Measured")
         XCTAssertEqual(

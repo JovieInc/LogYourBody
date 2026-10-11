@@ -23,6 +23,19 @@ final class AppVersionTests: XCTestCase {
         XCTAssertEqual(AppVersion.build, expectedBuild)
     }
 
+    func testVoiceInputPurposeStringsAreIncludedInAppBundle() {
+        let info = Bundle.main.infoDictionary
+
+        XCTAssertEqual(
+            info?["NSMicrophoneUsageDescription"] as? String,
+            "Voice input uses the microphone so you can talk to your coach."
+        )
+        XCTAssertEqual(
+            info?["NSSpeechRecognitionUsageDescription"] as? String,
+            "Speech recognition turns your voice into text for your coach."
+        )
+    }
+
     func testShortVersionIsCurrentVersionWithoutPrefix() {
         XCTAssertEqual(AppVersion.shortVersion, AppVersion.current)
         XCTAssertFalse(AppVersion.shortVersion.hasPrefix("Version"))
@@ -65,6 +78,24 @@ final class AppVersionTests: XCTestCase {
                 isEligible: true
             ).isEmpty
         )
+    }
+
+    func testWhatsNewWaitsForPeopleWhoJustFinishedOnboarding() {
+        func eligible(finishedOnboardingThisLaunch: Bool) -> Bool {
+            ReleaseReviewLaunchState(
+                isAuthenticated: true,
+                isLoadingComplete: true,
+                hasCompletedOnboarding: true,
+                needsProfileCompletion: false,
+                isSubscribed: true,
+                showsDailyReminderPrompt: false,
+                isSuppressedForUITests: false,
+                finishedOnboardingThisLaunch: finishedOnboardingThisLaunch
+            ).isEligibleForWhatsNew
+        }
+
+        XCTAssertTrue(eligible(finishedOnboardingThisLaunch: false))
+        XCTAssertFalse(eligible(finishedOnboardingThisLaunch: true))
     }
 
     func testReleaseReviewSeenAndReviewedStatesRemainDistinct() throws {

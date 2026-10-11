@@ -1,10 +1,10 @@
 # LogYourBody Product Roadmap And Build Guardrails
 
-Last updated: 2026-06-05
+Last updated: 2026-09-26
 
 ## Operating Principle
 
-LogYourBody is an iOS-first paid product. It should not become another food logger, workout tracker, or dashboard suite. The job is to answer one question with almost no input:
+LogYourBody is an iOS-first paid product centered on body-composition progress. It also includes an evidence-grounded hypertrophy coach whose deterministic programming engine supplies training prescriptions. Keep training focused on engine-led programs rather than a general-purpose workout tracker, and do not add a food logger. The job is to answer one question with almost no input:
 
 > How am I doing?
 
@@ -119,21 +119,15 @@ Do not build a Watch app speculatively. Start only after repeated user pull:
 
 Initial Watch scope is read-only basic stats and latest trend direction. No logging-first Watch app unless usage proves it.
 
-### AI
+### Hypertrophy Coach
 
-AI starts as deterministic, low-text insight, not chat.
+The deterministic programming engine owns training plans and every numeric prescription. The conversation model may narrate engine-returned output, explain its evidence, cite the opaque knowledge IDs it receives, and record user feedback. It must never invent, calculate, select, or modify exercises, sets, reps, loads, volume, progression, or schedule. When an authorized engine plan or its supporting evidence is absent, the coach says that it has no authorized training guidance to provide.
 
-First AI-adjacent surface:
+Keep responses concise and non-medical. Preserve the existing consent, health-data, evidence, and body-image safeguards. Do not provide prescriptive aesthetic coaching to minors, pregnant or postpartum users, people with known eating-disorder risk, or people pursuing unsafe targets.
 
-- Classify current phase from weight/body-fat trend: cutting, maintenance, gaining.
-- Warn when a cut or bulk has likely gone on too long.
-- Keep copy short and non-medical.
+### Food And Training Scope
 
-Only consider a Jovie-style chat after the core timeline is retained and users are asking for interactive recommendations. The app should "just tell me" before it asks the user to have a conversation.
-
-### Food And Workouts
-
-Do not build a food logger or workout tracker. This product is for people who already have those systems and want a body-composition HUD.
+Do not build a food logger or a general-purpose workout tracker. The hypertrophy programming engine and its bounded coaching interface are in scope alongside the body-composition timeline.
 
 ## Agent Build Rules
 
