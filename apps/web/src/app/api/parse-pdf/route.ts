@@ -84,64 +84,6 @@ export async function POST(request: NextRequest) {
       void parseError;
     }
 
-    // If pdf-parse didn't work, try pdf-lib as fallback
-    if (!pdfText) {
-      try {
-        const { PDFDocument } = await import('pdf-lib');
-        const pdfDoc = await PDFDocument.load(buffer);
-
-        // Get basic info from PDF
-        const pages = pdfDoc.getPages();
-        const pageCount = pages.length;
-
-        // pdf-lib doesn't extract text well, so we'll use a different approach
-        // Convert first page to base64 and send to OpenAI Vision API
-        if (pageCount > 0) {
-          // For DEXA scans, usually the first page has the summary
-          // const base64 = buffer.toString('base64') // Not used with current approach
-
-          // Use OpenAI to analyze the PDF content
-          // Note: This is a workaround - ideally we'd extract text directly
-          const completionContent = await openAICompletion.createJsonObjectCompletion({
-            model: 'gpt-4o-mini',
-            messages: [
-              {
-                role: 'system',
-                content: `You are analyzing a medical document that was uploaded as a PDF. Since we cannot extract text directly, please analyze any visible information and extract body composition data.
-                
-                Look for:
-                - Weight (in kg or lbs)
-                - Body fat percentage
-                - Muscle mass / Lean mass
-                - Bone mass
-                - Visceral fat level
-                - Date of scan
-                - Any other relevant measurements
-                
-                Return the data in JSON format as specified.`,
-              },
-              {
-                role: 'user',
-                content: `This is a ${file.name} file with ${pageCount} pages. Please extract any body composition data you can identify.`,
-              },
-            ],
-            temperature: 0.1,
-          });
-
-          const extractedData = JSON.parse(completionContent);
-
-          return NextResponse.json({
-            success: true,
-            data: extractedData,
-            filename: file.name,
-            method: 'pdf-lib-extraction',
-          });
-        }
-      } catch {
-        console.error('pdf-lib extraction failed');
-      }
-    }
-
     // Check if we extracted any text
     if (!pdfText || pdfText.trim().length === 0) {
       return NextResponse.json(

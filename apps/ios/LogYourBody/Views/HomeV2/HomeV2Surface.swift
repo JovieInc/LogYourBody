@@ -514,7 +514,7 @@ struct HomeV2Filmstrip: View {
             CachedAsyncImage(urlString: bodyMetrics[index].photoUrl ?? "") { image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
             } placeholder: {
                 HomeV2Tokens.Colors.card
             }
@@ -557,7 +557,7 @@ struct SubjectPlateView: View {
     private func stagePhoto(_ image: UIImage) -> some View {
         Image(uiImage: AspectFillCropper.crop(image, to: size))
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .frame(width: size.width, height: size.height)
     }
 

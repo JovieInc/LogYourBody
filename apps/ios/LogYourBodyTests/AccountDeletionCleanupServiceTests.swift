@@ -231,7 +231,9 @@ final class AccountDeletionCleanupServiceTests: XCTestCase {
             defaults.set("value", forKey: key)
         }
 
+        defaults.set("deleted-billing-owner", forKey: RevenueCatManager.DefaultsKey.subscriptionOwner)
         let removedKeys = AccountDeletionCleanupService.clearAccountUserDefaults(in: defaults)
+        XCTAssertNil(defaults.string(forKey: RevenueCatManager.DefaultsKey.subscriptionOwner))
 
         for key in keys {
             XCTAssertNil(defaults.object(forKey: key), "\(key) should be removed")
