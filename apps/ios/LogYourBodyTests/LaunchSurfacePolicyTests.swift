@@ -90,7 +90,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         )
     }
 
-    func testHomeSwipeMatchesFounderIAContract() {
+    func testHomeSwipeMatchesJovieEdgeAndPageRules() {
         XCTAssertEqual(
             HomeChatChromePolicy.swipeDestination(
                 translationX: 80,
@@ -99,7 +99,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isOnStats: false,
                 isChatExpanded: false
             ),
-            .stats
+            .menu
         )
         XCTAssertEqual(
             HomeChatChromePolicy.swipeDestination(
@@ -109,11 +109,11 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isOnStats: false,
                 isChatExpanded: false
             ),
-            .menu
+            .stats
         )
         XCTAssertEqual(
             HomeChatChromePolicy.swipeDestination(
-                translationX: -90,
+                translationX: 90,
                 translationY: 8,
                 startX: 180,
                 isOnStats: true,
@@ -150,6 +150,30 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isChatExpanded: false
             ),
             .none
+        )
+    }
+
+    func testAskOverProgressCollapsesBeforeNavigatingItsUnderlyingPage() {
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 90,
+                translationY: 8,
+                startX: 180,
+                isOnStats: true,
+                isChatExpanded: true
+            ),
+            .collapseChat
+        )
+        XCTAssertEqual(
+            HomeChatChromePolicy.swipeDestination(
+                translationX: 90,
+                translationY: 8,
+                startX: 20,
+                isOnStats: true,
+                isChatExpanded: true
+            ),
+            .menu,
+            "The edge swipe still opens navigation while Ask is expanded"
         )
     }
 
