@@ -12,6 +12,51 @@ function normalized(statement: unknown) {
 }
 
 describe('createNeonChatConversationStore', () => {
+  it.each([
+    ['failed', true],
+    ['cancelled', true],
+    ['pending', false],
+    ['pending', true],
+    ['completed', false],
+  ])(
+    'hydrates durable %s turn recovery (retryable=%s) only on the owned user message',
+    async (status, retryable) => {
+      const conversation = {
+        id: 'conversation',
+        title: 'Question',
+        created_at: '2026-10-09',
+        updated_at: '2026-10-09',
+        expires_at: '2026-11-09',
+      };
+      const message = {
+        id: 'user-message',
+        role: 'user',
+        content: 'Question',
+        client_message_id: 'client-message',
+        created_at: '2026-10-09',
+        turn_status: status,
+        turn_retryable: retryable,
+      };
+      const query = jest
+        .fn()
+        .mockResolvedValueOnce([conversation])
+        .mockResolvedValueOnce([conversation])
+        .mockResolvedValueOnce([
+          message,
+          { ...message, id: 'assistant-message', role: 'assistant', client_message_id: null },
+        ]);
+      const loaded = await createNeonChatConversationStore(databaseWith(query)).getLatest('owner');
+      expect(loaded?.messages[0]).toMatchObject({
+        clientMessageId: 'client-message',
+        turn: { status, retryable },
+      });
+      expect(loaded?.messages[1]).not.toHaveProperty('turn');
+      expect(normalized(query.mock.calls[2]?.[0])).toContain('turns.conversation_id = $1');
+      expect(normalized(query.mock.calls[2]?.[0])).toContain('turns.user_subject = $2');
+      expect(normalized(query.mock.calls[2]?.[0])).toContain('turns.lease_expires_at <= now()');
+    },
+  );
+
   it('scopes conversation lookup and message hydration to the authenticated subject', async () => {
     const conversationRow = {
       id: '11111111-1111-4111-8111-111111111111',
