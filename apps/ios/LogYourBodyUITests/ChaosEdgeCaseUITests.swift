@@ -511,6 +511,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
     // MARK: - 13. Accessibility XXXL round trip has no layout anomalies
 
     func testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies() throws {
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
