@@ -3,6 +3,7 @@
 import { NextRequest } from 'next/server';
 import { createNativeProductRecordHandlers } from '../route-handlers';
 import type {
+  NativeProductAccountMutationsPort,
   NativeProductRecord,
   NativeProductRecordCollection,
   NativeProductRecordsPort,
@@ -20,6 +21,13 @@ const morning = {
 };
 
 class MemoryNativeRecords implements NativeProductRecordsPort {
+  accountMutations: NativeProductAccountMutationsPort = {
+    capture: async (subject) => ({ subject, ownerId: morningId }),
+    push: (a, collection, records) => this.push(a.subject, collection, records),
+    remove: (a, collection, ids) => this.remove(a.subject, collection, ids),
+    endActiveGlp1Medications: (a, endedAt) => this.endActiveGlp1Medications(a.subject, endedAt),
+  };
+
   pushed: Array<{
     subject: string;
     collection: NativeProductRecordCollection;
@@ -188,6 +196,160 @@ describe('/api/auth/mobile/sync/v1/[collection]', () => {
     expect(response.status).toBe(200);
     expect(records.pushed[0]?.collection).toBe('dexa_results');
     expect(records.pushed[0]?.records).toHaveLength(1);
+  });
+
+  const reportedMeasurements = {
+    schema_version: 1,
+    items: [
+      {
+        kind: 'lean_mass',
+        value: 62,
+        unit: 'kg',
+        reported_label: 'Lean Mass',
+        reported_unit: 'kg',
+      },
+    ],
+  };
+
+  it.each([
+    ['known measurements', reportedMeasurements],
+    [
+      'unknown kind',
+      {
+        schema_version: 1,
+        items: [{ kind: 'future_ratio', value: { numerator: 2, denominator: 3 } }],
+      },
+    ],
+    [
+      'future meaning for a known name',
+      {
+        schema_version: 2,
+        items: [{ kind: 'lean_mass', value: { opaque: true }, unit: 'future' }],
+      },
+    ],
+    [
+      'future version',
+      {
+        schema_version: 2,
+        items: [{ kind: 'future_ratio', value: 'uninterpreted', unit: { future: 'unit' } }],
+      },
+    ],
+  ])('preserves bounded %s without converting them into a muscle scalar', async (_, envelope) => {
+    const { handlers, records } = makeHarness();
+    const response = await handlers.POST(
+      request('POST', 'dexa-results', 'access-a', [
+        { id: morningId, reported_measurements: envelope },
+      ]),
+    );
+    expect(response.status).toBe(200);
+    expect(records.pushed[0]?.records[0]).toEqual({
+      id: morningId,
+      reported_measurements: envelope,
+    });
+    expect(records.pushed[0]?.records[0]).not.toHaveProperty('muscle_mass');
+  });
+
+  it.each([
+    ['null', null],
+    ['array', []],
+    ['missing version', { items: [] }],
+    ['invalid version', { schema_version: 0, items: [] }],
+    ['fractional version', { schema_version: 1.5, items: [] }],
+    ['missing items', { schema_version: 1 }],
+    ['nonobject item', { schema_version: 2, items: [3] }],
+    ['missing kind', { schema_version: 2, items: [{}] }],
+    [
+      'too many items',
+      { schema_version: 2, items: Array.from({ length: 65 }, () => ({ kind: 'future' })) },
+    ],
+    ['too many bytes', { schema_version: 2, items: [{ kind: 'future', data: '界'.repeat(6000) }] }],
+    [
+      'too many nodes',
+      {
+        schema_version: 2,
+        items: Array.from({ length: 64 }, () => ({ kind: 'future', data: [1, 2, 3, 4, 5, 6, 7] })),
+      },
+    ],
+    [
+      'too deep',
+      {
+        schema_version: 2,
+        items: [{ kind: 'future', data: { a: { b: { c: { d: { e: 1 } } } } } }],
+      },
+    ],
+    [
+      'invalid known value',
+      { ...reportedMeasurements, items: [{ ...reportedMeasurements.items[0], value: -2 }] },
+    ],
+    [
+      'non-number known value',
+      { ...reportedMeasurements, items: [{ ...reportedMeasurements.items[0], value: '62' }] },
+    ],
+    [
+      'unknown known-kind unit',
+      { ...reportedMeasurements, items: [{ ...reportedMeasurements.items[0], unit: 'stone' }] },
+    ],
+    [
+      'non-string known unit',
+      { ...reportedMeasurements, items: [{ ...reportedMeasurements.items[0], unit: ['kg'] }] },
+    ],
+    [
+      'unbounded label',
+      {
+        ...reportedMeasurements,
+        items: [{ ...reportedMeasurements.items[0], reported_label: 'x'.repeat(161) }],
+      },
+    ],
+  ])('rejects %s measurements before writing any record', async (_, envelope) => {
+    const { handlers, records } = makeHarness();
+    const response = await handlers.POST(
+      request('POST', 'dexa-results', 'access-a', [
+        { id: eveningId },
+        { id: morningId, reported_measurements: envelope },
+      ]),
+    );
+    expect(response.status).toBe(400);
+    expect(records.pushed).toEqual([]);
+  });
+
+  it('keeps explicit unknown units and labels without inference', async () => {
+    const { handlers, records } = makeHarness();
+    const envelope = {
+      schema_version: 1,
+      items: [
+        {
+          kind: 'muscle_mass',
+          value: 33,
+          unit: null,
+          reported_label: 'Muscle Mass',
+          reported_unit: 'unidentified',
+        },
+      ],
+    };
+    expect(
+      (
+        await handlers.POST(
+          request('POST', 'dexa-results', 'access-a', [
+            { id: morningId, weight_unit: 'lbs', reported_measurements: envelope },
+          ]),
+        )
+      ).status,
+    ).toBe(200);
+    expect(records.pushed[0]?.records[0]?.reported_measurements).toEqual(envelope);
+  });
+
+  it('does not change other collections containing a field with the same name', async () => {
+    const { handlers, records } = makeHarness();
+    expect(
+      (
+        await handlers.POST(
+          request('POST', 'daily-metrics', 'access-a', [
+            { ...morning, reported_measurements: null },
+          ]),
+        )
+      ).status,
+    ).toBe(200);
+    expect(records.pushed[0]?.records[0]?.reported_measurements).toBeNull();
   });
 
   it('ends active GLP-1 medications for the authenticated subject', async () => {
