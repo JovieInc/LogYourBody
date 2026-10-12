@@ -558,6 +558,11 @@ nonisolated func syncProfilesBatch(_ profiles: [PendingProfileSyncItem], token: 
     }
 
 nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) async throws {
+        // A response that arrives after logout or an account switch must not
+        // write the previous account's rows into the shared store.
+        let ownership = await MainActor.run { self.authManager.captureRequestSession() }
+        guard let ownership, ownership.subject == userId else { return }
+
         // Get last sync date for incremental sync
         let lastSync = lastSync ?? Date().addingTimeInterval(-7 * 24 * 60 * 60) // Default to 1 week ago
 
@@ -567,6 +572,7 @@ nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) 
             since: lastSync,
             token: token
         )
+        guard await stillOwnsPull(ownership) else { return }
 
         for metricData in bodyMetrics {
             coreDataManager.updateOrCreateBodyMetric(from: metricData)
@@ -578,6 +584,7 @@ nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) 
             since: lastSync,
             token: token
         )
+        guard await stillOwnsPull(ownership) else { return }
 
         for metricData in dailyMetrics {
             coreDataManager.updateOrCreateDailyMetric(from: metricData)
@@ -585,8 +592,11 @@ nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) 
 
         // Pull profile updates
         if let profileData = try await productAPIClient.fetchProfile(userId: userId, token: token) {
+            guard await stillOwnsPull(ownership) else { return }
             coreDataManager.updateOrCreateProfile(from: profileData)
         }
+
+        guard await stillOwnsPull(ownership) else { return }
 
         // Pull latest body metric timestamp
         if let remoteLatest = try? await productAPIClient.fetchLatestBodyMetricTimestamp(
@@ -597,21 +607,21 @@ nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) 
             _ = remoteLatest
         }
 
-        let isStillAuthenticated = await MainActor.run {
-            self.authManager.isAuthenticated
+        let canPublish = await MainActor.run {
+            self.authManager.ownsRequestSession(ownership) && self.authManager.isAuthenticated && self.isOnline
         }
-        let stillOnline = await MainActor.run {
-            self.isOnline
-        }
-
-        guard isStillAuthenticated else { return }
-        guard stillOnline else { return }
+        guard canPublish else { return }
 
         // For now, we'll use polling instead of WebSocket to simplify
         // WebSocket implementation can be added later for true real-time
         await MainActor.run {
+            guard self.authManager.ownsRequestSession(ownership) else { return }
             self.realtimeConnected = false
         }
+    }
+
+    private func stillOwnsPull(_ ownership: AuthManager.RequestSessionOwnership) async -> Bool {
+        await MainActor.run { authManager.ownsRequestSession(ownership) }
     }
 
 func connectRealtime() {
