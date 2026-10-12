@@ -64,7 +64,7 @@ struct MetricChartView: View {
     private var currentValueHeader: some View {
         VStack(spacing: 4) {
             if let currentValue = getCurrentValue() {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(formatValue(currentValue))
                         .font(.system(size: 64, weight: .bold))
                         .foregroundColor(.appText)
@@ -423,8 +423,8 @@ enum TrendDirection {
 
     var color: Color {
         switch self {
-        case .up: return .green
-        case .down: return .red
+        case .up: return Color.appSuccess
+        case .down: return Color.appError
         case .neutral: return .gray
         }
     }

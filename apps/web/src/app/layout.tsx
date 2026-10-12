@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Providers } from './providers';
@@ -8,9 +8,18 @@ import { ServiceWorkerUpdater } from '@/components/ServiceWorkerUpdater';
 import './globals.css';
 import { logYourBody } from '@jovieinc/product-registry';
 
-const inter = Inter({
-  subsets: ['latin'],
+const inter = localFont({
+  src: '../../../../packages/design-tokens/fonts/Inter-Latin.woff2',
+  variable: '--font-inter',
+  display: 'optional',
+  weight: '100 900',
+});
+
+const satoshi = localFont({
+  src: '../../../../packages/design-tokens/fonts/Satoshi-Latin.woff2',
+  variable: '--font-satoshi',
   display: 'swap',
+  weight: '300 900',
 });
 
 export const metadata: Metadata = {
@@ -133,7 +142,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${satoshi.variable}`}>
         <Providers>
           {children}
           <PWAInstallPrompt />

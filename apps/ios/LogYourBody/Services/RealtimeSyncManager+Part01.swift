@@ -149,105 +149,76 @@ func stopAutoSync() {
     }
 
 func syncAll(onCompletion: (() -> Void)? = nil) {
-        guard !isSyncing else {
+        guard !isSyncing, isOnline, let ownership = authManager.captureRequestSession() else {
+            if !isOnline { syncStatus = .offline }
             onCompletion?()
             return
         }
-        guard isOnline else {
-            syncStatus = .offline
-            onCompletion?()
-            return
-        }
-        guard authManager.isAuthenticated else {
-            onCompletion?()
-            return
-        }
-        guard let userIdSnapshot = authManager.currentUser?.id else {
-            onCompletion?()
-            return
-        }
-
         lastSyncAttempt = Date()
         isSyncing = true
         syncStatus = .syncing
         error = nil
-
-        let operationsToProcess = pendingOperations.filter { $0.userId == userIdSnapshot }
-        // Never assign legacy/unowned work to whichever account happens to be active.
-        // Preserve it for an explicit reconciliation path instead of silently dropping it.
-        pendingOperations.removeAll { $0.userId == userIdSnapshot }
-        savePendingOperations()
-
-        let lastSyncSnapshot = lastSyncDate
-
-        Task.detached(priority: .utility) { [weak self] in
+        let operations = pendingOperations.filter { $0.userId == ownership.subject }
+        let lastSync = lastSyncDate
+        Task { @MainActor [weak self] in
             guard let self else { return }
-            var operationsNeedingRetry = operationsToProcess
-
-            do {
-                guard let token = await self.authManager.getAccessToken() else {
-                    throw SyncError.tokenGenerationFailed
-                }
-
-                if !operationsNeedingRetry.isEmpty {
-                    let failedOperations = await self.processPendingOperations(operationsNeedingRetry, token: token)
-                    if failedOperations.isEmpty {
-                        operationsNeedingRetry.removeAll()
-                    } else {
-                        operationsNeedingRetry = failedOperations
-                        throw PendingSyncError.failedOperations
-                    }
-                }
-
-                try await self.syncLocalChanges(for: userIdSnapshot, token: token)
-                try await self.pullLatestData(userId: userIdSnapshot, lastSync: lastSyncSnapshot, token: token)
-                await self.coreDataManager.cleanupOldData()
-
-                await MainActor.run {
-                    self.isSyncing = false
-                    self.syncStatus = .success
-                    self.lastSyncDate = Date()
-                    self.consecutiveFailures = 0
-                    self.updatePendingSyncCount()
-                    self.savePendingOperations()
-                    onCompletion?()
-                }
-            } catch {
-                if let supabaseError = error as? SupabaseError {
-                    if case .unauthorized = supabaseError {
-                        await self.authManager.handleSupabaseUnauthorized()
-                    }
-                }
-
-                let retryOperations = operationsNeedingRetry
-                let errorDescription = error.localizedDescription
-
-                await MainActor.run { [retryOperations, errorDescription] in
-                    if !retryOperations.isEmpty {
-                        self.pendingOperations.insert(contentsOf: retryOperations, at: 0)
-                    }
-                    self.isSyncing = false
-                    self.syncStatus = .error(errorDescription)
-                    self.error = errorDescription
-                    self.consecutiveFailures += 1
-
-                    if self.consecutiveFailures >= self.maxConsecutiveFailures {
-                        self.syncInterval = min(self.syncInterval * 2, 3_600)
-                        self.startAutoSync()
-                    }
-
-                    self.savePendingOperations()
-                    self.updatePendingSyncCount()
-                    AnalyticsService.shared.track(
-                        event: "sync_failed",
-                        properties: [
-                            "pending_count": String(self.pendingSyncCount)
-                        ]
-                    )
-                    onCompletion?()
-                }
+            defer {
+                self.isSyncing = false
+                if self.syncStatus == .syncing { self.syncStatus = .idle }
+                onCompletion?()
             }
+            await self.runCapturedSync(operations, ownership: ownership, lastSync: lastSync)
         }
+    }
+
+    func runCapturedSync(
+        _ operations: [SyncOperation], ownership: AuthManager.RequestSessionOwnership, lastSync: Date?
+    ) async {
+        var requestOwner = ownership
+        do {
+            guard let authorization = await authManager.getAccessToken(for: ownership) else {
+                if authManager.didExpireRequestSession(ownership) {
+                    recordSyncFailure(SyncError.tokenGenerationFailed.localizedDescription)
+                    return
+                }
+                throw SyncError.tokenGenerationFailed
+            }
+            requestOwner = authorization.ownership
+            let failed = await processPendingOperations(
+                operations, token: authorization.token, ownership: requestOwner
+            )
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            guard failed.isEmpty else { throw PendingSyncError.failedOperations }
+            try await syncLocalChanges(for: requestOwner.subject, token: authorization.token)
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            try await pullLatestData(userId: requestOwner.subject, lastSync: lastSync, token: authorization.token)
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            await coreDataManager.cleanupOldData()
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            syncStatus = .success
+            lastSyncDate = Date()
+            consecutiveFailures = 0
+            updatePendingSyncCount()
+        } catch {
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            if let productError = error as? ProductAPIError, productError == .unauthorized {
+                await authManager.handleProductAPIUnauthorized(for: requestOwner)
+            }
+            guard authManager.ownsRequestSession(requestOwner) else { return }
+            recordSyncFailure(error.localizedDescription)
+        }
+    }
+
+    func recordSyncFailure(_ description: String) {
+        syncStatus = .error(description)
+        error = description
+        consecutiveFailures += 1
+        if consecutiveFailures >= maxConsecutiveFailures {
+            syncInterval = min(syncInterval * 2, 3_600)
+            startAutoSync()
+        }
+        updatePendingSyncCount()
+        analyticsService.track(event: "sync_failed", properties: ["pending_count": String(pendingSyncCount)])
     }
 
 func syncAllAwaitingCompletion() async {
@@ -326,7 +297,7 @@ nonisolated func syncDeletedBodyMetricsBatch(
 
         do {
             for metric in metrics {
-                try await supabaseManager.deleteData(table: "body_metrics", id: metric.id, token: token)
+                try await productAPIClient.deleteData(table: "body_metrics", id: metric.id, token: token)
                 syncedIds.insert(metric.id)
             }
         } catch {
@@ -345,7 +316,7 @@ nonisolated func syncDeletedGlp1DoseLogsBatch(
 
         do {
             for log in logs {
-                try await supabaseManager.deleteData(table: "glp1_dose_logs", id: log.id, token: token)
+                try await productAPIClient.deleteData(table: "glp1_dose_logs", id: log.id, token: token)
                 syncedIds.insert(log.id)
             }
         } catch {
@@ -385,7 +356,7 @@ nonisolated func syncBodyMetricsBatch(_ metrics: [PendingBodyMetricSyncItem], to
                 ]
             }
 
-            let response = try await supabaseManager.upsertBodyMetricsBatch(metricsData, token: token)
+            let response = try await productAPIClient.upsertBodyMetricsBatch(metricsData, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedBodyMetrics", ids: syncedIds)
         }
@@ -416,6 +387,10 @@ nonisolated func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], to
                 }
                 let vatMassValue: Any = result.vatMassKg > 0 ? result.vatMassKg : NSNull()
                 let vatVolumeValue: Any = result.vatVolumeCm3 > 0 ? result.vatVolumeCm3 : NSNull()
+                let scanWeightValue: Any = result.scanWeight ?? NSNull()
+                let bodyFatValue: Any = result.bodyFatPercentage ?? NSNull()
+                let muscleMassValue: Any = result.muscleMass ?? NSNull()
+                let boneMassValue: Any = result.boneMass ?? NSNull()
 
                 return [
                     "id": result.id,
@@ -431,6 +406,11 @@ nonisolated func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], to
                     "analyze_time": analyzeTimeValue,
                     "vat_mass_kg": vatMassValue,
                     "vat_volume_cm3": vatVolumeValue,
+                    "scan_weight": scanWeightValue,
+                    "scan_weight_unit": result.scanWeightUnit as Any,
+                    "body_fat_percentage": bodyFatValue,
+                    "muscle_mass": muscleMassValue,
+                    "bone_mass": boneMassValue,
                     "result_pdf_url": result.resultPdfUrl as Any,
                     "result_pdf_name": result.resultPdfName as Any,
                     "created_at": formatter.string(from: result.createdAt),
@@ -439,7 +419,7 @@ nonisolated func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], to
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
-            let response = try await supabaseManager.upsertData(table: "dexa_results", data: data, token: token)
+            let response = try await productAPIClient.upsertData(table: "dexa_results", data: data, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedDexaResult", ids: syncedIds)
         }
@@ -457,7 +437,7 @@ nonisolated func syncGlp1MedicationsBatch(
         for userId in Set(medications.map(\.userId)) {
             let userMeds = medications.filter { $0.userId == userId }
             let endDate = userMeds.compactMap { $0.endedAt }.max() ?? Date()
-            try await supabaseManager.endActiveGlp1Medications(userId: userId, endedAt: endDate)
+            try await productAPIClient.endActiveGlp1Medications(userId: userId, endedAt: endDate)
         }
 
         for batch in medications.chunked(into: batchSize) {
@@ -489,7 +469,7 @@ nonisolated func syncGlp1MedicationsBatch(
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
-            let response = try await supabaseManager.upsertData(table: "glp1_medications", data: data, token: token)
+            let response = try await productAPIClient.upsertData(table: "glp1_medications", data: data, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedGlp1Medication", ids: syncedIds)
         }
@@ -520,7 +500,7 @@ nonisolated func syncGlp1DoseLogsBatch(_ logs: [PendingGlp1DoseLogSyncItem], tok
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
-            let response = try await supabaseManager.upsertData(table: "glp1_dose_logs", data: data, token: token)
+            let response = try await productAPIClient.upsertData(table: "glp1_dose_logs", data: data, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedGlp1DoseLog", ids: syncedIds)
         }
@@ -543,7 +523,7 @@ nonisolated func syncDailyMetricsBatch(_ metrics: [PendingDailyMetricSyncItem], 
                 ]
             }
 
-            let response = try await supabaseManager.upsertDailyMetricsBatch(metricsData, token: token)
+            let response = try await productAPIClient.upsertDailyMetricsBatch(metricsData, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
             await coreDataManager.markAsSynced(entityName: "CachedDailyMetrics", ids: syncedIds)
         }
@@ -572,44 +552,54 @@ nonisolated func syncProfilesBatch(_ profiles: [PendingProfileSyncItem], token: 
                 profileData["height"] = height
             }
 
-            try await supabaseManager.updateProfile(profileData, token: token)
+            try await productAPIClient.updateProfile(profileData, token: token)
             await coreDataManager.markAsSynced(entityName: "CachedProfile", ids: [profile.id])
         }
     }
 
 nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) async throws {
+        // A response that arrives after logout or an account switch must not
+        // write the previous account's rows into the shared store.
+        let ownership = await MainActor.run { self.authManager.captureRequestSession() }
+        guard let ownership, ownership.subject == userId else { return }
+
         // Get last sync date for incremental sync
         let lastSync = lastSync ?? Date().addingTimeInterval(-7 * 24 * 60 * 60) // Default to 1 week ago
 
         // Pull latest body metrics
-        let bodyMetrics = try await supabaseManager.fetchBodyMetrics(
+        let bodyMetrics = try await productAPIClient.fetchBodyMetrics(
             userId: userId,
             since: lastSync,
             token: token
         )
+        guard await stillOwnsPull(ownership) else { return }
 
         for metricData in bodyMetrics {
             coreDataManager.updateOrCreateBodyMetric(from: metricData)
         }
 
         // Pull latest daily metrics
-        let dailyMetrics = try await supabaseManager.fetchDailyMetrics(
+        let dailyMetrics = try await productAPIClient.fetchDailyMetrics(
             userId: userId,
             since: lastSync,
             token: token
         )
+        guard await stillOwnsPull(ownership) else { return }
 
         for metricData in dailyMetrics {
             coreDataManager.updateOrCreateDailyMetric(from: metricData)
         }
 
         // Pull profile updates
-        if let profileData = try await supabaseManager.fetchProfile(userId: userId, token: token) {
+        if let profileData = try await productAPIClient.fetchProfile(userId: userId, token: token) {
+            guard await stillOwnsPull(ownership) else { return }
             coreDataManager.updateOrCreateProfile(from: profileData)
         }
 
+        guard await stillOwnsPull(ownership) else { return }
+
         // Pull latest body metric timestamp
-        if let remoteLatest = try? await supabaseManager.fetchLatestBodyMetricTimestamp(
+        if let remoteLatest = try? await productAPIClient.fetchLatestBodyMetricTimestamp(
             userId: userId,
             token: token
         ) {
@@ -617,21 +607,21 @@ nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) 
             _ = remoteLatest
         }
 
-        let isStillAuthenticated = await MainActor.run {
-            self.authManager.isAuthenticated
+        let canPublish = await MainActor.run {
+            self.authManager.ownsRequestSession(ownership) && self.authManager.isAuthenticated && self.isOnline
         }
-        let stillOnline = await MainActor.run {
-            self.isOnline
-        }
-
-        guard isStillAuthenticated else { return }
-        guard stillOnline else { return }
+        guard canPublish else { return }
 
         // For now, we'll use polling instead of WebSocket to simplify
         // WebSocket implementation can be added later for true real-time
         await MainActor.run {
+            guard self.authManager.ownsRequestSession(ownership) else { return }
             self.realtimeConnected = false
         }
+    }
+
+    private func stillOwnsPull(_ ownership: AuthManager.RequestSessionOwnership) async -> Bool {
+        await MainActor.run { authManager.ownsRequestSession(ownership) }
     }
 
 func connectRealtime() {

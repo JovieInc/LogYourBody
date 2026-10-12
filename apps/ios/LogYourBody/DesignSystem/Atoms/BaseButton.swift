@@ -31,7 +31,7 @@ struct ButtonConfiguration {
             case .primary: return .jovieAction
             case .secondary: return .appCard
             case .tertiary: return .appCard
-            case .destructive: return .red
+            case .destructive: return Color.appError
             case .ghost: return .clear
             case .social: return .white
             case .custom(let bg, _): return bg
@@ -67,18 +67,17 @@ struct ButtonConfiguration {
 
         var height: CGFloat {
             switch self {
-            case .small: return JovieTokens.compactControlHeight
-            case .medium: return JovieTokens.controlHeight
-            case .large: return 56
+            // ActionButton 32 / 510 / r999: one visible height for the CTA family.
+            case .small, .medium, .large: return JovieTokens.actionControlHeight
             case .custom(let height, _, _): return height
             }
         }
 
         var padding: EdgeInsets {
             switch self {
-            case .small: return EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
-            case .medium: return EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20)
-            case .large: return EdgeInsets(top: 16, leading: 24, bottom: 16, trailing: 24)
+            case .small: return EdgeInsets(top: 0, leading: 12, bottom: 0, trailing: 12)
+            case .medium: return EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16)
+            case .large: return EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20)
             case .custom(_, let padding, _): return padding
             }
         }
@@ -103,11 +102,53 @@ struct ButtonConfiguration {
     }
 }
 
+// MARK: - Geometry policy
+
+/// Source-bound contract for the locked ActionButton atom: a 32pt visible pill
+/// whose hit area is expanded to at least 44pt without changing the visual.
+enum BaseButtonGeometry {
+    static func visibleHeight(for size: ButtonConfiguration.ButtonSizeVariant) -> CGFloat {
+        size.height
+    }
+
+    static func tapTargetHeight(for size: ButtonConfiguration.ButtonSizeVariant) -> CGFloat {
+        max(size.height, JovieTokens.minimumHitTarget)
+    }
+}
+
+/// Rollout stays off until the shared control has passed native UI acceptance.
+enum BaseButtonLoadingPolicy {
+    static let gateKey = "native_button_loading_parity_v1"
+
+    @MainActor
+    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
+        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return checkGate(gateKey)
+    }
+}
+
+#if DEBUG
+/// Component tests and previews exercise both paths without changing a live gate.
+private struct BaseButtonLoadingParityKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var baseButtonLoadingParity: Bool? {
+        get { self[BaseButtonLoadingParityKey.self] }
+        set { self[BaseButtonLoadingParityKey.self] = newValue }
+    }
+}
+#endif
+
 // MARK: - BaseButton
 
 struct BaseButton<Label: View>: View {
     @Environment(\.isEnabled) private var isEnvironmentEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if DEBUG
+    @Environment(\.baseButtonLoadingParity) private var loadingParityOverride
+    #endif
 
     let configuration: ButtonConfiguration
     let action: () -> Void
@@ -117,6 +158,13 @@ struct BaseButton<Label: View>: View {
 
     private var isEnabled: Bool {
         configuration.isEnabled && !configuration.isLoading && isEnvironmentEnabled
+    }
+
+    private var loadingParityEnabled: Bool {
+        #if DEBUG
+        if let loadingParityOverride { return loadingParityOverride }
+        #endif
+        return BaseButtonLoadingPolicy.isEnabled()
     }
 
     private var usesCapsule: Bool {
@@ -138,21 +186,31 @@ struct BaseButton<Label: View>: View {
         }
     }
 
-    private var minimumHeight: CGFloat {
-        max(configuration.size.height, JovieTokens.minimumHitTarget)
+    var body: some View {
+        if loadingParityEnabled {
+            button
+                .accessibilityRepresentation {
+                    Button(action: handleTap, label: label)
+                        .disabled(!isEnabled)
+                        .accessibilityValue(configuration.isLoading ? "Loading" : "")
+                }
+        } else {
+            button
+        }
     }
 
-    var body: some View {
+    private var button: some View {
         Button(action: handleTap, label: {
             buttonContent
                 .frame(maxWidth: configuration.fullWidth ? .infinity : nil)
-                .frame(minHeight: minimumHeight)
+                .frame(minHeight: BaseButtonGeometry.visibleHeight(for: configuration.size))
                 .padding(.horizontal, configuration.size.padding.leading)
                 .background(backgroundView)
                 .clipShape(buttonShape)
                 .overlay(borderOverlay)
-                .contentShape(buttonShape)
-                .scaleEffect(reduceMotion ? 1 : (isPressed || configuration.isLoading ? 0.96 : 1.0))
+                .frame(minHeight: BaseButtonGeometry.tapTargetHeight(for: configuration.size))
+                .contentShape(Rectangle())
+                .scaleEffect(reduceMotion ? 1 : (isPressed || (configuration.isLoading && !loadingParityEnabled) ? 0.96 : 1.0))
                 .opacity(isEnabled ? 1.0 : 0.6)
                 .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: isPressed)
                 .animation(reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration), value: configuration.isLoading)
@@ -174,16 +232,33 @@ struct BaseButton<Label: View>: View {
 
     @ViewBuilder
     private var buttonContent: some View {
-        if configuration.isLoading {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: configuration.style.foregroundColor))
-                .scaleEffect(0.8)
+        if loadingParityEnabled {
+            styledLabel
+                .opacity(configuration.isLoading ? 0 : 1)
+                .overlay {
+                    if configuration.isLoading {
+                        loadingIndicator
+                            .accessibilityHidden(true)
+                    }
+                }
+        } else if configuration.isLoading {
+            loadingIndicator
         } else {
-            label()
-                .font(.system(labelTextStyle, design: .default).weight(.semibold))
-                .foregroundColor(configuration.style.foregroundColor)
-                .multilineTextAlignment(.center)
+            styledLabel
         }
+    }
+
+    private var styledLabel: some View {
+        label()
+            .font(.system(labelTextStyle, design: .default).weight(JovieTokens.actionLabelWeight))
+            .foregroundColor(configuration.style.foregroundColor)
+            .multilineTextAlignment(.center)
+    }
+
+    private var loadingIndicator: some View {
+        ProgressView()
+            .progressViewStyle(CircularProgressViewStyle(tint: configuration.style.foregroundColor))
+            .scaleEffect(0.8)
     }
 
     @ViewBuilder

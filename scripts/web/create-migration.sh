@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Script to create a new Supabase migration file
+# Script to create a new Neon migration file
 # Usage: ./scripts/create-migration.sh "descriptive name"
 
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-MIGRATIONS_DIR="$REPO_ROOT/supabase/migrations"
+MIGRATIONS_DIR="$REPO_ROOT/apps/web/db/migrations"
 
 if [ "$#" -lt 1 ] || [ -z "$1" ]; then
   echo "Usage: $0 \"descriptive name\""
@@ -59,5 +59,5 @@ echo "✅ Created migration file: $RELATIVE_FILEPATH"
 echo ""
 echo "Next steps:"
 echo "1. Edit the migration file to add your SQL"
-echo "2. Test locally: supabase db push --local"
+echo "2. Apply against a reviewed direct Neon connection: pnpm --filter logyourbody db:apply:neon"
 echo "3. Commit and push to trigger CI/CD migrations"

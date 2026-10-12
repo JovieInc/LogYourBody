@@ -146,15 +146,17 @@ public struct MetricSummaryCard: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            // Small icon + title in accent color (Apple Health-style label)
-            HStack(spacing: 6) {
+            // Keep the metric accent on the non-text icon, but use the semantic
+            // text role for the small label so every metric has a readable
+            // foreground independent of its accent hue.
+            HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: headerIconSize, weight: .semibold))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(accentColor)
 
                 Text(titleText)
                     .font(.system(size: 15, weight: .semibold, design: .default))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
             }
 
@@ -167,7 +169,7 @@ public struct MetricSummaryCard: View {
                 if isButtonContext && hasActionableState {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(secondaryTextColor.opacity(0.7))
+                        .foregroundStyle(secondaryTextColor)
                 }
             }
         }
@@ -215,7 +217,7 @@ public struct MetricSummaryCard: View {
                 if let time = content.timestamp {
                     Text(time)
                         .font(.system(.footnote, design: .rounded))
-                        .foregroundStyle(secondaryTextColor.opacity(0.8))
+                        .foregroundStyle(secondaryTextColor)
                         .transition(.opacity)
                 }
             default:
@@ -252,7 +254,7 @@ public struct MetricSummaryCard: View {
 
     private func valueBlock(for content: Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if content.unit.isEmpty {
                     Text(content.value)
                         .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
@@ -279,7 +281,7 @@ public struct MetricSummaryCard: View {
     }
 
     private func trendView(_ trend: Trend) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: trendIcon(for: trend.direction))
                 .font(.system(size: 12, weight: .bold))
 
@@ -294,8 +296,8 @@ public struct MetricSummaryCard: View {
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(trendBackground(for: trend.direction))
         .cornerRadius(theme.radius.full)
         .foregroundStyle(trendForeground(for: trend.direction))
@@ -324,7 +326,7 @@ public struct MetricSummaryCard: View {
                     .foregroundStyle(
                         isToday
                             ? lineColor
-                            : lineColor.opacity(0.55)
+                            : lineColor
                     )
                 }
             } else {
@@ -353,7 +355,7 @@ public struct MetricSummaryCard: View {
                         y: .value("Value", minPoint.value)
                     )
                     .symbolSize(6)
-                    .foregroundStyle(lineColor.opacity(0.7))
+                    .foregroundStyle(lineColor)
                 }
 
                 if let maxPoint {
@@ -362,7 +364,7 @@ public struct MetricSummaryCard: View {
                         y: .value("Value", maxPoint.value)
                     )
                     .symbolSize(6)
-                    .foregroundStyle(lineColor.opacity(0.9))
+                    .foregroundStyle(lineColor)
                 }
             }
         }
@@ -378,13 +380,13 @@ public struct MetricSummaryCard: View {
     }
 
     private func loadingView() -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            RoundedRectangle(cornerRadius: 6)
+        VStack(alignment: .leading, spacing: 20) {
+            RoundedRectangle(cornerRadius: 8)
                 .fill(placeholderColor)
                 .frame(width: 140, height: 36)
                 .shimmer()
 
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(placeholderColor)
                 .frame(width: 80, height: 16)
                 .shimmer()
@@ -397,7 +399,7 @@ public struct MetricSummaryCard: View {
     }
 
     private func messageView(message: String, action: CardAction?, iconName: String, isError: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 Image(systemName: iconName)
                     .font(.system(size: 18, weight: .semibold))
@@ -413,8 +415,8 @@ public struct MetricSummaryCard: View {
                 Button(action: action.handler) {
                     Text(action.title)
                         .font(.system(.callout, design: .rounded).weight(.semibold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
                         .background(actionBackground(isError: isError))
                         .cornerRadius(14)
                 }
@@ -565,7 +567,7 @@ struct MetricCardButtonStyle: ButtonStyle {
             Button(action: {}, label: {
                 MetricSummaryCard(
                     icon: "flame.fill",
-                    accentColor: .orange,
+                    accentColor: Color.appWarning,
                     state: .data(
                         MetricSummaryCard.Content(
                             title: "Steps",
@@ -587,13 +589,13 @@ struct MetricCardButtonStyle: ButtonStyle {
 
             MetricSummaryCard(
                 icon: "figure.stand",
-                accentColor: .purple,
+                accentColor: Color.linearPurple,
                 state: .loading
             )
 
             MetricSummaryCard(
                 icon: "percent",
-                accentColor: .teal,
+                accentColor: Color.appPrimary,
                 state: .empty(
                     message: "Log your body fat to see trends and insights.",
                     action: MetricSummaryCard.CardAction(title: "Add measurement", handler: {})
@@ -602,7 +604,7 @@ struct MetricCardButtonStyle: ButtonStyle {
 
             MetricSummaryCard(
                 icon: "figure.arms.open",
-                accentColor: .pink,
+                accentColor: Color.metricAccentBodyFat,
                 state: .error(
                     message: "We couldn’t load FFMI data.",
                     action: MetricSummaryCard.CardAction(title: "Retry", handler: {})

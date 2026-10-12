@@ -6,18 +6,24 @@
   "merge_queue": {
     "required": true,
     "merge_method": "MERGE",
-    "max_entries_to_build": 5,
+    "max_entries_to_build": 2,
     "min_entries_to_merge": 1,
     "max_entries_to_merge": 5,
-    "min_entries_to_merge_wait_minutes": 5,
+    "min_entries_to_merge_wait_minutes": 0,
     "grouping_strategy": "ALLGREEN",
-    "check_response_timeout_minutes": 60
+    "check_response_timeout_minutes": 360,
+    "max_entries_to_build_reason": "each iOS merge group holds two hosted macOS runners and the org shares one small macOS pool with Jovie; raise when self-hosted Macs add capacity",
+    "check_response_timeout_minutes_reason": "GitHub's maximum: the timer must only catch groups whose CI never reports, never eject groups waiting on runner capacity (job timeouts bound runtime)"
   },
   "auto_enrollment": {
     "workflow": ".github/workflows/native-merge-queue.yml",
-    "certification_label": "machine-certified",
     "exact_head_required": true,
     "same_repository_only": true,
     "drafts_allowed": false
+  },
+  "token_enrollment": {
+    "workflow": ".github/workflows/merge-queue-token-enrollment.yml",
+    "secret": "MERGE_QUEUE_TOKEN",
+    "reason": "merge_group events caused by GITHUB_TOKEN start no CI run; the queue only honours checks from the merge_group event, so the entry must be enqueued by a non-GITHUB_TOKEN identity"
   }
 }

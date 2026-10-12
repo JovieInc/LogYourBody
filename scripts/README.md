@@ -8,19 +8,16 @@ This directory contains essential CI/CD and configuration scripts for the LogYou
 scripts/
 ├── web/                    # Web app essential scripts
 │   ├── pre-push-check.sh   # Git pre-push checks
-│   └── create-migration.sh # Root Supabase migration creator
-├── supabase/               # Supabase schema checks
+│   └── create-migration.sh # Neon migration creator
+├── neon/                   # Neon migration layout checks
 └── ios/                    # iOS build and release helpers
 ```
 
 ## Web Scripts
 
-The `apps/web/scripts/` directory has been gitignored to prevent CodeQL warnings from development scripts. Only essential scripts remain:
-
-- `seed-database.ts` - Database seeding
-- `test-seeded-users.ts` - Test seeded data
-
-All other scripts (avatar generators, test scripts, etc.) are ignored by git but remain available for local development.
+The tracked web scripts cover production migrations and build support. Keep schema
+changes in `apps/web/db/migrations` and apply them through the checked-in Neon
+migration runner.
 
 ## Usage
 

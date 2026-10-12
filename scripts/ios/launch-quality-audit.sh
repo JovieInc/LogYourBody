@@ -10,13 +10,17 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$IOS_DIR/test_results/launch-quality-audit/$STAMP}"
 RUN_SWIFTLINT="${RUN_SWIFTLINT:-true}"
 RUN_STATIC_UI_REGRESSION_AUDIT="${RUN_STATIC_UI_REGRESSION_AUDIT:-true}"
+RUN_OPTICAL_GRID_AUDIT="${RUN_OPTICAL_GRID_AUDIT:-true}"
 RUN_RUNTIME_WARNING_AUDIT="${RUN_RUNTIME_WARNING_AUDIT:-true}"
 FAIL_ON_RUNTIME_WARNINGS="${FAIL_ON_RUNTIME_WARNINGS:-false}"
 XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO}"
 TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
 DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
 MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180}"
-XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-420}"
+# 720s covers one chaos group: ~2m of xcodebuild startup plus the slowest
+# passing tests (about 100s) without cutting off the last case. A command
+# timeout is not retried; see is_simulator_infra_failure.
+XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-720}"
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
@@ -26,7 +30,15 @@ if [[ "$ARTIFACT_DIR" != /* ]]; then
   ARTIFACT_DIR="$ROOT_DIR/$ARTIFACT_DIR"
 fi
 
+if [[ -d "$ARTIFACT_DIR" && -n "$(ls -A "$ARTIFACT_DIR")" ]]; then
+  echo "Refusing to reuse nonempty launch-quality artifact directory: $ARTIFACT_DIR" >&2
+  exit 65
+fi
 mkdir -p "$ARTIFACT_DIR"
+AUDIT_STARTED_AT="$(date +%s)"
+# Record source identity without implying an authenticated production build.
+git -C "$ROOT_DIR" rev-parse HEAD > "$ARTIFACT_DIR/source-revision.txt"
+git -C "$ROOT_DIR" diff HEAD --binary > "$ARTIFACT_DIR/source-working-tree.patch"
 
 bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 
@@ -77,6 +89,7 @@ COMMON_XCODEBUILD_ARGS=(
   -scheme "$SCHEME"
   -destination "$DESTINATION"
   -parallel-testing-enabled NO
+  -enableCodeCoverage YES
   -maximum-concurrent-test-simulator-destinations 1
   -test-timeouts-enabled "$TEST_TIMEOUTS_ENABLED"
   -default-test-execution-time-allowance "$DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE"
@@ -91,8 +104,11 @@ cleanup_booted_simulator_apps() {
 is_simulator_infra_failure() {
   local log_file="$1"
 
+  # Command-timeout is intentionally absent. Merge-group run 36947770736
+  # reached it on the last chaos test while that test was still scanning, then
+  # this matcher retried the whole group and the 26-minute step died mid-retry.
   grep -Eq \
-    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Restarting after unexpected exit|unexpected exit, crash, or test timeout|xcodebuild command timed out' \
+    'Failed to get background assertion|Timed out while acquiring background assertion|Failed to install or launch the test runner|Failed to launch app|Mach error -308|server died|Early unexpected exit|operation never finished bootstrapping|Test crashed with signal kill before establishing connection|Restarting after unexpected exit|unexpected exit, crash, or test timeout' \
     "$log_file"
 }
 
@@ -109,7 +125,9 @@ run_xcodebuild_test() {
 
   for attempt in 1 2; do
     cleanup_booted_simulator_apps
-    rm -rf "$result_bundle"
+    if [[ -e "$result_bundle" ]]; then
+      mv "$result_bundle" "${result_bundle%.xcresult}.attempt-$((attempt - 1)).xcresult"
+    fi
 
     echo "Running $label (attempt $attempt)" | tee -a "$log_file"
     xcodebuild_command=(
@@ -146,42 +164,11 @@ run_xcodebuild_test() {
   done
 }
 
-assert_xcresult_has_test_cases() {
-  local label="$1"
-  local result_bundle="$2"
-  local case_count
-
-  if [[ ! -d "$result_bundle" ]]; then
-    echo "Missing xcresult bundle for $label: $result_bundle" >&2
-    exit 66
-  fi
-
-  case_count="$(
-    xcrun xcresulttool get test-results tests \
-      --path "$result_bundle" \
-      --format json |
-      python3 -c '
-import json
-import sys
-
-payload = json.load(sys.stdin)
-
-def count_cases(node):
-    count = 1 if node.get("nodeType") == "Test Case" else 0
-    for child in node.get("children", []):
-        count += count_cases(child)
-    return count
-
-print(sum(count_cases(root) for root in payload.get("testNodes", [])))
-'
-  )"
-
-  if [[ "$case_count" == "0" ]]; then
-    echo "$label executed 0 XCTest cases; check -only-testing selectors and Xcode target membership." >&2
-    exit 65
-  fi
-
-  echo "$label executed $case_count XCTest case(s)."
+assert_xcresult_evidence() {
+  local result_bundle="$1"
+  shift
+  python3 "$ROOT_DIR/scripts/ios/launch-quality-evidence.py" \
+    --bundle "$result_bundle" --started-at "$AUDIT_STARTED_AT" "$@"
 }
 
 build_for_testing_once() {
@@ -220,10 +207,15 @@ run_ui_test_group() {
   local log_file="$ARTIFACT_DIR/$label.log"
   local test_name
   local -a only_testing_args=()
+  local -a evidence_args=()
   shift
 
   for test_name in "$@"; do
     only_testing_args+=("-only-testing:LogYourBodyUITests/LogYourBodyUITests/$test_name")
+    evidence_args+=(--expected-test "LogYourBodyUITests/$test_name()")
+    if [[ "$test_name" == "testLaunchQualityGateCapturesCriticalSurfaces" ]]; then
+      evidence_args+=(--critical-captures)
+    fi
   done
 
   UI_RESULT_BUNDLES+=("$result_bundle")
@@ -232,7 +224,7 @@ run_ui_test_group() {
     "$result_bundle" \
     "$log_file" \
     "${only_testing_args[@]}"
-  assert_xcresult_has_test_cases "$label" "$result_bundle"
+  assert_xcresult_evidence "$result_bundle" "${evidence_args[@]}"
 }
 
 cd "$IOS_DIR"
@@ -250,6 +242,18 @@ else
   echo "Skipping static launch UI regression audit" | tee "$ARTIFACT_DIR/launch-ui-regression-audit.log"
 fi
 
+if [[ "$RUN_OPTICAL_GRID_AUDIT" == "true" ]]; then
+  # optical-grid-consistent-v1: shrink-only drift ratchet against
+  # scripts/ios/optical-grid-baseline.json (spacing, radius, palette, type).
+  python3 "$ROOT_DIR/scripts/ios/optical-grid-audit.py" \
+    --root "$ROOT_DIR" \
+    --artifact-dir "$ARTIFACT_DIR" |
+    tee "$ARTIFACT_DIR/optical-grid-audit.log"
+else
+  echo "Skipping optical grid audit" | tee "$ARTIFACT_DIR/optical-grid-audit.log"
+fi
+
+python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
 build_for_testing_once
 
 # The whole unit target is the gate: every journey test in docs/USER_JOURNEYS.md
@@ -259,14 +263,50 @@ run_xcodebuild_test \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
   -only-testing:LogYourBodyTests
-assert_xcresult_has_test_cases \
-  "launch-quality-unit-tests" \
-  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult"
+assert_xcresult_evidence \
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage
 
 UI_RESULT_BUNDLES=()
 run_ui_test_group \
   "launch-quality-ui-critical-surfaces" \
-  "testLaunchQualityGateCapturesCriticalSurfaces"
+  "testLaunchQualityGateCapturesCriticalSurfaces" \
+  "testLaunchQualityGateCapturesOnboardingFixedCTA" \
+  "testLaunchQualityGateCapturesOnboardingFirstPhotoCTA" \
+  "testLaunchQualityGateCapturesTimelineSurfaces"
+
+run_ui_test_group \
+  "launch-quality-ui-logout-hierarchy" \
+  "testProfileLogoutSignsOutFromPushedDetail"
+
+# Security-sensitive chaos regressions use the same native execution and
+# exact-test evidence validator as the existing launch quality checks.
+CHAOS_REGRESSIONS=(
+  "ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration"
+  "ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote"
+  "ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies"
+  "ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor"
+  "ChaosMonkeyUITests/testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates"
+  "ChaosMonkeyUITests/testSystemAlertsRequireKnownDenyOnlyAction"
+  "ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending"
+  "ChaosMonkeyUITests/testProfilePhotoImportIsExcludedFromMonkeyCandidates"
+  "ChaosMonkeyUITests/testMissingActionTargetsDoNotCompleteMonkeySteps"
+  "ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget"
+  "ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion"
+)
+CHAOS_SELECTORS=()
+CHAOS_EVIDENCE_ARGS=()
+for test_id in "${CHAOS_REGRESSIONS[@]}"; do
+  CHAOS_SELECTORS+=("-only-testing:LogYourBodyUITests/$test_id")
+  CHAOS_EVIDENCE_ARGS+=(--expected-test "$test_id()")
+done
+CHAOS_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui-chaos-regressions.xcresult"
+UI_RESULT_BUNDLES+=("$CHAOS_RESULT_BUNDLE")
+run_xcodebuild_test \
+  "launch-quality-ui-chaos-regressions" \
+  "$CHAOS_RESULT_BUNDLE" \
+  "$ARTIFACT_DIR/launch-quality-ui-chaos-regressions.log" \
+  "${CHAOS_SELECTORS[@]}"
+assert_xcresult_evidence "$CHAOS_RESULT_BUNDLE" "${CHAOS_EVIDENCE_ARGS[@]}" --require-settings-row-coverage --require-chaos-accounting-coverage
 
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
@@ -282,10 +322,15 @@ fi
   printf '# iOS Launch Quality Audit\n\n'
   printf -- '- Destination: `%s`\n' "$DESTINATION"
   printf -- '- Static UI regression audit: `launch-ui-regression-audit.md`\n'
+  printf -- '- Optical grid drift ratchet: `optical-grid-audit.md`\n'
   printf -- '- Unit coverage: photo timeline HUD launch policy, Body Score share card layout\n'
-  printf -- '- UI coverage: home hero + chat composer, Jovie swipe/menu Timeline/Stats, one timeline scrubber, home/analytics/onboarding/share screenshot attachments\n'
+  printf -- '- Fixture UI coverage: home hero + chat composer, Jovie swipe/menu Timeline/Stats, one timeline scrubber, home/analytics/onboarding/share screenshot attachments\n'
+  printf -- '- Evidence scope: `fixture_ui`; injected auth and entitlement state. Real Sign in with Apple, purchase, and restore remain `not_verified`.\n'
+  printf -- '- Required passing test IDs and seven screenshot hashes: `launch-quality-ui-critical-surfaces.evidence.json`. First failed attempt bundles are retained.\n'
+  printf -- '- Source: `source-revision.txt` plus `source-working-tree.patch`; this is not exact deployed-build certification.\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
-  printf -- '- Build strategy: one `build-for-testing`, unit selectors in one `test-without-building` run, and one composite launch-quality UI selector that captures all required screenshot surfaces with simulator parallelism disabled\n'
+  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, four independent screenshot selectors, logout hierarchy, and eleven bounded chaos regressions with simulator parallelism disabled\n'
+  printf -- '- Required native function coverage: biometric policy in unit execution and SettingsRow body, leading content, and value inset and action accounting in the chaos UI regressions\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"

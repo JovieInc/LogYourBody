@@ -5,6 +5,20 @@
 import SwiftUI
 
 extension PreferencesView {
+    var privacyExportSection: some View {
+        SettingsSection(header: "Your data") {
+            SettingsNavigationLink(
+                icon: "square.and.arrow.down",
+                title: "Export data",
+                subtitle: "Download a copy of your account data.",
+                accessibilityIdentifier: "home_v2_settings_export"
+            ) {
+                ExportDataView()
+                    .environmentObject(authManager)
+            }
+        }
+    }
+
     var photosSection: some View {
         SettingsSection(header: "Photos") {
             SettingsToggleRow(
@@ -23,7 +37,8 @@ extension PreferencesView {
         SettingsSection(header: "Restore purchases") {
             SettingsButtonRow(
                 icon: "arrow.triangle.2.circlepath",
-                title: isRestoringPurchases ? "Restoring purchases…" : "Restore purchases"
+                title: isRestoringPurchases ? "Restoring purchases…" : "Restore purchases",
+                titleAccessibilityIdentifier: "home_v2_subscription_restore"
             ) {
                 restorePurchases()
             }
@@ -47,7 +62,7 @@ extension PreferencesView {
                     title: "Delete account",
                     subtitle: "Permanently remove your account and data.",
                     showChevron: false,
-                    tintColor: .red
+                    tintColor: Color.appError
                 )
             }
             .accessibilityLabel("Delete account")

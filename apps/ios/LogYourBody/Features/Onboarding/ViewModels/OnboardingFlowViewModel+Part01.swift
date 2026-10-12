@@ -41,7 +41,7 @@ func goToNextStep() {
 
         switch currentStep {
         case .hook:
-            currentStep = .basics
+            currentStep = .manualWeight
         case .basics:
             currentStep = .height
         case .height:
@@ -58,10 +58,8 @@ func goToNextStep() {
             currentStep = .loading
         case .loading:
             currentStep = .bodyScore
-        case .bodyScore:
-            currentStep = .defaultHomeMode
-        case .defaultHomeMode:
-            advanceFromDefaultHomeMode()
+        case .bodyScore, .defaultHomeMode:
+            advanceFromReveal()
         case .emailCapture:
             advanceFromEmailCapture()
         case .account:
@@ -107,9 +105,9 @@ func goBack() {
         case .hook: break
         case .basics: currentStep = .hook
         case .height: currentStep = .basics
-        case .healthConnect: currentStep = .height
+        case .healthConnect: currentStep = .hook
         case .healthConfirmation: currentStep = .healthConnect
-        case .manualWeight: currentStep = .healthConnect
+        case .manualWeight: currentStep = .hook
         case .bodyFatChoice: decideManualWeightBack()
         case .bodyFatNumeric, .bodyFatVisual: currentStep = .bodyFatChoice
         case .loading:
@@ -121,15 +119,15 @@ func goBack() {
             bodyScoreResult = nil
             isLoading = false
             errorMessage = nil
-            currentStep = .bodyFatChoice
+            currentStep = scanImport == nil ? .bodyFatChoice : .hook
         case .defaultHomeMode:
             currentStep = .bodyScore
         case .emailCapture:
-            currentStep = .defaultHomeMode
+            currentStep = .bodyScore
         case .account:
             currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .emailCapture
         case .profileDetails:
-            currentStep = hasAuthenticatedAccountEmail ? .defaultHomeMode : .account
+            currentStep = hasAuthenticatedAccountEmail ? .bodyScore : .account
         case .firstPhoto: currentStep = .profileDetails
         case .paywall: currentStep = includesFirstPhotoStep ? .firstPhoto : .profileDetails
         }
@@ -143,17 +141,17 @@ func advanceFromBodyFatChoice() {
         }
     }
 
-func advanceFromDefaultHomeMode() {
+/// Leaves the fat-vs-muscle reveal. Home opens on its default view; people
+/// change it in Settings instead of answering a question before they've seen Home.
+func advanceFromReveal() {
         UserDefaults.standard.set(defaultHomeMode.rawValue, forKey: Constants.defaultHomeModeKey)
 
         if entryContext == .preAuth {
-            if let result = bodyScoreResult {
-                PreAuthOnboardingStore.shared.save(
-                    input: bodyScoreInput,
-                    result: result,
-                    defaultHomeMode: defaultHomeMode
-                )
-            }
+            PreAuthOnboardingStore.shared.save(
+                input: bodyScoreInput,
+                result: bodyScoreResult,
+                defaultHomeMode: defaultHomeMode
+            )
             currentStep = .emailCapture
         } else {
             if hasAuthenticatedAccountEmail {
@@ -193,15 +191,9 @@ func advanceAfterHealthConfirmation() {
         }
     }
 
+/// The reveal needs only weight and body fat; sex, birthday and height are
+/// asked after it, and only when nothing supplied them.
 func firstMissingInputStep() -> Step {
-        if bodyScoreInput.sex == nil {
-            return .basics
-        }
-
-        if bodyScoreInput.height.inCentimeters == nil {
-            return .height
-        }
-
         if bodyScoreInput.weight.inKilograms == nil {
             return healthKitManager.isAuthorized ? .healthConfirmation : .manualWeight
         }
@@ -214,7 +206,9 @@ func firstMissingInputStep() -> Step {
     }
 
 func decideManualWeightBack() {
-        if bodyScoreInput.weight.value == nil {
+        if scanImport != nil {
+            currentStep = .hook
+        } else if bodyScoreInput.weight.value == nil {
             currentStep = .manualWeight
         } else if healthKitManager.isAuthorized {
             currentStep = .healthConfirmation
@@ -265,10 +259,8 @@ func progressMilestone(for step: Step) -> ProgressMilestone? {
             return .basics
         case .healthConnect, .healthConfirmation, .manualWeight, .bodyFatChoice, .bodyFatNumeric, .bodyFatVisual:
             return .measurements
-        case .bodyScore:
+        case .bodyScore, .defaultHomeMode:
             return .score
-        case .defaultHomeMode:
-            return .home
         case .emailCapture, .account, .profileDetails:
             return .profile
         case .firstPhoto:
@@ -293,17 +285,21 @@ func progressMilestone(for step: Step) -> ProgressMilestone? {
             return
         }
 
-        let granted = await healthKitManager.requestAuthorization()
-        if granted {
+        _ = await healthKitManager.requestAuthorization()
+        let followUp = HealthKitAuthorizationPolicy.onboardingFollowUp(
+            healthKitManager.lastAuthorizationResolution
+        )
+        switch followUp {
+        case .importHealth:
             didRequestHealthSync = true
             AppServicePorts.analyticsTracker.track(
-                event: "onboarding_health_import_authorized"
+                event: HealthKitAuthorizationPolicy.onboardingAnalyticsEvent(followUp)
             )
             currentStep = .healthConfirmation
             await fetchHealthMetrics()
-        } else {
+        case .manualAfterEmptyRead, .manualAfterRequestFailure:
             AppServicePorts.analyticsTracker.track(
-                event: "onboarding_health_import_denied"
+                event: HealthKitAuthorizationPolicy.onboardingAnalyticsEvent(followUp)
             )
             currentStep = .manualWeight
         }
@@ -323,6 +319,7 @@ func fetchHealthMetrics() async {
                 let preferredUnit = weightUnit
                 let value = preferredUnit == .kilograms ? weightInKilograms : pounds
                 bodyScoreInput.weight = WeightValue(value: value, unit: preferredUnit)
+                bodyScoreInput.weightSource = .healthKit
                 bodyScoreInput.healthSnapshot.weightKg = weightInKilograms
                 bodyScoreInput.healthSnapshot.weightDate = weight.date
                 manualWeightText = Self.formatNumber(value)
@@ -346,12 +343,76 @@ func fetchHealthMetrics() async {
         } catch {
             // Fail gracefully; user can continue manually
         }
+
+        applyHealthCharacteristics()
+    }
+
+/// Sex and birth year from Apple Health spare the profile step those questions.
+func applyHealthCharacteristics() {
+        if bodyScoreInput.sex == nil,
+           let sex = healthKitManager.fetchBiologicalSex().flatMap(Self.biologicalSex(from:)) {
+            bodyScoreInput.sex = sex
+        }
+        if bodyScoreInput.birthYear == nil, let dateOfBirth = healthKitManager.fetchDateOfBirth() {
+            bodyScoreInput.birthYear = Calendar.current.component(.year, from: dateOfBirth)
+        }
+    }
+
+// MARK: - First screen paths
+
+func chooseHealthPath() {
+        let previousStep = currentStep
+        scanImport = nil
+        currentStep = .healthConnect
+        trackStepTransition(from: previousStep, to: currentStep)
+    }
+
+func chooseManualPath() {
+        let previousStep = currentStep
+        scanImport = nil
+        currentStep = .manualWeight
+        trackStepTransition(from: previousStep, to: currentStep)
+    }
+
+/// Fills weight and body fat from the newest imported scan. A scan without
+/// body fat still saves its weight and asks for body fat next.
+func applyImportedScans(_ scans: [DexaPDFScan]) {
+        guard let imported = OnboardingScanImport(scans: scans) else { return }
+        let previousStep = currentStep
+        scanImport = imported
+
+        let weightValue = weightUnit == .kilograms ? imported.latest.weightKg : imported.latest.weightKg / 0.45359237
+        bodyScoreInput.weight = WeightValue(value: weightValue, unit: weightUnit)
+        bodyScoreInput.weightSource = .scan
+        manualWeightText = Self.formatNumber(weightValue)
+
+        AppServicePorts.analyticsTracker.track(
+            event: "onboarding_scan_imported",
+            properties: [
+                "scan_count": "\(scans.count)",
+                "has_body_fat": imported.latest.bodyFatPercentage == nil ? "false" : "true",
+                "has_previous": imported.previous == nil ? "false" : "true"
+            ]
+        )
+
+        if let bodyFat = imported.latest.bodyFatPercentage {
+            bodyScoreInput.bodyFat = BodyFatValue(percentage: bodyFat, source: .scan)
+            bodyFatPercentageText = Self.formatNumber(bodyFat)
+            selectedVisualBodyFat = nil
+            currentStep = .loading
+        } else {
+            bodyScoreInput.bodyFat = BodyFatValue()
+            bodyFatPercentageText = ""
+            selectedVisualBodyFat = nil
+            currentStep = .bodyFatChoice
+        }
+        trackStepTransition(from: previousStep, to: currentStep)
     }
 
 // MARK: - Calculation
 
     func calculateScore() async {
-        guard bodyScoreInput.isReadyForCalculation else {
+        guard FatVsMuscleSummary(input: bodyScoreInput) != nil else {
             errorMessage = "Missing inputs for score calculation."
             isLoading = false
             currentStep = firstMissingInputStep()
@@ -367,6 +428,16 @@ func fetchHealthMetrics() async {
 
         isLoading = true
         currentStep = .loading
+
+        // The fat-vs-muscle reveal needs only weight and body fat. The score
+        // also needs sex and height, which may come later in the profile step.
+        guard bodyScoreInput.isReadyForCalculation else {
+            bodyScoreResult = nil
+            currentStep = .bodyScore
+            isLoading = false
+            errorMessage = nil
+            return
+        }
 
         do {
             let context = BodyScoreCalculationContext(input: bodyScoreInput)
@@ -394,10 +465,12 @@ func fetchHealthMetrics() async {
                 ]
             )
 
+            // A failed score never blocks the reveal; it only drops the cache.
             await MainActor.run {
-                self.errorMessage = error.localizedDescription
+                self.bodyScoreResult = nil
                 self.isLoading = false
-                self.currentStep = .bodyFatChoice
+                self.errorMessage = nil
+                self.currentStep = .bodyScore
             }
         }
     }
@@ -416,20 +489,20 @@ func calculateScoreIfNeeded() async {
 var canContinueHeight: Bool {
         switch heightUnit {
         case .centimeters:
-            let numeric = Double(heightCentimetersText) ?? bodyScoreInput.height.inCentimeters ?? 0
-            return numeric >= 100 // ~3'3"
+            return HeightEntryPolicy.validatedCentimeters(
+                for: heightCentimetersText, storedValue: bodyScoreInput.height.inCentimeters
+            ) != nil
         case .inches:
-            let totalInches = Double((heightFeet * 12) + heightInches)
-            return totalInches >= 48 // 4 feet minimum safeguard
+            let totalInches = Double(heightFeet) * 12 + Double(heightInches)
+            return totalInches >= 48 && HeightEntryPolicy.isRepresentableCentimeters(totalInches * 2.54)
         }
     }
 
 var canContinueWeight: Bool {
-        let entered = Double(manualWeightText)
-            ?? (weightUnit == .kilograms ? bodyScoreInput.weight.inKilograms : bodyScoreInput.weight.inPounds)
-            ?? 0
-        let poundsEquivalent = weightUnit == .kilograms ? entered * 2.2046226218 : entered
-        return poundsEquivalent >= 70
+        let stored = weightUnit == .kilograms ? bodyScoreInput.weight.inKilograms : bodyScoreInput.weight.inPounds
+        return ManualWeightEntryPolicy.validatedValue(
+            for: manualWeightText, unit: weightUnit, storedValue: stored
+        ) != nil
     }
 
 var canContinueBodyFatChoice: Bool {
@@ -479,8 +552,7 @@ func updateBirthYear(_ year: Int) {
 func setHeightUnit(_ unit: HeightUnit) {
         guard heightUnit != unit else { return }
 
-        convertHeightFields(to: unit)
-        applyMeasurementSystem(unit.measurementSystem, skipHeight: true)
+        applyMeasurementSystem(unit.measurementSystem)
     }
 
 func updateHeightCentimetersText(_ text: String) {
@@ -490,12 +562,11 @@ func updateHeightCentimetersText(_ text: String) {
 func persistHeightEntry() {
         switch heightUnit {
         case .centimeters:
-            if let value = Double(heightCentimetersText) {
-                bodyScoreInput.height = HeightValue(value: value, unit: .centimeters)
-            }
+            guard let value = HeightEntryPolicy.validatedCentimeters(for: heightCentimetersText) else { return }
+            bodyScoreInput.height = HeightValue(value: value, unit: .centimeters)
         case .inches:
-            let total = Double((heightFeet * 12) + heightInches)
-            guard total > 0 else { return }
+            let total = Double(heightFeet) * 12 + Double(heightInches)
+            guard total >= 48, HeightEntryPolicy.isRepresentableCentimeters(total * 2.54) else { return }
             bodyScoreInput.height = HeightValue(value: total, unit: .inches)
             heightCentimetersText = Self.formatHeight(total * 2.54)
         }
@@ -506,15 +577,15 @@ func updateManualWeightText(_ text: String) {
     }
 
 func persistManualWeightEntry() {
-        guard let value = Double(manualWeightText) else { return }
+        guard let value = ManualWeightEntryPolicy.validatedValue(for: manualWeightText, unit: weightUnit) else { return }
         bodyScoreInput.weight = WeightValue(value: value, unit: weightUnit)
+        bodyScoreInput.weightSource = .manual
     }
 
 func setWeightUnit(_ unit: WeightUnit) {
         guard weightUnit != unit else { return }
 
-        convertWeightFields(to: unit)
-        applyMeasurementSystem(unit.measurementSystem, skipWeight: true)
+        applyMeasurementSystem(unit.measurementSystem)
     }
 
 func updateBodyFatSource(_ source: BodyFatInputSource) {
@@ -552,31 +623,16 @@ func persistEmailCapture() {
         )
     }
 
-func createAccount(authManager: AuthManager) async {
+func beginAccountCreation() {
         guard canContinueAccountCreation else { return }
+        isCreatingAccount = true
+        accountCreationError = nil
+        accountCreationStage = .preparing
+        accountCreationStage = .creatingAccount
+}
 
-        await MainActor.run {
-            isCreatingAccount = true
-            accountCreationError = nil
-            accountCreationStage = .preparing
-        }
-
-        if authManager.isAuthenticated {
-            await MainActor.run {
-                accountCreationStage = .finalizing
-                accountCreationStage = .idle
-                isCreatingAccount = false
-                goToNextStep()
-            }
-            return
-        }
-
-        do {
-            await MainActor.run {
-                accountCreationStage = .creatingAccount
-            }
-            try await authManager.signInWithApple()
-
+func completeAccountCreation(didSignIn: Bool) {
+        if didSignIn {
             AppServicePorts.analyticsTracker.track(
                 event: "onboarding_account_created",
                 properties: [
@@ -584,31 +640,30 @@ func createAccount(authManager: AuthManager) async {
                     "method": "apple"
                 ]
             )
-
-            await MainActor.run {
-                accountCreationStage = .finalizing
-            }
-
-            await MainActor.run {
-                self.accountCreationStage = .idle
-                self.isCreatingAccount = false
-                self.goToNextStep()
-            }
-        } catch {
-            AppServicePorts.analyticsTracker.track(
-                event: "onboarding_account_creation_failed",
-                properties: [
-                    "entry_context": entryContext.analyticsContext
-                ]
-            )
-
-            await MainActor.run {
-                self.isCreatingAccount = false
-                self.accountCreationStage = .idle
-                self.accountCreationError = error.localizedDescription
-            }
         }
-    }
+
+        accountCreationStage = .finalizing
+        accountCreationStage = .idle
+        isCreatingAccount = false
+        goToNextStep()
+}
+
+func cancelAccountCreation() {
+        accountCreationStage = .idle
+        isCreatingAccount = false
+}
+
+func failAccountCreation(_ error: Error) {
+        AppServicePorts.analyticsTracker.track(
+            event: "onboarding_account_creation_failed",
+            properties: [
+                "entry_context": entryContext.analyticsContext
+            ]
+        )
+        isCreatingAccount = false
+        accountCreationStage = .idle
+        accountCreationError = error.localizedDescription
+}
 
 var accountCreationStatusMessage: String? {
         accountCreationStage.statusMessage

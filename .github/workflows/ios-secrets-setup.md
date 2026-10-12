@@ -35,11 +35,7 @@ environments:
 - App Store builds use `Production`, which is branch-restricted to protect live
   releases.
 
-Both environments need these secrets:
-
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` or `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
-- `REVENUE_CAT_PUBLIC_KEY`
+Both environments need `REVENUE_CAT_PUBLIC_KEY`.
 
 Optional production integrations:
 

@@ -61,13 +61,13 @@ struct DashboardSyncBanner: View {
         switch style {
         case .error:
             return LinearGradient(
-                colors: [Color.red.opacity(0.9), Color.red.opacity(0.7)],
+                colors: [Color.appError.opacity(0.9), Color.appError.opacity(0.7)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
         case .success:
             return LinearGradient(
-                colors: [Color.green.opacity(0.85), Color.green.opacity(0.7)],
+                colors: [Color.appSuccess.opacity(0.85), Color.appSuccess.opacity(0.7)],
                 startPoint: .leading,
                 endPoint: .trailing
             )
@@ -95,7 +95,7 @@ struct DashboardSyncDetailsSheet: View {
                     Section(header: Text("Last Error")) {
                         Text(error)
                             .font(.footnote)
-                            .foregroundColor(.red)
+                            .foregroundColor(Color.appError)
                     }
                 }
             }
@@ -189,11 +189,21 @@ struct DashboardSyncDetailsSheet: View {
 
     private var healthKitSection: some View {
         Section(header: Text("HealthKit")) {
-            HStack {
-                Text("Authorization")
-                Spacer()
-                Text(healthKitManager.isAuthorized ? "Authorized" : "Not authorized")
-                    .foregroundColor(healthKitManager.isAuthorized ? .green : .orange)
+            if healthKitManager.authorizationStatusText.isEmpty {
+                HStack {
+                    Text("Authorization")
+                    Spacer()
+                    Text(healthKitManager.isAuthorized ? "Authorized" : "Not authorized")
+                        .foregroundColor(healthKitManager.isAuthorized ? Color.appSuccess : Color.appWarning)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Authorization")
+                    Text(healthKitManager.authorizationStatusText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             if healthKitManager.isImporting {
@@ -290,8 +300,8 @@ struct DashboardSyncDetailsSheet: View {
 
     private var statusColor: Color {
         switch syncManager.syncStatus {
-        case .error: .red
-        case .offline: .orange
+        case .error: Color.appError
+        case .offline: Color.appWarning
         case .success, .syncing, .idle: .primary
         }
     }

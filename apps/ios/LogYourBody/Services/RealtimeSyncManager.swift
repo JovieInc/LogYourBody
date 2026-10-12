@@ -29,7 +29,9 @@ class RealtimeSyncManager: ObservableObject {
     // MARK: - Private Properties
     nonisolated let coreDataManager: CoreDataManager
     nonisolated let authManager: AuthManager
-    nonisolated let supabaseManager: SupabaseManager
+    nonisolated let productAPIClient: ProductAPIClient
+    let userDefaults: UserDefaults
+    let analyticsService: AnalyticsService
     let networkMonitor: NWPathMonitor
 
     var syncTimer: Timer?
@@ -65,6 +67,13 @@ class RealtimeSyncManager: ObservableObject {
         let tableName: String
         let timestamp: Date
         var retryCount: Int = 0
+        var queueID: UUID? = UUID()
+
+        func matchesQueuedChange(_ other: SyncOperation) -> Bool {
+            queueID == other.queueID && id == other.id && userId == other.userId &&
+                type == other.type && data == other.data && tableName == other.tableName &&
+                timestamp == other.timestamp
+        }
 
         enum OperationType: String, Codable, Sendable {
             case insert, update, delete
@@ -75,7 +84,9 @@ class RealtimeSyncManager: ObservableObject {
     init() {
         coreDataManager = CoreDataManager.shared
         authManager = AuthManager.shared
-        supabaseManager = SupabaseManager.shared
+        productAPIClient = ProductAPIClient.shared
+        userDefaults = .standard
+        analyticsService = .shared
         networkMonitor = NWPathMonitor()
 
         setupNetworkMonitoring()
@@ -87,13 +98,17 @@ class RealtimeSyncManager: ObservableObject {
     init(
         coreDataManager: CoreDataManager,
         authManager: AuthManager,
-        supabaseManager: SupabaseManager,
-        networkMonitor: NWPathMonitor = NWPathMonitor()
+        productAPIClient: ProductAPIClient,
+        networkMonitor: NWPathMonitor = NWPathMonitor(),
+        userDefaults: UserDefaults = .standard,
+        analyticsService: AnalyticsService = .shared
     ) {
         self.coreDataManager = coreDataManager
         self.authManager = authManager
-        self.supabaseManager = supabaseManager
+        self.productAPIClient = productAPIClient
         self.networkMonitor = networkMonitor
+        self.userDefaults = userDefaults
+        self.analyticsService = analyticsService
     }
 }
 

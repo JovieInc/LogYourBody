@@ -47,7 +47,36 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
         XCTAssertFalse(manager.isAuthenticated)
     }
 
-    func testHandleSupabaseUnauthorizedExpiresSessionWithoutRefreshToken() async {
+    func testLogoutBindsTheDepartingHealthAccountAndSuspendsImport() async {
+        let suiteName = "AuthManagerLocalUserStateTests.\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: suiteName)!
+        suite.set(true, forKey: Constants.healthKitSyncEnabledKey)
+        defer { suite.removePersistentDomain(forName: suiteName) }
+
+        let manager = AuthManager(userDefaults: suite)
+        var suspended = 0
+        manager.prepareHealthAccountHandoff = { userId in
+            HealthKitAccountSyncPolicy.bindIfUnbound(userId: userId, syncEnabled: true, defaults: suite)
+        }
+        manager.suspendHealthImport = { suspended += 1 }
+        manager.authSession = .localFixture(subject: "account-a", email: "a@example.invalid")
+        manager.currentUser = LocalUser(
+            id: "account-a",
+            email: "a@example.invalid",
+            name: nil,
+            avatarUrl: nil,
+            profile: nil
+        )
+
+        await manager.logout()
+
+        XCTAssertEqual(suite.string(forKey: HealthKitAccountSyncPolicy.accountIdKey), "account-a")
+        XCTAssertEqual(suspended, 1)
+        XCTAssertNil(manager.currentUser)
+        XCTAssertFalse(manager.isAuthenticated)
+    }
+
+    func testHandleProductAPIUnauthorizedExpiresSessionWithoutRefreshToken() async {
         let manager = AuthManager()
         manager.authSession = .localFixture(subject: "test-user", email: "test@example.com")
         manager.currentUser = LocalUser(
@@ -58,7 +87,7 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
             profile: nil
         )
 
-        await manager.handleSupabaseUnauthorized()
+        await manager.handleProductAPIUnauthorized()
 
         XCTAssertEqual(manager.lastExitReason, .sessionExpired)
         XCTAssertFalse(manager.isAuthenticated)
