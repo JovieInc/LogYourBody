@@ -149,21 +149,6 @@ private struct PaidWeightLoggerMVPView: View {
                 .accessibilityLabel("Account")
                 .accessibilityIdentifier("mvp_account_menu_button")
             }
-
-            ToolbarItemGroup(placement: .keyboard) {
-                Button("Done") {
-                    isWeightFieldFocused = false
-                }
-                .accessibilityIdentifier("mvp_keyboard_done_button")
-
-                Spacer()
-
-                Button(isSaving ? "Saving" : "Save weight") {
-                    saveWeight()
-                }
-                .disabled(isSaveDisabled)
-                .accessibilityIdentifier("mvp_keyboard_save_weight_button")
-            }
         }
         .safeAreaInset(edge: .bottom) {
             if isWeightFieldFocused {
@@ -279,11 +264,17 @@ private struct PaidWeightLoggerMVPView: View {
                 .background(Color.appBorder)
 
             HStack(spacing: 12) {
-                Button("Done") {
+                Button {
                     isWeightFieldFocused = false
+                } label: {
+                    Text("Done")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.appTextSecondary)
+                        .frame(
+                            minWidth: JovieTokens.minimumHitTarget,
+                            minHeight: JovieTokens.minimumHitTarget
+                        )
                 }
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.appTextSecondary)
                 .accessibilityIdentifier("mvp_keyboard_bottom_done_button")
 
                 Button(action: saveWeight) {
@@ -652,18 +643,30 @@ private struct PaidWeightLoggerMVPView: View {
     }
 }
 
+struct ChatRecoveryPresentation: Equatable {
+    enum Kind: Equatable {
+        case pending
+        case warning
+    }
+
+    var message: String? {
+        didSet { kind = .warning }
+    }
+    private(set) var kind: Kind = .warning
+
+    mutating func restore(_ recovery: ChatHistoryRecovery?) {
+        message = recovery?.errorMessage
+        kind = recovery?.shouldReload == true ? .pending : .warning
+    }
+}
+
 private struct ChatMessage: Identifiable, Equatable {
     enum Role: Equatable {
         case assistant
         case user
     }
 
-    enum Delivery: Equatable {
-        case complete
-        case sending
-        case failed
-        case stopped
-    }
+    typealias Delivery = ChatHistoryDelivery
 
     var id: String
     let role: Role
@@ -704,28 +707,79 @@ private struct FailedChatTurn: Equatable {
     let clientMessageId: String
 }
 
+/// An unsent draft belongs to one authenticated account lifetime, not one mounted Ask view.
+@MainActor
+struct AccountSessionChatDraft {
+    private var owner: AuthManager.ProfileSessionOwnership?
+    private var text = ""
+
+    static func binding(
+        storage: Binding<Self>,
+        owner: AuthManager.ProfileSessionOwnership?,
+        isCurrent: @escaping () -> Bool
+    ) -> Binding<String> {
+        Binding(
+            get: {
+                guard let owner, isCurrent(), storage.wrappedValue.owner == owner else { return "" }
+                return storage.wrappedValue.text
+            },
+            set: { value in
+                // An old field/voice callback must never adopt the replacement account's session.
+                guard let owner, isCurrent() else { return }
+                storage.wrappedValue = Self(owner: owner, text: value)
+            }
+        )
+    }
+}
+
 @MainActor
 struct ChatTabView: View {
+    @Binding var draft: String
     var showsTranscript: Bool = true
     var onExpandRequest: () -> Void = {}
 
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var draft = ""
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    // Approved sizes at the default text setting; they scale only with the user's Dynamic Type choice.
+    @ScaledMetric(relativeTo: .footnote) private var starterPromptFontSize: CGFloat = 13
+    @ScaledMetric(relativeTo: .body) private var composerFontSize: CGFloat = 16
+    @ScaledMetric(relativeTo: .body) private var composerMultilineThreshold: CGFloat =
+        ChatComposerGeometry.multilineTextHeightThreshold
     @State private var composerTextHeight: CGFloat = 0
     @State private var isResponding = false
     @State private var isLoadingConversation = true
+    @State private var conversationLoadId: UUID?
+    @State private var conversationOwner: AuthManager.ProfileSessionOwnership?
     @State private var messages: [ChatMessage] = [.welcome]
     @State private var conversationId = UUID().uuidString
     @State private var currentRequestTask: Task<Void, Never>?
     @State private var activeClientMessageId: String?
     @State private var requestGeneration: UUID?
     @State private var failedTurn: FailedChatTurn?
-    @State private var chatErrorMessage: String?
+    @State private var chatRecoveryPresentation = ChatRecoveryPresentation()
     @State private var isConversationLoadRetryAvailable = false
     @State private var isDeleteConfirmationPresented = false
+    @State private var trainingResponse: TrainingNextResponse?
+    @State private var trainingOwner: AuthManager.ProfileSessionOwnership?
+    @State private var trainingLoadId: UUID?
+    @State private var isTrainingLoading = false
+    @State private var trainingEnrollmentRequired = false
+    @State private var trainingErrorMessage: String?
+    @State private var trainingPresentation: TrainingPresentation?
+    @State private var voiceCapture = VoiceCaptureService()
+    @State private var voicePlayback = VoicePlaybackService()
+    @State private var pendingVoiceSet: VoiceSetProposal?
+    @State private var isVoiceSetConfirmationPresented = false
+    @State private var pendingSpokenReply = PendingSpokenReply()
+    private let trainingService: TrainingServicing = URLSessionTrainingService()
     @FocusState private var isComposerFocused: Bool
+
+    private var chatErrorMessage: String? {
+        get { chatRecoveryPresentation.message }
+        nonmutating set { chatRecoveryPresentation.message = newValue }
+    }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -741,11 +795,22 @@ struct ChatTabView: View {
             }
         }
         .modifier(ChatTabWorldClassScreenModifier(isEnabled: showsTranscript))
-        .task(id: authManager.currentUser?.id) {
+        .task(id: authManager.captureAccountSession()) {
             await loadLatestConversation()
         }
+        .task(id: authManager.captureAccountSession()) {
+            trainingResponse = nil
+            trainingOwner = nil
+            trainingPresentation = nil
+            await loadTrainingNext()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
+            Task { await loadTrainingNext() }
+        }
         .onDisappear {
+            conversationLoadId = nil
             currentRequestTask?.cancel()
+            voiceCapture.cancel()
         }
         .alert("Delete this chat?", isPresented: $isDeleteConfirmationPresented) {
             Button("Cancel", role: .cancel) {}
@@ -755,6 +820,52 @@ struct ChatTabView: View {
         } message: {
             Text("This permanently removes the conversation from LogYourBody.")
         }
+        .alert("Review voice set", isPresented: $isVoiceSetConfirmationPresented) {
+            Button("Cancel", role: .cancel) { pendingVoiceSet = nil }
+            Button("Log set") { confirmVoiceSet() }
+        } message: {
+            if let proposal = pendingVoiceSet {
+                let load = proposal.loadKg.map { String(format: "%.1f kg", $0) } ?? "bodyweight"
+                Text("Log \(proposal.reps) reps at \(load), \(proposal.rir) RIR for \(proposal.exerciseName), set \(proposal.setNumber)?")
+            }
+        }
+        .sheet(item: $trainingPresentation) { presentation in
+            switch presentation {
+            case .setup:
+                TrainingEnrollmentView { sessionsPerWeek, equipment in
+                    try await enrollTraining(sessionsPerWeek: sessionsPerWeek, equipment: equipment)
+                }
+            case .session(let session, let ownership):
+                TrainingLiveSessionView(
+                    session: session,
+                    ownerId: ownership.subject,
+                    isCurrent: { authManager.ownsAccountSession(ownership) },
+                    onLogSet: { exercise, setNumber, reps, loadKg, rir in
+                        try await logTrainingSet(
+                            ownership: ownership,
+                            request: TrainingSetLogRequest(
+                                sessionId: session.id, exerciseId: exercise.id, setNumber: setNumber,
+                                reps: reps, loadKg: loadKg, rir: rir
+                            )
+                        )
+                    },
+                    onFeedback: { soreness, pump, performance, jointPain in
+                        try await recordTrainingFeedback(
+                            ownership: ownership,
+                            sessionId: session.id,
+                            soreness: soreness,
+                            pump: pump,
+                            performance: performance,
+                            jointPain: jointPain
+                        )
+                    }
+                )
+            case .voiceSetReview(let session, let heard):
+                VoiceSetReviewView(session: session, heard: heard) { proposal in
+                    commitVoiceSet(proposal)
+                }
+            }
+        }
     }
 
     private var chatSurface: some View {
@@ -763,10 +874,11 @@ struct ChatTabView: View {
                 chatMessages
             }
             starterPrompts
+                .layoutPriority(dynamicTypeSize.isAccessibilitySize && chatErrorMessage != nil ? 1 : 0)
         }
         .frame(maxHeight: showsTranscript ? .infinity : nil)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if showsTranscript {
+            if showsTranscript, !usesHomeV2Style {
                 chatHeader
             }
         }
@@ -819,10 +931,20 @@ struct ChatTabView: View {
         }
     }
 
+    /// The Ask surface (Pencil C4/C5) under the gate: the root header owns
+    /// the title, replies read as prose, the proof line stays visible.
+    private var usesHomeV2Style: Bool {
+        HomeV2Policy.isEnabled()
+    }
+
     private var chatMessages: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: 20) {
+                    if showsTranscript && trainingCoachEnabled {
+                        trainingCard
+                    }
+
                     if isLoadingConversation {
                         HStack(spacing: 12) {
                             ProgressView()
@@ -839,9 +961,28 @@ struct ChatTabView: View {
 
                     ForEach(messages) { message in
                         if !message.text.isEmpty {
-                            ChatBubble(message: message)
-                                .id(message.id)
+                            if usesHomeV2Style {
+                                HomeV2AskMessage(message: message)
+                                    .id(message.id)
+                            } else {
+                                ChatBubble(message: message)
+                                    .id(message.id)
+                            }
                         }
+                    }
+
+                    if usesHomeV2Style, showsTranscript, messages.contains(where: { $0.role == .user }) {
+                        Button {
+                            isDeleteConfirmationPresented = true
+                        } label: {
+                            Text(HomeV2AskCopy.deleteChat)
+                                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                                .frame(minHeight: JovieTokens.minimumHitTarget)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("home_v2_ask_delete")
                     }
 
                     if isResponding {
@@ -885,37 +1026,7 @@ struct ChatTabView: View {
     private var starterPrompts: some View {
         VStack(spacing: 0) {
             if let chatErrorMessage {
-                HStack(alignment: .center, spacing: 12) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(Color.appWarning)
-
-                    Text(chatErrorMessage)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(theme.colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Spacer(minLength: 0)
-
-                    if failedTurn != nil {
-                        Button("Retry", action: retryFailedTurn)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(theme.colors.text)
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("chat_retry_button")
-                    } else if isConversationLoadRetryAvailable {
-                        Button("Retry") {
-                            Task { await loadLatestConversation() }
-                        }
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(theme.colors.text)
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("chat_reload_button")
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(theme.colors.surface.opacity(0.92))
-                .accessibilityElement(children: .contain)
+                recoveryNotice(message: chatErrorMessage)
             }
 
             if messages == [.welcome] && !isComposerFocused && !isLoadingConversation {
@@ -933,31 +1044,284 @@ struct ChatTabView: View {
         }
     }
 
-    private func starterPrompt(_ text: String) -> some View {
-        Button(text) {
-            send(text)
+    private func recoveryNotice(message: String) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    accessibleRecoveryMessage(message)
+                    if failedTurn != nil || isConversationLoadRetryAvailable {
+                        HStack {
+                            Spacer(minLength: 0)
+                            recoveryAction
+                        }
+                    }
+                }
+            } else {
+                HStack(alignment: .center, spacing: 12) {
+                    recoveryMessage(message)
+                    Spacer(minLength: 0)
+                    recoveryAction
+                }
+            }
         }
-        .font(.system(size: 13, weight: .medium))
-        .foregroundStyle(theme.colors.text)
-        .padding(.horizontal, 12)
-        .frame(minHeight: 38)
-        .background(theme.colors.surface, in: Capsule())
-        .overlay {
-            Capsule()
-                .stroke(theme.colors.border, lineWidth: 1)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(theme.colors.surface.opacity(0.92))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func accessibleRecoveryMessage(_ message: String) -> some View {
+        ChatRecoveryMessageLayout {
+            recoveryMessage(message)
+                .hidden()
+                .accessibilityHidden(true)
+                .allowsHitTesting(false)
+            ScrollView(.vertical) {
+                recoveryMessage(message)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.never)
+            .accessibilityIdentifier("chat_recovery_message_scroll")
+        }
+    }
+
+    private func recoveryMessage(_ message: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: chatRecoveryPresentation.kind == .pending ? "clock" : "exclamationmark.circle.fill")
+                .foregroundStyle(
+                    chatRecoveryPresentation.kind == .pending ? theme.colors.textSecondary : Color.appWarning
+                )
+                .accessibilityHidden(true)
+            Text(message)
+                .foregroundStyle(theme.colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("chat_recovery_message")
+        }
+        .font(.subheadline.weight(.medium))
+    }
+
+    @ViewBuilder
+    private var recoveryAction: some View {
+        if failedTurn != nil {
+            Button(action: retryFailedTurn) {
+                recoveryActionLabel("Retry")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chat_retry_button")
+        } else if isConversationLoadRetryAvailable {
+            Button {
+                Task { await loadLatestConversation() }
+            } label: {
+                recoveryActionLabel("Reload")
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("chat_reload_button")
+        }
+    }
+
+    private func recoveryActionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(theme.colors.text)
+            .padding(.horizontal, 8)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+    }
+
+    private var trainingCoachEnabled: Bool {
+        TrainingCoachPolicy.isEnabled { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+    }
+
+    private var voiceCoachEnabled: Bool {
+        trainingCoachEnabled && VoiceCoachPolicy.isEnabled {
+            AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0)
+        }
+    }
+
+    @ViewBuilder
+    private var trainingCard: some View {
+        if isTrainingLoading && trainingResponse == nil && !trainingEnrollmentRequired {
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small)
+                Text("Loading your next session")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
+            .padding(.horizontal, 4)
+            .accessibilityIdentifier("training_loading_card")
+        } else if trainingEnrollmentRequired {
+            TrainingSetupCard { trainingPresentation = .setup }
+        } else if let session = trainingResponse?.session, let ownership = trainingOwner,
+                  authManager.ownsAccountSession(ownership) {
+            TrainingCoachCard(
+                session: session,
+                onStart: {
+                    guard authManager.ownsAccountSession(ownership) else { return }
+                    trainingPresentation = .session(session, ownership)
+                },
+                onStop: { Task { await revokeTraining(ownership: ownership) } }
+            )
+        } else if let week = trainingResponse?.week {
+            TrainingWeekCompleteCard(week: week)
+        } else if let trainingErrorMessage {
+            Text(trainingErrorMessage)
+                .font(.system(size: 13))
+                .foregroundStyle(theme.colors.textSecondary)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .accessibilityIdentifier("training_error_card")
+        }
+    }
+
+    private func loadTrainingNext() async {
+        let loadId = UUID()
+        trainingLoadId = loadId
+        guard showsTranscript, trainingCoachEnabled,
+              let ownership = authManager.captureAccountSession() else {
+            isTrainingLoading = false
+            trainingResponse = nil
+            trainingOwner = nil
+            trainingEnrollmentRequired = false
+            trainingErrorMessage = nil
+            return
+        }
+        isTrainingLoading = true
+        defer { if trainingLoadId == loadId { isTrainingLoading = false } }
+        guard let accessToken = await chatAccessToken(),
+              authManager.ownsAccountSession(ownership), trainingLoadId == loadId else {
+            guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
+            trainingErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
+            return
+        }
+        do {
+            let response = try await trainingService.loadNext(accessToken: accessToken)
+            guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
+            trainingResponse = response
+            trainingOwner = ownership
+            trainingEnrollmentRequired = false
+            trainingErrorMessage = nil
+        } catch let error as TrainingServiceError {
+            guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
+            if error == .server(code: "program_not_enrolled") {
+                trainingResponse = nil
+                trainingEnrollmentRequired = true
+                trainingErrorMessage = nil
+            } else {
+                trainingErrorMessage = error.localizedDescription
+            }
+        } catch {
+            guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
+            trainingErrorMessage = "Training is temporarily unavailable. Please try again."
+        }
+    }
+
+    private func enrollTraining(sessionsPerWeek: Int, equipment: String) async throws {
+        guard let accessToken = await chatAccessToken() else { throw TrainingServiceError.authenticationExpired }
+        _ = try await trainingService.enroll(
+            accessToken: accessToken,
+            sessionsPerWeek: sessionsPerWeek,
+            equipment: equipment
+        )
+        trainingEnrollmentRequired = false
+        await loadTrainingNext()
+    }
+
+    private func logTrainingSet(
+        ownership: AuthManager.ProfileSessionOwnership,
+        request: TrainingSetLogRequest
+    ) async throws {
+        try await TrainingOwnedRequest.perform(
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            getToken: { await chatAccessToken() },
+            send: { accessToken in
+                try await trainingService.logSet(accessToken: accessToken, request: request)
+            }
+        )
+        await loadTrainingNext()
+    }
+
+    private func recordTrainingFeedback(
+        ownership: AuthManager.ProfileSessionOwnership,
+        sessionId: String,
+        soreness: Int,
+        pump: Int,
+        performance: String,
+        jointPain: Int
+    ) async throws {
+        try await TrainingOwnedRequest.perform(
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            getToken: { await chatAccessToken() },
+            send: { accessToken in
+                try await trainingService.recordFeedback(
+                    accessToken: accessToken,
+                    request: TrainingFeedbackRequest(
+                        sessionId: sessionId, soreness: soreness, pump: pump,
+                        performance: performance, jointPain: jointPain
+                    )
+                )
+            }
+        )
+        await loadTrainingNext()
+    }
+
+    private func revokeTraining(ownership: AuthManager.ProfileSessionOwnership) async {
+        do {
+            try await TrainingOwnedRequest.perform(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { accessToken in
+                    let response = try await trainingService.revoke(accessToken: accessToken)
+                    guard response.revoked else { throw TrainingServiceError.invalidResponse }
+                }
+            )
+            try TrainingDraftStore.shared.purge(ownerId: ownership.subject)
+            trainingResponse = nil
+            trainingOwner = nil
+            trainingPresentation = nil
+            trainingEnrollmentRequired = true
+            trainingErrorMessage = nil
+        } catch let error as LocalizedError {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            trainingErrorMessage = error.errorDescription ?? "Training data could not be deleted."
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            trainingErrorMessage = "Training data could not be deleted."
+        }
+    }
+
+    private func starterPrompt(_ text: String) -> some View {
+        Button {
+            send(text)
+        } label: {
+            Text(text)
+                .font(.system(size: starterPromptFontSize, weight: .medium))
+                .foregroundStyle(theme.colors.text)
+                .padding(.horizontal, 12)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
+                .background(theme.colors.surface, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(theme.colors.border, lineWidth: 1)
+                }
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
     }
 
     private var composer: some View {
-        let isMultiline = ChatComposerGeometry.isMultiline(textHeight: composerTextHeight)
+        let isMultiline = ChatComposerGeometry.isMultiline(
+            textHeight: composerTextHeight,
+            threshold: composerMultilineThreshold
+        )
         let cornerRadius = ChatComposerGeometry.cornerRadius(isMultiline: isMultiline)
 
         return HStack(alignment: isMultiline ? .bottom : .center, spacing: JovieTokens.itemGap) {
-            TextField("Message LogYourBody", text: $draft, axis: .vertical)
+            TextField(usesHomeV2Style ? HomeV2AskCopy.composerPlaceholder : "Message LogYourBody", text: $draft, axis: .vertical)
                 .lineLimit(1...4)
                 .focused($isComposerFocused)
-                .font(.system(size: 16))
+                .font(.system(size: composerFontSize))
                 .foregroundStyle(theme.colors.text)
                 .tint(theme.colors.primary)
                 .submitLabel(.send)
@@ -999,6 +1363,20 @@ struct ChatTabView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(isResponding ? "Stop answer" : "Send message")
             .accessibilityIdentifier("chat_send_button")
+
+            if voiceCoachEnabled {
+                Button(action: toggleVoiceCapture) {
+                    Image(systemName: voiceCapture.isRecording ? "stop.fill" : "mic.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(theme.colors.text)
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                        .background(theme.colors.surface, in: Circle())
+                }
+                .disabled(isResponding || isLoadingConversation || voiceCapture.isFinishing)
+                .buttonStyle(.plain)
+                .accessibilityLabel(voiceCapture.isRecording ? "Stop Talk recording" : "Talk")
+                .accessibilityIdentifier("chat_voice_button")
+            }
         }
         .padding(.leading, JovieTokens.compactInset)
         .padding(.trailing, JovieTokens.tightGap)
@@ -1028,6 +1406,10 @@ struct ChatTabView: View {
             ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
             value: canSend
         )
+        .animation(
+            ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
+            value: voiceCapture.isRecording
+        )
     }
 
     private func accessibilityMarker(id: String, label: String) -> some View {
@@ -1049,11 +1431,156 @@ struct ChatTabView: View {
         AppServicePorts.chatService
     }
 
-    private func send(_ text: String) {
+    private func toggleVoiceCapture() {
+        if voiceCapture.isRecording {
+            Task { @MainActor in
+                do {
+                    let transcript = try await voiceCapture.finish()
+                    await handleVoiceTranscript(transcript)
+                } catch is CancellationError {
+                    return
+                } catch let error as LocalizedError {
+                    chatErrorMessage = error.errorDescription ?? "Voice input is unavailable. Try again."
+                } catch {
+                    chatErrorMessage = "Voice input is unavailable. Try again."
+                }
+            }
+            return
+        }
+
+        Task { @MainActor in
+            chatErrorMessage = nil
+            do {
+                try await voiceCapture.start()
+            } catch let error as LocalizedError {
+                chatErrorMessage = error.errorDescription ?? "Voice input is unavailable. Try again."
+            } catch {
+                chatErrorMessage = "Voice input is unavailable. Try again."
+            }
+        }
+    }
+
+    private func handleVoiceTranscript(_ transcript: String) async {
+        guard let accessToken = await chatAccessToken() else {
+            chatErrorMessage = VoiceAPIError.authenticationExpired.localizedDescription
+            return
+        }
+
+        do {
+            let intent = try await URLSessionVoiceService().parseIntent(
+                transcript: transcript,
+                accessToken: accessToken,
+                session: trainingResponse?.session,
+                weightUnit: MeasurementSystem.preferredFromDefaults.weightUnit
+            )
+            if intent.kind == "message" {
+                send(transcript, shouldSpeakReply: true)
+            } else if intent.kind == "log_set" {
+                switch VoiceSetAdmission.route(
+                    proposal: intent.proposal,
+                    heard: intent.heard,
+                    missingFields: intent.missingFields,
+                    session: trainingResponse?.session
+                ) {
+                case .confirm(let proposal):
+                    pendingVoiceSet = proposal
+                    isVoiceSetConfirmationPresented = true
+                case .review(let heard):
+                    guard let session = trainingResponse?.session else {
+                        draft = transcript
+                        chatErrorMessage = VoiceSetAdmission.rejectedLogMessage
+                        return
+                    }
+                    trainingPresentation = .voiceSetReview(session, heard)
+                case .clarify(let fields, let rejected):
+                    draft = transcript
+                    chatErrorMessage = rejected
+                        ? VoiceSetAdmission.rejectedLogMessage
+                        : voiceClarification(for: fields)
+                }
+            } else {
+                draft = transcript
+                chatErrorMessage = voiceClarification(for: intent.missingFields ?? [])
+            }
+        } catch let error as LocalizedError {
+            chatErrorMessage = error.errorDescription ?? "Voice is temporarily unavailable. Try again."
+        } catch {
+            chatErrorMessage = "Voice is temporarily unavailable. Try again."
+        }
+    }
+
+    private func voiceClarification(for fields: [String]) -> String {
+        let prompts: [String: String] = [
+            "session": "start a training session",
+            "exercise": "name one exercise in your current session",
+            "set_number": "say the set number",
+            "reps": "say the rep count",
+            "rir": "say the reps in reserve",
+            "weight": "say the load with a unit"
+        ]
+        let needed = fields.compactMap { prompts[$0] }
+        if needed.isEmpty { return "Review the transcript before sending or logging it." }
+        return "I heard a set log. To prepare it, \(needed.joined(separator: ", and ")). Nothing was logged."
+    }
+
+    private func confirmVoiceSet() {
+        guard let proposal = pendingVoiceSet else { return }
+        pendingVoiceSet = nil
+        commitVoiceSet(proposal)
+    }
+
+    private func commitVoiceSet(_ proposal: VoiceSetProposal) {
+        Task { @MainActor in
+            guard let accessToken = await chatAccessToken() else {
+                chatErrorMessage = VoiceAPIError.authenticationExpired.localizedDescription
+                return
+            }
+            do {
+                try await VoiceSetLogger.commit(
+                    proposal,
+                    isConfirmed: true,
+                    accessToken: accessToken,
+                    session: trainingResponse?.session
+                ) { token, request in
+                    try await trainingService.logSet(accessToken: token, request: request)
+                }
+                await loadTrainingNext()
+                voicePlayback.speakOffline("Set logged.")
+            } catch let error as LocalizedError {
+                chatErrorMessage = error.errorDescription ?? "The set could not be saved."
+            } catch {
+                chatErrorMessage = "The set could not be saved."
+            }
+        }
+    }
+
+    private func speakResponse(_ text: String, ownership: AuthManager.ProfileSessionOwnership) async {
+        guard !text.isEmpty, authManager.ownsAccountSession(ownership) else { return }
+        let accessToken = await chatAccessToken()
+        guard authManager.ownsAccountSession(ownership) else { return }
+        guard let accessToken else {
+            voicePlayback.speakOffline(text)
+            return
+        }
+        do {
+            let audio = try await URLSessionVoiceService().speak(text: text, accessToken: accessToken)
+            guard authManager.ownsAccountSession(ownership) else { return }
+            try voicePlayback.play(audio)
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            voicePlayback.speakOffline(text)
+        }
+    }
+
+    private func send(_ text: String, shouldSpeakReply: Bool = false) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isResponding, !isLoadingConversation else { return }
 
         let clientMessageId = UUID().uuidString
+        pendingSpokenReply.track(
+            clientMessageId: clientMessageId,
+            shouldSpeakReply: shouldSpeakReply
+        )
         messages.append(
             ChatMessage(
                 role: .user,
@@ -1071,6 +1598,12 @@ struct ChatTabView: View {
     }
 
     private func startTurn(message: String, clientMessageId: String) {
+        guard let ownership = authManager.captureAccountSession() else {
+            applyTurnFailure(.authenticationExpired, message: message, clientMessageId: clientMessageId)
+            return
+        }
+        let turnConversationId = conversationId
+        let voiceMode = pendingSpokenReply.shouldSpeakReply(for: clientMessageId)
         currentRequestTask?.cancel()
         messages.removeAll { $0.replyToClientMessageId == clientMessageId }
         if let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) {
@@ -1093,6 +1626,9 @@ struct ChatTabView: View {
         activeClientMessageId = clientMessageId
         let generation = UUID()
         requestGeneration = generation
+        func isCurrent() -> Bool {
+            requestGeneration == generation && authManager.ownsAccountSession(ownership)
+        }
         AppServicePorts.analyticsTracker.track(event: "chat_first_message_sent")
 
         currentRequestTask = Task { @MainActor in
@@ -1105,55 +1641,54 @@ struct ChatTabView: View {
                 }
             }
 
-            guard let accessToken = await chatAccessToken() else {
-                applyTurnFailure(
-                    ChatServiceError.authenticationExpired,
-                    message: message,
-                    clientMessageId: clientMessageId
-                )
-                return
-            }
-
             do {
-                var completed = false
-                let stream = chatService.streamMessage(
-                    accessToken: accessToken,
-                    conversationId: conversationId,
-                    clientMessageId: clientMessageId,
-                    message: message
+                try await ChatTurnExecutor.run(
+                    accessToken: { await chatAccessToken() },
+                    makeStream: { accessToken in
+                        chatService.streamMessage(
+                            accessToken: accessToken,
+                            conversationId: turnConversationId,
+                            clientMessageId: clientMessageId,
+                            message: message,
+                            voiceMode: voiceMode
+                        )
+                    },
+                    isCurrent: isCurrent,
+                    receive: { event in
+                        switch event {
+                        case .metadata(let serverConversationId, _, _):
+                            conversationId = serverConversationId
+                        case .delta(let text):
+                            mutateAssistant(clientMessageId: clientMessageId) { assistant in
+                                assistant.text += text
+                            }
+                        case .completed(let messageId, _, _):
+                            mutateAssistant(clientMessageId: clientMessageId) { assistant in
+                                assistant.id = messageId
+                                assistant.delivery = .complete
+                            }
+                            if let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) {
+                                messages[userIndex].delivery = .complete
+                            }
+                            if let spokenResponse = messages.first(where: { $0.replyToClientMessageId == clientMessageId })?.text,
+                               pendingSpokenReply.consumeIfMatching(clientMessageId: clientMessageId) {
+                                Task { @MainActor in await speakResponse(spokenResponse, ownership: ownership) }
+                            }
+                        case .failure(_, let message, let retryable):
+                            throw ChatServiceError.server(message: message, retryable: retryable)
+                        }
+                    }
                 )
 
-                for try await event in stream {
-                    try Task.checkCancellation()
-                    switch event {
-                    case .metadata(let serverConversationId, _, _):
-                        conversationId = serverConversationId
-                    case .delta(let text):
-                        mutateAssistant(clientMessageId: clientMessageId) { assistant in
-                            assistant.text += text
-                        }
-                    case .completed(let messageId, _, _):
-                        mutateAssistant(clientMessageId: clientMessageId) { assistant in
-                            assistant.id = messageId
-                            assistant.delivery = .complete
-                        }
-                        if let userIndex = messages.firstIndex(where: { $0.clientMessageId == clientMessageId }) {
-                            messages[userIndex].delivery = .complete
-                        }
-                        completed = true
-                    case .failure(_, let message, let retryable):
-                        throw ChatServiceError.server(message: message, retryable: retryable)
-                    }
-                }
-
-                try Task.checkCancellation()
-                guard completed else { throw ChatServiceError.invalidResponse }
+                guard isCurrent() else { return }
                 AppServicePorts.analyticsTracker.track(event: "chat_first_answer_completed")
             } catch is CancellationError {
                 return
             } catch let error as ChatServiceError {
+                guard isCurrent() else { return }
                 applyTurnFailure(error, message: message, clientMessageId: clientMessageId)
             } catch {
+                guard isCurrent() else { return }
                 applyTurnFailure(
                     ChatServiceError.server(
                         message: "Chat is temporarily unavailable. Please try again.",
@@ -1168,6 +1703,9 @@ struct ChatTabView: View {
 
     private func retryFailedTurn() {
         guard let failedTurn, !isResponding else { return }
+        if HomeChatChromePolicy.shouldExpandChat(afterSendingUserMessage: true) {
+            onExpandRequest()
+        }
         startTurn(message: failedTurn.message, clientMessageId: failedTurn.clientMessageId)
     }
 
@@ -1181,6 +1719,7 @@ struct ChatTabView: View {
 
         let failedMessage = messages[userIndex].text
         let task = currentRequestTask
+        pendingSpokenReply.cancel(clientMessageId: clientMessageId)
         requestGeneration = nil
         currentRequestTask = nil
         task?.cancel()
@@ -1237,19 +1776,44 @@ struct ChatTabView: View {
     }
 
     private func loadLatestConversation() async {
+        let loadId = UUID()
+        conversationLoadId = loadId
+        let ownership = authManager.captureAccountSession()
+        if conversationOwner != ownership {
+            messages = [.welcome]
+            conversationId = UUID().uuidString
+            // A new Ask view may reattach an unsent draft owned by this same session.
+            // An existing view still clears its draft when its conversation owner changes.
+            if conversationOwner != nil { draft = "" }
+        }
+        conversationOwner = ownership
         currentRequestTask?.cancel()
+        currentRequestTask = nil
+        requestGeneration = nil
+        activeClientMessageId = nil
+        isResponding = false
         isLoadingConversation = true
         isConversationLoadRetryAvailable = false
-        defer { isLoadingConversation = false }
+        failedTurn = nil
+        chatErrorMessage = nil
+        defer { if conversationLoadId == loadId { isLoadingConversation = false } }
 
-        guard authManager.currentUser != nil,
-              let accessToken = await chatAccessToken() else {
+        guard let ownership else {
             chatErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
             return
         }
+        func isCurrent() -> Bool {
+            conversationLoadId == loadId && authManager.ownsAccountSession(ownership)
+        }
 
         do {
-            guard let conversation = try await chatService.loadLatest(accessToken: accessToken) else {
+            let conversation = try await ChatHistoryLoader.load(
+                accessToken: { await chatAccessToken() },
+                loadHistory: { try await chatService.loadLatest(accessToken: $0) },
+                isCurrent: isCurrent
+            )
+            guard isCurrent() else { return }
+            guard let conversation else {
                 messages = [.welcome]
                 conversationId = UUID().uuidString
                 return
@@ -1261,15 +1825,24 @@ struct ChatTabView: View {
                     role: message.role == .user ? .user : .assistant,
                     text: message.content,
                     clientMessageId: message.clientMessageId,
-                    delivery: .complete
+                    delivery: message.historyDelivery
                 )
             }
             if messages.isEmpty { messages = [.welcome] }
-            chatErrorMessage = nil
+            let recovery = conversation.historyRecovery
+            if let recovery, recovery.retryable {
+                failedTurn = FailedChatTurn(message: recovery.message, clientMessageId: recovery.clientMessageId)
+            }
+            chatRecoveryPresentation.restore(recovery)
+            isConversationLoadRetryAvailable = recovery?.shouldReload == true
+        } catch is CancellationError {
+            return
         } catch let error as ChatServiceError {
+            guard isCurrent() else { return }
             chatErrorMessage = error.localizedDescription
             isConversationLoadRetryAvailable = error.isRetryable
         } catch {
+            guard isCurrent() else { return }
             chatErrorMessage = "Your conversation could not be loaded. Please try again."
             isConversationLoadRetryAvailable = true
         }
@@ -1313,6 +1886,28 @@ struct ChatTabView: View {
     }
 }
 
+/// Uses the text's intrinsic height for a compact dock, while respecting the
+/// finite space offered by a parent above the keyboard. The first child only
+/// measures text; the second is the visible scrolling explanation.
+private struct ChatRecoveryMessageLayout: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width.flatMap { $0.isFinite ? max(0, $0) : nil }
+        guard width != 0, proposal.height != 0 else { return .zero }
+        let textSize = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil))
+        let availableHeight = proposal.height.flatMap { $0.isFinite ? max(0, $0) : nil } ?? textSize.height
+        return CGSize(width: width ?? textSize.width, height: min(textSize.height, availableHeight))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard bounds.width.isFinite, bounds.height.isFinite, bounds.width > 0, bounds.height > 0 else { return }
+        subviews[1].place(
+            at: bounds.origin,
+            anchor: .topLeading,
+            proposal: ProposedViewSize(width: bounds.width, height: bounds.height)
+        )
+    }
+}
+
 private struct ChatComposerTextHeightPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
 
@@ -1329,6 +1924,54 @@ private struct ChatTabWorldClassScreenModifier: ViewModifier {
             content.worldClassScreen(.chat)
         } else {
             content
+        }
+    }
+}
+
+/// A message on the Ask surface: the person's words in a quiet pill on the
+/// right, the reply as plain prose with its proof line quieter below.
+private struct HomeV2AskMessage: View {
+    let message: ChatMessage
+
+    var body: some View {
+        if message.role == .user {
+            HStack {
+                Spacer(minLength: 36)
+                Text(message.text)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, HomeV2Tokens.Space.compact)
+                    .padding(.vertical, HomeV2Tokens.Space.row)
+                    .background(HomeV2Tokens.Colors.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .opacity(message.delivery == .failed ? 0.72 : 1)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("You: \(message.text)")
+        } else {
+            let reply = HomeV2AskReply.split(message.text)
+            VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+                Text(reply.body)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let proof = reply.proof {
+                    Text(proof)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("home_v2_ask_proof")
+                }
+                if message.delivery == .failed || message.delivery == .stopped {
+                    Text(message.delivery == .stopped ? "Stopped" : "Not delivered")
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, weight: .medium, relativeTo: .caption)
+                        .foregroundStyle(HomeV2Tokens.Colors.quiet)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("LogYourBody: \(message.text)")
         }
     }
 }

@@ -1,0 +1,158 @@
+name: Merge Queue Token Enrollment
+
+# GitHub creates no workflow runs for events caused by GITHUB_TOKEN, so a
+# merge group created by auto-enrollment never gets merge-group CI and the
+# queue's check timeout drops the entry. After enrollment completes, this job
+# re-enqueues bot-owned entries with the existing App or machine-user token so the merge_group
+# event starts CI. It never runs on pull-request events, never checks out
+# code, re-proves "CI Summary" on the exact head, and is a no-op until the
+# App inputs or MERGE_QUEUE_TOKEN secret exist.
+on:
+  workflow_run:
+    workflows: [Native Merge Queue Enrollment]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: merge-queue-token-enrollment
+  cancel-in-progress: false
+
+jobs:
+  reenqueue:
+    name: Re-enqueue bot-owned queue entries with an App or machine-user token
+    if: >-
+      github.repository == 'JovieInc/LogYourBody' &&
+      github.event.workflow_run.name == 'Native Merge Queue Enrollment' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Select existing enrollment credentials
+        id: gate
+        env:
+          MERGE_QUEUE_TOKEN: ${{ secrets.MERGE_QUEUE_TOKEN }}
+          JOVIE_BOT_APP_ID: ${{ vars.JOVIE_BOT_APP_ID }}
+          JOVIE_BOT_PRIVATE_KEY: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+        run: |
+          if [ "$GITHUB_REPOSITORY" != "JovieInc/LogYourBody" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::SKIPPED: enrollment is scoped to JovieInc/LogYourBody"
+          elif [ -n "$JOVIE_BOT_APP_ID" ] && [ -n "$JOVIE_BOT_PRIVATE_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "mode=app" >> "$GITHUB_OUTPUT"
+          elif [ -n "$MERGE_QUEUE_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "mode=pat" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            echo "::notice::SKIPPED: neither existing App inputs nor MERGE_QUEUE_TOKEN are available"
+          fi
+
+      - name: Mint the existing repository-scoped App token
+        id: app-token
+        if: steps.gate.outputs.mode == 'app'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-checks: read
+
+      - name: Re-enqueue with the selected App or machine-user token
+        if: steps.gate.outputs.present == 'true' && (steps.gate.outputs.mode == 'pat' || steps.app-token.outputs.token != '')
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ steps.app-token.outputs.token || secrets.MERGE_QUEUE_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const expectedRepository = 'JovieInc/LogYourBody';
+            const run = context.payload.workflow_run;
+            if (`${owner}/${repo}` !== expectedRepository || context.eventName !== 'workflow_run'
+                || run?.name !== 'Native Merge Queue Enrollment' || run.status !== 'completed'
+                || run.conclusion !== 'success' || run.repository?.full_name !== expectedRepository) {
+              core.notice('SKIPPED: Event is outside the repository token enrollment contract');
+              return;
+            }
+            const { repository } = await github.graphql(`
+              query Queue($owner: String!, $repo: String!) {
+                repository(owner: $owner, name: $repo) {
+                  mergeQueue(branch: "main") {
+                    entries(first: 100) {
+                      nodes {
+                        state
+                        enqueuer { login }
+                        pullRequest {
+                          id
+                          number
+                          state
+                          isDraft
+                          baseRefName
+                          headRefOid
+                          headRepository { nameWithOwner }
+                          commits(last: 1) {
+                            nodes {
+                              commit {
+                                oid
+                                statusCheckRollup {
+                                  contexts(first: 50) {
+                                    nodes { ... on CheckRun { name conclusion } }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, { owner, repo });
+            const entries = repository.mergeQueue?.entries?.nodes ?? [];
+            if (!entries.length) {
+              core.info('Queue is empty.');
+              return;
+            }
+            for (const entry of entries) {
+              const pull = entry.pullRequest;
+              const enqueuer = entry.enqueuer?.login ?? '';
+              if (!/^github-actions(\[bot\])?$/.test(enqueuer)) {
+                core.info(`#${pull.number}: enqueued by ${enqueuer}; nothing to do`);
+                continue;
+              }
+              if (pull.state !== 'OPEN' || pull.isDraft || pull.baseRefName !== 'main' || pull.headRepository?.nameWithOwner !== `${owner}/${repo}`) {
+                core.info(`#${pull.number}: not eligible (draft, base, or fork)`);
+                continue;
+              }
+              const commit = pull.commits.nodes[0]?.commit;
+              if (commit?.oid !== pull.headRefOid) {
+                core.info(`#${pull.number}: source commit no longer matches the head; leaving it`);
+                continue;
+              }
+              const checks = commit.statusCheckRollup?.contexts?.nodes ?? [];
+              const summary = checks.find((check) => check.name === 'CI Summary');
+              if (summary?.conclusion !== 'SUCCESS') {
+                core.info(`#${pull.number}: CI Summary on ${pull.headRefOid.slice(0, 9)} is ${summary?.conclusion ?? 'missing'}; leaving it`);
+                continue;
+              }
+              await github.graphql(`
+                mutation Dequeue($id: ID!) {
+                  dequeuePullRequest(input: { id: $id }) { mergeQueueEntry { id } }
+                }
+              `, { id: pull.id });
+              const result = await github.graphql(`
+                mutation Enqueue($id: ID!, $expectedHeadOid: GitObjectID!) {
+                  enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $expectedHeadOid }) {
+                    mergeQueueEntry { id position }
+                  }
+                }
+              `, { id: pull.id, expectedHeadOid: pull.headRefOid });
+              core.notice(`RE-ENQUEUED: #${pull.number} at ${pull.headRefOid.slice(0, 9)} position=${result.enqueuePullRequest.mergeQueueEntry.position}`);
+            }

@@ -718,6 +718,7 @@ struct DashboardStepsCard<ProgressView: View>: View {
 /// Share is the only chrome action. Body Score stays off this surface.
 struct LaunchTimelineSurface: View {
     @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
@@ -733,6 +734,7 @@ struct LaunchTimelineSurface: View {
     let onTapBodyFat: () -> Void
     let onTapFFMI: () -> Void
     let onShare: (() -> Void)?
+    var onAddPhoto: (() -> Void)?
 
     private let metricTitles = TimelinePhotoScrubLock.visibleMetricTitles
 
@@ -740,20 +742,29 @@ struct LaunchTimelineSurface: View {
         GeometryReader { geometry in
             let stageHeight = min(420, max(280, geometry.size.height * 0.58))
 
+            let content = VStack(alignment: .leading, spacing: 0) {
+                fusedPhotoStage
+                    .frame(height: stageHeight)
+
+                metricStrip
+                    .padding(.top, 16)
+            }
+            .padding(.horizontal, JovieTokens.compactInset)
+            .padding(.top, 4)
+            .padding(.bottom, 12)
+
             ZStack(alignment: .topLeading) {
                 launchAccessibilityMarker(id: "launch_timeline_surface", label: "Timeline")
 
-                VStack(alignment: .leading, spacing: 0) {
-                    fusedPhotoStage
-                        .frame(height: stageHeight)
-
-                    metricStrip
-                        .padding(.top, 16)
+                // At accessibility text sizes the stacked metric cells outgrow the screen; scroll instead of clipping.
+                if dynamicTypeSize.isAccessibilitySize {
+                    ScrollView(.vertical) {
+                        content.frame(width: geometry.size.width, alignment: .top)
+                    }
+                    .accessibilityIdentifier("launch_timeline_accessibility_scroll")
+                } else {
+                    content.frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
                 }
-                .padding(.horizontal, JovieTokens.compactInset)
-                .padding(.top, 4)
-                .padding(.bottom, 12)
-                .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
             }
         }
     }
@@ -811,7 +822,7 @@ struct LaunchTimelineSurface: View {
             CachedAsyncImage(urlString: photoURL) { image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
             } placeholder: {
                 stagePlaceholder
             }
@@ -824,7 +835,7 @@ struct LaunchTimelineSurface: View {
         DashboardChromeGlass.cluster(spacing: 12) {
             HStack(spacing: 12) {
                 Text(dateText)
-                    .font(.system(size: 13, weight: .semibold))
+                    .scaledSystemFont(size: 13, weight: .semibold, relativeTo: .footnote)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -879,26 +890,50 @@ struct LaunchTimelineSurface: View {
                 endPoint: .bottomTrailing
             )
 
-            VStack(spacing: 8) {
-                Image(systemName: "camera.metering.center.weighted")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(theme.colors.textSecondary)
-
-                Text("No progress photo")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.colors.text)
-
-                Text("Add one to this day")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(theme.colors.textSecondary)
+            // The copy invites adding a photo, so the placeholder opens the attach sheet for this day.
+            if let onAddPhoto {
+                Button(action: onAddPhoto) {
+                    stagePlaceholderLabel
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add progress photo for \(dateText)")
+                .accessibilityHint("Opens the photo picker for this day")
+                .accessibilityIdentifier("launch_timeline_add_photo")
+                .padding(.bottom, 72)
+            } else {
+                stagePlaceholderLabel
+                    .padding(.bottom, 72)
             }
-            .padding(.bottom, 72)
         }
     }
 
+    private var stagePlaceholderLabel: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "camera.metering.center.weighted")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(theme.colors.textSecondary)
+
+            Text("No progress photo")
+                .scaledSystemFont(size: 13, weight: .semibold, relativeTo: .footnote)
+                .foregroundStyle(theme.colors.text)
+
+            Text("Add one to this day")
+                .scaledSystemFont(size: 11, weight: .medium, relativeTo: .caption2)
+                .foregroundStyle(theme.colors.textSecondary)
+        }
+        .frame(minWidth: JovieTokens.minimumHitTarget, minHeight: JovieTokens.minimumHitTarget)
+        .contentShape(Rectangle())
+    }
+
+    // Equal-height row: the tallest cell (a wrapped caption) sets the height for all three.
+    // Accessibility text sizes can't fit three columns, so the cells stack.
     private var metricStrip: some View {
-        HStack(spacing: 8) {
-            launchMetricCell(
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 8))
+
+        return layout {
+            LaunchTimelineMetricCell(
                 title: metricTitles[0],
                 value: ffmiValue,
                 caption: ffmiCaption,
@@ -906,7 +941,7 @@ struct LaunchTimelineSurface: View {
                 action: onTapFFMI
             )
 
-            launchMetricCell(
+            LaunchTimelineMetricCell(
                 title: metricTitles[1],
                 value: weightValue,
                 caption: weightCaption,
@@ -914,7 +949,7 @@ struct LaunchTimelineSurface: View {
                 action: onTapWeight
             )
 
-            launchMetricCell(
+            LaunchTimelineMetricCell(
                 title: metricTitles[2],
                 value: bodyFatValue,
                 caption: bodyFatCaption,
@@ -922,15 +957,24 @@ struct LaunchTimelineSurface: View {
                 action: onTapBodyFat
             )
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
+}
 
-    private func launchMetricCell(
-        title: String,
-        value: String,
-        caption: String,
-        accent: Color,
-        action: @escaping () -> Void
-    ) -> some View {
+struct LaunchTimelineMetricCell: View {
+    @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    // Same point sizes as the approved design at the default text size; they scale only with Dynamic Type.
+    @ScaledMetric(relativeTo: .caption2) private var labelSize: CGFloat = 11
+    @ScaledMetric(relativeTo: .title3) private var valueSize: CGFloat = 20
+
+    let title: String
+    let value: String
+    let caption: String
+    let accent: Color
+    let action: () -> Void
+
+    var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 4) {
                 Capsule()
@@ -939,7 +983,7 @@ struct LaunchTimelineSurface: View {
 
                 DSMetricLabel(
                     text: title,
-                    size: .system(size: 11),
+                    size: .system(size: labelSize),
                     weight: .bold,
                     color: theme.colors.textSecondary
                 )
@@ -948,22 +992,24 @@ struct LaunchTimelineSurface: View {
                 DSMetricValue(
                     value: value,
                     unit: nil,
-                    size: .system(size: 20, weight: .semibold, design: .rounded),
+                    size: .system(size: valueSize, weight: .semibold, design: .rounded),
                     color: theme.colors.text
                 )
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
 
+                // Captions like "↓ −0.2 last 30d · Athletic" wrap instead of truncating in a 1/3-width cell.
                 DSMetricLabel(
                     text: caption,
-                    size: .system(size: 11),
+                    size: .system(size: labelSize),
                     weight: .medium,
                     color: theme.colors.textSecondary
                 )
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 .minimumScaleFactor(0.72)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 68, maxHeight: .infinity, alignment: .topLeading)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .dashboardContentSurface(cornerRadius: 12, border: theme.colors.border)

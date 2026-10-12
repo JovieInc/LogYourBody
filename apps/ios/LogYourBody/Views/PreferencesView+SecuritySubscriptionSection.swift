@@ -33,10 +33,32 @@ extension PreferencesView {
         }
     }
 
+    var changePlanSection: some View {
+        SettingsSection(header: "Plan") {
+            SettingsButtonRow(
+                icon: "arrow.up.forward.circle",
+                title: subscriptionManager.isSubscribed ? "Change plan" : "See plans",
+                titleAccessibilityIdentifier: "home_v2_subscription_change"
+            ) {
+                isShowingSettingsPaywall = true
+            }
+            .accessibilityIdentifier("home_v2_subscription_change")
+        }
+    }
+
+    var subscriptionBenefitsSection: some View {
+        SettingsSection(header: HomeV2SettingsCopy.included) {
+            Label(HomeV2SettingsCopy.included1, systemImage: "photo.on.rectangle.angled")
+            Label(HomeV2SettingsCopy.included2, systemImage: "chart.xyaxis.line")
+            Label(HomeV2SettingsCopy.included3, systemImage: "arrow.up.right")
+        }
+    }
+
     var subscriptionStatusRow: some View {
         SettingsRow(
             icon: "crown.fill",
             title: subscriptionStatusText,
+            titleAccessibilityIdentifier: "home_v2_subscription_plan",
             subtitle: subscriptionPlanDisplay,
             tintColor: subscriptionManager.isSubscribed ? nil : Color.appWarning
         )
@@ -60,6 +82,7 @@ extension PreferencesView {
             SettingsRow(
                 icon: "creditcard.fill",
                 title: "Manage subscription",
+                titleAccessibilityIdentifier: "home_v2_subscription_manage",
                 subtitle: "Opens App Store",
                 showChevron: true
             )

@@ -1,30 +1,63 @@
 name: Native Merge Queue Enrollment
 
+# Every same-repo, non-draft PR to main enters the native queue once CI passes on its exact head.
+# The queue re-runs CI on the merge group before landing; no extra labels or certification gates.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  # Draft-first PRs often go green while still drafts; enroll them when marked ready.
+  pull_request_target:
+    types: [ready_for_review]
+    branches: [main]
 
 permissions:
   actions: read
-  contents: read
+  contents: write # enqueuePullRequest is a merge-side mutation; read-only fails with "Resource not accessible by integration"
   pull-requests: write
 
 concurrency:
-  group: native-merge-queue-${{ github.event.workflow_run.head_sha }}
+  group: native-merge-queue-${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
   cancel-in-progress: false
 
 jobs:
   enroll:
-    name: Enroll exact certified head
-    if: github.event.workflow_run.event == 'pull_request'
+    name: Enroll exact green head
+    if: github.event_name == 'pull_request_target' || github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Enqueue eligible pull request
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
-            const run = context.payload.workflow_run;
+            const expectedRepository = 'JovieInc/LogYourBody';
+            if (`${context.repo.owner}/${context.repo.repo}` !== expectedRepository
+                || !['workflow_run', 'pull_request_target'].includes(context.eventName)
+                || (context.eventName === 'pull_request_target' && context.payload.action !== 'ready_for_review')) {
+              core.notice('NOT_ELIGIBLE: Event is outside the repository enrollment contract');
+              return;
+            }
+            let run = context.payload.workflow_run;
+            if (context.eventName === 'pull_request_target') {
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'ci.yml',
+                event: 'pull_request',
+                head_sha: context.payload.pull_request.head.sha,
+                per_page: 1,
+              });
+              run = data.workflow_runs[0];
+              if (!run || run.status !== 'completed') {
+                core.notice('PENDING: CI has not completed for this head; enrollment follows CI completion');
+                return;
+              }
+            }
+            if (!run || run.name !== 'CI' || run.event !== 'pull_request'
+                || run.status !== 'completed' || run.repository?.full_name !== expectedRepository) {
+              core.notice('NOT_ELIGIBLE: Source is not completed repository-local PR CI');
+              return;
+            }
             const recordOutcome = async (status, reason, details = '') => {
               core.notice(`${status}: ${reason}${details ? ` (${details})` : ''}`);
               await core.summary
@@ -59,11 +92,12 @@ jobs:
               pull_number: associated.number,
             });
 
-            if (pull.base.ref !== 'main' || pull.draft || pull.state !== 'open') {
+            if (pull.base.ref !== 'main' || pull.base.repo?.full_name !== expectedRepository
+                || pull.draft || pull.state !== 'open') {
               await recordOutcome('NOT_ELIGIBLE', 'Pull request is not open and ready for main');
               return;
             }
-            if (pull.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+            if (pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
               await recordOutcome('NOT_ELIGIBLE', 'Fork pull requests cannot auto-enroll');
               return;
             }
@@ -71,24 +105,46 @@ jobs:
               await recordOutcome('STALE', 'Exact-head CI proof no longer matches the PR', pull.head.sha);
               return;
             }
-            if (!pull.labels.some(({ name }) => name === 'machine-certified')) {
-              await recordOutcome('NOT_ELIGIBLE', 'The machine-certified label is absent');
+
+            let result;
+            try {
+              result = await github.graphql(`
+                mutation Enqueue($pullRequestId: ID!, $expectedHeadOid: GitObjectID!) {
+                  enqueuePullRequest(input: {
+                    pullRequestId: $pullRequestId
+                    expectedHeadOid: $expectedHeadOid
+                  }) {
+                    mergeQueueEntry { id position }
+                  }
+                }
+              `, {
+                pullRequestId: pull.node_id,
+                expectedHeadOid: pull.head.sha,
+              });
+            } catch (error) {
+              const errors = Array.isArray(error?.errors) ? error.errors : [];
+              const alreadyQueued = errors.some((failure) => failure.type === 'UNPROCESSABLE'
+                && /^Pull request is already in the queue\.?$/.test(failure.message ?? ''));
+              if (!alreadyQueued) throw error;
+              const { repository } = await github.graphql(`
+                query EnqueuedHead($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      state isDraft baseRefName headRefOid
+                      headRepository { nameWithOwner }
+                      mergeQueueEntry { id position }
+                    }
+                  }
+                }
+              `, { owner: context.repo.owner, repo: context.repo.repo, number: pull.number });
+              const queued = repository?.pullRequest;
+              if (!queued?.mergeQueueEntry || queued.headRefOid !== pull.head.sha
+                  || queued.state !== 'OPEN' || queued.isDraft || queued.baseRefName !== 'main'
+                  || queued.headRepository?.nameWithOwner !== expectedRepository) throw error;
+              await recordOutcome('ENQUEUED', `Pull request #${pull.number} is already in the repository-native queue`,
+                `entry=${queued.mergeQueueEntry.id} position=${queued.mergeQueueEntry.position}`);
               return;
             }
-
-            const result = await github.graphql(`
-              mutation Enqueue($pullRequestId: ID!, $expectedHeadOid: GitObjectID!) {
-                enqueuePullRequest(input: {
-                  pullRequestId: $pullRequestId
-                  expectedHeadOid: $expectedHeadOid
-                }) {
-                  mergeQueueEntry { id position }
-                }
-              }
-            `, {
-              pullRequestId: pull.node_id,
-              expectedHeadOid: pull.head.sha,
-            });
 
             await recordOutcome(
               'ENQUEUED',

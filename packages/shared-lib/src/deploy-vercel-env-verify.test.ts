@@ -139,6 +139,12 @@ describe('deploy neon migrate CLI stays runnable from GitHub Actions', () => {
     expect(migrateCli).toContain('assertDirectNeonMigrationConnection(connectionString)');
     expect(migrateCli).toContain('neonConfig.webSocketConstructor = WebSocket');
     expect(migrateCli).toContain('new Client(connectionString)');
+    // The neon() HTTP driver uses prepared statements, which reject the
+    // multi-statement .sql files; the entry must keep the ws Client path.
+    expect(migrateCli).not.toMatch(
+      /import\s*\{[^}]*\bneon\b[^}]*\}\s*from\s*['"]@neondatabase\/serverless['"]/,
+    );
+    expect(migrateCli).not.toContain('neon(connectionString');
     expect(migrateCli).toContain("await client.query('BEGIN')");
     expect(migrateCli).toContain('await client.query(contents)');
     expect(migrateCli).toContain("await client.query('COMMIT')");

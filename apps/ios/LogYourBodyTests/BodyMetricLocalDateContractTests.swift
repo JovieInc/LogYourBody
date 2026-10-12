@@ -140,6 +140,49 @@ final class BodyMetricLocalDateContractTests: XCTestCase {
         XCTAssertEqual(visible.map(\.id), ["newer"])
     }
 
+    /// Los Angeles springs forward on 2026-03-08 and falls back on 2026-11-01.
+    /// Instants are independent UTC values. The local day must follow the wall
+    /// calendar, including both 01:30 occurrences on the repeated hour.
+    func testLocalDateKeepsCalendarDayAcrossLosAngelesDaylightTransitions() throws {
+        let losAngeles = try makeCalendar(timeZoneIdentifier: "America/Los_Angeles")
+        let samples: [(TimeInterval, String, String)] = [
+            (1_772_956_740, "2026-03-07", "23"),
+            (1_772_963_940, "2026-03-08", "01"),
+            (1_772_964_000, "2026-03-08", "03"),
+            (1_773_007_200, "2026-03-08", "15"),
+            (1_793_516_340, "2026-10-31", "23"),
+            (1_793_521_800, "2026-11-01", "01"),
+            (1_793_525_400, "2026-11-01", "01"),
+            (1_793_530_800, "2026-11-01", "03")
+        ]
+
+        for (epoch, day, hour) in samples {
+            let date = Date(timeIntervalSince1970: epoch)
+            XCTAssertEqual(
+                BodyMetricLocalDate.key(for: date, calendar: losAngeles),
+                day,
+                "epoch \(epoch)"
+            )
+            XCTAssertEqual(
+                BodyMetricLocalDate.hourKey(for: date, calendar: losAngeles),
+                hour,
+                "epoch \(epoch)"
+            )
+        }
+
+        // The missing 02:00 hour is a 60-second UTC step from 01:59 PST to 03:00 PDT.
+        XCTAssertEqual(1_772_964_000 - 1_772_963_940, 60)
+        XCTAssertEqual(
+            BodyMetricLocalDate.key(for: Date(timeIntervalSince1970: 1_772_963_940), calendar: losAngeles),
+            BodyMetricLocalDate.key(for: Date(timeIntervalSince1970: 1_772_964_000), calendar: losAngeles)
+        )
+
+        for day in ["2026-03-07", "2026-03-08", "2026-10-31", "2026-11-01"] {
+            let start = try XCTUnwrap(BodyMetricLocalDate.startOfDay(for: day, calendar: losAngeles))
+            XCTAssertEqual(BodyMetricLocalDate.key(for: start, calendar: losAngeles), day)
+        }
+    }
+
     private func makeMetric(
         id: String = UUID().uuidString,
         userId: String = "user",

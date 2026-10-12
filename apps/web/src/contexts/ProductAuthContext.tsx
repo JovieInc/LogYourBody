@@ -95,13 +95,7 @@ export function ProductAuthProvider({ children }: { children: React.ReactNode })
     if (!isLoaded) return;
 
     if (user) {
-      const email = user.primaryEmailAddress?.emailAddress ?? undefined;
-      const nameParts = [user.firstName, user.lastName].filter(Boolean) as string[];
-      const name = nameParts.length > 0 ? nameParts.join(' ') : undefined;
-
       analytics.identify(user.id, {
-        email,
-        name,
         platform: 'web',
       });
     } else {
