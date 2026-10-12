@@ -138,6 +138,68 @@ final class BulkImportManagerBoundsTests: XCTestCase {
         XCTAssertEqual(syncTriggers, 1)
     }
 
+    /// Opt-in bulk deletion must remove only verified imports (completed uploads)
+    /// from the camera roll, never failed or pending tasks.
+    func testDeleteAfterImportRemovesOnlySuccessfullyImportedAssets() async {
+        var deletedIdentifiers: [String] = []
+        var uploadCalls = 0
+        let manager = BulkImportManager(
+            accountOwner: auth,
+            metricsStore: coreData,
+            loadFullImage: { _ in
+                UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { _ in }
+            },
+            uploadPhoto: { _, _ in
+                uploadCalls += 1
+                if uploadCalls == 2 {
+                    throw NSError(domain: "BulkImportTests", code: 1)
+                }
+                return "synthetic://photo"
+            },
+            syncImportedPhoto: { self.syncTriggers += 1 },
+            shouldDeleteAfterImport: { true },
+            deleteAssets: { identifiers in deletedIdentifiers = identifiers }
+        )
+        let successfulPhoto = makeScannedPhoto(assetIdentifier: "imported-asset")
+        let failedPhoto = makeScannedPhoto(assetIdentifier: "failed-asset")
+
+        await manager.importPhotos([successfulPhoto, failedPhoto])
+
+        XCTAssertEqual(manager.failedCount, 1)
+        XCTAssertEqual(deletedIdentifiers, ["imported-asset"])
+    }
+
+    func testDeleteAfterImportDisabledSkipsDeletion() async {
+        var deletedIdentifiers: [String] = []
+        let manager = BulkImportManager(
+            accountOwner: auth,
+            metricsStore: coreData,
+            loadFullImage: { _ in
+                UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { _ in }
+            },
+            uploadPhoto: { _, _ in "synthetic://photo" },
+            syncImportedPhoto: { self.syncTriggers += 1 },
+            shouldDeleteAfterImport: { false },
+            deleteAssets: { identifiers in deletedIdentifiers = identifiers }
+        )
+
+        await manager.importPhotos([makeScannedPhoto(assetIdentifier: "imported-asset")])
+
+        XCTAssertEqual(manager.failedCount, 0)
+        XCTAssertTrue(deletedIdentifiers.isEmpty)
+    }
+
+    private func makeScannedPhoto(assetIdentifier: String) -> ScannedPhoto {
+        ScannedPhoto(
+            asset: SyntheticImportAsset(localIdentifier: assetIdentifier),
+            date: Date(),
+            confidence: 1,
+            metadata: ScannedPhoto.PhotoMetadata(
+                location: nil, cameraType: .unknown, isScreenshot: false, hasBeenEdited: false
+            )
+        )
+    }
+
     func testHeldPhotoImportCannotSaveUnderReplacementAccount() async {
         await assertHeldPhotoImportIsRejected { setAccount("synthetic-photo-B") }
     }
@@ -185,4 +247,15 @@ final class HeldPhotoImageLoad {
     }
 }
 
-private final class SyntheticImportAsset: PHAsset, @unchecked Sendable {}
+private final class SyntheticImportAsset: PHAsset, @unchecked Sendable {
+    private let identifier: String
+
+    init(localIdentifier: String = "synthetic-asset") {
+        identifier = localIdentifier
+        super.init()
+    }
+
+    override var localIdentifier: String {
+        identifier
+    }
+}
