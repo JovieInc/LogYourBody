@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -103,7 +103,10 @@ describe('eve.dev core-chat boundary', () => {
       encoding: 'utf8',
     })
       .split('\0')
-      .filter(Boolean);
+      .filter(Boolean)
+      // Symlinks (e.g. .claude/skills/jovie-frontend -> a directory) have no
+      // source of their own; reading one through fails with EISDIR.
+      .filter((file) => lstatSync(join(repoRoot, file)).isFile());
     const dottedName = new RegExp(['trigger', 'dev'].join('\\.'), 'i');
     const packageName = new RegExp(['trigger', 'dev'].join(''), 'i');
 
