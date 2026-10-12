@@ -563,60 +563,81 @@ nonisolated func pullLatestData(userId: String, lastSync: Date?, token: String) 
         let ownership = await MainActor.run { self.authManager.captureRequestSession() }
         guard let ownership, ownership.subject == userId else { return }
 
-        // Get last sync date for incremental sync
-        let lastSync = lastSync ?? Date().addingTimeInterval(-7 * 24 * 60 * 60) // Default to 1 week ago
-
-        // Pull latest body metrics
-        let bodyMetrics = try await productAPIClient.fetchBodyMetrics(
-            userId: userId,
-            since: lastSync,
-            token: token
-        )
-        guard await stillOwnsPull(ownership) else { return }
-
-        for metricData in bodyMetrics {
-            coreDataManager.updateOrCreateBodyMetric(from: metricData)
+        // The queued Core Data writes have no originating Swift task. Each
+        // serialized apply re-checks the session inside the context queue and
+        // carries this pull's cancellation explicitly.
+        let cancellation = HealthKitImportCancellation()
+        let admission: CoreDataManager.WriteAdmission = { [authManager, cancellation] in
+            guard !cancellation.isCancelled, authManager.ownsRequestSession(ownership) else {
+                throw SyncError.noAuthSession
+            }
         }
 
-        // Pull latest daily metrics
-        let dailyMetrics = try await productAPIClient.fetchDailyMetrics(
-            userId: userId,
-            since: lastSync,
-            token: token
-        )
-        guard await stillOwnsPull(ownership) else { return }
+        try await withTaskCancellationHandler {
+            // Get last sync date for incremental sync
+            let lastSync = lastSync ?? Date().addingTimeInterval(-7 * 24 * 60 * 60) // Default to 1 week ago
 
-        for metricData in dailyMetrics {
-            coreDataManager.updateOrCreateDailyMetric(from: metricData)
-        }
-
-        // Pull profile updates
-        if let profileData = try await productAPIClient.fetchProfile(userId: userId, token: token) {
+            // Pull latest body metrics
+            let bodyMetrics = try await productAPIClient.fetchBodyMetrics(
+                userId: userId,
+                since: lastSync,
+                token: token
+            )
             guard await stillOwnsPull(ownership) else { return }
-            coreDataManager.updateOrCreateProfile(from: profileData)
-        }
 
-        guard await stillOwnsPull(ownership) else { return }
+            for metricData in bodyMetrics {
+                await coreDataManager.updateOrCreateBodyMetricAndWait(
+                    from: metricData, writeAdmission: admission
+                )
+            }
 
-        // Pull latest body metric timestamp
-        if let remoteLatest = try? await productAPIClient.fetchLatestBodyMetricTimestamp(
-            userId: userId,
-            token: token
-        ) {
-            // Use remoteLatest as needed (currently no-op)
-            _ = remoteLatest
-        }
+            // Pull latest daily metrics
+            let dailyMetrics = try await productAPIClient.fetchDailyMetrics(
+                userId: userId,
+                since: lastSync,
+                token: token
+            )
+            guard await stillOwnsPull(ownership) else { return }
 
-        let canPublish = await MainActor.run {
-            self.authManager.ownsRequestSession(ownership) && self.authManager.isAuthenticated && self.isOnline
-        }
-        guard canPublish else { return }
+            for metricData in dailyMetrics {
+                await coreDataManager.updateOrCreateDailyMetricAndWait(
+                    from: metricData, writeAdmission: admission
+                )
+            }
 
-        // For now, we'll use polling instead of WebSocket to simplify
-        // WebSocket implementation can be added later for true real-time
-        await MainActor.run {
-            guard self.authManager.ownsRequestSession(ownership) else { return }
-            self.realtimeConnected = false
+            // Pull profile updates
+            if let profileData = try await productAPIClient.fetchProfile(userId: userId, token: token) {
+                guard await stillOwnsPull(ownership) else { return }
+                await coreDataManager.updateOrCreateProfileAndWait(
+                    from: profileData, writeAdmission: admission
+                )
+            }
+
+            guard await stillOwnsPull(ownership) else { return }
+
+            // Pull latest body metric timestamp
+            if let remoteLatest = try? await productAPIClient.fetchLatestBodyMetricTimestamp(
+                userId: userId,
+                token: token
+            ) {
+                // Use remoteLatest as needed (currently no-op)
+                _ = remoteLatest
+            }
+
+            let canPublish = await MainActor.run {
+                self.authManager.ownsRequestSession(ownership)
+                    && self.authManager.isAuthenticated && self.isOnline
+            }
+            guard canPublish else { return }
+
+            // For now, we'll use polling instead of WebSocket to simplify
+            // WebSocket implementation can be added later for true real-time
+            await MainActor.run {
+                guard self.authManager.ownsRequestSession(ownership) else { return }
+                self.realtimeConnected = false
+            }
+        } onCancel: {
+            cancellation.cancel()
         }
     }
 

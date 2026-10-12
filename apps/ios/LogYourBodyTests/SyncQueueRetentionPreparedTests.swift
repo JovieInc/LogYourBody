@@ -585,6 +585,102 @@ final class SyncQueueRetentionPreparedTests: XCTestCase {
         XCTAssertEqual(auth.currentUser?.id, "synthetic-sync-A")
     }
 
+    // The pull-side guard passes, then the account switches inside the context
+    // queue before the queued apply. Only an admission check inside the
+    // serialized write can drop this payload.
+    func testPostGuardAccountSwitchDropsQueuedBodyApply() async throws {
+        let manager = makeStalePullManager(switchAccounts: false)
+        ServerApplyProbe.beforeWriteAdmission = { self.switchToB() }
+        defer {
+            ServerApplyProbe.beforeWriteAdmission = nil
+            StalePullAccountSwitchProtocol.disarm()
+        }
+        try await manager.pullLatestData(
+            userId: "synthetic-sync-A",
+            lastSync: Date(timeIntervalSince1970: 0),
+            token: "synthetic-token-A"
+        )
+        let stored = await storedStalePull()
+        XCTAssertNil(stored.body, "A queued body apply must re-check ownership inside the write")
+        XCTAssertNil(stored.daily)
+        XCTAssertNil(stored.profile)
+        XCTAssertEqual(auth.currentUser?.id, "synthetic-sync-B")
+    }
+
+    func testPostGuardLogoutDropsQueuedBodyApply() async throws {
+        let manager = makeStalePullManager(switchAccounts: false)
+        ServerApplyProbe.beforeWriteAdmission = { self.signOut() }
+        defer {
+            ServerApplyProbe.beforeWriteAdmission = nil
+            StalePullAccountSwitchProtocol.disarm()
+        }
+        try await manager.pullLatestData(
+            userId: "synthetic-sync-A",
+            lastSync: Date(timeIntervalSince1970: 0),
+            token: "synthetic-token-A"
+        )
+        let stored = await storedStalePull()
+        XCTAssertNil(stored.body, "A queued body apply must drop writes after logout")
+        XCTAssertNil(stored.daily)
+        XCTAssertNil(stored.profile)
+        XCTAssertNil(auth.authSession)
+    }
+
+    func testPostGuardSameSubjectReLoginDropsQueuedBodyApply() async throws {
+        let manager = makeStalePullManager(switchAccounts: false)
+        let originalSession = auth.authSession
+        let originalUser = auth.currentUser
+        ServerApplyProbe.beforeWriteAdmission = {
+            self.switchToB()
+            self.auth.authSession = originalSession
+            self.auth.currentUser = originalUser
+        }
+        defer {
+            ServerApplyProbe.beforeWriteAdmission = nil
+            StalePullAccountSwitchProtocol.disarm()
+        }
+        try await manager.pullLatestData(
+            userId: "synthetic-sync-A",
+            lastSync: Date(timeIntervalSince1970: 0),
+            token: "synthetic-token-A"
+        )
+        let stored = await storedStalePull()
+        XCTAssertNil(stored.body, "A replacement session must not satisfy the captured ownership")
+        XCTAssertNil(stored.daily)
+        XCTAssertNil(stored.profile)
+        XCTAssertEqual(auth.currentUser?.id, "synthetic-sync-A")
+        XCTAssertEqual(auth.authSession?.accessToken, "synthetic-token-A")
+    }
+
+    func testCancelledPullDropsQueuedBodyApply() async throws {
+        let manager = makeStalePullManager(switchAccounts: false)
+        var pull: Task<Void, Error>?
+        ServerApplyProbe.beforeWriteAdmission = { pull?.cancel() }
+        defer {
+            ServerApplyProbe.beforeWriteAdmission = nil
+            StalePullAccountSwitchProtocol.disarm()
+        }
+        let task = Task {
+            try await manager.pullLatestData(
+                userId: "synthetic-sync-A",
+                lastSync: Date(timeIntervalSince1970: 0),
+                token: "synthetic-token-A"
+            )
+        }
+        pull = task
+        try await task.value
+        let stored = await storedStalePull()
+        XCTAssertNil(stored.body, "Cancelling the pull must cancel its queued writes")
+        XCTAssertNil(stored.daily)
+        XCTAssertNil(stored.profile)
+        XCTAssertEqual(auth.currentUser?.id, "synthetic-sync-A")
+    }
+
+    private func signOut() {
+        auth.authSession = nil
+        auth.currentUser = nil
+    }
+
     private func makeStalePullManager(switchAccounts: Bool) -> RealtimeSyncManager {
         let client = ProductAPIClient()
         let configuration = URLSessionConfiguration.ephemeral
