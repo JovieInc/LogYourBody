@@ -4,14 +4,22 @@ import type {
   NativeProductRecordCollection,
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
+import { catalogVariantById } from './catalog';
 import {
   buildMicrocycle,
   buildSession,
   createMesoBlock,
   isProgramSetup,
+  progressionForExercise,
   validTrainingFeedback,
 } from './engine';
-import type { Session, SetLog, TrainingFeedback, TrainingProgramSetup } from './types';
+import type {
+  ExercisePrescription,
+  Session,
+  SetLog,
+  TrainingFeedback,
+  TrainingProgramSetup,
+} from './types';
 
 const EPOCH = '1970-01-01T00:00:00.000Z';
 
@@ -26,9 +34,82 @@ export function stableTrainingUuid(...parts: string[]): string {
 export type TrainingRecordsSnapshot = {
   setup: TrainingProgramSetup | null;
   sessions: NativeProductRecord[];
+  swaps: ExerciseSwapRecord[];
   logs: SetLog[];
   feedback: TrainingFeedback[];
 };
+
+/** Persists one exercise substitution for the rest of a mesocycle block. The
+ * original exercise keeps its history; the variant starts from its own. */
+export type ExerciseSwapRecord = NativeProductRecord & {
+  record_type: 'exercise_swap';
+  programSetupId: string;
+  blockId: string;
+  sessionId: string;
+  fromExerciseId: string;
+  toVariantId: string;
+};
+
+function toExerciseSwap(record: NativeProductRecord): ExerciseSwapRecord | null {
+  const value = record as Partial<ExerciseSwapRecord>;
+  if (
+    recordType(record) !== 'exercise_swap' ||
+    typeof value.programSetupId !== 'string' ||
+    typeof value.blockId !== 'string' ||
+    typeof value.sessionId !== 'string' ||
+    typeof value.fromExerciseId !== 'string' ||
+    typeof value.toVariantId !== 'string' ||
+    !catalogVariantById(value.toVariantId)
+  ) {
+    return null;
+  }
+  return record as ExerciseSwapRecord;
+}
+
+/** Rebuilds one exercise slot as a reviewed variant. Sets, rep range, RIR and
+ * schedule are preserved; progression is computed from the variant's own
+ * logged history, never transferred from the original exercise. */
+export function swappedPrescription(
+  exercise: ExercisePrescription,
+  variantId: string,
+  logs: SetLog[],
+  targetRir: number,
+): ExercisePrescription | null {
+  const variant = catalogVariantById(variantId);
+  if (!variant || variant.primaryMuscle !== exercise.primaryMuscle) return null;
+  const progression = progressionForExercise(variant.id, logs, targetRir);
+  return {
+    ...exercise,
+    id: variant.id,
+    name: variant.name,
+    muscleContribution: variant.muscleContribution,
+    targetReps: progression.targetReps,
+    targetLoadKg: progression.targetLoadKg,
+    loadInstruction: progression.loadInstruction,
+    progression: progression.action,
+  };
+}
+
+/** Applies the block's recorded swaps to a built session. Unknown or muscle-
+ * mismatched variants are ignored rather than guessing a substitute. */
+export function applyExerciseSwaps(
+  session: Session,
+  swaps: ExerciseSwapRecord[],
+  logs: SetLog[],
+): Session {
+  if (!swaps.length) return session;
+  const bySource = new Map(swaps.map((swap) => [swap.fromExerciseId, swap.toVariantId]));
+  let changed = false;
+  const exercises = session.exercises.map((exercise) => {
+    const variantId = bySource.get(exercise.id);
+    if (!variantId) return exercise;
+    const swapped = swappedPrescription(exercise, variantId, logs, exercise.targetRir);
+    if (!swapped) return exercise;
+    changed = true;
+    return swapped;
+  });
+  return changed ? { ...session, exercises } : session;
+}
 
 export async function pullAllTrainingRecords(
   records: NativeProductRecordsPort,
@@ -99,6 +180,10 @@ export async function loadTrainingRecords(
   return {
     setup: setupRecord ? (setupRecord as unknown as TrainingProgramSetup) : null,
     sessions: sessions.filter(active).filter((record) => recordType(record) === 'workout_session'),
+    swaps: sessions
+      .filter(active)
+      .map(toExerciseSwap)
+      .filter((record): record is ExerciseSwapRecord => record !== null),
     logs: sets
       .filter(active)
       .map(toSetLog)
@@ -144,6 +229,9 @@ export async function getOrCreateNextWorkout(input: {
   if (!setup) return { kind: 'not_enrolled' };
 
   const block = createMesoBlock(setup.startedAt, input.now.toISOString());
+  const blockSwaps = snapshot.swaps.filter(
+    (swap) => swap.programSetupId === setup.id && swap.blockId === block.id,
+  );
   let periodSessions = snapshot.sessions as SessionRecord[];
   const programSessionIds = new Set(
     periodSessions
@@ -219,14 +307,18 @@ export async function getOrCreateNextWorkout(input: {
   if (activeRecord?.prescription) {
     const existing = activeRecord.prescription;
     const targetRir = existing.exercises[0]?.targetRir ?? block.targetRir;
-    const adjusted = buildSession({
-      setup,
-      block: { ...block, currentWeek: existing.week, targetRir },
-      sessionId: existing.id,
-      slot: existing.slot,
-      logs: programLogs,
-      feedback: programFeedback,
-    });
+    const adjusted = applyExerciseSwaps(
+      buildSession({
+        setup,
+        block: { ...block, currentWeek: existing.week, targetRir },
+        sessionId: existing.id,
+        slot: existing.slot,
+        logs: programLogs,
+        feedback: programFeedback,
+      }),
+      blockSwaps,
+      programLogs,
+    );
     if (persist) {
       const saved = await input.records.push(input.subject, 'training_sessions', [
         {
@@ -259,7 +351,8 @@ export async function getOrCreateNextWorkout(input: {
   }
 
   const slot = completedThisWeek.length;
-  const session = microcycle.sessions[slot];
+  const planned = microcycle.sessions[slot];
+  const session = planned ? applyExerciseSwaps(planned, blockSwaps, programLogs) : undefined;
   if (!session)
     return {
       kind: 'week_complete',

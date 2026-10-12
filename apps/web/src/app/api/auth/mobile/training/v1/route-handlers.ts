@@ -7,7 +7,7 @@ import {
   isTrainingRecordCollection,
   type NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import { logTrainingSet, recordTrainingFeedback } from '@/lib/training/commands';
+import { logTrainingSet, recordTrainingFeedback, swapExercise } from '@/lib/training/commands';
 import {
   getOrCreateNextWorkout,
   pullAllTrainingRecords,
@@ -44,6 +44,19 @@ const FeedbackBodySchema = z
     pump: z.number().int().min(0).max(10),
     performance: z.enum(['up', 'stable', 'down']),
     jointPain: z.number().int().min(0).max(10),
+  })
+  .strict();
+
+const SwapBodySchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    exerciseId: z.string().trim().min(1).max(64),
+    toVariantId: z.string().trim().min(1).max(64).optional(),
+    unavailableEquipment: z.array(z.string().trim().min(1).max(32)).max(16).optional(),
+    declaredEquipment: z.array(z.string().trim().min(1).max(32)).max(16).optional(),
+    excludedConcerns: z.array(z.string().trim().min(1).max(48)).max(16).optional(),
+    preferTorsoSupport: z.boolean().optional(),
+    maxTrunkDemand: z.enum(['low', 'moderate', 'high']).optional(),
   })
   .strict();
 
@@ -265,6 +278,53 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             return apiError('set_not_in_session', 400);
           case 'set_conflict':
             return apiError('set_conflict', 409);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
+        }
+      } catch {
+        return apiError('training_unavailable', 503);
+      }
+    },
+
+    async swap(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      const parsed = SwapBodySchema.safeParse(await request.json().catch(() => null));
+      if (!parsed.success) return apiError('invalid_request', 400);
+      try {
+        const result = await swapExercise({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          swap: parsed.data,
+        });
+        switch (result.kind) {
+          case 'swapped':
+            return json(
+              withVersion({
+                swap: result.swap,
+                exercise: result.exercise,
+                diff: result.diff,
+              }),
+              201,
+            );
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'session_not_active':
+            return apiError('session_not_active', 409);
+          case 'exercise_not_found':
+            return apiError('exercise_not_found', 404);
+          case 'variant_not_found':
+            return apiError('variant_not_found', 404);
+          case 'variant_ineligible':
+            return json(withVersion({ error: 'variant_ineligible', missing: result.missing }), 409);
+          case 'no_feasible_alternative':
+            return apiError('no_feasible_alternative', 409);
           case 'rejected':
             return apiError('training_unavailable', 503);
         }
