@@ -536,7 +536,7 @@ pnpm --filter apps/web build
 ### Test Coverage Requirements
 
 - iOS: Minimum 70% code coverage
-- Web: Minimum 80% code coverage
+- Web: 80% code coverage is aspirational; CI runs the test suite but does not enforce this threshold
 - All new features must include tests
 
 ### Running Tests
@@ -562,7 +562,7 @@ For iOS tests, see "Working with the iOS App" section above.
 ### Current Migrations
 
 1. **iOS Code Signing**: Moving to Fastlane Match for certificate management
-2. **CI Performance**: Migrating to macOS-14 runners for better performance
+2. **CI Performance**: CI jobs use macOS-15 runners; certificate regeneration remains on macOS-14 pending LYB-65
 3. **Design System**: Updating to iOS 26 Liquid Glass design patterns
 
 ---
