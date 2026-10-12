@@ -102,12 +102,12 @@ jobs:
         uses: openai/codex-action@main
         id: codex
         with:
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt: >-
             You are working in a pnpm + Turborepo monorepo with GitHub Actions CI. Read the repository,
             run the relevant pnpm scripts, identify the minimal change needed to make all CI checks pass,
             implement only that change, and stop. Do not refactor unrelated code. Keep changes small and surgical.
-          codex_args: '["--config","sandbox_mode=\"workspace-write\""]'
+          codex-args: '["--config","sandbox_mode=\"workspace-write\""]'
 
       - name: Verify tests
         if: steps.pr.outputs.is-fork != 'true'

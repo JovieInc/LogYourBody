@@ -394,9 +394,6 @@ struct BodySpecIntegrationView: View {
         if let bodyFat = scan.bodyFatPercentage {
             details.append("\(bodyFat.formatted(.number.precision(.fractionLength(0...1))))% body fat")
         }
-        if let muscleMass = scan.muscleMass {
-            details.append("\(muscleMass.formatted(.number.precision(.fractionLength(0...1)))) muscle mass")
-        }
         return details.joined(separator: " · ")
     }
 }

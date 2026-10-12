@@ -1,0 +1,86 @@
+# Jovie Design Canon
+
+Status: Canon
+Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
+Last updated: 2026-07-17
+
+Design exists to increase customer throughput: make the next correct action obvious, trustworthy, and valuable.
+
+---
+
+## Design Goal
+
+Reduce friction between customer intent and customer value.
+
+Primary design question:
+
+> What is the smallest design change that helps more customers reach the next value moment?
+
+---
+
+## Design Bottlenecks
+
+Design work is justified when evidence shows one of these is limiting throughput:
+
+1. Customers do not understand the promise.
+2. Customers cannot find the next step.
+3. Customers do not trust the action.
+4. Customers abandon due to visual or interaction friction.
+5. Customers cannot perceive the value they received.
+6. Customers do not know what to do next.
+
+---
+
+## Required Design Proposal Shape
+
+- Current customer bottleneck:
+- Evidence (analytics, session, interview, support, screenshot, or user behavior):
+- Metric to improve:
+- Smallest design change:
+- Before/after verification:
+- Rollback:
+
+---
+
+## Principles
+
+- Clarity beats novelty.
+- Conversion-critical paths outrank decorative polish.
+- Polish is required when lack of polish blocks trust or activation.
+- Layout stability is part of correctness.
+- Taste matters, but customer behavior is stronger evidence.
+- For Jovie-owned intentionally art-directed or generated brand imagery, the
+  camera must find the palette: controllable high-salience color is designed
+  into the scene as a Jovie scene hue or neutral before capture/generation,
+  while human biology, creator identity, safety, trademark, documentary, and
+  other protected colors remain truthful.
+
+---
+
+## Anti-Goals
+
+Do not spend design effort on:
+
+- Visual novelty disconnected from activation, retention, trust, or revenue.
+- Redesigning stable surfaces because they feel old.
+- Animations that do not improve comprehension or conversion.
+- Dominant delight that has not passed the executable intentionality gate in
+  [`packages/ui/theme/motion-policy.ts`](../packages/ui/theme/motion-policy.ts).
+- Component churn without product bottleneck evidence.
+
+---
+
+## Relationship to Root Design System
+
+`../DESIGN.md` is the operational design-system reference. This file defines why and when design work matters; `../DESIGN.md` defines how to execute it correctly.
+
+UI judge calibration set: [`docs/screenshots/ui-escape-holdout/holdout.json`](https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/docs/screenshots/ui-escape-holdout/holdout.json) (HumanHoldoutSet v1). Its `fail` items render the escape classes in the UI escape corpus (`uiEscapeCorpus` in `scripts/invariants/assurance-matrix.json`), and its `pass` items are certified screens. Vision and coherence judges must be calibrated against it before they can block.
+
+---
+
+## Changelog
+
+| Date       | Change                                                                       | Source             |
+| ---------- | ---------------------------------------------------------------------------- | ------------------ |
+| 2026-08-21 | Canonized scene-first color harmony for Jovie-owned generated brand imagery. | Tim White approval |
+| 2026-07-17 | Created as domain canon under `/canon`.                                      | Tim White          |

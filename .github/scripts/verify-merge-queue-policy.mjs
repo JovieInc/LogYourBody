@@ -4,7 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 const requiredFragments = {
   ci: [
-    /\n\s*merge_group:\s*\n\s*branches:\s*\[main\]/,
+    // Every active branch ruleset requires the aggregate "CI Summary" check, so
+    // CI must emit it for pull requests and merge groups on both protected
+    // branches — main and production — or those rulesets deadlock.
+    /\n\s*pull_request:\s*\n\s*branches:\s*\[main,\s*production\]/,
+    /\n\s*merge_group:\s*\n\s*branches:\s*\[main,\s*production\]/,
     /types:\s*\[checks_requested\]/,
     /cancel-in-progress:\s*\$\{\{ github\.event_name != 'merge_group'/,
     /github\.event_name == 'merge_group'/,

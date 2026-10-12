@@ -44,4 +44,29 @@ where id = any ($1::uuid[])
 ```
 
 Do not send email addresses to product analytics. Conversion events remain
-anonymous; Neon is the system of record for invitation eligibility.
+free of contact traits; Neon is the system of record for invitation eligibility.
+
+## Registration evidence
+
+`accept` returns an internal `{ created: boolean }` receipt only after the
+unique insert succeeds. Duplicate submissions use `ON CONFLICT DO NOTHING`:
+they preserve the original source, timestamps, lifecycle and unsubscribe state.
+The API never returns the receipt. New entries, duplicates and honeypots still
+receive the same `202 { success: true }` response.
+
+`web_waitlist_submitted` is a legacy browser acceptance signal. It includes
+duplicates and honeypots and must not be used as the registration numerator.
+Use `summarizeWaitlistRegistrations({ from, to })` from the existing server store
+for the count of unique rows created in a half-open UTC interval `[from, to)`.
+It reads an aggregate only: no email, identity, health value or audience export.
+It includes the database observation time and explicitly marks historical
+cohort provenance as `unclassified`, with `qualified_real_users: null` and no
+claimed exclusions. No report endpoint, scheduled job or Summer activation is
+created by this interface.
+
+The current schema has no consent version, suppression history, test/founder
+classification or delivery ledger. Existing entries must not be retroactively
+granted new marketing consent. Those additions require a separate reviewed
+migration and a send-disabled outbox; invitation delivery requires explicit
+approval, idempotency and provider receipts. A database transaction alone
+cannot establish email delivery.
