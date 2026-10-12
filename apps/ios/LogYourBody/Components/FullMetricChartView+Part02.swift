@@ -179,7 +179,7 @@ func sourceLabel(for source: MetricEntrySourceType) -> String {
         case .manual:
             Image("AppIcon")
                 .resizable()
-                .aspectRatio(contentMode: .fit)
+                .scaledToFit()
                 .frame(width: 16, height: 16)
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         case .integration:

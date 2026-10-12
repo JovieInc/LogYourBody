@@ -95,7 +95,7 @@ final class OnboardingFlowViewModel: ObservableObject {
             case .welcome: return "Welcome"
             case .basics: return "Basics"
             case .measurements: return "Measurements"
-            case .score: return "Fat vs Muscle"
+            case .score: return "Body composition"
             case .profile: return "Profile"
             case .photo: return "Photo"
             }
@@ -276,7 +276,7 @@ extension OnboardingFlowViewModel.Step {
         case .healthConfirmation: return "Review"
         case .manualWeight: return "Weight"
         case .bodyFatChoice, .bodyFatNumeric, .bodyFatVisual: return "Body Fat"
-        case .bodyScore, .defaultHomeMode: return "Fat vs Muscle"
+        case .bodyScore, .defaultHomeMode: return "Body composition"
         case .emailCapture: return "Save Progress"
         case .account: return "Account"
         case .profileDetails: return "Profile"

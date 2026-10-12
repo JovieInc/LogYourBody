@@ -230,7 +230,7 @@ struct LogYourBodyApp: App {
         WindowGroup {
             switch persistenceController.persistentStoreLoadState {
             case .ready:
-                ContentView()
+                appContent
 #if DEBUG
                 .modifier(UITestViewportModifier())
 #endif
@@ -266,6 +266,9 @@ struct LogYourBodyApp: App {
                     // bundle. Do not let real startup race test-owned Keychain
                     // fixtures or external-service stubs in that environment.
                     guard !Self.isRunningUnitTests else { return }
+#if DEBUG
+                    guard !ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") else { return }
+#endif
                     await performStartupSequence()
                     resolvePendingEntryDeepLinkIfPossible()
                 }
@@ -311,6 +314,19 @@ struct LogYourBodyApp: App {
         }
     }
 
+    @ViewBuilder
+    private var appContent: some View {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") {
+            TrainingLiveSessionFixtureView()
+        } else {
+            ContentView()
+        }
+#else
+        ContentView()
+#endif
+    }
+
     // MARK: - Startup Helpers
 
     @MainActor
@@ -339,6 +355,7 @@ struct LogYourBodyApp: App {
         }
 
         Task { @MainActor in
+            await authInitializationTask.value
             await bootstrapHealthKit()
         }
 
@@ -354,16 +371,18 @@ struct LogYourBodyApp: App {
 
         await authTask.value
 
-        if authManager.isAuthenticated, let userId = authManager.currentUser?.id {
-            await subscriptionManager.identifyUser(userId: userId)
-        } else {
-            await subscriptionManager.refreshCustomerInfo()
-        }
+        // AuthManager's bound lifecycle owns every account transition, including cold restore.
+        await subscriptionManager.waitForBillingReconciliation()
     }
 
     @MainActor
     private func bootstrapHealthKit() async {
         let syncEnabled = UserDefaults.standard.bool(forKey: Constants.healthKitSyncEnabledKey)
+        HealthKitAccountSyncPolicy.bindIfUnbound(
+            userId: authManager.currentUser?.id,
+            syncEnabled: syncEnabled,
+            defaults: .standard
+        )
         HealthSyncCoordinator.shared.bootstrapIfNeeded(syncEnabled: syncEnabled)
     }
 
@@ -483,17 +502,6 @@ struct LogYourBodyApp: App {
             goalWeightUnit: "kg",
             onboardingCompleted: !usesBodyScoreOnboardingFixture
         )
-        subscriptionManager.isSubscribed = isSubscribed
-        subscriptionManager.customerInfo = nil
-        subscriptionManager.currentOffering = nil
-        subscriptionManager.errorMessage = nil
-        subscriptionManager.isPurchasing = false
-        if usesPaywallFixture {
-            subscriptionManager.applyCachedPaywallOfferingUITestFixture()
-        } else if usesPaywallPlansFixture {
-            subscriptionManager.applyPaywallPlansUITestFixture()
-        }
-        UserDefaults.standard.set(isSubscribed, forKey: Constants.revenueCatIsSubscribedKey)
         if isSubscribed && !usesDailyReminderPromptFixture {
             NotificationManager.shared.skipDailyWeighInPrompt()
         } else if usesDailyReminderPromptFixture {
@@ -545,6 +553,21 @@ struct LogYourBodyApp: App {
         )
         authManager.isAuthProviderLoaded = true
 
+        // Auth publication synchronously invalidates the previous billing owner.
+        // Install the synthetic UI-test state afterward, without yielding or
+        // configuring the live purchasing SDK.
+        subscriptionManager.isSubscribed = isSubscribed
+        subscriptionManager.customerInfo = nil
+        subscriptionManager.currentOffering = nil
+        subscriptionManager.errorMessage = nil
+        subscriptionManager.isPurchasing = false
+        if usesPaywallFixture {
+            subscriptionManager.applyCachedPaywallOfferingUITestFixture()
+        } else if usesPaywallPlansFixture {
+            subscriptionManager.applyPaywallPlansUITestFixture()
+        }
+        UserDefaults.standard.set(isSubscribed, forKey: Constants.revenueCatIsSubscribedKey)
+
         return true
     }
 
@@ -593,6 +616,15 @@ struct LogYourBodyApp: App {
                 continue
             }
 
+            let fixturePhotoURL: String?
+            if ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2SinglePhotoFixture"), entry.daysAgo != 0 {
+                fixturePhotoURL = nil
+            } else if ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2ShareMissingPhotoFixture"), entry.daysAgo != 0 {
+                fixturePhotoURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("lyb-ui-test-missing-share-photo.jpg").absoluteString
+            } else {
+                fixturePhotoURL = photoURL
+            }
             let metric = BodyMetrics(
                 id: "ui_test_full_dashboard_metric_\(entry.daysAgo)",
                 userId: userId,
@@ -607,7 +639,7 @@ struct LogYourBodyApp: App {
                 hipCm: nil,
                 waistUnit: nil,
                 notes: entry.notes,
-                photoUrl: photoURL,
+                photoUrl: fixturePhotoURL,
                 dataSource: entry.source,
                 createdAt: date,
                 updatedAt: now
@@ -630,51 +662,7 @@ struct LogYourBodyApp: App {
     }
 
     private func seedGlp1WeeklyCheckInUITestFixtureData(userId: String) async {
-        let calendar = Calendar.current
-        let now = Date()
-        let startedAt = calendar.date(byAdding: .day, value: -42, to: now) ?? now
-        let lastDoseDate = calendar.date(byAdding: .day, value: -9, to: now) ?? now
-
-        let medication = Glp1Medication(
-            id: "ui_test_glp1_medication",
-            userId: userId,
-            displayName: "Zepbound",
-            genericName: "tirzepatide",
-            drugClass: "dual GIP/GLP-1 receptor agonist",
-            brand: "Zepbound",
-            route: "subcutaneous",
-            frequency: "once weekly",
-            doseUnit: "mg/week",
-            isCompounded: false,
-            hkIdentifier: "hk.glp1.tirzepatide.zepbound.weekly",
-            startedAt: startedAt,
-            endedAt: nil,
-            notes: nil,
-            createdAt: startedAt,
-            updatedAt: now
-        )
-
-        let doseLog = Glp1DoseLog(
-            id: "ui_test_glp1_dose_due",
-            userId: userId,
-            takenAt: calendar.startOfDay(for: lastDoseDate),
-            medicationId: medication.id,
-            doseAmount: 5.0,
-            doseUnit: "mg/week",
-            drugClass: medication.drugClass,
-            brand: medication.brand,
-            isCompounded: medication.isCompounded,
-            supplierType: nil,
-            supplierName: nil,
-            notes: "UI test weekly check-in seed",
-            createdAt: lastDoseDate,
-            updatedAt: now
-        )
-
-        CoreDataManager.shared.saveGlp1Medications([medication], userId: userId)
-        CoreDataManager.shared.saveGlp1DoseLogs([doseLog], userId: userId)
-        _ = await CoreDataManager.shared.fetchGlp1Medications(for: userId)
-        _ = await CoreDataManager.shared.fetchGlp1DoseLogs(for: userId)
+        await CoreDataManager.shared.replaceUITestGlp1WeeklyCheckInFixture(userId: userId)
     }
     #endif
 

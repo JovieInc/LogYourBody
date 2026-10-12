@@ -25,9 +25,9 @@ enum ProfileDetailsValidationPolicy {
         return age >= 16 && age <= 80
     }
 
-    /// Converts the active height field into centimeters; returns nil when the
-    /// field cannot produce a positive height.
+    /// Converts a height accepted by this form into centimeters.
     static func heightInCentimeters(_ input: ProfileHeightInput) -> Double? {
+        guard isHeightValid(input) else { return nil }
         switch input.unit {
         case .centimeters:
             return Double(input.centimetersText)
@@ -406,11 +406,11 @@ struct BodyScoreProfileDetailsView: View {
             VStack(alignment: .leading, spacing: 20) {
                 OnboardingSegmentedControl(
                     options: HeightUnit.allCases,
-                    selection: $viewModel.profileHeightUnit
+                    selection: Binding(
+                        get: { viewModel.profileHeightUnit },
+                        set: { convertHeightFields(from: viewModel.profileHeightUnit, to: $0) }
+                    )
                 )
-                .onChange(of: viewModel.profileHeightUnit) { oldValue, newValue in
-                    convertHeightFields(from: oldValue, to: newValue)
-                }
 
                 switch viewModel.profileHeightUnit {
                 case .centimeters:
@@ -434,7 +434,11 @@ struct BodyScoreProfileDetailsView: View {
 
                     Text("Enter a height from 100 to 250 cm.")
                         .font(OnboardingTypography.caption)
-                        .foregroundStyle(theme.colors.textSecondary)
+                        .foregroundStyle(
+                            !viewModel.profileHeightCentimetersText.isEmpty &&
+                                !ProfileDetailsValidationPolicy.isHeightValid(profileHeightInput)
+                                ? theme.colors.error : theme.colors.textSecondary
+                        )
 
                 case .inches:
                     HStack(spacing: 12) {
@@ -545,6 +549,28 @@ struct BodyScoreProfileDetailsView: View {
 
 // MARK: - Substep Helpers
 
+extension BodyScoreProfileDetailsView {
+    func convertHeightFields(from oldUnit: HeightUnit, to newUnit: HeightUnit) {
+        guard oldUnit != newUnit else { return }
+
+        switch (oldUnit, newUnit) {
+        case (.centimeters, .inches):
+            if !viewModel.profileHeightCentimetersText.isEmpty {
+                guard let centimeters = ProfileDetailsValidationPolicy.heightInCentimeters(profileHeightInput),
+                      let totalInches = Int(exactly: (centimeters / 2.54).rounded()) else { return }
+                viewModel.profileHeightFeet = max(3, min(8, totalInches / 12))
+                viewModel.profileHeightInches = max(0, min(11, totalInches % 12))
+            }
+        case (.inches, .centimeters):
+            let totalInches = Double((viewModel.profileHeightFeet * 12) + viewModel.profileHeightInches)
+            viewModel.profileHeightCentimetersText = String(format: "%.0f", totalInches * 2.54)
+        default:
+            break
+        }
+        viewModel.profileHeightUnit = newUnit
+    }
+}
+
 private extension BodyScoreProfileDetailsView {
     func handlePrimaryAction() {
         switch viewModel.profileDetailsActiveSubstep {
@@ -573,23 +599,6 @@ private extension BodyScoreProfileDetailsView {
             focusedNameField = .lastName
         case .dateOfBirth, .sex, .height:
             focusedNameField = nil
-        }
-    }
-
-    func convertHeightFields(from oldUnit: HeightUnit, to newUnit: HeightUnit) {
-        guard oldUnit != newUnit else { return }
-
-        switch (oldUnit, newUnit) {
-        case (.centimeters, .inches):
-            guard let centimeters = Double(viewModel.profileHeightCentimetersText) else { return }
-            let totalInches = Int((centimeters / 2.54).rounded())
-            viewModel.profileHeightFeet = max(3, min(8, totalInches / 12))
-            viewModel.profileHeightInches = max(0, min(11, totalInches % 12))
-        case (.inches, .centimeters):
-            let totalInches = Double((viewModel.profileHeightFeet * 12) + viewModel.profileHeightInches)
-            viewModel.profileHeightCentimetersText = String(format: "%.0f", totalInches * 2.54)
-        default:
-            break
         }
     }
 

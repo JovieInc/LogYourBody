@@ -46,7 +46,7 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@typescript-eslint/eslint-plugin": "^8.70.1",
-    "@typescript-eslint/parser": "^8.70.1",
+    "@typescript-eslint/parser": "^8.71.0",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-import": "^2.32.0",
@@ -56,7 +56,7 @@
     "lint-staged": "^15.5.2",
     "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.6.14",
-    "turbo": "^2.11.4",
+    "turbo": "^2.11.7",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
   },
@@ -89,7 +89,7 @@
       "prettier --write"
     ],
     "apps/ios/**/*.{swift}": [
-      "cd apps/ios && swiftlint"
+      "swiftlint lint --strict --config apps/ios/.swiftlint.yml"
     ],
     "*.{ts,tsx,js,jsx,mjs,cjs,swift,sh,yml,yaml,json,md,html,css,scss,rb,py,toml,xml,plist,template,xcconfig}": [
       "node packages/product-registry/scripts/url-drift.test.mjs --staged"

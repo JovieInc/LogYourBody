@@ -41,7 +41,7 @@ describe('WaitlistForm', () => {
         method: 'POST',
         body: JSON.stringify({
           email: 'person@example.com',
-          source: 'landing:minimal:test_campaign',
+          source: 'landing:minimal:other',
           website: '',
         }),
       }),
@@ -51,6 +51,7 @@ describe('WaitlistForm', () => {
       expect.objectContaining({ outcome: 'accepted' }),
     );
     expect(JSON.stringify(track.mock.calls)).not.toContain('person@example.com');
+    expect(JSON.stringify(track.mock.calls)).not.toContain('test_campaign');
   });
 
   it('announces invalid email without making a request', async () => {

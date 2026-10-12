@@ -235,8 +235,42 @@ export function createMesoBlock(startDate: string, today: string): MesoBlock {
   };
 }
 
+/** Retries and later check-in updates are evidence from the same session.
+ * Equal-time pain reports take precedence because their recency cannot be distinguished.
+ */
+export function latestFeedbackPerSession(feedback: TrainingFeedback[]): TrainingFeedback[] {
+  const seen = new Set<string>();
+  return [...feedback]
+    .sort(
+      (a, b) =>
+        Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+        b.jointPain - a.jointPain ||
+        a.id.localeCompare(b.id),
+    )
+    .filter((item) => {
+      if (seen.has(item.sessionId)) return false;
+      seen.add(item.sessionId);
+      return true;
+    });
+}
+
+function hasConflictingFeedbackAtSameTime(
+  observation: TrainingFeedback,
+  feedback: TrainingFeedback[],
+): boolean {
+  return feedback.some(
+    (item) =>
+      item.sessionId === observation.sessionId &&
+      Date.parse(item.createdAt) === Date.parse(observation.createdAt) &&
+      (item.soreness !== observation.soreness ||
+        item.pump !== observation.pump ||
+        item.performance !== observation.performance ||
+        item.jointPain !== observation.jointPain),
+  );
+}
+
 export function evaluateDeload(feedback: TrainingFeedback[]): DeloadState {
-  const ordered = [...feedback].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const ordered = latestFeedbackPerSession(feedback);
   const latest = ordered[0];
   if (!latest) {
     return {
@@ -253,13 +287,21 @@ export function evaluateDeload(feedback: TrainingFeedback[]): DeloadState {
       evidenceIds: ['k:220190f8', 'k:e95f2199'],
     };
   }
+  if (ordered.slice(0, 2).some((item) => hasConflictingFeedbackAtSameTime(item, feedback))) {
+    return {
+      action: 'none',
+      explanation:
+        'Conflicting check-ins were recorded at the same time for a session, so recovery feedback cannot establish a repeated decline yet.',
+      evidenceIds: RECOVERY_EVIDENCE,
+    };
+  }
   const sustainedDecline =
     ordered.length >= 2 && ordered[0]?.performance === 'down' && ordered[1]?.performance === 'down';
   if (sustainedDecline && latest.soreness >= 7) {
     return {
       action: 'reduce_volume',
       explanation:
-        'Performance has declined across two check-ins while soreness is high, so this session uses one set per movement. Volume is not increased automatically.',
+        'Performance has declined across two sessions while soreness is high, so this session uses one set per movement. Volume is not increased automatically.',
       evidenceIds: ['k:0b3ea5bb', 'k:76bf778c', 'k:a6ae7fd4'],
     };
   }
@@ -280,24 +322,26 @@ function progressionForExercise(
 ): {
   action: ExercisePrescription['progression'];
   targetReps: number;
+  targetLoadKg: number | null;
   loadInstruction: string | null;
 } {
   const exerciseLogs = logs
     .filter((log) => log.exerciseId === exerciseId)
     .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt));
   if (exerciseLogs.length < 2)
-    return { action: 'hold', targetReps: REP_RANGE.min, loadInstruction: null };
+    return { action: 'hold', targetReps: REP_RANGE.min, targetLoadKg: null, loadInstruction: null };
   const lastSession = exerciseLogs[0]?.sessionId;
   const lastSets = exerciseLogs
     .filter((log) => log.sessionId === lastSession)
     .sort((a, b) => a.setNumber - b.setNumber);
   if (lastSets.length < 2)
-    return { action: 'hold', targetReps: REP_RANGE.min, loadInstruction: null };
+    return { action: 'hold', targetReps: REP_RANGE.min, targetLoadKg: null, loadInstruction: null };
   const allReachedTop = lastSets.every((log) => log.reps >= REP_RANGE.max && log.rir >= targetRir);
   if (allReachedTop) {
     return {
       action: 'increase_load',
       targetReps: REP_RANGE.min,
+      targetLoadKg: null,
       loadInstruction:
         'Use the next available load increment, then build repetitions within the range again.',
     };
@@ -309,7 +353,15 @@ function progressionForExercise(
         Math.max(REP_RANGE.min, Math.min(...lastSets.map((log) => log.reps)) + 1),
       )
     : Math.max(REP_RANGE.min, Math.min(...lastSets.map((log) => log.reps)));
-  return { action: canAddReps ? 'add_reps' : 'hold', targetReps, loadInstruction: null };
+  // Hold or add reps at the load the final set used last session. Equipment increments
+  // differ, so a load increase stays an instruction rather than a number.
+  const carriedLoad = lastSets[lastSets.length - 1]?.loadKg ?? null;
+  return {
+    action: canAddReps ? 'add_reps' : 'hold',
+    targetReps,
+    targetLoadKg: carriedLoad,
+    loadInstruction: null,
+  };
 }
 
 export function buildSession(input: {
@@ -338,7 +390,7 @@ export function buildSession(input: {
           repRange: REP_RANGE,
           targetReps: progression.targetReps,
           targetRir,
-          targetLoadKg: null,
+          targetLoadKg: progression.targetLoadKg,
           loadInstruction: progression.loadInstruction,
           progression: progression.action,
           evidenceIds: progression.action === 'increase_load' ? LOAD_EVIDENCE : EFFORT_EVIDENCE,

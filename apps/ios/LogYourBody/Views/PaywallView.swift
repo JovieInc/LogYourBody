@@ -97,10 +97,11 @@ struct PaywallView: View {
         } message: {
             paywallStatusMessage(subscriptionManager.errorMessage ?? "No active subscription found")
         }
-        .confirmationDialog(
+        // confirmationDialog presents without Cancel, so paywall logout has no
+        // reachable escape hatch.
+        .alert(
             "Log out of \(ProductRegistry.appName)?",
-            isPresented: $showLogoutConfirmation,
-            titleVisibility: .visible
+            isPresented: $showLogoutConfirmation
         ) {
             Button("Log Out", role: .destructive) {
                 Task {
@@ -108,7 +109,9 @@ struct PaywallView: View {
                     await authManager.logout()
                 }
             }
+            .accessibilityIdentifier("paywall_logout_confirm")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("paywall_logout_cancel")
         } message: {
             Text("Use this to switch accounts on this device.")
         }

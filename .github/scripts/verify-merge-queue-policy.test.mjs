@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { verifyPolicy, verifyRepository } from './verify-merge-queue-policy.mjs';
+import './merge-queue-enrollment.test.mjs';
 
 const validPolicy = {
   schema_version: 1,
@@ -16,8 +17,10 @@ const validPolicy = {
 
 const validCI = `
 on:
+  pull_request:
+    branches: [main, production]
   merge_group:
-    branches: [main]
+    branches: [main, production]
     types: [checks_requested]
 concurrency:
   cancel-in-progress: \${{ github.event_name != 'merge_group' }}
