@@ -14,6 +14,9 @@ struct ScannedPhoto: Identifiable {
     let date: Date
     let confidence: Float
     let metadata: PhotoMetadata
+    /// The user picked this photo directly from the library instead of the
+    /// on-device scan surfacing it as a suggestion.
+    let isManuallyPicked: Bool = false
 
     struct PhotoMetadata {
         let location: CLLocation?
@@ -418,6 +421,34 @@ class PhotoLibraryScanner: ObservableObject {
         }
 
         return groups.reversed() // Most recent first
+    }
+
+    // MARK: - Manual Library Picks
+
+    /// Resolves PhotosPicker item identifiers back to library assets so a
+    /// manual pick keeps its original capture date and full-resolution data.
+    /// Results follow the caller's identifier order and skip anything the
+    /// library can no longer resolve.
+    func assets(forLocalIdentifiers identifiers: [String]) -> [PHAsset] {
+        guard !identifiers.isEmpty else { return [] }
+        let result = PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil)
+        var byIdentifier: [String: PHAsset] = [:]
+        result.enumerateObjects { asset, _, _ in
+            byIdentifier[asset.localIdentifier] = asset
+        }
+        return identifiers.compactMap { byIdentifier[$0] }
+    }
+
+    /// A photo the user chose directly. It bypasses the detection heuristics
+    /// but feeds the same import, timeline, compare and share pipeline.
+    func manualCandidate(for asset: PHAsset) -> ScannedPhoto {
+        ScannedPhoto(
+            asset: asset,
+            date: asset.creationDate ?? Date(),
+            confidence: 1.0,
+            metadata: extractMetadata(from: asset),
+            isManuallyPicked: true
+        )
     }
 
     // MARK: - Image Loading
