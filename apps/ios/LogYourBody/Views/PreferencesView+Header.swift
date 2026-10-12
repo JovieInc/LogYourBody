@@ -23,17 +23,20 @@ extension PreferencesView {
                     accountSection
                     profileSection
                 }
-                .confirmationDialog(
+                // confirmationDialog on this settings screen presents as a popover
+                // and omits Cancel, so logout has no reachable escape hatch.
+                .alert(
                     "Log out of LogYourBody?",
-                    isPresented: $showingLogoutConfirmation,
-                    titleVisibility: .visible
+                    isPresented: $showingLogoutConfirmation
                 ) {
                     Button("Log Out", role: .destructive) {
                         Task {
                             await authManager.logout()
                         }
                     }
+                    .accessibilityIdentifier("settings_logout_confirm")
                     Button("Cancel", role: .cancel) {}
+                        .accessibilityIdentifier("settings_logout_cancel")
                 }
             }
             SettingsNavigationLink(
