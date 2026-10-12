@@ -155,7 +155,11 @@ export async function getOrCreateNextWorkout(input: {
     programSessionIds.has(feedback.sessionId),
   );
   let activeRecord: SessionRecord | undefined = periodSessions
-    .filter((record) => record.programSetupId === setup.id && record.status === 'in_progress')
+    .filter(
+      (record) =>
+        record.programSetupId === setup.id &&
+        (record.status === 'in_progress' || record.status === 'paused'),
+    )
     .sort(
       (a, b) =>
         Date.parse(String(b.startedAt ?? b.server_updated_at)) -
@@ -185,8 +189,15 @@ export async function getOrCreateNextWorkout(input: {
       status: 'completed',
       completedAt: input.now.toISOString(),
     };
-    const saved = await input.records.push(input.subject, 'training_sessions', [completed]);
-    if (saved.rejected_ids.includes(completed.id)) throw new Error('training_completion_rejected');
+    if (!input.records.updateTrainingSession) throw new Error('training_completion_unavailable');
+    const saved = await input.records.updateTrainingSession(
+      input.subject,
+      completed.id,
+      activePrescription.executionRevision ?? 0,
+      programLogs.filter((log) => log.sessionId === completed.id).length,
+      completed,
+    );
+    if (!saved) throw new Error('training_completion_rejected');
     periodSessions = periodSessions.map((record) =>
       record.id === completed.id ? completed : record,
     );
@@ -219,24 +230,35 @@ export async function getOrCreateNextWorkout(input: {
   if (activeRecord?.prescription) {
     const existing = activeRecord.prescription;
     const targetRir = existing.exercises[0]?.targetRir ?? block.targetRir;
-    const adjusted = buildSession({
-      setup,
-      block: { ...block, currentWeek: existing.week, targetRir },
-      sessionId: existing.id,
-      slot: existing.slot,
-      logs: programLogs,
-      feedback: programFeedback,
-    });
+    // Session-scoped interruption decisions are themselves an engine result.
+    // Preserve them until this session ends; rebuilding the base plan here would
+    // resurrect skipped equipment or discard a safety pause after relaunch.
+    const adjusted =
+      (existing.executionRevision ?? 0) > 0
+        ? existing
+        : buildSession({
+            setup,
+            block: { ...block, currentWeek: existing.week, targetRir },
+            sessionId: existing.id,
+            slot: existing.slot,
+            logs: programLogs,
+            feedback: programFeedback,
+          });
     if (persist) {
-      const saved = await input.records.push(input.subject, 'training_sessions', [
+      if (!input.records.updateTrainingSession)
+        throw new Error('training_session_update_unavailable');
+      const saved = await input.records.updateTrainingSession(
+        input.subject,
+        adjusted.id,
+        existing.executionRevision ?? 0,
+        programLogs.filter((log) => log.sessionId === adjusted.id).length,
         {
           ...activeRecord,
           prescription: adjusted,
           status: adjusted.safetyStop ? 'paused' : 'in_progress',
         },
-      ]);
-      if (saved.rejected_ids.includes(adjusted.id))
-        throw new Error('training_session_owner_conflict');
+      );
+      if (!saved) throw new Error('training_session_owner_conflict');
     }
     return {
       kind: 'workout',

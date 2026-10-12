@@ -792,7 +792,7 @@ struct ChatTabView: View {
                 Text("Log \(proposal.reps) reps at \(load), \(proposal.rir) RIR for \(proposal.exerciseName), set \(proposal.setNumber)?")
             }
         }
-        .sheet(item: $trainingPresentation) { presentation in
+        .fullScreenCover(item: $trainingPresentation) { presentation in
             switch presentation {
             case .setup:
                 TrainingEnrollmentView { sessionsPerWeek, equipment in
@@ -802,6 +802,7 @@ struct ChatTabView: View {
                 TrainingLiveSessionView(
                     session: session,
                     ownerId: ownership.subject,
+                    voiceEnabled: voiceCoachEnabled,
                     isCurrent: { authManager.ownsAccountSession(ownership) },
                     onLogSet: { exercise, setNumber, reps, loadKg, rir in
                         try await logTrainingSet(
@@ -810,6 +811,21 @@ struct ChatTabView: View {
                                 sessionId: session.id, exerciseId: exercise.id, setNumber: setNumber,
                                 reps: reps, loadKg: loadKg, rir: rir
                             )
+                        )
+                    },
+                    onCorrectSet: { request in
+                        try await correctTrainingSet(ownership: ownership, request: request)
+                    },
+                    onWorkoutAction: { request in
+                        try await applyTrainingAction(ownership: ownership, request: request)
+                    },
+                    onVoiceIntent: { activeSession, transcript, currentSet, lastCompletedSet in
+                        try await parseTrainingVoice(
+                            ownership: ownership,
+                            session: activeSession,
+                            transcript: transcript,
+                            currentSet: currentSet,
+                            lastCompletedSet: lastCompletedSet
                         )
                     },
                     onFeedback: { soreness, pump, performance, jointPain in
@@ -1149,6 +1165,116 @@ struct ChatTabView: View {
         await loadTrainingNext()
     }
 
+    private func correctTrainingSet(
+        ownership: AuthManager.ProfileSessionOwnership,
+        request: TrainingSetCorrectionRequest
+    ) async throws -> TrainingSavedSet {
+        var corrected: TrainingSavedSet?
+        try await TrainingOwnedRequest.perform(
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            getToken: { await chatAccessToken() },
+            send: { accessToken in
+                corrected = try await trainingService.correctSet(accessToken: accessToken, request: request)
+            }
+        )
+        guard let corrected else { throw TrainingServiceError.invalidResponse }
+        await loadTrainingNext()
+        return corrected
+    }
+
+    private func applyTrainingAction(
+        ownership: AuthManager.ProfileSessionOwnership,
+        request: TrainingWorkoutActionRequest
+    ) async throws -> TrainingSession {
+        var updated: TrainingSession?
+        do {
+            try await TrainingOwnedRequest.perform(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { accessToken in
+                    updated = try await trainingService.applyAction(accessToken: accessToken, request: request)
+                }
+            )
+        } catch {
+            let initialError = error
+            let retryable = error is URLError || (error as? TrainingServiceError) == .invalidResponse
+            if retryable {
+                do {
+                    try await TrainingOwnedRequest.perform(
+                        isCurrent: { authManager.ownsAccountSession(ownership) },
+                        getToken: { await chatAccessToken() },
+                        send: { accessToken in
+                            updated = try await trainingService.applyAction(
+                                accessToken: accessToken,
+                                request: request
+                            )
+                        }
+                    )
+                    if let updated {
+                        if request.action.kind == "end" {
+                            await loadTrainingNext()
+                        } else {
+                            replaceTrainingSession(updated)
+                        }
+                        return updated
+                    }
+                } catch {
+                    // Fall through to authoritative reload using the same event id.
+                }
+            }
+            // A response can be lost after the revisioned event commits. Reload
+            // and acknowledge only that exact event id; never infer success from copy.
+            await loadTrainingNext()
+            if let recovered = trainingResponse?.session,
+               recovered.id == request.sessionId,
+               recovered.executionEvents?.contains(where: { $0.id == request.eventId }) == true {
+                return recovered
+            }
+            throw initialError
+        }
+        guard let updated else { throw TrainingServiceError.invalidResponse }
+        replaceTrainingSession(updated)
+        if request.action.kind == "end" { await loadTrainingNext() }
+        return updated
+    }
+
+    private func replaceTrainingSession(_ updated: TrainingSession) {
+        trainingResponse = trainingResponse.map {
+            TrainingNextResponse(
+                version: $0.version,
+                error: $0.error,
+                session: updated,
+                week: $0.week,
+                weekCount: $0.weekCount,
+                weeklyFractionalVolume: $0.weeklyFractionalVolume
+            )
+        }
+    }
+
+    private func parseTrainingVoice(
+        ownership: AuthManager.ProfileSessionOwnership,
+        session: TrainingSession,
+        transcript: String,
+        currentSet: VoiceSetContext?,
+        lastCompletedSet: VoiceSetContext?
+    ) async throws -> VoiceIntentResponse {
+        guard authManager.ownsAccountSession(ownership), let token = await chatAccessToken(),
+              authManager.ownsAccountSession(ownership)
+        else { throw TrainingServiceError.authenticationExpired }
+        let response = try await URLSessionVoiceService().parseIntent(
+            transcript: transcript,
+            accessToken: token,
+            session: session,
+            weightUnit: MeasurementSystem.preferredFromDefaults.weightUnit,
+            currentSet: currentSet,
+            lastCompletedSet: lastCompletedSet
+        )
+        guard authManager.ownsAccountSession(ownership) else {
+            throw TrainingServiceError.authenticationExpired
+        }
+        return response
+    }
+
     private func recordTrainingFeedback(
         ownership: AuthManager.ProfileSessionOwnership,
         sessionId: String,
@@ -1435,25 +1561,33 @@ struct ChatTabView: View {
 
     private func commitVoiceSet(_ proposal: VoiceSetProposal) {
         Task { @MainActor in
-            guard let accessToken = await chatAccessToken() else {
-                chatErrorMessage = VoiceAPIError.authenticationExpired.localizedDescription
+            guard let session = trainingResponse?.session,
+                  let ownership = trainingOwner,
+                  authManager.ownsAccountSession(ownership),
+                  VoiceSetAdmission.admits(proposal, session: session),
+                  let exercise = session.exercises.first(where: { $0.id == proposal.exerciseId })
+            else {
+                chatErrorMessage = VoiceSetAdmission.rejectedLogMessage
                 return
             }
-            do {
-                try await VoiceSetLogger.commit(
-                    proposal,
-                    isConfirmed: true,
-                    accessToken: accessToken,
-                    session: trainingResponse?.session
-                ) { token, request in
-                    try await trainingService.logSet(accessToken: token, request: request)
-                }
-                await loadTrainingNext()
+            let journal = TrainingSessionDraft(
+                session: session,
+                ownerId: ownership.subject,
+                store: .shared,
+                isCurrent: { authManager.ownsAccountSession(ownership) }
+            )
+            journal.update(exercise, setNumber: proposal.setNumber) {
+                $0.repsText = String(proposal.reps)
+                $0.loadText = TrainingLoadInputPolicy.savedText(for: proposal.loadKg)
+                $0.rir = proposal.rir
+            }
+            await journal.save(exercise, setNumber: proposal.setNumber) { request in
+                try await logTrainingSet(ownership: ownership, request: request)
+            }
+            if journal.loggedSets["\(proposal.exerciseId)-\(proposal.setNumber)"] != nil {
                 voicePlayback.speakOffline("Set logged.")
-            } catch let error as LocalizedError {
-                chatErrorMessage = error.errorDescription ?? "The set could not be saved."
-            } catch {
-                chatErrorMessage = "The set could not be saved."
+            } else {
+                chatErrorMessage = journal.errorMessage ?? "The set could not be saved."
             }
         }
     }

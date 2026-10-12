@@ -98,6 +98,44 @@ export function createNeonNativeProductRecords(
       return existing[0] ? mapRecord(subject, existing[0]) : null;
     },
 
+    async correctTrainingSet(subject, id, expectedRevision, record) {
+      const rows = (await database.query(
+        `update public.native_records
+         set payload = $4::jsonb,
+             updated_at = now()
+         where collection = 'logged_sets' and id = $1
+           and user_subject = $2 and deleted_at is null
+           and coalesce((payload->>'revision')::integer, 0) = $3
+         returning id, payload, deleted_at, updated_at`,
+        [id, subject, expectedRevision, JSON.stringify(payloadForInsert(record))],
+      )) as NativeRecordRow[];
+      return rows[0] ? mapRecord(subject, rows[0]) : null;
+    },
+
+    async updateTrainingSession(subject, id, expectedRevision, expectedLoggedSetCount, record) {
+      const rows = (await database.query(
+        `update public.native_records
+         set payload = $5::jsonb,
+             updated_at = now()
+         where collection = 'training_sessions' and id = $1
+           and user_subject = $2 and deleted_at is null
+           and coalesce((payload->'prescription'->>'executionRevision')::integer, 0) = $3
+           and (select count(*) from public.native_records logged
+                where logged.collection = 'logged_sets'
+                  and logged.user_subject = $2 and logged.deleted_at is null
+                  and logged.payload->>'sessionId' = $1::text) = $4
+         returning id, payload, deleted_at, updated_at`,
+        [
+          id,
+          subject,
+          expectedRevision,
+          expectedLoggedSetCount,
+          JSON.stringify(payloadForInsert(record)),
+        ],
+      )) as NativeRecordRow[];
+      return rows[0] ? mapRecord(subject, rows[0]) : null;
+    },
+
     async push(subject, collection, records) {
       const accepted: NativeProductRecord[] = [];
       const rejectedIds: string[] = [];
@@ -219,6 +257,16 @@ export function createNeonNativeProductRecords(
 export const neonNativeProductRecords: NativeProductRecordsPort = {
   insertTrainingSet: (subject, record) =>
     createNeonNativeProductRecords().insertTrainingSet!(subject, record),
+  correctTrainingSet: (subject, id, expectedRevision, record) =>
+    createNeonNativeProductRecords().correctTrainingSet!(subject, id, expectedRevision, record),
+  updateTrainingSession: (subject, id, expectedRevision, expectedLoggedSetCount, record) =>
+    createNeonNativeProductRecords().updateTrainingSession!(
+      subject,
+      id,
+      expectedRevision,
+      expectedLoggedSetCount,
+      record,
+    ),
   push: (subject, collection, records) =>
     createNeonNativeProductRecords().push(subject, collection, records),
   pull: (subject, collection, input) =>
