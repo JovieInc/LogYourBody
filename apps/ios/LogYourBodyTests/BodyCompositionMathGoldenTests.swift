@@ -213,6 +213,126 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         XCTAssertTrue(result.isLastKnown)
     }
 
+    func testBodyFatBetweenDexaScansTracksScaleWeightTrend() throws {
+        // Two DEXA scans 90 days apart with identical weight and body fat,
+        // plus a weigh-in plateau in between. The estimate between scans must
+        // follow the scale weight (rising above the scanned 20%) and be
+        // marked as interpolated, not measured.
+        var metrics = [
+            makeMetric(
+                date: date(daysAfterStart: 0),
+                weight: 80,
+                bodyFatPercentage: 20,
+                dataSource: "bodyspec_dexa"
+            ),
+            makeMetric(
+                date: date(daysAfterStart: 90),
+                weight: 80,
+                bodyFatPercentage: 20,
+                dataSource: "bodyspec_dexa"
+            )
+        ]
+        for day in 40...50 {
+            metrics.append(makeMetric(date: date(daysAfterStart: day), weight: 90))
+        }
+
+        let result = try XCTUnwrap(MetricsInterpolationService.shared.estimateBodyFat(
+            for: date(daysAfterStart: 45),
+            metrics: metrics
+        ))
+
+        XCTAssertTrue(result.isInterpolated)
+        XCTAssertFalse(result.isLastKnown)
+        XCTAssertEqual(result.confidenceLevel, .low)
+        XCTAssertGreaterThan(result.value, 22)
+        XCTAssertLessThan(result.value, 35)
+    }
+
+    func testBodyFatBetweenDexaScansMatchesScanValuesWhenWeightIsFlat() throws {
+        let metrics = [
+            makeMetric(
+                date: date(daysAfterStart: 0),
+                weight: 80,
+                bodyFatPercentage: 20,
+                dataSource: "bodyspec_dexa"
+            ),
+            makeMetric(
+                date: date(daysAfterStart: 90),
+                weight: 80,
+                bodyFatPercentage: 20,
+                dataSource: "bodyspec_dexa"
+            )
+        ]
+
+        let result = try XCTUnwrap(MetricsInterpolationService.shared.estimateBodyFat(
+            for: date(daysAfterStart: 45),
+            metrics: metrics
+        ))
+
+        XCTAssertEqual(result.value, 20, accuracy: 0.5)
+        XCTAssertTrue(result.isInterpolated)
+        XCTAssertEqual(result.confidenceLevel, .low)
+    }
+
+    func testBodyFatLongGapWithoutDexaAnchorsStillReturnsNil() {
+        let metrics = [
+            makeMetric(date: date(daysAfterStart: 0), weight: 80, bodyFatPercentage: 20),
+            makeMetric(date: date(daysAfterStart: 90), weight: 80, bodyFatPercentage: 20)
+        ]
+
+        XCTAssertNil(MetricsInterpolationService.shared.estimateBodyFat(
+            for: date(daysAfterStart: 45),
+            metrics: metrics
+        ))
+    }
+
+    func testBodyFatDexaGapBeyondLimitReturnsNil() {
+        let metrics = [
+            makeMetric(
+                date: date(daysAfterStart: 0),
+                weight: 80,
+                bodyFatPercentage: 20,
+                dataSource: "bodyspec_dexa"
+            ),
+            makeMetric(
+                date: date(daysAfterStart: 400),
+                weight: 80,
+                bodyFatPercentage: 20,
+                dataSource: "bodyspec_dexa"
+            )
+        ]
+
+        XCTAssertNil(MetricsInterpolationService.shared.estimateBodyFat(
+            for: date(daysAfterStart: 200),
+            metrics: metrics
+        ))
+    }
+
+    func testBodyFatDexaAnchoredPointsRemainMeasuredOnScanDays() throws {
+        let metrics = [
+            makeMetric(
+                date: date(daysAfterStart: 0),
+                weight: 80,
+                bodyFatPercentage: 20,
+                dataSource: "bodyspec_dexa"
+            ),
+            makeMetric(
+                date: date(daysAfterStart: 90),
+                weight: 82,
+                bodyFatPercentage: 21,
+                dataSource: "bodyspec_dexa"
+            )
+        ]
+
+        let scanDay = try XCTUnwrap(MetricsInterpolationService.shared.estimateBodyFat(
+            for: date(daysAfterStart: 90),
+            metrics: metrics
+        ))
+        XCTAssertEqual(scanDay.value, 21, accuracy: 0.001)
+        XCTAssertFalse(scanDay.isInterpolated)
+        XCTAssertFalse(scanDay.isLastKnown)
+    }
+
     private func makeWeightContext(
         _ points: [(dayOffset: Int, weight: Double)]
     ) throws -> MetricsInterpolationService.WeightInterpolationContext {
@@ -225,7 +345,12 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         return try XCTUnwrap(MetricsInterpolationService.shared.makeWeightInterpolationContext(for: metrics))
     }
 
-    private func makeMetric(date: Date, weight: Double, bodyFatPercentage: Double? = nil) -> BodyMetrics {
+    private func makeMetric(
+        date: Date,
+        weight: Double,
+        bodyFatPercentage: Double? = nil,
+        dataSource: String = "manual"
+    ) -> BodyMetrics {
         BodyMetrics(
             id: UUID().uuidString,
             userId: "body-comp-golden-tests",
@@ -238,7 +363,7 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
             boneMass: nil,
             notes: nil,
             photoUrl: nil,
-            dataSource: "manual",
+            dataSource: dataSource,
             createdAt: date,
             updatedAt: date
         )
