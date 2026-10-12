@@ -697,7 +697,7 @@ def _run_mac_lane(tmp_path: Path, command: str, env: dict[str, str], **fixtures:
         ["bash", str(_MAC_LANE_SCRIPT), command], text=True, capture_output=True,
         check=False, pass_fds=_coverage_fds(),
         env={**os.environ, "PATH": f"{gh.parent}:{os.environ['PATH']}", "FAKE_DIR": str(tmp_path),
-             "GITHUB_OUTPUT": str(output), "GITHUB_SERVER_URL": "https://github.com",
+             "GITHUB_OUTPUT": str(output), "GITHUB_SERVER_URL": "server",
              "GH_REPO": "JovieInc/LogYourBody", "LANE": "ios", "FIRST_POLL_SECONDS": "0",
              "POLL_SECONDS": "0", **env},
     )
