@@ -40,6 +40,8 @@ extension DashboardViewLiquid {
             selectedIndex: $selectedIndex,
             weightValue: formatTrendWeightHeadline(metric, usesTrend: weightUsesTrend),
             weightUnit: unit,
+            ffmiValue: homeV2FFMIValue(metric).map { String(format: "%.1f", $0) } ?? "–",
+            bodyFatValue: homeV2Formatters.bodyFatText(metric),
             changeSentence: HomeV2Copy.changeSentence(delta: heroWeightDelta30d(), unit: unit),
             compositionSentence: HomeV2CompositionPolicy.headline(metrics: bodyMetrics),
             phaseSentence: homeV2PhaseSentence,

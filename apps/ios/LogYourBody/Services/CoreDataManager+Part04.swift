@@ -16,6 +16,18 @@ enum BodyMetricSyncDateParser {
         wholeSeconds.formatOptions = [.withInternetDateTime]
         return wholeSeconds.date(from: string)
     }
+
+    /// True when a stored row is strictly newer than a parseable payload
+    /// `updated_at`. A missing or unparseable timestamp is not newer, so those
+    /// payloads still apply.
+    static func storedVersionIsNewer(_ stored: Date?, than data: [String: Any]) -> Bool {
+        guard let stored,
+              let updatedString = data["updated_at"] as? String,
+              let incoming = date(from: updatedString) else {
+            return false
+        }
+        return stored > incoming
+    }
 }
 
 extension CoreDataManager {
@@ -44,6 +56,10 @@ extension CoreDataManager {
                 }
 
                 let metric = results.first ?? CachedBodyMetrics(context: context)
+                if results.first != nil,
+                   BodyMetricSyncDateParser.storedVersionIsNewer(metric.updatedAt, than: data) {
+                    return
+                }
 
                 // Update fields
                 metric.id = id
@@ -175,6 +191,10 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
                     return
                 }
                 let metric = results.first ?? CachedDailyMetrics(context: context)
+                if results.first != nil,
+                   BodyMetricSyncDateParser.storedVersionIsNewer(metric.updatedAt, than: data) {
+                    return
+                }
 
                 // Update fields
                 metric.id = id
@@ -229,6 +249,10 @@ func updateOrCreateProfile(from data: [String: Any]) {
             do {
                 let results = try context.fetch(request)
                 let profile = results.first ?? CachedProfile(context: context)
+                if results.first != nil,
+                   BodyMetricSyncDateParser.storedVersionIsNewer(profile.updatedAt, than: data) {
+                    return
+                }
 
                 // Update fields
                 // profile.userId = userId // Using id field instead
