@@ -635,6 +635,14 @@ def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
     assert "create-config-files: 'false'" in canary
 
 
+def test_setup_ios_build_installs_swiftlint_in_user_writable_path() -> None:
+    # /usr/local/bin is root-owned on self-hosted Apple Silicon runners, so the
+    # shared setup action must not unzip SwiftLint there (canary exit code 50).
+    action = (_REPO_ROOT / '.github' / 'actions' / 'setup-ios-build' / 'action.yml').read_text()
+    assert '/usr/local/bin' not in action
+    assert 'GITHUB_PATH' in action
+
+
 def test_invalid_awaiter_bounds_and_missing_helper_fall_back(tmp_path: Path) -> None:
     cases = [
         {'HEARTBEAT_POLL_ATTEMPTS': '0'},
