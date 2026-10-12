@@ -84,6 +84,26 @@ export function createNeonBodyMetricsStore(
   };
 }
 
+/** Export every active owned row without changing the paginated history reader. */
+export function createNeonBodyMetricsExportReader(
+  database: NeonQueryFunction<false, false> = getDatabase(),
+) {
+  return {
+    async listAll(subject: string): Promise<ProductBodyMetric[]> {
+      return (await database.query(
+        `select ${columns} from public.body_metrics
+         where user_subject = $1 and deleted_at is null
+         order by date desc, created_at desc, id desc`,
+        [subject],
+      )) as ProductBodyMetric[];
+    },
+  };
+}
+
+export const neonBodyMetricsExport = {
+  listAll: (subject: string) => createNeonBodyMetricsExportReader().listAll(subject),
+};
+
 export const neonBodyMetrics: BodyMetricsPort = {
   list: (subject, limit) => createNeonBodyMetricsStore().list(subject, limit),
   upsert: (subject, metric) => createNeonBodyMetricsStore().upsert(subject, metric),
