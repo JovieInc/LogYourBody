@@ -204,6 +204,117 @@ final class OnboardingFlowValidationTests: XCTestCase {
         XCTAssertEqual(viewModel.bodyScoreInput.weight.inPounds ?? 0, 185, accuracy: 0.01)
     }
 
+    func testManualWeightRejectsInvalidNonemptyDraftInsteadOfStoredValue() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.weightUnit = .pounds
+        viewModel.bodyScoreInput.weight = WeightValue(value: 180, unit: .pounds)
+        viewModel.bodyScoreInput.weightSource = .healthKit
+
+        for text in ["abc", " ", "inf", "nan", "1e309", "-inf", "-1", "69"] {
+            viewModel.manualWeightText = text
+            XCTAssertFalse(viewModel.canContinueWeight, text)
+            viewModel.persistManualWeightEntry()
+            XCTAssertEqual(viewModel.bodyScoreInput.weight, WeightValue(value: 180, unit: .pounds), text)
+            XCTAssertEqual(viewModel.bodyScoreInput.weightSource, .healthKit, text)
+        }
+        viewModel.manualWeightText = ""
+        XCTAssertTrue(viewModel.canContinueWeight, "An empty draft retains the existing finite weight contract")
+    }
+
+    func testWeightUnitChangePreservesInvalidDraftAndStoredMeasurement() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.weightUnit = .pounds
+        viewModel.bodyScoreInput.weight = WeightValue(value: 180, unit: .pounds)
+
+        for text in ["abc", "inf", "nan", "1e309"] {
+            viewModel.manualWeightText = text
+            viewModel.setWeightUnit(.kilograms)
+            XCTAssertEqual(viewModel.manualWeightText, text)
+            XCTAssertEqual(viewModel.weightUnit, .pounds, "Correct the invalid draft before converting units")
+            XCTAssertEqual(viewModel.bodyScoreInput.weight, WeightValue(value: 180, unit: .pounds))
+            XCTAssertFalse(viewModel.canContinueWeight)
+        }
+    }
+
+    func testWeightConversionOverflowCannotBecomeStoredInfinity() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.weightUnit = .kilograms
+        viewModel.manualWeightText = "1e308"
+        XCTAssertFalse(viewModel.canContinueWeight, "A weight must remain finite in either supported unit")
+        viewModel.persistManualWeightEntry()
+        XCTAssertNil(viewModel.bodyScoreInput.weight.value)
+        viewModel.setWeightUnit(.pounds)
+        XCTAssertEqual(viewModel.manualWeightText, "1e308")
+        XCTAssertEqual(viewModel.weightUnit, .kilograms)
+        XCTAssertNil(viewModel.bodyScoreInput.weight.value)
+    }
+
+    func testProfileHeightUnitChangeRejectsOutOfDomainDraftWithoutClampingIt() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        let view = BodyScoreProfileDetailsView(viewModel: viewModel)
+        viewModel.profileHeightUnit = .centimeters
+        viewModel.profileHeightFeet = 5
+        viewModel.profileHeightInches = 10
+
+        for text in ["abc", "999", "-1"] {
+            viewModel.profileHeightCentimetersText = text
+            view.convertHeightFields(from: .centimeters, to: .inches)
+            XCTAssertEqual(viewModel.profileHeightCentimetersText, text)
+            XCTAssertEqual(viewModel.profileHeightUnit, .centimeters)
+            XCTAssertEqual(viewModel.profileHeightFeet, 5)
+            XCTAssertEqual(viewModel.profileHeightInches, 10)
+        }
+    }
+
+    func testProfileHeightUnitChangeSafelyPreservesNonfiniteDrafts() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        let view = BodyScoreProfileDetailsView(viewModel: viewModel)
+        viewModel.profileHeightUnit = .centimeters
+        viewModel.profileHeightFeet = 5
+        viewModel.profileHeightInches = 10
+
+        for text in ["inf", "nan", "1e309", "1e308"] {
+            viewModel.profileHeightCentimetersText = text
+            view.convertHeightFields(from: .centimeters, to: .inches)
+            XCTAssertEqual(viewModel.profileHeightCentimetersText, text)
+            XCTAssertEqual(viewModel.profileHeightUnit, .centimeters)
+            XCTAssertEqual(viewModel.profileHeightFeet, 5)
+            XCTAssertEqual(viewModel.profileHeightInches, 10)
+        }
+    }
+
+    func testProfileHeightUnitChangeConvertsValidDraftAndAcceptsEmptyUnitChoice() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        let view = BodyScoreProfileDetailsView(viewModel: viewModel)
+        viewModel.profileHeightUnit = .centimeters
+        viewModel.profileHeightCentimetersText = "178"
+        view.convertHeightFields(from: .centimeters, to: .inches)
+        XCTAssertEqual(viewModel.profileHeightUnit, .inches)
+        XCTAssertEqual(viewModel.profileHeightFeet, 5)
+        XCTAssertEqual(viewModel.profileHeightInches, 10)
+        view.convertHeightFields(from: .inches, to: .centimeters)
+        XCTAssertEqual(viewModel.profileHeightUnit, .centimeters)
+        XCTAssertEqual(viewModel.profileHeightCentimetersText, "178")
+
+        viewModel.profileHeightCentimetersText = ""
+        view.convertHeightFields(from: .centimeters, to: .inches)
+        XCTAssertEqual(viewModel.profileHeightUnit, .inches, "An empty field can still choose picker entry")
+    }
+
+    func testMeasurementSystemDoesNotPartiallySwitchWithInvalidWeightDraft() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.weightUnit = .kilograms
+        viewModel.heightUnit = .centimeters
+        viewModel.bodyScoreInput.measurementPreference = .metric
+        viewModel.manualWeightText = "inf"
+        viewModel.heightCentimetersText = "178"
+        viewModel.setHeightUnit(.inches)
+        XCTAssertEqual(viewModel.heightUnit, .centimeters)
+        XCTAssertEqual(viewModel.weightUnit, .kilograms)
+        XCTAssertEqual(viewModel.bodyScoreInput.measurementPreference, .metric)
+        XCTAssertEqual(viewModel.manualWeightText, "inf")
+    }
+
     func testPersistHeightEntryHandlesBothUnits() {
         let viewModel = OnboardingFlowViewModel()
         viewModel.heightUnit = .centimeters
@@ -333,15 +444,10 @@ final class OnboardingFlowValidationTests: XCTestCase {
         XCTAssertEqual(skippedViewModel.currentStep, .bodyFatChoice)
     }
 
-    func testFirstMissingInputStepRoutesToEarliestGap() {
+    func testFirstMissingInputStepAsksOnlyWhatTheRevealNeeds() {
         let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
 
-        XCTAssertEqual(viewModel.firstMissingInputStep(), .basics)
-
-        viewModel.updateSex(.female)
-        XCTAssertEqual(viewModel.firstMissingInputStep(), .height)
-
-        viewModel.bodyScoreInput.height = HeightValue(value: 170, unit: .centimeters)
+        // Sex and height are asked after the reveal, in the profile step.
         XCTAssertEqual(viewModel.firstMissingInputStep(), .manualWeight)
 
         viewModel.bodyScoreInput.weight = WeightValue(value: 150, unit: .pounds)
@@ -349,8 +455,6 @@ final class OnboardingFlowValidationTests: XCTestCase {
 
         let authorizedViewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
         authorizedViewModel.healthKitManager.isAuthorized = true
-        authorizedViewModel.updateSex(.female)
-        authorizedViewModel.bodyScoreInput.height = HeightValue(value: 170, unit: .centimeters)
         XCTAssertEqual(authorizedViewModel.firstMissingInputStep(), .healthConfirmation)
     }
 
@@ -359,9 +463,22 @@ final class OnboardingFlowValidationTests: XCTestCase {
 
         await viewModel.calculateScoreIfNeeded()
 
-        XCTAssertEqual(viewModel.currentStep, .basics)
+        XCTAssertEqual(viewModel.currentStep, .manualWeight)
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertEqual(viewModel.errorMessage, "Missing inputs for score calculation.")
+    }
+
+    func testRevealDoesNotWaitForSexOrHeight() async {
+        let viewModel = OnboardingFlowViewModel(healthKitManager: HealthKitManager())
+        viewModel.bodyScoreInput.weight = WeightValue(value: 80, unit: .kilograms)
+        viewModel.bodyScoreInput.bodyFat = BodyFatValue(percentage: 20, source: .manualValue)
+
+        await viewModel.calculateScoreIfNeeded()
+
+        XCTAssertEqual(viewModel.currentStep, .bodyScore)
+        XCTAssertNil(viewModel.bodyScoreResult, "The score waits for sex and height; the reveal does not")
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertFalse(viewModel.isLoading)
     }
 
     // MARK: - Profile details draft logic
@@ -435,5 +552,82 @@ final class OnboardingFlowValidationTests: XCTestCase {
 
         input.birthYear = currentYear + 1
         XCTAssertEqual(input.age, 0)
+    }
+
+    func testLegacyHeightRejectsInvalidDraftInsteadOfStoredValue() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.heightUnit = .centimeters
+        for draft in ["abc", " ", "inf", "nan", "1e309", "1e308", "99"] {
+            viewModel.bodyScoreInput.height = HeightValue(value: 178, unit: .centimeters)
+            viewModel.heightCentimetersText = draft
+            XCTAssertFalse(viewModel.canContinueHeight, draft)
+            viewModel.persistHeightEntry()
+            XCTAssertEqual(viewModel.bodyScoreInput.height, HeightValue(value: 178, unit: .centimeters), draft)
+        }
+        viewModel.heightCentimetersText = ""
+        XCTAssertTrue(viewModel.canContinueHeight, "An empty draft retains the valid stored measurement")
+    }
+
+    func testLegacyHeightInvalidDraftDoesNotPartiallySwitchMeasurementUnits() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        for switchFromWeight in [false, true] {
+            viewModel.heightUnit = .centimeters
+            viewModel.weightUnit = .kilograms
+            viewModel.heightCentimetersText = "abc"
+            viewModel.manualWeightText = "80"
+            viewModel.bodyScoreInput.height = HeightValue(value: 178, unit: .centimeters)
+            viewModel.bodyScoreInput.weight = WeightValue(value: 80, unit: .kilograms)
+            viewModel.bodyScoreInput.measurementPreference = .metric
+            if switchFromWeight { viewModel.setWeightUnit(.pounds) } else { viewModel.setHeightUnit(.inches) }
+            XCTAssertEqual(viewModel.heightCentimetersText, "abc")
+            XCTAssertEqual(viewModel.heightUnit, .centimeters)
+            XCTAssertEqual(viewModel.manualWeightText, "80")
+            XCTAssertEqual(viewModel.weightUnit, .kilograms)
+            XCTAssertEqual(viewModel.bodyScoreInput.weight, WeightValue(value: 80, unit: .kilograms))
+            XCTAssertEqual(viewModel.bodyScoreInput.measurementPreference, .metric)
+        }
+    }
+
+    func testLegacyHeightUnitConversionUsesTheCurrentDraftBeforeStoredHeight() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.heightUnit = .centimeters
+        viewModel.bodyScoreInput.height = HeightValue(value: 178, unit: .centimeters)
+        viewModel.heightCentimetersText = "152.4"
+        viewModel.setHeightUnit(.inches)
+        XCTAssertEqual(viewModel.heightUnit, .inches)
+        XCTAssertEqual(viewModel.heightFeet, 5)
+        XCTAssertEqual(viewModel.heightInches, 0, "Use the edited 152.4 cm, not the prior 178 cm measurement")
+        viewModel.persistHeightEntry()
+        XCTAssertEqual(viewModel.bodyScoreInput.height.inCentimeters ?? 0, 152.4, accuracy: 0.001)
+    }
+
+    func testLegacyHeightUnitChangePreservesNonfiniteDraftWithoutCrashing() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.heightUnit = .centimeters
+        viewModel.bodyScoreInput.height = HeightValue()
+        for draft in ["inf", "nan", "1e309", "1e308"] {
+            viewModel.heightCentimetersText = draft
+            viewModel.setHeightUnit(.inches)
+            XCTAssertEqual(viewModel.heightUnit, .centimeters, draft)
+            XCTAssertEqual(viewModel.heightCentimetersText, draft)
+            XCTAssertFalse(viewModel.canContinueHeight, draft)
+            XCTAssertNil(viewModel.bodyScoreInput.height.value)
+        }
+    }
+
+    func testLegacyHeightHydrationRejectsUnsafeConversionsWithoutChangingTheDraft() {
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.heightFeet = 5
+        viewModel.heightInches = 10
+        viewModel.profileHeightUnit = .centimeters
+        viewModel.profileHeightCentimetersText = "178"
+        for height in [Double.infinity, -.infinity, .nan, Double.greatestFiniteMagnitude] {
+            viewModel.updateImperialFields(fromCentimeters: height)
+            XCTAssertEqual(viewModel.heightFeet, 5)
+            XCTAssertEqual(viewModel.heightInches, 10)
+            viewModel.hydrateProfileHeight(centimeters: height, storedUnit: "in")
+            XCTAssertEqual(viewModel.profileHeightUnit, .centimeters)
+            XCTAssertEqual(viewModel.profileHeightCentimetersText, "178")
+        }
     }
 }

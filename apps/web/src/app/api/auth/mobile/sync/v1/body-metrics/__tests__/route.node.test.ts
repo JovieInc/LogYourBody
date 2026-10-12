@@ -157,6 +157,64 @@ describe('/api/auth/mobile/sync/v1/body-metrics', () => {
     ]);
   });
 
+  it('preserves explicit unknown-method PDF provenance through the native sync boundary', async () => {
+    const { handlers, sync } = makeHarness();
+    const input = {
+      ...morningInput,
+      data_source: 'pdf_import',
+      body_fat_method: null,
+      muscle_mass: null,
+      source_metadata: { vendor: 'pdf_import', source_name: 'Unidentified device' },
+    };
+    const response = await handlers.POST(request('POST', 'access-a', { records: [input] }));
+    expect(response.status).toBe(200);
+    expect(sync.pushed).toEqual([{ subject: 'owner-a', records: [input] }]);
+    await expect(response.json()).resolves.toMatchObject({
+      records: [
+        {
+          data_source: 'pdf_import',
+          source_metadata: input.source_metadata,
+          body_fat_method: null,
+          muscle_mass: null,
+        },
+      ],
+    });
+  });
+
+  it.each([
+    'manual',
+    'healthkit',
+    'smart_scale',
+    'bodyspec_dexa',
+    'dexa_pdf',
+    'inbody_pdf',
+    'caliper',
+    'photo',
+  ] as const)('retains native source %s', async (dataSource) => {
+    const { handlers, sync } = makeHarness();
+    const response = await handlers.POST(
+      request('POST', 'access-a', {
+        records: [{ ...morningInput, data_source: dataSource }],
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(sync.pushed[0]?.records[0]?.data_source).toBe(dataSource);
+  });
+
+  it.each(['unknown', 'PDF Import', ''])(
+    'rejects noncanonical native source %j before persistence',
+    async (dataSource) => {
+      const { handlers, sync } = makeHarness();
+      const response = await handlers.POST(
+        request('POST', 'access-a', {
+          records: [{ ...morningInput, data_source: dataSource }],
+        }),
+      );
+      expect(response.status).toBe(400);
+      expect(sync.pushed).toEqual([]);
+    },
+  );
+
   it('fails closed when a native field would be silently dropped', async () => {
     const { handlers, sync } = makeHarness();
     const truncated: Record<string, unknown> = { ...morningInput };
