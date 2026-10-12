@@ -1,8 +1,8 @@
 name: Security Scanning
 
+# No clock: every scanned input (history, lockfile, pinned scanner versions)
+# only changes on a push to main, which runs every job here.
 on:
-  schedule:
-    - cron: '0 8 * * 1'  # Weekly on Monday at 8 AM
   workflow_dispatch:
   push:
     branches: [main]

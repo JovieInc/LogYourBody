@@ -2,7 +2,9 @@ name: Linear remediation
 
 # Reads failed iOS release logs and files JOV remediation:asc-agreements.
 # The release workflows themselves are unchanged, including any LYB-68 [ci] filing.
-# The weekly job only upserts JOV remediation:lyb-pr-no-reviewer. It never edits PRs.
+# The manual pr-no-reviewer job only upserts JOV remediation:lyb-pr-no-reviewer. It
+# never edits PRs. It has no clock: main requires no approving review, so a
+# missing reviewer never holds a PR.
 
 on:
   workflow_run:
@@ -11,8 +13,6 @@ on:
       - iOS Release Loop
       - iOS TestFlight Deploy
     types: [completed]
-  schedule:
-    - cron: '17 15 * * 1'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -39,7 +39,7 @@ concurrency:
 jobs:
   test:
     name: Remediation unit tests
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -87,7 +87,7 @@ jobs:
   pr-no-reviewer:
     name: File PRs with no reviewer
     needs: test
-    if: always() && needs.test.result == 'success' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    if: always() && needs.test.result == 'success' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

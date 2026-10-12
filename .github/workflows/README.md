@@ -29,7 +29,7 @@ Primary pull request workflow for `main`.
 
 ### `codeowners-check.yml`
 
-Weekly and manual CODEOWNERS drift check. Upserts JOV-7549 (`remediation:codeowners-drift`) with a comment for this repository when the file is missing or an owner is invalid. Live filing requires repository variable `REMEDIATION_TRIGGERS_ENABLED` to be `true` and `LINEAR_API_KEY`. Otherwise the job dry-runs.
+CODEOWNERS drift check on pushes to main that change a CODEOWNERS file, and on manual dispatch. Upserts JOV-7549 (`remediation:codeowners-drift`) with a comment for this repository when the file is missing or an owner is invalid. Live filing requires repository variable `REMEDIATION_TRIGGERS_ENABLED` to be `true` and `LINEAR_API_KEY`. Otherwise the job dry-runs.
 
 ### `advisory-ai-review.yml`
 
@@ -99,7 +99,7 @@ CodeQL analysis on pushes, pull requests, and schedule.
 
 ### `security-scan.yml`
 
-Weekly/manual/main-branch secret, dependency, and SBOM scanning.
+Main-branch push and manual secret, dependency, and SBOM scanning. No clock.
 
 ### `dependabot-auto-merge.yml`
 
