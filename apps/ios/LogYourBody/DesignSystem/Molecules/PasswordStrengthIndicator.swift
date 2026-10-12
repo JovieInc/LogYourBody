@@ -53,7 +53,7 @@ private struct StrengthRow: View {
         HStack(spacing: 4) {
             Image(systemName: isValid ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 12))
-                .foregroundColor(isValid ? .green : .appTextTertiary)
+                .foregroundColor(isValid ? Color.appSuccess : .appTextTertiary)
 
             Text(text)
                 .font(.system(size: 12))

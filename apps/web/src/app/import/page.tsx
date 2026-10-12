@@ -233,7 +233,7 @@ export default function ImportPage() {
 
       if (parsedData.type === 'photos') {
         setProcessingStatus('Starting photo upload...');
-        // Upload photos to Supabase Storage first - sequentially to avoid rate limits
+        // Upload photos sequentially to avoid rate limits.
         const uploadResults = [];
         let successfulUploads = 0;
         const errors: string[] = [];
@@ -264,7 +264,7 @@ export default function ImportPage() {
 
             const fileName = `${user.id}/${Date.now()}-${entry.notes?.replace(/[^a-zA-Z0-9]/g, '-') || 'photo'}.jpg`;
 
-            // Upload to Supabase Storage using our utility
+            // Upload through the configured photo-storage utility.
             const { publicUrl, error: uploadError } = await uploadToStorage(
               'photos',
               fileName,

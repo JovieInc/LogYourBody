@@ -25,37 +25,45 @@ enum JovieTokens {
     static let cinematicDuration: Double = 0.42
 }
 
-/// Dark-only canvas steps for `DefaultTheme` — the Noir Ion night ladder
-/// (night-dj-harmony-v1). page → main → rail → card → dropdown → modal are one
-/// stepped hue family. Accents stay reserved for metric meaning and state
-/// (palette-core-accents-v1: Ion blue, Pulse pink, Ultra purple, one gold, one
-/// error; success is blue, never green).
+/// Dark-only canvas steps for `DefaultTheme`. Accents stay reserved for metrics.
 enum JoviePalette {
-    static let canvasHex = "#030407"
-    static let shellHex = "#06080D"
-    static let panelHex = "#0A0D16"
-    static let cardHex = "#0F1420"
-    static let elevatedHex = "#151B2A"
-    static let floatingHex = "#1B2436"
-
-    /// Card/input step. Kept under its historical name for existing consumers.
-    static let surfaceHex = cardHex
-    /// Modal/floating step. Kept under its historical name for existing consumers.
-    static let raisedHex = floatingHex
-
-    static let ionHex = "#11AFFF"
-    static let pulseHex = "#FF48D2"
-    static let ultraHex = "#A982FF"
-    static let goldHex = "#FFC857"
-    static let errorHex = "#FF677D"
+    static let canvasHex = "#08090A"
+    static let surfaceHex = "#0F1011"
+    static let elevatedHex = "#17171A"
+    static let raisedHex = "#1C1C1E"
+    /// Launch mark only. The night field stays on the current canvas step.
     static let creamHex = "#F5F4F0"
+}
+
+/// Jovie design-system palette for the v2 surfaces (mirrors the LogYourBody
+/// iOS .pen tokens). `JoviePalette` keeps serving the gate-off screens.
+enum HomeV2Palette {
+    static let canvas = Color(hex: "#030406")
+    static let shell = Color(hex: "#07080A")
+    static let card = Color(hex: "#131417")
+    static let elevated = Color(hex: "#1A1B1E")
+    static let floating = Color(hex: "#232427")
+    static let ink = Color(hex: "#F5F7FB")
+    static let secondary = Color(hex: "#A0A5AF")
+    static let muted = Color(hex: "#8F95A0")
+    static let quiet = Color(hex: "#7D8593")
+    static let border = Color(hex: "#A8B0C3").opacity(0.10)
+    static let borderStrong = Color(hex: "#A8B0C3").opacity(0.20)
+    static let ion = Color(hex: "#11AFFF")
+    static let ultra = Color(hex: "#8E56F5")
+    static let mint = Color(hex: "#3FFA8B")
+    static let orange = Color(hex: "#FF7800")
+    static let red = Color(hex: "#F72A36")
+    static let ctaFill = Color(hex: "#F8FAFD")
+    static let ctaInk = Color(hex: "#030407")
 }
 
 enum ChatComposerGeometry {
     static let multilineTextHeightThreshold = JovieTokens.sectionGap
 
-    static func isMultiline(textHeight: CGFloat) -> Bool {
-        textHeight > multilineTextHeightThreshold
+    // Pass a Dynamic Type-scaled threshold so one line of large text isn't treated as multiline.
+    static func isMultiline(textHeight: CGFloat, threshold: CGFloat = multilineTextHeightThreshold) -> Bool {
+        textHeight > threshold
     }
 
     static func cornerRadius(isMultiline: Bool) -> CGFloat {
@@ -410,13 +418,13 @@ struct DefaultTheme: Theme {
     let colors = ColorTheme(
         // Background
         background: Color(hex: JoviePalette.canvasHex),
-        backgroundSecondary: Color(hex: JoviePalette.shellHex),
-        backgroundTertiary: Color(hex: JoviePalette.panelHex),
+        backgroundSecondary: Color(hex: JoviePalette.surfaceHex),
+        backgroundTertiary: Color(hex: JoviePalette.elevatedHex),
 
         // Surface
-        surface: Color(hex: JoviePalette.cardHex),
+        surface: Color(hex: JoviePalette.surfaceHex),
         surfaceSecondary: Color(hex: JoviePalette.elevatedHex),
-        surfaceTertiary: Color(hex: JoviePalette.floatingHex),
+        surfaceTertiary: Color(hex: JoviePalette.raisedHex),
 
         // Primary
         primary: .jovieAction,
@@ -424,11 +432,11 @@ struct DefaultTheme: Theme {
         primarySubtle: .jovieAction.opacity(0.12),
 
         // Accents
-        accentViolet: Color(hex: JoviePalette.ultraHex),
-        accentPink: Color(hex: JoviePalette.pulseHex),
-        accentTeal: Color(hex: JoviePalette.ionHex),
-        accentOrange: Color(hex: JoviePalette.goldHex),
-        accentGreen: Color(hex: JoviePalette.ionHex),
+        accentViolet: Color(hex: "#8b1eff"),
+        accentPink: Color(hex: "#d61a7f"),
+        accentTeal: Color(hex: "#0f9b8e"),
+        accentOrange: Color(hex: "#ff9800"),
+        accentGreen: Color(hex: "#2f9e44"),
 
         // Text
         text: Color(hex: "#F7F8F8"),
@@ -438,13 +446,13 @@ struct DefaultTheme: Theme {
 
         // Borders
         border: .jovieHairline,
-        borderSecondary: Color(hex: JoviePalette.elevatedHex),
+        borderSecondary: Color(hex: "#1A1A1C"),
         borderFocused: .jovieAction.opacity(0.72),
 
         // States
-        success: Color(hex: JoviePalette.ionHex),
-        warning: Color(hex: JoviePalette.goldHex),
-        error: Color(hex: JoviePalette.errorHex),
+        success: Color(hex: "#2F9E44"),
+        warning: Color(hex: "#ff9800"),
+        error: Color(hex: "#F3122D"),
         info: .jovieMetricAccent,
 
         // Interactive
@@ -458,7 +466,7 @@ struct DefaultTheme: Theme {
     let typography = TypographyTheme(
         // Display
         displayLarge: .system(.largeTitle, design: .default).weight(.bold),
-        displayMedium: .system(.title, design: .default).weight(.bold),
+        displayMedium: .system(.title, design: .default).weight(JovieTokens.displayTypeWeight),
         displaySmall: .system(.title2, design: .default).weight(.semibold),
 
         // Headline
@@ -578,14 +586,15 @@ extension View {
         }
     }
 
-    /// Expands a visual control to Apple's minimum recommended hit target without
-    /// forcing surrounding layout to use a one-off frame.
+    /// Expands the view it is applied to, up to at least 44 points, and makes that
+    /// whole rectangle tappable. Apply it to a button label. A frame wrapped
+    /// around the button does not grow the button's accessibility frame.
     func jovieTouchTarget() -> some View {
-        contentShape(Rectangle())
-            .frame(
-                minWidth: JovieTokens.minimumHitTarget,
-                minHeight: JovieTokens.minimumHitTarget
-            )
+        frame(
+            minWidth: JovieTokens.minimumHitTarget,
+            minHeight: JovieTokens.minimumHitTarget
+        )
+        .contentShape(Rectangle())
     }
 
     func worldClassScreen(_ screen: WorldClassScreen) -> some View {
@@ -681,5 +690,48 @@ struct ThemePreview<Content: View>: View {
         content()
             .theme(DefaultTheme())
             .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Locked atoms (native-swift-locked-atoms-v1)
+
+/// ActionButton 32 / 510 / r999 and type 28 / 620 are locked company-wide and
+/// must not be remocked. SF Pro exposes no numeric weights, so 510 resolves to
+/// `.medium` and 620 to `.semibold`; r999 is a `Capsule`. The 32pt height is
+/// the visible control; the tap target stays >= `minimumHitTarget` (44).
+extension JovieTokens {
+    static let actionControlHeight: CGFloat = 32
+    static let actionLabelWeight: Font.Weight = .medium
+    static let actionRadius: CGFloat = 999
+    static let displayTypeSize: CGFloat = 28
+    static let displayTypeWeight: Font.Weight = .semibold
+}
+
+extension Font {
+    /// Locked display atom: type 28 / 620.
+    static let jovieDisplay: Font = .system(
+        size: JovieTokens.displayTypeSize,
+        weight: JovieTokens.displayTypeWeight
+    )
+}
+
+/// System font at the approved point size by default, scaled with the user's Dynamic Type setting.
+private struct ScaledSystemFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+    private let weight: Font.Weight
+
+    init(size: CGFloat, weight: Font.Weight, relativeTo textStyle: Font.TextStyle) {
+        _size = ScaledMetric(wrappedValue: size, relativeTo: textStyle)
+        self.weight = weight
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: weight))
+    }
+}
+
+extension View {
+    func scaledSystemFont(size: CGFloat, weight: Font.Weight = .regular, relativeTo textStyle: Font.TextStyle) -> some View {
+        modifier(ScaledSystemFont(size: size, weight: weight, relativeTo: textStyle))
     }
 }

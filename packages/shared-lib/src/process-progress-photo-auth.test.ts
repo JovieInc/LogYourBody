@@ -29,9 +29,6 @@ describe('first-party progress photo auth boundary', () => {
     expect(iosPhotoUploadManager).toContain(
       'request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")',
     );
-    expect(iosPhotoUploadManager).not.toContain(
-      'request.setValue("Bearer \\(Constants.supabaseAnonKey)"',
-    );
     expect(iosPhotoUploadManager).not.toContain('storage/v1');
     expect(iosPhotoUploadManager).not.toContain('process-progress-photo');
   });

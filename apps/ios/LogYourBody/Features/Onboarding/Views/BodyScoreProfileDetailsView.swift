@@ -25,9 +25,9 @@ enum ProfileDetailsValidationPolicy {
         return age >= 16 && age <= 80
     }
 
-    /// Converts the active height field into centimeters; returns nil when the
-    /// field cannot produce a positive height.
+    /// Converts a height accepted by this form into centimeters.
     static func heightInCentimeters(_ input: ProfileHeightInput) -> Double? {
+        guard isHeightValid(input) else { return nil }
         switch input.unit {
         case .centimeters:
             return Double(input.centimetersText)
@@ -64,14 +64,49 @@ enum ProfileDetailsValidationPolicy {
         case .lastName:
             return isNameValid(lastName)
         case .dateOfBirth:
-            return isNameValid(firstName) &&
-                isNameValid(lastName) &&
-                isDateOfBirthWithinValidRange(dateOfBirth)
+            return isNameValid(firstName) && isDateOfBirthWithinValidRange(dateOfBirth)
         case .sex:
             return biologicalSex != nil
         case .height:
             return isHeightValid(height)
         }
+    }
+}
+
+/// Which profile-details substeps to show. Answers already given earlier in
+/// onboarding (or by Apple Health) are not asked again, and the last name is
+/// never asked: nothing in the app needs it.
+enum ProfileDetailsSubstepPlanPolicy {
+    typealias Substep = OnboardingFlowViewModel.ProfileDetailsSubstep
+
+    static func substeps(
+        askFirstName: Bool,
+        askDateOfBirth: Bool,
+        askSex: Bool,
+        askHeight: Bool
+    ) -> [Substep] {
+        var plan: [Substep] = []
+        if askFirstName { plan.append(.firstName) }
+        if askDateOfBirth { plan.append(.dateOfBirth) }
+        if askSex { plan.append(.sex) }
+        if askHeight { plan.append(.height) }
+        // The step still needs one screen that saves the profile.
+        return plan.isEmpty ? [.height] : plan
+    }
+
+    /// The order used before a plan exists (for example a restored draft).
+    static func fullOrder(askSex: Bool) -> [Substep] {
+        askSex ? [.firstName, .dateOfBirth, .sex, .height] : [.firstName, .dateOfBirth, .height]
+    }
+
+    static func next(after substep: Substep, in plan: [Substep]) -> Substep? {
+        guard let index = plan.firstIndex(of: substep), index + 1 < plan.count else { return nil }
+        return plan[index + 1]
+    }
+
+    static func previous(before substep: Substep, in plan: [Substep]) -> Substep? {
+        guard let index = plan.firstIndex(of: substep), index > 0 else { return nil }
+        return plan[index - 1]
     }
 }
 
@@ -166,17 +201,19 @@ struct BodyScoreProfileDetailsView: View {
         case .sex:
             return "Used only for body composition calculations."
         case .height:
-            return "Needed for FFMI and body score."
+            return "Used to compare your lean mass with your frame."
         }
     }
 
+    private var nextSubstep: OnboardingFlowViewModel.ProfileDetailsSubstep? {
+        ProfileDetailsSubstepPlanPolicy.next(
+            after: viewModel.profileDetailsActiveSubstep,
+            in: viewModel.profileDetailsSubsteps
+        )
+    }
+
     private var primaryButtonTitle: String {
-        switch viewModel.profileDetailsActiveSubstep {
-        case .firstName, .lastName, .dateOfBirth, .sex:
-            return "Continue"
-        case .height:
-            return "Finish setup"
-        }
+        nextSubstep == nil ? "Finish setup" : "Continue"
     }
 
     var body: some View {
@@ -184,17 +221,13 @@ struct BodyScoreProfileDetailsView: View {
             title: currentTitle,
             subtitle: currentSubtitle,
             onBack: {
-                switch viewModel.profileDetailsActiveSubstep {
-                case .firstName:
+                if let previous = ProfileDetailsSubstepPlanPolicy.previous(
+                    before: viewModel.profileDetailsActiveSubstep,
+                    in: viewModel.profileDetailsSubsteps
+                ) {
+                    transition(to: previous)
+                } else {
                     viewModel.goBack()
-                case .lastName:
-                    transition(to: .firstName)
-                case .dateOfBirth:
-                    transition(to: .lastName)
-                case .sex:
-                    transition(to: .dateOfBirth)
-                case .height:
-                    transition(to: viewModel.profileShouldAskSex ? .sex : .dateOfBirth)
                 }
             },
             progress: viewModel.progress(for: .profileDetails),
@@ -277,7 +310,7 @@ struct BodyScoreProfileDetailsView: View {
                         .autocorrectionDisabled(true)
                         .submitLabel(.next)
                         .focused($focusedNameField, equals: .firstName)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: JovieTokens.controlHeight,
@@ -288,7 +321,7 @@ struct BodyScoreProfileDetailsView: View {
                         )
                         .clipShape(Capsule(style: .continuous))
                         .onSubmit {
-                            handleFirstNameContinue()
+                            handlePrimaryAction()
                         }
 
                 case .lastName:
@@ -311,7 +344,7 @@ struct BodyScoreProfileDetailsView: View {
                         .autocorrectionDisabled(true)
                         .submitLabel(.next)
                         .focused($focusedNameField, equals: .lastName)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: JovieTokens.controlHeight,
@@ -322,7 +355,7 @@ struct BodyScoreProfileDetailsView: View {
                         )
                         .clipShape(Capsule(style: .continuous))
                         .onSubmit {
-                            handleLastNameContinue()
+                            handlePrimaryAction()
                         }
 
                 case .dateOfBirth, .sex, .height:
@@ -370,14 +403,14 @@ struct BodyScoreProfileDetailsView: View {
 
     private var heightSection: some View {
         OnboardingFormSection(title: nil, caption: "You can update this later in Settings.") {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 20) {
                 OnboardingSegmentedControl(
                     options: HeightUnit.allCases,
-                    selection: $viewModel.profileHeightUnit
+                    selection: Binding(
+                        get: { viewModel.profileHeightUnit },
+                        set: { convertHeightFields(from: viewModel.profileHeightUnit, to: $0) }
+                    )
                 )
-                .onChange(of: viewModel.profileHeightUnit) { oldValue, newValue in
-                    convertHeightFields(from: oldValue, to: newValue)
-                }
 
                 switch viewModel.profileHeightUnit {
                 case .centimeters:
@@ -386,7 +419,7 @@ struct BodyScoreProfileDetailsView: View {
                         .font(theme.typography.headlineLarge)
                         .multilineTextAlignment(.center)
                         .focused($heightFieldFocused)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, 16)
                         .frame(minHeight: JovieTokens.controlHeight)
                         .systemBGlassSurface(
                             cornerRadius: JovieTokens.controlHeight,
@@ -401,7 +434,11 @@ struct BodyScoreProfileDetailsView: View {
 
                     Text("Enter a height from 100 to 250 cm.")
                         .font(OnboardingTypography.caption)
-                        .foregroundStyle(theme.colors.textSecondary)
+                        .foregroundStyle(
+                            !viewModel.profileHeightCentimetersText.isEmpty &&
+                                !ProfileDetailsValidationPolicy.isHeightValid(profileHeightInput)
+                                ? theme.colors.error : theme.colors.textSecondary
+                        )
 
                 case .inches:
                     HStack(spacing: 12) {
@@ -512,32 +549,46 @@ struct BodyScoreProfileDetailsView: View {
 
 // MARK: - Substep Helpers
 
+extension BodyScoreProfileDetailsView {
+    func convertHeightFields(from oldUnit: HeightUnit, to newUnit: HeightUnit) {
+        guard oldUnit != newUnit else { return }
+
+        switch (oldUnit, newUnit) {
+        case (.centimeters, .inches):
+            if !viewModel.profileHeightCentimetersText.isEmpty {
+                guard let centimeters = ProfileDetailsValidationPolicy.heightInCentimeters(profileHeightInput),
+                      let totalInches = Int(exactly: (centimeters / 2.54).rounded()) else { return }
+                viewModel.profileHeightFeet = max(3, min(8, totalInches / 12))
+                viewModel.profileHeightInches = max(0, min(11, totalInches % 12))
+            }
+        case (.inches, .centimeters):
+            let totalInches = Double((viewModel.profileHeightFeet * 12) + viewModel.profileHeightInches)
+            viewModel.profileHeightCentimetersText = String(format: "%.0f", totalInches * 2.54)
+        default:
+            break
+        }
+        viewModel.profileHeightUnit = newUnit
+    }
+}
+
 private extension BodyScoreProfileDetailsView {
     func handlePrimaryAction() {
         switch viewModel.profileDetailsActiveSubstep {
         case .firstName:
-            handleFirstNameContinue()
+            guard isFirstNameValid else { return }
+            HapticManager.shared.selection()
         case .lastName:
-            handleLastNameContinue()
-        case .dateOfBirth:
-            transition(to: viewModel.profileShouldAskSex ? .sex : .height)
-        case .sex:
-            transition(to: .height)
-        case .height:
+            guard isLastNameValid else { return }
+            HapticManager.shared.selection()
+        case .dateOfBirth, .sex, .height:
+            break
+        }
+
+        if let nextSubstep {
+            transition(to: nextSubstep)
+        } else {
             submit()
         }
-    }
-
-    func handleFirstNameContinue() {
-        guard isFirstNameValid else { return }
-        HapticManager.shared.selection()
-        transition(to: .lastName)
-    }
-
-    func handleLastNameContinue() {
-        guard isLastNameValid else { return }
-        HapticManager.shared.selection()
-        transition(to: .dateOfBirth)
     }
 
     func focusNameFieldIfNeeded(_ step: OnboardingFlowViewModel.ProfileDetailsSubstep? = nil) {
@@ -548,23 +599,6 @@ private extension BodyScoreProfileDetailsView {
             focusedNameField = .lastName
         case .dateOfBirth, .sex, .height:
             focusedNameField = nil
-        }
-    }
-
-    func convertHeightFields(from oldUnit: HeightUnit, to newUnit: HeightUnit) {
-        guard oldUnit != newUnit else { return }
-
-        switch (oldUnit, newUnit) {
-        case (.centimeters, .inches):
-            guard let centimeters = Double(viewModel.profileHeightCentimetersText) else { return }
-            let totalInches = Int((centimeters / 2.54).rounded())
-            viewModel.profileHeightFeet = max(3, min(8, totalInches / 12))
-            viewModel.profileHeightInches = max(0, min(11, totalInches % 12))
-        case (.inches, .centimeters):
-            let totalInches = Double((viewModel.profileHeightFeet * 12) + viewModel.profileHeightInches)
-            viewModel.profileHeightCentimetersText = String(format: "%.0f", totalInches * 2.54)
-        default:
-            break
         }
     }
 

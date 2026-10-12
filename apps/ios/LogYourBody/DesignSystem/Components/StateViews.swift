@@ -223,7 +223,7 @@ struct ErrorView: View {
             // Error icon
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 60))
-                .foregroundColor(.red)
+                .foregroundColor(Color.appError)
                 .padding(.bottom, 8)
 
             // Error message
@@ -273,12 +273,12 @@ struct SuccessView: View {
             // Success checkmark
             ZStack {
                 Circle()
-                    .fill(.green.opacity(0.1))
+                    .fill(Color.appSuccess.opacity(0.1))
                     .frame(width: 100, height: 100)
 
                 Image(systemName: "checkmark")
                     .font(.system(size: 50, weight: .bold))
-                    .foregroundColor(.green)
+                    .foregroundColor(Color.appSuccess)
                     .scaleEffect(showCheckmark ? 1 : 0.5)
                     .opacity(showCheckmark ? 1 : 0)
                     .rotationEffect(.degrees(animateCheckmark ? 0 : -30))
@@ -336,12 +336,12 @@ struct ProgressBar: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 // Background
-                RoundedRectangle(cornerRadius: 3)
+                RoundedRectangle(cornerRadius: 4)
                     .fill(Color.appCard.opacity(0.5))
                     .frame(height: 6)
 
                 // Progress
-                RoundedRectangle(cornerRadius: 3)
+                RoundedRectangle(cornerRadius: 4)
                     .fill(Color.appPrimary)
                     .frame(width: geometry.size.width * progress, height: 6)
                     .animation(.easeInOut(duration: 0.3), value: progress)

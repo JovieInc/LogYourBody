@@ -14,9 +14,9 @@ The value was introduced in commit `d79327a5f` on 2025-07-04 and therefore remai
 - Removed the plaintext value from both active documents.
 - Replaced password-bearing command examples with the approved secret-manager/environment-variable workflow.
 - Searched the active worktree for the exposed value; no remaining occurrence was found.
-- Tested the historical value against the linked Supabase project's direct Postgres endpoint; it did not authenticate, confirming it is no longer the active database password.
+- Tested the historical value against the retired provider's direct Postgres endpoint; it did not authenticate, confirming it is no longer the active database password.
 
-No password change was issued because the exposed value was already inactive. If a future provider audit identifies another active copy, rotate it through the Supabase dashboard or Management API and update every legitimate consumer before resuming deployments.
+No password change was issued because the exposed value was already inactive. If a future provider audit identifies another active copy, rotate it through that provider's credential-management surface and update every legitimate consumer before resuming deployments.
 
 ## Follow-up Guardrail
 

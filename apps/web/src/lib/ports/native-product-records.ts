@@ -4,9 +4,23 @@ export const NATIVE_PRODUCT_RECORD_COLLECTIONS = [
   'glp1_dose_logs',
   'dexa_results',
   'progress_photos',
+  'training_sessions',
+  'logged_sets',
+  'training_feedback',
 ] as const;
 
 export type NativeProductRecordCollection = (typeof NATIVE_PRODUCT_RECORD_COLLECTIONS)[number];
+export const TRAINING_RECORD_COLLECTIONS = [
+  'training_sessions',
+  'logged_sets',
+  'training_feedback',
+] as const satisfies readonly NativeProductRecordCollection[];
+
+export function isTrainingRecordCollection(
+  value: NativeProductRecordCollection,
+): value is (typeof TRAINING_RECORD_COLLECTIONS)[number] {
+  return (TRAINING_RECORD_COLLECTIONS as readonly string[]).includes(value);
+}
 
 export type NativeProductRecord = Record<string, unknown> & {
   id: string;
@@ -20,6 +34,13 @@ export type NativeProductRecordsPullCursor = {
 };
 
 export interface NativeProductRecordsPort {
+  /** Insert a set once, or return its existing owned, active row without changing it.
+   * Missing capability must fail closed; callers must never fall back to push.
+   */
+  insertTrainingSet?(
+    subject: string,
+    record: Record<string, unknown>,
+  ): Promise<NativeProductRecord | null>;
   push(
     subject: string,
     collection: NativeProductRecordCollection,

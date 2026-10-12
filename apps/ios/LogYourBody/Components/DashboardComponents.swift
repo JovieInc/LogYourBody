@@ -197,7 +197,7 @@ struct DashboardMetricGauge: View {
             // Content
             VStack(spacing: 2) {
                 Text(displayValue)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(Font.jovieDisplay)
                     .foregroundColor(.white)
 
                 Text(label)

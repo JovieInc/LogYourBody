@@ -1,6 +1,6 @@
 # iOS Release Evidence Path
 
-This is the exact evidence path for moving a LogYourBody iOS change from local proof to TestFlight or App Store review. The local bootstrap below is secret-free and proves compile/UI fixture health only; production Jovie identity, Supabase, RevenueCat, TestFlight, and App Store behavior require the later workflow and external proof steps.
+This is the exact evidence path for moving a LogYourBody iOS change from local proof to TestFlight or App Store review. The local bootstrap below is secret-free and proves compile/UI fixture health only; production Jovie identity, first-party Neon data access, RevenueCat, TestFlight, and App Store behavior require the later workflow and external proof steps.
 
 ## 1. Local Config Bootstrap
 
@@ -14,7 +14,6 @@ This creates missing ignored files without overwriting real local config:
 
 - `apps/ios/LogYourBody/Config-Development.xcconfig`
 - `apps/ios/LogYourBody/Config.xcconfig`
-- `apps/ios/Supabase.xcconfig`
 
 Use `bash scripts/ios/bootstrap-local-config.sh --force` only when resetting local or CI placeholder config intentionally.
 

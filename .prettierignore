@@ -1,0 +1,14 @@
+# Temporary for the origin/main merge commit. These paths already match main,
+# and Prettier would reflow them while lint-staged lints every staged file.
+# The generated manifest must stay JSON.stringify output for product:check.
+# Removed in the follow-up commit.
+.agents/skills/jovie-frontend/references/upstream/DESIGN.md
+.github/workflows/README.md
+apps/ios/LogYourBody/Assets.xcassets/LaunchScreenBackground.colorset/Contents.json
+apps/ios/fastlane/storefront-manifest.generated.json
+docs/audits/app-walk-2026-09-27.md
+docs/audits/lyb-97/no-paid-trials.md
+docs/engineering/chaos-testing.md
+docs/product/icp.md
+docs/product/outcome-map.md
+docs/research/growth-playbook-2026-09-27.md

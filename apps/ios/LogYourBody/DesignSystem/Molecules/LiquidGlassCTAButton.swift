@@ -114,9 +114,9 @@ struct LiquidGlassCTAModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .font(.system(.headline, design: .default).weight(.semibold))
+            .font(.system(.headline, design: .default).weight(JovieTokens.actionLabelWeight))
             .frame(maxWidth: .infinity)
-            .frame(minHeight: JovieTokens.controlHeight)
+            .frame(minHeight: JovieTokens.actionControlHeight)
             .jovieTouchTarget()
             .foregroundColor(isEnabled ? .black : .white.opacity(0.5))
             .background(backgroundView)

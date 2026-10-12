@@ -34,17 +34,17 @@ Do not store raw vendor payloads, access tokens, refresh tokens, or unnecessary 
 
 ## Migration
 
-The additive Supabase migration is:
+The canonical Neon schema migration is:
 
-- `supabase/migrations/20260607043000_define_body_metric_source.sql`
+- `apps/web/db/migrations/20260715040000_create_body_metrics.sql`
 
-It adds `source_metadata`, normalizes legacy `data_source` values, defaults future rows to `manual`, and constrains future writes to the six canonical values.
+It defines `source_metadata`, defaults new rows to `manual`, and constrains writes to the six canonical values.
 
 ## iOS Mapping
 
 - `BodyMetrics` now normalizes `dataSource` at construction and decode time.
 - `CoreDataManager.saveBodyMetrics` persists canonical `dataSource` and optional metadata JSON.
-- `CoreDataManager.updateOrCreateBodyMetric` maps `data_source` and `source_metadata` from Supabase payloads.
+- `CoreDataManager.updateOrCreateBodyMetric` maps `data_source` and `source_metadata` from first-party product API payloads.
 - `RealtimeSyncManager.syncBodyMetricsBatch` sends both fields during local-to-remote sync.
 - HealthKit body metric rows use `healthkit`; raw sample metadata remains in `HKRawSample`.
 - BodySpec-created body metric rows use `bodyspec_dexa` and include scan/result metadata.

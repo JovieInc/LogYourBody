@@ -107,9 +107,8 @@ function isSensitivePath(filename) {
     /^\.github\//,
     /(^|\/)(\.env|secret|secrets|credential|credentials|private|cert|certificate|keychain|provisioning|profile|match)(\.|\/|$)/i,
     /^apps\/ios\/.*(auth|clerk|revenuecat|storekit|billing|payment|subscription|fastlane|entitlement|signing|config|xcconfig)/i,
-    /^apps\/web\/.*(auth|clerk|stripe|billing|payment|subscription|supabase|middleware)/i,
-    /^packages\/.*(auth|billing|payment|supabase|secrets?)/i,
-    /^supabase\/(migrations|functions)\//i,
+    /^apps\/web\/.*(auth|clerk|stripe|billing|payment|subscription|middleware)/i,
+    /^packages\/.*(auth|billing|payment|secrets?)/i,
   ].some((pattern) => pattern.test(filename));
 }
 
@@ -120,7 +119,7 @@ function diffLooksSensitive(diff) {
     /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/,
     /\b(?:sk|rk|pk)_(?:live|test|prod|sandbox)?_[A-Za-z0-9]{16,}\b/i,
     /\bAIza[0-9A-Za-z_-]{20,}\b/,
-    /\b(?:OPENAI|ANTHROPIC|OPENROUTER|CLERK|SUPABASE|STRIPE|REVENUECAT|ASC|APPLE|VERCEL)_[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)\b/i,
+    /\b(?:OPENAI|ANTHROPIC|OPENROUTER|CLERK|STRIPE|REVENUECAT|ASC|APPLE|VERCEL)_[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD)\b/i,
     /^\+.*(?:api[_-]?key|token|secret|password|private[_-]?key)\s*[:=]\s*['"]?[A-Za-z0-9_./+=-]{12,}/im,
   ];
 
@@ -173,7 +172,7 @@ Rules:
 Release-breaker categories:
 - Compile/typecheck/test/build failures visible in the diff.
 - Secret leakage or unsafe workflow permission changes.
-- Auth, billing, RevenueCat/App Store, Clerk, Supabase, signing, release, or migration changes that can break production with concrete evidence.
+- Auth, billing, RevenueCat/App Store, Clerk, signing, release, or migration changes that can break production with concrete evidence.
 - Data loss, crash-on-launch, or impossible user recovery.
 
 Return only compact JSON with this schema:

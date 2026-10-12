@@ -173,14 +173,30 @@ struct AddEntrySheet: View {
     @Binding var isPresented: Bool
     @State var selectedTab: Int
     let includesGlp1Entry: Bool
+    let isHomeV2LogEntry: Bool
     @State var selectedDate = Date()
+    let onWeightSaved: ((BodyMetrics) -> Void)?
     @AppStorage(Constants.preferredMeasurementSystemKey) var measurementSystem = PreferencesView.defaultMeasurementSystem
 
-    init(isPresented: Binding<Bool>, initialTab: Int = 0, includesGlp1Entry: Bool = false) {
+    init(
+        isPresented: Binding<Bool>,
+        initialTab: Int = 0,
+        includesGlp1Entry: Bool = false,
+        initialDate: Date = Date(),
+        initialWeight: String? = nil,
+        initialBodyFat: Double? = nil,
+        isHomeV2LogEntry: Bool = false,
+        onWeightSaved: ((BodyMetrics) -> Void)? = nil
+    ) {
         let resolvedInitialTab = initialTab == 3 && !includesGlp1Entry ? 0 : initialTab
         self._isPresented = isPresented
         self._selectedTab = State(initialValue: resolvedInitialTab)
         self.includesGlp1Entry = includesGlp1Entry
+        self.isHomeV2LogEntry = isHomeV2LogEntry
+        self._selectedDate = State(initialValue: initialDate)
+        self._weight = State(initialValue: initialWeight ?? "")
+        self._bodyFat = State(initialValue: initialBodyFat.map { String(format: "%.1f", $0) } ?? "")
+        self.onWeightSaved = onWeightSaved
     }
 
 
@@ -281,7 +297,7 @@ struct Glp1AddMedicationView: View {
                                             Text(filter.label)
                                                 .font(.appBodySmall)
                                                 .padding(.horizontal, 12)
-                                                .padding(.vertical, 6)
+                                                .padding(.vertical, 8)
                                                 .background(isSelected ? Color.appPrimary : Color.appCard)
                                                 .foregroundColor(isSelected ? .black : .appText)
                                                 .cornerRadius(999)
@@ -308,7 +324,7 @@ struct Glp1AddMedicationView: View {
                                     Button {
                                         selectedPreset = preset
                                     } label: {
-                                        VStack(alignment: .leading, spacing: 6) {
+                                        VStack(alignment: .leading, spacing: 8) {
                                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                                 brandIcon(for: preset)
 
@@ -319,12 +335,12 @@ struct Glp1AddMedicationView: View {
                                                 if preset.isCompounded {
                                                     Text("Compounded")
                                                         .font(.appCaption)
-                                                        .foregroundColor(.orange)
+                                                        .foregroundColor(Color.appWarning)
                                                 }
 
                                                 Spacer()
 
-                                                HStack(spacing: 6) {
+                                                HStack(spacing: 8) {
                                                     Image(
                                                         systemName: preset.route.lowercased() == "oral" ? "pills.fill" : "syringe"
                                                     )
@@ -349,7 +365,7 @@ struct Glp1AddMedicationView: View {
                                                 Spacer(minLength: 0)
                                             }
                                         }
-                                        .padding(.vertical, 6)
+                                        .padding(.vertical, 8)
                                         .contentShape(Rectangle())
                                         .background(
                                             RoundedRectangle(cornerRadius: 12)
@@ -409,7 +425,7 @@ struct Glp1AddMedicationView: View {
                             .frame(maxWidth: .infinity)
                             .disabled(!customCompoundCanSave || isSaving)
                         }
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 8)
                     }
                 }
                 .listStyle(.insetGrouped)
@@ -421,22 +437,34 @@ struct Glp1AddMedicationView: View {
             }
             .navigationTitle("Select GLP-1")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .cancellationAction) {
-                    Button("Cancel") {
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HStack(spacing: JovieTokens.itemGap) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Text("Cancel")
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
                     .disabled(isSaving)
-                }
+                    .accessibilityIdentifier("glp1_medication_selector_cancel_button")
 
-                ToolbarItemGroup(placement: .confirmationAction) {
-                    Button("Save medication") {
+                    Button {
                         if let preset = selectedPreset {
                             createMedication(from: preset)
                         }
+                    } label: {
+                        Text("Save medication")
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
                     .disabled(selectedPreset == nil || isSaving)
+                    .accessibilityIdentifier("glp1_medication_selector_save_button")
                 }
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.vertical, JovieTokens.itemGap)
             }
             .alert("Couldn't save", isPresented: glp1SaveErrorBinding) {
                 Button("Try again") {

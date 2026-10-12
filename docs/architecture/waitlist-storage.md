@@ -13,19 +13,15 @@ timestamps.
 
 ## Why
 
-- The historical LogYourBody Supabase production and development hosts no
-  longer resolve, so they cannot safely receive launch signups.
 - Jovie already operates Neon. A separate project preserves product isolation
   while avoiding another vendor account solely for one table.
 - The waitlist needs ordinary Postgres durability, uniqueness, and exportability;
-  it does not need Supabase Auth, Storage, Realtime, Functions, or a public Data
-  API.
+  it does not need a second identity, storage, realtime, or public data API.
 - The internal storage port keeps a later provider move local to one adapter.
 
-This is not a decision to migrate the native product to Neon. That migration
-would also need explicit replacements and verified cutovers for object storage,
-Realtime, Edge Functions, RLS/Data API behavior, and iOS sync. It should be
-evaluated as its own data-migration project before activated users depend on it.
+The native product also uses the same first-party Neon data plane through
+server-only APIs; its object storage and iOS sync boundaries remain explicitly
+verified.
 
 ## Invitation workflow
 
@@ -48,4 +44,29 @@ where id = any ($1::uuid[])
 ```
 
 Do not send email addresses to product analytics. Conversion events remain
-anonymous; Neon is the system of record for invitation eligibility.
+free of contact traits; Neon is the system of record for invitation eligibility.
+
+## Registration evidence
+
+`accept` returns an internal `{ created: boolean }` receipt only after the
+unique insert succeeds. Duplicate submissions use `ON CONFLICT DO NOTHING`:
+they preserve the original source, timestamps, lifecycle and unsubscribe state.
+The API never returns the receipt. New entries, duplicates and honeypots still
+receive the same `202 { success: true }` response.
+
+`web_waitlist_submitted` is a legacy browser acceptance signal. It includes
+duplicates and honeypots and must not be used as the registration numerator.
+Use `summarizeWaitlistRegistrations({ from, to })` from the existing server store
+for the count of unique rows created in a half-open UTC interval `[from, to)`.
+It reads an aggregate only: no email, identity, health value or audience export.
+It includes the database observation time and explicitly marks historical
+cohort provenance as `unclassified`, with `qualified_real_users: null` and no
+claimed exclusions. No report endpoint, scheduled job or Summer activation is
+created by this interface.
+
+The current schema has no consent version, suppression history, test/founder
+classification or delivery ledger. Existing entries must not be retroactively
+granted new marketing consent. Those additions require a separate reviewed
+migration and a send-disabled outbox; invitation delivery requires explicit
+approval, idempotency and provider receipts. A database transaction alone
+cannot establish email delivery.

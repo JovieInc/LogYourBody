@@ -54,10 +54,14 @@ final class UIAccessibilityContractTests: XCTestCase {
         XCTAssertTrue(required.contains("paywall_purchase_button"))
         XCTAssertTrue(required.contains(WorldClassScreen.signIn.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.home.accessibilityIdentifier))
+        XCTAssertTrue(required.contains(WorldClassScreen.photoTimeline.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.settings.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.paywall.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.bodyScoreIntro.accessibilityIdentifier))
         XCTAssertTrue(required.contains(WorldClassScreen.dailyReminder.accessibilityIdentifier))
+        XCTAssertTrue(required.contains("home_v2_paywall"))
+        XCTAssertTrue(required.contains("home_v2_paywall_restore"))
+        XCTAssertTrue(required.contains("home_v2_paywall_log_out"))
         XCTAssertEqual(
             "settings_\(PreferenceGoalKind.weight.rawValue)_goal_edit_button",
             "settings_weight_goal_edit_button"
@@ -82,6 +86,13 @@ enum UIAccessibilityContract {
         "paywall_restore_purchases_button",
         "paywall_logout_button",
         "paywall_purchase_button",
+        "home_v2_paywall",
+        "home_v2_paywall_status",
+        "home_v2_paywall_purchase",
+        "home_v2_paywall_restore",
+        "home_v2_paywall_log_out",
+        "home_v2_paywall_plans_unavailable",
+        "home_v2_paywall_plan_",
         "settings_profile_link",
         "settings_logout_button",
         "settings_account_subscription_link",
@@ -108,7 +119,6 @@ enum UIAccessibilityContract {
         "photo_timeline_root_menu",
         "photo_timeline_menu",
         "home_chat_collapse",
-        "photo_timeline_stats_presence_summary",
         "photo_timeline_stats_metric_stack",
         "photo_timeline_stats_metric_card_weight",
         "photo_timeline_stats_metric_card_body_fat",
@@ -137,6 +147,7 @@ enum UIAccessibilityContract {
         "integrations_bulk_photo_import_link",
         "world_class_screen_signIn",
         "world_class_screen_home",
+        "world_class_screen_photoTimeline",
         "world_class_screen_settings",
         "world_class_screen_paywall",
         "world_class_screen_bodyScoreIntro",

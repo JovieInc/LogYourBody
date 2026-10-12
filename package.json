@@ -14,12 +14,14 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
+    "lint:knowledge": "node scripts/lint-no-specifics.mjs && node scripts/lint-claims.mjs",
+    "test:knowledge-lint": "node --test scripts/lint-no-specifics.test.mjs scripts/lint-claims.test.mjs",
     "web": "pnpm --filter logyourbody dev",
     "db:migrate": "scripts/web/create-migration.sh",
-    "db:schema:check": "bash scripts/supabase/check-schema-drift.sh",
+    "db:schema:check": "bash scripts/neon/check-migration-layout.sh",
     "ios": "cd apps/ios && open LogYourBody.xcodeproj",
-    "prepush": "export NEXT_PUBLIC_SUPABASE_URL=\"${NEXT_PUBLIC_SUPABASE_URL:-https://placeholder.supabase.co}\" NEXT_PUBLIC_SUPABASE_ANON_KEY=\"${NEXT_PUBLIC_SUPABASE_ANON_KEY:-placeholder-anon-key}\" SUPABASE_SERVICE_ROLE_KEY=\"${SUPABASE_SERVICE_ROLE_KEY:-placeholder-service-key}\"; turbo run lint --filter='...[origin/main]' && turbo run typecheck --filter='...[origin/main]' && turbo run test --filter='...[origin/main]' && node packages/product-registry/scripts/url-drift.test.mjs",
-    "prepare": "husky install",
+    "prepush": "turbo run lint --filter='...[origin/main]' && turbo run typecheck --filter='...[origin/main]' && turbo run test --filter='...[origin/main]' && node packages/product-registry/scripts/url-drift.test.mjs",
+    "prepare": "husky",
     "check": "pnpm --filter logyourbody check",
     "format": "prettier --write .",
     "lint:swift": "cd apps/ios && swiftlint lint --strict",
@@ -33,7 +35,7 @@
     "product:generate": "pnpm --filter @jovieinc/product-registry generate",
     "product:check": "pnpm --filter @jovieinc/product-registry test",
     "check:vendor-boundaries": "node scripts/check-vendor-boundaries.js",
-    "check:supabase-migrations": "node scripts/check-supabase-migration-drift.js",
+    "check:neon-migrations": "bash scripts/neon/check-migration-layout.sh",
     "sync:main": "bash scripts/sync-main.sh",
     "eve:info": "bash scripts/eve/run-node24.sh info",
     "eve:build": "bash scripts/eve/run-node24.sh build",
@@ -41,27 +43,38 @@
     "eve:smoke": "bash scripts/eve/local-smoke.sh"
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.0.0",
-    "@commitlint/config-conventional": "^19.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.16.0",
-    "@typescript-eslint/parser": "^8.16.0",
-    "eslint": "^9.31.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-react": "^7.37.0",
-    "eslint-plugin-react-hooks": "^5.0.0",
-    "husky": "^9.0.0",
-    "lint-staged": "^15.0.0",
-    "prettier": "^3.4.0",
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@typescript-eslint/eslint-plugin": "^8.70.1",
+    "@typescript-eslint/parser": "^8.71.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.9.9",
     "prettier-plugin-tailwindcss": "^0.6.14",
-    "turbo": "^2.5.4",
-    "typescript": "^5.8.3",
-    "vitest": "^4.0.14"
+    "turbo": "^2.11.7",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
   },
   "packageManager": "pnpm@10.34.1",
   "engines": {
-    "node": "20.x",
+    "node": "22.x",
     "pnpm": ">=10.34.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "js-yaml": "4.3.2",
+      "prismjs": "1.30.0",
+      "@xmldom/xmldom": ">=0.8.15",
+      "fflate": ">=0.8.3",
+      "postcss": ">=8.5.23",
+      "vite": "7.3.6",
+      "undici": "^8.10.2"
+    }
   },
   "lint-staged": {
     "apps/web/**/*.{js,jsx,ts,tsx}": [
@@ -76,15 +89,15 @@
       "prettier --write"
     ],
     "apps/ios/**/*.{swift}": [
-      "cd apps/ios && swiftlint"
+      "swiftlint lint --strict --config apps/ios/.swiftlint.yml"
     ],
     "*.{ts,tsx,js,jsx,mjs,cjs,swift,sh,yml,yaml,json,md,html,css,scss,rb,py,toml,xml,plist,template,xcconfig}": [
       "node packages/product-registry/scripts/url-drift.test.mjs --staged"
     ]
   },
   "dependencies": {
-    "ai": "^7.0.42",
+    "ai": "^7.0.114",
     "eve": "0.27.13",
-    "zod": "^4.1.13"
+    "zod": "^4.6.5"
   }
 }

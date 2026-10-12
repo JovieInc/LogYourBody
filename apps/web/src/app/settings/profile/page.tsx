@@ -217,7 +217,7 @@ export default function ProfileSettingsPage() {
       }
 
       if (imageUrl) {
-        // Update Supabase profile with new product avatar URL
+        // Update the first-party profile with the new product avatar URL.
         await updateLocalProfile({ avatar_url: imageUrl });
 
         toast({
