@@ -2774,9 +2774,21 @@ final class LogYourBodyUITests: XCTestCase {
 
         let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
         let shareCard = app.descendants(matching: .any)["body_score_share_card"]
-        XCTAssertTrue(
-            app.descendants(matching: .any)["world_class_screen_shareBodyScore"].waitForExistence(timeout: 8)
-        )
+        let shareScreen = app.descendants(matching: .any)["world_class_screen_shareBodyScore"]
+        var shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
+        if !shareScreenVisible {
+            // A tap synthesized while the timeline stage re-lays out can land on
+            // a stale accessibility element; re-resolve and tap once before failing.
+            let retryShareButton = app.descendants(matching: .any)["body_score_hero_share_button"].firstMatch
+            if retryShareButton.exists {
+                scrollUntilHittable(retryShareButton, in: app)
+                if retryShareButton.isHittable {
+                    retryShareButton.tap()
+                    shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
+                }
+            }
+        }
+        XCTAssertTrue(shareScreenVisible)
         // Sheet identifier is preferred; card must remain discoverable for launch quality.
         let sheetVisible = shareSheet.waitForExistence(timeout: 8)
         let cardVisible = shareCard.waitForExistence(timeout: sheetVisible ? 4 : 8)
