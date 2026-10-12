@@ -31,6 +31,31 @@ test('current live ruleset shape satisfies the release gate contract', () => {
   assert.equal(verifyRulesetTargets(liveShape), true);
 });
 
+test('deliberate red: protected branch rulesets cannot configure bypass actors', () => {
+  const rulesets = [
+    {
+      ...liveShape[0],
+      bypass_actors: [{ actor_id: 1, actor_type: 'OrganizationAdmin', bypass_mode: 'always' }],
+    },
+    liveShape[1],
+  ];
+  assert.throws(
+    () => verifyRulesetTargets(rulesets),
+    /protected branch rulesets allow bypass actors.*OrganizationAdmin.*mode=always/,
+  );
+});
+
+test('deliberate red: unrestricted current-user bypass is rejected', () => {
+  const rulesets = [
+    { ...liveShape[0], current_user_can_bypass: 'always' },
+    liveShape[1],
+  ];
+  assert.throws(
+    () => verifyRulesetTargets(rulesets),
+    /protected branch rulesets allow bypass actors.*current user mode=always/,
+  );
+});
+
 test('deliberate red: quoted include targets are rejected', () => {
   const rulesets = [
     branchRuleset(6502188, 'Main - Protect', ['refs/heads/"main"']),

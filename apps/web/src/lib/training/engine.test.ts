@@ -3,6 +3,7 @@ import {
   buildSession,
   createMesoBlock,
   evaluateDeload,
+  latestFeedbackPerSession,
   validateSetLog,
   volume_landmarks,
 } from './engine';
@@ -36,6 +37,16 @@ function feedback(input: Partial<TrainingFeedback> = {}): TrainingFeedback {
     createdAt: '2026-01-20T00:00:00.000Z',
     ...input,
   };
+}
+
+function permutations<T>(items: T[]): T[][] {
+  if (items.length <= 1) return [items];
+  return items.flatMap((item, index) =>
+    permutations(items.filter((_, otherIndex) => otherIndex !== index)).map((rest) => [
+      item,
+      ...rest,
+    ]),
+  );
 }
 
 describe('deterministic training engine', () => {
@@ -161,6 +172,7 @@ describe('deterministic training engine', () => {
       }),
       feedback({
         id: 'old',
+        sessionId: 'previous-session',
         performance: 'down',
         soreness: 5,
         createdAt: '2026-01-20T00:00:00.000Z',
@@ -175,7 +187,7 @@ describe('deterministic training engine', () => {
       logs: [],
       feedback: [
         feedback({ performance: 'down', soreness: 8 }),
-        feedback({ id: 'older', performance: 'down' }),
+        feedback({ id: 'older', sessionId: 'previous-session', performance: 'down' }),
       ],
     });
     expect(reduced.exercises[0]?.sets).toBe(1);
@@ -191,6 +203,121 @@ describe('deterministic training engine', () => {
     expect(pause.safetyStop).toBe(true);
     expect(pause.exercises).toEqual([]);
     expect(pause.explanation).toContain('Pause the affected exercise');
+  });
+
+  it('counts legacy duplicate check-ins as one session of recovery evidence', () => {
+    expect(
+      evaluateDeload([
+        feedback({
+          id: 'retry',
+          sessionId: 'one-session',
+          performance: 'down',
+          soreness: 8,
+          createdAt: '2026-01-21T00:00:00.000Z',
+        }),
+        feedback({
+          id: 'original',
+          sessionId: 'one-session',
+          performance: 'down',
+          soreness: 8,
+          createdAt: '2026-01-20T00:00:00.000Z',
+        }),
+      ]).action,
+    ).toBe('none');
+  });
+
+  it('uses the latest deliberate update for each session while retaining pain safety', () => {
+    const earlier = feedback({
+      id: 'original',
+      sessionId: 'one-session',
+      performance: 'down',
+      soreness: 8,
+      jointPain: 5,
+      createdAt: '2026-01-20T00:00:00.000Z',
+    });
+    const updated = feedback({
+      id: 'update',
+      sessionId: 'one-session',
+      performance: 'stable',
+      soreness: 2,
+      jointPain: 0,
+      createdAt: '2026-01-21T00:00:00.000Z',
+    });
+    expect(evaluateDeload([earlier, updated]).action).toBe('none');
+    expect(evaluateDeload([updated, earlier]).action).toBe('none');
+    expect(
+      evaluateDeload([
+        updated,
+        {
+          ...earlier,
+          id: 'new-pain',
+          createdAt: '2026-01-22T00:00:00.000Z',
+        },
+      ]).action,
+    ).toBe('pause_session');
+  });
+
+  it.each(['same-session', 'different-session'])(
+    'retains the pain stop for every ordering of tied %s check-ins',
+    (painSessionId) => {
+      const lowPain = feedback({ id: 'a-low-pain', sessionId: 'same-session' });
+      const highPain = feedback({ id: 'z-high-pain', sessionId: painSessionId, jointPain: 4 });
+      const older = feedback({
+        id: 'older',
+        sessionId: 'older-session',
+        createdAt: '2026-01-19T00:00:00.000Z',
+      });
+      for (const input of permutations([lowPain, highPain, older])) {
+        const original = input.map((item) => ({ ...item }));
+        expect(evaluateDeload(input).action).toBe('pause_session');
+        expect(latestFeedbackPerSession(input)[0]).toEqual(highPain);
+        expect(input).toEqual(original);
+      }
+    },
+  );
+
+  it.each(['current-session', 'previous-session'])(
+    'does not infer repeated decline when the %s has contradictory tied recovery scores',
+    (ambiguousSessionId) => {
+      const current = feedback({
+        id: 'a-current',
+        sessionId: 'current-session',
+        performance: 'down',
+        soreness: 8,
+      });
+      const previous = feedback({
+        id: 'a-previous',
+        sessionId: 'previous-session',
+        performance: 'down',
+        soreness: 8,
+        createdAt: '2026-01-19T00:00:00.000Z',
+      });
+      const conflicting = {
+        ...(ambiguousSessionId === current.sessionId ? current : previous),
+        id: 'z-conflicting',
+        performance: 'stable' as const,
+      };
+      for (const input of permutations([current, previous, conflicting])) {
+        expect(evaluateDeload(input).action).toBe('none');
+        expect(evaluateDeload(input).explanation).toContain('Conflicting check-ins');
+        expect(latestFeedbackPerSession(input)).toEqual([current, previous]);
+      }
+    },
+  );
+
+  it('still recognizes distinct declining sessions when tied duplicates have identical scores', () => {
+    const current = feedback({ id: 'a-current', performance: 'down', soreness: 8 });
+    const retry = { ...current, id: 'z-retry' };
+    const previous = feedback({
+      id: 'previous',
+      sessionId: 'previous-session',
+      performance: 'down',
+      createdAt: '2026-01-19T00:00:00.000Z',
+    });
+    for (const input of permutations([current, retry, previous])) {
+      expect(evaluateDeload(input).action).toBe('reduce_volume');
+      expect(latestFeedbackPerSession(input)).toEqual([current, previous]);
+    }
   });
 
   it('does not change the dose based on pump alone and rejects logs outside the returned session', () => {
