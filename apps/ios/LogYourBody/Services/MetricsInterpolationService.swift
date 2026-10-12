@@ -46,6 +46,7 @@ class MetricsInterpolationService {
 
         // Cached trend-weight series for efficiency when querying multiple dates
         private var trendWeightCache: [Date: InterpolatedMetric] = [:]
+        private var trendRawValues: [Date: Double] = [:]
         private var trendLastDay: Date?
         private var trendLastValue: Double?
         // Smoothing factor for exponential moving average (EMA).
@@ -73,10 +74,29 @@ class MetricsInterpolationService {
                 return cached
             }
 
-            var ema = trendLastValue
+            // There is no new measurement after the final metric. Walking the
+            // EMA one day at a time all the way to a far-future query date can
+            // block the main thread for seconds (for example, when the last
+            // weigh-in is months or years before today). Process one day past
+            // the final metric so timestamped final-day measurements are
+            // included, then reuse that last-known trend for later dates.
+            let lastMetricDay = calendar.startOfDay(for: metrics[metrics.count - 1].date)
+            let processingEndDay: Date
+            if targetDay > lastMetricDay {
+                processingEndDay = calendar.date(byAdding: .day, value: 1, to: lastMetricDay) ?? lastMetricDay
+            } else {
+                processingEndDay = targetDay
+            }
+
+            let cachedAnchor = trendRawValues
+                .filter { $0.key <= targetDay }
+                .max { $0.key < $1.key }
+            var ema = cachedAnchor?.value ?? trendLastValue
             var currentDay: Date
 
-            if let lastDay = trendLastDay, let lastValue = ema, lastDay >= firstDay {
+            if let cachedAnchor {
+                currentDay = calendar.date(byAdding: .day, value: 1, to: cachedAnchor.key) ?? cachedAnchor.key
+            } else if let lastDay = trendLastDay, let lastValue = ema, lastDay >= firstDay, targetDay >= lastDay {
                 currentDay = calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay
                 ema = lastValue
             } else {
@@ -84,10 +104,20 @@ class MetricsInterpolationService {
                 ema = nil
             }
 
-            while currentDay <= targetDay {
+            while currentDay <= processingEndDay {
                 // Seed the first day at its actual measurement time, not an earlier midnight.
                 let sampleDate = currentDay == firstDay ? firstMetric.date : currentDay
                 guard let weightResult = estimate(for: sampleDate) else {
+                    // A gap larger than the interpolation limit cannot yield a
+                    // result on any intervening day. Jump to the next known
+                    // measurement instead of scanning every calendar day.
+                    if let nextMetric = metrics.first(where: { $0.date > sampleDate }) {
+                        let nextDay = calendar.startOfDay(for: nextMetric.date)
+                        if nextDay > currentDay {
+                            currentDay = nextDay
+                            continue
+                        }
+                    }
                     guard let nextDay = calendar.date(byAdding: .day, value: 1, to: currentDay) else {
                         break
                     }
@@ -111,6 +141,7 @@ class MetricsInterpolationService {
                 )
 
                 trendWeightCache[currentDay] = trendMetric
+                trendRawValues[currentDay] = emaValue
                 trendLastDay = currentDay
                 trendLastValue = emaValue
 
@@ -122,6 +153,25 @@ class MetricsInterpolationService {
                     break
                 }
                 currentDay = nextDay
+            }
+
+            if targetDay > processingEndDay,
+               let lastKnown = trendWeightCache[processingEndDay],
+               let anchorValue = trendRawValues[processingEndDay],
+               let days = calendar.dateComponents([.day], from: processingEndDay, to: targetDay).day,
+               days > 0 {
+                // Match the established estimate path for the final known
+                // value. It rounds measurements to one decimal before the
+                // analytical tail continues the EMA, while anchorValue stays
+                // unrounded for numerical continuity.
+                let finalWeight = estimate(for: metrics[metrics.count - 1].date)?.value ?? anchorValue
+                let decay = pow(1 - trendAlpha, Double(days))
+                return InterpolatedMetric(
+                    value: round((finalWeight + (anchorValue - finalWeight) * decay) * 10) / 10,
+                    isInterpolated: false,
+                    isLastKnown: true,
+                    confidenceLevel: nil
+                )
             }
 
             return trendWeightCache[targetDay]

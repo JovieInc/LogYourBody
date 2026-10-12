@@ -13,6 +13,59 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testWeightGoalCancelMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestWeightLoggerMVPFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 20))
+        let settings = app.buttons["mvp_settings_button"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        settings.tap()
+
+        let tracking = app.descendants(matching: .any)["settings_tracking_link"]
+        var swipes = 0
+        while !tracking.exists && swipes < 4 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(tracking.waitForExistence(timeout: 8))
+        tracking.tap()
+
+        let weightGoal = app.buttons["settings_weight_goal_edit_button"]
+        swipes = 0
+        while !weightGoal.exists && swipes < 4 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(weightGoal.waitForExistence(timeout: 8))
+        weightGoal.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings_goal_editor_text_field"].waitForExistence(timeout: 8)
+        )
+        let cancel = app.buttons["Cancel editing"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Goal cancel \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Goal cancel \(frame)")
+
+        let save = app.descendants(matching: .any)["settings_goal_editor_save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        let saveFrame = save.frame
+        XCTAssertGreaterThanOrEqual(saveFrame.width, 44, "Goal save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(saveFrame.height, 44, "Goal save \(saveFrame)")
+        cancel.tap()
+        XCTAssertTrue(weightGoal.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings_goal_editor_text_field"].waitForNonExistence(timeout: 5)
+        )
+    }
+
     func testLaunch() throws {
         let app = XCUIApplication()
         app.launch()
@@ -24,5 +77,56 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         attachment.name = "Launch Screen"
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    func testExportCancelMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestWeightLoggerMVPFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 20))
+        let settings = app.buttons["mvp_settings_button"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        settings.tap()
+
+        let export = app.buttons["home_v2_settings_export"]
+        var swipes = 0
+        while !export.exists && swipes < 4 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(export.waitForExistence(timeout: 8))
+        export.tap()
+
+        XCTAssertTrue(app.staticTexts["Export your data"].waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_exportData"].waitForExistence(timeout: 5)
+        )
+        let cancel = app.buttons["Cancel export"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel export \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel export \(frame)")
+        var exportAction = app.descendants(matching: .any)["export_data_action"]
+        if !exportAction.waitForExistence(timeout: 2) {
+            app.swipeUp()
+            exportAction = app.descendants(matching: .any)["export_data_action"]
+        }
+        XCTAssertTrue(
+            exportAction.waitForExistence(timeout: 5),
+            "export action missing; buttons \(app.buttons.allElementsBoundByIndex.prefix(12).map(\.label))"
+        )
+        let actionFrame = exportAction.frame
+        XCTAssertGreaterThanOrEqual(actionFrame.width, 44, "Export action \(actionFrame)")
+        XCTAssertGreaterThanOrEqual(actionFrame.height, 44, "Export action \(actionFrame)")
+        cancel.tap()
+        XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_exportData"].waitForNonExistence(timeout: 5)
+        )
     }
 }

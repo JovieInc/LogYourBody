@@ -22,10 +22,25 @@ runs:
   using: 'composite'
   steps:
     - name: Setup Ruby
+      if: runner.environment == 'github-hosted'
       uses: ruby/setup-ruby@v1
       with:
         ruby-version: ${{ inputs.ruby-version }}
         bundler-cache: false  # We'll handle caching ourselves for better control
+
+    # ruby/setup-ruby needs /Users/runner/hostedtoolcache, which the
+    # self-hosted Macs lack; they carry the same Ruby line from Homebrew.
+    - name: Use Homebrew Ruby on self-hosted Macs
+      if: runner.environment == 'self-hosted'
+      shell: bash
+      run: |
+        prefix="/opt/homebrew/opt/ruby@${{ inputs.ruby-version }}"
+        if [[ ! -x "$prefix/bin/ruby" ]]; then
+          echo "::error::Self-hosted Mac lacks Homebrew ruby@${{ inputs.ruby-version }} (brew install ruby@${{ inputs.ruby-version }})."
+          exit 1
+        fi
+        echo "$prefix/bin" >> "$GITHUB_PATH"
+        "$prefix/bin/ruby" -e 'puts Gem.bindir' >> "$GITHUB_PATH"
 
     - name: Get Ruby version
       id: ruby-version

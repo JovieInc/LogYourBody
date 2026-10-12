@@ -6,42 +6,56 @@ extension DashboardViewLiquid {
     var photoTimelineHUD: some View {
         ZStack(alignment: .topLeading) {
             timelineAccessibilityMarker(id: "photo_timeline_hud", label: "Timeline overview")
+            timelineAccessibilityMarker(id: "world_class_screen_photoTimeline", label: "Today timeline")
 
             Group {
                 if let metric = currentMetric {
-                    let bodyScore = bodyScoreText()
+                    if HomeV2Policy.isEnabled() {
+                        homeV2Surface(for: metric)
+                    } else {
+                        let bodyScore = bodyScoreText()
 
-                    LaunchTimelineSurface(
-                        metric: metric,
-                        bodyMetrics: bodyMetrics,
-                        selectedIndex: $selectedIndex,
-                        dateText: formatHUDDate(metric.date),
-                        weightValue: heroWeightValue(),
-                        weightCaption: heroWeightCaption(),
-                        bodyFatValue: heroBodyFatValue(),
-                        bodyFatCaption: heroBodyFatCaption(),
-                        ffmiValue: heroFFMIValue(),
-                        ffmiCaption: heroFFMICaption(),
-                        onTapWeight: {
-                            selectedMetricType = .weight
-                            isMetricDetailActive = true
-                        },
-                        onTapBodyFat: {
-                            selectedMetricType = .bodyFat
-                            isMetricDetailActive = true
-                        },
-                        onTapFFMI: {
-                            selectedMetricType = .ffmi
-                            isMetricDetailActive = true
-                        },
-                        onShare: makeBodyScoreShareAction(metric: metric, score: bodyScore.score)
-                    )
+                        LaunchTimelineSurface(
+                            metric: metric,
+                            bodyMetrics: bodyMetrics,
+                            selectedIndex: $selectedIndex,
+                            dateText: formatHUDDate(metric.date),
+                            weightValue: heroWeightValue(),
+                            weightCaption: heroWeightCaption(),
+                            bodyFatValue: heroBodyFatValue(),
+                            bodyFatCaption: heroBodyFatCaption(),
+                            ffmiValue: heroFFMIValue(),
+                            ffmiCaption: heroFFMICaption(),
+                            onTapWeight: {
+                                selectedMetricType = .weight
+                                isMetricDetailActive = true
+                            },
+                            onTapBodyFat: {
+                                selectedMetricType = .bodyFat
+                                isMetricDetailActive = true
+                            },
+                            onTapFFMI: {
+                                selectedMetricType = .ffmi
+                                isMetricDetailActive = true
+                            },
+                            onShare: makeBodyScoreShareAction(metric: metric, score: bodyScore.score),
+                            onAddPhoto: { presentProgressPhotoAttach(for: metric) }
+                        )
+                    }
                 } else {
                     photoTimelineHUDEmptyState
                 }
             }
         }
         .worldClassScreen(.home)
+    }
+
+    private var homeChatDraftBinding: Binding<String> {
+        let ownership = authManager.captureAccountSession()
+        return AccountSessionChatDraft.binding(storage: $homeChatDraft, owner: ownership) {
+            guard let ownership else { return false }
+            return authManager.ownsAccountSession(ownership)
+        }
     }
 
     var photoTimelineRoot: some View {
@@ -60,17 +74,19 @@ extension DashboardViewLiquid {
                 .accessibilityHidden(isHomeChatExpanded)
                 .clipped()
 
-            if HomeChatChromePolicy.shouldShowComposer(
+            if !isHomeV2CheckIn, HomeChatChromePolicy.shouldShowComposer(
                 isChatExpanded: isHomeChatExpanded,
                 isOnStats: selectedPhotoTimelineRootPage == .analytics
             ) {
                 ChatTabView(
+                    draft: homeChatDraftBinding,
                     showsTranscript: isHomeChatExpanded,
                     onExpandRequest: {
                         isHomeChatExpanded = true
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? .infinity : nil)
+                .layoutPriority(!isHomeChatExpanded && dynamicTypeSize.isAccessibilitySize ? 1 : 0)
             }
         }
         .worldClassScreen(
@@ -90,7 +106,42 @@ extension DashboardViewLiquid {
                 .highPriorityGesture(photoTimelineSwipe)
                 .accessibilityHidden(true)
         }
+        .fullScreenCover(isPresented: $isHomeV2ViewerPresented) {
+            homeV2PhotoViewer
+        }
+        .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
+            homeV2AllPhotosFromHome
+        }
+        .sheet(item: $homeV2EditingMetric) { metric in
+            homeV2EditEntrySheet(for: metric)
+        }
+        .navigationDestination(isPresented: $isHomeV2ContextPresented) {
+            homeV2ContextView
+        }
+        .navigationDestination(isPresented: $isHomeV2EntriesPresented) {
+            homeV2EntriesView
+        }
         .fullScreenCover(isPresented: $isShowingPhotoTimelineMenu) {
+            if HomeV2Policy.isEnabled() {
+                homeV2Sidebar
+            } else {
+                photoTimelineNavigationMenuCover
+            }
+        }
+        .navigationDestination(isPresented: $isHomeV2SettingsPresented) {
+            homeV2SettingsView
+        }
+        .sheet(isPresented: $isHomeV2HelpPresented) {
+            BugReportPromptSheet()
+                .environmentObject(BugReportManager.shared)
+        }
+        .navigationDestination(isPresented: $isPhotoTimelineSettingsPresented) {
+            PreferencesView()
+                .environmentObject(authManager)
+        }
+    }
+
+    private var photoTimelineNavigationMenuCover: some View {
             PhotoTimelineNavigationMenu(
                 selected: selectedPhotoTimelineRootPage,
                 onSelect: { page in
@@ -102,15 +153,12 @@ extension DashboardViewLiquid {
                     isShowingPhotoTimelineMenu = false
                     isPhotoTimelineSettingsPresented = true
                 },
+                onOpenEntries: homeV2OpenEntriesAction,
+                statsTitle: HomeV2Policy.isEnabled() ? HomeV2ProgressCopy.title : "Stats",
                 onClose: {
                     isShowingPhotoTimelineMenu = false
                 }
             )
-        }
-        .navigationDestination(isPresented: $isPhotoTimelineSettingsPresented) {
-            PreferencesView()
-                .environmentObject(authManager)
-        }
     }
 
     @ViewBuilder
@@ -123,8 +171,14 @@ extension DashboardViewLiquid {
                         id: "photo_timeline_root_page_timeline",
                         label: "Timeline page"
                     )
-                    if bodyMetrics.isEmpty {
-                        photoTimelineHUDEmptyState
+                    if isHomeV2CheckIn, homeV2SystemState == .loading {
+                        HomeV2LoadingHome()
+                    } else if bodyMetrics.isEmpty {
+                        if isHomeV2CheckIn {
+                            homeV2DayZero
+                        } else {
+                            photoTimelineHUDEmptyState
+                        }
                     } else {
                         photoTimelineHUD
                     }
@@ -135,7 +189,11 @@ extension DashboardViewLiquid {
                         id: "photo_timeline_root_page_analytics",
                         label: "Stats page"
                     )
-                    photoTimelineAnalyticsPage
+                    if HomeV2Policy.isEnabled() {
+                        homeV2ProgressView
+                    } else {
+                        photoTimelineAnalyticsPage
+                    }
                 }
             }
         }
@@ -145,14 +203,14 @@ extension DashboardViewLiquid {
 
     private var photoTimelineToolbarTitle: String {
         if isHomeChatExpanded {
-            return "Chat"
+            return HomeV2Policy.isEnabled() ? HomeV2AskCopy.title : "Chat"
         }
 
         switch selectedPhotoTimelineRootPage {
         case .timeline, .chat:
-            return "Home"
+            return isHomeV2CheckIn ? HomeV2Copy.title : "Home"
         case .analytics:
-            return "Stats"
+            return HomeV2Policy.isEnabled() ? HomeV2ProgressCopy.title : "Stats"
         }
     }
 
@@ -161,12 +219,20 @@ extension DashboardViewLiquid {
             Button {
                 isShowingPhotoTimelineMenu = true
             } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(theme.colors.text)
-                    .frame(width: 32, height: 32)
-                    .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
-                    .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                if isHomeV2Chrome {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(HomeV2Tokens.Colors.ink)
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                        .contentShape(Rectangle())
+                } else {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(theme.colors.text)
+                        .frame(width: 32, height: 32)
+                        .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                }
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Open Menu")
@@ -175,22 +241,44 @@ extension DashboardViewLiquid {
 
             VStack(spacing: 2) {
                 Text(photoTimelineToolbarTitle)
-                    .font(.system(size: 16, weight: .semibold))
+                    .scaledSystemFont(size: 16, weight: .semibold, relativeTo: .headline)
                     .foregroundStyle(theme.colors.text)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
 
-            if isHomeChatExpanded {
+            if isHomeV2CheckIn {
+                Button {
+                    openHomeV2Context()
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(HomeV2Tokens.Colors.ink)
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Today’s details")
+                .accessibilityHint("Opens the selected day")
+                .accessibilityIdentifier("home_v2_context_button")
+            } else if isHomeChatExpanded {
                 Button {
                     isHomeChatExpanded = false
                 } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(theme.colors.text)
-                        .frame(width: 32, height: 32)
-                        .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
-                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    if isHomeV2Chrome {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(HomeV2Tokens.Colors.ink)
+                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                            .contentShape(Rectangle())
+                    } else {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(theme.colors.text)
+                            .frame(width: 32, height: 32)
+                            .dashboardChromeGlass(in: Circle(), cornerRadius: 16)
+                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close chat")
@@ -229,6 +317,10 @@ extension DashboardViewLiquid {
         case .menu:
             isShowingPhotoTimelineMenu = true
         case .stats:
+            if isHomeV2CheckIn {
+                openHomeV2Context()
+                return
+            }
             selectedPhotoTimelineRootPage = .analytics
             isHomeChatExpanded = false
             HapticManager.shared.selection()
@@ -367,7 +459,7 @@ extension DashboardViewLiquid {
                         .foregroundColor(theme.colors.text)
 
                     Text("Add a progress photo or weight entry to build your body-composition timeline.")
-                        .font(.system(size: 15, weight: .medium))
+                        .scaledSystemFont(size: 15, weight: .medium, relativeTo: .subheadline)
                         .foregroundColor(theme.colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -440,6 +532,8 @@ private struct PhotoTimelineNavigationMenu: View {
     let selected: DashboardViewLiquid.PhotoTimelineRootPage
     let onSelect: (DashboardViewLiquid.PhotoTimelineRootPage) -> Void
     let onOpenSettings: () -> Void
+    var onOpenEntries: (() -> Void)?
+    var statsTitle = "Stats"
     let onClose: () -> Void
 
     var body: some View {
@@ -477,10 +571,22 @@ private struct PhotoTimelineNavigationMenu: View {
                         page: .timeline
                     )
                     menuRow(
-                        title: "Stats",
+                        title: statsTitle,
                         systemImage: "chart.line.uptrend.xyaxis",
                         page: .analytics
                     )
+                    if let onOpenEntries {
+                        Button(action: onOpenEntries) {
+                            menuLabel(
+                                title: "Entries",
+                                systemImage: "list.bullet",
+                                isSelected: false
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Entries")
+                        .accessibilityIdentifier("photo_timeline_menu_entries")
+                    }
                     Button(action: onOpenSettings) {
                         menuLabel(
                             title: "Settings",
