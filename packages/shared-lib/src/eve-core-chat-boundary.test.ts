@@ -111,6 +111,8 @@ describe('eve.dev core-chat boundary', () => {
     const packageName = new RegExp(['trigger', 'dev'].join(''), 'i');
 
     const matches = trackedFiles.filter((file) => {
+      // Tracked symlinks (e.g. .claude/skills/* -> .agents/skills/*) are scanned via their target.
+      if (lstatSync(join(repoRoot, file)).isSymbolicLink()) return false;
       const source = readFileSync(join(repoRoot, file)).toString('utf8');
       return dottedName.test(source) || packageName.test(source);
     });
