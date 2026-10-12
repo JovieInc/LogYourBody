@@ -422,8 +422,10 @@ final class ChaosMonkeyUITests: XCTestCase {
         composer.tap()
         let draft = "local chaos draft"
         composer.typeText(draft)
-        XCTAssertTrue(app.keyboards.element.exists)
-        XCTAssertEqual(dismissKeyboardForStep(app: app), .executed(.dismiss))
+        XCTAssertEqual(
+            dismissKeyboardForStep(app: app, refocusingIfNeeded: composer),
+            .executed(.dismiss)
+        )
         XCTAssertFalse(app.keyboards.element.exists)
         // Default Home removes the Ask view when collapsed; reopen before inspecting its draft.
         if !composer.exists { openDefaultHomeAsk(in: app) }
@@ -1038,9 +1040,23 @@ final class ChaosMonkeyUITests: XCTestCase {
         return false
     }
 
-    /// Count a dismissal only when a previously visible keyboard disappears.
-    private func dismissKeyboardForStep(app: XCUIApplication) -> ChaosStepOutcome {
-        guard app.keyboards.element.exists else { return .skipped("keyboard was not present") }
+    /// Count a dismissal only when a visible keyboard disappears. A focused
+    /// field may be supplied to recover if an asynchronous view update drops
+    /// focus between typing and the keyboard probe.
+    private func dismissKeyboardForStep(
+        app: XCUIApplication,
+        refocusingIfNeeded field: XCUIElement? = nil
+    ) -> ChaosStepOutcome {
+        let keyboard = app.keyboards.firstMatch
+        if !keyboard.exists {
+            guard let field, field.exists, field.isHittable else {
+                return .skipped("keyboard was not present")
+            }
+            field.tap()
+            guard keyboard.waitForExistence(timeout: 1.5) else {
+                return .skipped("text field did not regain keyboard focus")
+            }
+        }
         let scroll = app.scrollViews.firstMatch
         if scroll.exists && hasFiniteNonZeroFrame(scroll) && scroll.isHittable {
             scroll.swipeDown()
