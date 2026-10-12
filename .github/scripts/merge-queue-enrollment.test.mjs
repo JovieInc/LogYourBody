@@ -281,25 +281,28 @@ async function tokenScenario({ mutate = () => {}, entryMutate = () => {} } = {})
       baseRefName: 'main',
       headRefOid: head,
       headRepository: { nameWithOwner: repository },
-      commits: {
-        nodes: [
-          {
-            commit: {
-              oid: head,
-              statusCheckRollup: {
-                contexts: { nodes: [{ name: 'CI Summary', conclusion: 'SUCCESS' }] },
-              },
-            },
-          },
-        ],
-      },
     },
   };
+  const checkRuns = [
+    {
+      name: 'CI Summary',
+      conclusion: 'success',
+      head_sha: head,
+      completed_at: '2026-01-01T00:00:00Z',
+    },
+  ];
   mutate(context);
-  entryMutate(entry);
+  entryMutate(entry, checkRuns);
   const calls = [];
   const core = recordingCore();
   const github = {
+    rest: {
+      checks: {
+        async listForRef() {
+          return { data: { check_runs: checkRuns } };
+        },
+      },
+    },
     async graphql(query, variables) {
       calls.push({ query, variables });
       if (query.includes('query Queue'))
@@ -353,21 +356,20 @@ for (const [name, entryMutate] of [
   ],
   [
     'failed summary',
-    (entry) => {
-      entry.pullRequest.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[0].conclusion =
-        'FAILURE';
+    (entry, checkRuns) => {
+      checkRuns[0].conclusion = 'failure';
     },
   ],
   [
     'missing summary',
-    (entry) => {
-      entry.pullRequest.commits.nodes[0].commit.statusCheckRollup.contexts.nodes = [];
+    (entry, checkRuns) => {
+      checkRuns.length = 0;
     },
   ],
   [
     'summary from another commit',
-    (entry) => {
-      entry.pullRequest.commits.nodes[0].commit.oid = 'b'.repeat(40);
+    (entry, checkRuns) => {
+      checkRuns[0].head_sha = 'b'.repeat(40);
     },
   ],
 ]) {
