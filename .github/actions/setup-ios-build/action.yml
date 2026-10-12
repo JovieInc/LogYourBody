@@ -49,9 +49,25 @@ runs:
         SWIFTLINT_VERSION="0.63.3"
         if ! command -v swiftlint &> /dev/null || [[ "$(swiftlint version)" != "$SWIFTLINT_VERSION" ]]; then
           echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
+          # Self-hosted ARM64 Macs cannot write /usr/local/bin (Homebrew lives
+          # in /opt/homebrew there), so pick the first writable bin directory
+          # already on PATH and fall back to a runner-local dir otherwise.
+          INSTALL_DIR=""
+          for candidate in /usr/local/bin /opt/homebrew/bin; do
+            if [[ -d "$candidate" && -w "$candidate" ]]; then
+              INSTALL_DIR="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$INSTALL_DIR" ]]; then
+            INSTALL_DIR="${RUNNER_TEMP:-$PWD}/swiftlint-bin"
+            mkdir -p "$INSTALL_DIR"
+            echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+          fi
+          echo "Installing SwiftLint to ${INSTALL_DIR}"
           curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
-          unzip -o swiftlint.zip -d /usr/local/bin
-          chmod +x /usr/local/bin/swiftlint
+          unzip -o swiftlint.zip -d "$INSTALL_DIR"
+          chmod +x "$INSTALL_DIR/swiftlint"
         else
           echo "SwiftLint already installed: $(swiftlint version)"
         fi
