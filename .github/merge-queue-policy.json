@@ -11,7 +11,9 @@
     "max_entries_to_merge": 5,
     "min_entries_to_merge_wait_minutes": 0,
     "grouping_strategy": "ALLGREEN",
-    "check_response_timeout_minutes": 120
+    "check_response_timeout_minutes": 360,
+    "max_entries_to_build_reason": "each iOS merge group holds two hosted macOS runners and the org shares one small macOS pool with Jovie; raise when self-hosted Macs add capacity",
+    "check_response_timeout_minutes_reason": "GitHub's maximum: the timer must only catch groups whose CI never reports, never eject groups waiting on runner capacity (job timeouts bound runtime)"
   },
   "auto_enrollment": {
     "workflow": ".github/workflows/native-merge-queue.yml",
