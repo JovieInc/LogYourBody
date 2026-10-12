@@ -6,33 +6,54 @@ import UIKit
 extension RealtimeSyncManager {
 // MARK: - Pending Operations
     func loadPendingOperations() {
-        if let data = UserDefaults.standard.data(forKey: Constants.pendingSyncOperationsKey),
-           let operations = try? JSONDecoder().decode([SyncOperation].self, from: data) {
+        if let data = userDefaults.data(forKey: Constants.pendingSyncOperationsKey),
+           var operations = try? JSONDecoder().decode([SyncOperation].self, from: data) {
+            var identifiers = Set<UUID>()
+            for index in operations.indices {
+                if let identifier = operations[index].queueID, identifiers.insert(identifier).inserted { continue }
+                let identifier = UUID()
+                operations[index].queueID = identifier
+                identifiers.insert(identifier)
+            }
             pendingOperations = operations
+            savePendingOperations()
             updatePendingSyncCount()
         }
     }
 
 func savePendingOperations() {
         if let data = try? JSONEncoder().encode(pendingOperations) {
-            UserDefaults.standard.set(data, forKey: Constants.pendingSyncOperationsKey)
+            userDefaults.set(data, forKey: Constants.pendingSyncOperationsKey)
         }
     }
 
-nonisolated func processPendingOperations(_ operations: [SyncOperation], token: String) async -> [SyncOperation] {
+nonisolated func processPendingOperations(
+        _ operations: [SyncOperation], token: String,
+        ownership: AuthManager.RequestSessionOwnership? = nil
+    ) async -> [SyncOperation] {
         guard !operations.isEmpty else { return [] }
 
         var failedOperations: [SyncOperation] = []
 
-        for operation in operations {
+        for (index, operation) in operations.enumerated() {
+            if let ownership {
+                let isCurrent = await authManager.ownsRequestSession(ownership)
+                guard isCurrent, operation.userId == ownership.subject else {
+                    failedOperations.append(contentsOf: operations[index...])
+                    break
+                }
+            }
             do {
                 switch operation.type {
                 case .insert, .update:
-                    try await productAPIClient.upsertData(
+                    let response = try await productAPIClient.upsertData(
                         table: operation.tableName,
                         data: operation.data,
                         token: token
                     )
+                    guard response.contains(where: { $0["id"] as? String == operation.id }) else {
+                        throw ProductAPIError.invalidResponse
+                    }
                 case .delete:
                     try await productAPIClient.deleteData(
                         table: operation.tableName,
@@ -40,16 +61,28 @@ nonisolated func processPendingOperations(_ operations: [SyncOperation], token: 
                         token: token
                     )
                 }
+                await acknowledgePendingOperation(operation)
             } catch {
                 var failedOp = operation
-                failedOp.retryCount += 1
-                if failedOp.retryCount < 3 {
-                    failedOperations.append(failedOp)
-                }
+                if failedOp.retryCount < Int.max { failedOp.retryCount += 1 }
+                failedOperations.append(failedOp)
+                await retainFailedPendingOperation(failedOp)
             }
         }
 
         return failedOperations
+    }
+
+    func acknowledgePendingOperation(_ operation: SyncOperation) {
+        guard let index = pendingOperations.firstIndex(where: { $0.matchesQueuedChange(operation) }) else { return }
+        pendingOperations.remove(at: index)
+        savePendingOperations()
+    }
+
+    func retainFailedPendingOperation(_ operation: SyncOperation) {
+        guard let index = pendingOperations.firstIndex(where: { $0.matchesQueuedChange(operation) }) else { return }
+        pendingOperations[index].retryCount = operation.retryCount
+        savePendingOperations()
     }
 
 // MARK: - Helpers
@@ -181,7 +214,9 @@ func logBodyMetrics(_ metrics: BodyMetrics) {
     }
 
 func queueOperation(_ operation: SyncOperation) {
-        pendingOperations.append(operation)
+        var queued = operation
+        queued.queueID = UUID()
+        pendingOperations.append(queued)
         savePendingOperations()
         updatePendingSyncCount()
 

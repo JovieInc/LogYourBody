@@ -1,6 +1,6 @@
 ---
 name: recovery_signals
-description: 'Use when the user asks how soreness, pump, performance, or joint discomfort can inform recovery decisions.'
+description: 'Use when the user asks how systemic fatigue, soreness, pump, performance, muscle weakness, or joint discomfort can inform recovery decisions.'
 ---
 
 # Recovery signals

@@ -334,14 +334,84 @@ final class URLSessionVoiceService {
     }
 }
 
+enum VoiceSetLogRejection: LocalizedError, Equatable {
+    case outsideEngineSession
+
+    var errorDescription: String? { VoiceSetAdmission.rejectedLogMessage }
+}
+
+enum VoiceSetAdmission {
+    static let rejectedLogMessage = "That set does not match the current engine session. Nothing was logged."
+
+    enum Route: Equatable {
+        case confirm(VoiceSetProposal)
+        case review(VoiceHeardIntent)
+        case clarify(fields: [String], rejected: Bool)
+    }
+
+    static func admits(_ proposal: VoiceSetProposal, session: TrainingSession?) -> Bool {
+        guard let session, proposal.sessionId == session.id else { return false }
+        guard let exercise = session.exercises.first(where: { $0.id == proposal.exerciseId }) else { return false }
+        guard exercise.name == proposal.exerciseName else { return false }
+        guard (1...max(1, exercise.sets)).contains(proposal.setNumber) else { return false }
+        guard (1...50).contains(proposal.reps), (0...6).contains(proposal.rir) else { return false }
+        if let loadKg = proposal.loadKg {
+            guard loadKg.isFinite, (0...500).contains(loadKg) else { return false }
+        }
+        return true
+    }
+
+    static func route(
+        proposal: VoiceSetProposal?,
+        heard: VoiceHeardIntent?,
+        missingFields: [String]?,
+        session: TrainingSession?
+    ) -> Route {
+        let fields = missingFields ?? []
+        if let proposal, fields.isEmpty {
+            return admits(proposal, session: session)
+                ? .confirm(proposal)
+                : .clarify(fields: [], rejected: true)
+        }
+        if let session,
+           !session.exercises.isEmpty,
+           let heard,
+           !fields.isEmpty,
+           fields.allSatisfy(isExerciseOrSetField),
+           admitsHeard(heard) {
+            return .review(heard)
+        }
+        if let heard, !fields.isEmpty, fields.allSatisfy(isExerciseOrSetField), !admitsHeard(heard) {
+            return .clarify(fields: [], rejected: true)
+        }
+        return .clarify(fields: fields, rejected: false)
+    }
+
+    private static func admitsHeard(_ heard: VoiceHeardIntent) -> Bool {
+        guard (1...50).contains(heard.reps), (0...6).contains(heard.rir) else { return false }
+        if let loadKg = heard.loadKg {
+            guard loadKg.isFinite, (0...500).contains(loadKg) else { return false }
+        }
+        return true
+    }
+
+    private static func isExerciseOrSetField(_ field: String) -> Bool {
+        field == "exercise" || field == "set_number"
+    }
+}
+
 enum VoiceSetLogger {
     static func commit(
         _ proposal: VoiceSetProposal,
         isConfirmed: Bool,
         accessToken: String,
+        session: TrainingSession?,
         logSet: (String, TrainingSetLogRequest) async throws -> Void
     ) async throws {
         guard isConfirmed else { return }
+        guard VoiceSetAdmission.admits(proposal, session: session) else {
+            throw VoiceSetLogRejection.outsideEngineSession
+        }
         try await logSet(
             accessToken,
             TrainingSetLogRequest(

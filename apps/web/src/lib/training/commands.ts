@@ -2,7 +2,7 @@ import type {
   NativeProductRecord,
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import { validTrainingFeedback, validateSetLog } from './engine';
+import { latestFeedbackPerSession, validTrainingFeedback, validateSetLog } from './engine';
 import {
   isWorkoutSessionRecord,
   loadTrainingRecords,
@@ -30,6 +30,7 @@ export type LogSetResult =
   | { kind: 'session_not_found' }
   | { kind: 'session_not_active' }
   | { kind: 'set_not_in_session' }
+  | { kind: 'set_conflict' }
   | { kind: 'rejected' };
 
 /** Stores one set against the subject's active session. Shared by the mobile API and MCP. */
@@ -48,18 +49,54 @@ export async function logTrainingSet(input: {
   const sessionRecord = sessions.find((record) => record.id === set.sessionId);
   if (
     !sessionRecord ||
+    sessionRecord.deleted_at !== null ||
     !isWorkoutSessionRecord(sessionRecord) ||
     sessionRecord.programSetupId !== snapshot.setup.id
   ) {
     return { kind: 'session_not_found' };
   }
-  if (sessionRecord.status !== 'in_progress') return { kind: 'session_not_active' };
   const session = sessionRecord.prescription;
+  const logId = stableTrainingUuid(
+    subject,
+    sessionRecord.id,
+    set.exerciseId,
+    String(set.setNumber),
+  );
+  if (sessionRecord.status !== 'in_progress') {
+    // The final write may have succeeded even when its response was interrupted.
+    // A completed session permits an exact replay, never an edit or a new set.
+    const prior = snapshot.logs.find((log) => log.id === logId);
+    if (
+      sessionRecord.status === 'completed' &&
+      prior &&
+      prior.sessionId === set.sessionId &&
+      prior.exerciseId === set.exerciseId &&
+      prior.setNumber === set.setNumber &&
+      prior.reps === set.reps &&
+      prior.loadKg === set.loadKg &&
+      prior.rir === set.rir
+    ) {
+      return { kind: 'logged', log: { ...prior, record_type: 'set_log' }, sessionComplete: true };
+    }
+    return { kind: 'session_not_active' };
+  }
   const completedAt = input.now.toISOString();
-  if (!session || !validateSetLog({ id: 'server-generated', ...set, completedAt }, session))
+  const hasSavedIdentity = snapshot.logs.some(
+    (prior) =>
+      prior.id === logId &&
+      prior.sessionId === set.sessionId &&
+      prior.exerciseId === set.exerciseId &&
+      prior.setNumber === set.setNumber,
+  );
+  // Recovery can reduce the effective set count after a set was already saved.
+  // Let the atomic read below acknowledge that row or reject a changed payload;
+  // only a genuinely new identity must fit the current prescription.
+  if (
+    !session ||
+    (!hasSavedIdentity && !validateSetLog({ id: 'server-generated', ...set, completedAt }, session))
+  )
     return { kind: 'set_not_in_session' };
 
-  const logId = stableTrainingUuid(subject, session.id, set.exerciseId, String(set.setNumber));
   const log: SetLog & { record_type: string } = {
     id: logId,
     record_type: 'set_log',
@@ -71,9 +108,20 @@ export async function logTrainingSet(input: {
     rir: set.rir,
     completedAt,
   };
-  const saved = await records.push(subject, 'logged_sets', [log]);
-  if (saved.rejected_ids.includes(logId)) return { kind: 'rejected' };
-  const allLogs = [...snapshot.logs, log];
+  if (!records.insertTrainingSet) return { kind: 'rejected' };
+  const saved = await records.insertTrainingSet(subject, log);
+  if (!saved || saved.id !== logId || saved.deleted_at !== null || saved.record_type !== 'set_log')
+    return { kind: 'rejected' };
+  if (
+    saved.sessionId !== set.sessionId ||
+    saved.exerciseId !== set.exerciseId ||
+    saved.setNumber !== set.setNumber ||
+    saved.reps !== set.reps ||
+    saved.loadKg !== set.loadKg ||
+    saved.rir !== set.rir
+  )
+    return { kind: 'set_conflict' };
+  const allLogs = [...snapshot.logs.filter((prior) => prior.id !== logId), saved];
   const sessionComplete = session.exercises.every((exercise) =>
     Array.from({ length: exercise.sets }, (_, index) => index + 1).every((setNumber) =>
       allLogs.some(
@@ -85,11 +133,12 @@ export async function logTrainingSet(input: {
     ),
   );
   if (sessionComplete) {
-    await records.push(subject, 'training_sessions', [
+    const completion = await records.push(subject, 'training_sessions', [
       { ...sessionRecord, status: 'completed', completedAt },
     ]);
+    if (completion.rejected_ids.includes(session.id)) return { kind: 'rejected' };
   }
-  return { kind: 'logged', log: saved.records[0] ?? log, sessionComplete };
+  return { kind: 'logged', log: saved, sessionComplete };
 }
 
 export type FeedbackInput = Pick<
@@ -101,6 +150,7 @@ export type FeedbackResult =
   | { kind: 'recorded'; feedback: TrainingFeedback & { record_type: string } }
   | { kind: 'program_not_enrolled' }
   | { kind: 'session_not_found' }
+  | { kind: 'rejected' }
   | { kind: 'invalid' };
 
 /** Stores a post-session check-in. Shared by the mobile API and MCP. */
@@ -120,6 +170,28 @@ export async function recordTrainingFeedback(input: {
         snapshot.setup?.id,
   );
   if (!sessionExists) return { kind: 'session_not_found' };
+  if (!validTrainingFeedback(input.feedback)) return { kind: 'invalid' };
+  const latest = latestFeedbackPerSession(snapshot.feedback).find(
+    (item) => item.sessionId === input.feedback.sessionId,
+  );
+  if (
+    latest &&
+    latest.soreness === input.feedback.soreness &&
+    latest.pump === input.feedback.pump &&
+    latest.performance === input.feedback.performance &&
+    latest.jointPain === input.feedback.jointPain
+  ) {
+    // Keep the original observation time, even when another session has newer feedback.
+    return {
+      kind: 'recorded',
+      feedback: {
+        id: latest.id,
+        record_type: 'session_feedback',
+        ...input.feedback,
+        createdAt: latest.createdAt,
+      },
+    };
+  }
   const latestFeedbackTime = snapshot.feedback.reduce(
     (latest, item) => Math.max(latest, Date.parse(item.createdAt)),
     0,
@@ -131,7 +203,7 @@ export async function recordTrainingFeedback(input: {
     ...input.feedback,
     createdAt,
   };
-  if (!validTrainingFeedback(feedback)) return { kind: 'invalid' };
-  await input.records.push(input.subject, 'training_feedback', [feedback]);
+  const saved = await input.records.push(input.subject, 'training_feedback', [feedback]);
+  if (saved.rejected_ids.includes(feedback.id)) return { kind: 'rejected' };
   return { kind: 'recorded', feedback };
 }
