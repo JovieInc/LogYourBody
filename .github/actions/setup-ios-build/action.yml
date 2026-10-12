@@ -50,8 +50,17 @@ runs:
         if ! command -v swiftlint &> /dev/null || [[ "$(swiftlint version)" != "$SWIFTLINT_VERSION" ]]; then
           echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
           curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
-          unzip -o swiftlint.zip -d /usr/local/bin
-          chmod +x /usr/local/bin/swiftlint
+          # GitHub-hosted runners can write /usr/local/bin; user-level
+          # self-hosted runners often cannot. Fall back to a runner-local
+          # bin dir exported to subsequent steps via GITHUB_PATH.
+          INSTALL_DIR="/usr/local/bin"
+          if [[ ! -w "$INSTALL_DIR" ]]; then
+            INSTALL_DIR="${RUNNER_TEMP:-$RUNNER_WORKSPACE/_temp}/swiftlint-bin"
+            mkdir -p "$INSTALL_DIR"
+            echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+          fi
+          unzip -o swiftlint.zip -d "$INSTALL_DIR"
+          chmod +x "$INSTALL_DIR/swiftlint"
         else
           echo "SwiftLint already installed: $(swiftlint version)"
         fi
