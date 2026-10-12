@@ -35,7 +35,7 @@ jobs:
   gitleaks:
     name: Gitleaks (shared JovieInc/ci)
     # Shared pinned gitleaks; full-history keeps the previous --log-opts=--all scan.
-    uses: JovieInc/ci/.github/workflows/secret-scan.yml@8a162bd9e2a2d83e5b32d60810453ef1b31abc76
+    uses: JovieInc/ci/.github/workflows/secret-scan.yml@44105468cc7c271e5f117baec9effca295ebd13c
     with:
       full-history: true
     permissions:
