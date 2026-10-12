@@ -394,18 +394,19 @@ var body: some View {
                     }
             }
         }
-        .confirmationDialog(
+        // The confirmation-dialog Cancel button measured 36 points wide.
+        .alert(
             "Delete dose?",
-            isPresented: glp1DeleteConfirmationBinding,
-            titleVisibility: .visible
+            isPresented: glp1DeleteConfirmationBinding
         ) {
             if let log = pendingDeleteGlp1DoseLog {
                 Button("Delete dose", role: .destructive) {
                     deleteGlp1Dose(log)
                 }
+                .accessibilityIdentifier("glp1_dose_delete_confirm")
             }
-
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("glp1_dose_delete_cancel")
         } message: {
             if let log = pendingDeleteGlp1DoseLog {
                 Text("This removes \(Glp1DoseHistoryFormatter.doseText(log)) from your dose history.")
