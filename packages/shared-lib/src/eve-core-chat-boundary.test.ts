@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -108,7 +108,11 @@ describe('eve.dev core-chat boundary', () => {
     const packageName = new RegExp(['trigger', 'dev'].join(''), 'i');
 
     const matches = trackedFiles.filter((file) => {
-      const source = readFileSync(join(repoRoot, file)).toString('utf8');
+      const fullPath = join(repoRoot, file);
+      // git ls-files lists directory symlinks such as .claude/skills/jovie-frontend.
+      // Their targets are tracked as files and scanned on those paths.
+      if (!statSync(fullPath).isFile()) return false;
+      const source = readFileSync(fullPath).toString('utf8');
       return dottedName.test(source) || packageName.test(source);
     });
 
