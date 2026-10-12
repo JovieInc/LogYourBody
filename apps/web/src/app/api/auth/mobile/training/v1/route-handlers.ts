@@ -263,6 +263,8 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             return apiError('session_not_active', 409);
           case 'set_not_in_session':
             return apiError('set_not_in_session', 400);
+          case 'set_conflict':
+            return apiError('set_conflict', 409);
           case 'rejected':
             return apiError('training_unavailable', 503);
         }
@@ -296,6 +298,8 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             return apiError('session_not_found', 404);
           case 'invalid':
             return apiError('invalid_request', 400);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
         }
       } catch {
         return apiError('training_unavailable', 503);

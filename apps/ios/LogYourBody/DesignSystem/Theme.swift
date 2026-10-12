@@ -584,14 +584,15 @@ extension View {
         }
     }
 
-    /// Expands a visual control to Apple's minimum recommended hit target without
-    /// forcing surrounding layout to use a one-off frame.
+    /// Expands the view it is applied to, up to at least 44 points, and makes that
+    /// whole rectangle tappable. Apply it to a button label. A frame wrapped
+    /// around the button does not grow the button's accessibility frame.
     func jovieTouchTarget() -> some View {
-        contentShape(Rectangle())
-            .frame(
-                minWidth: JovieTokens.minimumHitTarget,
-                minHeight: JovieTokens.minimumHitTarget
-            )
+        frame(
+            minWidth: JovieTokens.minimumHitTarget,
+            minHeight: JovieTokens.minimumHitTarget
+        )
+        .contentShape(Rectangle())
     }
 
     func worldClassScreen(_ screen: WorldClassScreen) -> some View {

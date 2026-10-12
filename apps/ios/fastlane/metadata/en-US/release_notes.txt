@@ -1,1 +1,1 @@
-Private body-composition timeline with a single time-weighted photo scrubber, weight and body-fat logging, optional Apple Health context, Stats, restore purchases, data export, and account deletion.
+LogYourBody Pro is a monthly or annual subscription, and each plan includes a 3-day free trial. This update also fixes a crash that could happen when sign-in resumed more than once.
