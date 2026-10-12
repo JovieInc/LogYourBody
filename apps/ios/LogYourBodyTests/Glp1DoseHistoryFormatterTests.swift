@@ -17,6 +17,25 @@ final class Glp1DoseHistoryFormatterTests: XCTestCase {
         let log = makeDoseLog(amount: 2.50, unit: "mg/week")
 
         XCTAssertEqual(Glp1DoseHistoryFormatter.doseText(log), "2.5 mg/week")
+        XCTAssertEqual(Glp1DoseHistoryFormatter.numberText(-0.0), "0")
+    }
+
+    func testDoseTextFormatsFiniteAmountsBeyondIntegerRangeWithoutTrapping() {
+        XCTAssertEqual(
+            Glp1DoseHistoryFormatter.doseText(makeDoseLog(amount: 1e20, unit: "mg")),
+            "100000000000000000000 mg"
+        )
+        XCTAssertEqual(Glp1DoseHistoryFormatter.numberText(-1e20), "-100000000000000000000")
+        XCTAssertFalse(Glp1DoseHistoryFormatter.numberText(Double.greatestFiniteMagnitude).isEmpty)
+    }
+
+    func testNonfiniteDoseAmountsDisplayAsUnavailable() {
+        for value in [Double.infinity, -Double.infinity, Double.nan] {
+            XCTAssertEqual(
+                Glp1DoseHistoryFormatter.doseText(makeDoseLog(amount: value, unit: "mg")),
+                "— mg"
+            )
+        }
     }
 
     func testDateTextUsesPlainRelativeLabelsForRecentDoses() {
