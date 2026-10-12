@@ -16,26 +16,26 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `06549db2a0170705be78595e95f2bfde0cf1f5b883c4f8055da7af9de5c23919`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `1b977889a8d92e63bc506b1535d6d4e479103aeccec2ac842f3d0cdd52d0ea75`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
-- `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `771e3df18d6aa943cfbee4fcc35d2bad972ae11e1ac7e45fac101a2a3a064347`)
-- `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `eb37635cfa4967492a57d61e5040e7005d2aba5a68a83e761c91001c70688878`)
-- `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e7ff242929877632fd778ad1496b59b073eaa3c7262bfde2520557cb1e2f6b3a`)
+- `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `5b2192608219f43034c4a6c38a82c84ab25c6907c3ccd7de11863f5bcd15b8b2`)
+- `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11d9a680ec4c2c74193f2bd1bc9dd544c6ca3bc397bea165bfc08fd0e15933e0`)
+- `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d38b5542e5f33c488c19766a8b4a5b0da941b8683c31828f3bb3d8d9b1f223f8`)
 - `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3b6c5e65f3fc8491ac4dccc17daefaac865808100ce350386a9d8589c00342fa`)
-- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a882b45a6435a4d3038817124dc998c29567ad4623984d815f719140b2b34367`)
+- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `971aec29022757206bdc8f3f71374fae9a1fbfe705f8d5b2b424335d7f9d9563`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `308eefa5e2f5b371d60eb5142243654503b53b67ba2f36477bf7d389a57e89f3`)
-- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `8bf2c222772264189795e4737ecc84cfe07b18753ac208f892a9fc1898adc302`)
-- `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `12b8694c7993700dad552cbf5d7fb80361c92ff5c7fcb8cb25d02c1ed7b2d47b`)
-- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4855e17bea7a154121461b87ce225ee21fc49916bdcdaf0b15119043d2886263`)
-- `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `1a51dfe0c2b289b43d852a6921785ed33f4b25fb41f74ae13c80f95a1e48b18d`)
-- `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `5378796307535df3ec8d8b15a2e2dc5641419c3d3060cfe32238c0fa973f7aa3`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `4f9247b4bddae9634a48b2adf4ad87ef002eb01e91332da54ccbf8db354d1cc5`)
+- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d8b583c1e03eb3d93631ac1dd0e18986dd7905ccafe06816f2e662e7c2e29689`)
+- `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `533336c7050e4a5244f61b48e616b81337471ae6c305a52d3a1e78fa65235b2e`)
+- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a20b2e7a8c8ebf94fce0cb63b054ea603657c6b111784c014ba02117fed13a4d`)
+- `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `69b14201b1c33c7ae1f7eba0ce6f3718e9a5e738ad69c89e07b171e0b8f3ce59`)
+- `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ce11d368400a68b54d439d12b7ec9e1c50ce79980f1da3fd4536e8c6ac162297`)
 
 ### `apps/web/package.json`: engines
 
 ```json
 {
-  "node": "20.x"
+  "node": "22.x"
 }
 ```
 
@@ -56,8 +56,8 @@ A changed fingerprint requires review of its related documentation; it does not 
   "prepush": "pnpm run check",
   "start": "next start",
   "sync:marketing-assets": "node ../../scripts/marketing/sync-ios-marketing-assets.mjs",
-  "test": "jest",
-  "test:ci": "jest --runInBand",
+  "test": "jest && tsx --test scripts/voice-adapters.test.ts",
+  "test:ci": "jest --runInBand && tsx --test scripts/voice-adapters.test.ts",
   "test:coverage": "jest --coverage",
   "test:e2e": "playwright test",
   "test:e2e:ui": "playwright test --ui",
@@ -73,80 +73,83 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@headlessui/react": "^2.2.4",
-  "@hookform/resolvers": "^5.1.1",
+  "@ai-sdk/elevenlabs": "^3.0.54",
+  "@ai-sdk/gateway": "^4.0.96",
+  "@headlessui/react": "^2.2.10",
+  "@hookform/resolvers": "^5.9.1",
   "@jovieinc/product-registry": "workspace:*",
   "@neondatabase/serverless": "1.0.2",
-  "@radix-ui/react-accordion": "^1.2.11",
-  "@radix-ui/react-alert-dialog": "^1.1.14",
-  "@radix-ui/react-aspect-ratio": "^1.1.7",
-  "@radix-ui/react-avatar": "^1.1.10",
-  "@radix-ui/react-checkbox": "^1.3.2",
-  "@radix-ui/react-collapsible": "^1.1.11",
-  "@radix-ui/react-context-menu": "^2.2.15",
-  "@radix-ui/react-dialog": "^1.1.14",
-  "@radix-ui/react-dropdown-menu": "^2.1.15",
-  "@radix-ui/react-hover-card": "^1.1.14",
-  "@radix-ui/react-label": "^2.1.7",
-  "@radix-ui/react-menubar": "^1.1.15",
-  "@radix-ui/react-navigation-menu": "^1.2.13",
-  "@radix-ui/react-popover": "^1.1.14",
-  "@radix-ui/react-progress": "^1.1.7",
-  "@radix-ui/react-radio-group": "^1.3.7",
-  "@radix-ui/react-scroll-area": "^1.2.9",
-  "@radix-ui/react-select": "^2.2.5",
-  "@radix-ui/react-separator": "^1.1.7",
-  "@radix-ui/react-slider": "^1.3.5",
-  "@radix-ui/react-slot": "^1.2.3",
-  "@radix-ui/react-switch": "^1.2.5",
-  "@radix-ui/react-tabs": "^1.1.12",
-  "@radix-ui/react-toast": "^1.2.14",
-  "@radix-ui/react-toggle": "^1.1.9",
-  "@radix-ui/react-toggle-group": "^1.1.10",
-  "@radix-ui/react-tooltip": "^1.2.7",
-  "@radix-ui/react-visually-hidden": "^1.2.3",
-  "@statsig/js-client": "^3.30.0",
-  "@tailwindcss/postcss": "^4.1.11",
-  "@tailwindcss/typography": "^0.5.16",
-  "@tanstack/react-query": "^5.83.0",
+  "@radix-ui/react-accordion": "^1.2.20",
+  "@radix-ui/react-alert-dialog": "^1.1.23",
+  "@radix-ui/react-aspect-ratio": "^1.1.15",
+  "@radix-ui/react-avatar": "^1.2.6",
+  "@radix-ui/react-checkbox": "^1.3.11",
+  "@radix-ui/react-collapsible": "^1.1.20",
+  "@radix-ui/react-context-menu": "^2.3.7",
+  "@radix-ui/react-dialog": "^1.1.23",
+  "@radix-ui/react-dropdown-menu": "^2.1.24",
+  "@radix-ui/react-hover-card": "^1.1.23",
+  "@radix-ui/react-label": "^2.1.15",
+  "@radix-ui/react-menubar": "^1.1.24",
+  "@radix-ui/react-navigation-menu": "^1.2.22",
+  "@radix-ui/react-popover": "^1.1.23",
+  "@radix-ui/react-progress": "^1.1.16",
+  "@radix-ui/react-radio-group": "^1.4.7",
+  "@radix-ui/react-scroll-area": "^1.2.18",
+  "@radix-ui/react-select": "^2.3.7",
+  "@radix-ui/react-separator": "^1.1.15",
+  "@radix-ui/react-slider": "^1.4.7",
+  "@radix-ui/react-slot": "^1.3.3",
+  "@radix-ui/react-switch": "^1.3.7",
+  "@radix-ui/react-tabs": "^1.1.21",
+  "@radix-ui/react-toast": "^1.2.23",
+  "@radix-ui/react-toggle": "^1.1.18",
+  "@radix-ui/react-toggle-group": "^1.1.19",
+  "@radix-ui/react-tooltip": "^1.2.16",
+  "@radix-ui/react-visually-hidden": "^1.2.11",
+  "@statsig/js-client": "^3.33.5",
+  "@tailwindcss/postcss": "^4.3.3",
+  "@tailwindcss/typography": "^0.5.20",
+  "@tanstack/react-query": "^5.103.2",
   "@types/react-syntax-highlighter": "^15.5.13",
-  "@vercel/analytics": "^1.5.0",
-  "@vercel/speed-insights": "^1.2.0",
+  "@vercel/analytics": "^1.6.1",
+  "@vercel/speed-insights": "^1.3.1",
+  "ai": "^7.0.114",
   "class-variance-authority": "^0.7.1",
   "clsx": "^2.1.1",
   "cmdk": "^1.1.1",
-  "date-fns": "^4.1.0",
+  "date-fns": "^4.4.0",
   "embla-carousel-react": "^8.6.0",
   "exifr": "^7.1.3",
-  "framer-motion": "^12.23.5",
+  "framer-motion": "^12.43.0",
   "glob": "^11.1.0",
   "idb": "^8.0.3",
-  "input-otp": "^1.4.2",
-  "js-yaml": "4.3.1",
-  "lodash": "^4.17.21",
+  "input-otp": "^1.5.0",
+  "js-yaml": "5.4.2",
+  "lodash": "^4.18.1",
   "lucide-react": "^0.525.0",
-  "next": "15.5.21",
+  "next": "15.5.27",
   "next-themes": "^0.4.6",
-  "openai": "^6.9.1",
+  "openai": "^6.49.0",
   "pdf-lib": "^1.17.1",
-  "pdf-parse": "^1.1.1",
-  "pdfjs-dist": "^5.3.93",
-  "react": "^19.1.0",
-  "react-day-picker": "^9.8.0",
-  "react-dom": "^19.1.0",
-  "react-hook-form": "^7.60.0",
+  "pdf-parse": "^1.1.4",
+  "pdfjs-dist": "^6.3.289",
+  "react": "^19.3.0",
+  "react-day-picker": "^9.14.0",
+  "react-dom": "^19.3.0",
+  "react-hook-form": "^7.88.0",
   "react-markdown": "^10.1.0",
-  "react-resizable-panels": "^3.0.3",
-  "react-syntax-highlighter": "^16.1.0",
-  "read-excel-file": "^6.0.1",
-  "recharts": "^3.4.1",
+  "react-resizable-panels": "^3.0.6",
+  "react-syntax-highlighter": "^16.1.1",
+  "read-excel-file": "^6.0.3",
+  "recharts": "^3.10.1",
   "server-only": "^0.0.1",
-  "sonner": "^2.0.6",
-  "tailwind-merge": "^3.3.1",
+  "sonner": "^2.0.8",
+  "tailwind-merge": "^3.7.0",
   "tailwindcss-animate": "^1.0.7",
   "vaul": "^1.1.2",
   "ws": "8.21.0",
-  "zod": "^4.1.13"
+  "zod": "^4.6.5"
 }
 ```
 
@@ -155,36 +158,36 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@eslint/eslintrc": "^3.3.1",
-  "@next/bundle-analyzer": "^15.5.19",
-  "@playwright/test": "^1.56.0",
-  "@testing-library/dom": "^10.4.0",
-  "@testing-library/jest-dom": "^6.6.3",
-  "@testing-library/react": "^16.3.0",
-  "@testing-library/user-event": "^14.6.1",
+  "@eslint/eslintrc": "^3.3.7",
+  "@next/bundle-analyzer": "^15.5.26",
+  "@playwright/test": "^1.63.0",
+  "@testing-library/dom": "^10.4.2",
+  "@testing-library/jest-dom": "^6.9.1",
+  "@testing-library/react": "^16.3.3",
+  "@testing-library/user-event": "^14.6.7",
   "@types/jest": "^29.5.14",
   "@types/js-yaml": "4.0.9",
-  "@types/lodash": "^4.17.20",
-  "@types/node": "^20.19.4",
-  "@types/react": "^19.1.8",
-  "@types/react-dom": "^19.1.6",
+  "@types/lodash": "^4.17.25",
+  "@types/node": "^20.19.43",
+  "@types/react": "^19.3.0",
+  "@types/react-dom": "^19.3.0",
   "@types/ws": "8.18.1",
-  "autoprefixer": "^10.4.21",
-  "dotenv": "^17.2.3",
-  "eslint": "^9.31.0",
+  "autoprefixer": "^10.6.1",
+  "dotenv": "^17.4.2",
+  "eslint": "^9.39.5",
   "eslint-config-next": "15.5.19",
   "eslint-plugin-jsx-a11y": "^6.10.2",
-  "jest": "^30.0.4",
-  "jest-environment-jsdom": "^30.0.4",
-  "playwright": "^1.56.0",
-  "postcss": "^8.5.26",
-  "tailwindcss": "^4.0.0",
-  "tsx": "^4.20.3",
-  "typescript": "^5.8.3"
+  "jest": "^30.5.2",
+  "jest-environment-jsdom": "^30.5.2",
+  "playwright": "^1.63.0",
+  "postcss": "^8.5.28",
+  "tailwindcss": "^4.3.3",
+  "tsx": "^4.23.15",
+  "typescript": "^5.9.3"
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `322e2e5dc80a04bcb78ac243b6f3c7faec46e663705be9d4bab1a1abc8b2f0f1`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `2bcedbe54d69205213db08ce2d57b29e6df13e4c35686cd3d61caa32b313d726`)
 
 ### `package.json`: packageManager
 
@@ -197,7 +200,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "node": "20.x",
+  "node": "22.x",
   "pnpm": ">=10.34.1"
 }
 ```
@@ -227,8 +230,9 @@ A changed fingerprint requires review of its related documentation; it does not 
   "ios:quality-gate": "bash scripts/ios/quality-gate.sh",
   "ios:verify-ui": "bash scripts/ios/verify-ui.sh",
   "lint": "turbo run lint",
+  "lint:knowledge": "node scripts/lint-no-specifics.mjs && node scripts/lint-claims.mjs",
   "lint:swift": "cd apps/ios && swiftlint lint --strict",
-  "prepare": "husky install",
+  "prepare": "husky",
   "prepush": "turbo run lint --filter='...[origin/main]' && turbo run typecheck --filter='...[origin/main]' && turbo run test --filter='...[origin/main]' && node packages/product-registry/scripts/url-drift.test.mjs",
   "product:check": "pnpm --filter @jovieinc/product-registry test",
   "product:generate": "pnpm --filter @jovieinc/product-registry generate",
@@ -237,6 +241,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "sync:main": "bash scripts/sync-main.sh",
   "test": "turbo run test",
   "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
+  "test:knowledge-lint": "node --test scripts/lint-no-specifics.test.mjs scripts/lint-claims.test.mjs",
   "typecheck": "turbo run typecheck",
   "web": "pnpm --filter logyourbody dev"
 }
@@ -247,9 +252,9 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "ai": "^7.0.42",
+  "ai": "^7.0.114",
   "eve": "0.27.13",
-  "zod": "^4.1.13"
+  "zod": "^4.6.5"
 }
 ```
 
@@ -258,26 +263,26 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@commitlint/cli": "^19.0.0",
-  "@commitlint/config-conventional": "^19.0.0",
-  "@typescript-eslint/eslint-plugin": "^8.16.0",
-  "@typescript-eslint/parser": "^8.16.0",
-  "eslint": "^9.31.0",
-  "eslint-config-prettier": "^9.1.0",
-  "eslint-plugin-import": "^2.31.0",
-  "eslint-plugin-react": "^7.37.0",
-  "eslint-plugin-react-hooks": "^5.0.0",
-  "husky": "^9.0.0",
-  "lint-staged": "^15.0.0",
-  "prettier": "^3.4.0",
+  "@commitlint/cli": "^19.8.1",
+  "@commitlint/config-conventional": "^19.8.1",
+  "@typescript-eslint/eslint-plugin": "^8.70.1",
+  "@typescript-eslint/parser": "^8.71.0",
+  "eslint": "^9.39.5",
+  "eslint-config-prettier": "^9.1.2",
+  "eslint-plugin-import": "^2.32.0",
+  "eslint-plugin-react": "^7.37.5",
+  "eslint-plugin-react-hooks": "^5.2.0",
+  "husky": "^9.1.7",
+  "lint-staged": "^15.5.2",
+  "prettier": "^3.9.9",
   "prettier-plugin-tailwindcss": "^0.6.14",
-  "turbo": "^2.5.4",
-  "typescript": "^5.8.3",
-  "vitest": "^4.0.14"
+  "turbo": "^2.11.7",
+  "typescript": "^5.9.3",
+  "vitest": "^4.1.11"
 }
 ```
 
-- `packages/design-tokens/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f037f9832dab9b79bf88543ac5665d89b45b00a75f428484e24f2748fc369c20`)
+- `packages/design-tokens/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `80ae7dc9ef2d6b212897d208c9799c2e8ba4c7a061acda46a3ea10fde1553dbb`)
 
 ### `packages/design-tokens/package.json`: scripts
 
@@ -299,7 +304,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "style-dictionary": "^5.4.4"
+  "style-dictionary": "^5.5.5"
 }
 ```
 
@@ -308,12 +313,12 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "chroma-js": "^3.1.1",
-  "nodemon": "^3.1.7"
+  "chroma-js": "^3.2.0",
+  "nodemon": "^3.1.14"
 }
 ```
 
-- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `14968e4c75c30af2c30d052db9cb78e4e805d530da7957a53757d7191439f55d`)
+- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1ec9aadb1f1e7a2a873ae8f68c7def111953ea33c262534e9c0da2f1932d2fdd`)
 
 ### `packages/product-registry/package.json`: scripts
 
@@ -333,15 +338,15 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@typescript-eslint/eslint-plugin": "^8.16.0",
-  "@typescript-eslint/parser": "^8.16.0",
-  "eslint": "^9.31.0",
-  "prettier": "^3.4.0",
-  "typescript": "^5.8.3"
+  "@typescript-eslint/eslint-plugin": "^8.70.1",
+  "@typescript-eslint/parser": "^8.71.0",
+  "eslint": "^9.39.5",
+  "prettier": "^3.9.9",
+  "typescript": "^5.9.3"
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c8203a9a6ac65874ce67bc2b838525ad3208a13de8cfc29e74cfde23c6b4397d`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `95f45f0d8b5e738b2016f3666ac9a1c0ae38a2dc0ed586b83a69315bfed96f77`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -349,7 +354,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "build": "tsc -p tsconfig.json",
   "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
-  "test": "vitest run --passWithNoTests",
+  "test": "vitest run --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs",
   "typecheck": "tsc --noEmit -p tsconfig.json"
 }
 ```
@@ -359,21 +364,21 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@typescript-eslint/eslint-plugin": "^8.16.0",
-  "@typescript-eslint/parser": "^8.16.0",
-  "eslint": "^9.31.0",
-  "eslint-config-prettier": "^9.1.0",
-  "eslint-plugin-import": "^2.31.0",
-  "eslint-plugin-react": "^7.37.0",
-  "eslint-plugin-react-hooks": "^5.0.0",
-  "typescript": "^5.8.3",
-  "vitest": "^4.0.14"
+  "@typescript-eslint/eslint-plugin": "^8.70.1",
+  "@typescript-eslint/parser": "^8.71.0",
+  "eslint": "^9.39.5",
+  "eslint-config-prettier": "^9.1.2",
+  "eslint-plugin-import": "^2.32.0",
+  "eslint-plugin-react": "^7.37.5",
+  "eslint-plugin-react-hooks": "^5.2.0",
+  "typescript": "^5.9.3",
+  "vitest": "^4.1.11"
 }
 ```
 
-- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e78e7dfd4f07a0fc86336c3a4af5ca21521219e8139e10aa54ca98ddf01921eb`)
+- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b2b5444a1f0fedd65f01dfd873f436439576a088ae7c7c343c0ee052beccb2c0`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `ac5b8284509f9d087a41a2338752fc67c82c2a474dd771edbec062c1e780490d`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `c128ddaa264be5e0fa2d24676fa52cfef77faa62bc478c3b69ba168cc3f8516c`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `f92b600361fe9d26b2a4c9a944c8c921d33feb8eafb756a77ab0b285b940a3f6`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `a6b300cd1d6f78ffaa8f995998618ec710f27e0eefac28abde1b233b51d89875`)
