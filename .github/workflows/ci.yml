@@ -41,7 +41,7 @@ jobs:
           python3 -m pip install --user pytest==8.4.2
           gem install bashcov -v 4.0.0 --no-document
 
-      - name: Test heartbeat routing with shell coverage
+      - name: Test Mac runner routing with shell coverage
         run: |
           rm -f coverage/mac-runner-routing/.resultset.json
           bashcov --command-name mac-runner-routing -- -c 'python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q'
@@ -205,112 +205,31 @@ jobs:
 
   ios:
     name: iOS
-    # Required CI keeps hosted capacity even if a shared Mac is busy or disappears.
-    runs-on: macos-15
     needs: detect-changes
     if: needs.detect-changes.outputs.ios == 'true'
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup iOS build environment
-        uses: ./.github/actions/setup-ios-build
-        with:
-          xcode-version: 'latest-stable'
-          working-directory: apps/ios
-          setup-ruby: 'true'
-          create-config-files: 'true'
-
-      - name: Cache Swift packages
-        uses: actions/cache@v6
-        with:
-          path: |
-            apps/ios/.build
-            ~/Library/Developer/Xcode/DerivedData
-            ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-spm-xcode-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-xcode-stable-
-            ${{ runner.os }}-spm-
-
-      - name: Fastlane iOS CI
-        run: |
-          cd apps/ios
-          bundle exec fastlane ci_ios
-
-      - name: Unit-tier tests
-        run: |
-          cd apps/ios
-          DESTINATION=$(SCHEME=LogYourBodyTiers bash ../../scripts/ios/resolve-simulator-destination.sh)
-          bundle exec fastlane ci_test_unit destination:"$DESTINATION"
-
-      - name: Unit test duration + coverage report
-        if: always()
-        run: |
-          BUNDLE=$(ls -d apps/ios/test_results/unit-tier/*.xcresult 2>/dev/null | head -1 || true)
-          if [[ -n "$BUNDLE" ]]; then
-            python3 scripts/ios/test-tier-report.py "$BUNDLE" | tee -a "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No unit-tier result bundle found to report on." | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
+    # An idle self-hosted Mac first (cancellable child run), hosted macOS
+    # otherwise; a busy, asleep or offline Mac never holds this job.
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/ios-unit.yml
+    with:
+      mac-first: true
+      supersede-key: ${{ github.head_ref || '' }}
 
   ios_quality:
     name: iOS Launch Quality Gate
-    # Required CI keeps hosted capacity even if a shared Mac is busy or disappears.
-    runs-on: macos-15
     needs: detect-changes
     if: needs.detect-changes.outputs.ios == 'true'
-    # Setup plus one 40-minute audit plus the 8-minute performance cap.
-    timeout-minutes: 52
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup iOS build environment
-        uses: ./.github/actions/setup-ios-build
-        with:
-          xcode-version: 'latest-stable'
-          working-directory: apps/ios
-          setup-ruby: 'true'
-          create-config-files: 'true'
-
-      - name: Cache Swift packages
-        uses: actions/cache@v6
-        with:
-          path: |
-            apps/ios/.build
-            ~/Library/Developer/Xcode/DerivedData
-            ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-quality-spm-xcode-latest-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
-          restore-keys: |
-            ${{ runner.os }}-quality-spm-xcode-latest-stable-
-            ${{ runner.os }}-spm-
-
-      - name: Run launch quality audit
-        # Slow prefix plus the full chaos regression suite. The script does not
-        # retry a command timeout, so this budget is for a single attempt.
-        timeout-minutes: 40
-        env:
-          DESTINATION: auto
-          ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality
-        run: bash scripts/ios/launch-quality-audit.sh
-
-      - name: Run performance budget audit
-        timeout-minutes: 8
-        env:
-          DESTINATION: auto
-          RUN_SWIFTLINT: false
-          RUN_LAUNCH_PERFORMANCE: false
-          ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/performance
-        run: bash scripts/ios/performance-audit.sh
-
-      - name: Upload quality gate artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-launch-quality-gate-${{ github.run_id }}
-          path: apps/ios/test_results/quality-gate/ci-${{ github.run_id }}
-          if-no-files-found: warn
-          retention-days: 14
+    # An idle self-hosted Mac first (cancellable child run), hosted macOS
+    # otherwise; a busy, asleep or offline Mac never holds this job.
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/ios-quality.yml
+    with:
+      mac-first: true
+      supersede-key: ${{ github.head_ref || '' }}
 
   ci-summary:
     name: CI Summary
