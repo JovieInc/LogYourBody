@@ -228,7 +228,10 @@ jobs:
       contents: read
     uses: ./.github/workflows/ios-quality.yml
     with:
-      mac-first: true
+      # Hosted until the launch-quality capture tests pass on the Macs: four
+      # LaunchQualityGate capture tests failed on every self-hosted run
+      # (2026-10-12, tw-mac-001 and tims-macbook-air) and pass hosted.
+      mac-first: false
       supersede-key: ${{ github.head_ref || '' }}
 
   ci-summary:

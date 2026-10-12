@@ -609,7 +609,9 @@ def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
     for name, (reusable, work) in _IOS_LANES.items():
         job = _job_block("ci.yml", name)
         assert f"    uses: ./.github/workflows/{reusable}" in job.splitlines()
-        assert "      mac-first: true" in job.splitlines()
+        # ios_quality stays hosted until its capture tests pass on the Macs.
+        mac_first = "true" if name == "ios" else "false"
+        assert f"      mac-first: {mac_first}" in job.splitlines()
         assert "    needs: detect-changes" in job.splitlines()
         assert "if: needs.detect-changes.outputs.ios == 'true'" in job
         assert f"uses: ./.github/workflows/{reusable}" in child
