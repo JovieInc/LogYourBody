@@ -646,8 +646,11 @@ def test_mac_route_uses_first_attempts_of_trusted_events_only() -> None:
 def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> None:
     assert 'bundle exec fastlane ci_ios' in _job_block('ios-unit.yml', 'unit')
     assert 'ci_test_unit' in _job_block('ios-unit.yml', 'unit')
-    assert 'launch-quality-audit.sh' in _job_block('ios-quality.yml', 'quality')
-    assert 'performance-audit.sh' in _job_block('ios-quality.yml', 'quality')
+    quality = _job_block('ios-quality.yml', 'quality')
+    assert 'launch-quality-audit.sh' in quality
+    assert 'performance-audit.sh' in quality
+    assert 'timeout-minutes: 64' in quality
+    assert 'timeout-minutes: 52' in quality
     summary = _job_block('ci.yml', 'ci-summary')
     assert 'assert_expected_result "iOS Launch Quality Gate"' in summary
     assert 'mac-runner-routing-tests' in summary
