@@ -84,7 +84,7 @@ jobs:
               query Queue($owner: String!, $repo: String!) {
                 repository(owner: $owner, name: $repo) {
                   mergeQueue(branch: "main") {
-                    entries(first: 20) {
+                    entries(first: 100) {
                       nodes {
                         state
                         enqueuer { login }
