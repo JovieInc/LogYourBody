@@ -118,6 +118,122 @@ final class BodyMetricPhotoUpdateTests: XCTestCase {
         }
     }
 
+    func testSaveDexaResultsDoesNotReassignAnotherAccountsRow() async throws {
+        let ownerId = "dexa-owner-\(UUID().uuidString)"
+        let otherId = "dexa-other-\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_735_200_000)
+
+        try await CoreDataManager.shared.saveDexaResultsAndWait(
+            [makeDexaResult(
+                id: id,
+                userId: ownerId,
+                bodyFatPercentage: 22.5,
+                locationName: "Owner Clinic",
+                date: date
+            )],
+            userId: ownerId,
+            markAsSynced: true
+        )
+        try await CoreDataManager.shared.saveDexaResultsAndWait(
+            [makeDexaResult(
+                id: id,
+                userId: otherId,
+                bodyFatPercentage: 1.0,
+                locationName: "Stolen Clinic",
+                date: date
+            )],
+            userId: otherId,
+            markAsSynced: false
+        )
+
+        let cached = await cachedDexa(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, ownerId)
+        XCTAssertEqual(row.bodyFatPercentage, 22.5)
+        XCTAssertEqual(row.locationName, "Owner Clinic")
+        XCTAssertEqual(row.isSynced, true)
+    }
+
+    func testSaveDexaResultsUpdatesTheOwningAccount() async throws {
+        let ownerId = "dexa-same-\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_735_300_000)
+
+        try await CoreDataManager.shared.saveDexaResultsAndWait(
+            [makeDexaResult(
+                id: id,
+                userId: ownerId,
+                bodyFatPercentage: 22.5,
+                locationName: "Owner Clinic",
+                date: date
+            )],
+            userId: ownerId,
+            markAsSynced: true
+        )
+        try await CoreDataManager.shared.saveDexaResultsAndWait(
+            [makeDexaResult(
+                id: id,
+                userId: ownerId,
+                bodyFatPercentage: 24.0,
+                locationName: "Owner Clinic",
+                date: date
+            )],
+            userId: ownerId,
+            markAsSynced: false
+        )
+
+        let cached = await cachedDexa(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, ownerId)
+        XCTAssertEqual(row.bodyFatPercentage, 24.0)
+        XCTAssertEqual(row.locationName, "Owner Clinic")
+        XCTAssertEqual(row.isSynced, false)
+    }
+
+    private func makeDexaResult(
+        id: String,
+        userId: String,
+        bodyFatPercentage: Double,
+        locationName: String,
+        date: Date
+    ) -> DexaResult {
+        DexaResult(
+            id: id,
+            userId: userId,
+            bodyMetricsId: nil,
+            externalSource: "bodyspec",
+            externalResultId: "scan-\(id)",
+            externalUpdateTime: date,
+            scannerModel: nil,
+            locationId: nil,
+            locationName: locationName,
+            acquireTime: date,
+            analyzeTime: date,
+            vatMassKg: nil,
+            vatVolumeCm3: nil,
+            scanWeight: 70.0,
+            scanWeightUnit: "kg",
+            bodyFatPercentage: bodyFatPercentage,
+            muscleMass: nil,
+            boneMass: nil,
+            resultPdfUrl: nil,
+            resultPdfName: nil,
+            createdAt: date,
+            updatedAt: date
+        )
+    }
+
+    private func cachedDexa(id: String) async -> CachedDexaResult? {
+        let context = CoreDataManager.shared.viewContext
+        return await context.perform {
+            let request: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            request.fetchLimit = 1
+            return try? context.fetch(request).first
+        }
+    }
+
     private enum CoreDataPhotoUpdateTestError: Error {
         case missingMetric
     }

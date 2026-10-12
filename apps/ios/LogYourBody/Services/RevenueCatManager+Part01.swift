@@ -38,80 +38,31 @@ var cachedTrialExpirationTimestamp: Double {
 
     /// Configure RevenueCat SDK - call this on app launch
     /// Note: Does NOT fetch customer info immediately to avoid blocking UI
-    nonisolated func configure(apiKey: String) {
-        Task { @MainActor in
-            // print("💰 Configuring RevenueCat SDK")
-
-            purchasesClient.configure(apiKey: apiKey, delegate: self)
-
-            // Mark configured only after delegate wiring finishes to avoid race conditions
-            self.markAsConfigured()
-
-            // print("💰 RevenueCat SDK configured successfully")
-        }
+    func configure(apiKey: String) {
+        guard !isConfigured else { return }
+        purchasesClient.configure(apiKey: apiKey, delegate: self)
+        markAsConfigured()
     }
 
 /// Mark SDK as configured after delegate setup completes
     @MainActor
     func markAsConfigured() {
         isConfigured = true
+        startBillingIdentityWorkerIfNeeded()
         // print("✅ SDK marked as configured")
     }
 
 /// Identify the customer with the shared identity subject.
     func identifyUser(userId: String) async {
-        guard isConfigured else {
-            // print("⚠️ SDK not configured yet, skipping identifyUser()")
-            return
-        }
-
-        // print("💰 Identifying user: \(userId)")
-
-        do {
-            let customer = try await purchasesClient.logIn(userId: userId, entitlementID: proEntitlementID)
-            await MainActor.run {
-                self.updateSubscriptionStatus(customer: customer)
-            }
-            // print("💰 User identified successfully")
-        } catch {
-            let appError = AppError.billing(operation: "identifyUser", underlying: error)
-            let context = ErrorContext(
-                feature: "billing",
-                operation: "identifyUser",
-                screen: nil,
-                userId: userId
-            )
-            ErrorReporter.shared.capture(appError, context: context)
-
-            await MainActor.run {
-                self.errorMessage = "Failed to link account: \(error.localizedDescription)"
-            }
-        }
+        guard isConfigured, !Task.isCancelled else { return }
+        let ownership = requestBillingIdentity(subject: userId)
+        await waitForBillingIdentity(ownership)
     }
 
-/// Log out the current user (call this on sign out)
+/// Log out the current user (call this on sign out).
     func logoutUser() async {
-        // print("💰 Logging out user")
-
-        guard isConfigured else {
-            clearLocalSubscriptionState()
-            return
-        }
-
-        do {
-            try await purchasesClient.logOut()
-        } catch {
-            let appError = AppError.billing(operation: "logoutUser", underlying: error)
-            let context = ErrorContext(
-                feature: "billing",
-                operation: "logoutUser",
-                screen: nil,
-                userId: nil
-            )
-            ErrorReporter.shared.capture(appError, context: context)
-        }
-
-        clearLocalSubscriptionState()
+        let ownership = requestBillingIdentity(subject: nil)
+        await waitForBillingIdentity(ownership)
     }
 
 // MARK: - Subscription Status
@@ -123,15 +74,17 @@ var cachedTrialExpirationTimestamp: Double {
             return
         }
 
-        // print("💰 Refreshing customer info")
+        guard let ownership = captureBillingSession() else {
+            await retryPendingBillingIdentityIfNeeded()
+            return
+        }
 
         do {
-            let customer = try await purchasesClient.customerInfo(entitlementID: proEntitlementID)
-            await MainActor.run {
-                self.updateSubscriptionStatus(customer: customer)
-                // print("💰 Subscription status: \(self.isSubscribed ? "Active" : "Inactive")")
-            }
+            let customer = try await purchasesClient.customerInfo(entitlementID: proEntitlementID, read: .cached)
+            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
+            updateSubscriptionStatus(customer: customer)
         } catch {
+            guard ownsBillingSession(ownership), !Task.isCancelled else { return }
             let appError = AppError.billing(operation: "refreshCustomerInfo", underlying: error)
             let context = ErrorContext(
                 feature: "billing",
@@ -278,66 +231,75 @@ func purchase(packageIdentifier: String) async -> Bool {
             self.errorMessage = nil
         }
 
+        guard let ownership = captureBillingSession() else {
+            await MainActor.run { self.isPurchasing = false }
+            return false
+        }
+
         do {
             let customer = try await purchasesClient.purchase(
                 package: package,
                 entitlementID: proEntitlementID
             )
 
-            await MainActor.run {
-                self.updateSubscriptionStatus(customer: customer)
-                self.isPurchasing = false
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                isPurchasing = false
+                return false
             }
+
+            updateSubscriptionStatus(customer: customer)
+            isPurchasing = false
 
             // print("💰 Purchase successful!")
             return true
         } catch let error as RevenueCatPurchasingError {
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                isPurchasing = false
+                return false
+            }
             if error != .purchaseCancelled {
                 let appError = AppError.billing(operation: "purchase", underlying: error)
                 let context = ErrorContext(
                     feature: "billing",
                     operation: "purchase",
                     screen: "PaywallView",
-                    userId: nil
+                    userId: ownership.subject
                 )
                 ErrorReporter.shared.capture(appError, context: context)
             }
 
-            await MainActor.run {
-                self.isPurchasing = false
-
-                switch error {
-                case .purchaseCancelled:
-                    // print("💰 Purchase cancelled by user")
-                    // Don't show error for user cancellation
-                    break
-                case .storeProblem:
-                    self.errorMessage = "There was a problem with the App Store. Please try again."
-                case .purchaseNotAllowed:
-                    self.errorMessage = "Purchases are not allowed on this device."
-                case .purchaseInvalid:
-                    self.errorMessage = "Purchase failed. Please try again."
-                case .unexpected(let message):
-                    self.errorMessage = "Purchase failed: \(message)"
-                }
-
-                // print("❌ Purchase failed: \(error)")
+            isPurchasing = false
+            switch error {
+            case .purchaseCancelled:
+                // print("💰 Purchase cancelled by user")
+                // Don't show error for user cancellation
+                break
+            case .storeProblem:
+                errorMessage = "There was a problem with the App Store. Please try again."
+            case .purchaseNotAllowed:
+                errorMessage = "Purchases are not allowed on this device."
+            case .purchaseInvalid:
+                errorMessage = "Purchase failed. Please try again."
+            case .unexpected(let message):
+                errorMessage = "Purchase failed: \(message)"
             }
             return false
         } catch {
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                isPurchasing = false
+                return false
+            }
             let appError = AppError.billing(operation: "purchase", underlying: error)
             let context = ErrorContext(
                 feature: "billing",
                 operation: "purchase",
                 screen: "PaywallView",
-                userId: nil
+                userId: ownership.subject
             )
             ErrorReporter.shared.capture(appError, context: context)
 
-            await MainActor.run {
-                self.isPurchasing = false
-                self.errorMessage = "An unexpected error occurred"
-            }
+            isPurchasing = false
+            errorMessage = "An unexpected error occurred"
             // print("❌ Unexpected purchase error: \(error.localizedDescription)")
             return false
         }
@@ -360,37 +322,44 @@ func purchase(packageIdentifier: String) async -> Bool {
             return false
         }
 
+        guard let ownership = captureBillingSession() else {
+            await MainActor.run { self.isPurchasing = false }
+            return false
+        }
+
         do {
             let customer = try await purchasesClient.restorePurchases(entitlementID: proEntitlementID)
 
-            await MainActor.run {
-                self.updateSubscriptionStatus(customer: customer)
-                self.isPurchasing = false
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                isPurchasing = false
+                return false
             }
+
+            updateSubscriptionStatus(customer: customer)
+            isPurchasing = false
 
             if isSubscribed {
                 // print("💰 Purchases restored successfully")
                 return true
-            } else {
-                await MainActor.run {
-                    self.errorMessage = "No active subscriptions found"
-                }
+            }
+            errorMessage = "No active subscriptions found"
+            return false
+        } catch {
+            guard ownsBillingSession(ownership), !Task.isCancelled else {
+                isPurchasing = false
                 return false
             }
-        } catch {
             let appError = AppError.billing(operation: "restorePurchases", underlying: error)
             let context = ErrorContext(
                 feature: "billing",
                 operation: "restorePurchases",
                 screen: "PaywallView",
-                userId: nil
+                userId: ownership.subject
             )
             ErrorReporter.shared.capture(appError, context: context)
 
-            await MainActor.run {
-                self.isPurchasing = false
-                self.errorMessage = "Failed to restore purchases"
-            }
+            isPurchasing = false
+            errorMessage = "Failed to restore purchases"
             // print("❌ Failed to restore purchases: \(error.localizedDescription)")
             return false
         }
