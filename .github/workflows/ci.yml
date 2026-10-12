@@ -76,6 +76,24 @@ jobs:
             fi
           done
 
+  merge-group-fail-fast:
+    name: Merge Group Fail Fast
+    # CI Summary (the required check) waits for every job, so a group whose
+    # Linux jobs already failed kept two macOS runners busy for 20-60 min
+    # before the queue could eject it. Cancel the rest of the run instead:
+    # CI Summary still runs (if: always()) and fails at once.
+    needs: [detect-changes, mac-runner-routing-tests, js]
+    if: github.event_name == 'merge_group' && failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel the rest of this merge-group run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"
+
   detect-changes:
     name: Detect Changes
     runs-on: ubuntu-latest

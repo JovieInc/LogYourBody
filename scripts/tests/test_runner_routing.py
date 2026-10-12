@@ -846,3 +846,13 @@ def test_coverage_gate_rejects_missing_empty_and_low_coverage(tmp_path: Path) ->
 
 if __name__ == '__main__':
     verify_coverage(_REPO_ROOT / 'coverage/mac-runner-routing/.resultset.json')
+
+
+def test_failed_merge_group_cancels_its_mac_jobs_instead_of_holding_them() -> None:
+    block = _job_block("ci.yml", "merge-group-fail-fast")
+    assert "needs: [detect-changes, mac-runner-routing-tests, js]" in block
+    assert "if: github.event_name == 'merge_group' && failure()" in block
+    assert 'gh run cancel "$GITHUB_RUN_ID"' in block
+    summary = _job_block("ci.yml", "ci-summary")
+    # The required check must still conclude after the cancel.
+    assert "if: always()" in summary
