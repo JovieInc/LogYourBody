@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -108,6 +108,9 @@ describe('eve.dev core-chat boundary', () => {
     const packageName = new RegExp(['trigger', 'dev'].join(''), 'i');
 
     const matches = trackedFiles.filter((file) => {
+      if (!statSync(join(repoRoot, file)).isFile()) {
+        return false;
+      }
       const source = readFileSync(join(repoRoot, file)).toString('utf8');
       return dottedName.test(source) || packageName.test(source);
     });
