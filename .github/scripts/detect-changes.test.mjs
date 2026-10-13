@@ -85,12 +85,18 @@ function detect(workspace, env, ghScript) {
 
 const mergeGroup = (fx) => ({ GITHUB_EVENT_NAME: 'merge_group', BASE_SHA: fx.groupOne, HEAD_SHA: fx.groupTwo });
 
-// gh answers for the merge-group hold check (open post-merge-lq-red issues).
-const holdIssues = (count) => `case "$*" in
-  *"issues?labels=post-merge-lq-red&state=open"*) echo ${count} ;;
+// gh answers for a merge group: open post-merge-lq-red issues, then the entry's PR head
+// (second parent of the group head) and whether its PR CI run passed Launch Quality.
+const PR_HEAD = 'a'.repeat(40);
+const groupGh = ({ hold = 0, prHeadPassed = true } = {}) => `case "$*" in
+  *"issues?labels=post-merge-lq-red&state=open"*) echo ${hold} ;;
+  *"repos/JovieInc/LogYourBody/commits/"*) echo ${PR_HEAD} ;;
+  *"workflows/ci.yml/runs?head_sha=${PR_HEAD}&event=pull_request"*) echo 77 ;;
+  *"actions/runs/77/jobs"*) echo ${prHeadPassed ? 1 : 0} ;;
   *) exit 1 ;;
 esac`;
-const noHold = holdIssues(0);
+const holdIssues = (count) => groupGh({ hold: count });
+const noHold = groupGh();
 
 const surfaces = (web, iosChanged, unit, quality, deferred = 'false') => ({
   web,
@@ -112,6 +118,34 @@ test('native merge group runs iOS Unit only while main Launch Quality is green',
   const { outputs, calls } = detect(fx.workspace, mergeGroup(fx), noHold);
   assert.deepEqual(outputs, surfaces('false', 'true', 'true', 'false'));
   assert.match(calls[0], /repos\/JovieInc\/LogYourBody\/issues\?labels=post-merge-lq-red&state=open/);
+  assert.match(calls[1], new RegExp(`repos/JovieInc/LogYourBody/commits/${fx.groupTwo} --jq \\.parents\\[1\\]\\.sha`));
+});
+
+test('a native entry whose PR head never passed Launch Quality runs it in the group', () => {
+  // Entries enqueued before Launch Quality moved to the PR head, or from a draft-era run.
+  const fx = queueFixture({ 'apps/ios/App.swift': 'v3' });
+  assert.deepEqual(
+    detect(fx.workspace, mergeGroup(fx), groupGh({ prHeadPassed: false })).outputs,
+    surfaces('false', 'true', 'true', 'true'),
+  );
+  const lookupFails = `case "$*" in *"issues?labels="*) echo 0 ;; *) exit 1 ;; esac`;
+  assert.deepEqual(detect(fx.workspace, mergeGroup(fx), lookupFails).outputs, surfaces('false', 'true', 'true', 'true'));
+});
+
+test('the PR-head check accepts only a passing CI Summary with a passing Launch Quality job', () => {
+  const script = fs.readFileSync(detectScript, 'utf8');
+  const filter = script.match(/--jq '(if any\(\.jobs\[\]; \.name == "CI Summary"[\s\S]*?then 1 else 0 end)'/)[1];
+  const jobs = (...list) => JSON.stringify({ jobs: list.map(([name, conclusion]) => ({ name, conclusion })) });
+  const run = (payload) => execFileSync('jq', ['-r', filter], { input: payload, encoding: 'utf8' }).trim();
+  const summary = ['CI Summary', 'success'];
+  assert.equal(run(jobs(summary, ['iOS Launch Quality Gate / Launch Quality', 'success'])), '1');
+  assert.equal(
+    run(jobs(summary, ['iOS Launch Quality Gate / Launch Quality', 'skipped'], ['iOS Launch Quality Gate / Mac Route / Await the Mac', 'success'])),
+    '1',
+  );
+  // Old regime (PR runs skipped iOS) and draft runs: Launch Quality never ran.
+  assert.equal(run(jobs(summary, ['iOS Launch Quality Gate', 'skipped'])), '0');
+  assert.equal(run(jobs(['CI Summary', 'failure'], ['iOS Launch Quality Gate / Launch Quality', 'success'])), '0');
 });
 
 test('a red or unknown post-merge Launch Quality holds native merge groups on Launch Quality', () => {

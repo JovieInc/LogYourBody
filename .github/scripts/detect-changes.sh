@@ -50,14 +50,37 @@ echo "ios_changed=$ios_changed" >> "$GITHUB_OUTPUT"
 # - pull_request: Launch Quality on the PR head, once the PR is ready for review. A draft
 #   defers it; ci.yml reruns on ready_for_review, and that newer CI Summary is the one the
 #   queue reads. Unit waits for the merge group.
-# - merge_group: Unit only, on the exact tree that lands. While main's post-merge Launch
-#   Quality is red (an open post-merge-lq-red issue) Launch Quality runs here too, so only a
-#   change that passes it lands until main is green. An unknown hold state counts as held.
+# - merge_group: Unit only, on the exact tree that lands. Launch Quality runs here too when the
+#   entry's PR head has no passing Launch Quality, or while main's post-merge Launch Quality is
+#   red (an open post-merge-lq-red issue), so only a change that passes it lands until main is
+#   green. An unknown hold or PR-head state counts as unverified.
 # - push (main): Unit only when no passing merge group verified this exact SHA; under ALLGREEN
 #   the last group that changed an iOS input already ran Unit on it. Launch Quality for main
 #   runs in ios-post-merge-quality.yml.
 # - anything else: both jobs.
 # (Reusable-workflow job names are "iOS / Unit", never plain "iOS".)
+# A queue entry's group head is a merge commit whose second parent is the PR head. The PR head
+# passed Launch Quality when one of its pull_request CI runs passed CI Summary with a Launch
+# Quality job (hosted or the Mac route) succeeding. Entries enqueued before Launch Quality moved
+# to the PR head, or from a draft-era run, have none, so their group runs it.
+pr_head_passed_launch_quality() {
+  local pr_head run_id passed
+  pr_head=$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA" --jq '.parents[1].sha // ""' 2>/dev/null) || return 1
+  [[ -n "$pr_head" ]] || return 1
+  for run_id in $(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$pr_head&event=pull_request" \
+    --jq '.workflow_runs[].id' 2>/dev/null || true); do
+    passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" \
+      --jq 'if any(.jobs[]; .name == "CI Summary" and .conclusion == "success")
+              and any(.jobs[]; (.name | startswith("iOS Launch Quality Gate")) and .conclusion == "success")
+            then 1 else 0 end' 2>/dev/null || echo 0)
+    if [[ "$passed" == '1' ]]; then
+      echo "::notice::Launch Quality passed on PR head $pr_head (CI run $run_id)."
+      return 0
+    fi
+  done
+  return 1
+}
+
 ios_unit=false
 ios_quality=false
 ios_quality_deferred=false
@@ -80,6 +103,9 @@ if [[ "$ios_changed" == 'true' ]]; then
       if [[ "$held" != '0' ]]; then
         ios_quality=true
         echo "::notice::Post-merge Launch Quality hold is on (open issues: $held); this group runs Launch Quality."
+      elif ! pr_head_passed_launch_quality; then
+        ios_quality=true
+        echo "::notice::No passing Launch Quality on this entry's PR head; this group runs it."
       fi
       ;;
     push)
