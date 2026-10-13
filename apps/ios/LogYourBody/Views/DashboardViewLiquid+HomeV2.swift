@@ -35,6 +35,8 @@ extension DashboardViewLiquid {
             selectedID: Binding(get: { HomeV2TimelinePolicy.EntryID(metric) }, set: selectHomeV2TimelineEntry),
             weightValue: formatTrendWeightHeadline(metric, usesTrend: weightUsesTrend),
             weightUnit: unit,
+            ffmiValue: homeV2FFMIValue(metric).map { String(format: "%.1f", $0) } ?? "–",
+            bodyFatValue: homeV2Formatters.bodyFatText(metric),
             changeSentence: homeV2Timeline.weightChangeSentence(
                 for: HomeV2TimelinePolicy.EntryID(metric), system: currentMeasurementSystem
             ),

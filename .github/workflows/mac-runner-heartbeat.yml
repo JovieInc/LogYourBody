@@ -10,12 +10,16 @@ on:
         description: Verify setup-ios-build before considering optional self-hosted capacity.
         type: boolean
         default: false
+      runner:
+        description: Machine label (jovie-mac-<runner name>) to qualify one Mac; blank uses any.
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: mac-runner-heartbeat
+  group: mac-runner-heartbeat-${{ inputs.runner || 'any' }}
   # A busy/offline Mac retains only the newest queued probe, which observers
   # read as down until the runner drains it.
   cancel-in-progress: true
@@ -32,7 +36,7 @@ jobs:
   setup-canary:
     name: Self-hosted iOS setup canary
     if: github.event_name == 'workflow_dispatch' && inputs.verify-ios-setup
-    runs-on: [self-hosted, macOS, ARM64, jovie-mac]
+    runs-on: ${{ inputs.runner != '' && fromJSON(format('["self-hosted","jovie-mac","{0}"]', inputs.runner)) || fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
