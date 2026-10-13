@@ -5,11 +5,24 @@
 import CoreGraphics
 import Foundation
 
-/// Gate for the photo-first Home (Pencil H2, picked 2026-09-26). Off by default
-/// in production; the Statsig gate owns rollout. Debug fixtures force it on so
-/// XCUITest can cover both states without a network.
+/// Gate for the photo-first Home (Pencil H2, picked 2026-09-26). Evaluated
+/// through `FeatureReleaseEvaluator` (shared lifecycle contract, JOV-8056):
+/// dogfood-stage, so verified staff/agent principals see it automatically and
+/// ordinary customers need the Statsig enable gate. Debug fixtures force it
+/// on so XCUITest can cover both states without a network.
 enum HomeV2Policy {
     static let gateKey = "home_v2_photo_first"
+    /// Inverse-meaning emergency stop (shared lifecycle contract, JOV-8056).
+    /// Never a blanket default: only a fresh `true` stops the surface.
+    static let killSwitchKey = "home_v2_kill_switch"
+    /// Dogfood stage: verified staff/agent principals are exposed
+    /// automatically; ordinary customers still need the enable gate.
+    static let releaseDescriptor = FeatureReleaseDescriptor(
+        flagKey: gateKey,
+        killSwitchKey: killSwitchKey,
+        stage: .dogfood,
+        minimumBuild: nil
+    )
     static let fixtureArgument = "-lybUITestHomeV2Fixture"
     static let photoFixtureArgument = "-lybUITestHomeV2PhotoFixture"
     /// Signed in, nothing logged yet: the H0 day-zero state.
@@ -24,6 +37,8 @@ enum HomeV2Policy {
     @MainActor
     static func isEnabled(
         arguments: [String] = ProcessInfo.processInfo.arguments,
+        actor: FeatureReleaseActor = .ordinaryCustomer,
+        installedBuild: Int = installedBuildVersion,
         isGateEnabled: ((String) -> Bool)? = nil
     ) -> Bool {
         #if DEBUG
@@ -36,7 +51,25 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return checkGate(gateKey)
+        // Query the kill switch first so `flagKey` remains the last gate
+        // consulted, matching the enable-gate call contract.
+        let killSwitchEnabled = checkGate(killSwitchKey)
+        let enableGateEnabled = checkGate(gateKey)
+        return FeatureReleaseEvaluator.evaluate(
+            releaseDescriptor,
+            context: FeatureReleaseContext(
+                actor: actor,
+                installedBuild: installedBuild,
+                configState: .fresh,
+                enableGate: enableGateEnabled,
+                killSwitch: killSwitchEnabled
+            )
+        ).isEnabled
+    }
+
+    private static var installedBuildVersion: Int {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return Int(version ?? "") ?? 0
     }
 
     @MainActor
