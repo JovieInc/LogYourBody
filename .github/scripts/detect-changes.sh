@@ -2,7 +2,8 @@
 # Selects the CI surfaces one change touches (ci.yml "Detect Changes").
 #
 # Env: BASE_SHA, HEAD_SHA, GITHUB_EVENT_NAME, GITHUB_OUTPUT, plus GITHUB_REPOSITORY and
-# GH_TOKEN for the post-merge push dedupe. Writes web, ios_changed and ios.
+# GH_TOKEN for the push dedupe and the merge-group hold check, PR_DRAFT on pull requests.
+# Writes web, ios_changed, ios_unit, ios_quality and ios_quality_deferred.
 #
 # A merge group's base is the previous group's head, which a shallow main checkout does not
 # contain. Diffing against origin/main instead would inherit every queued PR ahead of this one,
@@ -44,29 +45,66 @@ ios_changed=false
 matches "$ios_pattern" && ios_changed=true
 echo "ios_changed=$ios_changed" >> "$GITHUB_OUTPUT"
 
-# macOS capacity is the scarce shared resource, so iOS verification runs once:
-# in the merge group, which tests the exact tree that lands on main/production.
-# PR runs skip it (the queue re-verifies). The post-merge main push skips it when
-# the merge group for this exact SHA passed CI Summary: that group selected iOS from
-# its own diff, and under ALLGREEN every earlier group in the batch passed too, so
-# the last group that changed an iOS input already ran both iOS jobs on that input.
+# macOS capacity is the scarce shared resource, so each iOS job runs once, where it is cheapest
+# and still gates the merge (Unit p50 17 min, Launch Quality p50 28 min, one hosted runner each):
+# - pull_request: Launch Quality on the PR head, once the PR is ready for review. A draft
+#   defers it; ci.yml reruns on ready_for_review, and that newer CI Summary is the one the
+#   queue reads. Unit waits for the merge group.
+# - merge_group: Unit only, on the exact tree that lands. While main's post-merge Launch
+#   Quality is red (an open post-merge-lq-red issue) Launch Quality runs here too, so only a
+#   change that passes it lands until main is green. An unknown hold state counts as held.
+# - push (main): Unit only when no passing merge group verified this exact SHA; under ALLGREEN
+#   the last group that changed an iOS input already ran Unit on it. Launch Quality for main
+#   runs in ios-post-merge-quality.yml.
+# - anything else: both jobs.
 # (Reusable-workflow job names are "iOS / Unit", never plain "iOS".)
-run_ios="$ios_changed"
-if [[ "$ios_changed" == 'true' && "$GITHUB_EVENT_NAME" == 'pull_request' ]]; then
-  run_ios=false
-  echo '::notice::iOS changed; iOS jobs run in the merge group, not on the PR.'
-elif [[ "$ios_changed" == 'true' && "$GITHUB_EVENT_NAME" == 'push' ]]; then
-  verified_runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$HEAD_SHA&event=merge_group" \
-    --jq '.workflow_runs[].id' 2>/dev/null || true)
-  for run_id in $verified_runs; do
-    passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" \
-      --jq '[.jobs[] | select(.name == "CI Summary" and .conclusion == "success")] | length' \
-      2>/dev/null || echo 0)
-    if [[ "$passed" == '1' ]]; then
-      run_ios=false
-      echo "::notice::iOS already verified on $HEAD_SHA by merge-group CI run $run_id."
-      break
-    fi
-  done
+ios_unit=false
+ios_quality=false
+ios_quality_deferred=false
+if [[ "$ios_changed" == 'true' ]]; then
+  case "$GITHUB_EVENT_NAME" in
+    pull_request)
+      if [[ "${PR_DRAFT:-false}" == 'true' ]]; then
+        ios_quality_deferred=true
+        echo '::notice::iOS changed on a draft; Launch Quality runs when the PR is ready for review.'
+      else
+        ios_quality=true
+      fi
+      ;;
+    merge_group)
+      ios_unit=true
+      if ! held=$(gh api "repos/$GITHUB_REPOSITORY/issues?labels=post-merge-lq-red&state=open&per_page=1" \
+        --jq 'length' 2>/dev/null); then
+        held=unknown
+      fi
+      if [[ "$held" != '0' ]]; then
+        ios_quality=true
+        echo "::notice::Post-merge Launch Quality hold is on (open issues: $held); this group runs Launch Quality."
+      fi
+      ;;
+    push)
+      ios_unit=true
+      verified_runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$HEAD_SHA&event=merge_group" \
+        --jq '.workflow_runs[].id' 2>/dev/null || true)
+      for run_id in $verified_runs; do
+        passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" \
+          --jq '[.jobs[] | select(.name == "CI Summary" and .conclusion == "success")] | length' \
+          2>/dev/null || echo 0)
+        if [[ "$passed" == '1' ]]; then
+          ios_unit=false
+          echo "::notice::iOS Unit already verified on $HEAD_SHA by merge-group CI run $run_id."
+          break
+        fi
+      done
+      ;;
+    *)
+      ios_unit=true
+      ios_quality=true
+      ;;
+  esac
 fi
-echo "ios=$run_ios" >> "$GITHUB_OUTPUT"
+{
+  echo "ios_unit=$ios_unit"
+  echo "ios_quality=$ios_quality"
+  echo "ios_quality_deferred=$ios_quality_deferred"
+} >> "$GITHUB_OUTPUT"

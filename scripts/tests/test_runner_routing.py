@@ -593,6 +593,8 @@ def test_wrong_run_identity_or_job_attestation_degrades_to_hosted(
 _MAC_LANE_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "mac-lane.sh"
 _SELF_HOSTED_MAC = 'fromJSON(\'["self-hosted","macOS","ARM64","jovie-mac"]\')'
 _IOS_LANES = {"ios": ("ios-unit.yml", "unit"), "ios_quality": ("ios-quality.yml", "quality")}
+# Unit gates merge groups; Launch Quality gates the PR head (.github/scripts/detect-changes.sh).
+_IOS_LANE_OUTPUTS = {"ios": "ios_unit", "ios_quality": "ios_quality"}
 
 
 def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
@@ -611,7 +613,7 @@ def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
         assert f"    uses: ./.github/workflows/{reusable}" in job.splitlines()
         assert "      mac-first: true" in job.splitlines()
         assert "    needs: detect-changes" in job.splitlines()
-        assert "if: needs.detect-changes.outputs.ios == 'true'" in job
+        assert f"if: needs.detect-changes.outputs.{_IOS_LANE_OUTPUTS[name]} == 'true'" in job
         assert f"uses: ./.github/workflows/{reusable}" in child
         lane = _job_block(reusable, work)
         assert (
