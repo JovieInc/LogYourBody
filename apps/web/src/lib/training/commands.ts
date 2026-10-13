@@ -1,3 +1,10 @@
+import type { TrainingMutationAdmission } from '@/lib/ports/training-mutations';
+import {
+  captureTrainingAdmission,
+  requireAdmittedSetup,
+  requireCurrentTrainingAdmission,
+  commitTrainingMutation,
+} from './mutation-admission';
 import type {
   NativeProductRecord,
   NativeProductRecordsPort,
@@ -50,13 +57,17 @@ export async function logTrainingSet(input: {
   subject: string;
   now: Date;
   set: LogSetInput;
+  admission?: TrainingMutationAdmission;
 }): Promise<LogSetResult> {
   const { records, subject, set } = input;
+  const admission = input.admission ?? (await captureTrainingAdmission(records, subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
   const [snapshot, sessions] = await Promise.all([
     loadTrainingRecords(records, subject),
     pullAllTrainingRecords(records, subject, 'training_sessions'),
   ]);
   if (!snapshot.setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, snapshot.setup);
   const sessionRecord = sessions.find((record) => record.id === set.sessionId);
   if (
     !sessionRecord ||
@@ -119,8 +130,7 @@ export async function logTrainingSet(input: {
     rir: set.rir,
     completedAt,
   };
-  if (!records.insertTrainingSet) return { kind: 'rejected' };
-  const saved = await records.insertTrainingSet(subject, log);
+  const saved = await commitTrainingMutation(records, subject, admission, 'set_insert', log);
   if (!saved || saved.id !== logId || saved.deleted_at !== null || saved.record_type !== 'set_log')
     return { kind: 'rejected' };
   if (
@@ -144,10 +154,11 @@ export async function logTrainingSet(input: {
     ),
   );
   if (sessionComplete) {
-    const completion = await records.push(subject, 'training_sessions', [
-      { ...sessionRecord, status: 'completed', completedAt },
-    ]);
-    if (completion.rejected_ids.includes(session.id)) return { kind: 'rejected' };
+    await commitTrainingMutation(records, subject, admission, 'session_update', {
+      ...sessionRecord,
+      status: 'completed',
+      completedAt,
+    });
   }
   return { kind: 'logged', log: saved, sessionComplete };
 }
@@ -171,9 +182,14 @@ export async function recordTrainingFeedback(input: {
   now: Date;
   createId: () => string;
   feedback: FeedbackInput;
+  admission?: TrainingMutationAdmission;
 }): Promise<FeedbackResult> {
+  const admission =
+    input.admission ?? (await captureTrainingAdmission(input.records, input.subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
   const snapshot = await loadTrainingRecords(input.records, input.subject);
   if (!snapshot.setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, snapshot.setup);
   const sessionExists = snapshot.sessions.some(
     (record) =>
       record.id === input.feedback.sessionId &&
@@ -193,6 +209,7 @@ export async function recordTrainingFeedback(input: {
     latest.jointPain === input.feedback.jointPain
   ) {
     // Keep the original observation time, even when another session has newer feedback.
+    await requireCurrentTrainingAdmission(input.records, input.subject, admission);
     return {
       kind: 'recorded',
       feedback: {
@@ -214,8 +231,13 @@ export async function recordTrainingFeedback(input: {
     ...input.feedback,
     createdAt,
   };
-  const saved = await input.records.push(input.subject, 'training_feedback', [feedback]);
-  if (saved.rejected_ids.includes(feedback.id)) return { kind: 'rejected' };
+  await commitTrainingMutation(
+    input.records,
+    input.subject,
+    admission,
+    'feedback_insert',
+    feedback,
+  );
   return { kind: 'recorded', feedback };
 }
 
@@ -275,14 +297,18 @@ export async function swapExercise(input: {
   subject: string;
   now: Date;
   swap: SwapExerciseInput;
+  admission?: TrainingMutationAdmission;
 }): Promise<SwapExerciseResult> {
   const { records, subject, swap } = input;
+  const admission = input.admission ?? (await captureTrainingAdmission(records, subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
   const [snapshot, sessions] = await Promise.all([
     loadTrainingRecords(records, subject),
     pullAllTrainingRecords(records, subject, 'training_sessions'),
   ]);
   const setup = snapshot.setup;
   if (!setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, setup);
   const sessionRecord = sessions.find((record) => record.id === swap.sessionId);
   if (
     !sessionRecord ||
@@ -335,6 +361,10 @@ export async function swapExercise(input: {
   const swapped = swappedPrescription(exercise, variant.id, snapshot.logs, exercise.targetRir);
   if (!swapped) return { kind: 'variant_not_found' };
 
+  const programRevisionId =
+    typeof sessionRecord.programRevisionId === 'string'
+      ? sessionRecord.programRevisionId
+      : undefined;
   const swapRecord: ExerciseSwapRecord = {
     id: stableTrainingUuid(
       subject,
@@ -346,6 +376,7 @@ export async function swapExercise(input: {
     ),
     record_type: 'exercise_swap',
     programSetupId: setup.id,
+    ...(programRevisionId ? { programRevisionId } : {}),
     blockId: String(sessionRecord.blockId ?? prescription.week),
     sessionId: sessionRecord.id,
     fromExerciseId: exercise.id,
@@ -353,17 +384,31 @@ export async function swapExercise(input: {
     deleted_at: null,
     server_updated_at: input.now.toISOString(),
   };
-  const savedSwap = await records.push(subject, 'training_sessions', [swapRecord]);
-  if (savedSwap.rejected_ids.includes(swapRecord.id)) return { kind: 'rejected' };
+  const savedSwap = await commitTrainingMutation(
+    records,
+    subject,
+    admission,
+    'swap_insert',
+    swapRecord,
+  );
+  if (
+    !savedSwap ||
+    savedSwap.id !== swapRecord.id ||
+    savedSwap.deleted_at !== null ||
+    savedSwap.record_type !== 'exercise_swap'
+  )
+    return { kind: 'rejected' };
 
   const updated = {
     ...prescription,
     exercises: prescription.exercises.map((item) => (item.id === exercise.id ? swapped : item)),
   };
-  const savedSession = await records.push(subject, 'training_sessions', [
-    { ...sessionRecord, prescription: updated },
-  ]);
-  if (savedSession.rejected_ids.includes(sessionRecord.id)) return { kind: 'rejected' };
+  const savedSession = await commitTrainingMutation(records, subject, admission, 'session_update', {
+    ...sessionRecord,
+    prescription: updated,
+  });
+  if (!savedSession || savedSession.id !== sessionRecord.id || savedSession.deleted_at !== null)
+    return { kind: 'rejected' };
 
   return {
     kind: 'swapped',
