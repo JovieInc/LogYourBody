@@ -50,6 +50,14 @@ extension DashboardViewLiquid {
         .worldClassScreen(.home)
     }
 
+    private var homeChatDraftBinding: Binding<String> {
+        let ownership = authManager.captureAccountSession()
+        return AccountSessionChatDraft.binding(storage: $homeChatDraft, owner: ownership) {
+            guard let ownership else { return false }
+            return authManager.ownsAccountSession(ownership)
+        }
+    }
+
     var photoTimelineRoot: some View {
         VStack(spacing: 0) {
             photoTimelineRootNavigation
@@ -71,12 +79,14 @@ extension DashboardViewLiquid {
                 isOnStats: selectedPhotoTimelineRootPage == .analytics
             ) {
                 ChatTabView(
+                    draft: homeChatDraftBinding,
                     showsTranscript: isHomeChatExpanded,
                     onExpandRequest: {
                         isHomeChatExpanded = true
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? .infinity : nil)
+                .layoutPriority(!isHomeChatExpanded && dynamicTypeSize.isAccessibilitySize ? 1 : 0)
             }
         }
         .worldClassScreen(
