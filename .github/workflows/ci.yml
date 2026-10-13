@@ -51,7 +51,9 @@ jobs:
     name: Cancel Superseded Merge Groups
     # When the queue drops or rebuilds a group it deletes the gh-readonly-queue ref, but
     # the old CI run keeps queueing and holding macOS runners. Each new group cancels
-    # merge-group CI runs whose ref no longer exists. Advisory: never fails CI.
+    # merge-group CI runs whose ref no longer exists. GitHub deletes the old refs a few
+    # seconds after starting the new group, so a second pass runs 90s later.
+    # Advisory: never fails CI.
     if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -65,16 +67,42 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -uo pipefail
-          for status in queued in_progress waiting pending; do
-            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=merge_group&status=$status&per_page=100" \
-              --jq '.workflow_runs[] | "\(.id) \(.head_branch)"'
-          done | sort -u | while read -r run_id branch; do
-            [[ "$run_id" == "$GITHUB_RUN_ID" || "$branch" != gh-readonly-queue/* ]] && continue
-            # Only a definitive 404 proves the group is gone; any other error leaves the run.
-            if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --silent 2>&1 | grep -q 'HTTP 404'; then
-              gh run cancel "$run_id" -R "$GITHUB_REPOSITORY" && echo "Cancelled superseded run $run_id ($branch)"
-            fi
-          done
+          sweep() {
+            for status in queued in_progress waiting pending; do
+              gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=merge_group&status=$status&per_page=100" \
+                --jq '.workflow_runs[] | "\(.id) \(.head_branch)"'
+            done | sort -u | while read -r run_id branch; do
+              [[ "$run_id" == "$GITHUB_RUN_ID" || "$branch" != gh-readonly-queue/* ]] && continue
+              # Only a definitive 404 proves the group is gone; any other error leaves the run.
+              # Capture first: under pipefail, `gh ... | grep -q` returns gh's 404 exit status
+              # even when grep matches, so the sweep never cancelled anything.
+              ref_lookup=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --silent 2>&1)
+              if grep -q 'HTTP 404' <<<"$ref_lookup"; then
+                gh run cancel "$run_id" -R "$GITHUB_REPOSITORY" && echo "Cancelled superseded run $run_id ($branch)"
+              fi
+            done
+          }
+          sweep
+          sleep 90
+          sweep
+
+  merge-group-fail-fast:
+    name: Merge Group Fail Fast
+    # CI Summary (the required check) waits for every job, so a group whose
+    # Linux jobs already failed kept two macOS runners busy for 20-60 min
+    # before the queue could eject it. Cancel the rest of the run instead:
+    # CI Summary still runs (if: always()) and fails at once.
+    needs: [detect-changes, mac-runner-routing-tests, js]
+    if: github.event_name == 'merge_group' && failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel the rest of this merge-group run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"
 
   detect-changes:
     name: Detect Changes
