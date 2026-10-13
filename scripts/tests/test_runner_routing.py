@@ -593,6 +593,8 @@ def test_wrong_run_identity_or_job_attestation_degrades_to_hosted(
 _MAC_LANE_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "mac-lane.sh"
 _SELF_HOSTED_MAC = 'fromJSON(\'["self-hosted","macOS","ARM64","jovie-mac"]\')'
 _IOS_LANES = {"ios": ("ios-unit.yml", "unit"), "ios_quality": ("ios-quality.yml", "quality")}
+# Unit gates merge groups; Launch Quality gates the PR head (.github/scripts/detect-changes.sh).
+_IOS_LANE_OUTPUTS = {"ios": "ios_unit", "ios_quality": "ios_quality"}
 
 
 def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
@@ -611,7 +613,7 @@ def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
         assert f"    uses: ./.github/workflows/{reusable}" in job.splitlines()
         assert "      mac-first: true" in job.splitlines()
         assert "    needs: detect-changes" in job.splitlines()
-        assert "if: needs.detect-changes.outputs.ios == 'true'" in job
+        assert f"if: needs.detect-changes.outputs.{_IOS_LANE_OUTPUTS[name]} == 'true'" in job
         assert f"uses: ./.github/workflows/{reusable}" in child
         lane = _job_block(reusable, work)
         assert (
@@ -646,8 +648,11 @@ def test_mac_route_uses_first_attempts_of_trusted_events_only() -> None:
 def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> None:
     assert 'bundle exec fastlane ci_ios' in _job_block('ios-unit.yml', 'unit')
     assert 'ci_test_unit' in _job_block('ios-unit.yml', 'unit')
-    assert 'launch-quality-audit.sh' in _job_block('ios-quality.yml', 'quality')
-    assert 'performance-audit.sh' in _job_block('ios-quality.yml', 'quality')
+    quality = _job_block('ios-quality.yml', 'quality')
+    assert 'launch-quality-audit.sh' in quality
+    assert 'performance-audit.sh' in quality
+    assert 'timeout-minutes: 64' in quality
+    assert 'timeout-minutes: 52' in quality
     summary = _job_block('ci.yml', 'ci-summary')
     assert 'assert_expected_result "iOS Launch Quality Gate"' in summary
     assert 'mac-runner-routing-tests' in summary
@@ -846,3 +851,13 @@ def test_coverage_gate_rejects_missing_empty_and_low_coverage(tmp_path: Path) ->
 
 if __name__ == '__main__':
     verify_coverage(_REPO_ROOT / 'coverage/mac-runner-routing/.resultset.json')
+
+
+def test_failed_merge_group_cancels_its_mac_jobs_instead_of_holding_them() -> None:
+    block = _job_block("ci.yml", "merge-group-fail-fast")
+    assert "needs: [detect-changes, mac-runner-routing-tests, js]" in block
+    assert "if: github.event_name == 'merge_group' && failure()" in block
+    assert 'gh run cancel "$GITHUB_RUN_ID"' in block
+    summary = _job_block("ci.yml", "ci-summary")
+    # The required check must still conclude after the cancel.
+    assert "if: always()" in summary

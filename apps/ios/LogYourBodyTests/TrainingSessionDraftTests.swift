@@ -205,7 +205,9 @@ final class TrainingSessionDraftTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         model(store).update(exercise, setNumber: 1) { $0.loadText = "22,5" }
-        let unknown = TrainingSetDraft(exerciseId: "obsolete", setNumber: 1, repsText: "10", loadText: "35", rir: 3)
+        let unknown = TrainingSetDraft(
+            exerciseId: "obsolete", setNumber: 1, repsText: "10", loadText: "35", rir: 3
+        )
         try store.put(unknown, ownerId: "owner-A", sessionId: "fixture-session")
         let saved = TrainingSavedSet(
             sessionId: "fixture-session",
