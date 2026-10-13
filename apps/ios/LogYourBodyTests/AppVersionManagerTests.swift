@@ -19,8 +19,10 @@ import XCTest
 ///   (migration 1.1.0, `optimizeDatabase`), so tests invoke it on the main
 ///   thread to match production and keep the main-queue viewContext legal.
 /// - Fire-and-forget Tasks (`RealtimeSyncManager.updatePendingSyncCount`,
-///   `CoreDataManager.cleanupOldData`, the `pendingSyncCount > 1_000` guard)
-///   are not deterministic and are intentionally not asserted.
+///   `CoreDataManager.cleanupOldData`) are not deterministic and are
+///   intentionally not asserted.
+/// - The `pendingSyncCount > 1_000` update path is asserted. The short wait
+///   lets that task run so an unsynced HealthKit import cannot be missed.
 /// - `cleanupKeychain()` is an empty no-op, so no KeychainAvailability gate is
 ///   needed here.
 final class AppVersionManagerTests: XCTestCase {
@@ -335,6 +337,49 @@ final class AppVersionManagerTests: XCTestCase {
         let healthKitEntry = try XCTUnwrap(metrics.first { $0.id == healthKitId })
         XCTAssertFalse(healthKitEntry.isSynced)
         XCTAssertEqual(healthKitEntry.syncStatus, "pending")
+    }
+
+    func testUpdateDoesNotAcknowledgeUnsyncedHealthKitImportWhenPendingCountIsHigh() async throws {
+        try await CoreDataManager.shared.deleteAllDataAndWait()
+        addTeardownBlock {
+            try? await CoreDataManager.shared.deleteAllDataAndWait()
+        }
+        let userId = "avm-pending-ack-\(UUID().uuidString)"
+        let healthKitId = try await seedBodyMetric(
+            userId: userId,
+            notes: "Imported from HealthKit",
+            dataSource: .healthKit
+        )
+        let manager = AppVersionManager.shared
+        UserDefaults.standard.set(manager.currentVersion, forKey: "lastMigrationVersion")
+        forceUpdateFrom(lastVersion: manager.currentVersion, lastBuild: "0")
+        let previousPendingCount = await MainActor.run { RealtimeSyncManager.shared.pendingSyncCount }
+        await MainActor.run { RealtimeSyncManager.shared.pendingSyncCount = 1_001 }
+        addTeardownBlock {
+            await MainActor.run { RealtimeSyncManager.shared.pendingSyncCount = previousPendingCount }
+        }
+
+        try await runStartup()
+
+        let deadline = Date().addingTimeInterval(2)
+        var acknowledged = false
+        while Date() < deadline {
+            let metrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+            let entry = try XCTUnwrap(metrics.first { $0.id == healthKitId })
+            if entry.isSynced {
+                acknowledged = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        let metrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        let entry = try XCTUnwrap(metrics.first { $0.id == healthKitId })
+        XCTAssertFalse(acknowledged)
+        XCTAssertFalse(entry.isSynced)
+        XCTAssertEqual(entry.syncStatus, "pending")
+        XCTAssertEqual(entry.weight, 80, accuracy: 0.001)
+        XCTAssertEqual(entry.notes, "Imported from HealthKit")
     }
 
     // MARK: - Helpers
