@@ -79,8 +79,10 @@ jobs:
             ${{ runner.os }}-spm-
 
       - name: Run launch quality audit
-        # Slow prefix plus the full chaos regression suite and one permitted
-        # 12-minute simulator-infrastructure retry.
+        # Slow prefix plus the full chaos regression suite. The script does not
+        # retry a command timeout, so this budget is for a single attempt. Passing
+        # hosted runs took up to 38 min (p90 36) on 2026-10-11/12, so 40 left no
+        # headroom and timed out five merge groups.
         timeout-minutes: 52
         env:
           DESTINATION: auto
