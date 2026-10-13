@@ -163,13 +163,38 @@ func fetchPendingLocalSyncSnapshot(for userId: String? = nil) async throws -> Pe
                 }
                 dexaResultsFetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: dexaPredicates)
 
+                let bodyMetrics = try context.fetch(bodyMetricsFetch)
+                let dailyMetrics = try context.fetch(dailyMetricsFetch)
+                let profiles = try context.fetch(profilesFetch)
+                let glp1DoseLogs = try context.fetch(glp1DoseLogsFetch)
+                let glp1Medications = try context.fetch(glp1MedicationsFetch)
+                let dexaResults = try context.fetch(dexaResultsFetch)
+                self.syncAcknowledgementVersions["CachedBodyMetrics"] = self.acknowledgementVersions(
+                    bodyMetrics.map { (id: $0.id, updatedAt: $0.updatedAt) }
+                )
+                self.syncAcknowledgementVersions["CachedDailyMetrics"] = self.acknowledgementVersions(
+                    dailyMetrics.map { (id: $0.id, updatedAt: $0.updatedAt) }
+                )
+                self.syncAcknowledgementVersions["CachedProfile"] = self.acknowledgementVersions(
+                    profiles.map { (id: $0.id, updatedAt: $0.updatedAt) }
+                )
+                self.syncAcknowledgementVersions["CachedGlp1DoseLog"] = self.acknowledgementVersions(
+                    glp1DoseLogs.map { (id: $0.id, updatedAt: $0.updatedAt) }
+                )
+                self.syncAcknowledgementVersions["CachedGlp1Medication"] = self.acknowledgementVersions(
+                    glp1Medications.map { (id: $0.id, updatedAt: $0.updatedAt) }
+                )
+                self.syncAcknowledgementVersions["CachedDexaResult"] = self.acknowledgementVersions(
+                    dexaResults.map { (id: $0.id, updatedAt: $0.updatedAt) }
+                )
+
                 return PendingLocalSyncSnapshot(
-                    bodyMetrics: try context.fetch(bodyMetricsFetch).map { $0.pendingSyncItem() },
-                    dailyMetrics: try context.fetch(dailyMetricsFetch).map { $0.pendingSyncItem() },
-                    profiles: try context.fetch(profilesFetch).map { $0.pendingSyncItem() },
-                    glp1DoseLogs: try context.fetch(glp1DoseLogsFetch).map { $0.pendingSyncItem() },
-                    glp1Medications: try context.fetch(glp1MedicationsFetch).map { $0.pendingSyncItem() },
-                    dexaResults: try context.fetch(dexaResultsFetch).map { $0.pendingSyncItem() }
+                    bodyMetrics: bodyMetrics.map { $0.pendingSyncItem() },
+                    dailyMetrics: dailyMetrics.map { $0.pendingSyncItem() },
+                    profiles: profiles.map { $0.pendingSyncItem() },
+                    glp1DoseLogs: glp1DoseLogs.map { $0.pendingSyncItem() },
+                    glp1Medications: glp1Medications.map { $0.pendingSyncItem() },
+                    dexaResults: dexaResults.map { $0.pendingSyncItem() }
                 )
             } catch {
                 let appError = AppError.coreData(operation: "fetchPendingLocalSyncSnapshot", underlying: error)
@@ -263,6 +288,26 @@ func fetchPendingLocalSyncCounts(for userId: String? = nil) async throws -> Pend
         (bodyMetrics: [], dailyMetrics: [], profiles: [])
     }
 
+func acknowledgementVersions(_ rows: [(id: String?, updatedAt: Date?)]) -> [String: Date] {
+        var versions: [String: Date] = [:]
+        for row in rows {
+            guard let id = row.id, let updatedAt = row.updatedAt else { continue }
+            versions[id] = updatedAt
+        }
+        return versions
+    }
+
+    /// True only when this id was in the latest pending snapshot and the row
+    /// still has that `updatedAt`. A newer local edit, or an id the snapshot
+    /// did not upload, stays unsynced.
+    func acknowledgeSyncVersion(entityName: String, id: String?, updatedAt: Date?) -> Bool {
+        guard let id, let updatedAt, syncAcknowledgementVersions[entityName]?[id] == updatedAt else {
+            return false
+        }
+        syncAcknowledgementVersions[entityName]?.removeValue(forKey: id)
+        return true
+    }
+
 func markAsSynced(entityName: String, id: String) {
         let context = viewContext
 
@@ -271,7 +316,8 @@ func markAsSynced(entityName: String, id: String) {
             case "CachedBodyMetrics":
                 let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "id == %@", id)
-                if let entry = try? context.fetch(fetchRequest).first {
+                if let entry = try? context.fetch(fetchRequest).first,
+                   self.acknowledgeSyncVersion(entityName: entityName, id: entry.id, updatedAt: entry.updatedAt) {
                     entry.isSynced = true
                     entry.syncStatus = "synced"
                 }
@@ -279,7 +325,8 @@ func markAsSynced(entityName: String, id: String) {
             case "CachedDailyMetrics":
                 let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "id == %@", id)
-                if let entry = try? context.fetch(fetchRequest).first {
+                if let entry = try? context.fetch(fetchRequest).first,
+                   self.acknowledgeSyncVersion(entityName: entityName, id: entry.id, updatedAt: entry.updatedAt) {
                     entry.isSynced = true
                     entry.syncStatus = "synced"
                 }
@@ -287,7 +334,8 @@ func markAsSynced(entityName: String, id: String) {
             case "CachedProfile":
                 let fetchRequest: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "id == %@", id)
-                if let entry = try? context.fetch(fetchRequest).first {
+                if let entry = try? context.fetch(fetchRequest).first,
+                   self.acknowledgeSyncVersion(entityName: entityName, id: entry.id, updatedAt: entry.updatedAt) {
                     entry.isSynced = true
                     entry.syncStatus = "synced"
                 }
@@ -310,49 +358,79 @@ func markAsSynced(entityName: String, ids: Set<String>) async {
                 case "CachedBodyMetrics":
                     let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
                     request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
-                    try context.fetch(request).forEach {
-                        $0.isSynced = true
-                        $0.syncStatus = "synced"
+                    try context.fetch(request).forEach { row in
+                        guard self.acknowledgeSyncVersion(
+                            entityName: entityName,
+                            id: row.id,
+                            updatedAt: row.updatedAt
+                        ) else { return }
+                        row.isSynced = true
+                        row.syncStatus = "synced"
                     }
 
                 case "CachedDailyMetrics":
                     let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
                     request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
-                    try context.fetch(request).forEach {
-                        $0.isSynced = true
-                        $0.syncStatus = "synced"
+                    try context.fetch(request).forEach { row in
+                        guard self.acknowledgeSyncVersion(
+                            entityName: entityName,
+                            id: row.id,
+                            updatedAt: row.updatedAt
+                        ) else { return }
+                        row.isSynced = true
+                        row.syncStatus = "synced"
                     }
 
                 case "CachedProfile":
                     let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
                     request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
-                    try context.fetch(request).forEach {
-                        $0.isSynced = true
-                        $0.syncStatus = "synced"
+                    try context.fetch(request).forEach { row in
+                        guard self.acknowledgeSyncVersion(
+                            entityName: entityName,
+                            id: row.id,
+                            updatedAt: row.updatedAt
+                        ) else { return }
+                        row.isSynced = true
+                        row.syncStatus = "synced"
                     }
 
                 case "CachedGlp1DoseLog":
                     let request: NSFetchRequest<CachedGlp1DoseLog> = CachedGlp1DoseLog.fetchRequest()
                     request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
-                    try context.fetch(request).forEach {
-                        $0.isSynced = true
-                        $0.syncStatus = "synced"
+                    try context.fetch(request).forEach { row in
+                        guard self.acknowledgeSyncVersion(
+                            entityName: entityName,
+                            id: row.id,
+                            updatedAt: row.updatedAt
+                        ) else { return }
+                        row.isSynced = true
+                        row.syncStatus = "synced"
                     }
 
                 case "CachedGlp1Medication":
                     let request: NSFetchRequest<CachedGlp1Medication> = CachedGlp1Medication.fetchRequest()
                     request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
-                    try context.fetch(request).forEach {
-                        $0.isSynced = true
-                        $0.syncStatus = "synced"
+                    try context.fetch(request).forEach { row in
+                        guard self.acknowledgeSyncVersion(
+                            entityName: entityName,
+                            id: row.id,
+                            updatedAt: row.updatedAt
+                        ) else { return }
+                        row.isSynced = true
+                        row.syncStatus = "synced"
                     }
 
                 case "CachedDexaResult":
                     let request: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
                     request.predicate = NSPredicate(format: "id IN %@", Array(ids) as NSArray)
-                    try context.fetch(request).forEach {
-                        $0.isSynced = true
-                        $0.syncStatus = "synced"
+                    try context.fetch(request).forEach { row in
+                        guard self.acknowledgeSyncVersion(
+                            entityName: entityName,
+                            id: row.id,
+                            updatedAt: row.updatedAt
+                        ) else { return }
+                        row.isSynced = true
+                        row.syncStatus = "synced"
                     }
 
                 default:
@@ -453,6 +531,7 @@ func fetchOrCreateSyncMetadata(entityName: String, entityId: String) -> SyncMeta
 
         context.perform {
             do {
+                self.syncAcknowledgementVersions.removeAll()
                 // Delete all body metrics
                 let bodyMetricsRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
                 let bodyMetrics = try context.fetch(bodyMetricsRequest)
