@@ -55,6 +55,8 @@ def main():
 
             run(client + ['-f', str(args.admission_migration or web / 'db/migrations/20261010103000_training_mutation_admission.sql')])
 
+            run(client + ['-f', str(web / 'db/migrations/20261010120000_native_account_admission.sql')])
+
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
                 sql(f"insert into app_users(id,identity_provider,identity_subject,profile_data) values('{uuid.uuid4()}','jovie',{quote(subject)},'{{\"date_of_birth\":\"1990-01-01\"}}');")
@@ -169,11 +171,18 @@ def main():
                 return int(sql(f'select count(*) from native_records where user_subject={quote(subject)} and deleted_at is null;'))
 
             import re
-            adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(subject)')[1]
+            adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
             statements=re.findall(r'database`([^`]+)`',adapter)
-            assert len(statements)==6 and 'for update' in statements[0]
+            assert len(statements)==5 and all(s.strip().startswith('delete from') for s in statements)
+            guard_source=(web/'src/lib/neon/native-account-admission.ts').read_text()
+            guards=re.findall(r"database.query\('(select public.lyb_native_account_admit\(\$1, \$2::uuid\))'",guard_source)
+            assert len(guards)==1, 'Expected the unique actual account guard SQL'
             def deletion(subject):
-                return ';'.join(s.replace('${subject}',quote(subject)) for s in statements)+';'
+                # Capture before scheduling either transaction, never after its lock wait.
+                owner_id=sql(f"select id from app_users where identity_provider='jovie' and identity_subject={quote(subject)};")
+                assert owner_id
+                guard=guards[0].replace('$1',quote(subject)).replace('$2',quote(owner_id))
+                return guard+';'+ ';'.join(s.replace('${subject}',quote(subject)) for s in statements)+';'
 
             for boundary in ['revoke','delete']:
                 for action in ['session_insert','session_update','completion','set_insert','feedback_insert']:

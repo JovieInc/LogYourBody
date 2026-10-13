@@ -1,3 +1,7 @@
+import {
+  captureNativeAccountAdmission,
+  executeNativeMutationQueries,
+} from './native-account-admission';
 import 'server-only';
 
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
@@ -60,6 +64,7 @@ const userColumns = `
 `;
 
 export const neonUserDirectory: UserDirectoryPort = {
+  captureAccountAdmission: (subject) => captureNativeAccountAdmission(getDatabase(), subject),
   async recordSignIn(identity) {
     await getDatabase()`
       insert into public.app_users (
@@ -132,14 +137,13 @@ export const neonUserDirectory: UserDirectoryPort = {
     return mapUser(rows[0]);
   },
 
-  async deleteUser(subject) {
+  async deleteUser(admission) {
     const database = getDatabase();
+    const subject = admission.subject;
 
     // Serialize with training revision decisions on the canonical owner/profile row.
     // Keep all existing cleanup predicates; rollback preserves the identity on failure.
-    await database.transaction([
-      database`select id from public.app_users
-        where identity_provider = 'jovie' and identity_subject = ${subject} for update`,
+    await executeNativeMutationQueries(database, admission, [
       database`delete from public.chat_usage_limits where user_subject = ${subject}`,
       database`delete from public.chat_conversations where user_subject = ${subject}`,
       database`delete from public.body_metrics where user_subject = ${subject}`,
