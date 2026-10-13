@@ -24,20 +24,23 @@ jobs:
         fetch-depth: 0  # Full history for comprehensive scanning
     
     - name: Run TruffleHog OSS
-      uses: trufflesecurity/trufflehog@v3.97.9
+      uses: trufflesecurity/trufflehog@v3.99.2
       with:
         path: ./
-        # An empty base scans full history; main and HEAD coincide on main runs.
-        head: HEAD
+        # On pushes, scan only the pushed commits; an empty base scans full
+        # history up to HEAD on scheduled/dispatch runs.
+        base: ${{ github.event_name == 'push' && github.event.before || '' }}
+        head: ${{ github.event_name == 'push' && github.sha || 'HEAD' }}
         extra_args: --debug --only-verified --json
     
 
   gitleaks:
     name: Gitleaks (shared JovieInc/ci)
-    # Shared pinned gitleaks; full-history keeps the previous --log-opts=--all scan.
+    # Block new leaks on pushes without letting legacy or unmerged refs mask the
+    # result. Scheduled/manual audits retain the comprehensive history scan.
     uses: JovieInc/ci/.github/workflows/secret-scan.yml@44105468cc7c271e5f117baec9effca295ebd13c
     with:
-      full-history: true
+      full-history: ${{ github.event_name != 'push' }}
     permissions:
       contents: read
 

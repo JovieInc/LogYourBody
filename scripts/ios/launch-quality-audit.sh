@@ -202,32 +202,6 @@ build_for_testing_once() {
   return "$status"
 }
 
-run_ui_test_group() {
-  local label="$1"
-  local result_bundle="$ARTIFACT_DIR/$label.xcresult"
-  local log_file="$ARTIFACT_DIR/$label.log"
-  local test_name
-  local -a only_testing_args=()
-  local -a evidence_args=()
-  shift
-
-  for test_name in "$@"; do
-    only_testing_args+=("-only-testing:LogYourBodyUITests/LogYourBodyUITests/$test_name")
-    evidence_args+=(--expected-test "LogYourBodyUITests/$test_name()")
-    if [[ "$test_name" == "testLaunchQualityGateCapturesCriticalSurfaces" ]]; then
-      evidence_args+=(--critical-captures)
-    fi
-  done
-
-  UI_RESULT_BUNDLES+=("$result_bundle")
-  run_xcodebuild_test \
-    "$label" \
-    "$result_bundle" \
-    "$log_file" \
-    "${only_testing_args[@]}"
-  assert_xcresult_evidence "$result_bundle" "${evidence_args[@]}"
-}
-
 cd "$IOS_DIR"
 
 if [[ "$RUN_SWIFTLINT" == "true" ]]; then
@@ -267,22 +241,25 @@ run_xcodebuild_test \
 assert_xcresult_evidence \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage
 
-UI_RESULT_BUNDLES=()
-run_ui_test_group \
-  "launch-quality-ui-critical-surfaces" \
-  "testLaunchQualityGateCapturesCriticalSurfaces" \
-  "testLaunchQualityGateCapturesOnboardingFixedCTA" \
-  "testLaunchQualityGateCapturesOnboardingFirstPhotoCTA" \
-  "testLaunchQualityGateCapturesTimelineSurfaces"
-
-run_ui_test_group \
-  "launch-quality-ui-logout-hierarchy" \
-  "testProfileLogoutSignsOutFromPushedDetail"
+# Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
+# test-without-building invocation pays 3-6 min launching the UI test runner
+# before its first test (xcresult action log, run 38320479871: runner launch
+# 340-537s per invocation). Three separate UI invocations plus the unit target
+# overran the 40-minute step with every test passing. Same tests, same exact
+# evidence checks, one runner launch.
+LAUNCH_QUALITY_UI_TESTS=(
+  "LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces"
+  "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
+  "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
+  "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
+  "LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail"
+)
 
 # Security-sensitive chaos regressions use the same native execution and
 # exact-test evidence validator as the existing launch quality checks.
 CHAOS_REGRESSIONS=(
   "ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration"
+  "ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory"
   "ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote"
   "ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies"
   "ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor"
@@ -294,20 +271,25 @@ CHAOS_REGRESSIONS=(
   "ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget"
   "ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion"
 )
-CHAOS_SELECTORS=()
-CHAOS_EVIDENCE_ARGS=()
-for test_id in "${CHAOS_REGRESSIONS[@]}"; do
-  CHAOS_SELECTORS+=("-only-testing:LogYourBodyUITests/$test_id")
-  CHAOS_EVIDENCE_ARGS+=(--expected-test "$test_id()")
+UI_SELECTORS=()
+UI_EVIDENCE_ARGS=()
+for test_id in "${LAUNCH_QUALITY_UI_TESTS[@]}" "${CHAOS_REGRESSIONS[@]}"; do
+  UI_SELECTORS+=("-only-testing:LogYourBodyUITests/$test_id")
+  UI_EVIDENCE_ARGS+=(--expected-test "$test_id()")
 done
-CHAOS_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui-chaos-regressions.xcresult"
-UI_RESULT_BUNDLES+=("$CHAOS_RESULT_BUNDLE")
-run_xcodebuild_test \
-  "launch-quality-ui-chaos-regressions" \
-  "$CHAOS_RESULT_BUNDLE" \
-  "$ARTIFACT_DIR/launch-quality-ui-chaos-regressions.log" \
-  "${CHAOS_SELECTORS[@]}"
-assert_xcresult_evidence "$CHAOS_RESULT_BUNDLE" "${CHAOS_EVIDENCE_ARGS[@]}" --require-settings-row-coverage --require-chaos-accounting-coverage
+UI_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui.xcresult"
+UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
+# One runner launch (up to ~9 min hosted) plus all seventeen UI tests (~6 min)
+# replaces three separately bounded invocations, so its own bound is the
+# per-invocation limit plus the work the other two used to carry.
+UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1500}"
+XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_xcodebuild_test \
+  "launch-quality-ui" \
+  "$UI_RESULT_BUNDLE" \
+  "$ARTIFACT_DIR/launch-quality-ui.log" \
+  "${UI_SELECTORS[@]}"
+assert_xcresult_evidence "$UI_RESULT_BUNDLE" "${UI_EVIDENCE_ARGS[@]}" \
+  --critical-captures --require-settings-row-coverage --require-chaos-accounting-coverage
 
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
@@ -327,10 +309,10 @@ fi
   printf -- '- Unit coverage: photo timeline HUD launch policy, Body Score share card layout\n'
   printf -- '- Fixture UI coverage: home hero + chat composer, Jovie swipe/menu Timeline/Stats, one timeline scrubber, home/analytics/onboarding/share screenshot attachments\n'
   printf -- '- Evidence scope: `fixture_ui`; injected auth and entitlement state. Real Sign in with Apple, purchase, and restore remain `not_verified`.\n'
-  printf -- '- Required passing test IDs and seven screenshot hashes: `launch-quality-ui-critical-surfaces.evidence.json`. First failed attempt bundles are retained.\n'
+  printf -- '- Required passing test IDs and seven screenshot hashes: `launch-quality-ui.evidence.json`. First failed attempt bundles are retained.\n'
   printf -- '- Source: `source-revision.txt` plus `source-working-tree.patch`; this is not exact deployed-build certification.\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
-  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, four independent screenshot selectors, logout hierarchy, and eleven bounded chaos regressions with simulator parallelism disabled\n'
+  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, then one UI invocation covering four screenshot selectors, logout hierarchy, and twelve bounded chaos regressions with simulator parallelism disabled\n'
   printf -- '- Required native function coverage: biometric policy in unit execution and SettingsRow body, leading content, and value inset and action accounting in the chaos UI regressions\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"

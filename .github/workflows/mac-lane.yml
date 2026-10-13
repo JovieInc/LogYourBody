@@ -1,9 +1,10 @@
 name: Mac Lane
-run-name: Mac lane ${{ inputs.lane }} for ${{ inputs.parent }}
+run-name: Mac lane ${{ inputs.lane }} @ ${{ inputs.sha }} for ${{ inputs.parent }}
 # Child run of mac-lane-route.yml: one macOS lane on the self-hosted jovie-mac
 # runners. The parent cancels this run when no Mac picks it up within 45s and
 # then runs the lane on hosted macOS, so the parent never holds on a Mac.
-# Policy: JovieInc/Jovie .claude/rules/infra.md "macOS runners".
+# Policy: JovieInc/Jovie .claude/rules/infra.md "macOS runners". The child
+# gets no secrets: only GITHUB_TOKEN, as the same jobs get when hosted.
 
 on:
   workflow_dispatch:
@@ -28,6 +29,11 @@ on:
       parent:
         description: Parent run URL.
         required: true
+        type: string
+      args:
+        description: JSON object of lane-specific inputs.
+        required: false
+        default: '{}'
         type: string
 
 permissions:
