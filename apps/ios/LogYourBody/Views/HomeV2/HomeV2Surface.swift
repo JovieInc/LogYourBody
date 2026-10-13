@@ -138,6 +138,10 @@ struct HomeV2Surface: View {
                 .accessibilityIdentifier("home_v2_change_sentence")
 
             compositionLine
+
+            if isLogged {
+                statusLine
+            }
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
