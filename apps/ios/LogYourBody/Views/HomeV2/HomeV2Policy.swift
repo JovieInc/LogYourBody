@@ -51,16 +51,18 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        // Query the kill switch first so `flagKey` remains the last gate
+        // consulted, matching the enable-gate call contract.
+        let killSwitchEnabled = checkGate(killSwitchKey)
+        let enableGateEnabled = checkGate(gateKey)
         return FeatureReleaseEvaluator.evaluate(
             releaseDescriptor,
             context: FeatureReleaseContext(
                 actor: actor,
                 installedBuild: installedBuild,
                 configState: .fresh,
-                // Query the kill switch first so `flagKey` remains the last
-                // gate consulted, matching the enable-gate call contract.
-                killSwitch: checkGate(killSwitchKey),
-                enableGate: checkGate(gateKey)
+                enableGate: enableGateEnabled,
+                killSwitch: killSwitchEnabled
             )
         ).isEnabled
     }
