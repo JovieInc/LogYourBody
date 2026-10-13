@@ -103,16 +103,17 @@ describe('eve.dev core-chat boundary', () => {
       encoding: 'utf8',
     })
       .split('\0')
-      .filter(Boolean);
+      .filter(Boolean)
+      // Symlinks (e.g. .claude/skills/jovie-frontend -> a directory) have no
+      // source of their own; reading one through fails with EISDIR.
+      .filter((file) => lstatSync(join(repoRoot, file)).isFile());
     const dottedName = new RegExp(['trigger', 'dev'].join('\\.'), 'i');
     const packageName = new RegExp(['trigger', 'dev'].join(''), 'i');
 
     const matches = trackedFiles.filter((file) => {
-      const path = join(repoRoot, file);
-      if (!lstatSync(path).isFile()) {
-        return false;
-      }
-      const source = readFileSync(path).toString('utf8');
+      // Tracked symlinks (e.g. .claude/skills/* -> .agents/skills/*) are scanned via their target.
+      if (lstatSync(join(repoRoot, file)).isSymbolicLink()) return false;
+      const source = readFileSync(join(repoRoot, file)).toString('utf8');
       return dottedName.test(source) || packageName.test(source);
     });
 
