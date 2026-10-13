@@ -41,7 +41,7 @@ extension PreferencesView {
             }
             SettingsNavigationLink(
                 icon: "crown.fill",
-                title: "Subscription",
+                title: "Account & subscription",
                 subtitle: accountSubscriptionSummary,
                 accessibilityIdentifier: "settings_account_subscription_link",
                 titleAccessibilityIdentifier: "home_v2_settings_subscription"
@@ -51,6 +51,15 @@ extension PreferencesView {
                     changePlanSection
                     advancedSection
                     subscriptionBenefitsSection
+                }
+            }
+            SettingsNavigationLink(
+                icon: "lock.shield",
+                title: "Security",
+                subtitle: "Face ID lock and active sessions",
+                accessibilityIdentifier: "settings_security_link"
+            ) {
+                SettingsDetailScreen(title: "Security", accessibilityIdentifier: "home_v2_security") {
                     securitySection
                 }
             }
@@ -122,38 +131,15 @@ extension PreferencesView {
         }
 
         SettingsSection(header: "Privacy & data") {
-            SettingsToggleRow(
-                icon: "faceid",
-                title: "Face ID lock",
-                isOn: $biometricLockEnabled
-            )
-            .accessibilityIdentifier("home_v2_settings_face_id")
-
-            SettingsNavigationLink(
-                icon: "square.and.arrow.down",
-                title: "Export data",
-                accessibilityIdentifier: "home_v2_settings_export"
-            ) {
-                ExportDataView()
-                    .environmentObject(authManager)
-            }
-            SettingsNavigationLink(
-                icon: "trash",
-                title: "Delete account",
-                accessibilityIdentifier: "home_v2_settings_delete",
-                tintColor: Color.appError
-            ) {
-                DeleteAccountView()
-                    .environmentObject(authManager)
-            }
             SettingsNavigationLink(
                 icon: "hand.raised",
                 title: "Privacy & data",
-                subtitle: "Photo handling and account actions",
+                subtitle: "Photo handling, export, and account deletion",
                 accessibilityIdentifier: "settings_privacy_data_link"
             ) {
                 SettingsDetailScreen(title: "Privacy & data") {
                     photosSection
+                    privacyExportSection
                     dangerSection
                 }
                 .worldClassScreen(.privacyAndData)
