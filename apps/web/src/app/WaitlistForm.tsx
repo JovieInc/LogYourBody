@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { analytics } from '@/lib/analytics';
+import { waitlistCampaign } from '@/lib/analytics-schema';
 import { cn } from '@/lib/utils';
 import { waitlistLandingCopy } from './waitlist-copy';
 
@@ -9,19 +10,15 @@ type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
 
 function landingAttribution() {
   if (typeof window === 'undefined') {
-    return { source: 'landing:minimal:direct', campaign: 'direct' };
+    return { source: 'landing:minimal:direct', campaign: 'direct' as const };
   }
 
   const params = new URLSearchParams(window.location.search);
-  const campaign = params
-    .get('utm_source')
-    ?.toLowerCase()
-    .replace(/[^a-z0-9_-]/g, '')
-    .slice(0, 60);
+  const campaign = waitlistCampaign(params.get('utm_source'));
 
   return {
-    source: `landing:minimal:${campaign || 'direct'}`,
-    campaign: campaign || 'direct',
+    source: `landing:minimal:${campaign}`,
+    campaign,
   };
 }
 
@@ -94,6 +91,8 @@ export function WaitlistForm() {
         return;
       }
 
+      // Acceptance intentionally includes duplicates and honeypots. Durable
+      // registration counts come only from the server-owned waitlist store.
       analytics.track('web_waitlist_submitted', {
         landing_id: 'minimal_waitlist_v1',
         variant: 'waitlist_minimal',

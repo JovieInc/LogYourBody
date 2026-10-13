@@ -44,7 +44,7 @@ export type ExercisePrescription = {
   repRange: { min: number; max: number };
   targetReps: number;
   targetRir: number;
-  targetLoadKg: null;
+  targetLoadKg: number | null;
   loadInstruction: string | null;
   progression: ProgressionAction;
   evidenceIds: string[];
@@ -87,6 +87,8 @@ export type TrainingProgramSetup = {
   sessionsPerWeek: 2 | 3;
   equipment: Equipment;
   startedAt: string;
+  programRevisionId?: string;
+  programPolicyVersion?: string;
 };
 
 export type TrainingFeedback = {

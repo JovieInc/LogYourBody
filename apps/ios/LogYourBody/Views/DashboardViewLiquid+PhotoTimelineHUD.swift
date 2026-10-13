@@ -6,6 +6,7 @@ extension DashboardViewLiquid {
     var photoTimelineHUD: some View {
         ZStack(alignment: .topLeading) {
             timelineAccessibilityMarker(id: "photo_timeline_hud", label: "Timeline overview")
+            timelineAccessibilityMarker(id: "world_class_screen_photoTimeline", label: "Today timeline")
 
             Group {
                 if let metric = currentMetric {
@@ -49,6 +50,14 @@ extension DashboardViewLiquid {
         .worldClassScreen(.home)
     }
 
+    private var homeChatDraftBinding: Binding<String> {
+        let ownership = authManager.captureAccountSession()
+        return AccountSessionChatDraft.binding(storage: $homeChatDraft, owner: ownership) {
+            guard let ownership else { return false }
+            return authManager.ownsAccountSession(ownership)
+        }
+    }
+
     var photoTimelineRoot: some View {
         VStack(spacing: 0) {
             photoTimelineRootNavigation
@@ -70,12 +79,14 @@ extension DashboardViewLiquid {
                 isOnStats: selectedPhotoTimelineRootPage == .analytics
             ) {
                 ChatTabView(
+                    draft: homeChatDraftBinding,
                     showsTranscript: isHomeChatExpanded,
                     onExpandRequest: {
                         isHomeChatExpanded = true
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? .infinity : nil)
+                .layoutPriority(!isHomeChatExpanded && dynamicTypeSize.isAccessibilitySize ? 1 : 0)
             }
         }
         .worldClassScreen(
@@ -100,9 +111,6 @@ extension DashboardViewLiquid {
         }
         .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
             homeV2AllPhotosFromHome
-        }
-        .sheet(isPresented: $isHomeV2LogSheetPresented) {
-            homeV2LogWeightSheet
         }
         .sheet(item: $homeV2EditingMetric) { metric in
             homeV2EditEntrySheet(for: metric)
@@ -130,6 +138,11 @@ extension DashboardViewLiquid {
         .navigationDestination(isPresented: $isPhotoTimelineSettingsPresented) {
             PreferencesView()
                 .environmentObject(authManager)
+        }
+        .alert("Couldn’t undo this entry", isPresented: $showsHomeV2UndoError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your entry is still saved. Try Undo again.")
         }
     }
 

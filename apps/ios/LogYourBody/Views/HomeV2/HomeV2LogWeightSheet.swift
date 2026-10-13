@@ -119,13 +119,16 @@ struct HomeV2LogWeightSheet: View {
                 .buttonStyle(.plain)
                 .disabled(isSaving)
                 .accessibilityIdentifier("home_v2_log_sheet_delete")
-                .confirmationDialog(
+                // confirmationDialog presents without Cancel, so deleting an
+                // entry has no reachable escape hatch.
+                .alert(
                     HomeV2ContextCopy.deleteTitle,
-                    isPresented: $isConfirmingDelete,
-                    titleVisibility: .visible
+                    isPresented: $isConfirmingDelete
                 ) {
                     Button(HomeV2ContextCopy.deleteEntry, role: .destructive, action: performDelete)
+                        .accessibilityIdentifier("home_v2_log_sheet_delete_confirm")
                     Button(HomeV2ContextCopy.cancel, role: .cancel) {}
+                        .accessibilityIdentifier("home_v2_log_sheet_delete_cancel")
                 } message: {
                     Text(deleteScope ?? "")
                 }
@@ -368,6 +371,7 @@ struct HomeV2LogWeightSheet: View {
             let saved = await onSave(value, bodyFat)
             isSaving = false
             if saved {
+                NotificationManager.shared.recordWeighInLogged()
                 dismiss()
             } else {
                 errorText = HomeV2Copy.saveFailed

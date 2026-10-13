@@ -1,23 +1,38 @@
 name: Regenerate Certificates
 
+# Manual only. There is no schedule. LYB-74: a monthly cron failed every month
+# since at least March at "Clean certificates repository" (JovieInc/certificates
+# is not reachable), and the first lane runs match_nuke on distribution and
+# development certificates while swallowing errors. A repository variable must
+# not be enough to turn that back on.
+# https://linear.app/jovie/issue/LYB-74
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "REGENERATE" to confirm certificate regeneration'
+        description: 'Type NUKE-AND-REGENERATE to destroy and recreate certificates'
         required: true
         type: string
-  schedule:
-    # Run on the 1st of every month at 2 AM UTC
-    - cron: '0 2 1 * *'
+
+concurrency:
+  group: regenerate-certificates
+  cancel-in-progress: false
 
 jobs:
   regenerate-certificates:
     name: Regenerate Match Certificates
     runs-on: macos-14
-    if: github.event_name == 'schedule' || github.event.inputs.confirm == 'REGENERATE'
-    
     steps:
+      - name: Require NUKE-AND-REGENERATE
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM" != "NUKE-AND-REGENERATE" ]; then
+            echo "::error::Refusing to nuke certificates. Dispatch confirm must be NUKE-AND-REGENERATE."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -92,28 +107,30 @@ jobs:
           MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
           MATCH_GIT_BRANCH: ${{ secrets.MATCH_GIT_BRANCH || 'main' }}
         run: |
+          set -euo pipefail
           echo "🗑️ Cleaning certificates repository..."
-          
-          # Extract the auth token from base64
-          AUTH_HEADER=$(echo $MATCH_GIT_BASIC_AUTHORIZATION | base64 -d)
-          
-          # Clone with authentication
-          git clone https://${AUTH_HEADER}@github.com/JovieInc/certificates.git certificates-temp
+
+          # Clone and push the configured Match repository with its Basic auth
+          # header. git -c does not persist onto the remote, so the push must
+          # send the header too. Credentials stay out of the clone URL.
+          git -c "http.extraheader=Authorization: Basic ${MATCH_GIT_BASIC_AUTHORIZATION}" \
+            clone "$MATCH_GIT_URL" certificates-temp
           cd certificates-temp
-          git checkout $MATCH_GIT_BRANCH || git checkout -b $MATCH_GIT_BRANCH
-          
+          git checkout "$MATCH_GIT_BRANCH" || git checkout -b "$MATCH_GIT_BRANCH"
+
           # Clean all certificate files
           rm -rf certs profiles
           mkdir -p certs profiles
           touch certs/.gitkeep profiles/.gitkeep
-          
+
           # Commit and push
           git add -A
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "GitHub Actions"
           git commit -m "Clean repository for certificate regeneration" || echo "Nothing to commit"
-          git push origin $MATCH_GIT_BRANCH
-          
+          git -c "http.extraheader=Authorization: Basic ${MATCH_GIT_BASIC_AUTHORIZATION}" \
+            push origin "$MATCH_GIT_BRANCH"
+
           cd ..
           rm -rf certificates-temp
 
@@ -179,20 +196,36 @@ jobs:
           
           echo "✅ Certificates regenerated successfully!"
 
+      - name: Detect Slack webhook
+        id: slack
+        if: always() && vars.CERT_REGEN_SLACK_ENABLED == 'true'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${SLACK_WEBHOOK_URL}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CERT_REGEN_SLACK_ENABLED is true but SLACK_WEBHOOK_URL is unset; skipping Slack."
+          fi
+
       - name: Send notification on failure
-        if: failure()
+        if: failure() && vars.CERT_REGEN_SLACK_ENABLED == 'true' && steps.slack.outputs.enabled == 'true'
         uses: 8398a7/action-slack@v3
         with:
           status: failure
           text: '❌ Certificate regeneration failed! Check the workflow logs.'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         continue-on-error: true
 
       - name: Send notification on success
-        if: success()
+        if: success() && vars.CERT_REGEN_SLACK_ENABLED == 'true' && steps.slack.outputs.enabled == 'true'
         uses: 8398a7/action-slack@v3
         with:
           status: success
           text: '✅ Certificates regenerated successfully!'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         continue-on-error: true

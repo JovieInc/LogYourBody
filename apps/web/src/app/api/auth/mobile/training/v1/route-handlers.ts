@@ -1,3 +1,6 @@
+import { TrainingMutationError } from '@/lib/training/mutation-admission';
+import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
+import { profileConfirmsAdult } from '@/lib/training/eligibility';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
@@ -5,19 +8,15 @@ import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
 import type { UserDirectoryPort } from '@/lib/ports/user-directory';
 import {
   isTrainingRecordCollection,
-  type NativeProductRecord,
   type NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import { validTrainingFeedback, validateSetLog } from '@/lib/training/engine';
+import { logTrainingSet, recordTrainingFeedback, swapExercise } from '@/lib/training/commands';
 import {
   getOrCreateNextWorkout,
-  isWorkoutSessionRecord,
-  loadTrainingRecords,
   pullAllTrainingRecords,
-  stableTrainingUuid,
   storeProgramSetup,
 } from '@/lib/training/service';
-import { TRAINING_CONSENT_VERSION, type SetLog, type TrainingFeedback } from '@/lib/training/types';
+import { TRAINING_CONSENT_VERSION } from '@/lib/training/types';
 
 export const TRAINING_API_VERSION = 1;
 
@@ -51,9 +50,23 @@ const FeedbackBodySchema = z
   })
   .strict();
 
+const SwapBodySchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    exerciseId: z.string().trim().min(1).max(64),
+    toVariantId: z.string().trim().min(1).max(64).optional(),
+    unavailableEquipment: z.array(z.string().trim().min(1).max(32)).max(16).optional(),
+    declaredEquipment: z.array(z.string().trim().min(1).max(32)).max(16).optional(),
+    excludedConcerns: z.array(z.string().trim().min(1).max(48)).max(16).optional(),
+    preferTorsoSupport: z.boolean().optional(),
+    maxTrunkDemand: z.enum(['low', 'moderate', 'high']).optional(),
+  })
+  .strict();
+
 type RouteDependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   records: NativeProductRecordsPort;
+  revisions?: TrainingRevisionsPort;
   users: UserDirectoryPort;
   reserveRequest: (subject: string) => Promise<ChatRateLimitResult>;
   createId: () => string;
@@ -81,28 +94,6 @@ function rateLimitError(result: Extract<ChatRateLimitResult, { allowed: false }>
 
 function withVersion(payload: Record<string, unknown>) {
   return { version: TRAINING_API_VERSION, ...payload };
-}
-
-function profileConfirmsAdult(dateOfBirth: unknown, today: Date): boolean {
-  if (typeof dateOfBirth !== 'string') return false;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth.slice(0, 10));
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  )
-    return false;
-  let age = today.getUTCFullYear() - year;
-  const birthdayPassed =
-    today.getUTCMonth() + 1 > month ||
-    (today.getUTCMonth() + 1 === month && today.getUTCDate() >= day);
-  if (!birthdayPassed) age -= 1;
-  return age >= 18;
 }
 
 async function collectionRecords(
@@ -159,7 +150,9 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             weeklyFractionalVolume: result.weeklyFractionalVolume,
           }),
         );
-      } catch {
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
         return apiError('training_unavailable', 503);
       }
     },
@@ -168,6 +161,16 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const identity = await authorized(request);
       if (!identity) return apiError('unauthorized', 401);
       if (!featureEnabled()) return apiError('not_found', 404);
+      // Capture before body/profile/rate-limit awaits: a request already in flight
+      // cannot restore consent after a concurrent revoke or canonical input edit.
+      let enrollmentContext;
+      try {
+        enrollmentContext = await dependencies.revisions?.readContext(identity.sub);
+        if (dependencies.revisions && !enrollmentContext)
+          return apiError('training_unavailable', 503);
+      } catch {
+        return apiError('training_unavailable', 503);
+      }
       const denied = await allowed(identity.sub);
       if (denied) return denied;
       const parsed = EnrollBodySchema.safeParse(await request.json().catch(() => null));
@@ -181,6 +184,8 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
         }
         const setup = await storeProgramSetup({
           records: dependencies.records,
+          revisions: dependencies.revisions,
+          expectedContext: enrollmentContext ?? undefined,
           subject: identity.sub,
           setup: {
             adultConfirmed: true,
@@ -214,6 +219,10 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const denied = await allowed(identity.sub);
       if (denied) return denied;
       try {
+        if (dependencies.revisions) {
+          const deleted = await dependencies.revisions.revoke(identity.sub);
+          return json(withVersion({ revoked: true, deletedRecords: deleted }));
+        }
         const [sessions, sets, feedback] = await Promise.all([
           collectionRecords(dependencies.records, identity.sub, 'training_sessions'),
           collectionRecords(dependencies.records, identity.sub, 'logged_sets'),
@@ -247,79 +256,83 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const parsed = LogSetBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) return apiError('invalid_request', 400);
       try {
-        const [snapshot, sessions] = await Promise.all([
-          loadTrainingRecords(dependencies.records, identity.sub),
-          collectionRecords(dependencies.records, identity.sub, 'training_sessions'),
-        ]);
-        if (!snapshot.setup) return apiError('program_not_enrolled', 409);
-        const sessionRecord = sessions.records.find(
-          (record) => record.id === parsed.data.sessionId,
-        );
-        if (
-          !sessionRecord ||
-          !isWorkoutSessionRecord(sessionRecord) ||
-          sessionRecord.programSetupId !== snapshot.setup.id
-        ) {
-          return apiError('session_not_found', 404);
+        const result = await logTrainingSet({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          set: { ...parsed.data, loadKg: parsed.data.loadKg ?? null },
+        });
+        switch (result.kind) {
+          case 'logged':
+            return json(
+              withVersion({ log: result.log, sessionComplete: result.sessionComplete }),
+              201,
+            );
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'session_not_active':
+            return apiError('session_not_active', 409);
+          case 'set_not_in_session':
+            return apiError('set_not_in_session', 400);
+          case 'set_conflict':
+            return apiError('set_conflict', 409);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
         }
-        if (sessionRecord.status !== 'in_progress') return apiError('session_not_active', 409);
-        const session = sessionRecord.prescription;
-        if (
-          !session ||
-          !validateSetLog(
-            {
-              id: 'server-generated',
-              ...parsed.data,
-              loadKg: parsed.data.loadKg ?? null,
-              completedAt: dependencies.now().toISOString(),
-            },
-            session,
-          )
-        )
-          return apiError('set_not_in_session', 400);
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
+        return apiError('training_unavailable', 503);
+      }
+    },
 
-        const completedAt = dependencies.now().toISOString();
-        const logId = stableTrainingUuid(
-          identity.sub,
-          session.id,
-          parsed.data.exerciseId,
-          String(parsed.data.setNumber),
-        );
-        const log: SetLog & { record_type: string } = {
-          id: logId,
-          record_type: 'set_log',
-          sessionId: session.id,
-          exerciseId: parsed.data.exerciseId,
-          setNumber: parsed.data.setNumber,
-          reps: parsed.data.reps,
-          loadKg: parsed.data.loadKg ?? null,
-          rir: parsed.data.rir,
-          completedAt,
-        };
-        const saved = await dependencies.records.push(identity.sub, 'logged_sets', [log]);
-        if (saved.rejected_ids.includes(logId)) return apiError('training_unavailable', 503);
-        const allLogs = [...snapshot.logs, log];
-        const sessionComplete = session.exercises.every((exercise) =>
-          Array.from({ length: exercise.sets }, (_, index) => index + 1).every((setNumber) =>
-            allLogs.some(
-              (record) =>
-                record.sessionId === session.id &&
-                record.exerciseId === exercise.id &&
-                record.setNumber === setNumber,
-            ),
-          ),
-        );
-        if (sessionComplete) {
-          await dependencies.records.push(identity.sub, 'training_sessions', [
-            {
-              ...sessionRecord,
-              status: 'completed',
-              completedAt,
-            },
-          ]);
+    async swap(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      const parsed = SwapBodySchema.safeParse(await request.json().catch(() => null));
+      if (!parsed.success) return apiError('invalid_request', 400);
+      try {
+        const result = await swapExercise({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          swap: parsed.data,
+        });
+        switch (result.kind) {
+          case 'swapped':
+            return json(
+              withVersion({
+                swap: result.swap,
+                exercise: result.exercise,
+                diff: result.diff,
+              }),
+              201,
+            );
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'session_not_active':
+            return apiError('session_not_active', 409);
+          case 'exercise_not_found':
+            return apiError('exercise_not_found', 404);
+          case 'variant_not_found':
+            return apiError('variant_not_found', 404);
+          case 'variant_ineligible':
+            return json(withVersion({ error: 'variant_ineligible', missing: result.missing }), 409);
+          case 'no_feasible_alternative':
+            return apiError('no_feasible_alternative', 409);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
         }
-        return json(withVersion({ log: saved.records[0] ?? log, sessionComplete }), 201);
-      } catch {
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
         return apiError('training_unavailable', 503);
       }
     },
@@ -333,32 +346,28 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const parsed = FeedbackBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) return apiError('invalid_request', 400);
       try {
-        const snapshot = await loadTrainingRecords(dependencies.records, identity.sub);
-        if (!snapshot.setup) return apiError('program_not_enrolled', 409);
-        const sessionExists = snapshot.sessions.some(
-          (record) =>
-            record.id === parsed.data.sessionId &&
-            (record as NativeProductRecord & { programSetupId?: string }).programSetupId ===
-              snapshot.setup?.id,
-        );
-        if (!sessionExists) return apiError('session_not_found', 404);
-        const latestFeedbackTime = snapshot.feedback.reduce(
-          (latest, item) => Math.max(latest, Date.parse(item.createdAt)),
-          0,
-        );
-        const createdAt = new Date(
-          Math.max(dependencies.now().getTime(), latestFeedbackTime + 1),
-        ).toISOString();
-        const feedback: TrainingFeedback & { record_type: string } = {
-          id: dependencies.createId(),
-          record_type: 'session_feedback',
-          ...parsed.data,
-          createdAt,
-        };
-        if (!validTrainingFeedback(feedback)) return apiError('invalid_request', 400);
-        await dependencies.records.push(identity.sub, 'training_feedback', [feedback]);
-        return json(withVersion({ feedback }), 201);
-      } catch {
+        const result = await recordTrainingFeedback({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          createId: dependencies.createId,
+          feedback: parsed.data,
+        });
+        switch (result.kind) {
+          case 'recorded':
+            return json(withVersion({ feedback: result.feedback }), 201);
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'invalid':
+            return apiError('invalid_request', 400);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
+        }
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
         return apiError('training_unavailable', 503);
       }
     },

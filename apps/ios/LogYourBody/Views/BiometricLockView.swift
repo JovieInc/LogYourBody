@@ -5,6 +5,42 @@
 import SwiftUI
 
 enum BiometricLockPolicy {
+    static func shouldDisableForUITests(
+        arguments: [String],
+        environment: [String: String],
+        userId: String?
+    ) -> Bool {
+        #if DEBUG
+        let hasConfiguration = environment["XCTestConfigurationFilePath"]
+            .map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false
+        let hasUITestSession = UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil &&
+            (environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") ?? false)
+        guard arguments.contains("-lybUITestDisableBiometricLock"),
+              hasConfiguration || hasUITestSession,
+              let userId else {
+            return false
+        }
+
+        // Match the synthetic identities seeded by LogYourBodyApp. A normal
+        // Debug launch must keep protecting the personal account on the device.
+        let fixtures = [
+            "-lybUITestPaidMVPFixture": "ui_test_paid_mvp_user_",
+            "-lybUITestWeightLoggerMVPFixture": "ui_test_weight_logger_user_",
+            "-lybUITestPaywallFixture": "ui_test_paywall_user_",
+            "-lybUITestPaywallPlansFixture": "ui_test_paywall_user_",
+            "-lybUITestFullDashboardFixture": "ui_test_full_dashboard_user_",
+            "-lybUITestPhotoTimelineHUDFixture": "ui_test_photo_hud_user_",
+            "-lybUITestBodyScoreOnboardingFixture": "ui_test_onboarding_user_",
+            "-lybUITestBodyScoreFirstPhotoFixture": "ui_test_onboarding_user_"
+        ]
+        return fixtures.contains { fixture, prefix in
+            arguments.contains(fixture) && userId.hasPrefix(prefix) && userId.count > prefix.count
+        }
+        #else
+        return false
+        #endif
+    }
+
     /// A new authentication attempt only starts while no attempt is in flight.
     static func canStartAuthentication(isAuthenticating: Bool) -> Bool {
         !isAuthenticating
@@ -26,6 +62,20 @@ enum BiometricLockPolicy {
     static func showsFallbackOptions(hasAttemptedOnce: Bool, isAuthenticating: Bool) -> Bool {
         hasAttemptedOnce && !isAuthenticating
     }
+
+    /// Relock when the app reaches the background so the app-switcher snapshot
+    /// and the next resume both show the lock instead of private content.
+    /// `.inactive` is ignored so Control Center-style interruptions keep the
+    /// current unlock state.
+    static func shouldRelock(onEntering phase: ScenePhase, lockEnabled: Bool) -> Bool {
+        lockEnabled && phase == .background
+    }
+
+    /// A shake instantly relocks while the lock is armed; otherwise the
+    /// gesture is left for other handlers (shake-to-report).
+    static func shouldLockOnShake(isLockArmed: Bool) -> Bool {
+        isLockArmed
+    }
 }
 
 struct BiometricLockView: View {
@@ -33,6 +83,7 @@ struct BiometricLockView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var isAuthenticating = false
     @State private var hasAttemptedOnce = false
@@ -74,6 +125,13 @@ struct BiometricLockView: View {
             .padding(.horizontal, JovieTokens.screenInset)
         }
         .onAppear(perform: authenticate)
+        .onChange(of: scenePhase) { _, newPhase in
+            // An attempt fired while the app was still backgrounding fails
+            // immediately; retry once the app is foregrounded again.
+            if newPhase == .active {
+                authenticate()
+            }
+        }
         .onDisappear {
             biometricAuthenticator.cancelCurrentAuthentication()
         }

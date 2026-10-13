@@ -1,6 +1,15 @@
 import SwiftUI
 
 extension AddEntrySheet {
+func stepWeight(by direction: Int) {
+        let current = Double(weight) ?? HomeV2WeightStepPolicy.defaultValue(unit: resolvedWeightUnit)
+        weight = HomeV2WeightStepPolicy.text(
+            HomeV2WeightStepPolicy.stepped(current, by: direction, unit: resolvedWeightUnit)
+        )
+        validateWeight(weight)
+        HapticManager.shared.selection()
+}
+
 // MARK: - Photo Entry View
     var photoEntryView: some View {
         VStack(spacing: 16) {
@@ -158,7 +167,7 @@ func saveWeight(userId: String) {
                 defer { isSavingEntry = false }
 
                 do {
-                    _ = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                    let savedResult = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
                         for: selectedDate,
                         weight: weightInKg,
                         userId: userId
@@ -175,6 +184,8 @@ func saveWeight(userId: String) {
                         ]
                     )
                     HapticManager.shared.successAction()
+                    NotificationManager.shared.recordWeighInLogged()
+                    onWeightSaved?(savedResult)
 
                     dismiss()
                 } catch {
@@ -495,8 +506,7 @@ func validateGlp1Dose(_ value: String) {
 
 var glp1DoseOptions: [Double] {
         guard let medication = glp1SelectedMedication else { return [] }
-        let config = Glp1MedicationCatalog.doseConfig(for: medication)
-        return config.doses
+        return Glp1DoseDraftResolver.options(for: medication, doseLogs: glp1DoseLogs)
     }
 
 var glp1UnitForSelectedMedication: String? {

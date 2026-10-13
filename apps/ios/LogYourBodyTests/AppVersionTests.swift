@@ -80,6 +80,24 @@ final class AppVersionTests: XCTestCase {
         )
     }
 
+    func testWhatsNewWaitsForPeopleWhoJustFinishedOnboarding() {
+        func eligible(finishedOnboardingThisLaunch: Bool) -> Bool {
+            ReleaseReviewLaunchState(
+                isAuthenticated: true,
+                isLoadingComplete: true,
+                hasCompletedOnboarding: true,
+                needsProfileCompletion: false,
+                isSubscribed: true,
+                showsDailyReminderPrompt: false,
+                isSuppressedForUITests: false,
+                finishedOnboardingThisLaunch: finishedOnboardingThisLaunch
+            ).isEligibleForWhatsNew
+        }
+
+        XCTAssertTrue(eligible(finishedOnboardingThisLaunch: false))
+        XCTAssertFalse(eligible(finishedOnboardingThisLaunch: true))
+    }
+
     func testReleaseReviewSeenAndReviewedStatesRemainDistinct() throws {
         let item = try XCTUnwrap(ReleaseReviewCatalog.items(version: "2.4", build: "2407").first)
         var state = ReleaseReviewState()

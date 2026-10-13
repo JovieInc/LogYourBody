@@ -281,6 +281,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             result.analyzeTime = analyzeTime
             result.vatMassKg = 1.23
             result.vatVolumeCm3 = 456.0
+            result.scanWeight = 79.2
+            result.scanWeightUnit = "kg"
+            result.bodyFatPercentage = 18.4
+            result.muscleMass = 62.0
+            result.boneMass = 3.2
             result.resultPdfUrl = "https://example.com/result.pdf"
             result.resultPdfName = "result.pdf"
             result.createdAt = createdAt
@@ -315,6 +320,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertEqual(payload["external_source"] as? String, "BodySpec")
         XCTAssertEqual(payload["result_pdf_url"] as? String, "https://example.com/result.pdf")
         XCTAssertEqual(payload["result_pdf_name"] as? String, "result.pdf")
+        XCTAssertEqual(payload["scan_weight"] as? Double, 79.2)
+        XCTAssertEqual(payload["scan_weight_unit"] as? String, "kg")
+        XCTAssertEqual(payload["body_fat_percentage"] as? Double, 18.4)
+        XCTAssertEqual(payload["muscle_mass"] as? Double, 62.0)
+        XCTAssertEqual(payload["bone_mass"] as? Double, 3.2)
 
         if let vatMass = payload["vat_mass_kg"] as? Double {
             XCTAssertEqual(vatMass, 1.23, accuracy: 0.001)
@@ -339,6 +349,129 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         let unsyncedDexa = await coreData.fetchUnsyncedDexaResults()
         let unsyncedForUser = unsyncedDexa.filter { $0.userId == userId }
         XCTAssertTrue(unsyncedForUser.isEmpty)
+    }
+
+    func testDexaUploadPreservesTypedAndFuturePayloadsWithoutChangingLegacyScalars() async throws {
+        let coreData = CoreDataManager.shared
+        let userId = "typed-upload-owner"
+        let inputs = [ReportedMeasurementsTestFixture.knownJSON, ReportedMeasurementsTestFixture.futureJSON]
+        for (index, json) in inputs.enumerated() {
+            let envelope = try XCTUnwrap(ReportedMeasurements(jsonString: json))
+            let result = ReportedMeasurementsTestFixture.result(
+                id: "typed-upload-\(index)", userId: userId, measurements: envelope
+            )
+            try await coreData.saveDexaResultsAndWait([result], userId: userId)
+        }
+        let stub = StubProductAPIClient()
+        let sync = RealtimeSyncManager(
+            coreDataManager: coreData, authManager: AuthManager.shared, productAPIClient: stub
+        )
+        let snapshot = try await coreData.fetchPendingLocalSyncSnapshot(for: userId)
+        try await sync.syncDexaResultsBatch(snapshot.dexaResults, token: "test-token")
+        XCTAssertEqual(stub.dexaPayloads.count, 2)
+        for (index, json) in inputs.enumerated() {
+            let payload = try XCTUnwrap(stub.dexaPayloads.first { $0["id"] as? String == "typed-upload-\(index)" })
+            let actual = try XCTUnwrap(payload["reported_measurements"] as? [String: Any])
+            let expected = try XCTUnwrap(ReportedMeasurements(jsonString: json))
+            XCTAssertEqual(actual as NSDictionary, expected.jsonObject as NSDictionary)
+            XCTAssertEqual(payload["muscle_mass"] as? Double, 12.5)
+            XCTAssertEqual(payload["user_id"] as? String, userId)
+        }
+        let remaining = try await coreData.fetchPendingLocalSyncSnapshot(for: userId)
+        XCTAssertTrue(remaining.dexaResults.isEmpty)
+    }
+
+    func testDexaUploadOmitsAbsentOptionalPayloadInsteadOfSendingNull() async throws {
+        let coreData = CoreDataManager.shared
+        let userId = "legacy-upload-owner"
+        let result = ReportedMeasurementsTestFixture.result(id: "legacy-upload", userId: userId)
+        try await coreData.saveDexaResultsAndWait([result], userId: userId)
+        let stub = StubProductAPIClient()
+        let sync = RealtimeSyncManager(
+            coreDataManager: coreData, authManager: AuthManager.shared, productAPIClient: stub
+        )
+        let snapshot = try await coreData.fetchPendingLocalSyncSnapshot(for: userId)
+        try await sync.syncDexaResultsBatch(snapshot.dexaResults, token: "test-token")
+        XCTAssertEqual(stub.dexaPayloads.count, 1)
+        let payload = try XCTUnwrap(stub.dexaPayloads.first)
+        XCTAssertNil(payload["reported_measurements"])
+        XCTAssertEqual(payload["muscle_mass"] as? Double, 12.5)
+    }
+
+    func testDexaUploadKeepsCorruptStoredEnvelopePendingAndReportsFailure() async throws {
+        let coreData = CoreDataManager.shared
+        let userId = "corrupt-upload-owner"
+        let result = ReportedMeasurementsTestFixture.result(id: "malformed-upload", userId: userId)
+        try await coreData.saveDexaResultsAndWait([result], userId: userId)
+        let context = coreData.viewContext
+        try await context.perform {
+            let request = CachedDexaResult.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", "malformed-upload")
+            let row = try XCTUnwrap(context.fetch(request).first)
+            row.reportedMeasurementsJSON = "{invalid-json"
+            try context.save()
+        }
+        let stub = StubProductAPIClient()
+        let sync = RealtimeSyncManager(
+            coreDataManager: coreData, authManager: AuthManager.shared, productAPIClient: stub
+        )
+        let snapshot = try await coreData.fetchPendingLocalSyncSnapshot(for: userId)
+        do {
+            try await sync.syncDexaResultsBatch(snapshot.dexaResults, token: "test-token")
+            XCTFail("A corrupt stored envelope must not be silently acknowledged")
+        } catch let error as AppError {
+            guard case .coreData(let operation, _) = error else { return XCTFail("Expected a cache error") }
+            XCTAssertEqual(operation, "syncDexaReportedMeasurements")
+        }
+        XCTAssertTrue(stub.dexaPayloads.isEmpty)
+        let remaining = try await coreData.fetchPendingLocalSyncSnapshot(for: userId)
+        XCTAssertEqual(remaining.dexaResults.first?.reportedMeasurementsJSON, "{invalid-json")
+    }
+
+    func testDexaDelayedAcknowledgmentCannotLoseEqualTimestampLocalEdit() async throws {
+        let coreData = CoreDataManager.shared
+        let originalEnvelope = try XCTUnwrap(ReportedMeasurements(jsonString: ReportedMeasurementsTestFixture.knownJSON))
+        let nextEnvelope = try XCTUnwrap(ReportedMeasurements(jsonString: ReportedMeasurementsTestFixture.futureJSON))
+        let original = ReportedMeasurementsTestFixture.result(measurements: originalEnvelope)
+        let edited = ReportedMeasurementsTestFixture.result(id: original.id, measurements: nextEnvelope)
+        XCTAssertEqual(original.updatedAt, edited.updatedAt, "Timestamp checks alone cannot protect this edit")
+        try await coreData.saveDexaResultsAndWait([original], userId: original.userId)
+        let snapshot = try await coreData.fetchPendingLocalSyncSnapshot(for: original.userId)
+        let stub = DeferredDexaProductAPIClient {
+            try await coreData.saveDexaResultsAndWait([edited], userId: edited.userId)
+        }
+        let sync = RealtimeSyncManager(
+            coreDataManager: coreData, authManager: AuthManager.shared, productAPIClient: stub
+        )
+        try await sync.syncDexaResultsBatch(snapshot.dexaResults, token: "test-token")
+        try await coreData.saveDexaResultsAndWait([original], userId: original.userId, markAsSynced: true)
+        let remaining = try await coreData.fetchPendingLocalSyncSnapshot(for: original.userId)
+        XCTAssertEqual(remaining.dexaResults.count, 1)
+        XCTAssertEqual(remaining.dexaResults.first?.reportedMeasurementsJSON, nextEnvelope.jsonString)
+        let cached = await coreData.fetchDexaResults(for: original.userId, limit: 10)
+        XCTAssertEqual(cached.first?.reportedMeasurements, nextEnvelope)
+    }
+
+    func testDexaDelayedAcknowledgmentCannotAcknowledgeReplacementOwner() async throws {
+        let coreData = CoreDataManager.shared
+        let envelope = try XCTUnwrap(ReportedMeasurements(jsonString: ReportedMeasurementsTestFixture.knownJSON))
+        let original = ReportedMeasurementsTestFixture.result(measurements: envelope)
+        let replacement = ReportedMeasurementsTestFixture.result(
+            id: original.id, userId: "replacement-owner", measurements: envelope
+        )
+        try await coreData.saveDexaResultsAndWait([original], userId: original.userId)
+        let snapshot = try await coreData.fetchPendingLocalSyncSnapshot(for: original.userId)
+        let stub = DeferredDexaProductAPIClient {
+            try await coreData.deleteAllDataAndWait()
+            try await coreData.saveDexaResultsAndWait([replacement], userId: replacement.userId)
+        }
+        let sync = RealtimeSyncManager(
+            coreDataManager: coreData, authManager: AuthManager.shared, productAPIClient: stub
+        )
+        try await sync.syncDexaResultsBatch(snapshot.dexaResults, token: "test-token")
+        let remaining = try await coreData.fetchPendingLocalSyncSnapshot(for: replacement.userId)
+        XCTAssertEqual(remaining.dexaResults.count, 1)
+        XCTAssertEqual(remaining.dexaResults.first?.userId, replacement.userId)
     }
 
     func testCachedDexaResult_toDexaResultMapsFieldsAndNormalizesVatValues() async throws {
@@ -372,6 +505,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             withVat.analyzeTime = now.addingTimeInterval(-1_800)
             withVat.vatMassKg = 2.5
             withVat.vatVolumeCm3 = 789.0
+            withVat.scanWeight = 80.1
+            withVat.scanWeightUnit = "kg"
+            withVat.bodyFatPercentage = 18.5
+            withVat.muscleMass = 63.0
+            withVat.boneMass = 3.3
             withVat.resultPdfUrl = "https://example.com/result.pdf"
             withVat.resultPdfName = "result.pdf"
             withVat.createdAt = createdAt
@@ -413,6 +551,11 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
 
         let vatVolume = try XCTUnwrap(withVat.vatVolumeCm3)
         XCTAssertEqual(vatVolume, 789.0, accuracy: 0.001)
+        XCTAssertEqual(withVat.scanWeight, 80.1)
+        XCTAssertEqual(withVat.scanWeightUnit, "kg")
+        XCTAssertEqual(withVat.bodyFatPercentage, 18.5)
+        XCTAssertEqual(withVat.muscleMass, 63.0)
+        XCTAssertEqual(withVat.boneMass, 3.3)
 
         XCTAssertEqual(withVat.resultPdfUrl, "https://example.com/result.pdf")
         XCTAssertEqual(withVat.resultPdfName, "result.pdf")
@@ -425,5 +568,25 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertEqual(withoutVat.externalResultId, externalResultId)
         XCTAssertNil(withoutVat.vatMassKg)
         XCTAssertNil(withoutVat.vatVolumeCm3)
+    }
+}
+
+private final class DeferredDexaProductAPIClient: ProductAPIClient {
+    private let beforeResponse: () async throws -> Void
+
+    init(beforeResponse: @escaping () async throws -> Void) {
+        self.beforeResponse = beforeResponse
+        super.init()
+    }
+
+    override func upsertData(table: String, data: Data, token: String) async throws -> [[String: Any]] {
+        XCTAssertEqual(table, "dexa_results")
+        let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        // Suspend at the real port boundary while a newer local row is persisted.
+        try await beforeResponse()
+        return sent.compactMap { row in
+            guard let id = row["id"] as? String else { return nil }
+            return ["id": id]
+        }
     }
 }

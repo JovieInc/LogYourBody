@@ -536,7 +536,7 @@ pnpm --filter apps/web build
 ### Test Coverage Requirements
 
 - iOS: Minimum 70% code coverage
-- Web: Minimum 80% code coverage
+- Web: 80% code coverage is aspirational; CI runs the test suite but does not enforce this threshold
 - All new features must include tests
 
 ### Running Tests
@@ -562,7 +562,7 @@ For iOS tests, see "Working with the iOS App" section above.
 ### Current Migrations
 
 1. **iOS Code Signing**: Moving to Fastlane Match for certificate management
-2. **CI Performance**: Migrating to macOS-14 runners for better performance
+2. **CI Performance**: CI jobs use macOS-15 runners; certificate regeneration remains on macOS-14 pending LYB-65
 3. **Design System**: Updating to iOS 26 Liquid Glass design patterns
 
 ---
@@ -654,10 +654,14 @@ All external services (feature flags, analytics, email/notifications, payments, 
 
 ### Secrets Management
 
-- Never commit secrets or API keys
-- Use `.xcconfig` files for iOS configuration (not in git)
-- Use environment variables for web configuration
-- All secrets are stored in GitHub Secrets for CI/CD
+Doppler remains the secrets manager. Operating rules are in [docs/engineering/secrets-policy.md](docs/engineering/secrets-policy.md) ([LYB-95](https://linear.app/jovie/issue/LYB-95)).
+
+- Never commit secrets or API keys, and never print secret values.
+- Use `.xcconfig` files for iOS configuration (not in git).
+- Use environment variables for web configuration.
+- Add new secrets directly to GitHub Actions and Vercel. Grok Bot performs the add after Tim supplies the value through a secure input.
+- Leave Doppler sync changes and Doppler billing to Tim.
+- Keep existing Doppler reads, including gbrain setup against `jovie-web/dev`.
 
 ### Code Security
 
@@ -752,3 +756,14 @@ pnpm --filter @jovieinc/product-registry test
 Remember: When in doubt, follow the existing patterns in the codebase. Consistency is more important than perfection.
 
 **Agents ship through gates. `main` only contains PR-merged, CI-passing, deployable code with release evidence.**
+
+<!-- BEGIN:turborepo-agent-rules -->
+
+# This is NOT the Turborepo you know
+
+Turborepo configuration, task behavior, and CLI commands can vary between installed versions and may differ from your training data. Resolve the `turbo` package from this file's directory or relevant workspace; in monorepos, it may not be visible from the repository root. For example, run `node -p "require.resolve('turbo/package.json')"` from a workspace that depends on `turbo`.
+
+Read `docs/README.md` inside that installed package first, then read the relevant pages from its `docs/` directory before changing Turborepo configuration or commands. Heed deprecation notices. These bundled docs match the installed package version and are available without network access.
+
+This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
+<!-- END:turborepo-agent-rules -->

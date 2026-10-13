@@ -152,9 +152,20 @@ extension DashboardViewLiquid {
         }
     }
 
-    func presentAddEntrySheet(initialTab: Int = 0, includesGlp1Entry: Bool = false) {
+    func presentAddEntrySheet(
+        initialTab: Int = 0,
+        includesGlp1Entry: Bool = false,
+        date: Date = Date(),
+        weight: String? = nil,
+        bodyFat: Double? = nil,
+        isHomeV2LoggingWeight: Bool = false
+    ) {
         addEntryInitialTab = initialTab
         addEntryIncludesGlp1Entry = includesGlp1Entry
+        addEntryInitialDate = date
+        addEntryInitialWeight = weight
+        addEntryInitialBodyFat = bodyFat
+        self.isHomeV2LoggingWeight = isHomeV2LoggingWeight
         showAddEntrySheet = true
     }
 

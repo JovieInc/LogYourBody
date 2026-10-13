@@ -158,7 +158,7 @@ struct PendingGlp1MedicationSyncItem {
     let updatedAt: Date
 }
 
-struct PendingDexaResultSyncItem {
+struct PendingDexaResultSyncItem: Equatable {
     let id: String
     let userId: String
     let bodyMetricsId: String?
@@ -172,6 +172,12 @@ struct PendingDexaResultSyncItem {
     let analyzeTime: Date?
     let vatMassKg: Double
     let vatVolumeCm3: Double
+    let scanWeight: Double?
+    let scanWeightUnit: String?
+    let bodyFatPercentage: Double?
+    let muscleMass: Double?
+    let boneMass: Double?
+    let reportedMeasurementsJSON: String?
     let resultPdfUrl: String?
     let resultPdfName: String?
     let createdAt: Date
@@ -179,6 +185,7 @@ struct PendingDexaResultSyncItem {
 }
 
 class CoreDataManager: ObservableObject {
+    typealias WriteAdmission = @MainActor () throws -> Void
     typealias PersistentStoreLoader = (
         NSPersistentContainer,
         @escaping (NSPersistentStoreDescription, Error?) -> Void
@@ -308,6 +315,10 @@ class CoreDataManager: ObservableObject {
     // Save context helper
 
     // Clean up body metrics with invalid UUIDs
+
+    /// `updatedAt` for each id in the latest pending sync snapshot.
+    /// Acknowledgement accepts only a row that still has that version.
+    var syncAcknowledgementVersions: [String: [String: Date]] = [:]
 }
 
 extension CachedGlp1Medication {
@@ -379,6 +390,12 @@ extension CachedDexaResult {
             analyzeTime: analyzeTime,
             vatMassKg: vatMassKg,
             vatVolumeCm3: vatVolumeCm3,
+            scanWeight: scanWeight > 0 ? scanWeight : nil,
+            scanWeightUnit: scanWeightUnit,
+            bodyFatPercentage: bodyFatPercentage > 0 ? bodyFatPercentage : nil,
+            muscleMass: muscleMass > 0 ? muscleMass : nil,
+            boneMass: boneMass > 0 ? boneMass : nil,
+            reportedMeasurementsJSON: reportedMeasurementsJSON,
             resultPdfUrl: resultPdfUrl,
             resultPdfName: resultPdfName,
             createdAt: createdAt ?? Date(),
@@ -424,6 +441,12 @@ extension CachedDexaResult {
             analyzeTime: analyzeTime,
             vatMassKg: resolvedVatMass,
             vatVolumeCm3: resolvedVatVolume,
+            scanWeight: scanWeight > 0 ? scanWeight : nil,
+            scanWeightUnit: scanWeightUnit,
+            bodyFatPercentage: bodyFatPercentage > 0 ? bodyFatPercentage : nil,
+            muscleMass: muscleMass > 0 ? muscleMass : nil,
+            boneMass: boneMass > 0 ? boneMass : nil,
+            reportedMeasurements: ReportedMeasurements(jsonString: reportedMeasurementsJSON),
             resultPdfUrl: resultPdfUrl,
             resultPdfName: resultPdfName,
             createdAt: createdAt,

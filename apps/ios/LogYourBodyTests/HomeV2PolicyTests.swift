@@ -22,10 +22,26 @@ final class HomeV2PolicyTests: XCTestCase {
         XCTAssertTrue(
             HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { key in
                 askedKey = key
-                return true
+                return key == HomeV2Policy.gateKey
             })
         )
         XCTAssertEqual(askedKey, "home_v2_photo_first")
+    }
+
+    func testKillSwitchOverridesTheEnableGate() {
+        XCTAssertFalse(
+            HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { _ in true })
+        )
+    }
+
+    func testDogfoodPrincipalIsExposedWithoutTheGate() {
+        XCTAssertTrue(
+            HomeV2Policy.isEnabled(
+                arguments: [],
+                actor: .dogfoodAgent,
+                isGateEnabled: { _ in false }
+            )
+        )
     }
 
     #if DEBUG
@@ -47,6 +63,65 @@ final class HomeV2PolicyTests: XCTestCase {
         XCTAssertEqual(HomeV2Copy.changeSentence(delta: 0.4, unit: "kg"), "Up 0.4 kg in 30 days")
         XCTAssertEqual(HomeV2Copy.changeSentence(delta: 0.02, unit: "lb"), "No change in 30 days")
         XCTAssertEqual(HomeV2Copy.changeSentence(delta: nil, unit: "lb"), "No 30-day trend yet")
+    }
+
+    func testCompositionHeadlineShowsDirectComparableBodyFatTrend() {
+        let calendar = Calendar.current
+        let now = calendar.startOfDay(for: Date())
+        let older = calendar.date(byAdding: .day, value: -20, to: now) ?? now
+        let otherMethod = calendar.date(byAdding: .day, value: -10, to: now) ?? now
+        let latest = calendar.date(byAdding: .day, value: -4, to: now) ?? now
+
+        let headline = HomeV2CompositionPolicy.headline(
+            metrics: [
+                compositionMetric(date: older, bodyFat: 24.1, method: "dexa"),
+                compositionMetric(date: otherMethod, bodyFat: 28.0, method: "manual"),
+                compositionMetric(date: latest, bodyFat: 21.2, method: "DEXA (BodySpec)")
+            ],
+            now: now,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(headline, "DEXA body fat 21.2% · Down 2.9 pts in 16 days")
+    }
+
+    func testCompositionHeadlineLabelsEstimatesAndDoesNotInventATrend() {
+        let now = Date()
+        let estimate = compositionMetric(date: now, bodyFat: 25.4, method: "visual_estimate")
+        XCTAssertEqual(
+            HomeV2CompositionPolicy.headline(metrics: [estimate], now: now),
+            "Estimated body fat 25.4% · trend starts with another check-in"
+        )
+
+        let stale = compositionMetric(
+            date: now.addingTimeInterval(-40 * 86_400),
+            bodyFat: 24.0,
+            method: "dexa"
+        )
+        XCTAssertEqual(
+            HomeV2CompositionPolicy.headline(metrics: [stale], now: now),
+            HomeV2Copy.compositionTrackingPrompt
+        )
+    }
+
+    private func compositionMetric(date: Date, bodyFat: Double, method: String) -> BodyMetrics {
+        BodyMetrics(
+            id: UUID().uuidString,
+            userId: "home-composition-test",
+            date: date,
+            localDate: BodyMetricLocalDate.key(for: date),
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: bodyFat,
+            bodyFatMethod: method,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "manual",
+            createdAt: date,
+            updatedAt: date
+        )
     }
 
     func testSinceSentenceAndPhotoPositionReadAsSentences() {
@@ -77,6 +152,67 @@ final class HomeV2PolicyTests: XCTestCase {
 
         let cropped = AspectFillCropper.crop(UIImage(), to: CGSize(width: 40, height: 50))
         XCTAssertEqual(cropped.size, CGSize(width: 40, height: 50))
+    }
+
+    func testAnchoredCropPutsTheTorsoOnTheStageAnchor() {
+        let stage = CGSize(width: 390, height: 487.5)
+        let torso = CGPoint(x: 0.5, y: 0.62)
+
+        let rect = AspectFillCropper.fillRect(
+            imageSize: CGSize(width: 400, height: 800),
+            in: stage,
+            anchor: torso,
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
+
+        XCTAssertGreaterThanOrEqual(rect.width, stage.width - 0.01)
+        XCTAssertGreaterThanOrEqual(rect.height, stage.height - 0.01)
+        XCTAssertLessThanOrEqual(rect.minX, 0)
+        XCTAssertLessThanOrEqual(rect.minY, 0)
+
+        let torsoY = rect.minY + torso.y * rect.height
+        XCTAssertEqual(torsoY, TorsoFocusService.stageAnchor.y * stage.height, accuracy: 0.5)
+
+        let centered = AspectFillCropper.fillRect(imageSize: CGSize(width: 400, height: 800), in: stage)
+        XCTAssertNotEqual(rect.minY, centered.minY, accuracy: 1, "the torso anchor must move the crop off center")
+    }
+
+    func testAnchoredCropClampsAtTheFrameEdges() {
+        let stage = CGSize(width: 390, height: 487.5)
+
+        let top = AspectFillCropper.fillRect(
+            imageSize: CGSize(width: 400, height: 800),
+            in: stage,
+            anchor: CGPoint(x: 0.5, y: 0.02),
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
+        XCTAssertEqual(top.minY, 0, accuracy: 0.01)
+
+        let bottom = AspectFillCropper.fillRect(
+            imageSize: CGSize(width: 400, height: 800),
+            in: stage,
+            anchor: CGPoint(x: 0.5, y: 0.98),
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
+        XCTAssertEqual(bottom.maxY, stage.height, accuracy: 0.01)
+    }
+
+    func testAnchoredCropWithoutAnAnchorIsTheCenteredFill() {
+        let stage = CGSize(width: 390, height: 487.5)
+        let plain = AspectFillCropper.fillRect(imageSize: CGSize(width: 400, height: 800), in: stage)
+        let anchored = AspectFillCropper.fillRect(
+            imageSize: CGSize(width: 400, height: 800),
+            in: stage,
+            anchor: nil,
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
+        XCTAssertEqual(anchored, plain)
+    }
+
+    func testTorsoFocusFallsBackWhenNoBodyIsDetected() async throws {
+        let cgImage = try XCTUnwrap(SyntheticImage.solidCGImage(width: 64, height: 80, red: 30, green: 30, blue: 30))
+        let anchor = await TorsoFocusService.torsoCenter(in: UIImage(cgImage: cgImage))
+        XCTAssertNil(anchor, "a solid frame has no body pose; surfaces keep the centered crop")
     }
 
     func testStageKeepsFourByFiveWhenItFitsAndGivesUpHeightOnShortScreens() {

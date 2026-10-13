@@ -176,6 +176,43 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         XCTAssertNil(context.trendWeight(for: date(daysAfterStart: 15)))
     }
 
+    func testTrendWeightUsesFinalKnownTrendForFarFutureDates() throws {
+        let context = try makeWeightContext([
+            (dayOffset: 0, weight: 100),
+            (dayOffset: 1, weight: 104)
+        ])
+
+        let result = try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 365 * 10)))
+
+        // The EMA converges toward the final known weight without scanning
+        // every day in the ten-year tail.
+        XCTAssertEqual(result.value, 104, accuracy: 0.001)
+        XCTAssertTrue(result.isLastKnown)
+    }
+
+    func testTrendWeightFarFutureOptimizationPreservesMixedQueryOrder() throws {
+        let context = try makeWeightContext([
+            (dayOffset: 0, weight: 100),
+            (dayOffset: 1, weight: 104)
+        ])
+
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 365 * 10))).value, 104, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 1))).value, 101, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 2))).value, 101.8, accuracy: 0.001)
+    }
+
+    func testTrendWeightFarFutureTailUsesRoundedFinalKnownWeight() throws {
+        let context = try makeWeightContext([
+            (dayOffset: 0, weight: 100),
+            (dayOffset: 1, weight: 104.04)
+        ])
+
+        let result = try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 4)))
+
+        XCTAssertEqual(result.value, 102.7, accuracy: 0.001)
+        XCTAssertTrue(result.isLastKnown)
+    }
+
     private func makeWeightContext(
         _ points: [(dayOffset: Int, weight: Double)]
     ) throws -> MetricsInterpolationService.WeightInterpolationContext {

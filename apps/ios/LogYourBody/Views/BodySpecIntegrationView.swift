@@ -1,39 +1,49 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct BodySpecIntegrationView: View {
     @EnvironmentObject var authManager: AuthManager
 
     @State private var isConfigured = false
-    @State private var isConnected = false
-    @State private var connectedEmail: String?
-    @State private var isConnecting = false
-    @State private var isSyncing = false
-    @State private var lastSyncSummary: String?
-    @State private var errorMessage: String?
-    @State private var recoveryAction: RecoveryAction?
-    @State private var isLoadingScans = false
-    @State private var recentScans: [DexaResult] = []
-    @State private var recentScansError: String?
-
-    private enum RecoveryAction {
-        case connect
-    }
+    @State private var sessionState = BodySpecIntegrationState()
+    @State private var isSelectingPDF = false
+    @State private var selectedPDF: DexaPDFFileSelection?
 
     var body: some View {
-        SettingsDetailScreen(title: "BodySpec") {
+        SettingsDetailScreen(title: "DEXA and InBody") {
             introductionSection
+            pdfImportSection
             connectionSection
             syncSection
             recentScansSection
 
-            if let errorMessage {
+            if let errorMessage = sessionState.errorMessage {
                 errorRecoverySection(message: errorMessage)
             }
         }
-        .onAppear {
-            Task { @MainActor in
-                await handleOnAppear()
+        .task(id: authManager.captureAccountSession()) { @MainActor in
+            sessionState.reset(for: authManager.captureAccountSession())
+            selectedPDF = nil
+            isSelectingPDF = false
+            await handleOnAppear()
+        }
+        .fileImporter(
+            isPresented: $isSelectingPDF,
+            allowedContentTypes: [.pdf],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    selectedPDF = DexaPDFFileSelection(url: url)
+                }
+            case .failure:
+                sessionState.errorMessage = "Choose a readable DEXA or InBody PDF and try again."
             }
+        }
+        .sheet(item: $selectedPDF, onDismiss: reloadRecentScans) { selection in
+            DexaPDFImportSheet(fileURL: selection.url)
+                .environmentObject(authManager)
         }
     }
 
@@ -42,18 +52,61 @@ struct BodySpecIntegrationView: View {
             DataInfoRow(
                 icon: "waveform.path.ecg",
                 title: "DEXA scan import",
-                description: "Connect BodySpec to bring your DEXA scan history into LogYourBody.",
+                description: "Import DEXA or InBody reports and keep your dated scan history together.",
                 iconColor: .accentColor
             )
         }
     }
 
+    #if DEBUG
+    private static let fixturePDF = """
+    %PDF-1.1
+    1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+    2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+    3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj
+    trailer<</Root 1 0 R>>
+    %%EOF
+    """
+
+    private static func fixturePDFURL() -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lyb-ui-dexa-fixture.pdf")
+        if !FileManager.default.fileExists(atPath: url.path) {
+            let bytes = Data(Self.fixturePDF.utf8)
+            try? bytes.write(to: url, options: .atomic)
+        }
+        return url
+    }
+    #endif
+
+    private var pdfImportSection: some View {
+        SettingsSection(
+            header: "Import from PDF",
+            footer: "Choose a report from Files or use the iOS share sheet to open a PDF in LogYourBody."
+        ) {
+            Button {
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-lybUITestDexaPDFSheetFixture") {
+                    selectedPDF = DexaPDFFileSelection(url: Self.fixturePDFURL())
+                } else {
+                    isSelectingPDF = true
+                }
+                #else
+                isSelectingPDF = true
+                #endif
+            } label: {
+                Label("Import DEXA or InBody PDF", systemImage: "doc.badge.plus")
+            }
+            .accessibilityIdentifier("body_spec_pdf_import")
+            .accessibilityHint("Choose a scan report PDF to add its dated measurements to your timeline.")
+        }
+    }
+
     private var connectionSection: some View {
         SettingsSection(
-            header: "Connection",
+            header: "Optional BodySpec sync",
             footer: isConfigured
                 ? "You can disconnect at any time."
-                : "BodySpec is not available in this version of the app."
+                : "Direct BodySpec account sync is not configured in this build. PDF import is available above."
         ) {
             SettingsRow(
                 icon: connectionIcon,
@@ -67,18 +120,18 @@ struct BodySpecIntegrationView: View {
                     connectTapped()
                 } label: {
                     Label(
-                        isConnected ? "Reconnect BodySpec" : "Connect BodySpec",
+                        sessionState.isConnected ? "Reconnect BodySpec" : "Connect BodySpec",
                         systemImage: "link"
                     )
                 }
-                .disabled(isConnecting)
+                .disabled(sessionState.isConnecting)
                 .accessibilityHint("Connects your BodySpec account.")
 
-                if isConnected {
+                if sessionState.isConnected {
                     Button("Disconnect BodySpec", role: .destructive) {
                         disconnectTapped()
                     }
-                    .disabled(isConnecting)
+                    .disabled(sessionState.isConnecting)
                     .accessibilityHint("Disconnects your BodySpec account from LogYourBody.")
                 }
             }
@@ -90,17 +143,17 @@ struct BodySpecIntegrationView: View {
             header: "DEXA sync",
             footer: "New scans are added to your body metrics."
         ) {
-            if isConfigured, isConnected {
+            if isConfigured, sessionState.isConnected {
                 Button {
                     syncTapped()
                 } label: {
-                    if isSyncing {
+                    if sessionState.isSyncing {
                         Label("Syncing…", systemImage: "arrow.triangle.2.circlepath")
                     } else {
                         Label("Sync DEXA scans", systemImage: "arrow.triangle.2.circlepath")
                     }
                 }
-                .disabled(isSyncing)
+                .disabled(sessionState.isSyncing)
                 .accessibilityHint("Checks BodySpec for new DEXA scans now.")
             } else {
                 SettingsRow(
@@ -111,12 +164,12 @@ struct BodySpecIntegrationView: View {
                 )
             }
 
-            if let lastSyncSummary {
+            if let lastSyncSummary = sessionState.lastSyncSummary {
                 DataInfoRow(
-                    icon: "checkmark.circle",
-                    title: "Sync complete",
+                    icon: sessionState.lastSyncFailed ? "exclamationmark.triangle" : "checkmark.circle",
+                    title: sessionState.lastSyncFailed ? "Sync incomplete" : "Sync complete",
                     description: lastSyncSummary,
-                    iconColor: Color.appSuccess
+                    iconColor: sessionState.lastSyncFailed ? Color.appWarning : Color.appSuccess
                 )
             }
         }
@@ -125,16 +178,16 @@ struct BodySpecIntegrationView: View {
     private var recentScansSection: some View {
         SettingsSection(
             header: "Recent scans",
-            footer: "Your five most recent BodySpec DEXA scans appear here."
+            footer: "Your five most recent DEXA and InBody scans appear here."
         ) {
-            if isLoadingScans {
+            if sessionState.isLoadingScans {
                 DataInfoRow(
                     icon: "arrow.triangle.2.circlepath",
                     title: "Loading scans",
                     description: "Checking your BodySpec history…",
                     iconColor: .secondary
                 )
-            } else if let recentScansError {
+            } else if let recentScansError = sessionState.recentScansError {
                 DataInfoRow(
                     icon: "exclamationmark.triangle",
                     title: "Couldn’t load scans",
@@ -147,21 +200,21 @@ struct BodySpecIntegrationView: View {
                 } label: {
                     Label("Try again", systemImage: "arrow.clockwise")
                 }
-            } else if recentScans.isEmpty {
+            } else if sessionState.recentScans.isEmpty {
                 DataInfoRow(
                     icon: "doc.text.magnifyingglass",
                     title: "No DEXA scans yet",
-                    description: isConnected
-                        ? "New scans from BodySpec will appear here after syncing."
-                        : "Connect BodySpec to see your DEXA scan history.",
+                    description: sessionState.isConnected
+                        ? "New scans appear here after syncing or importing a PDF."
+                        : "Import a DEXA or InBody PDF to start your scan history.",
                     iconColor: .secondary
                 )
             } else {
-                ForEach(recentScans.prefix(5)) { scan in
+                ForEach(sessionState.recentScans.prefix(5)) { scan in
                     SettingsRow(
                         icon: "calendar",
                         title: formattedDate(scan.acquireTime),
-                        subtitle: scan.locationName?.isEmpty == false ? scan.locationName : "BodySpec DEXA scan"
+                        subtitle: scanSummary(scan)
                     )
                 }
             }
@@ -177,7 +230,7 @@ struct BodySpecIntegrationView: View {
                 iconColor: Color.appError
             )
 
-            if recoveryAction != nil {
+            if sessionState.recoveryAction != nil {
                 Button {
                     retryLastAction()
                 } label: {
@@ -188,32 +241,33 @@ struct BodySpecIntegrationView: View {
     }
 
     private var connectionIcon: String {
-        if !isConfigured { return "exclamationmark.triangle" }
-        return isConnected ? "checkmark.circle.fill" : "link"
+        if !isConfigured || sessionState.recoveryAction == .disconnect { return "exclamationmark.triangle" }
+        return sessionState.isConnected ? "checkmark.circle.fill" : "link"
     }
 
     private var connectionTint: Color {
-        if !isConfigured { return Color.appWarning }
-        return isConnected ? Color.appSuccess : .secondary
+        if !isConfigured || sessionState.recoveryAction == .disconnect { return Color.appWarning }
+        return sessionState.isConnected ? Color.appSuccess : .secondary
     }
 
     private var connectionTitle: String {
-        if !isConfigured { return "BodySpec isn’t available" }
-        return isConnected ? "Connected" : "Not connected"
+        if !isConfigured { return "Direct sync isn’t configured" }
+        if sessionState.recoveryAction == .disconnect { return "Disconnect incomplete" }
+        return sessionState.isConnected ? "Connected" : "Not connected"
     }
 
     private var connectionDescription: String {
         if !isConfigured {
-            return "This build can’t connect to BodySpec."
+            return "PDF import works without a BodySpec account connection."
         }
-        return connectedEmail ?? (isConnected
+        return sessionState.connectedEmail ?? (sessionState.isConnected
             ? "Your BodySpec account is ready to sync."
-            : "Connect your account to import DEXA scans.")
+            : "Connect your account to sync DEXA scans automatically.")
     }
 
     private var syncUnavailableDescription: String {
         if !isConfigured {
-            return "BodySpec isn’t available in this build."
+            return "Import a DEXA or InBody PDF instead."
         }
         return "Connect BodySpec before syncing your scans."
     }
@@ -227,39 +281,45 @@ struct BodySpecIntegrationView: View {
     private func refreshConnectionState() {
         let manager = BodySpecAuthManager.shared
         isConfigured = manager.isConfigured
-        isConnected = manager.isConnected
-        connectedEmail = manager.connectedEmail
+        sessionState.isConnected = manager.isConnected
+        sessionState.connectedEmail = manager.connectedEmail
     }
 
     @MainActor
     private func loadRecentScansIfNeeded() async {
-        guard isConfigured,
-              isConnected,
-              let userId = authManager.currentUser?.id else {
-            recentScans = []
-            recentScansError = nil
+        guard let ownership = authManager.captureAccountSession() else {
+            sessionState.recentScans = []
+            sessionState.recentScansError = nil
             return
         }
 
-        isLoadingScans = true
-        recentScansError = nil
+        let userId = ownership.subject
+        let operationID = sessionState.operationID
+        sessionState.isLoadingScans = true
+        sessionState.recentScansError = nil
 
         let cached = await CoreDataManager.shared.fetchDexaResults(for: userId, limit: 10)
+        guard sessionState.owns(operationID, account: ownership),
+                      authManager.ownsAccountSession(ownership) else { return }
         if !cached.isEmpty {
-            recentScans = cached
+            sessionState.recentScans = cached
         }
 
         do {
             let scans = try await AppServicePorts.dexaResultRemoteDataProvider.fetchDexaResults(userId: userId, limit: 10)
-            recentScans = scans
+            guard sessionState.owns(operationID, account: ownership),
+                      authManager.ownsAccountSession(ownership) else { return }
+            sessionState.recentScans = scans
             CoreDataManager.shared.saveDexaResults(scans, userId: userId)
         } catch {
-            if recentScans.isEmpty {
-                recentScansError = "Check your connection and try again."
+            guard sessionState.owns(operationID, account: ownership),
+                      authManager.ownsAccountSession(ownership) else { return }
+            if sessionState.recentScans.isEmpty {
+                sessionState.recentScansError = "Check your connection and try again."
             }
         }
 
-        isLoadingScans = false
+        sessionState.isLoadingScans = false
     }
 
     private func reloadRecentScans() {
@@ -269,78 +329,85 @@ struct BodySpecIntegrationView: View {
     }
 
     private func connectTapped() {
-        errorMessage = nil
-        recoveryAction = nil
-        isConnecting = true
+        guard let ownership = authManager.captureAccountSession() else { return }
+        let operationID = sessionState.replaceConnectionOperation()
+        sessionState.errorMessage = nil
+        sessionState.recoveryAction = nil
+        sessionState.isConnecting = true
+        sessionState.isConnected = false
+        sessionState.connectedEmail = nil
 
         Task { @MainActor in
             do {
                 try await BodySpecAuthManager.shared.connect()
+                guard sessionState.owns(operationID, account: ownership),
+                      authManager.ownsAccountSession(ownership) else { return }
                 refreshConnectionState()
                 await loadRecentScansIfNeeded()
             } catch {
-                errorMessage = "We couldn’t connect BodySpec. Check your connection and try again."
-                recoveryAction = .connect
+                guard sessionState.owns(operationID, account: ownership),
+                      authManager.ownsAccountSession(ownership) else { return }
+                refreshConnectionState()
+                sessionState.errorMessage = "We couldn’t connect BodySpec. Check your connection and try again."
+                sessionState.recoveryAction = .connect
             }
-
-            isConnecting = false
+            guard sessionState.operationID == operationID else { return }
+            sessionState.isConnecting = false
         }
     }
 
     private func disconnectTapped() {
-        errorMessage = nil
-        recoveryAction = nil
-
-        Task { @MainActor in
-            BodySpecAuthManager.shared.disconnect()
-            refreshConnectionState()
-            await loadRecentScansIfNeeded()
+        _ = sessionState.replaceConnectionOperation()
+        sessionState.errorMessage = nil
+        sessionState.recoveryAction = nil
+        do {
+            try BodySpecAuthManager.shared.disconnect()
+        } catch {
+            sessionState.disconnectFailed()
         }
+        refreshConnectionState()
     }
 
     private func syncTapped() {
         guard isConfigured else {
-            errorMessage = "BodySpec isn’t available in this build."
-            recoveryAction = nil
+            sessionState.errorMessage = "BodySpec isn’t available in this build."
+            sessionState.recoveryAction = nil
             return
         }
 
-        guard isConnected else {
-            errorMessage = "Connect BodySpec before syncing your scans."
-            recoveryAction = .connect
+        guard sessionState.isConnected else {
+            sessionState.errorMessage = "Connect BodySpec before syncing your scans."
+            sessionState.recoveryAction = .connect
             return
         }
 
-        errorMessage = nil
-        recoveryAction = nil
-        lastSyncSummary = nil
-        isSyncing = true
+        guard let ownership = authManager.captureAccountSession() else { return }
+        let operationID = sessionState.operationID
+        sessionState.errorMessage = nil
+        sessionState.recoveryAction = nil
+        sessionState.lastSyncSummary = nil
+        sessionState.isSyncing = true
 
         Task { @MainActor in
             let result = await BodySpecDexaImporter.shared.importDexaResults()
-            isSyncing = false
-            lastSyncSummary = syncSummary(for: result)
+            guard sessionState.owns(operationID, account: ownership),
+                      authManager.ownsAccountSession(ownership) else { return }
+            sessionState.isSyncing = false
+            sessionState.lastSyncSummary = result.summary
+            sessionState.lastSyncFailed = result.failedCount > 0 || result.wasCancelled
             await loadRecentScansIfNeeded()
         }
     }
 
     private func retryLastAction() {
-        switch recoveryAction {
+        switch sessionState.recoveryAction {
         case .connect:
             connectTapped()
+        case .disconnect:
+            disconnectTapped()
         case nil:
             break
         }
-    }
-
-    private func syncSummary(for result: BodySpecDexaImporter.ImportResult) -> String {
-        if result.importedCount == 0, result.skippedCount == 0 {
-            return "No new DEXA scans found."
-        }
-
-        let importedUnit = result.importedCount == 1 ? "scan" : "scans"
-        let skippedUnit = result.skippedCount == 1 ? "scan" : "scans"
-        return "Imported \(result.importedCount) new \(importedUnit) and skipped \(result.skippedCount) \(skippedUnit)."
     }
 
     private func formattedDate(_ date: Date?) -> String {
@@ -352,6 +419,14 @@ struct BodySpecIntegrationView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+
+    private func scanSummary(_ scan: DexaResult) -> String {
+        var details = [scan.externalSource.replacingOccurrences(of: "_", with: " ").capitalized]
+        if let bodyFat = scan.bodyFatPercentage {
+            details.append("\(bodyFat.formatted(.number.precision(.fractionLength(0...1))))% body fat")
+        }
+        return details.joined(separator: " · ")
     }
 }
 

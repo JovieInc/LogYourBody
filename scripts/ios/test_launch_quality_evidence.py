@@ -55,6 +55,62 @@ class EvidenceTests(unittest.TestCase):
     def captures(self):
         return evidence.validate_captures(self.manifest, self.root, 100)
 
+    def test_native_function_coverage_rejects_missing_duplicate_unexecuted_partial_or_wrong_source(self):
+        required = {'SettingsComponents.swift': ['SettingsRow.leadingContent.getter']}
+        function = {'name': 'SettingsRow.leadingContent.getter', 'coveredLines': 35, 'executableLines': 35}
+        source = {'name': 'SettingsComponents.swift', 'path': '/checkout/apps/ios/LogYourBody/SettingsComponents.swift',
+                  'functions': [function]}
+        payload = {'targets': [{'name': 'LogYourBody.app', 'files': [source]}]}
+        self.assertEqual(evidence.validate_function_coverage(payload, required)[0]['coveredLines'], 35)
+        variants = []
+        for executed, total in [(0, 35), (34, 35), (0, 0), (None, 35), (35, None)]:
+            item = copy.deepcopy(payload)
+            item['targets'][0]['files'][0]['functions'][0].update(coveredLines=executed, executableLines=total)
+            variants.append(item)
+        missing = copy.deepcopy(payload)
+        missing['targets'][0]['files'][0]['functions'] = []
+        variants.append(missing)
+        duplicate = copy.deepcopy(payload)
+        duplicate['targets'][0]['files'][0]['functions'].append(copy.deepcopy(function))
+        variants.append(duplicate)
+        shadow = copy.deepcopy(payload)
+        shadow['targets'][0]['files'][0]['path'] = '/tests/SettingsComponents.swift'
+        variants.append(shadow)
+        wrong_target = copy.deepcopy(payload)
+        wrong_target['targets'][0]['name'] = 'LogYourBodyTests.xctest'
+        variants.append(wrong_target)
+        for item in variants:
+            with self.subTest(item=item), self.assertRaises(ValueError):
+                evidence.validate_function_coverage(item, required)
+
+    def test_chaos_accounting_coverage_rejects_wrong_target_source_and_partial_execution(self):
+        required = {'ChaosMonkeyUITests.swift': ['ChaosStepAccounting.record(_:)']}
+        function = {'name': 'ChaosStepAccounting.record(_:)', 'coveredLines': 7, 'executableLines': 7}
+        source = {'name': 'ChaosMonkeyUITests.swift',
+                  'path': '/checkout/apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift',
+                  'functions': [function]}
+        payload = {'targets': [{'name': 'LogYourBodyUITests.xctest', 'files': [source]}]}
+        def validate(item):
+            return evidence.validate_function_coverage(item, required,
+                target_name='LogYourBodyUITests.xctest', source_root='LogYourBodyUITests')
+        self.assertEqual(validate(payload)[0]['coveredLines'], 7)
+        for mutation in ('partial', 'empty', 'wrong_target', 'wrong_source', 'duplicate'):
+            item = copy.deepcopy(payload)
+            target = item['targets'][0]
+            file = target['files'][0]
+            if mutation == 'partial':
+                file['functions'][0]['coveredLines'] = 6
+            elif mutation == 'empty':
+                file['functions'][0].update(coveredLines=0, executableLines=0)
+            elif mutation == 'wrong_target':
+                target['name'] = 'LogYourBody.app'
+            elif mutation == 'wrong_source':
+                file['path'] = '/checkout/apps/ios/LogYourBody/ChaosMonkeyUITests.swift'
+            else:
+                file['functions'].append(copy.deepcopy(function))
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                validate(item)
+
     def test_passed_expected_case_and_all_seven_capture_hashes(self):
         self.assertEqual(self.validate()[0]['result'], 'Passed')
         captures = self.captures()
@@ -262,6 +318,31 @@ run_with_timeout() {
         self.assertTrue(result_bundle.is_dir())
         self.assertEqual(log.read_text().count('Running fixture (attempt '), 2)
         self.assertIn('first attempt evidence', (result_bundle.with_name('retry.attempt-1.xcresult') / 'receipt').read_text())
+
+    def test_shell_does_not_retry_xcodebuild_command_timeout(self):
+        source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
+        functions = source[source.index('is_simulator_infra_failure() {'):source.index('assert_xcresult_evidence() {')]
+        result_bundle = self.root / 'timeout.xcresult'
+        log = self.root / 'timeout.log'
+        command = r"""
+set -euo pipefail
+COMMON_XCODEBUILD_ARGS=(fixture)
+XCODEBUILD_SETTINGS_ARRAY=(fixture)
+XCODEBUILD_COMMAND_TIMEOUT_SECONDS=10
+cleanup_booted_simulator_apps() { :; }
+sleep() { :; }
+run_with_timeout() {
+  mkdir -p "$RESULT_BUNDLE"
+  echo 'xcodebuild command timed out after 720s'
+  return 124
+}
+""" + functions + '\nrun_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"\n'
+        result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
+                                env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
+        self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
+        self.assertNotIn('Retrying fixture', log.read_text())
 
 
 if __name__ == '__main__':

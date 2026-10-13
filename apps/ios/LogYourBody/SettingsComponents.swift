@@ -28,6 +28,7 @@ enum SettingsSurfacePolicy {
         "settings_tracking_link",
         "settings_integrations_link",
         "settings_account_subscription_link",
+        "settings_security_link",
         "settings_privacy_data_link",
         WorldClassScreen.settings.accessibilityIdentifier
     ]
@@ -52,6 +53,8 @@ enum SettingsSurfacePolicy {
         "settings_subscription_status_row",
         "settings_manage_subscription_button",
         "settings_restore_purchases_button",
+        "home_v2_settings_face_id",
+        "home_v2_settings_export",
         "settings_goal_editor_sheet",
         "settings_goal_editor_text_field"
     ] + profileEditorAccessibilityIdentifiers
@@ -109,6 +112,9 @@ struct SettingsSection<Content: View>: View {
 struct SettingsRow: View {
     @Environment(\.dynamicTypeSize)
     private var dynamicTypeSize
+
+    @ScaledMetric(relativeTo: .body)
+    private var iconFrame = SettingsLayout.iconFrame
 
     let icon: String?
     let title: String
@@ -184,7 +190,7 @@ struct SettingsRow: View {
     }
 
     private var valueLeadingInset: CGFloat {
-        icon == nil ? 0 : SettingsLayout.iconFrame + 12
+        icon == nil ? 0 : iconFrame + 12
     }
 
     private var leadingContent: some View {
@@ -193,7 +199,7 @@ struct SettingsRow: View {
                 Image(systemName: icon)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(resolvedTint)
-                    .frame(width: SettingsLayout.iconFrame)
+                    .frame(width: iconFrame)
                     .accessibilityHidden(true)
             }
 

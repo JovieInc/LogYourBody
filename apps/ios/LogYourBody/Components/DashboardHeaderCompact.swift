@@ -20,7 +20,12 @@ struct DashboardHeaderCompact: View {
     }
 
     private var shouldShowPersistentSyncStatus: Bool {
-        isSyncError || syncStatusTitle == "Offline"
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestSyncDetailsFixture") {
+            return true
+        }
+        #endif
+        return isSyncError || syncStatusTitle == "Offline"
     }
 
     var body: some View {
@@ -131,7 +136,7 @@ struct DashboardHeaderCompact: View {
                     case .success(let image):
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .scaledToFill()
                     case .failure, .empty:
                         Image(systemName: "person.fill")
                             .font(.system(size: 16, weight: .medium))

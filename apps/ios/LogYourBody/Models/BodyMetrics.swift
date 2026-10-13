@@ -11,6 +11,9 @@ struct BodyMetricSource: Codable, Equatable, Hashable {
     static let healthKit = BodyMetricSource(rawValue: "healthkit")
     static let smartScale = BodyMetricSource(rawValue: "smart_scale")
     static let bodySpecDexa = BodyMetricSource(rawValue: "bodyspec_dexa")
+    static let dexaPDF = BodyMetricSource(rawValue: "dexa_pdf")
+    static let inbodyPDF = BodyMetricSource(rawValue: "inbody_pdf")
+    static let pdfImport = BodyMetricSource(rawValue: "pdf_import")
     static let caliper = BodyMetricSource(rawValue: "caliper")
     static let photo = BodyMetricSource(rawValue: "photo")
 
@@ -19,6 +22,9 @@ struct BodyMetricSource: Codable, Equatable, Hashable {
         healthKit.rawValue,
         smartScale.rawValue,
         bodySpecDexa.rawValue,
+        dexaPDF.rawValue,
+        inbodyPDF.rawValue,
+        pdfImport.rawValue,
         caliper.rawValue,
         photo.rawValue
     ]
@@ -58,6 +64,18 @@ struct BodyMetricSource: Codable, Equatable, Hashable {
             "connected_scale"
         ].contains(normalized) {
             return "smart_scale"
+        }
+
+        if normalized == "inbody_pdf" || normalized.contains("inbody") {
+            return "inbody_pdf"
+        }
+
+        if normalized == "pdf_import" {
+            return "pdf_import"
+        }
+
+        if normalized == "dexa_pdf" {
+            return "dexa_pdf"
         }
 
         if [

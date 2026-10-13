@@ -3,6 +3,7 @@
 import { NextRequest } from 'next/server';
 import { createNativeBodyMetricsSyncHandlers } from '../route-handlers';
 import type {
+  NativeBodyMetricsAccountMutationsPort,
   NativeBodyMetricPushInput,
   NativeBodyMetricSyncRecord,
   NativeBodyMetricsSyncPort,
@@ -42,6 +43,12 @@ function asRecord(input: NativeBodyMetricPushInput): NativeBodyMetricSyncRecord 
 }
 
 class MemoryNativeSync implements NativeBodyMetricsSyncPort {
+  accountMutations: NativeBodyMetricsAccountMutationsPort = {
+    capture: async (subject) => ({ subject, ownerId: morningId }),
+    push: (a, records) => this.push(a.subject, records),
+    remove: (a, ids) => this.remove(a.subject, ids),
+  };
+
   pushed: Array<{ subject: string; records: NativeBodyMetricPushInput[] }> = [];
   pulled: Array<{ subject: string; since: string; after_id: string | null; limit?: number }> = [];
   removed: Array<{ subject: string; ids: string[] }> = [];
@@ -51,10 +58,7 @@ class MemoryNativeSync implements NativeBodyMetricsSyncPort {
     return { records: records.map(asRecord), rejected_ids: [] };
   }
 
-  async pull(
-    subject: string,
-    input: { since: string; after_id: string | null; limit?: number },
-  ) {
+  async pull(subject: string, input: { since: string; after_id: string | null; limit?: number }) {
     this.pulled.push({ subject, ...input });
     return {
       records: [asRecord(morningInput)],
@@ -69,7 +73,9 @@ class MemoryNativeSync implements NativeBodyMetricsSyncPort {
   }
 }
 
-function makeHarness(users: Record<string, string> = { 'access-a': 'owner-a', 'access-b': 'owner-b' }) {
+function makeHarness(
+  users: Record<string, string> = { 'access-a': 'owner-a', 'access-b': 'owner-b' },
+) {
   const sync = new MemoryNativeSync();
   const handlers = createNativeBodyMetricsSyncHandlers({
     authenticate: async (request) => {
@@ -82,12 +88,7 @@ function makeHarness(users: Record<string, string> = { 'access-a': 'owner-a', 'a
   return { handlers, sync };
 }
 
-function request(
-  method: 'GET' | 'POST' | 'DELETE',
-  token?: string,
-  body?: unknown,
-  query = '',
-) {
+function request(method: 'GET' | 'POST' | 'DELETE', token?: string, body?: unknown, query = '') {
   return new NextRequest(`http://localhost/api/auth/mobile/sync/v1/body-metrics${query}`, {
     method,
     headers: {
@@ -102,9 +103,9 @@ describe('/api/auth/mobile/sync/v1/body-metrics', () => {
   it('rejects missing bearer tokens before touching persistence', async () => {
     const { handlers, sync } = makeHarness();
     expect((await handlers.GET(request('GET'))).status).toBe(401);
-    expect((await handlers.POST(request('POST', undefined, { records: [morningInput] }))).status).toBe(
-      401,
-    );
+    expect(
+      (await handlers.POST(request('POST', undefined, { records: [morningInput] }))).status,
+    ).toBe(401);
     expect((await handlers.DELETE(request('DELETE', undefined, { ids: [morningId] }))).status).toBe(
       401,
     );
@@ -128,10 +129,7 @@ describe('/api/auth/mobile/sync/v1/body-metrics', () => {
 
     const response = await handlers.POST(
       request('POST', 'access-a', {
-        records: [
-          { ...morningInput, user_id: 'client-claimed-other-user' },
-          evening,
-        ],
+        records: [{ ...morningInput, user_id: 'client-claimed-other-user' }, evening],
       }),
     );
 
@@ -147,6 +145,82 @@ describe('/api/auth/mobile/sync/v1/body-metrics', () => {
     expect(sync.pushed[0]?.records[0]).not.toHaveProperty('user_id');
     expect(sync.pushed[0]?.records[0]?.bone_mass).toBe(3.11);
   });
+
+  it('accepts DEXA and InBody PDF data sources', async () => {
+    const { handlers, sync } = makeHarness();
+    const response = await handlers.POST(
+      request('POST', 'access-a', {
+        records: [
+          { ...morningInput, data_source: 'dexa_pdf' },
+          { ...morningInput, id: eveningId, data_source: 'inbody_pdf' },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(sync.pushed[0]?.records.map((record) => record.data_source)).toEqual([
+      'dexa_pdf',
+      'inbody_pdf',
+    ]);
+  });
+
+  it('preserves explicit unknown-method PDF provenance through the native sync boundary', async () => {
+    const { handlers, sync } = makeHarness();
+    const input = {
+      ...morningInput,
+      data_source: 'pdf_import',
+      body_fat_method: null,
+      muscle_mass: null,
+      source_metadata: { vendor: 'pdf_import', source_name: 'Unidentified device' },
+    };
+    const response = await handlers.POST(request('POST', 'access-a', { records: [input] }));
+    expect(response.status).toBe(200);
+    expect(sync.pushed).toEqual([{ subject: 'owner-a', records: [input] }]);
+    await expect(response.json()).resolves.toMatchObject({
+      records: [
+        {
+          data_source: 'pdf_import',
+          source_metadata: input.source_metadata,
+          body_fat_method: null,
+          muscle_mass: null,
+        },
+      ],
+    });
+  });
+
+  it.each([
+    'manual',
+    'healthkit',
+    'smart_scale',
+    'bodyspec_dexa',
+    'dexa_pdf',
+    'inbody_pdf',
+    'caliper',
+    'photo',
+  ] as const)('retains native source %s', async (dataSource) => {
+    const { handlers, sync } = makeHarness();
+    const response = await handlers.POST(
+      request('POST', 'access-a', {
+        records: [{ ...morningInput, data_source: dataSource }],
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(sync.pushed[0]?.records[0]?.data_source).toBe(dataSource);
+  });
+
+  it.each(['unknown', 'PDF Import', ''])(
+    'rejects noncanonical native source %j before persistence',
+    async (dataSource) => {
+      const { handlers, sync } = makeHarness();
+      const response = await handlers.POST(
+        request('POST', 'access-a', {
+          records: [{ ...morningInput, data_source: dataSource }],
+        }),
+      );
+      expect(response.status).toBe(400);
+      expect(sync.pushed).toEqual([]);
+    },
+  );
 
   it('fails closed when a native field would be silently dropped', async () => {
     const { handlers, sync } = makeHarness();
