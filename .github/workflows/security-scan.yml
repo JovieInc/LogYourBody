@@ -28,7 +28,7 @@ jobs:
       with:
         path: ./
         # On pushes, scan only the pushed commits; an empty base scans full
-        # history up to HEAD on scheduled/dispatch runs.
+        # history up to HEAD on manual dispatch.
         base: ${{ github.event_name == 'push' && github.event.before || '' }}
         head: ${{ github.event_name == 'push' && github.sha || 'HEAD' }}
         extra_args: --debug --only-verified --json
