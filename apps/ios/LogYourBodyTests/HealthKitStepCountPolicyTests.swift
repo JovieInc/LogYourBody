@@ -7,6 +7,41 @@ import XCTest
 @testable import LogYourBody
 
 final class HealthKitStepCountPolicyTests: XCTestCase {
+    func testMissingQuantityAndZeroRemainZero() throws {
+        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: nil), 0)
+        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: 0), 0)
+        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: -0.0), 0)
+    }
+
+    func testWholeCountsPreserveTheStorageBoundary() throws {
+        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: 8_421), 8_421)
+        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: Double(Int32.max)), Int(Int32.max))
+    }
+
+    func testFiniteFractionalAggregatesKeepExistingTruncation() throws {
+        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: 0.5), 0)
+        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: 8_421.75), 8_421)
+        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: Double(Int32.max).nextDown), Int(Int32.max) - 1)
+        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: Double(Int32.max) + 0.75), Int(Int32.max))
+    }
+
+    func testNegativeCountsAreRejectedInsteadOfPublished() {
+        for quantity in [-1.0, -8_421, -Double.leastNonzeroMagnitude] {
+            XCTAssertThrowsError(try HealthKitStepCountPolicy.stepCount(from: quantity)) { error in
+                XCTAssertEqual(error as? HealthKitStepCountPolicy.QuantityError, .invalidStepCount)
+            }
+        }
+    }
+
+    func testNonfiniteAndOversizedCountsFailWithoutIntegerTraps() {
+        for quantity in [Double.nan, .infinity, -.infinity, Double(Int32.max) + 1,
+                         Double(Int.max), Double.greatestFiniteMagnitude] {
+            XCTAssertThrowsError(try HealthKitStepCountPolicy.stepCount(from: quantity)) { error in
+                XCTAssertEqual(error as? HealthKitStepCountPolicy.QuantityError, .invalidStepCount)
+            }
+        }
+    }
+
     func testNoDataForTodayReadsAsZeroSteps() {
         let noData = NSError(
             domain: HKErrorDomain,

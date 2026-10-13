@@ -1,3 +1,4 @@
+import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { authCookies } from '@/lib/auth/constants';
@@ -25,10 +26,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const [user, metrics, records] = await Promise.all([
+  const [user, metrics, records, trainingPrograms] = await Promise.all([
     neonUserDirectory.getUser(identity.sub),
     neonBodyMetrics.list(identity.sub, 100),
     neonNativeProductRecords.listAll(identity.sub),
+    neonTrainingRevisions.exportForSubject(identity.sub),
   ]);
 
   return NextResponse.json(
@@ -39,6 +41,7 @@ export async function GET(request: NextRequest) {
       profile: user,
       body_metrics: metrics,
       ...records,
+      training_program_revisions: trainingPrograms,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );
