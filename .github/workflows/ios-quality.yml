@@ -48,8 +48,8 @@ jobs:
     needs: [mac]
     if: ${{ !cancelled() && (inputs.mac-child || needs.mac.result == 'skipped' || needs.mac.outputs.run_hosted == 'true') }}
     runs-on: ${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
-    # Setup plus one 40-minute audit plus the 8-minute performance cap.
-    timeout-minutes: 52
+    # Setup plus one 52-minute audit plus the 8-minute performance cap.
+    timeout-minutes: 64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,8 +80,10 @@ jobs:
 
       - name: Run launch quality audit
         # Slow prefix plus the full chaos regression suite. The script does not
-        # retry a command timeout, so this budget is for a single attempt.
-        timeout-minutes: 40
+        # retry a command timeout, so this budget is for a single attempt. Passing
+        # hosted runs took up to 38 min (p90 36) on 2026-10-11/12, so 40 left no
+        # headroom and timed out five merge groups.
+        timeout-minutes: 52
         env:
           DESTINATION: auto
           ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality
@@ -96,8 +98,11 @@ jobs:
           ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/performance
         run: bash scripts/ios/performance-audit.sh
 
+      # Hosted only: the Air spent 17 min uploading these over its home uplink
+      # (2026-10-12). A failed Mac run is rerun hosted (attempt 2), which
+      # uploads them.
       - name: Upload quality gate artifacts
-        if: always()
+        if: always() && runner.environment == 'github-hosted'
         uses: actions/upload-artifact@v4
         with:
           name: ios-launch-quality-gate-${{ github.run_id }}
