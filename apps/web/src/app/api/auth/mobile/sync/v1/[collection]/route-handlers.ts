@@ -6,6 +6,7 @@ import {
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { hasSafeReportedMeasurements } from '@/lib/ports/reported-measurements';
+import { hasSafeDailyStepMeasurement } from '@/lib/ports/daily-metric-steps';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import { NATIVE_BODY_METRICS_SYNC_VERSION } from '@/lib/ports/native-body-metrics-sync';
 import {
@@ -23,12 +24,6 @@ const NativeRecordSchema = z
     id: z.string().uuid(),
     user_id: z.string().optional(),
   })
-  .passthrough();
-
-// Match the native CachedDailyMetrics Int32 storage contract without imposing
-// a health-related limit. Keep existing omitted/null counts unchanged.
-const DailyMetricRecordSchema = z
-  .object({ steps: z.number().int().min(0).max(2147483647).nullable().optional() })
   .passthrough();
 
 const PushBodySchema = z.union([
@@ -156,9 +151,7 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
       if (
         !parsed.success ||
         (collection === 'daily_metrics' &&
-          pushRecords(parsed.data).some(
-            (record) => !DailyMetricRecordSchema.safeParse(record).success,
-          ))
+          !pushRecords(parsed.data).every(hasSafeDailyStepMeasurement))
       ) {
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_records' }, 400);
       }
