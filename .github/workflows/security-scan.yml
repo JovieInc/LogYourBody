@@ -27,8 +27,10 @@ jobs:
       uses: trufflesecurity/trufflehog@v3.97.9
       with:
         path: ./
-        # An empty base scans full history; main and HEAD coincide on main runs.
-        head: HEAD
+        # On pushes, scan only the pushed commits; an empty base scans full
+        # history up to HEAD on scheduled/dispatch runs.
+        base: ${{ github.event_name == 'push' && github.event.before || '' }}
+        head: ${{ github.event_name == 'push' && github.sha || 'HEAD' }}
         extra_args: --debug --only-verified --json
     
 
