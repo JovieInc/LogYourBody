@@ -119,7 +119,14 @@ func fetchTodayStepCount() async throws -> Int {
                     }
                     stepCount = noData
                 } else {
-                    stepCount = Int(statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0)
+                    do {
+                        stepCount = try HealthKitStepCountPolicy.stepCount(
+                            from: statistics?.sumQuantity()?.doubleValue(for: HKUnit.count())
+                        )
+                    } catch {
+                        continuation.resume(throwing: error)
+                        return
+                    }
                 }
 
                 Task {
@@ -163,8 +170,14 @@ func fetchStepCount(for date: Date) async throws -> Int {
                     return
                 }
 
-                let stepCount = statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
-                continuation.resume(returning: Int(stepCount))
+                do {
+                    let stepCount = try HealthKitStepCountPolicy.stepCount(
+                        from: statistics?.sumQuantity()?.doubleValue(for: HKUnit.count())
+                    )
+                    continuation.resume(returning: stepCount)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
 
             healthStore.execute(query)
@@ -249,7 +262,9 @@ func triggerFullHealthKitSyncIfNeeded(
         let totalCachedEntries = await (importCoreDataManager ?? .shared).fetchBodyMetrics(for: ownership.subject).count
         guard await ownsImport(ownership) else { return nil }
         guard !hasPerformedFullSync || (totalCachedEntries < 50 && imported > 0) else { return nil }
-        return Task.detached(priority: .background) { [weak self] in
+        // This import is scheduled asynchronously, but it must be admitted promptly so
+        // account replacement can observe and supersede the captured operation safely.
+        return Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let importSucceeded = await self.syncAllHistoricalHealthKitData(ownership: ownership)
             await MainActor.run {
@@ -760,11 +775,11 @@ func scheduleObservedBodyMetricSync() {
     }
 
 @MainActor
-    func scheduleObservedBodyMetricSync(for currentUserId: String?) {
+    func scheduleObservedBodyMetricSync(for currentUserId: String?, debounce: TimeInterval = 5) {
         // Check if we should sync (not more than once per hour)
         let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
         let shouldSync: Bool = {
-            if let lastSync = UserDefaults.standard.object(forKey: lastSyncKey) as? Date {
+            if let lastSync = userDefaults.object(forKey: lastSyncKey) as? Date {
                 let minutesSinceLastSync = Date().timeIntervalSince(lastSync) / 60
                 return minutesSinceLastSync >= 60
             }
@@ -776,8 +791,17 @@ func scheduleObservedBodyMetricSync() {
         // Debounce sync requests to prevent multiple concurrent syncs.
         DispatchQueue.main.async { [weak self] in
             self?.syncDebounceTimer?.invalidate()
-            self?.syncDebounceTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
-                UserDefaults.standard.set(Date(), forKey: lastSyncKey)
+            self?.syncDebounceTimer = Timer.scheduledTimer(withTimeInterval: debounce, repeats: false) { _ in
+                // The cooldown belongs to the account that scheduled this sync.
+                // A switch during the debounce must not burn that account's hour
+                // or import as whoever is signed in when the timer fires.
+                let signedInId = MainActor.assumeIsolated {
+                    (self?.importAuthManager ?? .shared).currentUser?.id
+                }
+                guard signedInId == currentUserId, let currentUserId, !currentUserId.isEmpty else {
+                    return
+                }
+                self?.userDefaults.set(Date(), forKey: lastSyncKey)
                 Task { [weak self] in
                     // Weight sync imports both weight and body fat for the recent window.
                     try? await self?.syncWeightFromHealthKitIncremental(days: 7)
@@ -791,6 +815,24 @@ func scheduleObservedBodyMetricSync() {
 /// nothing has been recorded for the predicate yet. For today's steps that is
 /// zero, not a failure, so it must not reach Sentry as a non-fatal error.
 enum HealthKitStepCountPolicy {
+    enum QuantityError: Error, LocalizedError {
+        case invalidStepCount
+
+        var errorDescription: String? { "Apple Health returned an invalid step count." }
+    }
+
+    /// Preserve HealthKit's existing truncation to a stored Int32 count, with
+    /// validation before conversion or publication. Missing data still means zero.
+    static func stepCount(from quantity: Double?) throws -> Int {
+        guard let quantity else { return 0 }
+        guard quantity.isFinite, quantity >= 0 else { throw QuantityError.invalidStepCount }
+        let wholeCount = quantity.rounded(.towardZero)
+        guard wholeCount <= Double(Int32.max), let count = Int(exactly: wholeCount) else {
+            throw QuantityError.invalidStepCount
+        }
+        return count
+    }
+
     static func stepCount(forNoData error: Error) -> Int? {
         let nsError = error as NSError
         guard nsError.domain == HKErrorDomain, nsError.code == HKError.Code.errorNoData.rawValue else {
