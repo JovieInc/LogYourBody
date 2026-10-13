@@ -129,6 +129,9 @@ jobs:
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
 
+      - name: Test post-merge Launch Quality
+        run: node --test .github/scripts/post-merge-quality.test.mjs
+
       - name: Detect changed surfaces locally
         id: filter
         env:
