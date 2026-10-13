@@ -417,10 +417,9 @@ class MetricsInterpolationService {
         }
 
         private func isDexaMeasurement(_ metric: BodyMetrics) -> Bool {
-            BodyCompMethod.infer(
-                from: metric.bodyFatMethod,
-                dataSource: metric.dataSource
-            ) == .dexa
+            let method = metric.bodyFatMethod?.lowercased() ?? ""
+            let source = metric.dataSource?.lowercased() ?? ""
+            return method.contains("dexa") || source.contains("bodyspec_dexa")
         }
 
         private func weight(at metric: BodyMetrics) -> Double? {
