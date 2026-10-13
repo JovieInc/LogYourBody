@@ -53,7 +53,7 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
                                         date: Date().addingTimeInterval(Double(index) * 86_400))
         }
         await viewModel.loadData(authManager: authManager, selectedIndex: 0)
-        let deleted = await CoreDataManager.shared.markBodyMetricDeleted(id: "\(userId)_0")
+        let deleted = await CoreDataManager.shared.markBodyMetricDeleted(id: "\(userId)_0", userId: userId)
         XCTAssertTrue(deleted)
         await viewModel.loadData(authManager: authManager, loadOnlyNewest: true, selectedIndex: 0)
         XCTAssertEqual(Set(viewModel.bodyMetrics.map(\.id)), Set(["\(userId)_1", "\(userId)_2"]))

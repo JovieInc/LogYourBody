@@ -45,6 +45,8 @@ describe('web surface cleanup', () => {
     expect(workspaceConfig).toContain('overrides:');
     expect(workspaceConfig).toContain('js-yaml: 4.3.2');
     expect(workspaceConfig).toContain('prismjs: 1.30.0');
+    expect(workspaceConfig).toContain('source-map-js: 1.2.2');
+    expect(workspaceConfig).toContain('postcss-selector-parser: 7.1.6');
   });
 
   it('does not ship debug or test route entry files', () => {
