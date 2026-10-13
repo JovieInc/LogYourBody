@@ -83,7 +83,7 @@ struct TrainingRevokeResponse: Decodable, Equatable, Sendable {
     let deletedRecords: Int
 }
 
-struct TrainingSetLogRequest: Encodable, Equatable, Sendable {
+struct TrainingSetLogRequest: Codable, Equatable, Sendable {
     let sessionId: String
     let exerciseId: String
     let setNumber: Int
@@ -157,12 +157,17 @@ final class URLSessionTrainingService: TrainingServicing {
     }
 
     func logSet(accessToken: String, request: TrainingSetLogRequest) async throws {
-        let _: EmptyTrainingResponse = try await send(
+        let response: TrainingSetLogResponse = try await send(
             path: "log-set",
             method: "POST",
             accessToken: accessToken,
             body: request
         )
+        guard response.sessionComplete != nil,
+              response.log == TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: request.reps, loadKg: request.loadKg, rir: request.rir
+              ) else { throw TrainingServiceError.invalidResponse }
     }
 
     func recordFeedback(accessToken: String, request: TrainingFeedbackRequest) async throws {
@@ -247,4 +252,9 @@ private struct EnrollmentRequest: Encodable {
 
 private struct EmptyTrainingRequest: Encodable {}
 private struct EmptyTrainingResponse: Decodable, VersionedTrainingResponse { let version: Int }
+private struct TrainingSetLogResponse: Decodable, VersionedTrainingResponse {
+    let version: Int
+    let log: TrainingSavedSet?
+    let sessionComplete: Bool?
+}
 private struct TrainingErrorResponse: Decodable { let error: String }

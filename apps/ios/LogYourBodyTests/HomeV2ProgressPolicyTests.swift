@@ -2,6 +2,7 @@
 // HomeV2ProgressPolicyTests.swift
 // LogYourBodyTests
 //
+import SwiftUI
 import XCTest
 @testable import LogYourBody
 
@@ -23,11 +24,70 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
             HomeV2ProgressCopy.deltaSentence(delta: nil, unit: "lb", range: .month6),
             "Your trend appears after 7 days"
         )
-        XCTAssertEqual(HomeV2ProgressCopy.loggedDaysSentence(days: 3), "3 days logged. Your trend appears after 7.")
-        XCTAssertEqual(HomeV2ProgressCopy.loggedDaysSentence(days: 1), "1 day logged. Your trend appears after 7.")
         XCTAssertEqual(HomeV2ProgressCopy.estimatedBy("Withings"), "Estimated by your Withings")
         XCTAssertEqual(HomeV2ProgressCopy.estimatedBy("Typed"), "Estimated, typed by you")
         XCTAssertTrue(HomeV2ProgressCopy.stepsAverageSentence(average: 8_412, range: .month3).hasPrefix("Averaging "))
+    }
+
+    func testStepFormatterPreservesOrdinaryRoundingAndLocale() {
+        let formatter = FormatterCache.stepsFormatter
+        let originalLocale = formatter.locale
+        defer { formatter.locale = originalLocale }
+        formatter.locale = Locale(identifier: "en_US")
+        XCTAssertEqual(FormatterCache.formattedSteps(0), "0")
+        XCTAssertEqual(FormatterCache.formattedSteps(8_421.49), "8,421")
+        XCTAssertEqual(FormatterCache.formattedSteps(8_421.5), "8,422")
+        XCTAssertEqual(FormatterCache.formattedSteps(-8_421.5), "-8,422")
+        XCTAssertEqual(FormatterCache.formattedSteps(Double(Int32.max)), "2,147,483,647")
+        formatter.locale = Locale(identifier: "de_DE")
+        XCTAssertEqual(FormatterCache.formattedSteps(8_421.5), "8.422")
+        formatter.locale = Locale(identifier: "hi_IN")
+        XCTAssertEqual(FormatterCache.formattedSteps(123_456), "1,23,456")
+    }
+
+    func testStepFormatterHandlesFiniteValuesBeyondIntegerRange() {
+        let formatter = FormatterCache.stepsFormatter
+        let originalLocale = formatter.locale
+        defer { formatter.locale = originalLocale }
+        formatter.locale = Locale(identifier: "en_US")
+        XCTAssertEqual(FormatterCache.formattedSteps(1e20), "100,000,000,000,000,000,000")
+        for value in [Double(Int.max), Double(Int.min), Double.greatestFiniteMagnitude] {
+            XCTAssertFalse(FormatterCache.formattedSteps(value)?.isEmpty ?? true)
+        }
+    }
+
+    func testStepFormatterTreatsNonfiniteValuesAsMissing() {
+        for value in [Double.nan, Double.infinity, -Double.infinity] {
+            XCTAssertNil(FormatterCache.formattedSteps(value))
+        }
+    }
+
+    func testStepAverageFormatsFractionalAndLargeValuesWithoutIntegerConversion() {
+        let formatter = FormatterCache.stepsFormatter
+        let originalLocale = formatter.locale
+        defer { formatter.locale = originalLocale }
+        formatter.locale = Locale(identifier: "en_US")
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsAverageSentence(average: 8_421.5, range: .month3),
+            "Averaging 8,422 a day in 3 months"
+        )
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsAverageSentence(average: 1e20, range: .all),
+            "Averaging 100,000,000,000,000,000,000 a day overall"
+        )
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsAverageSentence(average: 0, range: .week1),
+            "Averaging 0 a day in 7 days"
+        )
+    }
+
+    func testStepAverageTreatsMissingAndNonfiniteValuesAsNoTrend() {
+        for value: Double? in [nil, .nan, .infinity, -.infinity] {
+            XCTAssertEqual(
+                HomeV2ProgressCopy.stepsAverageSentence(average: value, range: .month1),
+                HomeV2ProgressCopy.noTrendYet
+            )
+        }
     }
 
     func testStatsTakeStartLowAndChangeFromTheVisiblePoints() {
@@ -59,5 +119,61 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
         }
         XCTAssertTrue(HomeV2ProgressMetric.steps.prefersHigh)
         XCTAssertFalse(HomeV2ProgressMetric.weight.prefersHigh)
+    }
+
+    func testSparseClassificationUsesDistinctDaysInTheSelectedRange() {
+        for days in 0...7 {
+            let visible = (0..<days).flatMap { offset in
+                [point(daysAgo: offset, value: 180), point(daysAgo: offset, value: 181)]
+            }
+            let all = visible + [point(daysAgo: 60, value: 190)]
+            let selected = HomeV2TrendPolicy.points(all, in: .month1)
+            let stats = HomeV2ProgressPolicy.stats(points: selected, prefersHigh: false)
+            XCTAssertEqual(stats.distinctDays, days, "Multiple entries on one day do not advance the trend threshold")
+            XCTAssertEqual(HomeV2TrendPolicy.hasEnoughData(selected), days >= HomeV2TrendPolicy.minimumDistinctDays)
+        }
+    }
+
+    @MainActor
+    func testRawProgressChartsIdentifyTheirMetricWithoutClaimingAnAverage() {
+        let points = (0..<7).map { point(daysAgo: $0, value: 20) }
+        for metric in HomeV2ProgressMetric.allCases {
+            let chart = HomeV2TrendChart(
+                daily: points,
+                trend: points,
+                accent: metric.accent,
+                range: .constant(.all),
+                axis: .months,
+                metricTitle: metric.title,
+                usesSevenDayAverage: false
+            )
+            XCTAssertEqual(chart.accessibilitySummary, "\(metric.title) history")
+        }
+    }
+
+    @MainActor
+    func testAveragedWeightChartDescribesItsActualSeries() {
+        let points = (0..<7).map { point(daysAgo: $0, value: 170) }
+        let chart = HomeV2TrendChart(
+            daily: points,
+            trend: points,
+            accent: HomeV2ProgressMetric.weight.accent,
+            range: .constant(.all)
+        )
+        XCTAssertEqual(chart.accessibilitySummary, "Weight trend, 7-day average")
+    }
+
+    @MainActor
+    func testSparseProgressChartKeepsMetricIdentityInItsAccessibilitySummary() {
+        let chart = HomeV2TrendChart(
+            daily: [point(daysAgo: 0, value: 8_000)],
+            trend: [],
+            accent: HomeV2ProgressMetric.steps.accent,
+            range: .constant(.month1),
+            axis: .months,
+            metricTitle: HomeV2ProgressMetric.steps.title,
+            usesSevenDayAverage: false
+        )
+        XCTAssertEqual(chart.accessibilitySummary, "Steps history. Your trend appears after 7 days")
     }
 }

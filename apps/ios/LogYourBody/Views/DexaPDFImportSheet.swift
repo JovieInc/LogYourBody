@@ -34,6 +34,8 @@ struct DexaPDFImportSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let fileURL: URL
+    /// Called with the parsed scans after they are saved; the sheet then closes.
+    var onSaved: (([DexaPDFScan]) -> Void)?
 
     @State private var scans: [DexaPDFScan] = []
     @State private var isReading = true
@@ -86,10 +88,18 @@ struct DexaPDFImportSheet: View {
             }
             .navigationTitle("Import scan PDF")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Close")
+                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .accessibilityIdentifier("dexa_pdf_import_close_button")
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.vertical, JovieTokens.itemGap)
             }
             .task {
                 await readReport()
@@ -101,7 +111,7 @@ struct DexaPDFImportSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(scan.date)
                 .font(.headline)
-            Text(scan.source ?? "DEXA scan")
+            Text(PDFScanProvenance(source: scan.source).displayLabel)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Text(measurementSummary(for: scan))
@@ -115,9 +125,6 @@ struct DexaPDFImportSheet: View {
         var values = ["\(scan.weight.formatted(.number.precision(.fractionLength(0...1)))) \(scan.weightUnit)"]
         if let bodyFat = scan.bodyFatPercentage {
             values.append("\(bodyFat.formatted(.number.precision(.fractionLength(0...1))))% body fat")
-        }
-        if let muscleMass = scan.muscleMass {
-            values.append("\(muscleMass.formatted(.number.precision(.fractionLength(0...1)))) muscle mass")
         }
         return values.joined(separator: " · ")
     }
@@ -158,6 +165,12 @@ struct DexaPDFImportSheet: View {
         Task { @MainActor in
             do {
                 let plan = try await DexaPDFImportCoordinator.shared.save(scans: scans, userId: userId)
+                if let onSaved {
+                    isSaving = false
+                    onSaved(scans)
+                    dismiss()
+                    return
+                }
                 savedSummary = DexaPDFImportMessagePolicy.savedSummary(
                     resultCount: plan.results.count,
                     metricCount: plan.metrics.count,

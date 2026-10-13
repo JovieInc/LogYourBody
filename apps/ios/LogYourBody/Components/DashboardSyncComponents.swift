@@ -100,12 +100,18 @@ struct DashboardSyncDetailsSheet: View {
                 }
             }
             .navigationTitle("Sync")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        isPresented = false
-                    }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Button {
+                    isPresented = false
+                } label: {
+                    Text("Close")
+                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .accessibilityIdentifier("dashboard_sync_close_button")
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.vertical, JovieTokens.itemGap)
             }
         }
         .worldClassScreen(.syncDetails)
@@ -189,11 +195,21 @@ struct DashboardSyncDetailsSheet: View {
 
     private var healthKitSection: some View {
         Section(header: Text("HealthKit")) {
-            HStack {
-                Text("Authorization")
-                Spacer()
-                Text(healthKitManager.isAuthorized ? "Authorized" : "Not authorized")
-                    .foregroundColor(healthKitManager.isAuthorized ? Color.appSuccess : Color.appWarning)
+            if healthKitManager.authorizationStatusText.isEmpty {
+                HStack {
+                    Text("Authorization")
+                    Spacer()
+                    Text(healthKitManager.isAuthorized ? "Authorized" : "Not authorized")
+                        .foregroundColor(healthKitManager.isAuthorized ? Color.appSuccess : Color.appWarning)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Authorization")
+                    Text(healthKitManager.authorizationStatusText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             if healthKitManager.isImporting {

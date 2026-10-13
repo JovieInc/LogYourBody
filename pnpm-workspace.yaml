@@ -2,6 +2,12 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# Dependabot's pnpm updater applies a mature-release gate. These providers are kept
+# current deliberately and are reviewed through their Dependabot PRs.
+minimumReleaseAgeExclude:
+  - next
+  - "@ai-sdk/elevenlabs"
+
 overrides:
   js-yaml: 4.3.2
   prismjs: 1.30.0
@@ -9,3 +15,5 @@ overrides:
   fflate: ">=0.8.3"
   postcss: ">=8.5.23"
   vite: "7.3.6"
+  source-map-js: 1.2.2
+  postcss-selector-parser: 7.1.6

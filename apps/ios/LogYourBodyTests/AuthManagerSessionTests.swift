@@ -3,6 +3,7 @@
 // LogYourBodyTests
 //
 import XCTest
+import CoreData
 @testable import LogYourBody
 
 /// Stubs the OAuth/HTTP boundary for AuthManager session tests.
@@ -279,6 +280,62 @@ final class AuthManagerSessionTests: XCTestCase {
         let stored = try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self)
         XCTAssertEqual(stored?.accessToken, "new-access")
         XCTAssertEqual(stored?.refreshToken, "new-refresh")
+    }
+
+    func testScopedAuthorizationCarriesValidatedSameAccountRefreshGeneration() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        manager.currentUser = LocalUser(
+            id: "user-123", email: "user@example.com", name: "Test User",
+            avatarUrl: nil, profile: nil, onboardingCompleted: false
+        )
+        let original = try XCTUnwrap(manager.captureRequestSession())
+        stubSessionSuccess()
+
+        let authorization = await manager.getAccessToken(for: original)
+
+        XCTAssertEqual(authorization?.token, "new-access")
+        XCTAssertEqual(authorization?.ownership.subject, original.subject)
+        XCTAssertNotEqual(authorization?.ownership, original)
+        let refreshed = try XCTUnwrap(authorization?.ownership)
+        XCTAssertTrue(manager.ownsRequestSession(refreshed))
+        XCTAssertFalse(manager.ownsRequestSession(original))
+    }
+
+    func testValidatedTokenRotationKeepsHeldHealthImportInSameAccountLifetime() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        manager.currentUser = LocalUser(
+            id: "user-123", email: "user@example.com", name: "Synthetic Health",
+            avatarUrl: nil, profile: nil, onboardingCompleted: true
+        )
+        let ownership = try XCTUnwrap(manager.captureAccountSession())
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        description.shouldAddStoreAsynchronously = false
+        let store = CoreDataManager(persistentStoreDescriptions: [description])
+        let query = HeldWeightImportQuery()
+        let health = HealthKitManager(
+            userDefaults: defaults, authManager: manager, coreDataManager: store,
+            weightImportQuery: { _, _ in await query.fetch() }, bodyFatImportQuery: { _ in [] },
+            syncTrigger: {}, importCompletion: { _ in },
+            rawImportStore: { _ in XCTFail("Synthetic query cannot dispatch raw samples") }
+        )
+        health.isAuthorized = true
+        let sample = HealthKitWeightImportSample(weight: 70, date: Date())
+        let work = Task { try await health.syncWeightFromHealthKitIncremental(days: 30) }
+        defer { query.complete([]) }
+        await fulfillment(of: [query.started], timeout: 3)
+        stubSessionSuccess()
+        let token = await manager.getAccessToken()
+        XCTAssertEqual(token, "new-access")
+        XCTAssertTrue(manager.ownsAccountSession(ownership))
+        query.complete([sample])
+        try await work.value
+        let records = await store.fetchAllBodyMetrics(for: "user-123")
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.first?.userId, "user-123")
+        XCTAssertEqual(records.first?.weight, 70)
     }
 
     func testRefreshKeepsExistingRefreshTokenWhenRotationOmitsIt() async throws {
@@ -677,6 +734,25 @@ final class AuthManagerSessionTests: XCTestCase {
         XCTAssertFalse(accepted)
     }
 
+    func testValidatedTokenRotationKeepsTheBoundBillingLifetime() async throws {
+        let manager = makeManager()
+        manager.authSession = makeSession(expiresAt: Date().addingTimeInterval(-5))
+        let client = MockRevenueCatPurchasesClient()
+        let billing = RevenueCatManager(purchasesClient: client, userDefaults: defaults)
+        billing.markAsConfigured()
+        manager.bindBillingLifecycle(billing)
+        await billing.waitForBillingReconciliation()
+        let owner = try XCTUnwrap(billing.captureBillingSession())
+        stubSessionSuccess()
+
+        let token = await manager.getAccessToken()
+        await billing.waitForBillingReconciliation()
+
+        XCTAssertEqual(token, "new-access")
+        XCTAssertEqual(billing.captureBillingSession(), owner)
+        XCTAssertEqual(client.identifiedUserIDs, ["user-123"])
+    }
+
     func testProfileWriteStillSucceedsAfterValidTokenRotation() async throws {
         let manager = makeManager()
         applyProfileAccount(manager, subject: "user-123", name: "Test User")
@@ -785,5 +861,189 @@ final class AuthManagerSessionTests: XCTestCase {
         XCTAssertEqual(AuthStubURLProtocol.recordedRequests.filter {
             $0.url?.path.hasSuffix("/api/auth/mobile/profile") == true
         }.count, 2)
+    }
+
+    func testAnotherAccountSessionClearsPreviousLocalGoals() async throws {
+        let manager = makeManager()
+        manager.currentUser = localUser(id: "user-a", email: "a@example.invalid")
+        storePersonalGoals()
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-b", email: "b@example.invalid"),
+            forKey: storedSessionKey
+        )
+        stubSessionSuccess()
+
+        await manager.initialize()
+
+        XCTAssertEqual(manager.currentUser?.id, "user-b")
+        assertPersonalGoalsCleared()
+        assertDeviceMeasurementSystemRemains()
+    }
+
+    func testLogoutKeepsGoalsUntilADifferentAccountSignsIn() async throws {
+        let manager = makeManager()
+        manager.currentUser = localUser(id: "user-a", email: "a@example.invalid")
+        storePersonalGoals()
+
+        await manager.performLogout(exitReason: .userInitiated)
+
+        XCTAssertNil(manager.currentUser)
+        assertPersonalGoalsIntact()
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-b", email: "b@example.invalid"),
+            forKey: storedSessionKey
+        )
+        stubSessionSuccess()
+
+        await manager.initialize()
+
+        XCTAssertEqual(manager.currentUser?.id, "user-b")
+        assertPersonalGoalsCleared()
+        assertDeviceMeasurementSystemRemains()
+    }
+
+    func testLogoutThenSameAccountKeepsLocalGoals() async throws {
+        let manager = makeManager()
+        manager.currentUser = localUser(id: "user-a", email: "a@example.invalid")
+        storePersonalGoals()
+        await manager.performLogout(exitReason: .userInitiated)
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-a", email: "a@example.invalid"),
+            forKey: storedSessionKey
+        )
+        stubSessionSuccess()
+
+        await manager.initialize()
+
+        XCTAssertEqual(manager.currentUser?.id, "user-a")
+        assertPersonalGoalsIntact()
+        assertDeviceMeasurementSystemRemains()
+    }
+
+    func testColdStartKeepsLocalGoalsForTheRestoredAccount() async throws {
+        let manager = makeManager()
+        storePersonalGoals()
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-a", email: "a@example.invalid"),
+            forKey: storedSessionKey
+        )
+        stubSessionSuccess()
+
+        await manager.initialize()
+
+        XCTAssertEqual(manager.currentUser?.id, "user-a")
+        assertPersonalGoalsIntact()
+        assertDeviceMeasurementSystemRemains()
+    }
+
+    func testRejectedStoredSessionKeepsGoalsWithThatAccount() async throws {
+        let manager = makeManager()
+        storePersonalGoals()
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-a", email: "a@example.invalid"),
+            forKey: storedSessionKey
+        )
+        AuthStubURLProtocol.requestHandler = { _ in
+            AuthStubURLProtocol.StubbedResponse(statusCode: 401, body: Data("{}".utf8))
+        }
+
+        await manager.initialize()
+
+        XCTAssertNil(manager.currentUser)
+        XCTAssertEqual(defaults.string(forKey: AccountLocalGoalFence.ownerKey), "user-a")
+        assertPersonalGoalsIntact()
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-a", email: "a@example.invalid"),
+            forKey: storedSessionKey
+        )
+        stubSessionSuccess()
+
+        await manager.retryAuthProviderInitialization()
+
+        XCTAssertEqual(manager.currentUser?.id, "user-a")
+        assertPersonalGoalsIntact()
+        assertDeviceMeasurementSystemRemains()
+    }
+
+    func testFailedColdRefreshKeepsGoalsUntilADifferentAccountSignsIn() async throws {
+        let manager = makeManager()
+        storePersonalGoals()
+        try keychain.save(
+            ProductAuthSession.localFixture(
+                subject: "user-a",
+                email: "a@example.invalid",
+                expiresAt: Date().addingTimeInterval(-5)
+            ),
+            forKey: storedSessionKey
+        )
+        AuthStubURLProtocol.requestHandler = { _ in
+            AuthStubURLProtocol.StubbedResponse(
+                statusCode: 400,
+                body: Data(#"{"error":"invalid_grant"}"#.utf8)
+            )
+        }
+
+        await manager.initialize()
+
+        XCTAssertNil(manager.currentUser)
+        XCTAssertEqual(defaults.string(forKey: AccountLocalGoalFence.ownerKey), "user-a")
+        assertPersonalGoalsIntact()
+        try keychain.save(
+            ProductAuthSession.localFixture(subject: "user-b", email: "b@example.invalid"),
+            forKey: storedSessionKey
+        )
+        stubSessionSuccess()
+
+        await manager.retryAuthProviderInitialization()
+
+        XCTAssertEqual(manager.currentUser?.id, "user-b")
+        assertPersonalGoalsCleared()
+        assertDeviceMeasurementSystemRemains()
+    }
+
+    private func localUser(id: String, email: String) -> LocalUser {
+        LocalUser(
+            id: id,
+            email: email,
+            name: "Test User",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+    }
+
+    private func storePersonalGoals() {
+        defaults.set(70.0, forKey: Constants.goalWeightKilogramsKey)
+        defaults.set(154.0, forKey: Constants.goalWeightKey)
+        defaults.set(18.0, forKey: Constants.goalBodyFatPercentageKey)
+        defaults.set(22.0, forKey: Constants.goalFFMIKey)
+        defaults.set(8_000, forKey: "stepGoal")
+        defaults.set(
+            MeasurementSystem.imperial.rawValue,
+            forKey: Constants.preferredMeasurementSystemKey
+        )
+    }
+
+    private func assertPersonalGoalsIntact() {
+        XCTAssertEqual(defaults.double(forKey: Constants.goalWeightKilogramsKey), 70, accuracy: 0.001)
+        XCTAssertEqual(defaults.double(forKey: Constants.goalWeightKey), 154, accuracy: 0.001)
+        XCTAssertEqual(defaults.double(forKey: Constants.goalBodyFatPercentageKey), 18, accuracy: 0.001)
+        XCTAssertEqual(defaults.double(forKey: Constants.goalFFMIKey), 22, accuracy: 0.001)
+        XCTAssertEqual(defaults.integer(forKey: "stepGoal"), 8_000)
+    }
+
+    private func assertPersonalGoalsCleared() {
+        XCTAssertNil(defaults.object(forKey: Constants.goalWeightKilogramsKey))
+        XCTAssertNil(defaults.object(forKey: Constants.goalWeightKey))
+        XCTAssertNil(defaults.object(forKey: Constants.goalBodyFatPercentageKey))
+        XCTAssertNil(defaults.object(forKey: Constants.goalFFMIKey))
+        XCTAssertNil(defaults.object(forKey: "stepGoal"))
+    }
+
+    private func assertDeviceMeasurementSystemRemains() {
+        XCTAssertEqual(
+            defaults.string(forKey: Constants.preferredMeasurementSystemKey),
+            MeasurementSystem.imperial.rawValue
+        )
     }
 }

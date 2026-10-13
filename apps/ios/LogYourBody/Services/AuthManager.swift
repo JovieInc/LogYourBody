@@ -243,9 +243,73 @@ actor AsyncGate {
     }
 }
 
+/// Weight, body-fat, FFMI, and step targets live in unscoped UserDefaults.
+/// Logout remembers which account owned them. The next signed-in account keeps
+/// them only when it is that same account.
+enum AccountLocalGoalFence {
+    static let ownerKey = "accountLocalGoalOwnerUserId"
+    static let valueKeys = [
+        Constants.goalWeightKey,
+        Constants.goalWeightKilogramsKey,
+        Constants.goalBodyFatPercentageKey,
+        Constants.goalFFMIKey,
+        "stepGoal"
+    ]
+
+    static func noteDepartingUser(_ userId: String?, defaults: UserDefaults) {
+        guard let userId, !userId.isEmpty else { return }
+        guard defaults.string(forKey: ownerKey) == nil else { return }
+        guard hasValues(in: defaults) else { return }
+        defaults.set(userId, forKey: ownerKey)
+    }
+
+    static func adopt(_ userId: String, replacing previousUserId: String?, defaults: UserDefaults) {
+        guard !userId.isEmpty else { return }
+        let owner = defaults.string(forKey: ownerKey)
+        let ownedBySomeoneElse = owner.map { $0 != userId } ?? false
+        let replacingSomeoneElse = previousUserId.map { !$0.isEmpty && $0 != userId } ?? false
+        if hasValues(in: defaults) && (ownedBySomeoneElse || (owner == nil && replacingSomeoneElse)) {
+            clear(defaults)
+            return
+        }
+        if ownedBySomeoneElse {
+            defaults.removeObject(forKey: ownerKey)
+        }
+        if defaults.string(forKey: ownerKey) == nil && hasValues(in: defaults) {
+            defaults.set(userId, forKey: ownerKey)
+        }
+    }
+
+    private static func hasValues(in defaults: UserDefaults) -> Bool {
+        valueKeys.contains { defaults.object(forKey: $0) != nil }
+    }
+
+    private static func clear(_ defaults: UserDefaults) {
+        for key in valueKeys {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.removeObject(forKey: ownerKey)
+    }
+}
+
 @MainActor
 final class AuthManager: NSObject, ObservableObject {
-    static let shared = AuthManager()
+    static let shared: AuthManager = {
+        let manager = AuthManager()
+        manager.prepareHealthAccountHandoff = { userId in
+            let syncEnabled = UserDefaults.standard.bool(forKey: Constants.healthKitSyncEnabledKey)
+            HealthKitAccountSyncPolicy.bindIfUnbound(
+                userId: userId,
+                syncEnabled: syncEnabled,
+                defaults: .standard
+            )
+        }
+        manager.suspendHealthImport = {
+            await HealthSyncCoordinator.shared.suspendAutomaticImportAfterSignOut()
+        }
+        manager.bindBillingLifecycle(RevenueCatManager.shared)
+        return manager
+    }()
 
     @Published var currentUser: LocalUser?
     @Published var authSession: ProductAuthSession? {
@@ -253,9 +317,11 @@ final class AuthManager: NSObject, ObservableObject {
             // Every replacement invalidates work, including A → B → A and logout
             // during a cold restore, when no session has been applied yet.
             authGeneration &+= 1
+            expiredRequestSession = nil
             if !isRotatingProfileSession {
                 profileGeneration &+= 1
                 bootstrappedProfileSessions.removeAll()
+                billingLifecycle?.authenticationDidChange(resolvedBillingSession)
             }
             refreshTask?.cancel()
             refreshTask = nil
@@ -266,7 +332,13 @@ final class AuthManager: NSObject, ObservableObject {
     /// Signed-in means a first-party Jovie access token is present.
     /// This is not Clerk in-memory session state and is not stored in UserDefaults.
     var isAuthenticated: Bool { JovieSessionPolicy.isSignedIn(authSession) }
-    @Published var isAuthProviderLoaded = false
+    @Published var isAuthProviderLoaded = false {
+        didSet {
+            if isAuthProviderLoaded {
+                billingLifecycle?.authenticationDidChange(resolvedBillingSession)
+            }
+        }
+    }
     @Published var authProviderInitError: String?
     @Published var needsLegalConsent = false
     @Published var lastExitReason: AuthExitReason = .none
@@ -276,6 +348,23 @@ final class AuthManager: NSObject, ObservableObject {
     let keychain: KeychainManager
     let urlSession: URLSession
     let legalConsentGate = AsyncGate()
+    var prepareHealthAccountHandoff: ((String?) -> Void)?
+    var suspendHealthImport: (() async -> Void)?
+    private weak var billingLifecycle: AuthBillingLifecycle?
+
+    func bindBillingLifecycle(_ lifecycle: AuthBillingLifecycle) {
+        billingLifecycle = lifecycle
+        let session = authSession == nil && !isAuthProviderLoaded
+            ? AuthBillingSession.restoring : resolvedBillingSession
+        lifecycle.authenticationDidChange(session)
+    }
+
+    private var resolvedBillingSession: AuthBillingSession {
+        if isAuthenticated, let subject = authSession?.subject {
+            return .authenticated(ProfileSessionOwnership(subject: subject, generation: profileGeneration))
+        }
+        return .signedOut(generation: profileGeneration)
+    }
 
     private let storedSessionKey = "productAuth.jovieOAuthSession"
     private var initializationTask: Task<Void, Never>?
@@ -285,7 +374,7 @@ final class AuthManager: NSObject, ObservableObject {
     private var authGeneration: UInt64 = 0
     // Token rotation keeps this account lifetime; a login/logout/replacement,
     // including the same subject, starts a new one and invalidates profile work.
-    private struct ProfileSessionOwnership: Hashable {
+    struct ProfileSessionOwnership: Hashable, Sendable {
         let subject: String
         let generation: UInt64
     }
@@ -394,7 +483,7 @@ final class AuthManager: NSObject, ObservableObject {
                         if isValid {
                             applyAuthenticatedSession(stored)
                         } else {
-                            await performLogout(exitReason: .sessionExpired)
+                            await performLogout(exitReason: .sessionExpired, knownAccountId: stored.subject)
                         }
                     }
                 } else {
@@ -619,6 +708,11 @@ final class AuthManager: NSObject, ObservableObject {
     ) {
         // This assignment is synchronous on MainActor. Only a validated refresh
         // for the currently applied subject may preserve profile ownership.
+        AccountLocalGoalFence.adopt(
+            session.subject,
+            replacing: currentUser?.id,
+            defaults: userDefaults
+        )
         isRotatingProfileSession = preservingProfileSession
         authSession = session
         isRotatingProfileSession = false
@@ -654,8 +748,56 @@ final class AuthManager: NSObject, ObservableObject {
         return await refreshAccessToken(using: session)
     }
 
+    struct RequestSessionOwnership: Equatable, Sendable {
+        let subject: String
+        let generation: UInt64
+    }
+
+    struct RequestAuthorization: Sendable {
+        let token: String
+        let ownership: RequestSessionOwnership
+    }
+
+    private var expiredRequestSession: (ownership: RequestSessionOwnership, generation: UInt64)?
+
+    func didExpireRequestSession(_ ownership: RequestSessionOwnership) -> Bool {
+        guard !Task.isCancelled, authSession == nil, currentUser == nil, lastExitReason == .sessionExpired,
+              let expiredRequestSession else { return false }
+        return expiredRequestSession.ownership == ownership && expiredRequestSession.generation == authGeneration
+    }
+
+    func captureRequestSession() -> RequestSessionOwnership? {
+        guard let session = authSession, isAuthenticated, currentUser?.id == session.subject else { return nil }
+        return RequestSessionOwnership(subject: session.subject, generation: authGeneration)
+    }
+
+    func ownsRequestSession(_ ownership: RequestSessionOwnership) -> Bool {
+        !Task.isCancelled && captureRequestSession() == ownership
+    }
+
+    func getAccessToken(for ownership: RequestSessionOwnership) async -> RequestAuthorization? {
+        guard ownsRequestSession(ownership), let session = authSession else { return nil }
+        if session.expiresAt.timeIntervalSinceNow > 60 {
+            return RequestAuthorization(token: session.accessToken, ownership: ownership)
+        }
+        guard let result = await refreshAccessTokenResult(using: session),
+              let token = currentRefreshToken(result),
+              let current = captureRequestSession(), current.subject == ownership.subject,
+              current.generation == result.generation else { return nil }
+        return RequestAuthorization(token: token, ownership: current)
+    }
+
+    func handleProductAPIUnauthorized(for ownership: RequestSessionOwnership) async {
+        guard ownsRequestSession(ownership) else { return }
+        await handleProductAPIUnauthorized()
+    }
+
     private func refreshAccessToken(using session: ProductAuthSession? = nil) async -> String? {
-        if let refreshTask { return currentRefreshToken(await refreshTask.value) }
+        currentRefreshToken(await refreshAccessTokenResult(using: session))
+    }
+
+    private func refreshAccessTokenResult(using session: ProductAuthSession? = nil) async -> RefreshedToken? {
+        if let refreshTask { return await refreshTask.value }
         guard let current = session ?? authSession else {
             await performLogout(exitReason: .sessionExpired)
             return nil
@@ -693,13 +835,13 @@ final class AuthManager: NSObject, ObservableObject {
                 return self.authSession.map { ($0.accessToken, self.authGeneration) }
             } catch {
                 guard self.authGeneration == generation, !Task.isCancelled else { return nil }
-                await self.performLogout(exitReason: .sessionExpired)
+                await self.performLogout(exitReason: .sessionExpired, knownAccountId: current.subject)
                 return nil
             }
         }
         refreshTask = task
         refreshTaskID = taskID
-        return currentRefreshToken(await task.value)
+        return await task.value
     }
 
     private func currentRefreshToken(_ result: RefreshedToken?) -> String? {
@@ -727,7 +869,14 @@ final class AuthManager: NSObject, ObservableObject {
         }
     }
 
-    func performLogout(exitReason: AuthExitReason) async {
+    func performLogout(exitReason: AuthExitReason, knownAccountId: String? = nil) async {
+        let signedInUserId = currentUser?.id
+        // A cold restore can fail before currentUser exists. The keychain
+        // subject still owns any unstamped local goals.
+        let departingUserId = signedInUserId ?? authSession?.subject ?? knownAccountId
+        AccountLocalGoalFence.noteDepartingUser(departingUserId, defaults: userDefaults)
+        prepareHealthAccountHandoff?(signedInUserId)
+        let expiredOwnership = exitReason == .sessionExpired ? captureRequestSession() : nil
         try? keychain.delete(forKey: storedSessionKey)
         authSession = nil
         currentUser = nil
@@ -735,7 +884,9 @@ final class AuthManager: NSObject, ObservableObject {
         memberSinceDate = nil
         bootstrappedProfileSessions.removeAll()
         lastExitReason = exitReason
+        expiredRequestSession = expiredOwnership.map { ($0, authGeneration) }
         AppServicePorts.analyticsTracker.reset()
+        await suspendHealthImport?()
     }
 
     func updateProfileDurably(_ updates: [String: Any]) async throws {
@@ -922,6 +1073,15 @@ final class AuthManager: NSObject, ObservableObject {
     private func currentProfileSession() -> ProfileSessionOwnership? {
         guard let subject = authSession?.subject, currentUser?.id == subject else { return nil }
         return ProfileSessionOwnership(subject: subject, generation: profileGeneration)
+    }
+
+    /// Read-only account lifetime shared with local imports; token rotation keeps it valid.
+    func captureAccountSession() -> ProfileSessionOwnership? {
+        currentProfileSession()
+    }
+
+    func ownsAccountSession(_ ownership: ProfileSessionOwnership) -> Bool {
+        isCurrentProfileSession(ownership)
     }
 
     private func isCurrentProfileSession(_ ownership: ProfileSessionOwnership) -> Bool {

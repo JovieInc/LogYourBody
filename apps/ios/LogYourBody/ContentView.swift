@@ -72,6 +72,7 @@ struct ContentView: View {
     @EnvironmentObject var bugReportManager: BugReportManager
     @StateObject private var loadingManager: LoadingManager
     @StateObject private var notificationManager = NotificationManager.shared
+    @Environment(\.scenePhase) private var scenePhase
     private let onboardingStateManager = OnboardingStateManager.shared
     @State private var currentUserId: String?
     @State private var hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion
@@ -97,6 +98,10 @@ struct ContentView: View {
             environment: ProcessInfo.processInfo.environment,
             userId: authManager.currentUser?.id
         )
+    }
+
+    private var isBiometricLockArmed: Bool {
+        authManager.isAuthenticated && biometricLockEnabled && !disableBiometricLockForUITests
     }
 
     init() {
@@ -252,6 +257,7 @@ struct ContentView: View {
                 hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion(for: currentUserId)
             } else {
                 lastProfileCompletionSync = nil
+                isUnlocked = false
                 if hasCompletedOnboarding {
                     onboardingStateManager.updateCompletionStatus(false)
                     hasCompletedOnboarding = false
@@ -286,9 +292,29 @@ struct ContentView: View {
         .onChange(of: authManager.needsLegalConsent) { _, newValue in
             showLegalConsent = newValue
         }
-        .onShake {
-            bugReportManager.handleShakeGesture()
+        .onChange(of: scenePhase) { _, newPhase in
+            if BiometricLockPolicy.shouldRelock(
+                onEntering: newPhase,
+                lockEnabled: isBiometricLockArmed
+            ) {
+                isUnlocked = false
+            }
         }
+        .onShake {
+            if BiometricLockPolicy.shouldLockOnShake(isLockArmed: isBiometricLockArmed) {
+                isUnlocked = false
+            } else {
+                bugReportManager.handleShakeGesture()
+            }
+        }
+        #if DEBUG
+        .onAppear {
+            // XCUIDevice has no shake in this SDK. The UI test uses the same handler as the gesture.
+            if ProcessInfo.processInfo.arguments.contains("-lybUITestPresentBugReport") {
+                bugReportManager.handleShakeGesture()
+            }
+        }
+        #endif
     }
 
     private var mainContent: some View {
@@ -305,18 +331,12 @@ struct ContentView: View {
     private var authenticatedContent: some View {
         Group {
             if shouldShowOnboarding {
-                if HomeV2Policy.isOnboardingV2Enabled() {
-                    HomeV2FirstRunView()
-                        .environmentObject(authManager)
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                } else {
-                    BodyScoreOnboardingFlowView()
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                }
+                // One first run for everyone: the onboarding_v2_focus gate now
+                // only picks the sign-in screen.
+                BodyScoreOnboardingFlowView()
+                    .onAppear {
+                        AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                    }
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
             } else if !subscriptionManager.isSubscribed {
@@ -347,8 +367,7 @@ struct ContentView: View {
 
     private var biometricLockOverlay: some View {
         Group {
-            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked
-                && !disableBiometricLockForUITests {
+            if isBiometricLockArmed && !isUnlocked {
                 BiometricLockView(isUnlocked: $isUnlocked)
                     .transition(AnyTransition.opacity)
             }
@@ -358,7 +377,7 @@ struct ContentView: View {
     private var unlockedDexaPDFSelection: Binding<DexaPDFFileSelection?> {
         Binding(
             get: {
-                biometricLockEnabled && !isUnlocked && !disableBiometricLockForUITests
+                isBiometricLockArmed && !isUnlocked
                     ? nil
                     : pendingDexaPDF
             },

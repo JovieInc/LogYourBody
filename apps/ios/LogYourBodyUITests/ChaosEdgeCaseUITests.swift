@@ -68,6 +68,54 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    func testIntegrationDirectorySeparatesHealthAccessAndScanHistory() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestIntegrationsDirectoryFixture"])
+        assertTimelineRootAppears(in: app, timeout: 30)
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        settings.tap()
+
+        let integrations = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'settings_integrations_link'")
+        ).firstMatch
+        XCTAssertTrue(integrations.waitForExistence(timeout: 8))
+        for _ in 0..<4 where !integrations.isHittable { app.swipeUp() }
+        XCTAssertTrue(integrations.isHittable)
+        integrations.tap()
+        XCTAssertTrue(app.navigationBars["Integrations"].waitForExistence(timeout: 8))
+
+        let health = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_health_status'")
+        ).firstMatch
+        XCTAssertTrue(health.waitForExistence(timeout: 8))
+        XCTAssertTrue(health.label.contains("Apple Health"))
+        XCTAssertFalse(health.label.contains("Connected"), "A permission request must not prove read access.")
+        let healthStatus = health.value as? String ?? ""
+        XCTAssertTrue(["Set up access", "Sync enabled", "Sync paused", "Use on iPhone", "Unavailable"].contains(healthStatus))
+        XCTAssertFalse(healthStatus.contains("Connected"), "A permission request must not prove read access.")
+
+        let bodySpec = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_link'")
+        ).firstMatch
+        XCTAssertTrue(bodySpec.waitForExistence(timeout: 8))
+        XCTAssertTrue(bodySpec.label.contains("BodySpec"))
+        XCTAssertFalse(bodySpec.label.contains("Last synced"), "A scan date must not become sync freshness.")
+        XCTAssertFalse(bodySpec.label.contains("Connection saved"), "Device scope belongs in the disclosure.")
+        XCTAssertFalse(bodySpec.label.contains("Latest scan"), "Scan history belongs in the disclosure.")
+        XCTAssertFalse(app.staticTexts["Health & Fitness"].exists)
+        attachScreenshot(named: "integrations-directory-permission-and-history-fixture", from: app)
+        let history = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_history'")
+        ).firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 8))
+        XCTAssertTrue(history.isHittable)
+        history.tap()
+        attachScreenshot(named: "integrations-directory-expanded-history-fixture", from: app)
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     // MARK: - 1. Weight entry boundaries
 
     func testWeightEntryRejectsInvalidAndOutOfRangeValues() throws {
@@ -586,6 +634,32 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         assertNoLayoutAnomalies(in: app, context: "timeline root after round trip")
     }
 
+    func testWeightKeyboardControlsMeetMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+        try openMVPWeightEntry(in: app)
+
+        let field = app.textFields["mvp_weight_text_field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        field.tap()
+        XCTAssertTrue(waitForKeyboard(in: app), "Keyboard did not appear after tapping the weight field.")
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_done_button").firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_save_weight_button").firstMatch.exists)
+
+        let window = app.windows.firstMatch.frame
+        for identifier in ["mvp_keyboard_bottom_done_button", "mvp_keyboard_save_weight_bar_button"] {
+            let control = app.buttons.matching(identifier: identifier).firstMatch
+            XCTAssertTrue(control.waitForExistence(timeout: 5), identifier)
+            let frame = control.frame
+            XCTAssertTrue(window.contains(frame), "\(identifier) \(frame) window \(window)")
+            XCTAssertGreaterThanOrEqual(frame.width, 44, "\(identifier) \(frame)")
+            XCTAssertGreaterThanOrEqual(frame.height, 44, "\(identifier) \(frame)")
+        }
+
+        app.buttons.matching(identifier: "mvp_keyboard_bottom_done_button").firstMatch.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+    }
+
     // MARK: - 14. Arabic locale renders the root with a hittable composer
 
     func testArabicLocaleRootRendersAndComposerIsHittable() throws {
@@ -607,7 +681,70 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         attachScreenshot(named: "edge-arabic-locale-root", from: app)
     }
 
+    func testGlp1MedicationSelectorCancelMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture",
+            "-lybUITestGlp1EmptyMedicationFixture"
+        ])
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+        if !app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists {
+            let menu = app.buttons["Open Menu"]
+            XCTAssertTrue(menu.waitForExistence(timeout: 8))
+            menu.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 5))
+            let stats = app.buttons["Stats"]
+            XCTAssertTrue(stats.waitForExistence(timeout: 5))
+            stats.tap()
+        }
+
+        let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
+        swipeUntilExists(prompt, in: app)
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        swipeUntilHittable(prompt, in: app)
+        prompt.tap()
+
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
+        let addMedication = app.buttons["Add medication"]
+        XCTAssertTrue(addMedication.waitForExistence(timeout: 5))
+        swipeUntilHittable(addMedication, in: app)
+        addMedication.tap()
+
+        let sheetBar = app.navigationBars["Select GLP-1"]
+        XCTAssertTrue(sheetBar.waitForExistence(timeout: 8))
+        let cancel = app.descendants(matching: .any)["glp1_medication_selector_cancel_button"]
+        let save = app.descendants(matching: .any)["glp1_medication_selector_save_button"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        let cancelFrame = cancel.frame
+        let saveFrame = save.frame
+        let windowFrame = app.windows.firstMatch.frame
+        XCTAssertTrue(windowFrame.contains(cancelFrame), "Cancel \(cancelFrame) window \(windowFrame)")
+        XCTAssertTrue(windowFrame.contains(saveFrame), "Save \(saveFrame) window \(windowFrame)")
+        XCTAssertGreaterThanOrEqual(cancelFrame.width, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(cancelFrame.height, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(saveFrame.width, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(saveFrame.height, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        cancel.tap()
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 5))
+        XCTAssertFalse(sheetBar.exists)
+    }
+
     // MARK: - Shared helpers
+
+    private func swipeUntilExists(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<8 where !element.exists {
+            app.swipeUp()
+        }
+    }
+
+    private func swipeUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<6 where !element.isHittable {
+            app.swipeUp()
+        }
+    }
 
     private func launch(_ app: XCUIApplication, with arguments: [String]) {
         if app.state != .notRunning {
