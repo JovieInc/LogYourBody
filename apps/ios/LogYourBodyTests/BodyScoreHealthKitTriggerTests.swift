@@ -2,6 +2,10 @@ import XCTest
 import CoreData
 @testable import LogYourBody
 
+private final class ObserverQueryCounter: @unchecked Sendable {
+    var value = 0
+}
+
 @MainActor
 final class BodyScoreHealthKitTriggerTests: XCTestCase {
     private var suiteName = ""
@@ -99,6 +103,63 @@ final class BodyScoreHealthKitTriggerTests: XCTestCase {
         XCTAssertEqual(result.skipped, 0)
         XCTAssertNil(BodyScoreCache.shared.latestResult(for: userId))
         XCTAssertEqual(BodyScoreCache.shared.latestResult(for: otherUserId), otherCachedScore)
+    }
+
+    func testObserverDebounceDoesNotBurnCooldownAfterAccountSwitch() async throws {
+        let userA = "observer-owner-\(UUID().uuidString)"
+        let userB = "observer-replacement-\(UUID().uuidString)"
+        auth.authSession = .localFixture(subject: userA, email: "observer-owner@example.com")
+        auth.currentUser = makeUser(id: userA, email: "observer-owner@example.com")
+        let queries = ObserverQueryCounter()
+        let manager = HealthKitManager(
+            userDefaults: defaults,
+            authManager: auth,
+            coreDataManager: coreData,
+            weightImportQuery: { _, _ in
+                queries.value += 1
+                return []
+            },
+            bodyFatImportQuery: { _ in [] },
+            syncTrigger: {}
+        )
+        manager.isAuthorized = true
+        defer { manager.syncDebounceTimer?.invalidate() }
+
+        manager.scheduleObservedBodyMetricSync(for: userA, debounce: 0.05)
+        auth.authSession = .localFixture(subject: userB, email: "observer-replacement@example.com")
+        auth.currentUser = makeUser(id: userB, email: "observer-replacement@example.com")
+        try await Task.sleep(nanoseconds: 500_000_000)
+
+        let ownerKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userA)
+        XCTAssertNil(defaults.object(forKey: ownerKey))
+        XCTAssertEqual(queries.value, 0)
+    }
+
+    func testObserverDebounceSyncsWhileTheSchedulingAccountStaysSignedIn() async throws {
+        let userA = "observer-stays-\(UUID().uuidString)"
+        auth.authSession = .localFixture(subject: userA, email: "observer-stays@example.com")
+        auth.currentUser = makeUser(id: userA, email: "observer-stays@example.com")
+        let queries = ObserverQueryCounter()
+        let manager = HealthKitManager(
+            userDefaults: defaults,
+            authManager: auth,
+            coreDataManager: coreData,
+            weightImportQuery: { _, _ in
+                queries.value += 1
+                return []
+            },
+            bodyFatImportQuery: { _ in [] },
+            syncTrigger: {}
+        )
+        manager.isAuthorized = true
+        defer { manager.syncDebounceTimer?.invalidate() }
+
+        manager.scheduleObservedBodyMetricSync(for: userA, debounce: 0.05)
+        try await Task.sleep(nanoseconds: 500_000_000)
+
+        let ownerKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userA)
+        XCTAssertNotNil(defaults.object(forKey: ownerKey))
+        XCTAssertEqual(queries.value, 1)
     }
 
     private func makeUser(id: String, email: String) -> LocalUser {
