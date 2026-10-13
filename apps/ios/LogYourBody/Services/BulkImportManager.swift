@@ -39,6 +39,8 @@ class BulkImportManager: ObservableObject {
     private let loadFullImage: (PHAsset) async -> UIImage?
     private let uploadPhoto: (BodyMetrics, UIImage) async throws -> String
     private let syncImportedPhoto: @MainActor () -> Void
+    private let shouldDeleteAfterImport: () -> Bool
+    private let deleteAssets: ([String]) async throws -> Void
 
     var totalCount: Int {
         importTasks.count
@@ -65,7 +67,13 @@ class BulkImportManager: ObservableObject {
             uploadPhoto: { metrics, image in
                 try await PhotoUploadManager.shared.uploadProgressPhoto(for: metrics, image: image)
             },
-            syncImportedPhoto: { RealtimeSyncManager.shared.syncIfNeeded() }
+            syncImportedPhoto: { RealtimeSyncManager.shared.syncIfNeeded() },
+            shouldDeleteAfterImport: {
+                UserDefaults.standard.bool(forKey: Constants.deletePhotosAfterImportKey)
+            },
+            deleteAssets: { localIdentifiers in
+                try await LivePhotoLibraryAdapter.shared.deleteAssets(localIdentifiers: localIdentifiers)
+            }
         )
     }
 
@@ -74,13 +82,17 @@ class BulkImportManager: ObservableObject {
         metricsStore: CoreDataManager,
         loadFullImage: @escaping (PHAsset) async -> UIImage?,
         uploadPhoto: @escaping (BodyMetrics, UIImage) async throws -> String,
-        syncImportedPhoto: @escaping @MainActor () -> Void
+        syncImportedPhoto: @escaping @MainActor () -> Void,
+        shouldDeleteAfterImport: @escaping () -> Bool = { false },
+        deleteAssets: @escaping ([String]) async throws -> Void = { _ in }
     ) {
         self.accountOwner = accountOwner
         self.metricsStore = metricsStore
         self.loadFullImage = loadFullImage
         self.uploadPhoto = uploadPhoto
         self.syncImportedPhoto = syncImportedPhoto
+        self.shouldDeleteAfterImport = shouldDeleteAfterImport
+        self.deleteAssets = deleteAssets
     }
 
     // MARK: - Public Methods
@@ -113,6 +125,8 @@ class BulkImportManager: ObservableObject {
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             }
 
+            await deleteImportedAssetsIfNeeded()
+
             await MainActor.run {
                 isImporting = false
                 currentPhotoName = nil
@@ -122,6 +136,34 @@ class BulkImportManager: ObservableObject {
         }
         currentTask = task
         await task.value
+    }
+
+    /// Deletes camera-roll originals for tasks whose upload completed, batched
+    /// into a single request so Photos shows one system confirmation and the
+    /// assets land in Recently Deleted. Runs only when the opt-in setting is on.
+    private func deleteImportedAssetsIfNeeded() async {
+        guard shouldDeleteAfterImport(), !Task.isCancelled else { return }
+
+        let localIdentifiers = await MainActor.run {
+            importTasks.compactMap { task -> String? in
+                guard task.status == .completed else { return nil }
+                let identifier = task.photo.asset.localIdentifier
+                return identifier.isEmpty ? nil : identifier
+            }
+        }
+        guard !localIdentifiers.isEmpty else { return }
+
+        do {
+            try await deleteAssets(localIdentifiers)
+        } catch {
+            let context = ErrorContext(
+                feature: "photos",
+                operation: "deleteImportedPhotos",
+                screen: "BulkPhotoImport",
+                userId: nil
+            )
+            ErrorReporter.shared.captureNonFatal(error, context: context)
+        }
     }
 
     func cancelImport() {

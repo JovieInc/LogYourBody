@@ -590,33 +590,173 @@ def test_wrong_run_identity_or_job_attestation_degrades_to_hosted(
         assert outputs["health"] == "down"
 
 
-def test_required_ios_jobs_ignore_mac_opt_in_and_heartbeat_state() -> None:
-    workflow = (_WORKFLOWS / 'ci.yml').read_text()
-    # No preflight state or repository opt-in can divert or delay required CI.
-    # Literal hosted labels also cover a Mac disappearing after a fresh probe.
-    assert 'vars.MAC_RUNNER' not in workflow
-    assert '  mac-runner-route:' not in workflow
-    for name in ['ios', 'ios_quality']:
-        job = _job_block('ci.yml', name)
-        assert '    runs-on: macos-15' in job.splitlines()
-        assert '    needs: detect-changes' in job.splitlines()
-        assert 'heartbeat' not in job
-        assert 'self-hosted' not in job
-        assert 'runner_class' not in job
-        assert 'uses: ./.github/actions/setup-ios-build' in job
+_MAC_LANE_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "mac-lane.sh"
+_SELF_HOSTED_MAC = 'fromJSON(\'["self-hosted","macOS","ARM64","jovie-mac"]\')'
+_IOS_LANES = {"ios": ("ios-unit.yml", "unit"), "ios_quality": ("ios-quality.yml", "quality")}
+
+
+def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
+    # Org rule (JovieInc/Jovie .claude/rules/infra.md "macOS runners"): an idle
+    # Mac first, hosted otherwise; nothing waits on a busy, asleep or offline
+    # Mac. A job queued straight on jovie-mac would wait 24h for a Mac that
+    # disappears after routing, so Mac work runs only in a mac-lane.yml child
+    # run that the route cancels when no Mac picks it up.
+    workflow = (_WORKFLOWS / "ci.yml").read_text()
+    assert "jovie-mac" not in workflow
+    assert "heartbeat" not in workflow
+    child = (_WORKFLOWS / "mac-lane.yml").read_text()
+    assert "cancel-in-progress: true" in child
+    for name, (reusable, work) in _IOS_LANES.items():
+        job = _job_block("ci.yml", name)
+        assert f"    uses: ./.github/workflows/{reusable}" in job.splitlines()
+        assert "      mac-first: true" in job.splitlines()
+        assert "    needs: detect-changes" in job.splitlines()
         assert "if: needs.detect-changes.outputs.ios == 'true'" in job
+        assert f"uses: ./.github/workflows/{reusable}" in child
+        lane = _job_block(reusable, work)
+        assert (
+            f"runs-on: ${{{{ inputs.mac-child && {_SELF_HOSTED_MAC} || 'macos-15' }}}}" in lane
+        )
+        assert "needs.mac.outputs.run_hosted == 'true'" in lane
+        assert "uses: ./.github/workflows/mac-lane-route.yml" in _job_block(reusable, "mac")
+    assert child.count("group: ${{ inputs.join-group }}") == len(_IOS_LANES)
+    for path in _WORKFLOWS.glob("*.yml"):
+        for line in path.read_text().splitlines():
+            if "runs-on:" in line and "jovie-mac" in line and path.name != "mac-runner-heartbeat.yml":
+                assert "inputs.mac-child && fromJSON" in line, f"{path.name}: {line}"
+
+
+def test_mac_route_uses_first_attempts_of_trusted_events_only() -> None:
+    route = (_WORKFLOWS / "mac-lane-route.yml").read_text()
+    assert (
+        "      vars.JOVIE_MAC_RUNNER != 'off' &&\n"
+        "      github.run_attempt == '1' &&\n"
+        "      (github.event_name != 'pull_request' || "
+        "github.event.pull_request.head.repo.full_name == github.repository)"
+    ) in route
+    assert "group: ${{ needs.dispatch.outputs.join_group }}" in route
+    assert (
+        "value: ${{ jobs.dispatch.outputs.fallback != 'false' || jobs.join.outputs.infra != 'false' }}"
+        in route
+    )
+    assert "secrets." not in route
+    assert "schedule:" not in route
 
 
 def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> None:
-    assert 'bundle exec fastlane ci_ios' in _job_block('ci.yml', 'ios')
-    assert 'ci_test_unit' in _job_block('ci.yml', 'ios')
-    assert 'launch-quality-audit.sh' in _job_block('ci.yml', 'ios_quality')
-    assert 'performance-audit.sh' in _job_block('ci.yml', 'ios_quality')
+    assert 'bundle exec fastlane ci_ios' in _job_block('ios-unit.yml', 'unit')
+    assert 'ci_test_unit' in _job_block('ios-unit.yml', 'unit')
+    assert 'launch-quality-audit.sh' in _job_block('ios-quality.yml', 'quality')
+    assert 'performance-audit.sh' in _job_block('ios-quality.yml', 'quality')
     summary = _job_block('ci.yml', 'ci-summary')
     assert 'assert_expected_result "iOS Launch Quality Gate"' in summary
     assert 'mac-runner-routing-tests' in summary
     assert 'setup-canary' not in summary
     assert 'heartbeat' not in summary
+
+
+_MAC_LANE_GH = """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$FAKE_DIR/calls"
+args="$*"
+if [[ "$args" == *"/dispatches"* ]]; then
+  [ -f "$FAKE_DIR/dispatch.json" ] || exit 1
+  cat "$FAKE_DIR/dispatch.json"
+elif [[ "$args" == *"/cancel"* ]]; then
+  echo '{}'
+elif [[ "$args" == *"/jobs"* ]]; then
+  [ -f "$FAKE_DIR/jobs.json" ] || exit 1
+  jq "$(sed -n 's/.*--jq //p' <<<"$args")" "$FAKE_DIR/jobs.json"
+else
+  exit 1
+fi
+"""
+
+
+def _mac_job(status: str, conclusion: Optional[str] = None, failed_step: bool = False) -> dict[str, Any]:
+    return {
+        "status": status,
+        "conclusion": conclusion,
+        "runner_name": None if status == "queued" else "tw-mac-001",
+        "labels": ["self-hosted", "macOS", "ARM64", "jovie-mac"],
+        "steps": [{"name": "Test", "conclusion": "failure" if failed_step else "success"}],
+    }
+
+
+def _run_mac_lane(tmp_path: Path, command: str, env: dict[str, str], **fixtures: Any):
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    gh = tmp_path / "bin" / "gh"
+    gh.parent.mkdir(exist_ok=True)
+    gh.write_text(_MAC_LANE_GH)
+    gh.chmod(0o755)
+    for name, value in fixtures.items():
+        (tmp_path / f"{name}.json").write_text(json.dumps(value))
+    output = tmp_path / "output"
+    output.write_text("")
+    (tmp_path / "calls").write_text("")
+    result = subprocess.run(
+        ["bash", str(_MAC_LANE_SCRIPT), command], text=True, capture_output=True,
+        check=False, pass_fds=_coverage_fds(),
+        env={**os.environ, "PATH": f"{gh.parent}:{os.environ['PATH']}", "FAKE_DIR": str(tmp_path),
+             "GITHUB_OUTPUT": str(output), "GITHUB_SERVER_URL": "server",
+             "GH_REPO": "JovieInc/LogYourBody", "LANE": "ios", "FIRST_POLL_SECONDS": "0",
+             "POLL_SECONDS": "0", **env},
+    )
+    outputs = dict(line.split("=", 1) for line in output.read_text().splitlines() if line)
+    return result, outputs, (tmp_path / "calls").read_text().splitlines()
+
+
+_DISPATCH_ENV = {
+    "GH_TOKEN": "token", "DISPATCH_REF": "main", "CHECKOUT_SHA": "abc",
+    "JOIN_GROUP": "join", "SUPERSEDE_GROUP": "supersede", "PARENT_RUN": "parent",
+}
+
+
+def test_mac_lane_dispatch_joins_on_pickup_and_falls_back_otherwise(tmp_path: Path) -> None:
+    result, outputs, calls = _run_mac_lane(
+        tmp_path / "picked", "dispatch", _DISPATCH_ENV,
+        dispatch={"workflow_run_id": 42}, jobs={"jobs": [_mac_job("in_progress")]},
+    )
+    assert result.returncode == 0, result.stderr
+    assert outputs == {"join_group": "join", "child_run_id": "42", "fallback": "false"}
+    assert not any("/cancel" in call for call in calls)
+
+    result, outputs, calls = _run_mac_lane(
+        tmp_path / "stuck", "dispatch", {**_DISPATCH_ENV, "PICKUP_SECONDS": "0"},
+        dispatch={"workflow_run_id": 42}, jobs={"jobs": [_mac_job("queued")]},
+    )
+    assert result.returncode == 0, result.stderr
+    assert outputs["fallback"] == "true"
+    assert "actions/runs/42/cancel" in calls[-1]
+
+    result, outputs, _ = _run_mac_lane(tmp_path / "no-dispatch", "dispatch", _DISPATCH_ENV)
+    assert result.returncode == 0, result.stderr
+    assert outputs["fallback"] == "true"
+    assert "child_run_id" not in outputs
+
+    result, _, _ = _run_mac_lane(tmp_path / "usage", "bogus", {})
+    assert result.returncode == 2
+
+
+def test_mac_lane_result_passes_fails_or_hands_back_to_hosted(tmp_path: Path) -> None:
+    env = {"GH_TOKEN": "token", "CHILD_RUN_ID": "42"}
+    result, outputs, _ = _run_mac_lane(
+        tmp_path / "pass", "result", env, jobs={"jobs": [_mac_job("completed", "success")]}
+    )
+    assert (result.returncode, outputs["infra"]) == (0, "false")
+    result, outputs, _ = _run_mac_lane(
+        tmp_path / "fail", "result", env, jobs={"jobs": [_mac_job("completed", "failure", True)]}
+    )
+    assert (result.returncode, outputs["infra"]) == (1, "false")
+    for index, jobs in enumerate([
+        [_mac_job("completed", "failure")],
+        [_mac_job("completed", "cancelled")],
+        [_mac_job("completed", "timed_out")],
+        [],
+    ]):
+        result, outputs, _ = _run_mac_lane(tmp_path / f"lost-{index}", "result", env, jobs={"jobs": jobs})
+        assert (result.returncode, outputs["infra"]) == (0, "true")
+    result, outputs, _ = _run_mac_lane(tmp_path / "unreadable", "result", env)
+    assert (result.returncode, outputs["infra"]) == (0, "true")
 
 
 def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
@@ -679,7 +819,7 @@ def verify_coverage(report: Path) -> None:
     suites = json.loads(report.read_text())
     assert list(suites) == ['mac-runner-routing'], 'Unexpected or stale coverage suite'
     coverage = suites['mac-runner-routing']['coverage']
-    for script in (_AWAIT_SCRIPT, _QUERY_SCRIPT):
+    for script in (_AWAIT_SCRIPT, _QUERY_SCRIPT, _MAC_LANE_SCRIPT):
         matches = [value for path, value in coverage.items() if Path(path).resolve() == script.resolve()]
         assert len(matches) == 1, f'Missing coverage for {script.name}'
         lines = matches[0]['lines']
@@ -706,3 +846,13 @@ def test_coverage_gate_rejects_missing_empty_and_low_coverage(tmp_path: Path) ->
 
 if __name__ == '__main__':
     verify_coverage(_REPO_ROOT / 'coverage/mac-runner-routing/.resultset.json')
+
+
+def test_failed_merge_group_cancels_its_mac_jobs_instead_of_holding_them() -> None:
+    block = _job_block("ci.yml", "merge-group-fail-fast")
+    assert "needs: [detect-changes, mac-runner-routing-tests, js]" in block
+    assert "if: github.event_name == 'merge_group' && failure()" in block
+    assert 'gh run cancel "$GITHUB_RUN_ID"' in block
+    summary = _job_block("ci.yml", "ci-summary")
+    # The required check must still conclude after the cancel.
+    assert "if: always()" in summary
