@@ -15,6 +15,10 @@ class LoadingManager: ObservableObject {
     private let syncManager = RealtimeSyncManager.shared
     private let healthSyncCoordinator: HealthSyncCoordinating
 
+    /// Runs after the cached profile fetch returns and before that profile is applied.
+    /// Production leaves this nil.
+    var onCachedProfileFetched: (@MainActor (String) async -> Void)?
+
     // Loading steps with their weights
     private enum LoadingStep {
         case initialize
@@ -142,6 +146,14 @@ class LoadingManager: ObservableObject {
         await updateProgress(for: .checkAuth)
     }
 
+    func loadCachedProfile(for userId: String) async -> CachedProfile? {
+        let profile = await coreDataManager.fetchProfile(for: userId)
+        if let onCachedProfileFetched {
+            await onCachedProfileFetched(userId)
+        }
+        return profile
+    }
+
     private func performProfileStepIfNeeded() async {
         if authManager.isAuthenticated {
             await updateProgress(for: .loadProfile, partial: 0.3)
@@ -150,10 +162,10 @@ class LoadingManager: ObservableObject {
                 // print("📱 LoadingManager: Loading profile for user \(userId)")
 
                 // Load profile from Core Data first
-                if let cachedProfile = await coreDataManager.fetchProfile(for: userId) {
+                if let cachedProfile = await loadCachedProfile(for: userId) {
                     let profile = cachedProfile.toUserProfile()
-                    // Update auth manager with cached profile
-                    if let currentUser = authManager.currentUser {
+                    // Update auth manager with cached profile only while that account is still signed in.
+                    if authManager.currentUser?.id == userId, let currentUser = authManager.currentUser {
                         let updatedUser = User(
                             id: currentUser.id,
                             email: currentUser.email,
