@@ -103,7 +103,7 @@ CodeQL analysis on pushes, pull requests, and schedule.
 
 ### `security-scan.yml`
 
-Weekly/manual/main-branch secret, dependency, and SBOM scanning. Gitleaks runs through the shared `JovieInc/ci` `secret-scan.yml` workflow, pinned by commit SHA.
+Weekly/manual/main-branch secret, dependency, and SBOM scanning. Gitleaks runs through the shared `JovieInc/ci` `secret-scan.yml` workflow, pinned by commit SHA. Main pushes fail on findings introduced by the pushed commit range; weekly and manual runs retain the full-history audit.
 
 ### `dependabot-auto-merge.yml`
 
