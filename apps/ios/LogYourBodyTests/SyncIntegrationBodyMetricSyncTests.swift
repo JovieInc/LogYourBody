@@ -85,8 +85,13 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
     }
 
     func testProcessBatchHealthKitData_DeduplicatesLateNightWeightsAndPreservesLocalDate() async throws {
+        let previousHealthAccount = isolateSharedHealthAccountBinding()
+        defer { restoreSharedHealthAccountBinding(previousHealthAccount) }
         let coreData = CoreDataManager.shared
-        let healthKitManager = HealthKitManager.shared
+        let healthKitManager = HealthKitManager(
+            authManager: AuthManager.shared, coreDataManager: coreData,
+            syncTrigger: {}, importCompletion: { _ in }
+        )
 
         let userId = "healthkit_test_user_late_night_dedup_\(UUID().uuidString)"
         let user = LocalUser(
@@ -96,6 +101,15 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
             avatarUrl: nil,
             profile: nil,
             onboardingCompleted: false
+        )
+        let originalSession = AuthManager.shared.authSession
+        let originalUser = AuthManager.shared.currentUser
+        defer {
+            AuthManager.shared.authSession = originalSession
+            AuthManager.shared.currentUser = originalUser
+        }
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId, email: "hk_late_night@example.com", accessToken: "synthetic-health-access"
         )
         AuthManager.shared.currentUser = user
 
@@ -126,8 +140,13 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
     }
 
     func testProcessBatchHealthKitData_PairsBodyFatByLocalDateAcrossMidnight() async throws {
+        let previousHealthAccount = isolateSharedHealthAccountBinding()
+        defer { restoreSharedHealthAccountBinding(previousHealthAccount) }
         let coreData = CoreDataManager.shared
-        let healthKitManager = HealthKitManager.shared
+        let healthKitManager = HealthKitManager(
+            authManager: AuthManager.shared, coreDataManager: coreData,
+            syncTrigger: {}, importCompletion: { _ in }
+        )
 
         let userId = "healthkit_test_user_midnight_pairing_\(UUID().uuidString)"
         let user = LocalUser(
@@ -137,6 +156,15 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
             avatarUrl: nil,
             profile: nil,
             onboardingCompleted: false
+        )
+        let originalSession = AuthManager.shared.authSession
+        let originalUser = AuthManager.shared.currentUser
+        defer {
+            AuthManager.shared.authSession = originalSession
+            AuthManager.shared.currentUser = originalUser
+        }
+        AuthManager.shared.authSession = .localFixture(
+            subject: userId, email: "hk_midnight_pairing@example.com", accessToken: "synthetic-health-access"
         )
         AuthManager.shared.currentUser = user
 
@@ -178,6 +206,24 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertEqual(nextDayMetric.weight, 83.8)
         XCTAssertEqual(nextDayMetric.bodyFatPercentage, 22.5)
         XCTAssertEqual(nextDayMetric.bodyFatMethod, "HealthKit")
+        XCTAssertEqual(
+            UserDefaults.standard.string(forKey: HealthKitAccountSyncPolicy.accountIdKey),
+            userId
+        )
+    }
+
+    private func isolateSharedHealthAccountBinding() -> String? {
+        let previous = UserDefaults.standard.string(forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        UserDefaults.standard.removeObject(forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        return previous
+    }
+
+    private func restoreSharedHealthAccountBinding(_ previous: String?) {
+        if let previous {
+            UserDefaults.standard.set(previous, forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: HealthKitAccountSyncPolicy.accountIdKey)
+        }
     }
 
     func testSyncLocalChanges_UsesProductAPIAndMarksBodyMetricSynced() async throws {
@@ -533,6 +579,54 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertNil(UserDefaults.standard.data(forKey: "pendingSyncOperations"))
     }
 
+    func testDeleteBodyMetricDoesNotDeleteAnotherAccountsRow() async throws {
+        let ownerId = "sync_test_owner_\(UUID().uuidString)"
+        let otherId = "sync_test_other_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(90)
+        let metric = BodyMetrics(
+            id: id,
+            userId: ownerId,
+            date: date,
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: ownerId, markAsSynced: true)
+
+        let authManager = AuthManager()
+        authManager.currentUser = LocalUser(
+            id: otherId,
+            email: "other@example.com",
+            name: "Other",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+        let manager = RealtimeSyncManager(
+            coreDataManager: CoreDataManager.shared,
+            authManager: authManager,
+            productAPIClient: StubProductAPIClient()
+        )
+        manager.isOnline = false
+
+        let deleted = await manager.deleteBodyMetric(id: id)
+
+        XCTAssertFalse(deleted, "A signed-in account must not delete another account's measurement")
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertFalse(row.isMarkedDeleted)
+        XCTAssertTrue(manager.pendingOperations.isEmpty)
+    }
+
     func testSyncLocalChangesDeletesMarkedBodyMetricInsteadOfUpserting() async throws {
         let coreData = CoreDataManager.shared
 
@@ -558,7 +652,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         )
 
         try await coreData.saveBodyMetricsAndWait(metricModel, userId: userId, markAsSynced: true)
-        let didMarkDeleted = await coreData.markBodyMetricDeleted(id: id)
+        let didMarkDeleted = await coreData.markBodyMetricDeleted(id: id, userId: userId)
         XCTAssertTrue(didMarkDeleted)
 
         let stubProductAPI = StubProductAPIClient()

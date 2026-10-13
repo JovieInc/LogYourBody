@@ -9,6 +9,18 @@ enum BulkPhotoImportPresentationPolicy {
     static func canConfirmImport(selectedCount: Int, isImporting: Bool) -> Bool {
         selectedCount > 0 && !isImporting
     }
+
+    /// Scan suggestions plus photos the user picked from the library,
+    /// deduplicated by library identifier and ordered newest first like the
+    /// scan results. A scanned suggestion wins over a duplicate manual pick so
+    /// its detection confidence stays attached.
+    static func mergeCandidates(scanned: [ScannedPhoto], manual: [ScannedPhoto]) -> [ScannedPhoto] {
+        var seen = Set<String>()
+        // Deduplicate before sorting so the scanned candidate always wins a
+        // shared-date tie; sorted is not guaranteed stable.
+        let unique = (scanned + manual).filter { seen.insert($0.asset.localIdentifier).inserted }
+        return unique.sorted { $0.date > $1.date }
+    }
 }
 
 struct BulkPhotoImportView: View {
@@ -21,6 +33,7 @@ struct BulkPhotoImportView: View {
     @Environment(\.dismiss)
     var dismiss
     @State private var selectedPhotos: Set<UUID> = []
+    @State private var manualPhotos: [ScannedPhoto] = []
     @State private var showPermissionAlert = false
     @State private var showImportConfirmation = false
     @State private var isImporting = false
@@ -49,7 +62,14 @@ struct BulkPhotoImportView: View {
     }
 
     private var allPhotosSelected: Bool {
-        selectedPhotos.count == scanner.scannedPhotos.count && !scanner.scannedPhotos.isEmpty
+        selectedPhotos.count == candidates.count && !candidates.isEmpty
+    }
+
+    private var candidates: [ScannedPhoto] {
+        BulkPhotoImportPresentationPolicy.mergeCandidates(
+            scanned: scanner.scannedPhotos,
+            manual: manualPhotos
+        )
     }
 
     var body: some View {
@@ -58,10 +78,10 @@ struct BulkPhotoImportView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                if !scanner.scannedPhotos.isEmpty && !isImporting {
+                if !candidates.isEmpty && !isImporting {
                     Menu {
                         Button("Select All", systemImage: "checkmark.circle") {
-                            selectedPhotos = Set(scanner.scannedPhotos.map { $0.id })
+                            selectedPhotos = Set(candidates.map { $0.id })
                         }
                         .disabled(allPhotosSelected)
 
@@ -118,7 +138,7 @@ struct BulkPhotoImportView: View {
             accessDeniedView
         } else if scanner.isScanning {
             scanningView
-        } else if scanner.scannedPhotos.isEmpty && hasStartedScan {
+        } else if candidates.isEmpty && hasStartedScan {
             noPhotosFoundView
         } else if isImporting || importManager.isImporting {
             importingView
@@ -351,7 +371,10 @@ struct BulkPhotoImportView: View {
                 Text("No Progress Photos Found")
                     .font(theme.typography.displaySmall)
 
-                Text("We couldn't find any photos that look like progress photos in your library")
+                Text(
+                    "We couldn't find any photos that look like progress photos in your library. " +
+                        "You can still search and choose them yourself."
+                )
                     .font(theme.typography.bodyLarge)
                     .foregroundColor(theme.colors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -359,6 +382,9 @@ struct BulkPhotoImportView: View {
             }
 
             Spacer()
+
+            manualPickButton(title: "Choose Photos Yourself")
+                .padding(.horizontal, JovieTokens.screenInset)
 
             BaseButton(
                 "Done",
@@ -380,12 +406,15 @@ struct BulkPhotoImportView: View {
     private var photoSelectionView: some View {
         VStack(spacing: 0) {
             VStack(spacing: 4) {
-                Text("Found \(scanner.scannedPhotos.count) potential photos")
+                Text("Found \(candidates.count) potential photos")
                     .font(theme.typography.headlineSmall)
 
                 Text("Select the photos you want to import")
                     .font(theme.typography.bodySmall)
                     .foregroundColor(theme.colors.textSecondary)
+
+                manualPickButton(title: "Add More From Library")
+                    .padding(.top, theme.spacing.xs)
             }
             .padding(theme.spacing.md)
             .background(theme.colors.surface)
@@ -397,7 +426,7 @@ struct BulkPhotoImportView: View {
                     GridItem(.flexible(), spacing: JovieTokens.itemGap),
                     GridItem(.flexible(), spacing: JovieTokens.itemGap)
                 ], spacing: JovieTokens.itemGap) {
-                    ForEach(scanner.scannedPhotos) { photo in
+                    ForEach(candidates) { photo in
                         PhotoGridItem(
                             photo: photo,
                             isSelected: selectedPhotos.contains(photo.id)
@@ -507,6 +536,34 @@ struct BulkPhotoImportView: View {
         }
     }
 
+    /// System picker search/browse for photos the on-device scan missed.
+    /// Picks resolve back to library assets so capture dates stay intact.
+    private func manualPickButton(title: String) -> some View {
+        AppPhotosPicker { picks in
+            addManualPicks(picks)
+        } label: {
+            Label(title, systemImage: "magnifyingglass")
+                .font(theme.typography.labelMedium)
+                .foregroundColor(theme.colors.info)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
+        }
+        .accessibilityIdentifier("bulk_photo_import_manual_pick")
+        .accessibilityHint("Opens your photo library to search and choose photos")
+    }
+
+    private func addManualPicks(_ picks: [AppPhotoAsset]) {
+        let identifiers = picks.compactMap { $0.localIdentifier }
+        let assets = scanner.assets(forLocalIdentifiers: identifiers)
+        let additions = assets.map { scanner.manualCandidate(for: $0) }
+        guard !additions.isEmpty else { return }
+
+        let known = Set(candidates.map { $0.asset.localIdentifier })
+        let fresh = additions.filter { !known.contains($0.asset.localIdentifier) }
+        manualPhotos.append(contentsOf: fresh)
+        // A manual pick is already an explicit choice, so pre-select it.
+        selectedPhotos.formUnion(fresh.map { $0.id })
+    }
+
     private func toggleSelection(for photo: ScannedPhoto) {
         if selectedPhotos.contains(photo.id) {
             selectedPhotos.remove(photo.id)
@@ -518,7 +575,7 @@ struct BulkPhotoImportView: View {
     private func startImport() {
         guard !importManager.isImporting else { return }
 
-        let photosToImport = scanner.scannedPhotos.filter { selectedPhotos.contains($0.id) }
+        let photosToImport = candidates.filter { selectedPhotos.contains($0.id) }
         isImporting = true
         importCompletion = nil
 
@@ -651,7 +708,7 @@ struct PhotoGridItem: View {
                 }
 
                 // Confidence indicator
-                if photo.confidence > 0.85 {
+                if photo.confidence > 0.85 && !photo.isManuallyPicked {
                     VStack {
                         HStack {
                             Spacer()
@@ -667,7 +724,7 @@ struct PhotoGridItem: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-            "Photo from \(photo.date.formatted(.dateTime.month(.wide).day().year()))\(photo.confidence > 0.85 ? ", high-confidence suggestion" : ", suggested progress photo")"
+            "Photo from \(photo.date.formatted(.dateTime.month(.wide).day().year()))\(photo.isManuallyPicked ? ", picked from your library" : photo.confidence > 0.85 ? ", high-confidence suggestion" : ", suggested progress photo")"
         )
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityHint("Double tap to \(isSelected ? "remove from" : "add to") import")

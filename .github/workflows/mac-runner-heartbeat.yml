@@ -1,0 +1,63 @@
+name: Mac Runner Heartbeat
+# Shared JovieInc Mac pool; no checkout or secrets in the heartbeat probe.
+
+on:
+  # Qualification is manual and independent of required CI. A heartbeat does
+  # not reserve capacity or provide failover after selecting self-hosted labels.
+  workflow_dispatch:
+    inputs:
+      verify-ios-setup:
+        description: Verify setup-ios-build before considering optional self-hosted capacity.
+        type: boolean
+        default: false
+      runner:
+        description: Machine label (jovie-mac-<runner name>) to qualify one Mac; blank uses any.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-runner-heartbeat-${{ inputs.runner || 'any' }}
+  # A busy/offline Mac retains only the newest queued probe, which observers
+  # read as down until the runner drains it.
+  cancel-in-progress: true
+
+jobs:
+  heartbeat:
+    name: Self-hosted Mac runner heartbeat
+    runs-on: [self-hosted, macOS, ARM64, jovie-mac]
+    timeout-minutes: 2
+    steps:
+      - name: Record heartbeat
+        run: echo "Self-hosted Mac heartbeat from $RUNNER_NAME"
+
+  setup-canary:
+    name: Self-hosted iOS setup canary
+    if: github.event_name == 'workflow_dispatch' && inputs.verify-ios-setup
+    runs-on: ${{ inputs.runner != '' && fromJSON(format('["self-hosted","jovie-mac","{0}"]', inputs.runner)) || fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup iOS build environment
+        uses: ./.github/actions/setup-ios-build
+        with:
+          xcode-version: 'latest-stable'
+          working-directory: apps/ios
+          setup-ruby: 'true'
+          create-config-files: 'false'
+
+      - name: Require the build toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          test "$(swiftlint version)" = '0.63.3'
+          xcbeautify --version
+          bundle --version
+          cd apps/ios
+          bundle check
