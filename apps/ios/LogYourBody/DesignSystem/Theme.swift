@@ -429,9 +429,10 @@ struct DefaultTheme: Theme {
         primaryMuted: .jovieAction.opacity(0.82),
         primarySubtle: .jovieAction.opacity(0.12),
 
-        // Accents
-        accentViolet: Color(hex: "#8b1eff"),
-        accentPink: Color(hex: "#d61a7f"),
+        // Accents — must clear WCAG 4.5:1 against `surface`/`background` for
+        // metric label text (JOV-6093); guarded by MetricAccentContrastTests.
+        accentViolet: Color(hex: "#BF5AF2"),
+        accentPink: Color(hex: "#F45A9E"),
         accentTeal: Color(hex: "#0f9b8e"),
         accentOrange: Color(hex: "#ff9800"),
         accentGreen: Color(hex: "#2f9e44"),

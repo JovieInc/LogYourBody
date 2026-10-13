@@ -593,7 +593,7 @@ struct HomeV2Filmstrip: View {
             CachedAsyncImage(urlString: bodyMetrics[index].photoUrl ?? "") { image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
             } placeholder: {
                 HomeV2Tokens.Colors.card
             }
@@ -617,6 +617,7 @@ struct SubjectPlateView: View {
 
     @State private var plate: UIImage?
     @State private var original: UIImage?
+    @State private var focus: CGPoint?
 
     var body: some View {
         ZStack {
@@ -634,27 +635,33 @@ struct SubjectPlateView: View {
     }
 
     private func stagePhoto(_ image: UIImage) -> some View {
-        Image(uiImage: AspectFillCropper.crop(image, to: size))
+        Image(uiImage: AspectFillCropper.crop(image, to: size, anchor: focus))
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .frame(width: size.width, height: size.height)
     }
 
     private func load() async {
         if let cached = SubjectPlateStore.shared.cachedPlate(for: urlString) {
             plate = cached
-            return
+        } else {
+            plate = nil
         }
+        focus = SubjectPlateStore.shared.cachedFocus(for: urlString)
 
-        plate = nil
         guard let image = await ImageCacheService.shared.loadImage(from: urlString), !Task.isCancelled else {
             return
         }
         original = image
 
-        let rendered = await SubjectPlateStore.shared.plate(for: urlString, image: image)
-        guard !Task.isCancelled else { return }
-        plate = rendered
+        if focus == nil {
+            focus = await SubjectPlateStore.shared.focus(for: urlString, image: image)
+            guard !Task.isCancelled else { return }
+        }
+
+        if plate == nil {
+            plate = await SubjectPlateStore.shared.plate(for: urlString, image: image)
+        }
     }
 }
 
@@ -675,9 +682,31 @@ enum AspectFillCropper {
         )
     }
 
+    /// Aspect-fill where `anchor` — a normalized point in image space (x
+    /// right, y down, 0–1) — lands on `anchorTarget`, a fraction of the
+    /// target. Offsets clamp so the drawn image still covers the frame;
+    /// a nil anchor is the centered fill above.
+    static func fillRect(imageSize: CGSize, in target: CGSize, anchor: CGPoint?, anchorTarget: CGPoint) -> CGRect {
+        let rect = fillRect(imageSize: imageSize, in: target)
+        guard let anchor else { return rect }
+
+        let offsetX = min(0, max(target.width - rect.width, anchorTarget.x * target.width - anchor.x * rect.width))
+        let offsetY = min(0, max(target.height - rect.height, anchorTarget.y * target.height - anchor.y * rect.height))
+        return CGRect(x: offsetX, y: offsetY, width: rect.width, height: rect.height)
+    }
+
     static func crop(_ image: UIImage, to target: CGSize) -> UIImage {
+        crop(image, to: target, anchor: nil)
+    }
+
+    static func crop(_ image: UIImage, to target: CGSize, anchor: CGPoint?) -> UIImage {
         guard target.width > 0, target.height > 0 else { return image }
-        let rect = fillRect(imageSize: image.size, in: target)
+        let rect = fillRect(
+            imageSize: image.size,
+            in: target,
+            anchor: anchor,
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
         return UIGraphicsImageRenderer(size: target).image { _ in
             image.draw(in: rect)
         }

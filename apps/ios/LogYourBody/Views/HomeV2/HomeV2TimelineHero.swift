@@ -186,7 +186,7 @@ private struct HomeV2TimelinePage: View {
         let failed = editorialPhoto?.key == key && editorialPhoto?.image == nil
         return ZStack(alignment: .top) {
             if let snapshot = editorialPhoto, snapshot.key == key, let image = snapshot.image {
-                Image(uiImage: image).resizable().aspectRatio(contentMode: .fill)
+                Image(uiImage: image).resizable().scaledToFill()
                     .frame(width: size.width, height: size.height)
                     .clipped()
                     .overlay(alignment: .bottomLeading) { compositionOverlay }
