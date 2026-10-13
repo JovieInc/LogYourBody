@@ -41,6 +41,7 @@ final class FeatureReleasePolicyTests: XCTestCase {
     private func loadCorpus() throws -> FeatureReleaseFixtureCorpus {
         let testFile = URL(fileURLWithPath: #filePath)
         let repoRoot = testFile
+            .deletingLastPathComponent() // FeatureReleasePolicyTests.swift
             .deletingLastPathComponent() // LogYourBodyTests
             .deletingLastPathComponent() // ios
             .deletingLastPathComponent() // apps
