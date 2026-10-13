@@ -16,7 +16,7 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `1b977889a8d92e63bc506b1535d6d4e479103aeccec2ac842f3d0cdd52d0ea75`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `0884ed9eafefe7a3cd6b5f4e3ef10b0800d0de45d9a1a05546a0d414b0233c65`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `5b2192608219f43034c4a6c38a82c84ab25c6907c3ccd7de11863f5bcd15b8b2`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11d9a680ec4c2c74193f2bd1bc9dd544c6ca3bc397bea165bfc08fd0e15933e0`)
@@ -26,7 +26,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `308eefa5e2f5b371d60eb5142243654503b53b67ba2f36477bf7d389a57e89f3`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d8b583c1e03eb3d93631ac1dd0e18986dd7905ccafe06816f2e662e7c2e29689`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `533336c7050e4a5244f61b48e616b81337471ae6c305a52d3a1e78fa65235b2e`)
-- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a20b2e7a8c8ebf94fce0cb63b054ea603657c6b111784c014ba02117fed13a4d`)
+- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `367b6f08c03fac7182cc49a5161e9565a90d2f1e55ba140add10e289996792cc`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `69b14201b1c33c7ae1f7eba0ce6f3718e9a5e738ad69c89e07b171e0b8f3ce59`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
 - `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ce11d368400a68b54d439d12b7ec9e1c50ce79980f1da3fd4536e8c6ac162297`)
