@@ -9,12 +9,15 @@ jest.mock('@/lib/ports/server-auth-runtime', () => ({
   getServerAuthSession: jest.fn(),
 }));
 jest.mock('@/lib/neon/user-directory-adapter', () => ({
-  neonUserDirectory: { deleteUser: jest.fn() },
+  neonUserDirectory: { captureAccountAdmission: jest.fn(), deleteUser: jest.fn() },
 }));
 
 describe('DELETE /api/auth/delete-account', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest
+      .mocked(neonUserDirectory.captureAccountAdmission)
+      .mockResolvedValue({ subject: 'user_123', ownerId: '11111111-1111-4111-8111-111111111111' });
     (getServerAuthSession as jest.Mock).mockResolvedValue({
       userId: 'user_123',
       getToken: async () => 'web-access-token',
@@ -33,7 +36,10 @@ describe('DELETE /api/auth/delete-account', () => {
     const response = await DELETE();
 
     expect(response.status).toBe(200);
-    expect(neonUserDirectory.deleteUser).toHaveBeenCalledWith('user_123');
+    expect(neonUserDirectory.deleteUser).toHaveBeenCalledWith({
+      subject: 'user_123',
+      ownerId: '11111111-1111-4111-8111-111111111111',
+    });
     expect(neonUserDirectory.deleteUser).toHaveBeenCalledTimes(1);
   });
 

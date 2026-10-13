@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		5A1AE51CD34B4A8E812811B2 /* CoreDataManager+BodySpecImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */; };
 		D7B509EA4FE543A7A3E32A1F /* BodySpecAtomicImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */; };
+		9A041FE1B8AF416FB7931540 /* DailyStepValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 577B839EE95E4F09A47A27E0 /* DailyStepValidationTests.swift */; };
 		DB6F742008744039AA49CA01 /* HomeV2ShareRecoveryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6F742008744039AA49CA02 /* HomeV2ShareRecoveryUITests.swift */; };
 		A62E114302EC00A5A0070201 /* HealthKitImportOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */; };
 		E9A811932F40800000C0A701 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */; };
@@ -458,6 +459,7 @@
 		FE20A0A100000000000000B1 /* JovieTokensTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A100000000000000F1 /* JovieTokensTests.swift */; };
 		FE20A0A200000000000000B2 /* JovieGlassSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */; };
 		FE20A0A300000000000000B3 /* WorldClassScreenInventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */; };
+		FE20A0A400000000000000B4 /* MetricAccentContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */; };
 		FEEA241F6B0A6F9819E7BBF7 /* HomeV2OnboardingPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA535A0684FDFFAF479F14AB /* HomeV2OnboardingPolicyTests.swift */; };
 		FFC041175CAD1871B45B8FE6 /* RevenueCatPurchaseRestoreFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F9119B26AB2A527AA6E344 /* RevenueCatPurchaseRestoreFlowTests.swift */; };
 		2DB2C8F582E3823A58973EC9 /* ReportedMeasurements.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F2A97E0DC1E8AB1DB030D6 /* ReportedMeasurements.swift */; };
@@ -487,6 +489,7 @@
 /* Begin PBXFileReference section */
 		12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CoreDataManager+BodySpecImport.swift"; sourceTree = "<group>"; };
 		435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecAtomicImportTests.swift; sourceTree = "<group>"; };
+		577B839EE95E4F09A47A27E0 /* DailyStepValidationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyStepValidationTests.swift; sourceTree = "<group>"; };
 		DB6F742008744039AA49CA02 /* HomeV2ShareRecoveryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2ShareRecoveryUITests.swift; sourceTree = "<group>"; };
 		A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitImportOwnershipTests.swift; sourceTree = "<group>"; };
 		E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -1012,6 +1015,7 @@
 		FE20A0A100000000000000F1 /* JovieTokensTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JovieTokensTests.swift; sourceTree = "<group>"; };
 		FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JovieGlassSurfaceTests.swift; sourceTree = "<group>"; };
 		FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldClassScreenInventoryTests.swift; sourceTree = "<group>"; };
+		FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricAccentContrastTests.swift; sourceTree = "<group>"; };
 		FE9C6D5CF67D9E4FA0995EC1 /* BodySpecAuthManagerTokenStateTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodySpecAuthManagerTokenStateTests.swift; sourceTree = "<group>"; };
 		BAA76179221F4B5C885A1144 /* BodySpecConnectionLifecycleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecConnectionLifecycleTests.swift; sourceTree = "<group>"; };
 		FECEBC7B2B956D26BF45822F /* DSLogo.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSLogo.swift; path = DesignSystem/Atoms/DSLogo.swift; sourceTree = "<group>"; };
@@ -1151,6 +1155,7 @@
 				FE20A0A100000000000000F1 /* JovieTokensTests.swift */,
 				FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */,
 				FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */,
+				FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */,
 			);
 			name = DesignSystem;
 			path = DesignSystem;
@@ -1356,6 +1361,7 @@
 				EC326F70438A47EBD30E41A7 /* TimelineScrollJankRegressionTests.swift */,
 				4877512DEE0F7236151A15AA /* HomeV2PolicyTests.swift */,
 				AB73CC33EB688034C7B8512F /* SubjectPlateRendererTests.swift */,
+				577B839EE95E4F09A47A27E0 /* DailyStepValidationTests.swift */,
 				A42DAD978808FA956C842F52 /* HealthKitStepCountPolicyTests.swift */,
 				3FDA4E2154B359271C66879D /* HomeV2TrendPolicyTests.swift */,
 				CFB072CB90358ED3EF144059 /* HomeV2ContextPolicyTests.swift */,
@@ -2170,6 +2176,7 @@
 				FE20A0A100000000000000B1 /* JovieTokensTests.swift in Sources */,
 				FE20A0A200000000000000B2 /* JovieGlassSurfaceTests.swift in Sources */,
 				FE20A0A300000000000000B3 /* WorldClassScreenInventoryTests.swift in Sources */,
+				FE20A0A400000000000000B4 /* MetricAccentContrastTests.swift in Sources */,
 				E740BE7171B6D98EEC5796B5 /* ErrorStateViewTests.swift in Sources */,
 				57EE5D3DE35D32DFC0A60E02 /* KeychainManagerTests.swift in Sources */,
 				0EC249B0ED61CDC66976258E /* AuthManagerSessionTests.swift in Sources */,
@@ -2218,6 +2225,7 @@
 				F80E7F3EED8BA23533A7C1D0 /* TimelineScrollJankRegressionTests.swift in Sources */,
 				CB2DAC6AFD2CCDD76F568339 /* HomeV2PolicyTests.swift in Sources */,
 				A3B2D419E2AED6266506624B /* SubjectPlateRendererTests.swift in Sources */,
+				9A041FE1B8AF416FB7931540 /* DailyStepValidationTests.swift in Sources */,
 				69FE1F8757E6B0643B73F39E /* HealthKitStepCountPolicyTests.swift in Sources */,
 				3D1AFA818E06FB9D3FFDA1C6 /* HomeV2TrendPolicyTests.swift in Sources */,
 				95739BB14EBE755CF6081FA0 /* HomeV2ContextPolicyTests.swift in Sources */,
