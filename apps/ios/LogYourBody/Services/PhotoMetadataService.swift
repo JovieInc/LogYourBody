@@ -10,6 +10,20 @@ import CoreData
 struct PhotoMetricsUpdateResult {
     let metrics: BodyMetrics
     let createdNewEntry: Bool
+    let previousMetric: BodyMetrics?
+
+    init(metrics: BodyMetrics, createdNewEntry: Bool, previousMetric: BodyMetrics? = nil) {
+        self.metrics = metrics
+        self.createdNewEntry = createdNewEntry
+        self.previousMetric = previousMetric
+    }
+}
+
+enum PhotoMetricsRestoreError: Error {
+    case entryNotFound
+    #if DEBUG
+    case simulatedSaveFailure
+    #endif
 }
 
 class PhotoMetadataService {
@@ -180,7 +194,7 @@ class PhotoMetadataService {
             )
 
             try await persistMetricsBeforeReturning(updated, userId: userId)
-            return PhotoMetricsUpdateResult(metrics: updated, createdNewEntry: false)
+            return PhotoMetricsUpdateResult(metrics: updated, createdNewEntry: false, previousMetric: existing)
         } else {
             // Create new metrics
             let new = BodyMetrics(
@@ -216,6 +230,56 @@ class PhotoMetadataService {
     /// the timeline can miss today's measured log and sync can skip it.
     private func persistMetricsBeforeReturning(_ metrics: BodyMetrics, userId: String) async throws {
         try await CoreDataManager.shared.saveBodyMetricsAndWait(metrics, userId: userId)
+    }
+
+    /// Restore exactly the measurements replaced by a log, including absent values.
+    /// Unlike createOrUpdate, nil means clear; unrelated photo/source fields stay intact.
+    func restoreMeasurements(
+        id: String,
+        userId: String,
+        previous: BodyMetrics,
+        context: NSManagedObjectContext? = nil
+    ) async throws {
+        guard previous.id == id, previous.userId == userId else {
+            throw PhotoMetricsRestoreError.entryNotFound
+        }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2UndoFailureFixture") {
+            throw PhotoMetricsRestoreError.simulatedSaveFailure
+        }
+        #endif
+        let context = context ?? CoreDataManager.shared.viewContext
+        try await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(
+                format: "id == %@ AND userId == %@ AND isMarkedDeleted == NO", id, userId
+            )
+            request.fetchLimit = 1
+            guard let cached = try context.fetch(request).first else {
+                throw PhotoMetricsRestoreError.entryNotFound
+            }
+
+            let previousValues = cached.dictionaryWithValues(forKeys: [
+                "weight", "weightUnit", "bodyFatPercentage", "bodyFatMethod", "updatedAt",
+                "lastModified", "isSynced", "syncStatus"
+            ])
+            cached.weight = previous.weight ?? 0
+            cached.weightUnit = previous.weightUnit
+            cached.bodyFatPercentage = previous.bodyFatPercentage ?? 0
+            cached.bodyFatMethod = previous.bodyFatMethod
+            let now = Date()
+            cached.updatedAt = now
+            cached.lastModified = now
+            cached.isSynced = false
+            cached.syncStatus = "pending"
+            do {
+                try context.save()
+            } catch {
+                // Do not leave a failed Undo visible as an unsaved local edit.
+                cached.setValuesForKeys(previousValues)
+                throw error
+            }
+        }
     }
 
     /// Create or reuse the metrics row for an upload and mark empty placeholders in flight atomically.

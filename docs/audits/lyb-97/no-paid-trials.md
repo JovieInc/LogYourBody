@@ -8,10 +8,10 @@ This is a read-only audit. No paywall, product, metadata, StoreKit, or App Store
 
 Both current products have a **3-day free introductory trial**. Neither checked-in source configures a paid introductory offer (Apple pay as you go, or pay up front).
 
-| Plan | Product ID | Intro offer | Evidence |
-| --- | --- | --- | --- |
+| Plan        | Product ID                                   | Intro offer                                                           | Evidence                                                                                                                                                                                                 |
+| ----------- | -------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Monthly Pro | `com.logyourbody.app.pro1.monthly.3daytrial` | Free trial, 3 days, then the subscription renews at the monthly price | `apps/ios/LogYourBody.storekit` `introductoryOffer.paymentMode` = `free`, `subscriptionPeriod` = `P3D`, `numberOfPeriods` = `1`. Renewal `displayPrice` = `9.99`, `recurringSubscriptionPeriod` = `P1M`. |
-| Annual Pro | `com.logyourbody.app.pro1.annual.3daytrial` | Free trial, 3 days, then the subscription renews at the annual price | Same file. `paymentMode` = `free`, `subscriptionPeriod` = `P3D`, `numberOfPeriods` = `1`. Renewal `displayPrice` = `69.99`, `recurringSubscriptionPeriod` = `P1Y`. |
+| Annual Pro  | `com.logyourbody.app.pro1.annual.3daytrial`  | Free trial, 3 days, then the subscription renews at the annual price  | Same file. `paymentMode` = `free`, `subscriptionPeriod` = `P3D`, `numberOfPeriods` = `1`. Renewal `displayPrice` = `69.99`, `recurringSubscriptionPeriod` = `P1Y`.                                       |
 
 Apple's StoreKit configuration uses `paymentMode` `free` for a free trial. A paid intro would be `payAsYouGo` or `payUpFront`, usually with an intro price. Those modes are absent from `LogYourBody.storekit`. `adHocOffers` and `codeOffers` are empty arrays on both subscriptions. There are no other products in that file (`products` and `nonRenewingSubscriptions` are empty).
 
@@ -33,10 +33,10 @@ On the checked-in StoreKit file, this decision is already met. A later enforceme
 
 Fields a guard or a correction would use:
 
-| File | Field |
-| --- | --- |
-| `apps/ios/LogYourBody.storekit` | `subscriptionGroups[0].subscriptions[].introductoryOffer.paymentMode` must stay `free`. A paid offer would also set an intro price and use `payAsYouGo` or `payUpFront`. |
-| App Store Connect (not in git) | Each subscription's introductory offer `offerMode`. Must be `FREE_TRIAL`. Duration `THREE_DAYS` (API) matching local `P3D`. |
+| File                                                | Field                                                                                                                                                                                                         |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/ios/LogYourBody.storekit`                     | `subscriptionGroups[0].subscriptions[].introductoryOffer.paymentMode` must stay `free`. A paid offer would also set an intro price and use `payAsYouGo` or `payUpFront`.                                      |
+| App Store Connect (not in git)                      | Each subscription's introductory offer `offerMode`. Must be `FREE_TRIAL`. Duration `THREE_DAYS` (API) matching local `P3D`.                                                                                   |
 | `.github/scripts/verify-app-store-subscriptions.rb` | Today: product id and `state` only. A guard would also require `introductoryOffers.offerMode == FREE_TRIAL` for `com.logyourbody.app.pro1.monthly.3daytrial` and `com.logyourbody.app.pro1.annual.3daytrial`. |
 
 The iOS paywall already treats a non-free intro as "no trial copy": `getTrialDurationText` returns text only when `introductoryDiscount.paymentMode == .freeTrial`. Pay as you go and pay up front fall through to purchase button title `Subscribe` and no trial line. That hides a paid intro in the UI. It does not stop StoreKit from charging it.
@@ -53,97 +53,97 @@ Exact files and fields for that later change:
 
 **Source of truth**
 
-| File | Field | Current value |
-| --- | --- | --- |
-| `packages/product-registry/src/products/logyourbody.mjs` | `plans[0].trialDays` | `3` |
-| same | `plans[0].pricing.monthly.productId` | `com.logyourbody.app.pro1.monthly.3daytrial` |
-| same | `plans[0].pricing.monthly.amount` | `9.99` |
-| same | `plans[0].pricing.monthly.packageId` | `$rc_monthly` |
-| same | `plans[0].pricing.annual.productId` | `com.logyourbody.app.pro1.annual.3daytrial` |
-| same | `plans[0].pricing.annual.amount` | `69.99` |
-| same | `plans[0].pricing.annual.packageId` | `$rc_annual` |
-| same | `plans[0].pricing.source` | `app-store-connect` |
-| `packages/product-registry/src/types.ts` | `ProductPlan.trialDays` | `number` (length only; no offer-mode field) |
+| File                                                     | Field                                | Current value                                |
+| -------------------------------------------------------- | ------------------------------------ | -------------------------------------------- |
+| `packages/product-registry/src/products/logyourbody.mjs` | `plans[0].trialDays`                 | `3`                                          |
+| same                                                     | `plans[0].pricing.monthly.productId` | `com.logyourbody.app.pro1.monthly.3daytrial` |
+| same                                                     | `plans[0].pricing.monthly.amount`    | `9.99`                                       |
+| same                                                     | `plans[0].pricing.monthly.packageId` | `$rc_monthly`                                |
+| same                                                     | `plans[0].pricing.annual.productId`  | `com.logyourbody.app.pro1.annual.3daytrial`  |
+| same                                                     | `plans[0].pricing.annual.amount`     | `69.99`                                      |
+| same                                                     | `plans[0].pricing.annual.packageId`  | `$rc_annual`                                 |
+| same                                                     | `plans[0].pricing.source`            | `app-store-connect`                          |
+| `packages/product-registry/src/types.ts`                 | `ProductPlan.trialDays`              | `number` (length only; no offer-mode field)  |
 
 Generated from that registry. Do not hand-edit. Regenerate with `pnpm product:generate`:
 
-| File | Field |
-| --- | --- |
+| File                                                  | Field                                                                                                                               |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/ios/LogYourBody/GeneratedProductRegistry.swift` | `ProductRegistry.Paywall.trialDays`, `monthlyProductID`, `annualProductID`, `monthlyPackageID`, `annualPackageID`, reference prices |
-| `docs/product/product-registry.generated.md` | Plan line `Pro: Premium; 3-day trial; USD 9.99/month or USD 69.99/year.` |
-| `packages/product-registry/scripts/generate.mjs` | Emits `trialDays` and the `N-day trial` sentence. The generator does not emit the word `free`. |
+| `docs/product/product-registry.generated.md`          | Plan line `Pro: Premium; 3-day trial; USD 9.99/month or USD 69.99/year.`                                                            |
+| `packages/product-registry/scripts/generate.mjs`      | Emits `trialDays` and the `N-day trial` sentence. The generator does not emit the word `free`.                                      |
 
 **StoreKit local config**
 
-| File | Field |
-| --- | --- |
+| File                            | Field                                                                                                                                        |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/ios/LogYourBody.storekit` | Monthly and annual `introductoryOffer` (`paymentMode`, `subscriptionPeriod`, `numberOfPeriods`, `internalID` `MONTHLYTRIAL` / `ANNUALTRIAL`) |
-| same | `productID`, `referenceName` (`LogYourBody Pro Monthly (3-Day Trial)`, `LogYourBody Pro Annual (3-Day Trial)`) |
-| same | `localizations[].description` (`… with 3-day free trial`) and `displayName` |
+| same                            | `productID`, `referenceName` (`LogYourBody Pro Monthly (3-Day Trial)`, `LogYourBody Pro Annual (3-Day Trial)`)                               |
+| same                            | `localizations[].description` (`… with 3-day free trial`) and `displayName`                                                                  |
 
 **Paywall copy (driven by StoreKit, not by `trialDays`)**
 
-| File | Field | Current behavior |
-| --- | --- | --- |
-| `apps/ios/LogYourBody/Services/RevenueCatManager+Part01.swift` | `getTrialDurationText` | Returns `"\(value) \(unit) free"` only for `.freeTrial`. For 3 days the unit string is `"day"` (`SubscriptionPeriod.Unit.description` in `RevenueCatManager.swift`), so the live line is `3 day free`. |
-| same | `makePaywallPackageDisplay.purchaseButtonTitle` | `Start trial` when `trialText` is set, otherwise `Subscribe` |
-| same | DEBUG `applyCachedPaywallOfferingUITestFixture` | Hard-codes `trialText: "3 days free"` for both product IDs |
-| `apps/ios/LogYourBody/Views/PaywallView.swift` | `pricingOption` | Renders `package.trialText` when there is no savings badge (lines around the `trialText` branch) |
-| same | `purchaseButton` | Renders `package.purchaseButtonTitle` |
-| `apps/ios/LogYourBody/Services/RevenueCatManager.swift` | `PaywallPackageDisplay.trialText`, `purchaseButtonTitle` | Display model only. No offer-mode enum. |
-| `packages/product-registry/src/products/logyourbody.mjs` | `messages.paywall.title`, `subtitle`, `valueProposition` | No trial sentence. Paywall trial copy is not in the registry messages. |
+| File                                                           | Field                                                    | Current behavior                                                                                                                                                                                       |
+| -------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/ios/LogYourBody/Services/RevenueCatManager+Part01.swift` | `getTrialDurationText`                                   | Returns `"\(value) \(unit) free"` only for `.freeTrial`. For 3 days the unit string is `"day"` (`SubscriptionPeriod.Unit.description` in `RevenueCatManager.swift`), so the live line is `3 day free`. |
+| same                                                           | `makePaywallPackageDisplay.purchaseButtonTitle`          | `Start trial` when `trialText` is set, otherwise `Subscribe`                                                                                                                                           |
+| same                                                           | DEBUG `applyCachedPaywallOfferingUITestFixture`          | Hard-codes `trialText: "3 days free"` for both product IDs                                                                                                                                             |
+| `apps/ios/LogYourBody/Views/PaywallView.swift`                 | `pricingOption`                                          | Renders `package.trialText` when there is no savings badge (lines around the `trialText` branch)                                                                                                       |
+| same                                                           | `purchaseButton`                                         | Renders `package.purchaseButtonTitle`                                                                                                                                                                  |
+| `apps/ios/LogYourBody/Services/RevenueCatManager.swift`        | `PaywallPackageDisplay.trialText`, `purchaseButtonTitle` | Display model only. No offer-mode enum.                                                                                                                                                                |
+| `packages/product-registry/src/products/logyourbody.mjs`       | `messages.paywall.title`, `subtitle`, `valueProposition` | No trial sentence. Paywall trial copy is not in the registry messages.                                                                                                                                 |
 
 **Release notes and review notes**
 
-| File | Field | On `main` now |
-| --- | --- | --- |
-| `apps/ios/fastlane/metadata/en-US/release_notes.txt` | whole file | No trial mention. Describes the timeline, logging, Health, Stats, restore, export, and account deletion. |
-| `packages/product-registry/src/storefronts/logyourbody.mjs` | `releaseNotes` | Same sentence as the metadata file. |
-| `apps/ios/fastlane/storefront-manifest.generated.json` | `releaseNotes` | Generated from the storefront registry. |
-| `apps/ios/fastlane/metadata/en-US/description.txt`, `promotional_text.txt`, `subtitle.txt`, `keywords.txt`, `name.txt` | listing copy | No trial sentence. Description says "Keep access managed through LogYourBody Pro". |
-| `apps/ios/fastlane/Fastfile.release` | default `APP_REVIEW_NOTES` | Tells review to tap `Start trial` and says subscriptions "include a 3-day trial". |
+| File                                                                                                                   | Field                      | On `main` now                                                                                            |
+| ---------------------------------------------------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `apps/ios/fastlane/metadata/en-US/release_notes.txt`                                                                   | whole file                 | No trial mention. Describes the timeline, logging, Health, Stats, restore, export, and account deletion. |
+| `packages/product-registry/src/storefronts/logyourbody.mjs`                                                            | `releaseNotes`             | Same sentence as the metadata file.                                                                      |
+| `apps/ios/fastlane/storefront-manifest.generated.json`                                                                 | `releaseNotes`             | Generated from the storefront registry.                                                                  |
+| `apps/ios/fastlane/metadata/en-US/description.txt`, `promotional_text.txt`, `subtitle.txt`, `keywords.txt`, `name.txt` | listing copy               | No trial sentence. Description says "Keep access managed through LogYourBody Pro".                       |
+| `apps/ios/fastlane/Fastfile.release`                                                                                   | default `APP_REVIEW_NOTES` | Tells review to tap `Start trial` and says subscriptions "include a 3-day trial".                        |
 
 PR #1197 changes `releaseNotes` in the storefront registry, the generated manifest, and `release_notes.txt` to the 3-day free trial sentence. That PR is the in-flight 1.2.0 What's New edit. Leave it alone for this audit.
 
 **Checks that pin the product IDs**
 
-| File | What it pins |
-| --- | --- |
-| `.github/scripts/verify-app-store-subscriptions.rb` | `DEFAULT_REQUIRED_PRODUCTS` lists both `pro1` `3daytrial` IDs |
-| `apps/ios/Scripts/verify_revenuecat_offerings.sh` | `REVENUECAT_REQUIRED_PACKAGES` default `$rc_annual:…annual.3daytrial,$rc_monthly:…monthly.3daytrial` |
-| `apps/ios/docs/development/RELEASE_CHECKLIST.md` | Same RevenueCat package mapping |
+| File                                                | What it pins                                                                                         |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `.github/scripts/verify-app-store-subscriptions.rb` | `DEFAULT_REQUIRED_PRODUCTS` lists both `pro1` `3daytrial` IDs                                        |
+| `apps/ios/Scripts/verify_revenuecat_offerings.sh`   | `REVENUECAT_REQUIRED_PACKAGES` default `$rc_annual:…annual.3daytrial,$rc_monthly:…monthly.3daytrial` |
+| `apps/ios/docs/development/RELEASE_CHECKLIST.md`    | Same RevenueCat package mapping                                                                      |
 
 **Tests and fixtures that would fail if the intro or the IDs change**
 
-| File | Assertion |
-| --- | --- |
-| `apps/ios/LogYourBodyTests/CachedPaywallOfferingDisplayTests.swift` | `trialText` `3 days free` on both product IDs |
-| `apps/ios/LogYourBodyTests/RevenueCatProductConfigurationTests.swift` | Both `pro1` `3daytrial` product IDs |
-| `apps/ios/LogYourBodyTests/RevenueCatPurchaseRestoreFlowTests.swift` | Annual `pro1` product ID |
-| `apps/web/src/app/__tests__/launch-landing.test.tsx` | Pricing line contains `3-day free trial` |
+| File                                                                  | Assertion                                     |
+| --------------------------------------------------------------------- | --------------------------------------------- |
+| `apps/ios/LogYourBodyTests/CachedPaywallOfferingDisplayTests.swift`   | `trialText` `3 days free` on both product IDs |
+| `apps/ios/LogYourBodyTests/RevenueCatProductConfigurationTests.swift` | Both `pro1` `3daytrial` product IDs           |
+| `apps/ios/LogYourBodyTests/RevenueCatPurchaseRestoreFlowTests.swift`  | Annual `pro1` product ID                      |
+| `apps/web/src/app/__tests__/launch-landing.test.tsx`                  | Pricing line contains `3-day free trial`      |
 
 **Web copy that already says the trial is free**
 
 The registry does not say `free`. These call sites add it:
 
-| File | Field |
-| --- | --- |
-| `apps/web/src/constants/app.ts` | `trialLengthDays` from `trialDays`; `trialLengthText` is `` `${trialDays}-day free trial` `` |
-| `apps/web/src/app/launch-landing-copy.ts` | `pricingLine` uses `` `${trialDays}-day free trial, then …` `` |
+| File                                                        | Field                                                                                           |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `apps/web/src/constants/app.ts`                             | `trialLengthDays` from `trialDays`; `trialLengthText` is `` `${trialDays}-day free trial` ``    |
+| `apps/web/src/app/launch-landing-copy.ts`                   | `pricingLine` uses `` `${trialDays}-day free trial, then …` ``                                  |
 | `apps/web/src/components/LandingPageConversionSections.tsx` | `{trialLengthDays} days free. Then $…`; hardcoded `3-day free trial`; `No credit card required` |
-| `apps/web/src/components/Prefooter.tsx` | `APP_CONFIG.trialLengthText` |
-| `apps/web/src/components/LandingPage.tsx` | `No credit card required` |
-| `apps/web/src/app/about/page.tsx` | Button `Start Free Trial`; line `No credit card • 3-day trial • Cancel anytime` |
-| `apps/web/src/app/settings/subscription/page.tsx` | Local mock: `days left in your free trial` using `trialLengthDays` |
+| `apps/web/src/components/Prefooter.tsx`                     | `APP_CONFIG.trialLengthText`                                                                    |
+| `apps/web/src/components/LandingPage.tsx`                   | `No credit card required`                                                                       |
+| `apps/web/src/app/about/page.tsx`                           | Button `Start Free Trial`; line `No credit card • 3-day trial • Cancel anytime`                 |
+| `apps/web/src/app/settings/subscription/page.tsx`           | Local mock: `days left in your free trial` using `trialLengthDays`                              |
 
 **Docs that state the offer, and would go stale**
 
-| File | Statement |
-| --- | --- |
-| `docs/product/outcome-map.md` | Table rows: intro offer `3 days free, then monthly renewal` / `3 days free, then annual renewal` |
-| `docs/design/app-walk-staging-2026-09-28.md` | Paywall has the three-day trial |
-| `docs/RELEASE_APP_STORE.md` | 1.2.0 submission runbook. Purchase path assumes the current products. |
-| `docs/product-development-roadmap.md` | Activation includes a paywall/free trial decision |
+| File                                         | Statement                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `docs/product/outcome-map.md`                | Table rows: intro offer `3 days free, then monthly renewal` / `3 days free, then annual renewal` |
+| `docs/design/app-walk-staging-2026-09-28.md` | Paywall has the three-day trial                                                                  |
+| `docs/RELEASE_APP_STORE.md`                  | 1.2.0 submission runbook. Purchase path assumes the current products.                            |
+| `docs/product-development-roadmap.md`        | Activation includes a paywall/free trial decision                                                |
 
 Archive docs under `docs/archive/` still name the older IDs `com.logyourbody.app.pro.monthly.3daytrial` and `com.logyourbody.app.pro.annual.3daytrial` (no `pro1`). Those are not the current registry IDs. Do not revive them as part of a trial change.
 
