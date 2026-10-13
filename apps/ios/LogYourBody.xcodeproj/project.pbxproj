@@ -459,6 +459,7 @@
 		FE13A3A300000000000000C1 /* FeatureReleasePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE13A3A300000000000000C2 /* FeatureReleasePolicy.swift */; };
 		FE13A3A300000000000000C3 /* FeatureReleasePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE13A3A300000000000000C4 /* FeatureReleasePolicyTests.swift */; };
 		FE20A0A100000000000000B1 /* JovieTokensTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A100000000000000F1 /* JovieTokensTests.swift */; };
+		FE20A0A500000000000000B5 /* SemanticContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A500000000000000F5 /* SemanticContrastTests.swift */; };
 		FE20A0A200000000000000B2 /* JovieGlassSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */; };
 		FE20A0A300000000000000B3 /* WorldClassScreenInventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */; };
 		FE20A0A400000000000000B4 /* MetricAccentContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */; };
@@ -1017,6 +1018,7 @@
 		FE13A3A300000000000000C2 /* FeatureReleasePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureReleasePolicy.swift; sourceTree = "<group>"; };
 		FE13A3A300000000000000C4 /* FeatureReleasePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureReleasePolicyTests.swift; sourceTree = "<group>"; };
 		FE20A0A100000000000000F1 /* JovieTokensTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JovieTokensTests.swift; sourceTree = "<group>"; };
+		FE20A0A500000000000000F5 /* SemanticContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticContrastTests.swift; sourceTree = "<group>"; };
 		FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JovieGlassSurfaceTests.swift; sourceTree = "<group>"; };
 		FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldClassScreenInventoryTests.swift; sourceTree = "<group>"; };
 		FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricAccentContrastTests.swift; sourceTree = "<group>"; };
@@ -1158,6 +1160,7 @@
 				0D09F39EA8F6241DE176F54C /* Molecules */,
 				FE20A0A100000000000000F1 /* JovieTokensTests.swift */,
 				FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */,
+				FE20A0A500000000000000F5 /* SemanticContrastTests.swift */,
 				FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */,
 				FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */,
 			);
@@ -2182,6 +2185,7 @@
 				D2184ADBFB25DEB92514F85D /* DSCircularProgressTests.swift in Sources */,
 				FE20A0A100000000000000B1 /* JovieTokensTests.swift in Sources */,
 				FE20A0A200000000000000B2 /* JovieGlassSurfaceTests.swift in Sources */,
+				FE20A0A500000000000000B5 /* SemanticContrastTests.swift in Sources */,
 				FE20A0A300000000000000B3 /* WorldClassScreenInventoryTests.swift in Sources */,
 				FE20A0A400000000000000B4 /* MetricAccentContrastTests.swift in Sources */,
 				E740BE7171B6D98EEC5796B5 /* ErrorStateViewTests.swift in Sources */,
