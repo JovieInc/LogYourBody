@@ -3,6 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main, production]
+    # ready_for_review reruns CI on the same head so a draft's deferred Launch Quality runs.
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
     branches: [main, production]
     types: [checks_requested]
@@ -76,7 +78,8 @@ jobs:
               # Only a definitive 404 proves the group is gone; any other error leaves the run.
               # Capture first: under pipefail, `gh ... | grep -q` returns gh's 404 exit status
               # even when grep matches, so the sweep never cancelled anything.
-              ref_lookup=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --silent 2>&1)
+              # Actions runs this under bash -e, so a 404 (gh exits 1) must not end the step.
+              ref_lookup=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --silent 2>&1) || true
               if grep -q 'HTTP 404' <<<"$ref_lookup"; then
                 gh run cancel "$run_id" -R "$GITHUB_REPOSITORY" && echo "Cancelled superseded run $run_id ($branch)"
               fi
@@ -109,8 +112,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.filter.outputs.web }}
-      ios: ${{ steps.filter.outputs.ios }}
       ios_changed: ${{ steps.filter.outputs.ios_changed }}
+      ios_unit: ${{ steps.filter.outputs.ios_unit }}
+      ios_quality: ${{ steps.filter.outputs.ios_quality }}
+      ios_quality_deferred: ${{ steps.filter.outputs.ios_quality_deferred }}
     steps:
       - uses: actions/checkout@v4
 
@@ -128,12 +133,16 @@ jobs:
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
 
+      - name: Test post-merge Launch Quality
+        run: node --test .github/scripts/post-merge-quality.test.mjs
+
       - name: Detect changed surfaces locally
         id: filter
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.sha }}
+          PR_DRAFT: ${{ github.event.pull_request.draft || false }}
         run: bash .github/scripts/detect-changes.sh
 
   js:
@@ -185,7 +194,7 @@ jobs:
   ios:
     name: iOS
     needs: detect-changes
-    if: needs.detect-changes.outputs.ios == 'true'
+    if: needs.detect-changes.outputs.ios_unit == 'true'
     # An idle self-hosted Mac first (cancellable child run), hosted macOS
     # otherwise; a busy, asleep or offline Mac never holds this job.
     permissions:
@@ -199,7 +208,7 @@ jobs:
   ios_quality:
     name: iOS Launch Quality Gate
     needs: detect-changes
-    if: needs.detect-changes.outputs.ios == 'true'
+    if: needs.detect-changes.outputs.ios_quality == 'true'
     # An idle self-hosted Mac first (cancellable child run), hosted macOS
     # otherwise; a busy, asleep or offline Mac never holds this job.
     permissions:
@@ -207,7 +216,10 @@ jobs:
       contents: read
     uses: ./.github/workflows/ios-quality.yml
     with:
-      mac-first: true
+      # Hosted until the launch-quality capture tests pass on the Macs: four
+      # LaunchQualityGate capture tests failed on every self-hosted run
+      # (2026-10-12, tw-mac-001 and tims-macbook-air) and pass hosted.
+      mac-first: false
       supersede-key: ${{ github.head_ref || '' }}
 
   ci-summary:
@@ -239,7 +251,8 @@ jobs:
             echo ""
             echo "- Web changed: ${{ needs.detect-changes.outputs.web }}"
             echo "- iOS changed: ${{ needs.detect-changes.outputs.ios_changed }}"
-            echo "- iOS jobs run here: ${{ needs.detect-changes.outputs.ios }}"
+            echo "- iOS Unit runs here: ${{ needs.detect-changes.outputs.ios_unit }}"
+            echo "- iOS Launch Quality runs here: ${{ needs.detect-changes.outputs.ios_quality }} (deferred for draft: ${{ needs.detect-changes.outputs.ios_quality_deferred }})"
             echo "- iOS quality gate: ${{ needs.ios_quality.result }}"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
@@ -247,8 +260,8 @@ jobs:
           if [[ "${{ needs.detect-changes.result }}" != "success" ]] || \
              [[ "${{ needs.mac-runner-routing-tests.result }}" != "success" ]] || \
              ! assert_expected_result "JavaScript/TypeScript" "${{ needs.detect-changes.outputs.web }}" "${{ needs.js.result }}" || \
-             ! assert_expected_result "iOS" "${{ needs.detect-changes.outputs.ios }}" "${{ needs.ios.result }}" || \
-             ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios }}" "${{ needs.ios_quality.result }}"; then
+             ! assert_expected_result "iOS" "${{ needs.detect-changes.outputs.ios_unit }}" "${{ needs.ios.result }}" || \
+             ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios_quality }}" "${{ needs.ios_quality.result }}"; then
             echo "❌ One or more CI jobs failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi

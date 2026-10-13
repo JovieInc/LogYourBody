@@ -487,7 +487,11 @@ struct LogYourBodyApp: App {
         } else {
             fixtureSlug = isSubscribed ? "paid_mvp" : "paywall"
         }
-        let userId = "ui_test_\(fixtureSlug)_user_\(UUID().uuidString)"
+        let usesUndoPhotoFixture = arguments.contains("-lybUITestHomeV2UndoPhotoOnlyFixture")
+        let undoFixtureAccount = ProcessInfo.processInfo.environment["LYB_UI_TEST_UNDO_ACCOUNT"]
+            .flatMap(UUID.init(uuidString:))
+        let fixtureAccount = usesUndoPhotoFixture ? undoFixtureAccount ?? UUID() : UUID()
+        let userId = "ui_test_\(fixtureSlug)_user_\(fixtureAccount.uuidString)"
         let profile = UserProfile(
             id: userId,
             email: fixtureEmail,
@@ -526,7 +530,12 @@ struct LogYourBodyApp: App {
             let fixturePhotoURL = arguments.contains(HomeV2Policy.photoFixtureArgument)
                 ? writeHomeV2FixturePhoto()
                 : nil
-            await seedFullDashboardUITestFixtureData(userId: userId, photoURL: fixturePhotoURL)
+            if usesUndoPhotoFixture && arguments.contains("-lybUITestReuseUndoFixtureData") {
+                let persisted = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+                precondition(!persisted.isEmpty, "Undo relaunch must read persisted rows without reseeding")
+            } else {
+                await seedFullDashboardUITestFixtureData(userId: userId, photoURL: fixturePhotoURL)
+            }
         }
 
         if arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") &&
@@ -599,6 +608,8 @@ struct LogYourBodyApp: App {
     private func seedFullDashboardUITestFixtureData(userId: String, photoURL: String? = nil) async {
         let calendar = Calendar.current
         let now = Date()
+        let usesUndoPhotoFixture = ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2UndoPhotoOnlyFixture")
+        let metricIdPrefix = usesUndoPhotoFixture ? "\(userId)_metric" : "ui_test_full_dashboard_metric"
         let entries: [
             (daysAgo: Int, weight: Double, bodyFat: Double?, muscle: Double, notes: String, source: String)
         ] = [
@@ -621,6 +632,7 @@ struct LogYourBodyApp: App {
                 continue
             }
 
+            let isPhotoOnly = usesUndoPhotoFixture && entry.daysAgo == 0
             let fixturePhotoURL: String?
             if ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2SinglePhotoFixture"), entry.daysAgo != 0 {
                 fixturePhotoURL = nil
@@ -631,15 +643,15 @@ struct LogYourBodyApp: App {
                 fixturePhotoURL = photoURL
             }
             let metric = BodyMetrics(
-                id: "ui_test_full_dashboard_metric_\(entry.daysAgo)",
+                id: "\(metricIdPrefix)_\(entry.daysAgo)",
                 userId: userId,
                 date: date,
-                weight: entry.weight,
+                weight: isPhotoOnly ? nil : entry.weight,
                 weightUnit: "kg",
-                bodyFatPercentage: usesWeightOnlyHero || usesSingleWeightHero ? nil : entry.bodyFat,
-                bodyFatMethod: usesWeightOnlyHero || usesSingleWeightHero || entry.bodyFat == nil
+                bodyFatPercentage: isPhotoOnly || usesWeightOnlyHero || usesSingleWeightHero ? nil : entry.bodyFat,
+                bodyFatMethod: isPhotoOnly || usesWeightOnlyHero || usesSingleWeightHero || entry.bodyFat == nil
                     ? nil : (usesVisualEstimateHero ? "visual_estimate" : entry.source),
-                muscleMass: entry.muscle,
+                muscleMass: isPhotoOnly ? nil : entry.muscle,
                 boneMass: nil,
                 waistCm: nil,
                 hipCm: nil,
@@ -661,10 +673,10 @@ struct LogYourBodyApp: App {
         let savedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
         let savedIds = savedMetrics.compactMap { $0.toBodyMetrics()?.id }
         let expectedIds = Set(entries.filter { !usesSingleReading || $0.daysAgo == 0 }
-            .map { "ui_test_full_dashboard_metric_\($0.daysAgo)" })
+            .map { "\(metricIdPrefix)_\($0.daysAgo)" })
         precondition(
             savedIds.count == expectedIds.count && Set(savedIds) == expectedIds,
-            "Dashboard UI fixture expected \(entries.count) saved measurements, found \(savedIds.count)"
+            "Dashboard UI fixture expected \(expectedIds.count) saved measurements, found \(savedIds.count)"
         )
     }
 
