@@ -1,8 +1,8 @@
 name: Security Scanning
 
+# No clock: every scanned input (history, lockfile, pinned scanner versions)
+# only changes on a push to main, which runs every job here.
 on:
-  schedule:
-    - cron: '0 8 * * 1'  # Weekly on Monday at 8 AM
   workflow_dispatch:
   push:
     branches: [main]
@@ -28,7 +28,7 @@ jobs:
       with:
         path: ./
         # On pushes, scan only the pushed commits; an empty base scans full
-        # history up to HEAD on scheduled/dispatch runs.
+        # history up to HEAD on manual dispatch.
         base: ${{ github.event_name == 'push' && github.event.before || '' }}
         head: ${{ github.event_name == 'push' && github.sha || 'HEAD' }}
         extra_args: --debug --only-verified --json
@@ -37,7 +37,7 @@ jobs:
   gitleaks:
     name: Gitleaks (shared JovieInc/ci)
     # Block new leaks on pushes without letting legacy or unmerged refs mask the
-    # result. Scheduled/manual audits retain the comprehensive history scan.
+    # result. Manual audits retain the comprehensive history scan.
     uses: JovieInc/ci/.github/workflows/secret-scan.yml@44105468cc7c271e5f117baec9effca295ebd13c
     with:
       full-history: ${{ github.event_name != 'push' }}
