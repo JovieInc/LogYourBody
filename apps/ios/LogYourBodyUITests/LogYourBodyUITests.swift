@@ -1533,10 +1533,12 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 5), "Critical chat prompt must be available")
         XCTAssertTrue(prompt.isHittable, "Critical chat prompt must be tappable")
         prompt.tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8),
-            "Critical chat prompt must open the chat root"
-        )
+        let openedChatRoot = app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8)
+        // Diagnostic only: the app's send/load trail if the tap did not open chat.
+        let sendProbe = openedChatRoot
+            ? ""
+            : String(describing: app.descendants(matching: .any)["home_chat_composer_dock"].value ?? "unavailable")
+        XCTAssertTrue(openedChatRoot, "Critical chat prompt must open the chat root (send probe: \(sendProbe))")
         attachScreenshot(named: "launch-quality-chat-tab", from: app)
         collapseHomeChat(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
