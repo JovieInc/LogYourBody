@@ -65,15 +65,23 @@ struct OnboardingPrimaryButtonStyle: ButtonStyle {
 
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     func makeBody(configuration: Self.Configuration) -> some View {
         configuration.label
             .font(theme.typography.labelLarge)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity)
             .frame(minHeight: JovieTokens.controlHeight)
             .foregroundStyle(isEnabled ? theme.colors.background : theme.colors.background.opacity(0.55))
             .background(
-                Capsule(style: .continuous)
+                RoundedRectangle(
+                    cornerRadius: dynamicTypeSize.isAccessibilitySize ? theme.radius.card : JovieTokens.controlHeight,
+                    style: .continuous
+                )
                     .fill(theme.colors.text.opacity(buttonOpacity(isPressed: configuration.isPressed)))
             )
             .jovieTouchTarget()
@@ -91,22 +99,30 @@ struct OnboardingSecondaryButtonStyle: ButtonStyle {
     @Environment(\.theme)
     private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     func makeBody(configuration: Self.Configuration) -> some View {
         configuration.label
             .font(theme.typography.labelLarge)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity)
             .frame(minHeight: JovieTokens.compactControlHeight)
             .jovieTouchTarget()
             .foregroundStyle(theme.colors.text)
             .systemBGlassSurface(
-                cornerRadius: JovieTokens.controlHeight,
+                cornerRadius: dynamicTypeSize.isAccessibilitySize ? theme.radius.card : JovieTokens.controlHeight,
                 tint: theme.colors.text,
                 tintOpacity: configuration.isPressed ? 0.05 : 0.035,
                 borderColor: theme.colors.border,
                 borderOpacity: 0.65
             )
-            .clipShape(Capsule(style: .continuous))
+            .clipShape(RoundedRectangle(
+                cornerRadius: dynamicTypeSize.isAccessibilitySize ? theme.radius.card : JovieTokens.controlHeight,
+                style: .continuous
+            ))
             .animation(reduceMotion ? nil : theme.animation.fast, value: configuration.isPressed)
     }
 }

@@ -9,7 +9,7 @@ This directory supports fast trunk-based shipping. Required checks should prove 
 Primary pull request workflow for `main`.
 
 - Pull requests target `main`; `preview`, `production`, and `dev` are not active development branches. Pull requests and merge groups targeting `production` also run so the active "Production" ruleset's required `CI Summary` check cannot deadlock.
-- `Detect Changes`: path filter for web/package and iOS changes. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`.
+- `Detect Changes`: path filter for web/package and iOS changes (`.github/scripts/detect-changes.sh`, tested by `detect-changes.test.mjs`). A merge group diffs against its own base (the previous group's head), so a web-only group never inherits a queued iOS PR; iOS runs only when a file the iOS jobs read changed, and an unknown diff selects everything. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`.
 - `JavaScript/TypeScript`: runs `pnpm install`, `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` when web, package, or CI harness files change. The job uses no privileged data-provider configuration, so pull request CI can verify buildability without credentials.
 - `iOS`: runs the iOS Fastlane CI lane when iOS files change.
 - `CI Summary`: aggregate required status. Branch protection should depend on this stable aggregate name rather than individual implementation jobs.
@@ -99,7 +99,7 @@ CodeQL analysis on pushes, pull requests, and schedule.
 
 ### `security-scan.yml`
 
-Weekly/manual/main-branch secret, dependency, and SBOM scanning.
+Weekly/manual/main-branch secret, dependency, and SBOM scanning. Gitleaks runs through the shared `JovieInc/ci` `secret-scan.yml` workflow, pinned by commit SHA.
 
 ### `dependabot-auto-merge.yml`
 
@@ -127,3 +127,34 @@ Advisory checks:
 - Follow-up cleanup and test coverage ideas.
 
 When advisory review finds a noncritical issue, open a focused follow-up PR or issue instead of delaying a landable PR.
+
+### Shared Mac qualification
+
+The required `iOS` and `iOS Launch Quality Gate` jobs always use standard hosted
+`macos-15`. Their execution and signing paths are independent of shared Mac
+availability, heartbeat state, and `MAC_RUNNER`; setting that variable cannot
+reroute either required job. Existing tests and quality gates remain required.
+
+Self-hosted Macs are optional capacity pending successful setup qualification and
+measured pickup time, execution time, and reliability benefit. A fresh heartbeat
+is not a capacity reservation: a Mac can become busy or disappear after the
+probe, and GitHub does not switch a queued self-hosted job to hosted macOS. Job
+execution timeouts do not bound that queue wait. No dispatcher or duplicate
+product/release execution path is introduced.
+
+The shared Mac workflow is manual only and cannot gate required CI. After it is
+on `main`, request a secretless setup canary explicitly:
+
+```sh
+gh workflow run mac-runner-heartbeat.yml --repo JovieInc/LogYourBody --ref main \
+  -f verify-ios-setup=true
+```
+
+Inspect the **Self-hosted iOS setup canary** job, its recorded runner name, and
+Xcode, pinned SwiftLint, xcbeautify, Ruby/Bundler and `bundle check` output. Setup
+or heartbeat success alone does not demonstrate shipping benefit or authorize
+routing required builds onto the shared Macs.
+
+CI tests this hosted policy and the diagnostic heartbeat helpers with Bashcov
+4.0.0, requiring at least 80% executed-line coverage for each helper. The coverage
+check rejects missing scripts, zero-line reports and reused suite records.

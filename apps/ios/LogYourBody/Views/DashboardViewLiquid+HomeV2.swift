@@ -40,6 +40,8 @@ extension DashboardViewLiquid {
             selectedIndex: $selectedIndex,
             weightValue: formatTrendWeightHeadline(metric, usesTrend: weightUsesTrend),
             weightUnit: unit,
+            ffmiValue: homeV2FFMIValue(metric).map { String(format: "%.1f", $0) } ?? "–",
+            bodyFatValue: homeV2Formatters.bodyFatText(metric),
             changeSentence: HomeV2Copy.changeSentence(delta: heroWeightDelta30d(), unit: unit),
             compositionSentence: HomeV2CompositionPolicy.headline(metrics: bodyMetrics),
             phaseSentence: homeV2PhaseSentence,
@@ -59,13 +61,9 @@ extension DashboardViewLiquid {
             onDone: { homeV2Logged = nil },
             onUndo: { Task { await undoHomeV2Logged() } }
         )
-        // The whole-history chart series are built off the main actor by
-        // prewarmMetricCaches; never regenerate them inside body. The caches
-        // reset to [:] whenever metrics change, so this re-warms on demand.
-        .task(id: bodyMetrics.count) {
-            if fullChartCache[.weight] == nil {
-                await prewarmMetricCaches()
-            }
+        // Chart caches refresh centrally when measurements change. Phase copy
+        // must also follow edits to an existing day, not just added rows.
+        .task(id: bodyMetrics) {
             let insight = PhaseInsightPolicy.insight(for: bodyMetrics)
             homeV2PhaseSentence = HomeV2Copy.phaseSentence(
                 kind: insight.kind,

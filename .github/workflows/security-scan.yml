@@ -31,11 +31,15 @@ jobs:
         head: HEAD
         extra_args: --debug --only-verified --json
     
-    - name: Run Gitleaks
-      uses: gitleaks/gitleaks-action@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITLEAKS_ENABLE_SUMMARY: true
+
+  gitleaks:
+    name: Gitleaks (shared JovieInc/ci)
+    # Shared pinned gitleaks; full-history keeps the previous --log-opts=--all scan.
+    uses: JovieInc/ci/.github/workflows/secret-scan.yml@44105468cc7c271e5f117baec9effca295ebd13c
+    with:
+      full-history: true
+    permissions:
+      contents: read
 
   dependency-review:
     name: Dependency Review

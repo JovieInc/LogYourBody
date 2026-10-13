@@ -94,6 +94,88 @@ private final class PreparedSyncNoNetworkProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+/// Returns one stale sync payload. The first body-metrics read can switch accounts
+/// before `pullLatestData` applies that payload.
+private final class StalePullAccountSwitchProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var switchAccount: (@MainActor () -> Void)?
+    private static var armed = false
+
+    static func armSwitch(_ handler: @escaping @MainActor () -> Void) {
+        lock.lock()
+        switchAccount = handler
+        armed = true
+        lock.unlock()
+    }
+
+    static func disarm() {
+        lock.lock()
+        switchAccount = nil
+        armed = false
+        lock.unlock()
+    }
+
+    // swiftlint:disable:next static_over_final_class
+    override class func canInit(with request: URLRequest) -> Bool { true }
+
+    // swiftlint:disable:next static_over_final_class
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let path = request.url?.path ?? ""
+        if request.httpMethod == "GET", path.hasSuffix("/body-metrics"), let handler = Self.takeSwitch() {
+            if Thread.isMainThread {
+                MainActor.assumeIsolated(handler)
+            } else {
+                DispatchQueue.main.sync { MainActor.assumeIsolated(handler) }
+            }
+        }
+        guard let url = request.url,
+              let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
+            return
+        }
+        let body = Self.payload(for: path)
+        guard !body.isEmpty else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+
+    private static func takeSwitch() -> (@MainActor () -> Void)? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard armed else { return nil }
+        armed = false
+        return switchAccount
+    }
+
+    private static func payload(for path: String) -> String {
+        if path.hasSuffix("/body-metrics") {
+            return """
+            {"records":[{"id":"stale-body-a","user_id":"synthetic-sync-A",\
+            "weight":91.5,"weight_unit":"kg","notes":"stale-pull",\
+            "date":"2026-01-15T12:00:00Z","data_source":"manual"}]}
+            """
+        }
+        if path.hasSuffix("/daily-metrics") {
+            return """
+            {"records":[{"id":"stale-daily-a","user_id":"synthetic-sync-A",\
+            "steps":4321,"notes":"stale-steps","date":"2026-01-15T12:00:00Z"}]}
+            """
+        }
+        if path.hasSuffix("/profile") {
+            return #"{"profile":{"id":"synthetic-sync-A","full_name":"Stolen Name"}}"#
+        }
+        return ""
+    }
+}
+
 /// Uses isolated stores, synthetic auth and a transport that never reaches the network.
 @MainActor
 final class SyncQueueRetentionPreparedTests: XCTestCase {
@@ -471,5 +553,72 @@ final class SyncQueueRetentionPreparedTests: XCTestCase {
         XCTAssertEqual(analytics.events, ["sync_failed"])
         switchToB()
         XCTAssertFalse(auth.didExpireRequestSession(ownership))
+    }
+
+    func testStalePullDropsBodyDailyAndProfileAfterAccountSwitch() async throws {
+        let manager = makeStalePullManager(switchAccounts: true)
+        defer { StalePullAccountSwitchProtocol.disarm() }
+        try await manager.pullLatestData(
+            userId: "synthetic-sync-A",
+            lastSync: Date(timeIntervalSince1970: 0),
+            token: "synthetic-token-A"
+        )
+        let stored = await storedStalePull()
+        XCTAssertNil(stored.body, "A stale body-metric response must not land after the account switch")
+        XCTAssertNil(stored.daily, "A stale daily-metric response must not land after the account switch")
+        XCTAssertNil(stored.profile, "A stale profile response must not rename the previous account")
+        XCTAssertEqual(auth.currentUser?.id, "synthetic-sync-B")
+    }
+
+    func testOwningPullStillSavesBodyDailyAndProfile() async throws {
+        let manager = makeStalePullManager(switchAccounts: false)
+        defer { StalePullAccountSwitchProtocol.disarm() }
+        try await manager.pullLatestData(
+            userId: "synthetic-sync-A",
+            lastSync: Date(timeIntervalSince1970: 0),
+            token: "synthetic-token-A"
+        )
+        let stored = await storedStalePull()
+        XCTAssertEqual(stored.body, "stale-pull")
+        XCTAssertEqual(stored.daily, "stale-steps")
+        XCTAssertEqual(stored.profile, "Stolen Name")
+        XCTAssertEqual(auth.currentUser?.id, "synthetic-sync-A")
+    }
+
+    private func makeStalePullManager(switchAccounts: Bool) -> RealtimeSyncManager {
+        let client = ProductAPIClient()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StalePullAccountSwitchProtocol.self]
+        client.session = URLSession(configuration: configuration)
+        if switchAccounts {
+            StalePullAccountSwitchProtocol.armSwitch { self.switchToB() }
+        } else {
+            StalePullAccountSwitchProtocol.disarm()
+        }
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData, authManager: auth, productAPIClient: client,
+            userDefaults: defaults, analyticsService: AnalyticsService(client: analytics)
+        )
+        manager.isOnline = true
+        return manager
+    }
+
+    private func storedStalePull() async -> (body: String?, daily: String?, profile: String?) {
+        await coreData.viewContext.perform {
+            let context = self.coreData.viewContext
+            let bodyRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            bodyRequest.predicate = NSPredicate(format: "id == %@", "stale-body-a")
+            bodyRequest.fetchLimit = 1
+            let body = (try? context.fetch(bodyRequest))?.first?.notes
+            let dailyRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
+            dailyRequest.predicate = NSPredicate(format: "id == %@", "stale-daily-a")
+            dailyRequest.fetchLimit = 1
+            let daily = (try? context.fetch(dailyRequest))?.first?.notes
+            let profileRequest: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
+            profileRequest.predicate = NSPredicate(format: "id == %@", "synthetic-sync-A")
+            profileRequest.fetchLimit = 1
+            let profile = (try? context.fetch(profileRequest))?.first?.fullName
+            return (body, daily, profile)
+        }
     }
 }
