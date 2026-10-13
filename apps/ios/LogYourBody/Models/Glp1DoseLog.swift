@@ -54,8 +54,10 @@ enum Glp1DoseHistoryFormatter {
     }
 
     static func numberText(_ value: Double) -> String {
+        guard value.isFinite else { return "—" }
+
         if value.rounded() == value {
-            return String(Int(value))
+            return value == 0 ? "0" : String(format: "%.0f", value)
         }
 
         return String(format: "%.2f", value)

@@ -133,14 +133,11 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         // This test is @MainActor. Task.yield() and Task.sleep resume it at
         // the test's priority, ahead of triggerFullHealthKitSyncIfNeeded's
         // Task.detached(priority: .background) hop into MainActor.run. A busy
-        // runner then never starts the weight query. Sleep off the main actor
-        // so that import can enter. The deadline is only a ceiling.
-        let deadline = Date().addingTimeInterval(30)
-        while !query.hasStarted, Date() < deadline {
-            await Task.detached(priority: .background) {
-                try? await Task.sleep(nanoseconds: 50_000_000)
-            }.value
-        }
+        // runner then never starts the weight query. Suspending on XCTest's
+        // expectation waiter keeps the main actor free so that import can
+        // enter, and resumes the test the moment the query starts rather than
+        // on a detached-sleep polling boundary.
+        await fulfillment(of: [query.started], timeout: 30)
     }
 
     private func assertHeldImportIsRejected(replace: () -> Void) async {
