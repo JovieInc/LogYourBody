@@ -106,7 +106,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const admission = await neonUserDirectory.captureAccountAdmission(identity.sub);
     if (!admission) return new NextResponse(null, { status: 204 });
-    await deleteOwnedProgressPhotos(identity.sub);
+    await deleteOwnedProgressPhotos(admission);
     await neonUserDirectory.deleteUser(admission);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
