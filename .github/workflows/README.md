@@ -99,7 +99,7 @@ CodeQL analysis on pushes, pull requests, and schedule.
 
 ### `security-scan.yml`
 
-Weekly/manual/main-branch secret, dependency, and SBOM scanning. Gitleaks runs through the shared `JovieInc/ci` `secret-scan.yml` workflow, pinned by commit SHA.
+Weekly/manual/main-branch secret, dependency, and SBOM scanning. Gitleaks runs through the shared `JovieInc/ci` `secret-scan.yml` workflow, pinned by commit SHA. Main pushes fail on findings introduced by the pushed commit range; weekly and manual runs retain the full-history audit.
 
 ### `dependabot-auto-merge.yml`
 
@@ -127,6 +127,7 @@ Advisory checks:
 - Follow-up cleanup and test coverage ideas.
 
 When advisory review finds a noncritical issue, open a focused follow-up PR or issue instead of delaying a landable PR.
+
 ### Shared Mac qualification
 
 The required `iOS` and `iOS Launch Quality Gate` jobs always use standard hosted
