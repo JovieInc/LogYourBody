@@ -32,6 +32,13 @@ var hasBodyFatEntry: Bool {
 
 var hasAuthenticatedAccountEmail: Bool {
         guard entryContext == .authenticated else { return false }
+        #if DEBUG
+        // The body-score UI fixture always signs in with an email, which skips
+        // this screen. The argument keeps the real no-email branch reachable.
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestRecoveryEmailPath") {
+            return false
+        }
+        #endif
         guard let email = AuthManager.shared.currentUser?.email else { return false }
         return !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
