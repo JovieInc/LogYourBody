@@ -9,12 +9,16 @@ This directory supports fast trunk-based shipping. Required checks should prove 
 Primary pull request workflow for `main`.
 
 - Pull requests target `main`; `preview`, `production`, and `dev` are not active development branches. Pull requests and merge groups targeting `production` also run so the active "Production" ruleset's required `CI Summary` check cannot deadlock.
-- `Detect Changes`: path filter for web/package and iOS changes. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`.
+- `Detect Changes`: path filter for web/package and iOS changes (`.github/scripts/detect-changes.sh`, tested by `detect-changes.test.mjs`). A merge group diffs against its own base (the previous group's head), so a web-only group never inherits a queued iOS PR; iOS runs only when a file the iOS jobs read changed, and an unknown diff selects everything. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`.
 - `JavaScript/TypeScript`: runs `pnpm install`, `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` when web, package, or CI harness files change. The job uses no privileged data-provider configuration, so pull request CI can verify buildability without credentials.
-- `iOS`: runs the iOS Fastlane CI lane when iOS files change.
+- `iOS` (Unit) and `iOS Launch Quality Gate`: each runs once, where it still gates the merge. Launch Quality runs on the PR head once the PR is ready for review (drafts defer it; `ready_for_review` reruns CI). Unit runs in the merge group, on the exact tree that lands; the group also runs Launch Quality when the entry's PR head has no passing Launch Quality run (e.g. entries enqueued before this split). While the `post-merge-lq-red` issue is open (see `ios-post-merge-quality.yml`), iOS merge groups run Launch Quality too, and an unknown hold state counts as held. A web-only change runs neither.
 - `CI Summary`: aggregate required status. Branch protection should depend on this stable aggregate name rather than individual implementation jobs.
 
 `CI Summary` is the normal hard merge gate. Keep it deterministic and fast enough for agent throughput.
+
+## `ios-post-merge-quality.yml`
+
+Launch Quality for `main` after merge, on the latest SHA only (`cancel-in-progress`). It checks iOS inputs changed since the newest SHA this workflow verified (`detect-changes.sh` with that base), so a run cancelled by a newer push is still covered. A failure is retried once. A second failure opens or updates the `post-merge-lq-red` issue (`.github/scripts/post-merge-quality-report.sh`, tested by `post-merge-quality.test.mjs`), and the next passing SHA closes it. There is no auto-revert: Launch Quality failed in 15% of merge groups over 2026-10-06..13, nearly all timeouts and recurring flakes.
 
 ## Merge Queue Auto-Land
 
@@ -127,6 +131,7 @@ Advisory checks:
 - Follow-up cleanup and test coverage ideas.
 
 When advisory review finds a noncritical issue, open a focused follow-up PR or issue instead of delaying a landable PR.
+
 ### Shared Mac qualification
 
 The required `iOS` and `iOS Launch Quality Gate` jobs always use standard hosted
