@@ -45,6 +45,7 @@ export type NativeBodyMetricsPushResult = {
 };
 
 export interface NativeBodyMetricsSyncPort {
+  accountMutations?: NativeBodyMetricsAccountMutationsPort;
   push(subject: string, records: NativeBodyMetricPushInput[]): Promise<NativeBodyMetricsPushResult>;
   pull(
     subject: string,
@@ -52,3 +53,15 @@ export interface NativeBodyMetricsSyncPort {
   ): Promise<NativeBodyMetricsPullResult>;
   remove(subject: string, ids: string[]): Promise<{ deleted_ids: string[] }>;
 }
+
+export interface NativeBodyMetricsAccountMutationsPort extends NativeAccountAdmissionPort {
+  push(
+    admission: NativeAccountAdmission,
+    records: NativeBodyMetricPushInput[],
+  ): Promise<NativeBodyMetricsPushResult>;
+  remove(admission: NativeAccountAdmission, ids: string[]): Promise<{ deleted_ids: string[] }>;
+}
+import type {
+  NativeAccountAdmission,
+  NativeAccountAdmissionPort,
+} from './native-account-admission';

@@ -579,6 +579,54 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertNil(UserDefaults.standard.data(forKey: "pendingSyncOperations"))
     }
 
+    func testDeleteBodyMetricDoesNotDeleteAnotherAccountsRow() async throws {
+        let ownerId = "sync_test_owner_\(UUID().uuidString)"
+        let otherId = "sync_test_other_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(90)
+        let metric = BodyMetrics(
+            id: id,
+            userId: ownerId,
+            date: date,
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: ownerId, markAsSynced: true)
+
+        let authManager = AuthManager()
+        authManager.currentUser = LocalUser(
+            id: otherId,
+            email: "other@example.com",
+            name: "Other",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+        let manager = RealtimeSyncManager(
+            coreDataManager: CoreDataManager.shared,
+            authManager: authManager,
+            productAPIClient: StubProductAPIClient()
+        )
+        manager.isOnline = false
+
+        let deleted = await manager.deleteBodyMetric(id: id)
+
+        XCTAssertFalse(deleted, "A signed-in account must not delete another account's measurement")
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertFalse(row.isMarkedDeleted)
+        XCTAssertTrue(manager.pendingOperations.isEmpty)
+    }
+
     func testSyncLocalChangesDeletesMarkedBodyMetricInsteadOfUpserting() async throws {
         let coreData = CoreDataManager.shared
 
@@ -604,7 +652,7 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         )
 
         try await coreData.saveBodyMetricsAndWait(metricModel, userId: userId, markAsSynced: true)
-        let didMarkDeleted = await coreData.markBodyMetricDeleted(id: id)
+        let didMarkDeleted = await coreData.markBodyMetricDeleted(id: id, userId: userId)
         XCTAssertTrue(didMarkDeleted)
 
         let stubProductAPI = StubProductAPIClient()
