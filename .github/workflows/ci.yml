@@ -125,65 +125,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node --test .github/scripts/verify-ruleset-targets.test.mjs && node .github/scripts/verify-ruleset-targets.mjs
 
+      - name: Test change detection and the CI Summary gate
+        run: node --test .github/scripts/detect-changes.test.mjs
+
       - name: Detect changed surfaces locally
         id: filter
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.sha }}
-        run: |
-          set -euo pipefail
-          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
-            changed_files=$(git diff-tree --no-commit-id --name-only -r "$HEAD_SHA")
-          else
-            diff_base="$BASE_SHA"
-            if ! git cat-file -e "$diff_base^{commit}" 2>/dev/null; then
-              git fetch --no-tags --depth=100 origin main
-            fi
-            if ! git cat-file -e "$diff_base^{commit}" 2>/dev/null; then
-              diff_base='origin/main'
-            fi
-            changed_files=$(git diff --name-only "$diff_base" "$HEAD_SHA")
-          fi
-
-          web_pattern='^(agent/|evals/|apps/web/|packages/|\.github/actions/|\.github/scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|scripts/|turbo\.json$)'
-          ios_pattern='^(apps/ios/|\.github/actions/setup-ios-build/|\.github/workflows/ci\.yml$|\.github/workflows/ios[^/]*\.yml$|scripts/ios/|package\.json$)'
-
-          if printf '%s\n' "$changed_files" | grep -Eq "$web_pattern"; then
-            echo 'web=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'web=false' >> "$GITHUB_OUTPUT"
-          fi
-
-          ios_changed=false
-          if printf '%s\n' "$changed_files" | grep -Eq "$ios_pattern"; then
-            ios_changed=true
-          fi
-          echo "ios_changed=$ios_changed" >> "$GITHUB_OUTPUT"
-
-          # macOS capacity is the scarce shared resource, so iOS verification runs once:
-          # in the merge group, which tests the exact tree that lands on main/production.
-          # PR runs skip it (the queue re-verifies), and the post-merge main push skips it
-          # when a merge-group run already passed both iOS jobs on this exact SHA.
-          run_ios="$ios_changed"
-          if [[ "$ios_changed" == 'true' && "$GITHUB_EVENT_NAME" == 'pull_request' ]]; then
-            run_ios=false
-            echo '::notice::iOS changed; iOS jobs run in the merge group, not on the PR.'
-          elif [[ "$ios_changed" == 'true' && "$GITHUB_EVENT_NAME" == 'push' ]]; then
-            verified_runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$HEAD_SHA&event=merge_group" \
-              --jq '.workflow_runs[].id' 2>/dev/null || true)
-            for run_id in $verified_runs; do
-              passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?per_page=100" \
-                --jq '[.jobs[] | select((.name == "iOS" or .name == "iOS Launch Quality Gate") and .conclusion == "success")] | length' \
-                2>/dev/null || echo 0)
-              if [[ "$passed" == '2' ]]; then
-                run_ios=false
-                echo "::notice::iOS already verified on $HEAD_SHA by merge-group CI run $run_id."
-                break
-              fi
-            done
-          fi
-          echo "ios=$run_ios" >> "$GITHUB_OUTPUT"
+        run: bash .github/scripts/detect-changes.sh
 
   js:
     name: JavaScript/TypeScript
