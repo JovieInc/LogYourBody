@@ -16,7 +16,7 @@ struct ScannedPhoto: Identifiable {
     let metadata: PhotoMetadata
     /// The user picked this photo directly from the library instead of the
     /// on-device scan surfacing it as a suggestion.
-    let isManuallyPicked: Bool = false
+    let isManuallyPicked: Bool
 
     struct PhotoMetadata {
         let location: CLLocation?
@@ -29,6 +29,20 @@ struct ScannedPhoto: Identifiable {
         case front
         case back
         case unknown
+    }
+
+    init(
+        asset: PHAsset,
+        date: Date,
+        confidence: Float,
+        metadata: PhotoMetadata,
+        isManuallyPicked: Bool = false
+    ) {
+        self.asset = asset
+        self.date = date
+        self.confidence = confidence
+        self.metadata = metadata
+        self.isManuallyPicked = isManuallyPicked
     }
 }
 
