@@ -225,6 +225,7 @@ class HealthKitManager: ObservableObject {
     let importCoreDataManager: CoreDataManager?
     let weightImportQuery: ((Date, Date) async throws -> [HealthKitWeightImportSample])?
     let bodyFatImportQuery: ((Date) async throws -> [HealthKitBodyFatImportSample])?
+    let todayStepQuantityQuery: ((Date, Date) async throws -> Double?)?
     let stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])?
     let earliestImportDateQuery: (() async throws -> Date?)?
     let importSyncTrigger: (@MainActor () -> Void)?
@@ -243,6 +244,7 @@ class HealthKitManager: ObservableObject {
         coreDataManager: CoreDataManager? = nil,
         weightImportQuery: ((Date, Date) async throws -> [HealthKitWeightImportSample])? = nil,
         bodyFatImportQuery: ((Date) async throws -> [HealthKitBodyFatImportSample])? = nil,
+        todayStepQuantityQuery: ((Date, Date) async throws -> Double?)? = nil,
         stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])? = nil,
         earliestImportDateQuery: (() async throws -> Date?)? = nil,
         syncTrigger: (@MainActor () -> Void)? = nil,
@@ -257,6 +259,7 @@ class HealthKitManager: ObservableObject {
         importCoreDataManager = coreDataManager
         self.weightImportQuery = weightImportQuery
         self.bodyFatImportQuery = bodyFatImportQuery
+        self.todayStepQuantityQuery = todayStepQuantityQuery
         self.stepHistoryQuery = stepHistoryQuery
         self.earliestImportDateQuery = earliestImportDateQuery
         importSyncTrigger = syncTrigger
@@ -275,6 +278,7 @@ class HealthKitManager: ObservableObject {
     @Published var latestWeightDate: Date?
     @Published var latestBodyFatPercentage: Double?
     @Published var latestBodyFatDate: Date?
+    @MainActor var todayStepCountOwner: AuthManager.ProfileSessionOwnership?
     @Published var todayStepCount: Int = 0
     @Published var latestStepCount: Int?
     @Published var latestStepCountDate: Date?
