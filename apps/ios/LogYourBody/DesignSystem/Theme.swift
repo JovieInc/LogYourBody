@@ -31,6 +31,8 @@ enum JoviePalette {
     static let surfaceHex = "#0F1011"
     static let elevatedHex = "#17171A"
     static let raisedHex = "#1C1C1E"
+    /// Launch mark only. The night field stays on the current canvas step.
+    static let creamHex = "#F5F4F0"
 }
 
 /// Jovie design-system palette for the v2 surfaces (mirrors the LogYourBody

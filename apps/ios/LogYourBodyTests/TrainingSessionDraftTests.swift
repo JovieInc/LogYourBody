@@ -210,7 +210,12 @@ final class TrainingSessionDraftTests: XCTestCase {
         )
         try store.put(unknown, ownerId: "owner-A", sessionId: "fixture-session")
         let saved = TrainingSavedSet(
-            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1, reps: 12, loadKg: 45, rir: 2
+            sessionId: "fixture-session",
+            exerciseId: exercise.id,
+            setNumber: 1,
+            reps: 12,
+            loadKg: 45,
+            rir: 2
         )
         let restored = TrainingSessionDraft(
             session: session(saved: [saved]), ownerId: "owner-A", store: store, isCurrent: { true }
@@ -307,7 +312,12 @@ final class TrainingSessionDraftTests: XCTestCase {
         let before = try store.load(ownerId: "owner-A", sessionId: "fixture-session")
         let saved = (1...2).map { number in
             TrainingSavedSet(
-                sessionId: "fixture-session", exerciseId: exercise.id, setNumber: number, reps: 12, loadKg: 45, rir: 2
+                sessionId: "fixture-session",
+                exerciseId: exercise.id,
+                setNumber: number,
+                reps: 12,
+                loadKg: 45,
+                rir: 2
             )
         }
         var cleanupWrites = 0
