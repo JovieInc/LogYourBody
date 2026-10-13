@@ -36,6 +36,28 @@ enum ProfileSettingsPolicy {
         return (first, last)
     }
 
+    /// A cached or imported profile can predate server validation. Never trap
+    /// when turning its floating-point height into a display or picker value.
+    static func roundedStoredHeight(_ heightCm: Double?) -> Int? {
+        guard let heightCm, heightCm.isFinite, heightCm > 0,
+              let rounded = Int(exactly: heightCm.rounded()), rounded > 0 else { return nil }
+        return rounded
+    }
+
+    static func storedHeightText(_ heightCm: Double, useMetric: Bool, spaces: Bool = false) -> String? {
+        guard let centimeters = roundedStoredHeight(heightCm) else { return nil }
+        if useMetric { return "\(centimeters) cm" }
+        guard let totalInches = Int(exactly: (heightCm / 2.54).rounded()) else { return nil }
+        let separator = spaces ? " " : ""
+        return "\(totalInches / 12)'\(separator)\(totalInches % 12)\""
+    }
+
+    /// Preserve stored heights, including imperial choices outside the metric
+    /// wheel. The existing default remains an unsaved draft for missing data.
+    static func heightEditorSeed(_ heightCm: Double?) -> Int {
+        roundedStoredHeight(heightCm) ?? 170
+    }
+
     /// Formats a height stored in cm for the profile row and picker sheet display.
     static func formattedHeight(heightCm: Int, useMetric: Bool) -> String {
         if useMetric {
