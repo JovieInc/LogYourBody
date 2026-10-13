@@ -622,7 +622,14 @@ struct LogYourBodyApp: App {
             (35, 84.7, 17.4, 65.4, "Manual baseline", "manual")
         ]
 
+        let editorialArguments = ProcessInfo.processInfo.arguments
+        let usesWeightOnlyHero = editorialArguments.contains("-lybUITestHomeV2WeightOnlyHeroFixture")
+        let usesSingleWeightHero = editorialArguments.contains("-lybUITestHomeV2SingleWeightHeroFixture")
+        let usesSingleReading = usesSingleWeightHero ||
+            editorialArguments.contains("-lybUITestHomeV2SingleReadingFixture")
+        let usesVisualEstimateHero = editorialArguments.contains("-lybUITestHomeV2EstimateHeroFixture")
         for entry in entries {
+            if usesSingleReading && entry.daysAgo != 0 { continue }
             guard let date = calendar.date(byAdding: .day, value: -entry.daysAgo, to: now) else {
                 continue
             }
@@ -643,8 +650,9 @@ struct LogYourBodyApp: App {
                 date: date,
                 weight: isPhotoOnly ? nil : entry.weight,
                 weightUnit: "kg",
-                bodyFatPercentage: isPhotoOnly ? nil : entry.bodyFat,
-                bodyFatMethod: isPhotoOnly || entry.bodyFat == nil ? nil : entry.source,
+                bodyFatPercentage: isPhotoOnly || usesWeightOnlyHero || usesSingleWeightHero ? nil : entry.bodyFat,
+                bodyFatMethod: isPhotoOnly || usesWeightOnlyHero || usesSingleWeightHero || entry.bodyFat == nil
+                    ? nil : (usesVisualEstimateHero ? "visual_estimate" : entry.source),
                 muscleMass: isPhotoOnly ? nil : entry.muscle,
                 boneMass: nil,
                 waistCm: nil,
@@ -666,10 +674,11 @@ struct LogYourBodyApp: App {
 
         let savedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
         let savedIds = savedMetrics.compactMap { $0.toBodyMetrics()?.id }
-        let expectedIds = Set(entries.map { "\(metricIdPrefix)_\($0.daysAgo)" })
+        let expectedIds = Set(entries.filter { !usesSingleReading || $0.daysAgo == 0 }
+            .map { "\(metricIdPrefix)_\($0.daysAgo)" })
         precondition(
-            savedIds.count == entries.count && Set(savedIds) == expectedIds,
-            "Dashboard UI fixture expected \(entries.count) saved measurements, found \(savedIds.count)"
+            savedIds.count == expectedIds.count && Set(savedIds) == expectedIds,
+            "Dashboard UI fixture expected \(expectedIds.count) saved measurements, found \(savedIds.count)"
         )
     }
 
