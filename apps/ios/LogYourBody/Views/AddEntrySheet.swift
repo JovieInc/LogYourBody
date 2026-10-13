@@ -175,7 +175,7 @@ struct AddEntrySheet: View {
     let includesGlp1Entry: Bool
     let isHomeV2LogEntry: Bool
     @State var selectedDate = Date()
-    let onWeightSaved: ((BodyMetrics) -> Void)?
+    let onWeightSaved: ((PhotoMetricsUpdateResult) -> Void)?
     @AppStorage(Constants.preferredMeasurementSystemKey) var measurementSystem = PreferencesView.defaultMeasurementSystem
 
     init(
@@ -186,7 +186,7 @@ struct AddEntrySheet: View {
         initialWeight: String? = nil,
         initialBodyFat: Double? = nil,
         isHomeV2LogEntry: Bool = false,
-        onWeightSaved: ((BodyMetrics) -> Void)? = nil
+        onWeightSaved: ((PhotoMetricsUpdateResult) -> Void)? = nil
     ) {
         let resolvedInitialTab = initialTab == 3 && !includesGlp1Entry ? 0 : initialTab
         self._isPresented = isPresented
@@ -437,22 +437,34 @@ struct Glp1AddMedicationView: View {
             }
             .navigationTitle("Select GLP-1")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .cancellationAction) {
-                    Button("Cancel") {
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HStack(spacing: JovieTokens.itemGap) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Text("Cancel")
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
                     .disabled(isSaving)
-                }
+                    .accessibilityIdentifier("glp1_medication_selector_cancel_button")
 
-                ToolbarItemGroup(placement: .confirmationAction) {
-                    Button("Save medication") {
+                    Button {
                         if let preset = selectedPreset {
                             createMedication(from: preset)
                         }
+                    } label: {
+                        Text("Save medication")
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
                     .disabled(selectedPreset == nil || isSaving)
+                    .accessibilityIdentifier("glp1_medication_selector_save_button")
                 }
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.vertical, JovieTokens.itemGap)
             }
             .alert("Couldn't save", isPresented: glp1SaveErrorBinding) {
                 Button("Try again") {

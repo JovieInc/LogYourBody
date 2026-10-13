@@ -14,6 +14,8 @@ struct HomeV2Surface: View {
     @Binding var selectedIndex: Int
     let weightValue: String
     let weightUnit: String
+    let ffmiValue: String
+    let bodyFatValue: String
     let changeSentence: String
     let compositionSentence: String
     let phaseSentence: String?
@@ -88,9 +90,35 @@ struct HomeV2Surface: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .bottom) { photoStatStrip }
         .accessibilityLabel("Progress photo")
         .accessibilityHint("Opens the photo")
         .accessibilityIdentifier("home_v2_photo_stage")
+    }
+
+    /// Weight, FFMI and body fat overlaid on the dimmed lower band of the
+    /// photo. The torso anchor keeps the person above it, so the strip sits
+    /// on treated background. Taps pass through to the photo button.
+    private var photoStatStrip: some View {
+        HStack(spacing: HomeV2Tokens.Space.margin) {
+            HomeV2PhotoStat(label: "Weight", value: "\(weightValue) \(weightUnit)")
+            HomeV2PhotoStat(label: "FFMI", value: ffmiValue)
+            HomeV2PhotoStat(label: "Body fat", value: bodyFatValue)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, HomeV2Tokens.Space.inset)
+        .padding(.top, HomeV2Tokens.Space.margin)
+        .padding(.bottom, HomeV2Tokens.Space.row)
+        .background(
+            LinearGradient(
+                colors: [.clear, Color.black.opacity(0.55)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home_v2_photo_stats")
     }
 
     private var photoNumberBlock: some View {
@@ -110,6 +138,10 @@ struct HomeV2Surface: View {
                 .accessibilityIdentifier("home_v2_change_sentence")
 
             compositionLine
+
+            if isLogged {
+                statusLine
+            }
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
@@ -246,6 +278,24 @@ struct HomeV2Surface: View {
     }
 }
 
+/// One stat in the photo-stage overlay: quiet label over a white value.
+struct HomeV2PhotoStat: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, weight: .medium, relativeTo: .caption)
+                .foregroundStyle(.white.opacity(0.72))
+            Text(value)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .body)
+                .foregroundStyle(.white)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct HomeV2Hairline: View {
     var body: some View {
         Rectangle()
@@ -358,7 +408,7 @@ struct HomeV2Filmstrip: View {
             CachedAsyncImage(urlString: bodyMetrics[index].photoUrl ?? "") { image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
             } placeholder: {
                 HomeV2Tokens.Colors.card
             }
@@ -382,6 +432,7 @@ struct SubjectPlateView: View {
 
     @State private var plate: UIImage?
     @State private var original: UIImage?
+    @State private var focus: CGPoint?
 
     var body: some View {
         ZStack {
@@ -399,27 +450,33 @@ struct SubjectPlateView: View {
     }
 
     private func stagePhoto(_ image: UIImage) -> some View {
-        Image(uiImage: AspectFillCropper.crop(image, to: size))
+        Image(uiImage: AspectFillCropper.crop(image, to: size, anchor: focus))
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .frame(width: size.width, height: size.height)
     }
 
     private func load() async {
         if let cached = SubjectPlateStore.shared.cachedPlate(for: urlString) {
             plate = cached
-            return
+        } else {
+            plate = nil
         }
+        focus = SubjectPlateStore.shared.cachedFocus(for: urlString)
 
-        plate = nil
         guard let image = await ImageCacheService.shared.loadImage(from: urlString), !Task.isCancelled else {
             return
         }
         original = image
 
-        let rendered = await SubjectPlateStore.shared.plate(for: urlString, image: image)
-        guard !Task.isCancelled else { return }
-        plate = rendered
+        if focus == nil {
+            focus = await SubjectPlateStore.shared.focus(for: urlString, image: image)
+            guard !Task.isCancelled else { return }
+        }
+
+        if plate == nil {
+            plate = await SubjectPlateStore.shared.plate(for: urlString, image: image)
+        }
     }
 }
 
@@ -440,9 +497,31 @@ enum AspectFillCropper {
         )
     }
 
+    /// Aspect-fill where `anchor` — a normalized point in image space (x
+    /// right, y down, 0–1) — lands on `anchorTarget`, a fraction of the
+    /// target. Offsets clamp so the drawn image still covers the frame;
+    /// a nil anchor is the centered fill above.
+    static func fillRect(imageSize: CGSize, in target: CGSize, anchor: CGPoint?, anchorTarget: CGPoint) -> CGRect {
+        let rect = fillRect(imageSize: imageSize, in: target)
+        guard let anchor else { return rect }
+
+        let offsetX = min(0, max(target.width - rect.width, anchorTarget.x * target.width - anchor.x * rect.width))
+        let offsetY = min(0, max(target.height - rect.height, anchorTarget.y * target.height - anchor.y * rect.height))
+        return CGRect(x: offsetX, y: offsetY, width: rect.width, height: rect.height)
+    }
+
     static func crop(_ image: UIImage, to target: CGSize) -> UIImage {
+        crop(image, to: target, anchor: nil)
+    }
+
+    static func crop(_ image: UIImage, to target: CGSize, anchor: CGPoint?) -> UIImage {
         guard target.width > 0, target.height > 0 else { return image }
-        let rect = fillRect(imageSize: image.size, in: target)
+        let rect = fillRect(
+            imageSize: image.size,
+            in: target,
+            anchor: anchor,
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
         return UIGraphicsImageRenderer(size: target).image { _ in
             image.draw(in: rect)
         }

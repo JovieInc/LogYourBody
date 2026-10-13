@@ -1,0 +1,69 @@
+name: Mac Lane
+run-name: Mac lane ${{ inputs.lane }} for ${{ inputs.parent }}
+# Child run of mac-lane-route.yml: one macOS lane on the self-hosted jovie-mac
+# runners. The parent cancels this run when no Mac picks it up within 45s and
+# then runs the lane on hosted macOS, so the parent never holds on a Mac.
+# Policy: JovieInc/Jovie .claude/rules/infra.md "macOS runners".
+
+on:
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: Lane to run on a Mac.
+        required: true
+        type: choice
+        options: [ios, ios-quality]
+      sha:
+        description: Exact SHA to check out.
+        required: true
+        type: string
+      join-group:
+        description: Concurrency group the parent's join job waits on.
+        required: true
+        type: string
+      supersede-group:
+        description: A newer child run in this group cancels an older one.
+        required: true
+        type: string
+      parent:
+        description: Parent run URL.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ inputs.supersede-group }}
+  cancel-in-progress: true
+
+jobs:
+  # Each lane holds the parent's join group from queue to completion. The
+  # write grant is only the ceiling for the (skipped here) route job.
+  ios:
+    name: iOS
+    if: ${{ inputs.lane == 'ios' }}
+    concurrency:
+      group: ${{ inputs.join-group }}
+      cancel-in-progress: false
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/ios-unit.yml
+    with:
+      checkout-ref: ${{ inputs.sha }}
+      mac-child: true
+
+  ios-quality:
+    name: iOS Launch Quality Gate
+    if: ${{ inputs.lane == 'ios-quality' }}
+    concurrency:
+      group: ${{ inputs.join-group }}
+      cancel-in-progress: false
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/ios-quality.yml
+    with:
+      checkout-ref: ${{ inputs.sha }}
+      mac-child: true

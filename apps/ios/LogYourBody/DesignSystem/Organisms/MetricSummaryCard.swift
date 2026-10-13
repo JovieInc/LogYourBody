@@ -146,15 +146,17 @@ public struct MetricSummaryCard: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            // Small icon + title in accent color (Apple Health-style label)
+            // Keep the metric accent on the non-text icon, but use the semantic
+            // text role for the small label so every metric has a readable
+            // foreground independent of its accent hue.
             HStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: headerIconSize, weight: .semibold))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(accentColor)
 
                 Text(titleText)
                     .font(.system(size: 15, weight: .semibold, design: .default))
-                    .foregroundStyle(accentColor.opacity(0.8))
+                    .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
             }
 
@@ -167,7 +169,7 @@ public struct MetricSummaryCard: View {
                 if isButtonContext && hasActionableState {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(secondaryTextColor.opacity(0.7))
+                        .foregroundStyle(secondaryTextColor)
                 }
             }
         }
@@ -215,7 +217,7 @@ public struct MetricSummaryCard: View {
                 if let time = content.timestamp {
                     Text(time)
                         .font(.system(.footnote, design: .rounded))
-                        .foregroundStyle(secondaryTextColor.opacity(0.8))
+                        .foregroundStyle(secondaryTextColor)
                         .transition(.opacity)
                 }
             default:
@@ -239,6 +241,14 @@ public struct MetricSummaryCard: View {
                 }
             }
 
+            // JOV-6090: the trend chip spans the card's full width on its own row,
+            // so its label is never squeezed by the value/chart column. At standard
+            // text sizes it stays one coherent line; at accessibility sizes the
+            // caption may wrap inside the chip rather than clip.
+            if let trend = content.trend {
+                trendView(trend)
+            }
+
             if let footnote = content.footnote, !footnote.isEmpty {
                 Text(footnote)
                     .font(.system(.footnote, design: .rounded))
@@ -251,29 +261,23 @@ public struct MetricSummaryCard: View {
     }
 
     private func valueBlock(for content: Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                if content.unit.isEmpty {
-                    Text(content.value)
-                        .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
-                        .foregroundStyle(primaryTextColor)
-                        .monospacedDigit()
-                        .tracking(-0.5)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.55)
-                        .layoutPriority(2)
-                } else {
-                    // Render value + unit as a single Text so they stay on one line
-                    // and scale together, preventing vertical stacking of the unit.
-                    Text("\(Text(content.value).font(.system(size: valueFontSize, weight: .semibold, design: .rounded)).foregroundStyle(primaryTextColor).monospacedDigit().tracking(-0.5)) \(Text(content.unit).font(.system(size: unitFontSize, weight: .medium, design: .rounded)).foregroundStyle(secondaryTextColor))")
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if content.unit.isEmpty {
+                Text(content.value)
+                    .font(.system(size: valueFontSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(primaryTextColor)
+                    .monospacedDigit()
+                    .tracking(-0.5)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
                     .layoutPriority(2)
-                }
-            }
-
-            if let trend = content.trend {
-                trendView(trend)
+            } else {
+                // Render value + unit as a single Text so they stay on one line
+                // and scale together, preventing vertical stacking of the unit.
+                Text("\(Text(content.value).font(.system(size: valueFontSize, weight: .semibold, design: .rounded)).foregroundStyle(primaryTextColor).monospacedDigit().tracking(-0.5)) \(Text(content.unit).font(.system(size: unitFontSize, weight: .medium, design: .rounded)).foregroundStyle(secondaryTextColor))")
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+                .layoutPriority(2)
             }
         }
     }
@@ -299,6 +303,7 @@ public struct MetricSummaryCard: View {
         .background(trendBackground(for: trend.direction))
         .cornerRadius(theme.radius.full)
         .foregroundStyle(trendForeground(for: trend.direction))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func isStepsContent(_ content: Content) -> Bool {
@@ -324,7 +329,7 @@ public struct MetricSummaryCard: View {
                     .foregroundStyle(
                         isToday
                             ? lineColor
-                            : lineColor.opacity(0.55)
+                            : lineColor
                     )
                 }
             } else {
@@ -353,7 +358,7 @@ public struct MetricSummaryCard: View {
                         y: .value("Value", minPoint.value)
                     )
                     .symbolSize(6)
-                    .foregroundStyle(lineColor.opacity(0.7))
+                    .foregroundStyle(lineColor)
                 }
 
                 if let maxPoint {
@@ -362,7 +367,7 @@ public struct MetricSummaryCard: View {
                         y: .value("Value", maxPoint.value)
                     )
                     .symbolSize(6)
-                    .foregroundStyle(lineColor.opacity(0.9))
+                    .foregroundStyle(lineColor)
                 }
             }
         }

@@ -13,6 +13,16 @@ import UIKit
 
 
 final class HealthKitAuthorizationPolicyTests: XCTestCase {
+    func testIntegrationDirectoryDefaultsOffAndUsesTheRolloutGate() {
+        var requestedGate: String?
+        XCTAssertFalse(IntegrationStatusPolicy.isEnabled(arguments: []) {
+            requestedGate = $0
+            return false
+        })
+        XCTAssertEqual(requestedGate, "lyb_integrations_directory_v1")
+        XCTAssertTrue(IntegrationStatusPolicy.isEnabled(arguments: []) { _ in true })
+    }
+
     func testConfirmedReadAccessKeepsReadOnlyHealthKitAccessUsableWhenSharingIsDenied() {
         XCTAssertTrue(
             HealthKitAuthorizationPolicy.isAuthorized(
@@ -47,5 +57,144 @@ final class HealthKitAuthorizationPolicyTests: XCTestCase {
                 hasConfirmedReadAccess: false
             )
         )
+    }
+
+    func testMacAvailabilityWinsOverStoredAuthorizationAndSyncPreferences() {
+        for requestCompleted in [false, true] {
+            for syncEnabled in [false, true] {
+                let state = IntegrationStatusPolicy.health(
+                    available: false, onMac: true, requestCompleted: requestCompleted, syncEnabled: syncEnabled
+                )
+                XCTAssertEqual(state.status, "Use on iPhone")
+                XCTAssertTrue(state.detail.contains("supported iPhone or iPad"))
+            }
+        }
+    }
+
+    func testCompletedHealthRequestDoesNotClaimReadAuthorization() {
+        let state = IntegrationStatusPolicy.health(
+            available: true, onMac: false, requestCompleted: true, syncEnabled: true
+        )
+        XCTAssertEqual(state.status, "Sync enabled")
+        XCTAssertTrue(state.detail.contains("controls which data is shared"))
+        XCTAssertFalse(state.status.contains("Connected"))
+    }
+
+    func testUnrequestedHealthAccessDoesNotInheritDefaultSyncPreference() {
+        let state = IntegrationStatusPolicy.health(
+            available: true, onMac: false, requestCompleted: false, syncEnabled: true
+        )
+        XCTAssertEqual(state.status, "Set up access")
+    }
+
+    func testPausingSyncDoesNotClaimHealthPermissionWasRevoked() {
+        let state = IntegrationStatusPolicy.health(
+            available: true, onMac: false, requestCompleted: true, syncEnabled: false
+        )
+        XCTAssertEqual(state.status, "Sync paused")
+        XCTAssertTrue(state.detail.contains("controls which data is shared"))
+    }
+
+    func testUnsupportedDeviceDoesNotPresentSetupAsAvailable() {
+        XCTAssertEqual(IntegrationStatusPolicy.health(
+            available: false, onMac: false, requestCompleted: false, syncEnabled: true
+        ).status, "Unavailable")
+    }
+
+    func testEmptyReadDoesNotEstablishDenialOrReadAccess() {
+        let resolution = HealthKitAuthorizationPolicy.resolve(
+            writeAuthorized: false,
+            probes: [
+                .bodyMass: .empty,
+                .bodyFatPercentage: .empty,
+                .height: .empty
+            ],
+            requestSucceeded: true
+        )
+
+        XCTAssertFalse(resolution.treatsEmptyReadAsDenial)
+        XCTAssertFalse(resolution.shouldPresentAccessNeededAlert)
+        XCTAssertTrue(resolution.confirmedReadKinds.isEmpty)
+        XCTAssertFalse(resolution.grantsEveryRequestedReadKind)
+        XCTAssertFalse(resolution.canUseHealthKit)
+        XCTAssertEqual(resolution.record, .emptyNotDenial)
+        XCTAssertEqual(
+            HealthKitAuthorizationPolicy.connectFollowUp(resolution),
+            .showInconclusiveRead
+        )
+        XCTAssertEqual(
+            HealthKitAuthorizationPolicy.onboardingFollowUp(resolution),
+            .manualAfterEmptyRead
+        )
+        XCTAssertEqual(
+            HealthKitAuthorizationPolicy.onboardingAnalyticsEvent(.manualAfterEmptyRead),
+            "onboarding_health_import_no_samples"
+        )
+        let status = resolution.statusText
+        XCTAssertFalse(status.localizedCaseInsensitiveContains("denied"))
+        XCTAssertFalse(status.localizedCaseInsensitiveContains("not authorized"))
+        XCTAssertTrue(status.contains("not a denial"))
+    }
+
+    func testWriteAuthorizationDoesNotGrantEveryRequestedReadType() {
+        let resolution = HealthKitAuthorizationPolicy.resolve(
+            writeAuthorized: true,
+            probes: [
+                .bodyMass: .empty,
+                .bodyFatPercentage: .empty,
+                .height: .empty
+            ],
+            requestSucceeded: true
+        )
+
+        XCTAssertTrue(resolution.writeAuthorized)
+        XCTAssertTrue(resolution.canUseHealthKit)
+        XCTAssertTrue(resolution.confirmedReadKinds.isEmpty)
+        XCTAssertFalse(resolution.grantsEveryRequestedReadKind)
+        XCTAssertFalse(resolution.treatsEmptyReadAsDenial)
+        XCTAssertEqual(resolution.record, .writeOnly)
+        XCTAssertFalse(resolution.statusText.localizedCaseInsensitiveContains("denied"))
+    }
+
+    func testOneReadableSampleConfirmsOnlyThatType() {
+        let resolution = HealthKitAuthorizationPolicy.resolve(
+            writeAuthorized: false,
+            probes: [
+                .bodyMass: .found,
+                .bodyFatPercentage: .empty,
+                .height: .failed
+            ],
+            requestSucceeded: true
+        )
+
+        XCTAssertEqual(resolution.confirmedReadKinds, [.bodyMass])
+        XCTAssertFalse(resolution.grantsEveryRequestedReadKind)
+        XCTAssertFalse(resolution.treatsEmptyReadAsDenial)
+        XCTAssertFalse(resolution.shouldPresentAccessNeededAlert)
+        XCTAssertTrue(resolution.canUseHealthKit)
+        XCTAssertEqual(resolution.record, .partialSample)
+        XCTAssertTrue(resolution.statusText.contains("weight"))
+        XCTAssertFalse(resolution.statusText.contains("body fat"))
+        XCTAssertFalse(resolution.statusText.contains("steps"))
+    }
+
+    func testFailedAuthorizationRequestIsNotDescribedAsAReadDenial() {
+        let resolution = HealthKitAuthorizationPolicy.resolve(
+            writeAuthorized: false,
+            probes: [:],
+            requestSucceeded: false
+        )
+
+        XCTAssertFalse(resolution.canUseHealthKit)
+        XCTAssertEqual(
+            HealthKitAuthorizationPolicy.connectFollowUp(resolution),
+            .showRequestFailure
+        )
+        XCTAssertEqual(
+            HealthKitAuthorizationPolicy.onboardingFollowUp(resolution),
+            .manualAfterRequestFailure
+        )
+        XCTAssertFalse(resolution.statusText.localizedCaseInsensitiveContains("denied"))
+        XCTAssertTrue(resolution.statusText.contains("could not be opened"))
     }
 }

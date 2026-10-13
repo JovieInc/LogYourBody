@@ -535,6 +535,9 @@ struct BodyScoreShareSheet: View {
                 }
             } else {
                 shareSheetContent(previewHeight: nil)
+                    // The accessibility ScrollView branch owns vertical content
+                    // scrolling; do not also bind the dismiss drag to this branch.
+                    .gesture(dismissDragGesture)
             }
         }
         // Keep content inside the safe area so Close stays tappable under Dynamic Island / notch.
@@ -543,7 +546,6 @@ struct BodyScoreShareSheet: View {
         .background(Color.jovieCanvas.ignoresSafeArea())
         .offset(y: max(0, dragOffsetY))
         .opacity(dismissDragOpacity)
-        .gesture(dismissDragGesture)
         .overlay {
             if isRendering {
                 ZStack {
@@ -590,10 +592,14 @@ struct BodyScoreShareSheet: View {
     private var dismissDragGesture: some Gesture {
         DragGesture(minimumDistance: 20, coordinateSpace: .local)
             .onChanged { value in
-                // Only track downward dismiss drags; horizontal/upward should not fight controls.
-                guard !isRendering else { return }
-                let translationY = value.translation.height
-                dragOffsetY = translationY > 0 ? translationY : 0
+                // Only predominantly vertical drags may pull the sheet; horizontal
+                // format-control swipes must not move or dismiss it.
+                guard !isRendering,
+                      Self.isVerticalGesture(
+                        translationWidth: value.translation.width,
+                        translationHeight: value.translation.height
+                      ) else { return }
+                dragOffsetY = max(0, value.translation.height)
             }
             .onEnded { value in
                 guard !isRendering else {
@@ -601,7 +607,14 @@ struct BodyScoreShareSheet: View {
                     return
                 }
 
-                if Self.shouldDismiss(
+                // A diagonal or horizontal gesture never dismisses, even when its
+                // vertical component passes the threshold; the surface springs back.
+                let isVertical = Self.isVerticalGesture(
+                    translationWidth: value.translation.width,
+                    translationHeight: value.translation.height
+                )
+
+                if isVertical, Self.shouldDismiss(
                     afterDragTranslation: value.translation.height,
                     predictedEndTranslation: value.predictedEndTranslation.height
                 ) {
@@ -612,6 +625,16 @@ struct BodyScoreShareSheet: View {
                     }
                 }
             }
+    }
+
+    /// Pure axis-dominance policy so unit tests can lock which gesture owns the
+    /// surface without a UI harness: only predominantly vertical drags may drive
+    /// dismissal; horizontal format-control swipes and diagonal drags never do.
+    static func isVerticalGesture(
+        translationWidth: CGFloat,
+        translationHeight: CGFloat
+    ) -> Bool {
+        abs(translationHeight) >= abs(translationWidth)
     }
 
     /// Pure dismiss-threshold policy so unit tests can lock the escape path without UI harness.

@@ -97,10 +97,11 @@ struct PaywallView: View {
         } message: {
             paywallStatusMessage(subscriptionManager.errorMessage ?? "No active subscription found")
         }
-        .confirmationDialog(
+        // confirmationDialog presents without Cancel, so paywall logout has no
+        // reachable escape hatch.
+        .alert(
             "Log out of \(ProductRegistry.appName)?",
-            isPresented: $showLogoutConfirmation,
-            titleVisibility: .visible
+            isPresented: $showLogoutConfirmation
         ) {
             Button("Log Out", role: .destructive) {
                 Task {
@@ -108,7 +109,9 @@ struct PaywallView: View {
                     await authManager.logout()
                 }
             }
+            .accessibilityIdentifier("paywall_logout_confirm")
             Button("Cancel", role: .cancel) {}
+                .accessibilityIdentifier("paywall_logout_cancel")
         } message: {
             Text("Use this to switch accounts on this device.")
         }
@@ -441,13 +444,20 @@ struct PaywallView: View {
     private func legalDocumentSheet(_ documentType: LegalDocumentView.LegalDocumentType) -> some View {
         NavigationStack {
             LegalDocumentView(documentType: documentType)
-                .toolbar {
-                    ToolbarItemGroup(placement: .cancellationAction) {
-                        Button("Done") {
-                            showTermsSheet = false
-                            showPrivacySheet = false
-                        }
+                // The navigation-bar Done accessibility frame stays 36 points tall.
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    Button {
+                        showTermsSheet = false
+                        showPrivacySheet = false
+                    } label: {
+                        Text("Done")
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("paywall_legal_done_button")
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.vertical, JovieTokens.itemGap)
                 }
         }
         .nativeSheetChrome(for: .paywallLegal, detent: $legalSheetDetent)

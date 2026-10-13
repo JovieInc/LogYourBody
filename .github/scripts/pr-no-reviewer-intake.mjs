@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // Weekly: open non-draft PRs that are green, have auto-merge enabled, and
-// have had no reviewer for more than 48h. Files or reopens one JOV issue
-// (remediation:lyb-pr-no-reviewer / JOV-7547). Never edits pull requests.
+// have had no reviewer for more than 48h. Files or reopens one LYB issue
+// (remediation:lyb-pr-no-reviewer). Never edits pull requests.
 
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import {
   addLinearIssueComment,
+  findTeamIdByKey,
+  LYB_TEAM_KEY,
   missingLinearKeyWarning,
   upsertLinearIssue,
 } from './lib/linear-issue-intake.mjs';
@@ -90,6 +92,7 @@ export function buildNoReviewerIssue(selected, runUrl) {
     priority: 1,
     createStateName: 'Todo',
     reopenTerminal: true,
+    teamKey: LYB_TEAM_KEY,
   };
 }
 
@@ -172,7 +175,12 @@ async function main() {
     console.log(formatNoReviewerDryRun(selected, runUrl));
     return;
   }
-  const upserted = await upsertLinearIssue({ ...plan, apiKey: process.env.LINEAR_API_KEY });
+  const team = await findTeamIdByKey({ teamKey: plan.teamKey, apiKey: process.env.LINEAR_API_KEY });
+  if (!team.ok) {
+    console.error(team.reason || 'linear_team_lookup_failed');
+    process.exit(1);
+  }
+  const upserted = await upsertLinearIssue({ ...plan, teamId: team.id, apiKey: process.env.LINEAR_API_KEY });
   if (!upserted.ok) {
     console.error(upserted.reason || 'linear_upsert_failed');
     process.exit(1);

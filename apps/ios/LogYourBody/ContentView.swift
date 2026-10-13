@@ -289,6 +289,14 @@ struct ContentView: View {
         .onShake {
             bugReportManager.handleShakeGesture()
         }
+        #if DEBUG
+        .onAppear {
+            // XCUIDevice has no shake in this SDK. The UI test uses the same handler as the gesture.
+            if ProcessInfo.processInfo.arguments.contains("-lybUITestPresentBugReport") {
+                bugReportManager.handleShakeGesture()
+            }
+        }
+        #endif
     }
 
     private var mainContent: some View {
@@ -305,18 +313,12 @@ struct ContentView: View {
     private var authenticatedContent: some View {
         Group {
             if shouldShowOnboarding {
-                if HomeV2Policy.isOnboardingV2Enabled() {
-                    HomeV2FirstRunView()
-                        .environmentObject(authManager)
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                } else {
-                    BodyScoreOnboardingFlowView()
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                }
+                // One first run for everyone: the onboarding_v2_focus gate now
+                // only picks the sign-in screen.
+                BodyScoreOnboardingFlowView()
+                    .onAppear {
+                        AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                    }
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
             } else if !subscriptionManager.isSubscribed {
