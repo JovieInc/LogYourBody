@@ -6,6 +6,7 @@ import XCTest
 import AVFoundation
 import CoreData
 import HealthKit
+import Photos
 import RevenueCat
 import SwiftUI
 import UIKit
@@ -119,6 +120,7 @@ private final class ManualPickAsset: PHAsset, @unchecked Sendable {
     init(identifier: String, day: Int) {
         self.identifier = identifier
         self.day = day
+        super.init()
     }
 
     override var localIdentifier: String { identifier }
