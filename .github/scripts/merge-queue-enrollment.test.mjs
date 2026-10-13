@@ -55,13 +55,19 @@ function recordingCore() {
   };
 }
 
-async function nativeScenario({ mutate = () => {}, enqueueError, queuedMutate = () => {} } = {}) {
+async function nativeScenario({
+  mutate = () => {},
+  enqueueError,
+  queuedMutate = () => {},
+  removals = [],
+} = {}) {
   const run = {
     name: 'CI',
     event: 'pull_request',
     status: 'completed',
     conclusion: 'success',
     head_sha: head,
+    created_at: '2026-10-10T00:00:00Z',
     repository: { full_name: repository },
     pull_requests: [{ number: 1284 }],
   };
@@ -110,12 +116,78 @@ async function nativeScenario({ mutate = () => {}, enqueueError, queuedMutate = 
         if (enqueueError) throw enqueueError;
         return { enqueuePullRequest: { mergeQueueEntry: queued.mergeQueueEntry } };
       }
+      if (query.includes('query Removals')) {
+        return { repository: { pullRequest: { timelineItems: { nodes: removals } } } };
+      }
       return { repository: { pullRequest: queued } };
     },
   };
   await inlineScript(nativeWorkflow)(github, context, core);
   return { calls, core };
 }
+
+const dequeued = ({ context }) => {
+  context.eventName = 'pull_request_target';
+  context.payload.action = 'dequeued';
+};
+const removal = (reason, createdAt = '2026-10-11T00:00:00Z') => ({ reason, createdAt });
+
+test('a dropped green head re-enters after a check timeout or a first failed group', async () => {
+  for (const removals of [
+    [removal('checks_timed_out')],
+    [removal('checks_timed_out'), removal('checks_timed_out')],
+    [removal('failed_checks', '2026-10-01T00:00:00Z'), removal('failed_checks')],
+  ]) {
+    const { calls, core } = await nativeScenario({ mutate: dequeued, removals });
+    assert.equal(calls.length, 2);
+    assert.match(calls[1].query, /mutation Enqueue/);
+    assert.equal(calls[1].variables.expectedHeadOid, head);
+    assert.ok(core.messages.some((message) => message.startsWith('ENQUEUED:')));
+  }
+});
+
+test('a head whose merge group failed twice is poisoned and stays out', async () => {
+  const { calls, core } = await nativeScenario({
+    mutate: dequeued,
+    removals: [removal('failed_checks'), removal('checks_timed_out'), removal('failed_checks')],
+  });
+  assert.equal(calls.length, 1);
+  assert.ok(core.messages.some((message) => message.startsWith('POISONED:')));
+});
+
+test('manual and merge-conflict removals are never undone', async () => {
+  for (const removals of [[removal('manual')], [removal('merge_conflict')], []]) {
+    const { calls, core } = await nativeScenario({ mutate: dequeued, removals });
+    assert.equal(calls.length, 1);
+    assert.ok(core.messages.some((message) => message.startsWith('NOT_ELIGIBLE:')));
+  }
+});
+
+test('a dropped head that moved or went red is not re-enqueued', async () => {
+  for (const mutate of [
+    (scenario) => {
+      dequeued(scenario);
+      scenario.pull.head.sha = 'b'.repeat(40);
+    },
+    (scenario) => {
+      dequeued(scenario);
+      scenario.run.conclusion = 'failure';
+    },
+  ]) {
+    const { calls } = await nativeScenario({ mutate, removals: [removal('checks_timed_out')] });
+    assert.equal(calls.length, 0);
+  }
+});
+
+test('other pull request actions stay outside the enrollment contract', async () => {
+  const { calls } = await nativeScenario({
+    mutate: ({ context }) => {
+      context.eventName = 'pull_request_target';
+      context.payload.action = 'synchronize';
+    },
+  });
+  assert.equal(calls.length, 0);
+});
 
 function alreadyQueuedError(type = 'UNPROCESSABLE') {
   return Object.assign(new Error('GraphQL enrollment failed'), {
