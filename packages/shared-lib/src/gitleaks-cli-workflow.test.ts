@@ -17,8 +17,10 @@ describe('shared Gitleaks security gate', () => {
     );
   });
 
-  it('scans the pushed range while keeping scheduled full-history audits', () => {
-    expect(job).toContain("full-history: ${{ github.event_name != 'push' }}");
+  it('scans change ranges while keeping scheduled full-history audits', () => {
+    expect(job).toContain(
+      "full-history: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}",
+    );
     expect(job).not.toContain('fail-on-findings');
   });
 
