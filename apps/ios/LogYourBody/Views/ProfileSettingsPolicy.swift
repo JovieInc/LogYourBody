@@ -36,15 +36,35 @@ enum ProfileSettingsPolicy {
         return (first, last)
     }
 
+    /// A cached or imported profile can predate server validation. Never trap
+    /// when turning its floating-point height into a display or picker value.
+    static func roundedStoredHeight(_ heightCm: Double?) -> Int? {
+        guard let heightCm, heightCm.isFinite, heightCm > 0,
+              let rounded = Int(exactly: heightCm.rounded()), rounded > 0 else { return nil }
+        return rounded
+    }
+
+    static func storedHeightText(_ heightCm: Double, useMetric: Bool, spaces: Bool = false) -> String? {
+        guard let centimeters = roundedStoredHeight(heightCm) else { return nil }
+        if useMetric { return "\(centimeters) cm" }
+        guard let totalInches = Int(exactly: (heightCm / 2.54).rounded()) else { return nil }
+        let separator = spaces ? " " : ""
+        return "\(totalInches / 12)'\(separator)\(totalInches % 12)\""
+    }
+
+    /// Preserve stored heights, including imperial choices outside the metric
+    /// wheel. The existing default remains an unsaved draft for missing data.
+    static func heightEditorSeed(_ heightCm: Double?) -> Int {
+        roundedStoredHeight(heightCm) ?? 170
+    }
+
     /// Formats a height stored in cm for the profile row and picker sheet display.
     static func formattedHeight(heightCm: Int, useMetric: Bool) -> String {
         if useMetric {
             return "\(heightCm) cm"
         }
-        let totalInches = Int(Double(heightCm) / 2.54)
-        let feet = totalInches / 12
-        let inches = totalInches % 12
-        return "\(feet)'\(inches)\""
+        let components = imperialHeightComponents(heightCm: heightCm)
+        return "\(components.feet)'\(components.inches)\""
     }
 
     /// Formats the age row label from a date of birth.
@@ -55,14 +75,15 @@ enum ProfileSettingsPolicy {
 
     /// Imperial wheel components for a height stored in cm.
     static func imperialHeightComponents(heightCm: Int) -> (feet: Int, inches: Int) {
-        let totalInches = Double(heightCm) / 2.54
-        let feet = Int(totalInches / 12)
-        let inches = Int(totalInches.truncatingRemainder(dividingBy: 12))
+        let totalInches = Int((Double(heightCm) / 2.54).rounded())
+        let feet = totalInches / 12
+        let inches = totalInches % 12
         return (feet, inches)
     }
 
     /// Height in cm from imperial wheel components.
     static func heightCm(feet: Int, inches: Int) -> Int {
-        Int((Double(feet) * 12 + Double(inches)) * 2.54)
+        let totalInches = (feet * 12) + inches
+        return Int((Double(totalInches) * 2.54).rounded())
     }
 }
