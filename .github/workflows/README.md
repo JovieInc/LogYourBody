@@ -16,6 +16,10 @@ Primary pull request workflow for `main`.
 
 `CI Summary` is the normal hard merge gate. Keep it deterministic and fast enough for agent throughput.
 
+## `ios-post-merge-quality.yml`
+
+Launch Quality for `main` after merge, on the latest SHA only (`cancel-in-progress`). It checks iOS inputs changed since the newest SHA this workflow verified (`detect-changes.sh` with that base), so a run cancelled by a newer push is still covered. A failure is retried once. A second failure opens or updates the `post-merge-lq-red` issue (`.github/scripts/post-merge-quality-report.sh`, tested by `post-merge-quality.test.mjs`), and the next passing SHA closes it. There is no auto-revert: Launch Quality failed in 15% of merge groups over 2026-10-06..13, nearly all timeouts and recurring flakes.
+
 ## Merge Queue Auto-Land
 
 `main` uses GitHub's native merge queue (ruleset "Main - Protect", `ALLGREEN`, `MERGE`, required check `CI Summary`, 60-minute check timeout). Two secret-boundaried workflows make landing hands-off:
