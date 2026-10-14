@@ -211,9 +211,23 @@ private struct HomeV2TimelinePage: View {
         .accessibilityHint("Open the photo")
         .accessibilityIdentifier("home_v2_photo_stage")
         .task(id: key) {
+            let cached = SubjectPlateStore.shared.cachedPlate(for: url)
+            if let cached {
+                let focus = SubjectPlateStore.shared.cachedFocus(for: url)
+                editorialPhoto = (key, AspectFillCropper.crop(cached, to: size, anchor: focus))
+            }
+
             let image = await ImageCacheService.shared.loadImage(from: url)
             guard !Task.isCancelled else { return }
-            editorialPhoto = (key, image)
+            guard let image else {
+                if cached == nil { editorialPhoto = (key, nil) }
+                return
+            }
+            let focus = await SubjectPlateStore.shared.focus(for: url, image: image)
+            guard !Task.isCancelled else { return }
+            let plate = await SubjectPlateStore.shared.plate(for: url, image: image) ?? image
+            guard !Task.isCancelled else { return }
+            editorialPhoto = (key, AspectFillCropper.crop(plate, to: size, anchor: focus))
         }
     }
 
