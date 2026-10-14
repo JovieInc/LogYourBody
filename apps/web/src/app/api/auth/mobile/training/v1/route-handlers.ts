@@ -1,3 +1,6 @@
+import { TrainingMutationError } from '@/lib/training/mutation-admission';
+import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
+import { profileConfirmsAdult } from '@/lib/training/eligibility';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
@@ -7,7 +10,7 @@ import {
   isTrainingRecordCollection,
   type NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import { logTrainingSet, recordTrainingFeedback } from '@/lib/training/commands';
+import { logTrainingSet, recordTrainingFeedback, swapExercise } from '@/lib/training/commands';
 import {
   getOrCreateNextWorkout,
   pullAllTrainingRecords,
@@ -47,9 +50,23 @@ const FeedbackBodySchema = z
   })
   .strict();
 
+const SwapBodySchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    exerciseId: z.string().trim().min(1).max(64),
+    toVariantId: z.string().trim().min(1).max(64).optional(),
+    unavailableEquipment: z.array(z.string().trim().min(1).max(32)).max(16).optional(),
+    declaredEquipment: z.array(z.string().trim().min(1).max(32)).max(16).optional(),
+    excludedConcerns: z.array(z.string().trim().min(1).max(48)).max(16).optional(),
+    preferTorsoSupport: z.boolean().optional(),
+    maxTrunkDemand: z.enum(['low', 'moderate', 'high']).optional(),
+  })
+  .strict();
+
 type RouteDependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   records: NativeProductRecordsPort;
+  revisions?: TrainingRevisionsPort;
   users: UserDirectoryPort;
   reserveRequest: (subject: string) => Promise<ChatRateLimitResult>;
   createId: () => string;
@@ -77,28 +94,6 @@ function rateLimitError(result: Extract<ChatRateLimitResult, { allowed: false }>
 
 function withVersion(payload: Record<string, unknown>) {
   return { version: TRAINING_API_VERSION, ...payload };
-}
-
-function profileConfirmsAdult(dateOfBirth: unknown, today: Date): boolean {
-  if (typeof dateOfBirth !== 'string') return false;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth.slice(0, 10));
-  if (!match) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  )
-    return false;
-  let age = today.getUTCFullYear() - year;
-  const birthdayPassed =
-    today.getUTCMonth() + 1 > month ||
-    (today.getUTCMonth() + 1 === month && today.getUTCDate() >= day);
-  if (!birthdayPassed) age -= 1;
-  return age >= 18;
 }
 
 async function collectionRecords(
@@ -144,6 +139,7 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
               session: null,
               week: result.week,
               weeklyFractionalVolume: result.weeklyFractionalVolume,
+              decision: result.decision,
             }),
           );
         }
@@ -153,9 +149,12 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             week: result.week,
             weekCount: result.weekCount,
             weeklyFractionalVolume: result.weeklyFractionalVolume,
+            decision: result.decision,
           }),
         );
-      } catch {
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
         return apiError('training_unavailable', 503);
       }
     },
@@ -164,6 +163,16 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const identity = await authorized(request);
       if (!identity) return apiError('unauthorized', 401);
       if (!featureEnabled()) return apiError('not_found', 404);
+      // Capture before body/profile/rate-limit awaits: a request already in flight
+      // cannot restore consent after a concurrent revoke or canonical input edit.
+      let enrollmentContext;
+      try {
+        enrollmentContext = await dependencies.revisions?.readContext(identity.sub);
+        if (dependencies.revisions && !enrollmentContext)
+          return apiError('training_unavailable', 503);
+      } catch {
+        return apiError('training_unavailable', 503);
+      }
       const denied = await allowed(identity.sub);
       if (denied) return denied;
       const parsed = EnrollBodySchema.safeParse(await request.json().catch(() => null));
@@ -177,6 +186,8 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
         }
         const setup = await storeProgramSetup({
           records: dependencies.records,
+          revisions: dependencies.revisions,
+          expectedContext: enrollmentContext ?? undefined,
           subject: identity.sub,
           setup: {
             adultConfirmed: true,
@@ -210,6 +221,10 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const denied = await allowed(identity.sub);
       if (denied) return denied;
       try {
+        if (dependencies.revisions) {
+          const deleted = await dependencies.revisions.revoke(identity.sub);
+          return json(withVersion({ revoked: true, deletedRecords: deleted }));
+        }
         const [sessions, sets, feedback] = await Promise.all([
           collectionRecords(dependencies.records, identity.sub, 'training_sessions'),
           collectionRecords(dependencies.records, identity.sub, 'logged_sets'),
@@ -268,7 +283,58 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
           case 'rejected':
             return apiError('training_unavailable', 503);
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
+        return apiError('training_unavailable', 503);
+      }
+    },
+
+    async swap(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      const parsed = SwapBodySchema.safeParse(await request.json().catch(() => null));
+      if (!parsed.success) return apiError('invalid_request', 400);
+      try {
+        const result = await swapExercise({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          swap: parsed.data,
+        });
+        switch (result.kind) {
+          case 'swapped':
+            return json(
+              withVersion({
+                swap: result.swap,
+                exercise: result.exercise,
+                diff: result.diff,
+              }),
+              201,
+            );
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'session_not_active':
+            return apiError('session_not_active', 409);
+          case 'exercise_not_found':
+            return apiError('exercise_not_found', 404);
+          case 'variant_not_found':
+            return apiError('variant_not_found', 404);
+          case 'variant_ineligible':
+            return json(withVersion({ error: 'variant_ineligible', missing: result.missing }), 409);
+          case 'no_feasible_alternative':
+            return apiError('no_feasible_alternative', 409);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
+        }
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
         return apiError('training_unavailable', 503);
       }
     },
@@ -301,7 +367,9 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
           case 'rejected':
             return apiError('training_unavailable', 503);
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
         return apiError('training_unavailable', 503);
       }
     },

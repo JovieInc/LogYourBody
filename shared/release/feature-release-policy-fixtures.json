@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "contract": "Shared feature release lifecycle (JOV-8056). Both platforms evaluate these cases with their native adapter and must produce the expected decision exactly; any divergence is a conformance failure.",
+  "cases": [
+    {
+      "name": "human staff principal gets dogfood exposure automatically",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "dogfoodHuman",
+        "installedBuild": 500,
+        "configState": "fresh",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "dogfoodPrincipal" }
+    },
+    {
+      "name": "independent agent principal gets dogfood exposure automatically",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "dogfoodAgent",
+        "installedBuild": 500,
+        "configState": "fresh",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "dogfoodPrincipal" }
+    },
+    {
+      "name": "second account or session on the roster still exposes",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "dogfoodHuman",
+        "installedBuild": 500,
+        "configState": "stale",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "dogfoodPrincipal" }
+    },
+    {
+      "name": "newly registered agent principal exposes without an individual toggle",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "dogfoodAgent",
+        "installedBuild": 500,
+        "configState": "missing",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "dogfoodPrincipal" }
+    },
+    {
+      "name": "ordinary customer in the wrong cohort stays off",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 500,
+        "configState": "fresh",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": false, "reason": "ordinaryCustomer" }
+    },
+    {
+      "name": "revoked dogfood membership falls back to ordinary customer",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 500,
+        "configState": "fresh",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": false, "reason": "ordinaryCustomer" }
+    },
+    {
+      "name": "old binary below minimumBuild is BLOCKED_BUILD even for staff",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": 600
+      },
+      "context": {
+        "actor": "dogfoodHuman",
+        "installedBuild": 500,
+        "configState": "fresh",
+        "enableGate": true,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": false, "reason": "blockedBuild" }
+    },
+    {
+      "name": "true flag on a binary missing the surface is BLOCKED_BUILD, not exposure",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "graduated",
+        "minimumBuild": 700
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 650,
+        "configState": "fresh",
+        "enableGate": true,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": false, "reason": "blockedBuild" }
+    },
+    {
+      "name": "missing config on a graduated feature keeps the public baseline on",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "graduated",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 500,
+        "configState": "missing",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "graduatedDefault" }
+    },
+    {
+      "name": "stale config on a graduated feature keeps the public baseline on",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "graduated",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 500,
+        "configState": "stale",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "graduatedDefault" }
+    },
+    {
+      "name": "offline dogfood principal still exposes on a compatible build",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": 400
+      },
+      "context": {
+        "actor": "dogfoodHuman",
+        "installedBuild": 500,
+        "configState": "missing",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "dogfoodPrincipal" }
+    },
+    {
+      "name": "active kill switch on fresh config stops even a graduated feature",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "graduated",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "dogfoodHuman",
+        "installedBuild": 500,
+        "configState": "fresh",
+        "enableGate": true,
+        "killSwitch": true
+      },
+      "expected": { "isEnabled": false, "reason": "killSwitch" }
+    },
+    {
+      "name": "kill switch value in a stale config cannot manufacture a stop",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "graduated",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 500,
+        "configState": "stale",
+        "enableGate": false,
+        "killSwitch": true
+      },
+      "expected": { "isEnabled": true, "reason": "graduatedDefault" }
+    },
+    {
+      "name": "disabled stage stays off even with the enable gate on",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "disabled",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "dogfoodHuman",
+        "installedBuild": 500,
+        "configState": "fresh",
+        "enableGate": true,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": false, "reason": "disabledStage" }
+    },
+    {
+      "name": "enable gate exposes an ordinary customer in the dogfood stage",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 500,
+        "configState": "fresh",
+        "enableGate": true,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "enableGate" }
+    },
+    {
+      "name": "a false enable gate is not a blanket off for a graduated feature",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "graduated",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 500,
+        "configState": "fresh",
+        "enableGate": false,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "graduatedDefault" }
+    },
+    {
+      "name": "missing config cannot vouch for a positive enable gate",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 500,
+        "configState": "missing",
+        "enableGate": true,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": false, "reason": "ordinaryCustomer" }
+    },
+    {
+      "name": "stale config keeps a previously observed positive enable gate",
+      "descriptor": {
+        "flagKey": "home_v2_photo_first",
+        "killSwitchKey": "home_v2_kill_switch",
+        "stage": "dogfood",
+        "minimumBuild": null
+      },
+      "context": {
+        "actor": "ordinaryCustomer",
+        "installedBuild": 500,
+        "configState": "stale",
+        "enableGate": true,
+        "killSwitch": false
+      },
+      "expected": { "isEnabled": true, "reason": "enableGate" }
+    }
+  ]
+}

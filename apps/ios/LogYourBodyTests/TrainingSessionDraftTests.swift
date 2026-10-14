@@ -205,9 +205,18 @@ final class TrainingSessionDraftTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = TrainingDraftStore(rootURL: directory)
         model(store).update(exercise, setNumber: 1) { $0.loadText = "22,5" }
-        let unknown = TrainingSetDraft(exerciseId: "obsolete", setNumber: 1, repsText: "10", loadText: "35", rir: 3)
+        let unknown = TrainingSetDraft(
+            exerciseId: "obsolete", setNumber: 1, repsText: "10", loadText: "35", rir: 3
+        )
         try store.put(unknown, ownerId: "owner-A", sessionId: "fixture-session")
-        let saved = TrainingSavedSet(sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1, reps: 12, loadKg: 45, rir: 2)
+        let saved = TrainingSavedSet(
+            sessionId: "fixture-session",
+            exerciseId: exercise.id,
+            setNumber: 1,
+            reps: 12,
+            loadKg: 45,
+            rir: 2
+        )
         let restored = TrainingSessionDraft(
             session: session(saved: [saved]), ownerId: "owner-A", store: store, isCurrent: { true }
         )
@@ -302,7 +311,14 @@ final class TrainingSessionDraftTests: XCTestCase {
         draft.update(exercise, setNumber: 2) { $0.loadText = "35" }
         let before = try store.load(ownerId: "owner-A", sessionId: "fixture-session")
         let saved = (1...2).map { number in
-            TrainingSavedSet(sessionId: "fixture-session", exerciseId: exercise.id, setNumber: number, reps: 12, loadKg: 45, rir: 2)
+            TrainingSavedSet(
+                sessionId: "fixture-session",
+                exerciseId: exercise.id,
+                setNumber: number,
+                reps: 12,
+                loadKg: 45,
+                rir: 2
+            )
         }
         var cleanupWrites = 0
         let failing = TrainingDraftStore(rootURL: directory) { _, _, _ in

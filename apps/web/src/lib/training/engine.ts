@@ -254,7 +254,7 @@ export function latestFeedbackPerSession(feedback: TrainingFeedback[]): Training
     });
 }
 
-function hasConflictingFeedbackAtSameTime(
+export function hasConflictingFeedbackAtSameTime(
   observation: TrainingFeedback,
   feedback: TrainingFeedback[],
 ): boolean {
@@ -315,7 +315,7 @@ export function evaluateDeload(feedback: TrainingFeedback[]): DeloadState {
   };
 }
 
-function progressionForExercise(
+export function progressionForExercise(
   exerciseId: string,
   logs: SetLog[],
   targetRir: number,

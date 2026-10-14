@@ -1,9 +1,12 @@
 name: Security Scanning
 
+# No clock: every scanned input (history, lockfile, pinned scanner versions)
+# only changes on a push to main, which runs every job here.
 on:
-  schedule:
-    - cron: '0 8 * * 1'  # Weekly on Monday at 8 AM
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+  merge_group:
   push:
     branches: [main]
 
@@ -24,27 +27,31 @@ jobs:
         fetch-depth: 0  # Full history for comprehensive scanning
     
     - name: Run TruffleHog OSS
-      uses: trufflesecurity/trufflehog@v3.97.9
+      uses: trufflesecurity/trufflehog@v3.99.2
       with:
         path: ./
-        # An empty base scans full history; main and HEAD coincide on main runs.
-        head: HEAD
+        # On pushes, scan only the pushed commits; an empty base scans full
+        # history up to HEAD on manual dispatch.
+        base: ${{ github.event_name == 'push' && github.event.before || '' }}
+        head: ${{ github.event_name == 'push' && github.sha || 'HEAD' }}
         extra_args: --debug --only-verified --json
     
 
   gitleaks:
     name: Gitleaks (shared JovieInc/ci)
-    # Shared pinned gitleaks; full-history keeps the previous --log-opts=--all scan.
+    # Block new leaks on change-triggered runs without letting legacy or
+    # unmerged refs mask the result. Manual audits retain the comprehensive
+    # history scan.
     uses: JovieInc/ci/.github/workflows/secret-scan.yml@44105468cc7c271e5f117baec9effca295ebd13c
     with:
-      full-history: true
+      full-history: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     permissions:
       contents: read
 
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     permissions:
       contents: read
     
@@ -55,8 +62,6 @@ jobs:
       uses: actions/dependency-review-action@v4
       with:
         fail-on-severity: high
-        base-ref: ${{ github.event.before }}
-        head-ref: ${{ github.sha }}
         
   sbom-generation:
     name: Generate SBOM
