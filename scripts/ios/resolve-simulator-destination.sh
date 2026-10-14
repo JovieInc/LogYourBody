@@ -92,9 +92,18 @@ if [[ -z "$SIMULATOR_ID" ]]; then
 
   if [[ -n "$RUNTIME_ID" && -n "$DEVICE_TYPE_ID" ]]; then
     SIMULATOR_ID="$(xcrun simctl create "LYB CI iPhone" "$DEVICE_TYPE_ID" "$RUNTIME_ID")"
-    xcrun simctl boot "$SIMULATOR_ID" >/dev/null 2>&1 || true
-    xcrun simctl bootstatus "$SIMULATOR_ID" -b >/dev/null 2>&1 || true
   fi
+fi
+
+# Boot the chosen simulator and wait for it to finish booting before any test
+# invocation. A stock simulator left for xcodebuild to boot made every hosted
+# test invocation spend 5-9 min launching the runner (run 38320479871); the
+# created-and-booted fallback simulator launched it in 24-60s (#1379 probe).
+if [[ -n "$SIMULATOR_ID" ]]; then
+  boot_started="$(date +%s)"
+  xcrun simctl boot "$SIMULATOR_ID" >/dev/null 2>&1 || true
+  xcrun simctl bootstatus "$SIMULATOR_ID" -b >/dev/null 2>&1 || true
+  echo "Simulator $SIMULATOR_ID booted in $(( $(date +%s) - boot_started ))s" >&2
 fi
 
 if [[ -z "$SIMULATOR_ID" ]]; then

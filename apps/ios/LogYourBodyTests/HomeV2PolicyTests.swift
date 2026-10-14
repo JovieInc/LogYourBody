@@ -22,10 +22,26 @@ final class HomeV2PolicyTests: XCTestCase {
         XCTAssertTrue(
             HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { key in
                 askedKey = key
-                return true
+                return key == HomeV2Policy.gateKey
             })
         )
         XCTAssertEqual(askedKey, "home_v2_photo_first")
+    }
+
+    func testKillSwitchOverridesTheEnableGate() {
+        XCTAssertFalse(
+            HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { _ in true })
+        )
+    }
+
+    func testDogfoodPrincipalIsExposedWithoutTheGate() {
+        XCTAssertTrue(
+            HomeV2Policy.isEnabled(
+                arguments: [],
+                actor: .dogfoodAgent,
+                isGateEnabled: { _ in false }
+            )
+        )
     }
 
     #if DEBUG

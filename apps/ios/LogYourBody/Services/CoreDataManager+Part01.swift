@@ -67,6 +67,13 @@ func saveDailyMetrics(
                     return
                 }
             }
+            let steps: Int32
+            do {
+                steps = try DailyStepCountPolicy.storedSteps(metrics.steps)
+            } catch {
+                completion?(.failure(error))
+                return
+            }
             let fetchRequest: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "id == %@", metrics.id)
             fetchRequest.fetchLimit = 1
@@ -93,7 +100,7 @@ func saveDailyMetrics(
 
             cached.userId = userId
             cached.date = metrics.date
-            cached.steps = Int32(metrics.steps ?? 0)
+            cached.steps = steps
             cached.notes = metrics.notes
             cached.updatedAt = metrics.updatedAt
             cached.lastModified = Date()
@@ -291,12 +298,17 @@ func fetchDexaResults(for userId: String, limit: Int) async -> [DexaResult] {
             let fetchRequest: NSFetchRequest<CachedDexaResult> = CachedDexaResult.fetchRequest()
 
             for result in results {
+                guard result.userId == userId else { continue }
                 fetchRequest.predicate = NSPredicate(format: "id == %@", result.id)
                 fetchRequest.fetchLimit = 1
 
                 let cached: CachedDexaResult
                 if let existing = try? context.fetch(fetchRequest).first {
                     if let owner = existing.userId, !owner.isEmpty, owner != userId {
+                        continue
+                    }
+                    // A remote cache refresh cannot acknowledge or replace a pending typed edit.
+                    if markAsSynced, !existing.isSynced, existing.reportedMeasurementsJSON != nil {
                         continue
                     }
                     cached = existing
@@ -323,6 +335,9 @@ func fetchDexaResults(for userId: String, limit: Int) async -> [DexaResult] {
                 cached.bodyFatPercentage = result.bodyFatPercentage ?? 0
                 cached.muscleMass = result.muscleMass ?? 0
                 cached.boneMass = result.boneMass ?? 0
+                if let reportedMeasurements = result.reportedMeasurements {
+                    cached.reportedMeasurementsJSON = reportedMeasurements.jsonString
+                }
                 cached.resultPdfUrl = result.resultPdfUrl
                 cached.resultPdfName = result.resultPdfName
                 cached.updatedAt = result.updatedAt

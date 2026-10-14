@@ -70,6 +70,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ steps.app-token.outputs.token || secrets.MERGE_QUEUE_TOKEN }}
+          retries: 3
           script: |
             const { owner, repo } = context.repo;
             const expectedRepository = 'JovieInc/LogYourBody';
@@ -80,6 +81,9 @@ jobs:
               core.notice('SKIPPED: Event is outside the repository token enrollment contract');
               return;
             }
+            // Keep this query shallow: nesting commits/statusCheckRollup inside
+            // the queue listing previously pushed it past GitHub's GraphQL
+            // timeout (HTTP 504). Check status is fetched per candidate below.
             const { repository } = await github.graphql(`
               query Queue($owner: String!, $repo: String!) {
                 repository(owner: $owner, name: $repo) {
@@ -96,18 +100,6 @@ jobs:
                           baseRefName
                           headRefOid
                           headRepository { nameWithOwner }
-                          commits(last: 1) {
-                            nodes {
-                              commit {
-                                oid
-                                statusCheckRollup {
-                                  contexts(first: 50) {
-                                    nodes { ... on CheckRun { name conclusion } }
-                                  }
-                                }
-                              }
-                            }
-                          }
                         }
                       }
                     }
@@ -131,14 +123,17 @@ jobs:
                 core.info(`#${pull.number}: not eligible (draft, base, or fork)`);
                 continue;
               }
-              const commit = pull.commits.nodes[0]?.commit;
-              if (commit?.oid !== pull.headRefOid) {
-                core.info(`#${pull.number}: source commit no longer matches the head; leaving it`);
-                continue;
-              }
-              const checks = commit.statusCheckRollup?.contexts?.nodes ?? [];
-              const summary = checks.find((check) => check.name === 'CI Summary');
-              if (summary?.conclusion !== 'SUCCESS') {
+              const { data: checkData } = await github.rest.checks.listForRef({
+                owner,
+                repo,
+                ref: pull.headRefOid,
+                check_name: 'CI Summary',
+                per_page: 10,
+              });
+              const summary = checkData.check_runs
+                .filter((run) => run.name === 'CI Summary' && run.head_sha === pull.headRefOid)
+                .sort((a, b) => new Date(b.completed_at ?? 0) - new Date(a.completed_at ?? 0))[0];
+              if (summary?.conclusion !== 'success') {
                 core.info(`#${pull.number}: CI Summary on ${pull.headRefOid.slice(0, 9)} is ${summary?.conclusion ?? 'missing'}; leaving it`);
                 continue;
               }
