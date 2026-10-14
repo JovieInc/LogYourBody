@@ -100,12 +100,18 @@ struct DashboardSyncDetailsSheet: View {
                 }
             }
             .navigationTitle("Sync")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        isPresented = false
-                    }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Button {
+                    isPresented = false
+                } label: {
+                    Text("Close")
+                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .accessibilityIdentifier("dashboard_sync_close_button")
+                .padding(.horizontal, JovieTokens.screenInset)
+                .padding(.vertical, JovieTokens.itemGap)
             }
         }
         .worldClassScreen(.syncDetails)

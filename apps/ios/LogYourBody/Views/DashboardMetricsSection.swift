@@ -158,7 +158,7 @@ struct DashboardMetricsSection: View {
                     icon: "percent",
                     accentColor: theme.colors.accentPink,
                     state: .data(MetricSummaryCard.Content(
-                        title: "Body Fat %",
+                        title: "Body Fat",
                         value: formatBodyFatValue(currentMetric.bodyFatPercentage),
                         unit: "%",
                         timestamp: formatCardDate(currentMetric.date),
@@ -193,7 +193,7 @@ struct DashboardMetricsSection: View {
                     state: .data(MetricSummaryCard.Content(
                         title: "FFMI",
                         value: formatFFMIValue(currentMetric),
-                        unit: "FFMI",
+                        unit: "",
                         timestamp: formatCardDate(currentMetric.date),
                         dataPoints: generateFFMIChartData().map { point in
                             MetricSummaryCard.DataPoint(index: point.index, value: point.value)

@@ -149,21 +149,6 @@ private struct PaidWeightLoggerMVPView: View {
                 .accessibilityLabel("Account")
                 .accessibilityIdentifier("mvp_account_menu_button")
             }
-
-            ToolbarItemGroup(placement: .keyboard) {
-                Button("Done") {
-                    isWeightFieldFocused = false
-                }
-                .accessibilityIdentifier("mvp_keyboard_done_button")
-
-                Spacer()
-
-                Button(isSaving ? "Saving" : "Save weight") {
-                    saveWeight()
-                }
-                .disabled(isSaveDisabled)
-                .accessibilityIdentifier("mvp_keyboard_save_weight_button")
-            }
         }
         .safeAreaInset(edge: .bottom) {
             if isWeightFieldFocused {
@@ -279,11 +264,17 @@ private struct PaidWeightLoggerMVPView: View {
                 .background(Color.appBorder)
 
             HStack(spacing: 12) {
-                Button("Done") {
+                Button {
                     isWeightFieldFocused = false
+                } label: {
+                    Text("Done")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.appTextSecondary)
+                        .frame(
+                            minWidth: JovieTokens.minimumHitTarget,
+                            minHeight: JovieTokens.minimumHitTarget
+                        )
                 }
-                .font(.subheadline.weight(.semibold))
-                .foregroundColor(.appTextSecondary)
                 .accessibilityIdentifier("mvp_keyboard_bottom_done_button")
 
                 Button(action: saveWeight) {
@@ -582,6 +573,7 @@ private struct PaidWeightLoggerMVPView: View {
             realtimeSyncManager.updatePendingSyncCount()
             realtimeSyncManager.syncIfNeeded()
             AppServicePorts.analyticsTracker.track(event: "mvp_weight_logged")
+            NotificationManager.shared.recordWeighInLogged()
 
             isWeightFieldFocused = false
             weightText = ""
@@ -759,6 +751,8 @@ struct ChatTabView: View {
     @State private var composerTextHeight: CGFloat = 0
     @State private var isResponding = false
     @State private var isLoadingConversation = true
+    /// UI-test-only trail of send and load events (LQ chat-root flake probe).
+    @State private var sendProbe = ChatSendProbe()
     @State private var conversationLoadId: UUID?
     @State private var conversationOwner: AuthManager.ProfileSessionOwnership?
     @State private var messages: [ChatMessage] = [.welcome]
@@ -796,6 +790,7 @@ struct ChatTabView: View {
                 id: showsTranscript ? "chat_tab_root" : "home_chat_composer_dock",
                 label: showsTranscript ? "Chat" : "Chat composer"
             )
+            .accessibilityValue(sendProbe.accessibilityValue)
             chatSurface
         }
         .background {
@@ -1583,7 +1578,13 @@ struct ChatTabView: View {
 
     private func send(_ text: String, shouldSpeakReply: Bool = false) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isResponding, !isLoadingConversation else { return }
+        guard !trimmed.isEmpty, !isResponding, !isLoadingConversation else {
+            sendProbe.record(
+                trimmed.isEmpty ? "drop-empty" : isResponding ? "drop-responding" : "drop-loading"
+            )
+            return
+        }
+        sendProbe.record("send")
 
         let clientMessageId = UUID().uuidString
         pendingSpokenReply.track(
@@ -1787,6 +1788,8 @@ struct ChatTabView: View {
     private func loadLatestConversation() async {
         let loadId = UUID()
         conversationLoadId = loadId
+        sendProbe.record("load-start")
+        defer { sendProbe.record(conversationLoadId == loadId ? "load-end" : "load-superseded") }
         let ownership = authManager.captureAccountSession()
         if conversationOwner != ownership {
             messages = [.welcome]
@@ -2035,5 +2038,24 @@ private struct ChatBubble: View {
                 ? "You: \(message.text)"
                 : "LogYourBody: \(message.text)"
         )
+    }
+}
+
+/// Records the last few chat send and conversation-load events for UI tests.
+/// The launch-quality chat-root check once saw a delivered prompt tap leave the
+/// welcome state untouched (run 38328287365). `send` silently returns while a
+/// load or reply is in flight, so this exposes which path ran. It is empty
+/// outside the UI-test chat fixture, so VoiceOver never reads it.
+struct ChatSendProbe {
+    private static let isEnabled = ProcessInfo.processInfo.arguments.contains("-lybUITestChatFirstFixture")
+    private(set) var events: [String] = []
+
+    mutating func record(_ event: String) {
+        guard Self.isEnabled else { return }
+        events = Array((events + [event]).suffix(8))
+    }
+
+    var accessibilityValue: String {
+        Self.isEnabled ? events.joined(separator: ",") : ""
     }
 }

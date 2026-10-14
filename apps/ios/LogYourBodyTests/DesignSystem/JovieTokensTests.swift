@@ -48,6 +48,13 @@ final class JovieTokensTests: XCTestCase {
         XCTAssertEqual(JoviePalette.raisedHex, "#1C1C1E")
     }
 
+    func testSplashBMarkIsThirtyTwoPointBrandCream() {
+        XCTAssertEqual(JoviePalette.creamHex, "#F5F4F0")
+        XCTAssertEqual(SplashBGeometry.markSize, 32)
+        XCTAssertEqual(SplashBGeometry.progressHeight, 2)
+        XCTAssertEqual(SplashBGeometry.progressWidth, SplashBGeometry.markSize)
+    }
+
     func testChatComposerGeometryUsesSharedTokens() {
         XCTAssertEqual(ChatComposerGeometry.multilineTextHeightThreshold, JovieTokens.sectionGap)
         XCTAssertTrue(ChatComposerGeometry.isMultiline(textHeight: JovieTokens.sectionGap + 1))

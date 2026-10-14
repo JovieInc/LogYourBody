@@ -5,11 +5,23 @@
 import CoreGraphics
 import Foundation
 
-/// Photo-first Home (Pencil H2, picked 2026-09-26). Default on in production.
-/// Statsig is an emergency kill switch only; an unavailable or unset gate must
-/// not silently fall back to the legacy Home. Debug fixtures explicitly choose Home V2 or rollback.
+/// Photo-first Home (Pencil H2, picked 2026-09-26). Graduated: ordinary users
+/// open it by default. Evaluated through `FeatureReleaseEvaluator` (shared
+/// lifecycle contract, JOV-8056). Statsig is an emergency kill switch only;
+/// an unavailable or unset gate must not fall back to the legacy Home.
+/// Debug fixtures explicitly choose Home V2 or rollback.
 enum HomeV2Policy {
+    static let gateKey = "home_v2_photo_first"
+    /// Inverse-meaning emergency stop. Only a fresh `true` stops the surface.
     static let killSwitchKey = "home_v2_kill_switch"
+    /// Public baseline. The positive enable gate is recorded on the descriptor
+    /// and is not consulted: a missing or false gate must not hide Home.
+    static let releaseDescriptor = FeatureReleaseDescriptor(
+        flagKey: gateKey,
+        killSwitchKey: killSwitchKey,
+        stage: .graduated,
+        minimumBuild: nil
+    )
     #if DEBUG
     /// Explicit legacy captures exercise rollback without changing remote gates.
     /// Rollback wins if a test accidentally supplies both fixture modes.
@@ -29,6 +41,8 @@ enum HomeV2Policy {
     @MainActor
     static func isEnabled(
         arguments: [String] = ProcessInfo.processInfo.arguments,
+        actor: FeatureReleaseActor = .ordinaryCustomer,
+        installedBuild: Int = installedBuildVersion,
         isGateEnabled: ((String) -> Bool)? = nil
     ) -> Bool {
         #if DEBUG
@@ -42,7 +56,24 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return !checkGate(killSwitchKey)
+        // Graduated Home does not consult the positive enable gate. Doing so
+        // would record an exposure for a flag that no longer decides the surface.
+        let killSwitchEnabled = checkGate(killSwitchKey)
+        return FeatureReleaseEvaluator.evaluate(
+            releaseDescriptor,
+            context: FeatureReleaseContext(
+                actor: actor,
+                installedBuild: installedBuild,
+                configState: .fresh,
+                enableGate: false,
+                killSwitch: killSwitchEnabled
+            )
+        ).isEnabled
+    }
+
+    private static var installedBuildVersion: Int {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return Int(version ?? "") ?? 0
     }
 
     @MainActor
@@ -318,10 +349,9 @@ enum HomeV2WeightStepPolicy {
 /// What Home needs to show C2 and to undo it.
 struct HomeV2LoggedEntry: Equatable {
     let metricId: String
+    let userId: String
     let date: Date
-    let existedBefore: Bool
-    let previousWeightKilograms: Double?
-    let previousBodyFat: Double?
+    let previousMetric: BodyMetrics?
     let valueText: String
     let unit: String
 }
