@@ -272,7 +272,7 @@ enum HomeV2EntriesPolicy {
         }
         return monthsNewestFirst.compactMap { key -> HomeV2EntriesSection? in
             guard let monthMetrics = grouped[key], let newest = monthMetrics.first else { return nil }
-            let chronological = monthMetrics.reversed().compactMap { metric in
+            let chronological: [Double] = monthMetrics.reversed().compactMap { metric -> Double? in
                 guard HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight) else { return nil }
                 return weightValue(metric)
             }
