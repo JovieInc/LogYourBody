@@ -660,6 +660,64 @@ def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> Non
     assert 'heartbeat' not in summary
 
 
+def test_onboarding_golden_path_is_selected_and_requires_exact_passed_evidence() -> None:
+    import copy
+    import importlib.util
+    import pytest
+
+    for workflow, job in (("ci.yml", "ios_quality"),
+                          ("ios-post-merge-quality.yml", "quality")):
+        assert "uses: ./.github/workflows/ios-quality.yml" in _job_block(workflow, job)
+    assert "run: bash scripts/ios/launch-quality-audit.sh" in _job_block(
+        "ios-quality.yml", "quality"
+    )
+    caller = _job_block("ci.yml", "ios")
+    assert "      - name:" not in caller, "Reusable calls cannot contain inline steps"
+
+    script = _REPO_ROOT / "scripts/ios/launch-quality-audit.sh"
+    source = script.read_text()
+    selection = "LAUNCH_QUALITY_UI_TESTS=(" + source.split(
+        "LAUNCH_QUALITY_UI_TESTS=(", 1
+    )[1].split("UI_RESULT_BUNDLE=", 1)[0]
+    result = subprocess.run(
+        ["bash", "-e", "-u", "-c", selection +
+         '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
+         'printf "evidence:%s\\n" "${UI_EVIDENCE_ARGS[@]}"\n'],
+        text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+    )
+    assert result.returncode == 0, result.stderr
+    selectors = [line.removeprefix("selector:") for line in result.stdout.splitlines()
+                 if line.startswith("selector:")]
+    arguments = [line.removeprefix("evidence:") for line in result.stdout.splitlines()
+                 if line.startswith("evidence:")]
+    golden = "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal"
+    assert selectors.count(f"-only-testing:LogYourBodyUITests/{golden}") == 1
+    assert arguments[::2] == ["--expected-test"] * len(selectors)
+    expected = arguments[1::2]
+    assert expected.count(golden + "()") == 1
+    assert len(expected) == len(selectors)
+
+    spec = importlib.util.spec_from_file_location(
+        "onboarding_launch_evidence", script.with_name("launch-quality-evidence.py")
+    )
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    cases = [{"nodeType": "Test Case", "nodeIdentifier": identifier, "result": "Passed"}
+             for identifier in expected]
+    assert len(evidence.validate_cases({"testNodes": cases}, expected)) == len(expected)
+    for state in ("Failed", "Skipped", "missing", "duplicate"):
+        invalid = copy.deepcopy(cases)
+        golden_case = next(case for case in invalid if case["nodeIdentifier"] == golden + "()")
+        if state == "missing":
+            invalid.remove(golden_case)
+        elif state == "duplicate":
+            invalid.append(copy.deepcopy(golden_case))
+        else:
+            golden_case["result"] = state
+        with pytest.raises(ValueError):
+            evidence.validate_cases({"testNodes": invalid}, expected)
+
+
 _MAC_LANE_GH = """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$FAKE_DIR/calls"
 args="$*"

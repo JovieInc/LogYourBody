@@ -106,6 +106,22 @@ const surfaces = (web, iosChanged, unit, quality, deferred = 'false') => ({
   ios_quality_deferred: deferred,
 });
 
+test('large native source imports preserve detection under pipefail', () => {
+  const files = { 'apps/ios/App.swift': 'v3' };
+  for (let index = 0; index < 2000; index++) {
+    files[`docs/import-${String(index).padStart(5, '0')}-${'a'.repeat(60)}.md`] = 'fixture';
+  }
+  const fx = queueFixture(files);
+  try {
+    const result = detect(fx.workspace, {
+      ...mergeGroup(fx), GITHUB_EVENT_NAME: 'pull_request', PR_DRAFT: 'true',
+    });
+    assert.deepEqual(result.outputs, surfaces('false', 'true', 'false', 'false', 'true'));
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
 test('web-only merge group behind a queued iOS PR skips iOS', () => {
   const fx = queueFixture({ 'apps/web/page.tsx': 'v2' });
   const { outputs, calls } = detect(fx.workspace, mergeGroup(fx));
