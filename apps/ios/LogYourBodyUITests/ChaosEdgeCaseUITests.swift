@@ -68,6 +68,54 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    func testIntegrationDirectorySeparatesHealthAccessAndScanHistory() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestIntegrationsDirectoryFixture"])
+        assertTimelineRootAppears(in: app, timeout: 30)
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        settings.tap()
+
+        let integrations = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'settings_integrations_link'")
+        ).firstMatch
+        XCTAssertTrue(integrations.waitForExistence(timeout: 8))
+        for _ in 0..<4 where !integrations.isHittable { app.swipeUp() }
+        XCTAssertTrue(integrations.isHittable)
+        integrations.tap()
+        XCTAssertTrue(app.navigationBars["Integrations"].waitForExistence(timeout: 8))
+
+        let health = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_health_status'")
+        ).firstMatch
+        XCTAssertTrue(health.waitForExistence(timeout: 8))
+        XCTAssertTrue(health.label.contains("Apple Health"))
+        XCTAssertFalse(health.label.contains("Connected"), "A permission request must not prove read access.")
+        let healthStatus = health.value as? String ?? ""
+        XCTAssertTrue(["Set up access", "Sync enabled", "Sync paused", "Use on iPhone", "Unavailable"].contains(healthStatus))
+        XCTAssertFalse(healthStatus.contains("Connected"), "A permission request must not prove read access.")
+
+        let bodySpec = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_link'")
+        ).firstMatch
+        XCTAssertTrue(bodySpec.waitForExistence(timeout: 8))
+        XCTAssertTrue(bodySpec.label.contains("BodySpec"))
+        XCTAssertFalse(bodySpec.label.contains("Last synced"), "A scan date must not become sync freshness.")
+        XCTAssertFalse(bodySpec.label.contains("Connection saved"), "Device scope belongs in the disclosure.")
+        XCTAssertFalse(bodySpec.label.contains("Latest scan"), "Scan history belongs in the disclosure.")
+        XCTAssertFalse(app.staticTexts["Health & Fitness"].exists)
+        attachScreenshot(named: "integrations-directory-permission-and-history-fixture", from: app)
+        let history = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_history'")
+        ).firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 8))
+        XCTAssertTrue(history.isHittable)
+        history.tap()
+        attachScreenshot(named: "integrations-directory-expanded-history-fixture", from: app)
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     // MARK: - 1. Weight entry boundaries
 
     func testWeightEntryRejectsInvalidAndOutOfRangeValues() throws {
@@ -511,6 +559,9 @@ final class ChaosEdgeCaseUITests: XCTestCase {
     // MARK: - 13. Accessibility XXXL round trip has no layout anomalies
 
     func testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies() throws {
+        // A 120s kill retries all eleven chaos tests and blows the 40-minute
+        // gate. 180s is the audit's existing maximum, not a workflow change.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
@@ -586,6 +637,32 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         assertNoLayoutAnomalies(in: app, context: "timeline root after round trip")
     }
 
+    func testWeightKeyboardControlsMeetMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+        try openMVPWeightEntry(in: app)
+
+        let field = app.textFields["mvp_weight_text_field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        field.tap()
+        XCTAssertTrue(waitForKeyboard(in: app), "Keyboard did not appear after tapping the weight field.")
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_done_button").firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_save_weight_button").firstMatch.exists)
+
+        let window = app.windows.firstMatch.frame
+        for identifier in ["mvp_keyboard_bottom_done_button", "mvp_keyboard_save_weight_bar_button"] {
+            let control = app.buttons.matching(identifier: identifier).firstMatch
+            XCTAssertTrue(control.waitForExistence(timeout: 5), identifier)
+            let frame = control.frame
+            XCTAssertTrue(window.contains(frame), "\(identifier) \(frame) window \(window)")
+            XCTAssertGreaterThanOrEqual(frame.width, 44, "\(identifier) \(frame)")
+            XCTAssertGreaterThanOrEqual(frame.height, 44, "\(identifier) \(frame)")
+        }
+
+        app.buttons.matching(identifier: "mvp_keyboard_bottom_done_button").firstMatch.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+    }
+
     // MARK: - 14. Arabic locale renders the root with a hittable composer
 
     func testArabicLocaleRootRendersAndComposerIsHittable() throws {
@@ -607,7 +684,170 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         attachScreenshot(named: "edge-arabic-locale-root", from: app)
     }
 
+    // MARK: - 15. Privacy, export, and delete confirmation
+
+    func testPrivacyExportAndDeleteConfirmationStayReachable() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+
+        assertTimelineRootAppears(in: app, timeout: 30)
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+
+        let privacy = revealButton("settings_privacy_data_link", in: app)
+        XCTAssertTrue(privacy.waitForExistence(timeout: 5))
+        XCTAssertTrue(privacy.isHittable)
+        privacy.tap()
+        XCTAssertTrue(waitForSettingsDetailScreen(in: app, timeout: 8))
+        XCTAssertTrue(app.staticTexts["Remove from Photos after import"].waitForExistence(timeout: 5))
+        navigateBack(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+
+        let export = revealButton("home_v2_settings_export", in: app)
+        XCTAssertTrue(export.isHittable)
+        export.tap()
+        XCTAssertTrue(
+            app.staticTexts["Export your data"].waitForExistence(timeout: 8),
+            "The export row must open the export screen."
+        )
+        let exportAction = app.descendants(matching: .any)["export_data_action"]
+        for _ in 0..<4 where !exportAction.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(exportAction.waitForExistence(timeout: 3))
+        XCTAssertTrue(exportAction.isHittable)
+        navigateBack(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+
+        let delete = revealButton("home_v2_settings_delete", in: app)
+        XCTAssertTrue(delete.isHittable)
+        delete.tap()
+        let field = app.textFields["delete_account_confirmation_field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        let confirm = app.buttons["delete_account_confirm_button"]
+        for _ in 0..<6 where !(confirm.exists && confirm.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirm.isHittable)
+        XCTAssertFalse(confirm.isEnabled)
+
+        field.tap()
+        XCTAssertTrue(waitForKeyboard(in: app))
+        field.typeText("DELET")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["delete_account_confirmation_error"].waitForExistence(timeout: 3)
+        )
+        XCTAssertFalse(confirm.isEnabled)
+
+        clearText(in: field)
+        field.typeText("DELETE")
+        dismissKeyboardIfNeeded(in: app)
+        for _ in 0..<4 where !(confirm.exists && confirm.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirm.isHittable)
+        XCTAssertTrue(confirm.isEnabled)
+        confirm.tap()
+
+        let alert = app.alerts["Delete Account?"]
+        XCTAssertTrue(
+            alert.waitForExistence(timeout: 5),
+            "The final delete confirmation must present as an alert with a reachable Cancel control."
+        )
+        let cancel = app.buttons.matching(identifier: "delete_account_final_cancel").firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 2))
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertFalse(alert.exists)
+        XCTAssertFalse(app.staticTexts["Deleting your account..."].exists)
+    }
+
+    private func revealButton(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let button = app.buttons[identifier]
+        for _ in 0..<6 {
+            if button.exists, button.isHittable {
+                return button
+            }
+            app.swipeUp()
+        }
+        return button
+    }
+
+    // MARK: - 16. GLP-1 medication selector cancel hit target
+
+    func testGlp1MedicationSelectorCancelMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestGlp1WeeklyCheckInFixture",
+            "-lybUITestGlp1EmptyMedicationFixture"
+        ])
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+        if !app.descendants(matching: .any)["photo_timeline_root_page_analytics"].exists {
+            let menu = app.buttons["Open Menu"]
+            XCTAssertTrue(menu.waitForExistence(timeout: 8))
+            menu.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 5))
+            let stats = app.buttons["Stats"]
+            XCTAssertTrue(stats.waitForExistence(timeout: 5))
+            stats.tap()
+        }
+
+        let prompt = app.buttons["photo_timeline_hud_glp1_weekly_checkin"]
+        swipeUntilExists(prompt, in: app)
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        swipeUntilHittable(prompt, in: app)
+        prompt.tap()
+
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 10))
+        let addMedication = app.buttons["Add medication"]
+        XCTAssertTrue(addMedication.waitForExistence(timeout: 5))
+        swipeUntilHittable(addMedication, in: app)
+        addMedication.tap()
+
+        let sheetBar = app.navigationBars["Select GLP-1"]
+        XCTAssertTrue(sheetBar.waitForExistence(timeout: 8))
+        let cancel = app.descendants(matching: .any)["glp1_medication_selector_cancel_button"]
+        let save = app.descendants(matching: .any)["glp1_medication_selector_save_button"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        let cancelFrame = cancel.frame
+        let saveFrame = save.frame
+        let windowFrame = app.windows.firstMatch.frame
+        XCTAssertTrue(windowFrame.contains(cancelFrame), "Cancel \(cancelFrame) window \(windowFrame)")
+        XCTAssertTrue(windowFrame.contains(saveFrame), "Save \(saveFrame) window \(windowFrame)")
+        XCTAssertGreaterThanOrEqual(cancelFrame.width, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(cancelFrame.height, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(saveFrame.width, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(saveFrame.height, 44, "Cancel \(cancelFrame) save \(saveFrame)")
+        cancel.tap()
+        XCTAssertTrue(app.staticTexts["Log GLP-1 dose"].waitForExistence(timeout: 5))
+        XCTAssertFalse(sheetBar.exists)
+    }
+
     // MARK: - Shared helpers
+
+    private func swipeUntilExists(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<8 where !element.exists {
+            app.swipeUp()
+        }
+    }
+
+    private func swipeUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<6 where !element.isHittable {
+            app.swipeUp()
+        }
+    }
 
     private func launch(_ app: XCUIApplication, with arguments: [String]) {
         if app.state != .notRunning {
@@ -870,23 +1110,15 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        attachDiagnosticTree(from: app, named: "layout-scan-\(context)-tree")
-        attachScreenshot(named: "layout-scan-\(context)", from: app)
-        let window = app.windows.firstMatch.frame
-        let elements = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
-        let geometry = elements.map { "\($0.identifier) \($0.label): \($0.frame)" }
-        let attachment = XCTAttachment(string: "window=\(window)\n" + geometry.joined(separator: "\n"))
-        attachment.name = "layout-scan-\(context)-geometry"
-        attachment.lifetime = .keepAlways
-        add(attachment)
         var observations: [String] = []
         let findings = layoutAnomalies(in: app, observations: &observations)
+        guard !findings.isEmpty else { return }
+        attachDiagnosticTree(from: app, named: "layout-scan-\(context)-tree")
+        attachScreenshot(named: "layout-anomaly-\(context)", from: app)
         let clipping = XCTAttachment(string: observations.joined(separator: "\n"))
         clipping.name = "layout-scan-\(context)-expected-native-scroll-clipping"
         clipping.lifetime = .keepAlways
         add(clipping)
-        guard !findings.isEmpty else { return }
-        attachScreenshot(named: "layout-anomaly-\(context)", from: app)
         XCTFail("Layout anomalies at \(context): \(findings.joined(separator: "; "))", file: file, line: line)
     }
 

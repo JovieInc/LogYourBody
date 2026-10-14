@@ -3,6 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main, production]
+    # ready_for_review reruns CI on the same head so a draft's deferred Launch Quality runs.
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
     branches: [main, production]
     types: [checks_requested]
@@ -21,12 +23,99 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'merge_group' && github.ref != 'refs/heads/main' }}
 
 jobs:
+  mac-runner-routing-tests:
+    name: Mac Runner Routing Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+
+      - name: Install routing test tools
+        run: |
+          python3 -m pip install --user pytest==8.4.2
+          gem install bashcov -v 4.0.0 --no-document
+
+      - name: Test Mac runner routing with shell coverage
+        run: |
+          rm -f coverage/mac-runner-routing/.resultset.json
+          bashcov --command-name mac-runner-routing -- -c 'python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q'
+          python3 scripts/tests/test_runner_routing.py
+
+  cancel-superseded-merge-groups:
+    name: Cancel Superseded Merge Groups
+    # When the queue drops or rebuilds a group it deletes the gh-readonly-queue ref, but
+    # the old CI run keeps queueing and holding macOS runners. Each new group cancels
+    # merge-group CI runs whose ref no longer exists. GitHub deletes the old refs a few
+    # seconds after starting the new group, so a second pass runs 90s later.
+    # Advisory: never fails CI.
+    if: github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Cancel CI runs for deleted merge-group refs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          sweep() {
+            for status in queued in_progress waiting pending; do
+              gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=merge_group&status=$status&per_page=100" \
+                --jq '.workflow_runs[] | "\(.id) \(.head_branch)"'
+            done | sort -u | while read -r run_id branch; do
+              [[ "$run_id" == "$GITHUB_RUN_ID" || "$branch" != gh-readonly-queue/* ]] && continue
+              # Only a definitive 404 proves the group is gone; any other error leaves the run.
+              # Capture first: under pipefail, `gh ... | grep -q` returns gh's 404 exit status
+              # even when grep matches, so the sweep never cancelled anything.
+              # Actions runs this under bash -e, so a 404 (gh exits 1) must not end the step.
+              ref_lookup=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --silent 2>&1) || true
+              if grep -q 'HTTP 404' <<<"$ref_lookup"; then
+                gh run cancel "$run_id" -R "$GITHUB_REPOSITORY" && echo "Cancelled superseded run $run_id ($branch)"
+              fi
+            done
+          }
+          sweep
+          sleep 90
+          sweep
+
+  merge-group-fail-fast:
+    name: Merge Group Fail Fast
+    # CI Summary (the required check) waits for every job, so a group whose
+    # Linux jobs already failed kept two macOS runners busy for 20-60 min
+    # before the queue could eject it. Cancel the rest of the run instead:
+    # CI Summary still runs (if: always()) and fails at once.
+    needs: [detect-changes, mac-runner-routing-tests, js]
+    if: github.event_name == 'merge_group' && failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Cancel the rest of this merge-group run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY"
+
   detect-changes:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.filter.outputs.web }}
-      ios: ${{ steps.filter.outputs.ios }}
+      ios_changed: ${{ steps.filter.outputs.ios_changed }}
+      ios_unit: ${{ steps.filter.outputs.ios_unit }}
+      ios_quality: ${{ steps.filter.outputs.ios_quality }}
+      ios_quality_deferred: ${{ steps.filter.outputs.ios_quality_deferred }}
     steps:
       - uses: actions/checkout@v4
 
@@ -41,40 +130,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node --test .github/scripts/verify-ruleset-targets.test.mjs && node .github/scripts/verify-ruleset-targets.mjs
 
+      - name: Test change detection and the CI Summary gate
+        run: node --test .github/scripts/detect-changes.test.mjs
+
+      - name: Test post-merge Launch Quality
+        run: node --test .github/scripts/post-merge-quality.test.mjs
+
       - name: Detect changed surfaces locally
         id: filter
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
           HEAD_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.sha }}
-        run: |
-          set -euo pipefail
-          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
-            changed_files=$(git diff-tree --no-commit-id --name-only -r "$HEAD_SHA")
-          else
-            diff_base="$BASE_SHA"
-            if ! git cat-file -e "$diff_base^{commit}" 2>/dev/null; then
-              git fetch --no-tags --depth=100 origin main
-            fi
-            if ! git cat-file -e "$diff_base^{commit}" 2>/dev/null; then
-              diff_base='origin/main'
-            fi
-            changed_files=$(git diff --name-only "$diff_base" "$HEAD_SHA")
-          fi
-
-          web_pattern='^(agent/|evals/|apps/web/|packages/|\.github/actions/|\.github/scripts/|\.github/workflows/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|scripts/|turbo\.json$)'
-          ios_pattern='^(apps/ios/|\.github/actions/setup-ios-build/|\.github/workflows/ci\.yml$|\.github/workflows/ios[^/]*\.yml$|scripts/ios/|package\.json$)'
-
-          if printf '%s\n' "$changed_files" | grep -Eq "$web_pattern"; then
-            echo 'web=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'web=false' >> "$GITHUB_OUTPUT"
-          fi
-
-          if printf '%s\n' "$changed_files" | grep -Eq "$ios_pattern"; then
-            echo 'ios=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'ios=false' >> "$GITHUB_OUTPUT"
-          fi
+          PR_DRAFT: ${{ github.event.pull_request.draft || false }}
+        run: bash .github/scripts/detect-changes.sh
 
   js:
     name: JavaScript/TypeScript
@@ -86,7 +155,7 @@ jobs:
 
       - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -124,116 +193,40 @@ jobs:
 
   ios:
     name: iOS
-    runs-on: macos-15
     needs: detect-changes
-    if: needs.detect-changes.outputs.ios == 'true'
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup iOS build environment
-        uses: ./.github/actions/setup-ios-build
-        with:
-          xcode-version: 'latest-stable'
-          working-directory: apps/ios
-          setup-ruby: 'true'
-          create-config-files: 'true'
-
-      - name: Cache Swift packages
-        uses: actions/cache@v6
-        with:
-          path: |
-            apps/ios/.build
-            ~/Library/Developer/Xcode/DerivedData
-            ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-spm-xcode-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-xcode-stable-
-            ${{ runner.os }}-spm-
-
-      - name: Fastlane iOS CI
-        run: |
-          cd apps/ios
-          bundle exec fastlane ci_ios
-
-      - name: Unit-tier tests
-        run: |
-          cd apps/ios
-          DESTINATION=$(SCHEME=LogYourBodyTiers bash ../../scripts/ios/resolve-simulator-destination.sh)
-          bundle exec fastlane ci_test_unit destination:"$DESTINATION"
-
-      - name: Unit test duration + coverage report
-        if: always()
-        run: |
-          BUNDLE=$(ls -d apps/ios/test_results/unit-tier/*.xcresult 2>/dev/null | head -1 || true)
-          if [[ -n "$BUNDLE" ]]; then
-            python3 scripts/ios/test-tier-report.py "$BUNDLE" | tee -a "$GITHUB_STEP_SUMMARY"
-          else
-            echo "No unit-tier result bundle found to report on." | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
+    if: needs.detect-changes.outputs.ios_unit == 'true'
+    # An idle self-hosted Mac first (cancellable child run), hosted macOS
+    # otherwise; a busy, asleep or offline Mac never holds this job.
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/ios-unit.yml
+    with:
+      mac-first: true
+      supersede-key: ${{ github.head_ref || '' }}
 
   ios_quality:
     name: iOS Launch Quality Gate
-    runs-on: macos-15
     needs: detect-changes
-    if: needs.detect-changes.outputs.ios == 'true'
-    # Setup plus one 40-minute audit plus the 8-minute performance cap.
-    timeout-minutes: 52
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup iOS build environment
-        uses: ./.github/actions/setup-ios-build
-        with:
-          xcode-version: 'latest-stable'
-          working-directory: apps/ios
-          setup-ruby: 'true'
-          create-config-files: 'true'
-
-      - name: Cache Swift packages
-        uses: actions/cache@v6
-        with:
-          path: |
-            apps/ios/.build
-            ~/Library/Developer/Xcode/DerivedData
-            ~/Library/Caches/org.swift.swiftpm
-          key: ${{ runner.os }}-quality-spm-xcode-latest-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
-          restore-keys: |
-            ${{ runner.os }}-quality-spm-xcode-latest-stable-
-            ${{ runner.os }}-spm-
-
-      - name: Run launch quality audit
-        # Slow prefix plus the full chaos regression suite. The script does not
-        # retry a command timeout, so this budget is for a single attempt.
-        timeout-minutes: 40
-        env:
-          DESTINATION: auto
-          ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality
-        run: bash scripts/ios/launch-quality-audit.sh
-
-      - name: Run performance budget audit
-        timeout-minutes: 8
-        env:
-          DESTINATION: auto
-          RUN_SWIFTLINT: false
-          RUN_LAUNCH_PERFORMANCE: false
-          ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/performance
-        run: bash scripts/ios/performance-audit.sh
-
-      - name: Upload quality gate artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-launch-quality-gate-${{ github.run_id }}
-          path: apps/ios/test_results/quality-gate/ci-${{ github.run_id }}
-          if-no-files-found: warn
-          retention-days: 14
+    if: needs.detect-changes.outputs.ios_quality == 'true'
+    # An idle self-hosted Mac first (cancellable child run), hosted macOS
+    # otherwise; a busy, asleep or offline Mac never holds this job.
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/ios-quality.yml
+    with:
+      # Hosted until the launch-quality capture tests pass on the Macs: four
+      # LaunchQualityGate capture tests failed on every self-hosted run
+      # (2026-10-12, tw-mac-001 and tims-macbook-air) and pass hosted.
+      mac-first: false
+      supersede-key: ${{ github.head_ref || '' }}
 
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
     if: always()
-    needs: [detect-changes, js, ios, ios_quality]
+    needs: [detect-changes, mac-runner-routing-tests, js, ios, ios_quality]
     steps:
       - name: Check results
         run: |
@@ -257,15 +250,18 @@ jobs:
             echo "## CI Summary"
             echo ""
             echo "- Web changed: ${{ needs.detect-changes.outputs.web }}"
-            echo "- iOS changed: ${{ needs.detect-changes.outputs.ios }}"
+            echo "- iOS changed: ${{ needs.detect-changes.outputs.ios_changed }}"
+            echo "- iOS Unit runs here: ${{ needs.detect-changes.outputs.ios_unit }}"
+            echo "- iOS Launch Quality runs here: ${{ needs.detect-changes.outputs.ios_quality }} (deferred for draft: ${{ needs.detect-changes.outputs.ios_quality_deferred }})"
             echo "- iOS quality gate: ${{ needs.ios_quality.result }}"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "${{ needs.detect-changes.result }}" != "success" ]] || \
+             [[ "${{ needs.mac-runner-routing-tests.result }}" != "success" ]] || \
              ! assert_expected_result "JavaScript/TypeScript" "${{ needs.detect-changes.outputs.web }}" "${{ needs.js.result }}" || \
-             ! assert_expected_result "iOS" "${{ needs.detect-changes.outputs.ios }}" "${{ needs.ios.result }}" || \
-             ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios }}" "${{ needs.ios_quality.result }}"; then
+             ! assert_expected_result "iOS" "${{ needs.detect-changes.outputs.ios_unit }}" "${{ needs.ios.result }}" || \
+             ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios_quality }}" "${{ needs.ios_quality.result }}"; then
             echo "❌ One or more CI jobs failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi

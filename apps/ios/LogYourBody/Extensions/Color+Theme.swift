@@ -18,6 +18,7 @@ public extension Color {
     static let jovieAction = Color.white
     static let jovieActionText = Color.black
     static let jovieMetricAccent = Color(hex: "#1EB4EA")
+    static let jovieCream = Color(hex: JoviePalette.creamHex)
 
     // MARK: - Primary Colors
     static let linearPurple = Color(hex: "#5B63D3")
@@ -56,15 +57,18 @@ public extension Color {
     static let metricDeltaNegative = Color(hex: "#FF453A")  // System red
     static let metricTextPrimary = Color(hex: "#FFFFFF")
     static let metricTextSecondary = Color(hex: "#9AA0AA")
-    static let metricTextTertiary = Color(hex: "#6E737C")
+    static let metricTextTertiary = Color(hex: "#8A9099")
     static let metricCardBorder = Color(hex: "#1F2228")
     static let metricGridMajor = Color(hex: "#242830")
     static let metricGridMinor = Color(hex: "#1C1F26")
     static let metricAccentSteps = Color(hex: "#FF9F0A")
-    static let metricAccentWeight = Color(hex: "#AF52DE")
-    static let metricAccentBodyFat = Color(hex: "#FF2D55")
-    static let metricAccentFFMI = Color.purple
-    static let metricAccentWaist = Color.blue
+    // Same hues as Theme accentViolet/accentPink. #AF52DE was 4.39:1 on the metric card.
+    static let metricAccentWeight = Color(hex: "#BF5AF2")
+    static let metricAccentBodyFat = Color(hex: "#F45A9E")
+    // Explicit values keep chart/icon accents above the non-text contrast
+    // floor on the canonical metric card surface in light and dark contexts.
+    static let metricAccentFFMI = Color(hex: "#54D9CE")
+    static let metricAccentWaist = Color(hex: "#6EA8FF")
 
     // MARK: - State Colors
     static let linearDisabled = Color(hex: "#3A3A3A")

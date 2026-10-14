@@ -14,11 +14,6 @@ extension DashboardViewLiquid {
             formatValue: { homeV2ProgressValueText($0, $1) },
             onLogWeight: { presentHomeV2LogSheet() }
         )
-        .task(id: bodyMetrics.count) {
-            if fullChartCache[.weight] == nil {
-                await prewarmMetricCaches()
-            }
-        }
     }
 
     func openHomeV2Progress(metric: HomeV2ProgressMetric = .weight) {
@@ -92,7 +87,7 @@ extension DashboardViewLiquid {
     func homeV2ProgressValueText(_ metric: HomeV2ProgressMetric, _ value: Double) -> String {
         switch metric {
         case .steps:
-            return FormatterCache.stepsFormatter.string(from: NSNumber(value: Int(value.rounded()))) ?? "\(Int(value.rounded()))"
+            return FormatterCache.formattedSteps(value) ?? "—"
         case .weight, .bodyFat, .ffmi:
             return String(format: "%.1f", value)
         }
