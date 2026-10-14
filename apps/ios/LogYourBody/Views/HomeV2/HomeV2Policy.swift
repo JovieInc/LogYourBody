@@ -5,11 +5,22 @@
 import CoreGraphics
 import Foundation
 
-/// Photo-first Home (Pencil H2, picked 2026-09-26). Default on in production.
-/// Statsig is an emergency kill switch only; an unavailable or unset gate must
-/// not silently fall back to the legacy Home. Debug fixtures explicitly choose Home V2 or rollback.
+/// Photo-first Home (Pencil H2, picked 2026-09-26). Graduated public baseline
+/// through `FeatureReleaseEvaluator`: on unless a fresh kill switch stops it.
+/// Debug fixtures explicitly choose Home V2 or rollback.
 enum HomeV2Policy {
+    static let gateKey = "home_v2_photo_first"
+    /// Inverse-meaning emergency stop (shared lifecycle contract, JOV-8056).
+    /// Never a blanket default: only a fresh `true` stops the surface.
     static let killSwitchKey = "home_v2_kill_switch"
+    /// Public baseline. Ordinary customers see Home without an enable gate;
+    /// a fresh kill switch is the only remote stop.
+    static let releaseDescriptor = FeatureReleaseDescriptor(
+        flagKey: gateKey,
+        killSwitchKey: killSwitchKey,
+        stage: .graduated,
+        minimumBuild: nil
+    )
     #if DEBUG
     /// Explicit legacy captures exercise rollback without changing remote gates.
     /// Rollback wins if a test accidentally supplies both fixture modes.
@@ -29,6 +40,8 @@ enum HomeV2Policy {
     @MainActor
     static func isEnabled(
         arguments: [String] = ProcessInfo.processInfo.arguments,
+        actor: FeatureReleaseActor = .ordinaryCustomer,
+        installedBuild: Int = installedBuildVersion,
         isGateEnabled: ((String) -> Bool)? = nil
     ) -> Bool {
         #if DEBUG
@@ -42,7 +55,24 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return !checkGate(killSwitchKey)
+        // Kill switch first so the enable gate stays the last check.
+        let killSwitchEnabled = checkGate(killSwitchKey)
+        let enableGateEnabled = checkGate(gateKey)
+        return FeatureReleaseEvaluator.evaluate(
+            releaseDescriptor,
+            context: FeatureReleaseContext(
+                actor: actor,
+                installedBuild: installedBuild,
+                configState: .fresh,
+                enableGate: enableGateEnabled,
+                killSwitch: killSwitchEnabled
+            )
+        ).isEnabled
+    }
+
+    private static var installedBuildVersion: Int {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return Int(version ?? "") ?? 0
     }
 
     @MainActor

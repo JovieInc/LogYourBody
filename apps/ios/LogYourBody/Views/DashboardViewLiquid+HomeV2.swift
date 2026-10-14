@@ -174,7 +174,6 @@ extension DashboardViewLiquid {
     }
 
     func presentHomeV2LogSheet(for date: Date = Date(), initialTab: Int = 0) {
-        homeV2LogSheetDate = date
         let existing = homeV2Metric(on: date)
         let latestKilograms = existing?.weight
             ?? bodyMetrics.filter { $0.weight != nil && $0.date <= date }.max { $0.date < $1.date }?.weight

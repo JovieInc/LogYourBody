@@ -9,28 +9,44 @@ import UIKit
 @MainActor
 final class HomeV2PolicyTests: XCTestCase {
     func testHomeV2DefaultsOnWhenKillSwitchIsOff() {
-        var askedKey: String?
+        var asked: [String] = []
         XCTAssertTrue(
             HomeV2Policy.isEnabled(
                 arguments: ["-lybUITestPhotoTimelineHUDFixture"],
                 isGateEnabled: { key in
-                    askedKey = key
+                    asked.append(key)
                     return false
                 }
             )
         )
-        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
+        XCTAssertEqual(asked, [HomeV2Policy.killSwitchKey, HomeV2Policy.gateKey])
     }
 
     func testKillSwitchDisablesHomeV2() {
-        var askedKey: String?
+        var asked: [String] = []
         XCTAssertFalse(
             HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { key in
-                askedKey = key
+                asked.append(key)
                 return true
             })
         )
-        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
+        XCTAssertEqual(asked, [HomeV2Policy.killSwitchKey, HomeV2Policy.gateKey])
+    }
+
+    func testKillSwitchOverridesTheEnableGate() {
+        XCTAssertFalse(
+            HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { _ in true })
+        )
+    }
+
+    func testDogfoodPrincipalIsExposedWithoutTheGate() {
+        XCTAssertTrue(
+            HomeV2Policy.isEnabled(
+                arguments: [],
+                actor: .dogfoodAgent,
+                isGateEnabled: { _ in false }
+            )
+        )
     }
 
     #if DEBUG

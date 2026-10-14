@@ -62,6 +62,20 @@ enum BiometricLockPolicy {
     static func showsFallbackOptions(hasAttemptedOnce: Bool, isAuthenticating: Bool) -> Bool {
         hasAttemptedOnce && !isAuthenticating
     }
+
+    /// Relock when the app reaches the background so the app-switcher snapshot
+    /// and the next resume both show the lock instead of private content.
+    /// `.inactive` is ignored so Control Center-style interruptions keep the
+    /// current unlock state.
+    static func shouldRelock(onEntering phase: ScenePhase, lockEnabled: Bool) -> Bool {
+        lockEnabled && phase == .background
+    }
+
+    /// A shake instantly relocks while the lock is armed; otherwise the
+    /// gesture is left for other handlers (shake-to-report).
+    static func shouldLockOnShake(isLockArmed: Bool) -> Bool {
+        isLockArmed
+    }
 }
 
 struct BiometricLockView: View {
@@ -69,6 +83,7 @@ struct BiometricLockView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var isAuthenticating = false
     @State private var hasAttemptedOnce = false
@@ -110,6 +125,13 @@ struct BiometricLockView: View {
             .padding(.horizontal, JovieTokens.screenInset)
         }
         .onAppear(perform: authenticate)
+        .onChange(of: scenePhase) { _, newPhase in
+            // An attempt fired while the app was still backgrounding fails
+            // immediately; retry once the app is foregrounded again.
+            if newPhase == .active {
+                authenticate()
+            }
+        }
         .onDisappear {
             biometricAuthenticator.cancelCurrentAuthentication()
         }

@@ -79,6 +79,23 @@ export class MemoryTrainingRecords implements NativeProductRecordsPort {
         const saved = await this.insertTrainingSet(subject, record);
         return saved ? { kind: 'saved', record: saved } : { kind: 'record_conflict' };
       }
+      if (action === 'swap_insert') {
+        if (
+          record.record_type !== 'exercise_swap' ||
+          record.programSetupId !== admission.setupId ||
+          (record.programRevisionId ?? null) !== admission.revisionId ||
+          typeof record.fromExerciseId !== 'string' ||
+          typeof record.toVariantId !== 'string' ||
+          typeof record.blockId !== 'string'
+        )
+          return { kind: 'record_conflict' };
+        if (
+          !session ||
+          session.record_type !== 'workout_session' ||
+          session.status !== 'in_progress'
+        )
+          return { kind: 'session_conflict' };
+      }
       const collection = action === 'feedback_insert' ? 'training_feedback' : 'training_sessions';
       const existing = this.data[collection].get(String(record.id));
       if (existing?.deleted_at) return { kind: 'record_conflict' };
