@@ -46,6 +46,23 @@ function requireStateCookie(response) {
   return cookie;
 }
 
+// Own the supplied browser through capture so every success/failure closes it.
+export async function captureProviderRequestFromBrowser(browser, identityURL) {
+  try {
+    const page = await browser.newPage();
+    await page.goto(identityURL.toString(), { waitUntil: 'domcontentloaded' });
+    const [request] = await Promise.all([
+      page.waitForRequest((request) =>
+        request.url().endsWith('/api/auth/sign-in/social'),
+      ),
+      page.getByRole('button', { name: 'Continue with Apple' }).click(),
+    ]);
+    return request.postDataJSON();
+  } finally {
+    await browser.close();
+  }
+}
+
 async function captureLiveProviderRequest(identityURL) {
   const require = createRequire(new URL('../../apps/web/package.json', import.meta.url));
   const { chromium } = require('playwright');
@@ -53,19 +70,7 @@ async function captureLiveProviderRequest(identityURL) {
     channel: process.env.PLAYWRIGHT_BROWSER_CHANNEL || 'chrome',
     headless: true,
   });
-
-  try {
-    const page = await browser.newPage();
-    await page.goto(identityURL.toString(), { waitUntil: 'domcontentloaded' });
-    const providerRequest = page.waitForRequest((request) =>
-      request.url().endsWith('/api/auth/sign-in/social'),
-    );
-    await page.getByRole('button', { name: 'Continue with Apple' }).click();
-    const request = await providerRequest;
-    return request.postDataJSON();
-  } finally {
-    await browser.close();
-  }
+  return captureProviderRequestFromBrowser(browser, identityURL);
 }
 
 export async function verifyIOSAuthContract({
