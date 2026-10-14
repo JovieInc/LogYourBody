@@ -1,3 +1,4 @@
+import { catalogVariantById } from './catalog';
 import type { TrainingRecordsSnapshot } from './service';
 import type { Session, SetLog } from './types';
 
@@ -79,7 +80,7 @@ export function summarizeTrainingProgress(
         .sort((a, b) => b.loadKg! - a.loadKg! || b.reps - a.reps)[0];
       return {
         exerciseId,
-        name: names.get(exerciseId) ?? exerciseId,
+        name: names.get(exerciseId) ?? catalogVariantById(exerciseId)?.name ?? exerciseId,
         lastPerformedAt: latest.completedAt,
         lastSession,
         heaviestSet: heaviest

@@ -165,7 +165,11 @@ struct ProgressPhotoAttachSheet: View {
             }
             .fullScreenCover(isPresented: $isCameraPresented) {
                 CameraView { image in
-                    handleCameraImage(image)
+                    Task { @MainActor in
+                        handleCameraImage(image)
+                        await Task.yield()
+                        attachSelectedPhoto()
+                    }
                 }
             }
             .interactiveDismissDisabled(!ProgressPhotoAttachPolicy.canDismiss(status: attachStatus))
@@ -476,6 +480,12 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private func startCameraCapture() {
+        #if DEBUG
+        if usesProgressPhotoAttachFixture {
+            isCameraPresented = true
+            return
+        }
+        #endif
         guard cameraAuthorizer.isCameraAvailable else {
             attachStatus = .failed("Camera is not available in Simulator. Choose from Library instead.")
             return

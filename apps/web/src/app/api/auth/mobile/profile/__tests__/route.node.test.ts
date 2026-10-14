@@ -8,6 +8,7 @@ import { DELETE, GET, PATCH } from '../route';
 jest.mock('@/lib/auth/jovie-oauth', () => ({ fetchUserInfo: jest.fn() }));
 jest.mock('@/lib/neon/user-directory-adapter', () => ({
   neonUserDirectory: {
+    captureAccountAdmission: jest.fn(),
     getUser: jest.fn(),
     updateProfile: jest.fn(),
     deleteUser: jest.fn(),
@@ -43,7 +44,13 @@ function request(method: string, body?: unknown) {
 }
 
 describe('/api/auth/mobile/profile', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedDirectory.captureAccountAdmission.mockResolvedValue({
+      subject: identity.sub,
+      ownerId: '11111111-1111-4111-8111-111111111111',
+    });
+  });
 
   it('rejects missing bearer authentication', async () => {
     const response = await GET(new NextRequest('http://localhost/api/auth/mobile/profile'));
@@ -114,7 +121,10 @@ describe('/api/auth/mobile/profile', () => {
     mockedFetchUserInfo.mockResolvedValue(identity);
     const response = await DELETE(request('DELETE'));
     expect(response.status).toBe(204);
-    expect(mockedDirectory.deleteUser).toHaveBeenCalledWith(identity.sub);
+    expect(mockedDirectory.deleteUser).toHaveBeenCalledWith({
+      subject: identity.sub,
+      ownerId: '11111111-1111-4111-8111-111111111111',
+    });
   });
 
   it('fails closed when Neon account deletion fails', async () => {

@@ -5,6 +5,7 @@
 import {
   findTeamIdByKey,
   LYB_TEAM_KEY,
+  normalizeRemediationProvenance,
   noteFingerprintedIssueGreen,
   remediationKey,
   upsertLinearIssue,
@@ -134,6 +135,7 @@ export function skippedFilingMessage(reason) {
   let detail = 'Linear API error';
   if (reason === 'missing_linear_api_key') detail = 'LINEAR_API_KEY missing';
   else if (reason === 'linear_team_missing' || reason === 'missing_team_key') detail = 'LYB team not found';
+  else if (/^(?:invalid_source_provenance|source_provenance_|source_run_conflict)/.test(reason || '')) detail = 'Source provenance boundary: ' + reason;
   else if (reason) detail = `Linear API error: ${reason}`;
   return `Remediation intake did NOT file: ${detail} (LYB-99)`;
 }
@@ -145,19 +147,41 @@ export function gateSteadyGreen(decision, previous) {
   return { action: 'skip', reason: 'steady_green' };
 }
 
-export function detectorFromGithubEvent(eventName, event = {}) {
+function verifiedProvenance(value, runUrl, env) {
+  const provenance = normalizeRemediationProvenance(value);
+  if (!provenance || provenance.repository !== 'jovieinc/logyourbody' ||
+      (env.GITHUB_REPOSITORY && env.GITHUB_REPOSITORY.toLowerCase() !== provenance.repository)) return null;
+  try {
+    const url = new URL(runUrl);
+    if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.port ||
+        url.username || url.password || url.search || url.hash ||
+        url.pathname.toLowerCase() !== '/' + provenance.repository + '/actions/runs/' + provenance.runId) return null;
+  } catch {
+    return null;
+  }
+  return provenance;
+}
+
+export function detectorFromGithubEvent(eventName, event = {}, env = {}) {
   if (eventName === 'schedule' || eventName === 'workflow_dispatch') {
+    const workflowRef = (env.GITHUB_WORKFLOW_REF || '').toLowerCase();
+    const expectedRef = 'jovieinc/logyourbody/.github/workflows/remediation-signal.yml@refs/heads/main';
     return {
       mode: 'http',
       fingerprint: 'synthetic-monitoring',
       source: 'remediation-signal.yml:synthetic',
+      provenance: workflowRef === expectedRef ? verifiedProvenance({
+        repository: env.GITHUB_REPOSITORY, workflowId: 'synthetic',
+        runNumber: env.GITHUB_RUN_NUMBER, runId: env.GITHUB_RUN_ID, runAttempt: env.GITHUB_RUN_ATTEMPT,
+      }, env.REMEDIATION_RUN_URL, env) : null,
     };
   }
   if (eventName !== 'workflow_run') return null;
   const run = event.workflow_run ?? {};
   if (run.head_branch !== 'main' || run.event !== 'push') return null;
   if (run.name === 'CI') {
-    return { mode: 'monitor', fingerprint: 'red-checks', source: 'CI', conclusion: run.conclusion, runUrl: run.html_url };
+    return { mode: 'monitor', fingerprint: 'red-checks', source: 'CI', conclusion: run.conclusion, runUrl: run.html_url,
+      provenance: workflowRunProvenance(run, event, env, '.github/workflows/ci.yml') };
   }
   if (run.name === 'Deploy') {
     return {
@@ -166,18 +190,34 @@ export function detectorFromGithubEvent(eventName, event = {}) {
       source: 'Deploy',
       conclusion: run.conclusion,
       runUrl: run.html_url,
+      provenance: workflowRunProvenance(run, event, env, '.github/workflows/deploy.yml'),
     };
   }
   return null;
 }
 
+function workflowRunProvenance(run, event, env, path) {
+  const repository = event.repository?.full_name;
+  const workflow = event.workflow;
+  if ((run.path ?? workflow?.path) !== path ||
+      (run.path && workflow?.path && run.path !== workflow.path) ||
+      (workflow?.id !== undefined && String(workflow.id) !== String(run.workflow_id)) ||
+      (run.repository?.full_name &&
+      run.repository.full_name.toLowerCase() !== String(repository || '').toLowerCase())) return null;
+  return verifiedProvenance({
+    repository, workflowId: run.workflow_id, runNumber: run.run_number,
+    runId: run.id, runAttempt: run.run_attempt,
+  }, run.html_url, env);
+}
+
 export async function applyRemediationDecision(
   decision,
-  { source, runUrl, detail, apiKey, fetchImpl } = {},
+  { source, runUrl, detail, provenance, apiKey, fetchImpl } = {},
 ) {
   if (!decision || decision.action === 'skip') return { ok: true, action: 'skip' };
   const team = await findTeamIdByKey({ teamKey: LYB_TEAM_KEY, apiKey, fetchImpl });
   if (!team.ok) return team;
+  if (!normalizeRemediationProvenance(provenance)) return { ok: false, reason: 'invalid_source_provenance' };
   const fingerprint = decision.fingerprint;
   if (decision.action === 'red') {
     const filed = await upsertLinearIssue({
@@ -192,6 +232,7 @@ export async function applyRemediationDecision(
       priority: 1,
       createStateName: 'Todo',
       reopenTerminal: true,
+      provenance,
       teamId: team.id,
       apiKey,
       fetchImpl,
@@ -201,7 +242,8 @@ export async function applyRemediationDecision(
   const resolved = await noteFingerprintedIssueGreen({
     fingerprint,
     source,
-    comment: `${GREEN_MARKER}\nSource-workflow: ${source} is green.\nRun: ${runUrl || '(run url unavailable)'}`,
+    provenance,
+    comment: `${GREEN_MARKER}\nSource-workflow: ${source} completed a green run.\nRun: ${runUrl || '(run url unavailable)'}`,
     teamId: team.id,
     apiKey,
     fetchImpl,
@@ -220,7 +262,7 @@ export async function runRemediationIntake({
   sleep,
 }) {
   if (remediationIntakeDisabled(env)) return { ok: true, action: 'disabled', state: null };
-  const detector = detectorFromGithubEvent(eventName, event);
+  const detector = detectorFromGithubEvent(eventName, event, env);
   if (!detector) return { ok: true, action: 'skip', reason: 'no_detector', state: null };
   let decision;
   if (detector.mode === 'http') {
@@ -253,6 +295,7 @@ export async function runRemediationIntake({
       source: detector.source,
       runUrl: detector.runUrl || env.REMEDIATION_RUN_URL,
       detail: gated.detail,
+      provenance: detector.provenance,
       apiKey: env.LINEAR_API_KEY,
       fetchImpl,
     },
@@ -260,6 +303,7 @@ export async function runRemediationIntake({
   return {
     ...applied,
     fingerprint: detector.fingerprint,
-    state: applied.ok ? gated.action : null,
+    state: applied.ok && ['created', 'updated', 'resolved', 'already_closed'].includes(applied.action)
+      ? gated.action : null,
   };
 }
