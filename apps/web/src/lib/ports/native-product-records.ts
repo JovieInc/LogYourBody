@@ -48,6 +48,22 @@ export interface NativeProductRecordsPort {
     subject: string,
     record: Record<string, unknown>,
   ): Promise<NativeProductRecord | null>;
+  /** Revision-guarded correction that replaces one owned set and its embedded
+   * audit trail atomically. Missing capability must fail closed. */
+  correctTrainingSet?(
+    subject: string,
+    id: string,
+    expectedRevision: number,
+    record: Record<string, unknown>,
+  ): Promise<NativeProductRecord | null>;
+  /** Compare-and-swap for revisioned active-session actions. */
+  updateTrainingSession?(
+    subject: string,
+    id: string,
+    expectedRevision: number,
+    expectedLoggedSetCount: number,
+    record: Record<string, unknown>,
+  ): Promise<NativeProductRecord | null>;
   push(
     subject: string,
     collection: NativeProductRecordCollection,

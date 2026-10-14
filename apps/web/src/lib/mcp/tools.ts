@@ -2,7 +2,13 @@ import { captureTrainingAdmission } from '@/lib/training/mutation-admission';
 import { z } from 'zod';
 import type { NativeProductRecordsPort } from '@/lib/ports/native-product-records';
 import { EXERCISE_CATALOG } from '@/lib/training/catalog';
-import { logTrainingSet, recordTrainingFeedback, swapExercise } from '@/lib/training/commands';
+import {
+  applyWorkoutAction,
+  correctTrainingSet,
+  logTrainingSet,
+  recordTrainingFeedback,
+  swapExercise,
+} from '@/lib/training/commands';
 import { summarizeTrainingProgress } from '@/lib/training/progress';
 import {
   getOrCreateNextWorkout,
@@ -167,6 +173,27 @@ const feedbackInput = z
     pump: z.number().int().min(0).max(10),
     performance: z.enum(['up', 'stable', 'down']),
     jointPain: z.number().int().min(0).max(10),
+  })
+  .strict();
+
+const workoutControlInput = z
+  .object({
+    action: z.enum(['equipment_unavailable', 'shorten', 'skip', 'pain', 'pause', 'resume', 'end']),
+    minutes: z.number().int().min(5).max(180).optional(),
+  })
+  .strict()
+  .refine((value) => value.action !== 'shorten' || value.minutes !== undefined, {
+    message: 'minutes is required when shortening a workout',
+  });
+
+const correctSetInput = z
+  .object({
+    exercise: z.string().trim().min(1).max(80),
+    setNumber: z.number().int().min(1).max(10),
+    reps: z.number().int().min(1).max(50),
+    rir: z.number().int().min(0).max(6),
+    load: z.number().finite().min(0).max(1100).nullable().optional(),
+    weightUnit: z.enum(['kg', 'lb']).default('kg'),
   })
   .strict();
 
@@ -373,6 +400,136 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         sessionComplete,
       };
       return logged.length ? text(summary, payload) : { ...text(summary, payload), isError: true };
+    },
+  },
+  {
+    name: 'control_workout',
+    title: 'Control active workout',
+    description:
+      'Applies one situational action to the active workout. Equipment conflicts are evaluated by the training engine, which reorders before using an eligible substitution. Skip and time limits apply only to this session. Pain always enters the safety pause path.',
+    scope: LYB_MCP_SCOPES.trainingWrite,
+    readOnly: false,
+    input: workoutControlInput,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['equipment_unavailable', 'shorten', 'skip', 'pain', 'pause', 'resume', 'end'],
+        },
+        minutes: { type: 'integer', minimum: 5, maximum: 180 },
+      },
+      required: ['action'],
+      additionalProperties: false,
+    },
+    async run(subject, args: z.infer<typeof workoutControlInput>, deps) {
+      const workout = await getOrCreateNextWorkout({
+        records: deps.records,
+        subject,
+        now: deps.now(),
+      });
+      if (workout.kind === 'not_enrolled') return failure(ENROLL_IN_APP);
+      if (workout.kind === 'week_complete') return failure('There is no active workout to update.');
+      const logs = workout.session.loggedSets;
+      const current = workout.session.exercises.find((exercise) =>
+        Array.from({ length: exercise.sets }, (_, index) => index + 1).some(
+          (setNumber) =>
+            !logs.some((log) => log.exerciseId === exercise.id && log.setNumber === setNumber),
+        ),
+      );
+      const needsExercise = ['equipment_unavailable', 'skip', 'pain'].includes(args.action);
+      if (needsExercise && !current) return failure('There is no current exercise to update.');
+      const action =
+        args.action === 'equipment_unavailable'
+          ? { kind: args.action, exerciseId: current!.id }
+          : args.action === 'skip' || args.action === 'pain'
+            ? { kind: args.action, exerciseId: current!.id }
+            : args.action === 'shorten'
+              ? { kind: args.action, minutes: args.minutes! }
+              : { kind: args.action };
+      const result = await applyWorkoutAction({
+        records: deps.records,
+        subject,
+        now: deps.now(),
+        sessionId: workout.session.id,
+        eventId: deps.createId(),
+        expectedRevision: workout.session.executionRevision ?? 0,
+        action,
+      });
+      if (result.kind !== 'updated') return failure(`Workout unchanged: ${result.kind}.`);
+      return text(`Workout updated: ${result.decision}.`, {
+        sessionId: result.session.id,
+        decision: result.decision,
+        revision: result.session.executionRevision,
+      });
+    },
+  },
+  {
+    name: 'correct_set',
+    title: 'Correct a logged set',
+    description:
+      'Corrects one already-logged set in the active workout while preserving its stable identity and an audit trail. Use only when the user explicitly corrects prior values.',
+    scope: LYB_MCP_SCOPES.trainingWrite,
+    readOnly: false,
+    input: correctSetInput,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        exercise: { type: 'string' },
+        setNumber: { type: 'integer', minimum: 1, maximum: 10 },
+        reps: { type: 'integer', minimum: 1, maximum: 50 },
+        rir: { type: 'integer', minimum: 0, maximum: 6 },
+        load: { type: ['number', 'null'], minimum: 0 },
+        weightUnit: { type: 'string', enum: ['kg', 'lb'], default: 'kg' },
+      },
+      required: ['exercise', 'setNumber', 'reps', 'rir'],
+      additionalProperties: false,
+    },
+    async run(subject, args: z.infer<typeof correctSetInput>, deps) {
+      const workout = await getOrCreateNextWorkout({
+        records: deps.records,
+        subject,
+        now: deps.now(),
+      });
+      if (workout.kind !== 'workout') return failure('There is no active workout to correct.');
+      const match = matchExercise(workout.session, args.exercise);
+      if (match.kind !== 'match') return failure("That exercise is not in today's active workout.");
+      const prior = workout.session.loggedSets.find(
+        (log) => log.exerciseId === match.exercise.id && log.setNumber === args.setNumber,
+      );
+      if (!prior) return failure('That set has not been logged, so there is nothing to correct.');
+      const loadKg =
+        args.load === undefined
+          ? prior.loadKg
+          : args.load === null
+            ? null
+            : args.weightUnit === 'lb'
+              ? poundsToKg(args.load)
+              : args.load;
+      const result = await correctTrainingSet({
+        records: deps.records,
+        subject,
+        now: deps.now(),
+        set: {
+          sessionId: workout.session.id,
+          exerciseId: match.exercise.id,
+          setNumber: args.setNumber,
+          reps: args.reps,
+          loadKg,
+          rir: args.rir,
+          correctionId: deps.createId(),
+          expectedRevision: prior.revision ?? 0,
+        },
+      });
+      if (result.kind !== 'corrected') return failure(`Set unchanged: ${result.kind}.`);
+      return text(`Corrected ${match.exercise.name}, set ${args.setNumber}.`, {
+        sessionId: workout.session.id,
+        exerciseId: match.exercise.id,
+        setNumber: args.setNumber,
+        reps: args.reps,
+        loadKg,
+        rir: args.rir,
+      });
     },
   },
   {
