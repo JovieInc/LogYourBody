@@ -1,4 +1,14 @@
+import type { NativeAccountAdmission } from '@/lib/ports/native-account-admission';
+import {
+  type NativeMutationQuery,
+  captureNativeAccountAdmission,
+  executeNativeMutationQueries,
+} from './native-account-admission';
+import { createNeonTrainingMutations } from './training-mutations-adapter';
 import 'server-only';
+
+import { hasSafeReportedMeasurements } from '@/lib/ports/reported-measurements';
+import { hasSafeDailyStepMeasurement } from '@/lib/ports/daily-metric-steps';
 
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import type {
@@ -73,7 +83,124 @@ function payloadForInsert(record: Record<string, unknown>): Record<string, unkno
 export function createNeonNativeProductRecords(
   database: NeonQueryFunction<false, false> = getDatabase(),
 ): NativeProductRecordsPort {
+  async function remove(
+    subject: string,
+    collection: NativeProductRecordCollection,
+    ids: string[],
+    admission?: NativeAccountAdmission,
+  ) {
+    const [rows] = (await executeNativeMutationQueries(database, admission, [
+      database.query(
+        `update public.native_records
+         set deleted_at = coalesce(deleted_at, now()),
+             updated_at = now()
+         where user_subject = $1 and collection = $2 and id = any($3::uuid[])
+         returning id`,
+        [subject, collection, ids],
+      ),
+    ])) as Array<Array<{ id: string }>>;
+    return { deleted_ids: (rows ?? []).map((row) => row.id) };
+  }
+
+  async function endActiveGlp1Medications(
+    subject: string,
+    endedAt: string,
+    admission?: NativeAccountAdmission,
+  ) {
+    const [rows] = (await executeNativeMutationQueries(database, admission, [
+      database.query(
+        `update public.native_records
+         set payload = payload || jsonb_build_object('ended_at', $2::text),
+             updated_at = now()
+         where user_subject = $1
+           and collection = 'glp1_medications'
+           and deleted_at is null
+           and (
+             payload->>'ended_at' is null
+             or payload->>'ended_at' = ''
+             or payload->>'ended_at' = 'null'
+           )
+         returning id`,
+        [subject, endedAt],
+      ),
+    ])) as Array<Array<{ id: string }>>;
+    return { updated: (rows ?? []).length };
+  }
+
+  async function push(
+    subject: string,
+    collection: NativeProductRecordCollection,
+    records: Array<Record<string, unknown>>,
+    admission?: NativeAccountAdmission,
+  ) {
+    const accepted: NativeProductRecord[] = [];
+    const rejectedIds: string[] = [];
+    const queries: NativeMutationQuery[] = [];
+    const submittedIds: string[] = [];
+
+    for (const record of records) {
+      const id = recordId(record);
+      if (!id) continue;
+      if (collection === 'daily_metrics' && !hasSafeDailyStepMeasurement(record)) {
+        rejectedIds.push(id);
+        continue;
+      }
+      if (collection === 'dexa_results' && !hasSafeReportedMeasurements(record)) {
+        rejectedIds.push(id);
+        continue;
+      }
+      queries.push(
+        database.query(
+          `insert into public.native_records (
+             collection, id, user_subject, payload, deleted_at, updated_at
+           ) values ($1, $2, $3, $4::jsonb, null, now())
+           on conflict (collection, id) do update set
+             payload = case
+               when excluded.collection = 'daily_metrics'
+                 and not (excluded.payload ? 'steps_present')
+                 and public.native_records.payload->'steps_present' = 'true'::jsonb
+                 and jsonb_typeof(excluded.payload->'steps') = 'number'
+                 and public.native_records.payload->'steps' = excluded.payload->'steps'
+                 and jsonb_typeof(excluded.payload->'date') = 'string'
+                 and public.native_records.payload->'date' = excluded.payload->'date'
+               then excluded.payload || jsonb_build_object('steps_present', true)
+               when excluded.collection = 'dexa_results'
+                 and not (excluded.payload ? 'reported_measurements')
+                 and public.native_records.payload ? 'reported_measurements'
+               then excluded.payload || jsonb_build_object(
+                 'reported_measurements', public.native_records.payload->'reported_measurements'
+               )
+               else excluded.payload
+             end,
+             deleted_at = null,
+             updated_at = now()
+           where public.native_records.user_subject = excluded.user_subject
+           returning id, payload, deleted_at, updated_at`,
+          [collection, id, subject, JSON.stringify(payloadForInsert(record))],
+        ),
+      );
+      submittedIds.push(id);
+    }
+    const results = await executeNativeMutationQueries(database, admission, queries);
+    for (const [index, result] of results.entries()) {
+      const rows = result as NativeRecordRow[];
+      if (rows[0]) accepted.push(mapRecord(subject, rows[0]));
+      else rejectedIds.push(submittedIds[index]!);
+    }
+
+    return { records: accepted, rejected_ids: rejectedIds };
+  }
+
   return {
+    accountMutations: {
+      capture: (subject) => captureNativeAccountAdmission(database, subject),
+      push: (admission, collection, records) =>
+        push(admission.subject, collection, records, admission),
+      remove: (admission, collection, ids) => remove(admission.subject, collection, ids, admission),
+      endActiveGlp1Medications: (admission, endedAt) =>
+        endActiveGlp1Medications(admission.subject, endedAt, admission),
+    },
+    trainingMutations: createNeonTrainingMutations(database),
     async insertTrainingSet(subject, record) {
       const id = recordId(record);
       if (!id) return null;
@@ -98,31 +225,33 @@ export function createNeonNativeProductRecords(
       return existing[0] ? mapRecord(subject, existing[0]) : null;
     },
 
-    async push(subject, collection, records) {
-      const accepted: NativeProductRecord[] = [];
-      const rejectedIds: string[] = [];
-
-      for (const record of records) {
-        const id = recordId(record);
-        if (!id) continue;
-        const rows = (await database.query(
-          `insert into public.native_records (
-             collection, id, user_subject, payload, deleted_at, updated_at
-           ) values ($1, $2, $3, $4::jsonb, null, now())
-           on conflict (collection, id) do update set
-             payload = excluded.payload,
-             deleted_at = null,
-             updated_at = now()
-           where public.native_records.user_subject = excluded.user_subject
-           returning id, payload, deleted_at, updated_at`,
-          [collection, id, subject, JSON.stringify(payloadForInsert(record))],
-        )) as NativeRecordRow[];
-        if (rows[0]) accepted.push(mapRecord(subject, rows[0]));
-        else rejectedIds.push(id);
-      }
-
-      return { records: accepted, rejected_ids: rejectedIds };
+    async correctTrainingSet(subject, id, expectedRevision, record) {
+      const mutations = createNeonTrainingMutations(database);
+      const admission = await mutations.captureAdmission(subject);
+      if (!admission) return null;
+      const result = await mutations.commit({
+        subject,
+        admission,
+        action: 'set_correct',
+        record: { ...record, id, expectedRevision },
+      });
+      return result.kind === 'saved' ? result.record : null;
     },
+
+    async updateTrainingSession(subject, id, expectedRevision, expectedLoggedSetCount, record) {
+      const mutations = createNeonTrainingMutations(database);
+      const admission = await mutations.captureAdmission(subject);
+      if (!admission) return null;
+      const result = await mutations.commit({
+        subject,
+        admission,
+        action: 'session_update',
+        record: { ...record, expectedExecutionRevision: expectedRevision, expectedLoggedSetCount },
+      });
+      return result.kind === 'saved' ? result.record : null;
+    },
+
+    push,
 
     async pull(subject, collection, input) {
       const limit = Math.min(Math.max(input.limit ?? 200, 1), 500);
@@ -158,37 +287,9 @@ export function createNeonNativeProductRecords(
       };
     },
 
-    async remove(subject, collection, ids) {
-      if (ids.length === 0) return { deleted_ids: [] };
-      const rows = (await database.query(
-        `update public.native_records
-         set deleted_at = coalesce(deleted_at, now()),
-             updated_at = now()
-         where user_subject = $1 and collection = $2 and id = any($3::uuid[])
-         returning id`,
-        [subject, collection, ids],
-      )) as Array<{ id: string }>;
-      return { deleted_ids: rows.map((row) => row.id) };
-    },
+    remove,
 
-    async endActiveGlp1Medications(subject, endedAt) {
-      const rows = (await database.query(
-        `update public.native_records
-         set payload = payload || jsonb_build_object('ended_at', $2::text),
-             updated_at = now()
-         where user_subject = $1
-           and collection = 'glp1_medications'
-           and deleted_at is null
-           and (
-             payload->>'ended_at' is null
-             or payload->>'ended_at' = ''
-             or payload->>'ended_at' = 'null'
-           )
-         returning id`,
-        [subject, endedAt],
-      )) as Array<{ id: string }>;
-      return { updated: rows.length };
-    },
+    endActiveGlp1Medications,
 
     async listAll(subject) {
       const rows = (await database.query(
@@ -217,8 +318,35 @@ export function createNeonNativeProductRecords(
 }
 
 export const neonNativeProductRecords: NativeProductRecordsPort = {
+  accountMutations: {
+    capture: (subject) => captureNativeAccountAdmission(getDatabase(), subject),
+    push: (admission, collection, records) =>
+      createNeonNativeProductRecords().accountMutations!.push(admission, collection, records),
+    remove: (admission, collection, ids) =>
+      createNeonNativeProductRecords().accountMutations!.remove(admission, collection, ids),
+    endActiveGlp1Medications: (admission, endedAt) =>
+      createNeonNativeProductRecords().accountMutations!.endActiveGlp1Medications(
+        admission,
+        endedAt,
+      ),
+  },
+  trainingMutations: {
+    captureAdmission: (subject) =>
+      createNeonTrainingMutations(getDatabase()).captureAdmission(subject),
+    commit: (input) => createNeonTrainingMutations(getDatabase()).commit(input),
+  },
   insertTrainingSet: (subject, record) =>
     createNeonNativeProductRecords().insertTrainingSet!(subject, record),
+  correctTrainingSet: (subject, id, expectedRevision, record) =>
+    createNeonNativeProductRecords().correctTrainingSet!(subject, id, expectedRevision, record),
+  updateTrainingSession: (subject, id, expectedRevision, expectedLoggedSetCount, record) =>
+    createNeonNativeProductRecords().updateTrainingSession!(
+      subject,
+      id,
+      expectedRevision,
+      expectedLoggedSetCount,
+      record,
+    ),
   push: (subject, collection, records) =>
     createNeonNativeProductRecords().push(subject, collection, records),
   pull: (subject, collection, input) =>

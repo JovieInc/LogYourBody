@@ -1,3 +1,7 @@
+import {
+  NativeAccountAdmissionError,
+  nativeAccountFailureStatus,
+} from '@/lib/ports/native-account-admission';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
@@ -5,8 +9,9 @@ import { deleteOwnedProgressPhotos } from '@/lib/cloudflare/r2-progress-photo-st
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import type { ProductUserRecord } from '@/lib/ports/user-directory';
 
-const CURRENT_TERMS_VERSION = '2026-07-14';
-const CURRENT_PRIVACY_VERSION = '2026-07-14';
+// Content revisions of the currently published shared legal documents.
+const CURRENT_TERMS_VERSION = '2026-10-14';
+const CURRENT_PRIVACY_VERSION = '2026-10-14';
 
 const ProfileUpdateSchema = z
   .object({
@@ -100,10 +105,15 @@ export async function DELETE(request: NextRequest) {
   const identity = await authenticate(request);
   if (!identity) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   try {
-    await deleteOwnedProgressPhotos(identity.sub);
-    await neonUserDirectory.deleteUser(identity.sub);
+    const admission = await neonUserDirectory.captureAccountAdmission(identity.sub);
+    if (!admission) return new NextResponse(null, { status: 204 });
+    await deleteOwnedProgressPhotos(admission);
+    await neonUserDirectory.deleteUser(admission);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
+    const status = nativeAccountFailureStatus(error);
+    if (status !== null)
+      return NextResponse.json({ error: (error as NativeAccountAdmissionError).code }, { status });
     console.error('Mobile account deletion failed', error);
     return NextResponse.json({ error: 'account_deletion_failed' }, { status: 500 });
   }

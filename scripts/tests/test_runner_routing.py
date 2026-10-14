@@ -15,6 +15,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _WORKFLOWS = _REPO_ROOT / ".github" / "workflows"
 _QUERY_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "query-runner-heartbeat.sh"
 _AWAIT_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "await-runner-heartbeat.sh"
+# Materialize the actual pre-checkout workflow body so Bashcov measures it too.
+_DISPATCH_GUARD_SCRIPT = _REPO_ROOT / "coverage/mac-runner-routing/ios-quality-dispatch-guard.sh"
 _FIXTURE_GH = (
     _REPO_ROOT / "scripts" / "tests" / "fixtures" / "runner-heartbeat-gh" / "gh"
 )
@@ -592,7 +594,10 @@ def test_wrong_run_identity_or_job_attestation_degrades_to_hosted(
 
 _MAC_LANE_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "mac-lane.sh"
 _SELF_HOSTED_MAC = 'fromJSON(\'["self-hosted","macOS","ARM64","jovie-mac"]\')'
+_MANUAL_QUALITY_DISPATCH = "github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))"
 _IOS_LANES = {"ios": ("ios-unit.yml", "unit"), "ios_quality": ("ios-quality.yml", "quality")}
+# Unit gates merge groups; Launch Quality gates the PR head (.github/scripts/detect-changes.sh).
+_IOS_LANE_OUTPUTS = {"ios": "ios_unit", "ios_quality": "ios_quality"}
 
 
 def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
@@ -609,14 +614,15 @@ def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
     for name, (reusable, work) in _IOS_LANES.items():
         job = _job_block("ci.yml", name)
         assert f"    uses: ./.github/workflows/{reusable}" in job.splitlines()
-        assert "      mac-first: true" in job.splitlines()
+        # ios_quality stays hosted until its capture tests pass on the Macs.
+        mac_first = "true" if name == "ios" else "false"
+        assert f"      mac-first: {mac_first}" in job.splitlines()
         assert "    needs: detect-changes" in job.splitlines()
-        assert "if: needs.detect-changes.outputs.ios == 'true'" in job
+        assert f"if: needs.detect-changes.outputs.{_IOS_LANE_OUTPUTS[name]} == 'true'" in job
         assert f"uses: ./.github/workflows/{reusable}" in child
         lane = _job_block(reusable, work)
-        assert (
-            f"runs-on: ${{{{ inputs.mac-child && {_SELF_HOSTED_MAC} || 'macos-15' }}}}" in lane
-        )
+        manual_guard = f"!({_MANUAL_QUALITY_DISPATCH}) && " if name == "ios_quality" else ""
+        assert f"runs-on: ${{{{ {manual_guard}inputs.mac-child && {_SELF_HOSTED_MAC} || 'macos-15' }}}}" in lane
         assert "needs.mac.outputs.run_hosted == 'true'" in lane
         assert "uses: ./.github/workflows/mac-lane-route.yml" in _job_block(reusable, "mac")
     assert child.count("group: ${{ inputs.join-group }}") == len(_IOS_LANES)
@@ -631,8 +637,6 @@ def test_mac_route_uses_first_attempts_of_trusted_events_only() -> None:
     assert (
         "      vars.JOVIE_MAC_RUNNER != 'off' &&\n"
         "      github.run_attempt == '1' &&\n"
-        "      (github.event_name != 'pull_request' || "
-        "github.event.pull_request.head.repo.full_name == github.repository)"
     ) in route
     assert "group: ${{ needs.dispatch.outputs.join_group }}" in route
     assert (
@@ -658,6 +662,240 @@ def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> Non
     assert 'heartbeat' not in summary
 
 
+def _run_manual_quality_guard(tmp_path: Path, **overrides: str) -> subprocess.CompletedProcess[str]:
+    quality = _job_block("ios-quality.yml", "quality")
+    guard_step = quality.split("      - name: Validate manual qualification source\n", 1)[1]
+    guard = textwrap.dedent(guard_step.split("        run: |\n", 1)[1].split("\n      - uses:", 1)[0])
+    _DISPATCH_GUARD_SCRIPT.parent.mkdir(parents=True, exist_ok=True)
+    _DISPATCH_GUARD_SCRIPT.write_text(guard, encoding="utf-8")
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    fake = tmp_path / "gh"
+    fake.write_text(textwrap.dedent("""\
+        #!/usr/bin/env bash
+        set -euo pipefail
+        printf '%s\n' "$2" >> "$FAKE_GH_INVOCATION_MARKER"
+        [[ "${FAKE_GH_ERROR:-}" != 'true' ]] || exit 1
+        case "$2" in
+          */collaborators/*/permission)
+            payload="$FAKE_PERMISSION_JSON"
+            [[ "$2" != */collaborators/reader/permission ]] || payload='{"permission":"read"}'
+            ;;
+          */branches-where-head) payload="$FAKE_BRANCHES_JSON" ;;
+          *) exit 1 ;;
+        esac
+        printf '%s' "$payload" | jq -r "$4"
+        """), encoding="utf-8")
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+    env = {**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+           "GITHUB_REPOSITORY": "JovieInc/LogYourBody", "GITHUB_REF": "refs/heads/main",
+           "GITHUB_ACTOR": "writer", "GITHUB_TRIGGERING_ACTOR": "writer", "CHECKOUT_REF": "a" * 40,
+           "FAKE_PERMISSION_JSON": '{"permission":"write"}',
+           "FAKE_BRANCHES_JSON": json.dumps([{"name": "codex/qualification", "commit": {"sha": "a" * 40}}]),
+           "FAKE_GH_INVOCATION_MARKER": str(tmp_path / "api-calls"), **overrides}
+    return subprocess.run(["bash", str(_DISPATCH_GUARD_SCRIPT)], cwd=_REPO_ROOT, env=env,
+                          text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+
+
+def test_manual_quality_dispatch_uses_trusted_workflow_and_same_hosted_audit() -> None:
+    workflow = (_WORKFLOWS / "ios-quality.yml").read_text()
+    dispatch = workflow.split("  workflow_dispatch:\n", 1)[1].split("  workflow_call:", 1)[0]
+    assert "      checkout-ref:\n" in dispatch
+    assert "        required: true\n        type: string" in dispatch
+    assert "mac-first:" not in dispatch and "mac-child:" not in dispatch
+    assert f"!({_MANUAL_QUALITY_DISPATCH}) && inputs.mac-first && !inputs.mac-child" in _job_block("ios-quality.yml", "mac")
+    quality = _job_block("ios-quality.yml", "quality")
+    assert quality.index("Validate manual qualification source") < quality.index("uses: actions/checkout@v4")
+    assert "if: ${{ " + _MANUAL_QUALITY_DISPATCH + " }}" in quality
+    assert "CHECKOUT_REF: ${{ inputs.checkout-ref }}" in quality
+    assert "ref: ${{ inputs.checkout-ref || github.sha }}" in quality
+    assert "persist-credentials: ${{ !(" + _MANUAL_QUALITY_DISPATCH + ") }}" in quality
+    assert f"!({_MANUAL_QUALITY_DISPATCH}) && inputs.mac-child &&" in quality
+    assert quality.count("run: bash scripts/ios/launch-quality-audit.sh") == 1
+    assert "ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality" in quality
+    assert "path: apps/ios/test_results/quality-gate/ci-${{ github.run_id }}" in quality
+    assert "permissions:\n  contents: read\n" in workflow and "secrets." not in workflow
+
+
+def test_manual_quality_checkout_retains_canonical_comparison_history(tmp_path: Path) -> None:
+    import re
+
+    quality = _job_block("ios-quality.yml", "quality")
+    checkout = quality.split("      - uses: actions/checkout@v4\n", 1)[1].split("\n      - ", 1)[0]
+    configured_depth = re.search(r"^          fetch-depth: (\d+)$", checkout, re.MULTILINE)
+    depth = int(configured_depth.group(1)) if configured_depth else 1
+
+    def git(directory: Path, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-c", "commit.gpgsign=false", "-c", "protocol.file.allow=always",
+             "-C", str(directory), *arguments], text=True, capture_output=True, check=check,
+        )
+
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git(origin, "init", "-q", "-b", "main")
+    git(origin, "config", "user.name", "Qualification fixture")
+    git(origin, "config", "user.email", "fixture@example.invalid")
+    (origin / "source").write_text("base")
+    git(origin, "add", ".")
+    git(origin, "commit", "-qm", "base")
+    base = git(origin, "rev-parse", "HEAD").stdout.strip()
+    (origin / "source").write_text("canonical")
+    git(origin, "commit", "-qam", "canonical")
+    canonical = git(origin, "rev-parse", "HEAD").stdout.strip()
+    git(origin, "checkout", "-qb", "candidate")
+    (origin / "source").write_text("candidate")
+    git(origin, "commit", "-qam", "candidate")
+    candidate = git(origin, "rev-parse", "HEAD").stdout.strip()
+
+    def fetch_checkout(name: str, fetch_depth: int) -> Path:
+        directory = tmp_path / name
+        directory.mkdir()
+        git(directory, "init", "-q")
+        git(directory, "remote", "add", "origin", origin.as_uri())
+        # Match checkout@v4: SHA-only uses no destination ref at positive depth;
+        # depth0 fetches all branch refs before checking out the requested SHA.
+        if fetch_depth > 0:
+            git(directory, "fetch", "--no-tags", f"--depth={fetch_depth}", "origin", candidate)
+        else:
+            git(directory, "fetch", "--no-tags", "origin", "+refs/heads/*:refs/remotes/origin/*")
+        git(directory, "checkout", "--detach", candidate)
+        assert git(directory, "rev-parse", "HEAD").stdout.strip() == candidate
+        return directory
+
+    shallow = fetch_checkout("depth1-counterfactual", 1)
+    assert git(shallow, "rev-parse", "--verify", "refs/remotes/origin/main^{commit}", check=False).returncode != 0
+    assert git(shallow, "rev-parse", "--verify", canonical + "^{commit}", check=False).returncode != 0
+
+    actual = fetch_checkout("workflow-configured", depth)
+    assert git(actual, "rev-parse", "--verify", "refs/remotes/origin/main^{commit}").stdout.strip() == canonical
+    assert git(actual, "rev-parse", "--verify", "refs/remotes/origin/main^").stdout.strip() == base
+    assert git(actual, "rev-parse", "--verify", canonical + "^{commit}").stdout.strip() == canonical
+
+
+def test_manual_quality_selection_preserves_reusable_dispatch_callers() -> None:
+    import re
+    from types import SimpleNamespace
+
+    quality = _job_block("ios-quality.yml", "quality")
+    mac = _job_block("ios-quality.yml", "mac")
+    guard = quality.split("      - name: Validate manual qualification source\n", 1)[1]
+    expressions = [next(line for line in block.splitlines() if line.strip().startswith(prefix))
+                   for block, prefix in ((guard, "if:"), (mac, "if:"), (quality, "runs-on:"))]
+    for event, caller, mac_first, mac_child, expected_guard, expected_mac, expected_runner in (
+        ("workflow_dispatch", "ios-quality.yml", True, True, True, False, "macos-15"),
+        ("workflow_dispatch", "mac-lane.yml", False, True, False, False, ["self-hosted", "macOS", "ARM64", "jovie-mac"]),
+        ("workflow_dispatch", "ios-post-merge-quality.yml", True, False, False, True, "macos-15"),
+        ("pull_request", "ci.yml", True, False, False, True, "macos-15"),
+        ("merge_group", "ci.yml", False, False, False, False, "macos-15"),
+    ):
+        github = SimpleNamespace(event_name=event, repository="JovieInc/LogYourBody",
+                                 workflow_ref=f"JovieInc/LogYourBody/.github/workflows/{caller}@refs/heads/main")
+        actual = []
+        for line in expressions:
+            # Execute these actual boolean/runner expressions with their GitHub
+            # operators and functions; the production expressions stay in YAML.
+            expression = line.split("${{", 1)[1].split("}}", 1)[0].strip()
+            expression = expression.replace("inputs.mac-first", "mac_first").replace("inputs.mac-child", "mac_child")
+            expression = re.sub(r"!(?!=)", "not ", expression.replace("&&", " and ").replace("||", " or "))
+            actual.append(eval(expression, {"__builtins__": {}}, {
+                "github": github, "mac_first": mac_first, "mac_child": mac_child,
+                "startsWith": lambda value, prefix: value.startswith(prefix),
+                "format": lambda template, value: template.format(value), "fromJSON": json.loads}))
+        assert actual == [expected_guard, expected_mac, expected_runner], caller
+
+
+def test_manual_quality_guard_accepts_only_immutable_same_repository_branch_heads(tmp_path: Path) -> None:
+    for index, permission in enumerate(("write", "admin")):
+        result = _run_manual_quality_guard(tmp_path / str(index), FAKE_PERMISSION_JSON=json.dumps({"permission": permission}))
+        assert result.returncode == 0, result.stderr
+        assert f"Qualified source: JovieInc/LogYourBody@{'a' * 40}" in result.stdout
+        calls = (tmp_path / str(index) / "api-calls").read_text().splitlines()
+        assert calls[-1] == f"repos/JovieInc/LogYourBody/commits/{'a' * 40}/branches-where-head"
+
+
+def test_manual_quality_guard_rejects_untrusted_refs_before_any_api_or_checkout(tmp_path: Path) -> None:
+    cases = [{"CHECKOUT_REF": ref} for ref in ("", "main", "refs/heads/main", "a" * 39, "g" * 40, "A" * 40, "a" * 40 + "\n")]
+    cases.extend(({"GITHUB_REPOSITORY": "attacker/fork"}, {"GITHUB_REF": "refs/heads/untrusted"}))
+    for index, case in enumerate(cases):
+        result = _run_manual_quality_guard(tmp_path / str(index), **case)
+        assert result.returncode != 0
+        assert "::error::" in result.stdout
+        assert not (tmp_path / str(index) / "api-calls").exists()
+
+
+def test_manual_quality_guard_fails_closed_on_permission_or_source_proof_failure(tmp_path: Path) -> None:
+    cases = [{"FAKE_PERMISSION_JSON": json.dumps({"permission": permission})} for permission in ("read", "none", "", "owner")]
+    cases.extend(({"GITHUB_TRIGGERING_ACTOR": "reader"}, {"FAKE_PERMISSION_JSON": "{}"},
+                  {"FAKE_PERMISSION_JSON": "malformed"}, {"FAKE_GH_ERROR": "true"}))
+    cases.extend({"FAKE_BRANCHES_JSON": json.dumps(branches)} for branches in (
+        [], [{"name": "wrong-head", "commit": {"sha": "b" * 40}}],
+        [{"commit": {"sha": "a" * 40}}], {"wrong-schema": {"name": "x", "commit": {"sha": "a" * 40}}}))
+    cases.append({"FAKE_BRANCHES_JSON": "malformed"})
+    for index, case in enumerate(cases):
+        result = _run_manual_quality_guard(tmp_path / str(index), **case)
+        assert result.returncode != 0
+        assert "Qualified source:" not in result.stdout
+        assert "::error::" in result.stdout
+
+
+def test_onboarding_golden_path_is_selected_and_requires_exact_passed_evidence() -> None:
+    import copy
+    import importlib.util
+    import pytest
+
+    for workflow, job in (("ci.yml", "ios_quality"),
+                          ("ios-post-merge-quality.yml", "quality")):
+        assert "uses: ./.github/workflows/ios-quality.yml" in _job_block(workflow, job)
+    assert "run: bash scripts/ios/launch-quality-audit.sh" in _job_block(
+        "ios-quality.yml", "quality"
+    )
+    caller = _job_block("ci.yml", "ios")
+    assert "      - name:" not in caller, "Reusable calls cannot contain inline steps"
+
+    script = _REPO_ROOT / "scripts/ios/launch-quality-audit.sh"
+    source = script.read_text()
+    selection = "LAUNCH_QUALITY_UI_TESTS=(" + source.split(
+        "LAUNCH_QUALITY_UI_TESTS=(", 1
+    )[1].split("UI_RESULT_BUNDLE=", 1)[0]
+    result = subprocess.run(
+        ["bash", "-e", "-u", "-c", selection +
+         '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
+         'printf "evidence:%s\\n" "${UI_EVIDENCE_ARGS[@]}"\n'],
+        text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+    )
+    assert result.returncode == 0, result.stderr
+    selectors = [line.removeprefix("selector:") for line in result.stdout.splitlines()
+                 if line.startswith("selector:")]
+    arguments = [line.removeprefix("evidence:") for line in result.stdout.splitlines()
+                 if line.startswith("evidence:")]
+    golden = "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal"
+    assert selectors.count(f"-only-testing:LogYourBodyUITests/{golden}") == 1
+    assert arguments[::2] == ["--expected-test"] * len(selectors)
+    expected = arguments[1::2]
+    assert expected.count(golden + "()") == 1
+    assert len(expected) == len(selectors)
+
+    spec = importlib.util.spec_from_file_location(
+        "onboarding_launch_evidence", script.with_name("launch-quality-evidence.py")
+    )
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    cases = [{"nodeType": "Test Case", "nodeIdentifier": identifier, "result": "Passed"}
+             for identifier in expected]
+    assert len(evidence.validate_cases({"testNodes": cases}, expected)) == len(expected)
+    for state in ("Failed", "Skipped", "missing", "duplicate"):
+        invalid = copy.deepcopy(cases)
+        golden_case = next(case for case in invalid if case["nodeIdentifier"] == golden + "()")
+        if state == "missing":
+            invalid.remove(golden_case)
+        elif state == "duplicate":
+            invalid.append(copy.deepcopy(golden_case))
+        else:
+            golden_case["result"] = state
+        with pytest.raises(ValueError):
+            evidence.validate_cases({"testNodes": invalid}, expected)
+
+
 _MAC_LANE_GH = """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$FAKE_DIR/calls"
 args="$*"
@@ -669,6 +907,9 @@ elif [[ "$args" == *"/cancel"* ]]; then
 elif [[ "$args" == *"/jobs"* ]]; then
   [ -f "$FAKE_DIR/jobs.json" ] || exit 1
   jq "$(sed -n 's/.*--jq //p' <<<"$args")" "$FAKE_DIR/jobs.json"
+elif [[ "$args" == *"/actions/runs/"* ]]; then
+  [ -f "$FAKE_DIR/run.json" ] || exit 1
+  jq -r "$(sed -n 's/.*--jq //p' <<<"$args")" "$FAKE_DIR/run.json"
 else
   exit 1
 fi
@@ -724,7 +965,7 @@ def test_mac_lane_dispatch_joins_on_pickup_and_falls_back_otherwise(tmp_path: Pa
     assert not any("/cancel" in call for call in calls)
 
     result, outputs, calls = _run_mac_lane(
-        tmp_path / "stuck", "dispatch", {**_DISPATCH_ENV, "PICKUP_SECONDS": "0"},
+        tmp_path / "stuck", "dispatch", {**_DISPATCH_ENV, "MAC_PICKUP_SECONDS": "0"},
         dispatch={"workflow_run_id": 42}, jobs={"jobs": [_mac_job("queued")]},
     )
     assert result.returncode == 0, result.stderr
@@ -741,13 +982,15 @@ def test_mac_lane_dispatch_joins_on_pickup_and_falls_back_otherwise(tmp_path: Pa
 
 
 def test_mac_lane_result_passes_fails_or_hands_back_to_hosted(tmp_path: Path) -> None:
-    env = {"GH_TOKEN": "token", "CHILD_RUN_ID": "42"}
+    env = {"GH_TOKEN": "token", "CHILD_RUN_ID": "42", "CHECKOUT_SHA": "abc"}
+    run = {"display_title": "Mac lane ios @ abc for parent"}
     result, outputs, _ = _run_mac_lane(
-        tmp_path / "pass", "result", env, jobs={"jobs": [_mac_job("completed", "success")]}
+        tmp_path / "pass", "result", env, run=run, jobs={"jobs": [_mac_job("completed", "success")]}
     )
     assert (result.returncode, outputs["infra"]) == (0, "false")
     result, outputs, _ = _run_mac_lane(
-        tmp_path / "fail", "result", env, jobs={"jobs": [_mac_job("completed", "failure", True)]}
+        tmp_path / "fail", "result", env, run=run,
+        jobs={"jobs": [_mac_job("completed", "failure", True)]},
     )
     assert (result.returncode, outputs["infra"]) == (1, "false")
     for index, jobs in enumerate([
@@ -756,10 +999,31 @@ def test_mac_lane_result_passes_fails_or_hands_back_to_hosted(tmp_path: Path) ->
         [_mac_job("completed", "timed_out")],
         [],
     ]):
-        result, outputs, _ = _run_mac_lane(tmp_path / f"lost-{index}", "result", env, jobs={"jobs": jobs})
+        result, outputs, _ = _run_mac_lane(
+            tmp_path / f"lost-{index}", "result", env, run=run, jobs={"jobs": jobs}
+        )
         assert (result.returncode, outputs["infra"]) == (0, "true")
-    result, outputs, _ = _run_mac_lane(tmp_path / "unreadable", "result", env)
-    assert (result.returncode, outputs["infra"]) == (0, "true")
+    # A child for another SHA, or an unreadable child, is never evidence.
+    for index, fixtures in enumerate([
+        {"run": {"display_title": "Mac lane ios @ other for parent"},
+         "jobs": {"jobs": [_mac_job("completed", "success")]}},
+        {"jobs": {"jobs": [_mac_job("completed", "success")]}},
+        {"run": run},
+    ]):
+        result, outputs, _ = _run_mac_lane(tmp_path / f"untrusted-{index}", "result", env, **fixtures)
+        assert (result.returncode, outputs["infra"]) == (0, "true")
+
+
+def test_mac_lanes_route_only_trusted_events_and_carry_no_secrets() -> None:
+    route = (_WORKFLOWS / "mac-lane-route.yml").read_text()
+    child = (_WORKFLOWS / "mac-lane.yml").read_text()
+    assert "contains(fromJSON('[\"merge_group\",\"push\",\"workflow_dispatch\"]'), github.event_name)" in route
+    assert "github.event.pull_request.head.repo.full_name == github.repository" in route
+    assert "pull_request_target" not in route.split("if: >-", 1)[1].split("runs-on:", 1)[0]
+    assert "MAC_PICKUP_SECONDS: '45'" in route
+    for text in (route, child):
+        assert "secrets." not in text
+        assert "secrets: inherit" not in text
 
 
 def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
@@ -818,11 +1082,65 @@ def test_failed_query_and_unknown_state_select_hosted(tmp_path: Path) -> None:
     assert 'trusted heartbeat query failed' in output.read_text()
 
 
+
+def test_chat_corpus_selects_public_turns_and_requires_exact_unit_and_ui_passes() -> None:
+    import copy
+    import importlib.util
+    import pytest
+
+    source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
+    unit = "CHAT_QUALIFICATION_UNIT_TESTS=(" + source.split("CHAT_QUALIFICATION_UNIT_TESTS=(", 1)[1].split("# The whole unit target", 1)[0]
+    ui = "LAUNCH_QUALITY_UI_TESTS=(" + source.split("LAUNCH_QUALITY_UI_TESTS=(", 1)[1].split("UI_RESULT_BUNDLE=", 1)[0]
+    result = subprocess.run(["bash", "-e", "-u", "-c", unit + ui +
+        '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
+        'printf "ui:%s\\n" "${UI_EVIDENCE_ARGS[@]}"\n' +
+        'printf "unit:%s\\n" "${CHAT_UNIT_EVIDENCE_ARGS[@]}"\n'],
+        text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+    assert result.returncode == 0, result.stderr
+    selectors = [line.removeprefix("selector:") for line in result.stdout.splitlines() if line.startswith("selector:")]
+    expected_ui = [line.removeprefix("ui:") for line in result.stdout.splitlines() if line.startswith("ui:")][1::2]
+    expected_unit = [line.removeprefix("unit:") for line in result.stdout.splitlines() if line.startswith("unit:")][1::2]
+    required_ui = ["LogYourBodyUITests/" + name + "()" for name in [
+        "testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch",
+        "testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity",
+        "testHomeV2AskSyntheticCancelledTurnRecovers"]]
+    required_unit = ["ChatServiceTests/" + name + "()" for name in [
+        "testSyntheticChatCompletionRestoresThroughExistingHistoryPort",
+        "testSyntheticChatRetryRetainsOriginalIdentity",
+        "testSyntheticChatMissingDoneAndCancelledTurnNeverPersistComplete",
+        "testTurnRejectsDelayedReplacementTokenBeforeOpeningStream",
+        "testTurnDropsHeldMetadataDeltasCompletionAndFailureAfterReplacement",
+        "testTurnSuppressesDelayedProviderErrorButPreservesCurrentErrors",
+        "testHistoryLoadRejectsDelayedSuccessEmptyAndErrorAfterOwnershipOrLoadChanges",
+        "testHistoryLoadRejectsTokenFromReplacementSessionBeforeSending",
+        "testCurrentTurnAcceptsRotatedTokenEventsAndRequiresCompletion"]]
+    for identifier in required_ui:
+        assert selectors.count("-only-testing:LogYourBodyUITests/" + identifier.removesuffix("()")) == 1
+        assert expected_ui.count(identifier) == 1
+    assert expected_unit == required_unit
+    assert '--require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"' in source
+    spec = importlib.util.spec_from_file_location("chat_corpus_evidence", _REPO_ROOT / "scripts/ios/launch-quality-evidence.py")
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    required = required_ui + required_unit
+    passed = {"testNodes": [{"nodeType": "Test Case", "nodeIdentifier": name, "result": "Passed"} for name in required]}
+    assert len(evidence.validate_cases(passed, required)) == len(required)
+    for index in range(len(required)):
+        for status in [None, "Skipped", "Failed"]:
+            negative = copy.deepcopy(passed)
+            if status is None:
+                negative["testNodes"].pop(index)
+            else:
+                negative["testNodes"][index]["result"] = status
+            with pytest.raises(ValueError):
+                evidence.validate_cases(negative, required)
+
+
 def verify_coverage(report: Path) -> None:
     suites = json.loads(report.read_text())
     assert list(suites) == ['mac-runner-routing'], 'Unexpected or stale coverage suite'
     coverage = suites['mac-runner-routing']['coverage']
-    for script in (_AWAIT_SCRIPT, _QUERY_SCRIPT, _MAC_LANE_SCRIPT):
+    for script in (_AWAIT_SCRIPT, _QUERY_SCRIPT, _MAC_LANE_SCRIPT, _DISPATCH_GUARD_SCRIPT):
         matches = [value for path, value in coverage.items() if Path(path).resolve() == script.resolve()]
         assert len(matches) == 1, f'Missing coverage for {script.name}'
         lines = matches[0]['lines']

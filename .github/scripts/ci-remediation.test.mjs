@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
@@ -232,7 +233,8 @@ test('CODEOWNERS drift is missing file or invalid owner, and stays a dry-run unl
   assert.match(formatCodeownersDryRun(null, { reason: 'ok' }), /No Linear issue filed/);
 
   const workflow = readFileSync(resolve(root, '.github/workflows/codeowners-check.yml'), 'utf8');
-  assert.match(workflow, /cron: '41 16 \* \* 1'/);
+  assert.doesNotMatch(workflow, /cron:/);
+  assert.match(workflow, /push:\n\s+branches: \[main\]\n\s+paths:\n\s+- '\.github\/CODEOWNERS'/);
   assert.match(workflow, /workflow_dispatch/);
   assert.match(workflow, /vars\.REMEDIATION_TRIGGERS_ENABLED/);
   assert.match(workflow, /secrets\.LINEAR_API_KEY/);
@@ -324,6 +326,126 @@ test('one Linear upsert helper matches a title fingerprint or a label', async ()
   assert.equal(calls[1].variables.id, 'JOV-7549');
   assert.deepEqual(calls[2].variables.labelIds, ['label-1']);
   assert.equal(calls[2].variables.priority, undefined);
+});
+
+function runCodeownersWithCommentOutcome(outcome) {
+  // Exercise the real CLI and HTTP helper without credentials or network access.
+  const preload = `
+    import assert from 'node:assert/strict';
+    const outcome = ${JSON.stringify(outcome)};
+    const issue = { id: 'issue-147', identifier: 'LYB-147', url: 'https://example.com/LYB-147',
+      state: { id: 'todo', type: 'unstarted' },
+      labels: { nodes: [{ id: 'drift', name: 'remediation:codeowners-drift' }] } };
+    const commentBody = 'repo: JovieInc/LogYourBody\\nremediation:codeowners-drift\\nCODEOWNERS is missing.';
+    const response = (body, status = 200) => new Response(JSON.stringify(body), { status });
+    globalThis.fetch = async (url, init) => {
+      if (url === 'https://api.github.com/repos/JovieInc/LogYourBody/codeowners/errors') {
+        return response({ message: 'Not Found' }, outcome === 'detection-error' ? 503 : 404);
+      }
+      assert.equal(url, 'https://api.linear.app/graphql');
+      const { query, variables } = JSON.parse(init.body);
+      const operation = query.match(/(?:query|mutation) (\\w+)/)?.[1];
+      console.log('fixture-request:' + operation);
+      switch (operation) {
+        case 'TeamByKey':
+          assert.equal(variables.key, 'LYB');
+          return response({ data: { teams: { nodes: [{ id: 'lyb-team', key: 'LYB' }] } } });
+        case 'FindRemediationIssue':
+          assert.equal(variables.teamId, 'lyb-team');
+          return response({ data: { team: { labels: issue.labels }, issues: { nodes: [issue] } } });
+        case 'UpdateDedupedLinearIssue':
+          assert.equal(variables.id, issue.id);
+          return outcome === 'upsert-error' ? response({}, 403)
+            : response({ data: { issueUpdate: { success: true, issue } } });
+        case 'ListLinearIssueComments':
+          assert.equal(variables.id, issue.id);
+          return response({ data: { issue: { comments: { nodes:
+            outcome === 'duplicate' ? [{ id: 'prior-comment', body: commentBody }] : [] } } } });
+        case 'AddLinearIssueComment':
+          assert.deepEqual(variables, { id: issue.id, body: commentBody });
+          if (outcome === 'transport') throw new Error('offline fixture');
+          if (outcome === 'http-400') return response({ errors: [{ message: 'invalid input' }] }, 400);
+          if (outcome === 'graphql') return response({ errors: [{ message: 'invalid input' }] });
+          return response({ data: { commentCreate: { success: true, comment: { id: 'comment-1' } } } });
+        default: throw new Error('Unexpected fixture request: ' + operation);
+      }
+    };
+  `;
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      `data:text/javascript,${encodeURIComponent(preload)}`,
+      resolve(root, '.github/scripts/codeowners-check.mjs'),
+    ],
+    {
+      encoding: 'utf8',
+      timeout: 10_000,
+      env: {
+        GITHUB_REPOSITORY: 'JovieInc/LogYourBody',
+        REMEDIATION_TRIGGERS_ENABLED: outcome === 'gate-off' ? 'false' : 'true',
+        LINEAR_API_KEY: 'fixture-key',
+      },
+    },
+  );
+  assert.ifError(result.error);
+  assert.equal(result.signal, null);
+  return result;
+}
+
+for (const [outcome, reason] of [
+  ['http-400', 'linear_comment_create_400'],
+  ['graphql', 'linear_comment_create_graphql_error'],
+  ['transport', 'linear_comment_create_transport'],
+]) {
+  test(`CODEOWNERS CLI succeeds with a warning after upsert when comment fails: ${outcome}`, () => {
+    const result = runCodeownersWithCommentOutcome(outcome);
+    assert.match(result.stdout, /updated LYB-147/);
+    assert.match(result.stdout, /fixture-request:AddLinearIssueComment/);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      result.stderr,
+      new RegExp(`CODEOWNERS issue upsert succeeded; comment failed: ${reason}`),
+    );
+  });
+}
+
+test('CODEOWNERS CLI preserves successful comments and skips duplicates', () => {
+  for (const outcome of ['success', 'duplicate']) {
+    const result = runCodeownersWithCommentOutcome(outcome);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.match(result.stdout, /updated LYB-147/);
+    if (outcome === 'duplicate') {
+      assert.match(result.stdout, /Skipped duplicate CODEOWNERS comment/);
+      assert.doesNotMatch(result.stdout, /fixture-request:AddLinearIssueComment/);
+    } else {
+      assert.match(result.stdout, /fixture-request:AddLinearIssueComment/);
+    }
+  }
+});
+
+test('CODEOWNERS CLI still fails detection and upsert errors without attempting comments', () => {
+  for (const [outcome, reason] of [
+    ['detection-error', 'codeowners_http_503'],
+    ['upsert-error', 'linear_update_403'],
+  ]) {
+    const result = runCodeownersWithCommentOutcome(outcome);
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, new RegExp(reason));
+    assert.doesNotMatch(
+      result.stdout,
+      /fixture-request:(ListLinearIssueComments|AddLinearIssueComment)/,
+    );
+    assert.doesNotMatch(result.stdout, /updated LYB-147/);
+  }
+});
+
+test('CODEOWNERS CLI leaves the remediation gate in control of all Linear writes', () => {
+  const result = runCodeownersWithCommentOutcome('gate-off');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /dry_run: would upsert Linear issue/);
+  assert.doesNotMatch(result.stdout, /fixture-request:/);
 });
 
 test('failed iOS release workflows are the ASC log source', () => {

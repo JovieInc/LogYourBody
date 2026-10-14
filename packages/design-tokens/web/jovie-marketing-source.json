@@ -1,0 +1,52 @@
+{
+  "repository": "JovieInc/Jovie",
+  "revision": "ac0833d8cac40fb32edcd4404a505f108c7728e5",
+  "export": {
+    "source": "design.tokens.json",
+    "sha256": "64bd0eec9aa35fd05f9b5494db76569c381d13bf73cbc5414ec34c4c9fbbc379"
+  },
+  "styleSource": {
+    "source": "apps/web/styles/design-system.css",
+    "sha256": "31e3b1d7db396b44838cc9ac3ccef6dbf6563cbe29680b967ae3145ec9a20847"
+  },
+  "roles": {
+    "surface-page": "surface.canvas",
+    "surface-1": "surface.card",
+    "primary-token": "text.primary",
+    "secondary-token": "text.secondary",
+    "tertiary-token": "text.tertiary",
+    "subtle": "border.subtle",
+    "default": "border.default",
+    "focus": "border.focus",
+    "success": "status.success",
+    "error": "status.error"
+  },
+  "declarations": {
+    "--color-surface-page": "#030407",
+    "--color-surface-1": "#0f1420",
+    "--color-primary-token": "#f5f7fb",
+    "--color-secondary-token": "#d7dce8",
+    "--color-tertiary-token": "#a8b0c3",
+    "--color-subtle": "rgba(168, 176, 195, 0.1)",
+    "--color-default": "rgba(168, 176, 195, 0.16)",
+    "--color-focus": "#11afff",
+    "--color-success": "#3ffa8b",
+    "--color-error": "#f72a36",
+    "--color-btn-primary": "#e6e6e6",
+    "--color-btn-primary-foreground": "#020307",
+    "--color-btn-primary-hover": "#f0f0f0",
+    "--color-btn-secondary": "#151b2a",
+    "--color-btn-secondary-foreground": "#f5f7fb",
+    "--color-btn-secondary-hover": "#1b2436",
+    "--color-interactive-hover": "rgba(168, 176, 195, 0.06)",
+    "--color-interactive-active": "rgba(17, 175, 255, 0.1)",
+    "--color-text-disabled-token": "#525d75",
+    "--shadow-button-inset": "rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px",
+    "--ds-public-content-max": "1298px",
+    "--ds-prose-max": "680px",
+    "--font-weight-normal": "400",
+    "--font-weight-medium": "510",
+    "--font-weight-semibold": "590",
+    "--font-weight-bold": "680"
+  }
+}

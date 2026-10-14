@@ -4,6 +4,7 @@
 //
 import SwiftUI
 import CoreData
+import UIKit
 
 struct MainTabView: View {
     @AppStorage(Constants.healthKitSyncEnabledKey) private var healthKitSyncEnabled = true
@@ -573,6 +574,7 @@ private struct PaidWeightLoggerMVPView: View {
             realtimeSyncManager.updatePendingSyncCount()
             realtimeSyncManager.syncIfNeeded()
             AppServicePorts.analyticsTracker.track(event: "mvp_weight_logged")
+            NotificationManager.shared.recordWeighInLogged()
 
             isWeightFieldFocused = false
             weightText = ""
@@ -737,6 +739,8 @@ struct ChatTabView: View {
     @Binding var draft: String
     var showsTranscript: Bool = true
     var onExpandRequest: () -> Void = {}
+    var loggingPrototypeEnabled = false
+    var onLoggingModeSelected: (ComposerLoggingMode) -> Void = { _ in }
 
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.theme) private var theme
@@ -748,8 +752,15 @@ struct ChatTabView: View {
     @ScaledMetric(relativeTo: .body) private var composerMultilineThreshold: CGFloat =
         ChatComposerGeometry.multilineTextHeightThreshold
     @State private var composerTextHeight: CGFloat = 0
+    @State private var loggingSelector = ComposerLoggingSelectorState()
+    @State private var loggingTargetFrames: [ComposerLoggingMode: CGRect] = [:]
+    @State private var didRecognizeLoggingHold = false
+    @State private var isRoutingLoggingMode = false
+    @State private var loggingRouteID: UUID?
     @State private var isResponding = false
     @State private var isLoadingConversation = true
+    /// UI-test-only trail of send and load events (LQ chat-root flake probe).
+    @State private var sendProbe = ChatSendProbe()
     @State private var conversationLoadId: UUID?
     @State private var conversationOwner: AuthManager.ProfileSessionOwnership?
     @State private var messages: [ChatMessage] = [.welcome]
@@ -773,8 +784,10 @@ struct ChatTabView: View {
     @State private var pendingVoiceSet: VoiceSetProposal?
     @State private var isVoiceSetConfirmationPresented = false
     @State private var pendingSpokenReply = PendingSpokenReply()
+    @Namespace private var loggingHighlightNamespace
     private let trainingService: TrainingServicing = URLSessionTrainingService()
     @FocusState private var isComposerFocused: Bool
+    @AccessibilityFocusState private var isLoggingPlusAccessibilityFocused: Bool
 
     private var chatErrorMessage: String? {
         get { chatRecoveryPresentation.message }
@@ -787,6 +800,7 @@ struct ChatTabView: View {
                 id: showsTranscript ? "chat_tab_root" : "home_chat_composer_dock",
                 label: showsTranscript ? "Chat" : "Chat composer"
             )
+            .accessibilityValue(sendProbe.accessibilityValue)
             chatSurface
         }
         .background {
@@ -811,6 +825,18 @@ struct ChatTabView: View {
             conversationLoadId = nil
             currentRequestTask?.cancel()
             voiceCapture.cancel()
+            loggingSelector.cancel()
+            didRecognizeLoggingHold = false
+            isRoutingLoggingMode = false
+            loggingRouteID = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            cancelLoggingSelection(restoreAccessibilityFocus: false)
+        }
+        .onChange(of: loggingPrototypeEnabled) { _, isEnabled in
+            if !isEnabled {
+                cancelLoggingSelection(restoreAccessibilityFocus: false)
+            }
         }
         .alert("Delete this chat?", isPresented: $isDeleteConfirmationPresented) {
             Button("Cancel", role: .cancel) {}
@@ -829,7 +855,7 @@ struct ChatTabView: View {
                 Text("Log \(proposal.reps) reps at \(load), \(proposal.rir) RIR for \(proposal.exerciseName), set \(proposal.setNumber)?")
             }
         }
-        .sheet(item: $trainingPresentation) { presentation in
+        .fullScreenCover(item: $trainingPresentation) { presentation in
             switch presentation {
             case .setup:
                 TrainingEnrollmentView { sessionsPerWeek, equipment in
@@ -839,6 +865,7 @@ struct ChatTabView: View {
                 TrainingLiveSessionView(
                     session: session,
                     ownerId: ownership.subject,
+                    voiceEnabled: voiceCoachEnabled,
                     isCurrent: { authManager.ownsAccountSession(ownership) },
                     onLogSet: { exercise, setNumber, reps, loadKg, rir in
                         try await logTrainingSet(
@@ -849,14 +876,25 @@ struct ChatTabView: View {
                             )
                         )
                     },
-                    onFeedback: { soreness, pump, performance, jointPain in
+                    onCorrectSet: { request in
+                        try await correctTrainingSet(ownership: ownership, request: request)
+                    },
+                    onWorkoutAction: { request in
+                        try await applyTrainingAction(ownership: ownership, request: request)
+                    },
+                    onVoiceIntent: { activeSession, transcript, currentSet, lastCompletedSet in
+                        try await parseTrainingVoice(
+                            ownership: ownership,
+                            session: activeSession,
+                            transcript: transcript,
+                            currentSet: currentSet,
+                            lastCompletedSet: lastCompletedSet
+                        )
+                    },
+                    onFeedback: { request in
                         try await recordTrainingFeedback(
                             ownership: ownership,
-                            sessionId: session.id,
-                            soreness: soreness,
-                            pump: pump,
-                            performance: performance,
-                            jointPain: jointPain
+                            request: request
                         )
                     }
                 )
@@ -1242,25 +1280,125 @@ struct ChatTabView: View {
         await loadTrainingNext()
     }
 
+    private func correctTrainingSet(
+        ownership: AuthManager.ProfileSessionOwnership,
+        request: TrainingSetCorrectionRequest
+    ) async throws -> TrainingSavedSet {
+        var corrected: TrainingSavedSet?
+        try await TrainingOwnedRequest.perform(
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            getToken: { await chatAccessToken() },
+            send: { accessToken in
+                corrected = try await trainingService.correctSet(accessToken: accessToken, request: request)
+            }
+        )
+        guard let corrected else { throw TrainingServiceError.invalidResponse }
+        await loadTrainingNext()
+        return corrected
+    }
+
+    private func applyTrainingAction(
+        ownership: AuthManager.ProfileSessionOwnership,
+        request: TrainingWorkoutActionRequest
+    ) async throws -> TrainingSession {
+        var updated: TrainingSession?
+        do {
+            try await TrainingOwnedRequest.perform(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { accessToken in
+                    updated = try await trainingService.applyAction(accessToken: accessToken, request: request)
+                }
+            )
+        } catch {
+            let initialError = error
+            let retryable = error is URLError || (error as? TrainingServiceError) == .invalidResponse
+            if retryable {
+                do {
+                    try await TrainingOwnedRequest.perform(
+                        isCurrent: { authManager.ownsAccountSession(ownership) },
+                        getToken: { await chatAccessToken() },
+                        send: { accessToken in
+                            updated = try await trainingService.applyAction(
+                                accessToken: accessToken,
+                                request: request
+                            )
+                        }
+                    )
+                    if let updated {
+                        if request.action.kind == "end" {
+                            await loadTrainingNext()
+                        } else {
+                            replaceTrainingSession(updated)
+                        }
+                        return updated
+                    }
+                } catch {
+                    // Fall through to authoritative reload using the same event id.
+                }
+            }
+            // A response can be lost after the revisioned event commits. Reload
+            // and acknowledge only that exact event id; never infer success from copy.
+            await loadTrainingNext()
+            if let recovered = trainingResponse?.session,
+               recovered.id == request.sessionId,
+               recovered.executionEvents?.contains(where: { $0.id == request.eventId }) == true {
+                return recovered
+            }
+            throw initialError
+        }
+        guard let updated else { throw TrainingServiceError.invalidResponse }
+        replaceTrainingSession(updated)
+        if request.action.kind == "end" { await loadTrainingNext() }
+        return updated
+    }
+
+    private func replaceTrainingSession(_ updated: TrainingSession) {
+        trainingResponse = trainingResponse.map {
+            TrainingNextResponse(
+                version: $0.version,
+                error: $0.error,
+                session: updated,
+                week: $0.week,
+                weekCount: $0.weekCount,
+                weeklyFractionalVolume: $0.weeklyFractionalVolume
+            )
+        }
+    }
+
+    private func parseTrainingVoice(
+        ownership: AuthManager.ProfileSessionOwnership,
+        session: TrainingSession,
+        transcript: String,
+        currentSet: VoiceSetContext?,
+        lastCompletedSet: VoiceSetContext?
+    ) async throws -> VoiceIntentResponse {
+        guard authManager.ownsAccountSession(ownership), let token = await chatAccessToken(),
+              authManager.ownsAccountSession(ownership)
+        else { throw TrainingServiceError.authenticationExpired }
+        let response = try await URLSessionVoiceService().parseIntent(
+            transcript: transcript,
+            accessToken: token,
+            session: session,
+            weightUnit: MeasurementSystem.preferredFromDefaults.weightUnit,
+            currentSet: currentSet,
+            lastCompletedSet: lastCompletedSet
+        )
+        guard authManager.ownsAccountSession(ownership) else {
+            throw TrainingServiceError.authenticationExpired
+        }
+        return response
+    }
+
     private func recordTrainingFeedback(
         ownership: AuthManager.ProfileSessionOwnership,
-        sessionId: String,
-        soreness: Int,
-        pump: Int,
-        performance: String,
-        jointPain: Int
+        request: TrainingFeedbackRequest
     ) async throws {
         try await TrainingOwnedRequest.perform(
             isCurrent: { authManager.ownsAccountSession(ownership) },
             getToken: { await chatAccessToken() },
             send: { accessToken in
-                try await trainingService.recordFeedback(
-                    accessToken: accessToken,
-                    request: TrainingFeedbackRequest(
-                        sessionId: sessionId, soreness: soreness, pump: pump,
-                        performance: performance, jointPain: jointPain
-                    )
-                )
+                try await trainingService.recordFeedback(accessToken: accessToken, request: request)
             }
         )
         await loadTrainingNext()
@@ -1317,65 +1455,15 @@ struct ChatTabView: View {
         )
         let cornerRadius = ChatComposerGeometry.cornerRadius(isMultiline: isMultiline)
 
-        return HStack(alignment: isMultiline ? .bottom : .center, spacing: JovieTokens.itemGap) {
-            TextField(usesHomeV2Style ? HomeV2AskCopy.composerPlaceholder : "Message LogYourBody", text: $draft, axis: .vertical)
-                .lineLimit(1...4)
-                .focused($isComposerFocused)
-                .font(.system(size: composerFontSize))
-                .foregroundStyle(theme.colors.text)
-                .tint(theme.colors.primary)
-                .submitLabel(.send)
-                .onSubmit {
-                    send(draft)
-                }
-                .accessibilityIdentifier("chat_composer")
-                .background {
-                    GeometryReader { geometry in
-                        Color.clear.preference(
-                            key: ChatComposerTextHeightPreferenceKey.self,
-                            value: geometry.size.height
-                        )
-                    }
-                }
+        return ZStack(alignment: .bottom) {
+            composerInputRow(isMultiline: isMultiline)
+                .opacity(loggingSelector.isPresented ? 0 : 1)
+                .allowsHitTesting(!loggingSelector.isPresented || loggingSelector.isDragging)
+                .accessibilityHidden(loggingSelector.isPresented)
 
-            Button {
-                if isResponding {
-                    stopResponse()
-                } else {
-                    send(draft)
-                }
-            } label: {
-                Image(systemName: isResponding ? "stop.fill" : "arrow.up")
-                    .font(.system(size: isResponding ? 11 : 15, weight: .bold))
-                    .foregroundStyle(
-                        (canSend || isResponding) ? theme.colors.background : theme.colors.textTertiary
-                    )
-                    .frame(
-                        width: JovieTokens.minimumHitTarget,
-                        height: JovieTokens.minimumHitTarget
-                    )
-                    .background(
-                        (canSend || isResponding) ? theme.colors.text : theme.colors.surface,
-                        in: Circle()
-                    )
-            }
-            .disabled((!canSend && !isResponding) || isLoadingConversation)
-            .buttonStyle(.plain)
-            .accessibilityLabel(isResponding ? "Stop answer" : "Send message")
-            .accessibilityIdentifier("chat_send_button")
-
-            if voiceCoachEnabled {
-                Button(action: toggleVoiceCapture) {
-                    Image(systemName: voiceCapture.isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(theme.colors.text)
-                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-                        .background(theme.colors.surface, in: Circle())
-                }
-                .disabled(isResponding || isLoadingConversation || voiceCapture.isFinishing)
-                .buttonStyle(.plain)
-                .accessibilityLabel(voiceCapture.isRecording ? "Stop Talk recording" : "Talk")
-                .accessibilityIdentifier("chat_voice_button")
+            if loggingSelector.isPresented {
+                loggingModeSelector
+                    .transition(.opacity)
             }
         }
         .padding(.leading, JovieTokens.compactInset)
@@ -1395,8 +1483,22 @@ struct ChatTabView: View {
         }
         .padding(.horizontal, JovieTokens.screenInset)
         .padding(.vertical, JovieTokens.itemGap)
+        .coordinateSpace(name: "composer_logging_selector")
         .onPreferenceChange(ChatComposerTextHeightPreferenceKey.self) { height in
             composerTextHeight = height
+        }
+        .onPreferenceChange(ComposerLoggingTargetFramePreferenceKey.self) { frames in
+            loggingTargetFrames = frames
+        }
+        .onKeyPress(.escape) {
+            guard loggingSelector.isPresented else { return .ignored }
+            cancelLoggingSelection()
+            return .handled
+        }
+        .accessibilityAction(.escape) {
+            if loggingSelector.isPresented {
+                cancelLoggingSelection()
+            }
         }
         .animation(
             ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
@@ -1410,6 +1512,284 @@ struct ChatTabView: View {
             ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
             value: voiceCapture.isRecording
         )
+        .animation(
+            ChatComposerGeometry.morphAnimation(reduceMotion: reduceMotion),
+            value: loggingSelector.isPresented
+        )
+        .animation(
+            ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
+            value: loggingSelector.highlightedMode
+        )
+    }
+
+    private func composerInputRow(isMultiline: Bool) -> some View {
+        HStack(alignment: isMultiline ? .bottom : .center, spacing: JovieTokens.itemGap) {
+            if loggingPrototypeEnabled {
+                loggingPlusButton
+            }
+
+            TextField(
+                usesHomeV2Style ? HomeV2AskCopy.composerPlaceholder : "Message LogYourBody",
+                text: $draft,
+                axis: .vertical
+            )
+            .lineLimit(1...4)
+            .focused($isComposerFocused)
+            .font(.system(size: composerFontSize))
+            .foregroundStyle(theme.colors.text)
+            .tint(theme.colors.primary)
+            .submitLabel(.send)
+            .onSubmit {
+                send(draft)
+            }
+            .accessibilityIdentifier("chat_composer")
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: ChatComposerTextHeightPreferenceKey.self,
+                        value: geometry.size.height
+                    )
+                }
+            }
+
+            if loggingPrototypeEnabled, voiceCoachEnabled {
+                voiceButton
+            }
+
+            sendButton
+
+            if !loggingPrototypeEnabled, voiceCoachEnabled {
+                voiceButton
+            }
+        }
+    }
+
+    private var loggingPlusButton: some View {
+        Button {
+            guard !didRecognizeLoggingHold else { return }
+            isLoggingPlusAccessibilityFocused = false
+            loggingSelector.toggleTapSelection()
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(theme.colors.text)
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(loggingHoldGesture)
+        .accessibilityLabel("Choose what to log")
+        .accessibilityHint("Shows Weight, Body fat, and Photo. Touch and hold, then drag for a shortcut.")
+        .accessibilityIdentifier("composer_logging_plus")
+        .accessibilityFocused($isLoggingPlusAccessibilityFocused)
+    }
+
+    private var sendButton: some View {
+        Button {
+            if isResponding {
+                stopResponse()
+            } else {
+                send(draft)
+            }
+        } label: {
+            Image(systemName: isResponding ? "stop.fill" : "arrow.up")
+                .font(.system(size: isResponding ? 11 : 15, weight: .bold))
+                .foregroundStyle(
+                    (canSend || isResponding) ? theme.colors.background : theme.colors.textTertiary
+                )
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .background(
+                    (canSend || isResponding) ? theme.colors.text : theme.colors.surface,
+                    in: Circle()
+                )
+        }
+        .disabled((!canSend && !isResponding) || isLoadingConversation)
+        .buttonStyle(.plain)
+        .accessibilityLabel(isResponding ? "Stop answer" : "Send message")
+        .accessibilityIdentifier("chat_send_button")
+    }
+
+    private var voiceButton: some View {
+        Button(action: toggleVoiceCapture) {
+            Image(systemName: voiceCapture.isRecording ? "stop.fill" : "mic.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.colors.text)
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .background(theme.colors.surface, in: Circle())
+        }
+        .disabled(isResponding || isLoadingConversation || voiceCapture.isFinishing)
+        .buttonStyle(.plain)
+        .accessibilityLabel(voiceCapture.isRecording ? "Stop Talk recording" : "Talk")
+        .accessibilityIdentifier("chat_voice_button")
+    }
+
+    @ViewBuilder
+    private var loggingModeSelector: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: 0) {
+                Button {
+                    cancelLoggingSelection()
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close logging options")
+                .accessibilityIdentifier("composer_logging_close")
+
+                ForEach(ComposerLoggingMode.allCases) { mode in
+                    loggingModeButton(mode)
+                }
+            }
+        } else {
+            HStack(spacing: 0) {
+                Button {
+                    cancelLoggingSelection()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close logging options")
+                .accessibilityIdentifier("composer_logging_close")
+
+                ForEach(ComposerLoggingMode.allCases) { mode in
+                    loggingModeButton(mode)
+                }
+            }
+        }
+    }
+
+    private func loggingModeButton(_ mode: ComposerLoggingMode) -> some View {
+        Button {
+            guard let selected = loggingSelector.selectFromTap(mode) else { return }
+            routeLoggingMode(selected)
+        } label: {
+            Text(mode.title)
+                .font(.system(.subheadline, design: .default, weight: .medium))
+                .foregroundStyle(theme.colors.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background {
+            if loggingSelector.highlightedMode == mode {
+                RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                    .fill(theme.colors.text.opacity(0.10))
+                    .matchedGeometryEffect(id: "composer_logging_indicator", in: loggingHighlightNamespace)
+            }
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: ComposerLoggingTargetFramePreferenceKey.self,
+                    value: [mode: geometry.frame(in: .named("composer_logging_selector"))]
+                )
+            }
+        }
+        .accessibilityLabel("Log \(mode.title)")
+        .accessibilityIdentifier(mode.accessibilityIdentifier)
+    }
+
+    private var loggingHoldGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.28, maximumDistance: 18)
+            .sequenced(
+                before: DragGesture(
+                    minimumDistance: 0,
+                    coordinateSpace: .named("composer_logging_selector")
+                )
+            )
+            .onChanged { value in
+                switch value {
+                case .first(true):
+                    beginLoggingHoldIfNeeded()
+                case .second(true, let drag):
+                    beginLoggingHoldIfNeeded()
+                    updateLoggingHold(at: drag?.location)
+                default:
+                    break
+                }
+            }
+            .onEnded { value in
+                guard didRecognizeLoggingHold else { return }
+                let mode: ComposerLoggingMode?
+                if case .second(true, let drag) = value, let location = drag?.location {
+                    mode = loggingMode(at: location)
+                } else {
+                    mode = nil
+                }
+                finishLoggingHold(over: mode)
+            }
+    }
+
+    private func beginLoggingHoldIfNeeded() {
+        guard ComposerLoggingPrototypePolicy.allowsHoldDrag(
+            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+        ) else { return }
+        guard !didRecognizeLoggingHold else { return }
+        didRecognizeLoggingHold = true
+        loggingSelector.beginDragSelection()
+    }
+
+    private func updateLoggingHold(at location: CGPoint?) {
+        let mode = location.flatMap(loggingMode(at:))
+        if loggingSelector.updateDragSelection(over: mode), mode != nil {
+            HapticManager.shared.selection()
+        }
+    }
+
+    private func finishLoggingHold(over mode: ComposerLoggingMode?) {
+        let selected = loggingSelector.finishDragSelection(over: mode)
+        DispatchQueue.main.async {
+            didRecognizeLoggingHold = false
+        }
+        if let selected {
+            routeLoggingMode(selected)
+        } else {
+            isLoggingPlusAccessibilityFocused = true
+        }
+    }
+
+    private func loggingMode(at location: CGPoint) -> ComposerLoggingMode? {
+        ComposerLoggingMode.allCases.first { mode in
+            loggingTargetFrames[mode]?.contains(location) == true
+        }
+    }
+
+    private func routeLoggingMode(_ mode: ComposerLoggingMode) {
+        guard !isRoutingLoggingMode else { return }
+        isRoutingLoggingMode = true
+        let routeID = UUID()
+        loggingRouteID = routeID
+        isComposerFocused = false
+
+        Task { @MainActor in
+            // Present on the next run-loop turn so this release cannot activate
+            // a newly revealed Save or camera control.
+            await Task.yield()
+            guard loggingRouteID == routeID else { return }
+            onLoggingModeSelected(mode)
+            if loggingRouteID == routeID {
+                loggingRouteID = nil
+                isRoutingLoggingMode = false
+            }
+        }
+    }
+
+    private func cancelLoggingSelection(restoreAccessibilityFocus: Bool = true) {
+        guard loggingSelector.isPresented || isRoutingLoggingMode || didRecognizeLoggingHold else { return }
+        loggingSelector.cancel()
+        didRecognizeLoggingHold = false
+        isRoutingLoggingMode = false
+        loggingRouteID = nil
+        if restoreAccessibilityFocus {
+            isLoggingPlusAccessibilityFocused = true
+        }
     }
 
     private func accessibilityMarker(id: String, label: String) -> some View {
@@ -1531,25 +1911,33 @@ struct ChatTabView: View {
 
     private func commitVoiceSet(_ proposal: VoiceSetProposal) {
         Task { @MainActor in
-            guard let accessToken = await chatAccessToken() else {
-                chatErrorMessage = VoiceAPIError.authenticationExpired.localizedDescription
+            guard let session = trainingResponse?.session,
+                  let ownership = trainingOwner,
+                  authManager.ownsAccountSession(ownership),
+                  VoiceSetAdmission.admits(proposal, session: session),
+                  let exercise = session.exercises.first(where: { $0.id == proposal.exerciseId })
+            else {
+                chatErrorMessage = VoiceSetAdmission.rejectedLogMessage
                 return
             }
-            do {
-                try await VoiceSetLogger.commit(
-                    proposal,
-                    isConfirmed: true,
-                    accessToken: accessToken,
-                    session: trainingResponse?.session
-                ) { token, request in
-                    try await trainingService.logSet(accessToken: token, request: request)
-                }
-                await loadTrainingNext()
+            let journal = TrainingSessionDraft(
+                session: session,
+                ownerId: ownership.subject,
+                store: .shared,
+                isCurrent: { authManager.ownsAccountSession(ownership) }
+            )
+            journal.update(exercise, setNumber: proposal.setNumber) {
+                $0.repsText = String(proposal.reps)
+                $0.loadText = TrainingLoadInputPolicy.savedText(for: proposal.loadKg)
+                $0.rir = proposal.rir
+            }
+            await journal.save(exercise, setNumber: proposal.setNumber) { request in
+                try await logTrainingSet(ownership: ownership, request: request)
+            }
+            if journal.loggedSets["\(proposal.exerciseId)-\(proposal.setNumber)"] != nil {
                 voicePlayback.speakOffline("Set logged.")
-            } catch let error as LocalizedError {
-                chatErrorMessage = error.errorDescription ?? "The set could not be saved."
-            } catch {
-                chatErrorMessage = "The set could not be saved."
+            } else {
+                chatErrorMessage = journal.errorMessage ?? "The set could not be saved."
             }
         }
     }
@@ -1574,7 +1962,13 @@ struct ChatTabView: View {
 
     private func send(_ text: String, shouldSpeakReply: Bool = false) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isResponding, !isLoadingConversation else { return }
+        guard !trimmed.isEmpty, !isResponding, !isLoadingConversation else {
+            sendProbe.record(
+                trimmed.isEmpty ? "drop-empty" : isResponding ? "drop-responding" : "drop-loading"
+            )
+            return
+        }
+        sendProbe.record("send")
 
         let clientMessageId = UUID().uuidString
         pendingSpokenReply.track(
@@ -1778,6 +2172,8 @@ struct ChatTabView: View {
     private func loadLatestConversation() async {
         let loadId = UUID()
         conversationLoadId = loadId
+        sendProbe.record("load-start")
+        defer { sendProbe.record(conversationLoadId == loadId ? "load-end" : "load-superseded") }
         let ownership = authManager.captureAccountSession()
         if conversationOwner != ownership {
             messages = [.welcome]
@@ -1916,6 +2312,17 @@ private struct ChatComposerTextHeightPreferenceKey: PreferenceKey {
     }
 }
 
+private struct ComposerLoggingTargetFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [ComposerLoggingMode: CGRect] = [:]
+
+    static func reduce(
+        value: inout [ComposerLoggingMode: CGRect],
+        nextValue: () -> [ComposerLoggingMode: CGRect]
+    ) {
+        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
+    }
+}
+
 private struct ChatTabWorldClassScreenModifier: ViewModifier {
     let isEnabled: Bool
 
@@ -2026,5 +2433,24 @@ private struct ChatBubble: View {
                 ? "You: \(message.text)"
                 : "LogYourBody: \(message.text)"
         )
+    }
+}
+
+/// Records the last few chat send and conversation-load events for UI tests.
+/// The launch-quality chat-root check once saw a delivered prompt tap leave the
+/// welcome state untouched (run 38328287365). `send` silently returns while a
+/// load or reply is in flight, so this exposes which path ran. It is empty
+/// outside the UI-test chat fixture, so VoiceOver never reads it.
+struct ChatSendProbe {
+    private static let isEnabled = ProcessInfo.processInfo.arguments.contains("-lybUITestChatFirstFixture")
+    private(set) var events: [String] = []
+
+    mutating func record(_ event: String) {
+        guard Self.isEnabled else { return }
+        events = Array((events + [event]).suffix(8))
+    }
+
+    var accessibilityValue: String {
+        Self.isEnabled ? events.joined(separator: ",") : ""
     }
 }

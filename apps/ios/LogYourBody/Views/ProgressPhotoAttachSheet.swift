@@ -136,29 +136,40 @@ struct ProgressPhotoAttachSheet: View {
                     .padding(.top, JovieTokens.itemGap)
                     .padding(.bottom, JovieTokens.itemGap)
                 }
+                // The navigation-bar Cancel accessibility frame stays 36 points tall.
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    attachButton
-                        .padding(.horizontal, JovieTokens.screenInset)
-                        .padding(.vertical, JovieTokens.itemGap)
+                    HStack(spacing: 12) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("Cancel")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .disabled(isBusy)
+                        .accessibilityIdentifier("progress_photo_attach_cancel_button")
+
+                        attachButton
+                    }
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.vertical, JovieTokens.itemGap)
                 }
             }
             .navigationTitle("Progress Photo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .disabled(isBusy)
-                }
-
                 ToolbarItemGroup(placement: .primaryAction) {
                     photoSourceMenu
                 }
             }
             .fullScreenCover(isPresented: $isCameraPresented) {
                 CameraView { image in
-                    handleCameraImage(image)
+                    Task { @MainActor in
+                        handleCameraImage(image)
+                        await Task.yield()
+                        attachSelectedPhoto()
+                    }
                 }
             }
             .interactiveDismissDisabled(!ProgressPhotoAttachPolicy.canDismiss(status: attachStatus))
@@ -416,13 +427,13 @@ struct ProgressPhotoAttachSheet: View {
         } label: {
             if isBusy {
                 ProgressView()
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             } else if isSuccess {
                 Label("Close", systemImage: "checkmark")
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             } else {
                 Label("Attach Photo", systemImage: "paperclip")
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
         }
         .buttonStyle(.glassProminent)
@@ -469,6 +480,12 @@ struct ProgressPhotoAttachSheet: View {
     }
 
     private func startCameraCapture() {
+        #if DEBUG
+        if usesProgressPhotoAttachFixture {
+            isCameraPresented = true
+            return
+        }
+        #endif
         guard cameraAuthorizer.isCameraAvailable else {
             attachStatus = .failed("Camera is not available in Simulator. Choose from Library instead.")
             return

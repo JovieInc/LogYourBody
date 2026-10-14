@@ -83,7 +83,9 @@ extension DashboardViewLiquid {
                     showsTranscript: isHomeChatExpanded,
                     onExpandRequest: {
                         isHomeChatExpanded = true
-                    }
+                    },
+                    loggingPrototypeEnabled: isComposerLoggingPrototypeEnabled,
+                    onLoggingModeSelected: presentComposerLoggingMode
                 )
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? .infinity : nil)
                 .layoutPriority(!isHomeChatExpanded && dynamicTypeSize.isAccessibilitySize ? 1 : 0)
@@ -138,6 +140,27 @@ extension DashboardViewLiquid {
         .navigationDestination(isPresented: $isPhotoTimelineSettingsPresented) {
             PreferencesView()
                 .environmentObject(authManager)
+        }
+        .alert("Couldn’t undo this entry", isPresented: $showsHomeV2UndoError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your entry is still saved. Try Undo again.")
+        }
+    }
+
+    private var isComposerLoggingPrototypeEnabled: Bool {
+        _ = featureGateRefreshToken
+        return ComposerLoggingPrototypePolicy.isEnabled()
+    }
+
+    private func presentComposerLoggingMode(_ mode: ComposerLoggingMode) {
+        switch mode {
+        case .weight:
+            presentHomeV2LogSheet()
+        case .bodyFat:
+            presentAddEntrySheet(initialTab: 1)
+        case .photo:
+            presentProgressPhotoAttach(for: progressPhotoAttachMetric)
         }
     }
 
@@ -317,10 +340,6 @@ extension DashboardViewLiquid {
         case .menu:
             isShowingPhotoTimelineMenu = true
         case .stats:
-            if isHomeV2CheckIn {
-                openHomeV2Context()
-                return
-            }
             selectedPhotoTimelineRootPage = .analytics
             isHomeChatExpanded = false
             HapticManager.shared.selection()
