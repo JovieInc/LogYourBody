@@ -527,11 +527,14 @@ struct LogYourBodyApp: App {
         realtimeSyncManager.syncStatus = .offline
         realtimeSyncManager.pendingSyncCount = 0
 
-        if (usesFullDashboardFixture || usesPhotoTimelineHUDFixture) &&
-            !arguments.contains(HomeV2Policy.emptyFixtureArgument) {
-            let fixturePhotoURL = arguments.contains(HomeV2Policy.photoFixtureArgument)
-                ? writeHomeV2FixturePhoto()
-                : nil
+        // These data-only aliases exercise the ordinary Home policy without
+        // the HomeV2 fixture arguments that force a particular rollout state.
+        let usesEmptyHomeData = arguments.contains(HomeV2Policy.emptyFixtureArgument) ||
+            arguments.contains("-lybUITestPhotoTimelineEmptyFixture")
+        if (usesFullDashboardFixture || usesPhotoTimelineHUDFixture) && !usesEmptyHomeData {
+            let usesPhotoData = arguments.contains(HomeV2Policy.photoFixtureArgument) ||
+                arguments.contains("-lybUITestPhotoTimelinePhotoFixture")
+            let fixturePhotoURL = usesPhotoData ? writeHomeV2FixturePhoto() : nil
             if usesUndoPhotoFixture && arguments.contains("-lybUITestReuseUndoFixtureData") {
                 let persisted = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
                 precondition(!persisted.isEmpty, "Undo relaunch must read persisted rows without reseeding")
