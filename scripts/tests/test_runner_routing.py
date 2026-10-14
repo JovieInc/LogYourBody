@@ -593,6 +593,8 @@ def test_wrong_run_identity_or_job_attestation_degrades_to_hosted(
 _MAC_LANE_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "mac-lane.sh"
 _SELF_HOSTED_MAC = 'fromJSON(\'["self-hosted","macOS","ARM64","jovie-mac"]\')'
 _IOS_LANES = {"ios": ("ios-unit.yml", "unit"), "ios_quality": ("ios-quality.yml", "quality")}
+# Unit gates merge groups; Launch Quality gates the PR head (.github/scripts/detect-changes.sh).
+_IOS_LANE_OUTPUTS = {"ios": "ios_unit", "ios_quality": "ios_quality"}
 
 
 def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
@@ -609,9 +611,11 @@ def test_required_ios_jobs_try_an_idle_mac_and_never_hold_on_one() -> None:
     for name, (reusable, work) in _IOS_LANES.items():
         job = _job_block("ci.yml", name)
         assert f"    uses: ./.github/workflows/{reusable}" in job.splitlines()
-        assert "      mac-first: true" in job.splitlines()
+        # ios_quality stays hosted until its capture tests pass on the Macs.
+        mac_first = "true" if name == "ios" else "false"
+        assert f"      mac-first: {mac_first}" in job.splitlines()
         assert "    needs: detect-changes" in job.splitlines()
-        assert "if: needs.detect-changes.outputs.ios == 'true'" in job
+        assert f"if: needs.detect-changes.outputs.{_IOS_LANE_OUTPUTS[name]} == 'true'" in job
         assert f"uses: ./.github/workflows/{reusable}" in child
         lane = _job_block(reusable, work)
         assert (
@@ -631,8 +635,6 @@ def test_mac_route_uses_first_attempts_of_trusted_events_only() -> None:
     assert (
         "      vars.JOVIE_MAC_RUNNER != 'off' &&\n"
         "      github.run_attempt == '1' &&\n"
-        "      (github.event_name != 'pull_request' || "
-        "github.event.pull_request.head.repo.full_name == github.repository)"
     ) in route
     assert "group: ${{ needs.dispatch.outputs.join_group }}" in route
     assert (
@@ -669,6 +671,9 @@ elif [[ "$args" == *"/cancel"* ]]; then
 elif [[ "$args" == *"/jobs"* ]]; then
   [ -f "$FAKE_DIR/jobs.json" ] || exit 1
   jq "$(sed -n 's/.*--jq //p' <<<"$args")" "$FAKE_DIR/jobs.json"
+elif [[ "$args" == *"/actions/runs/"* ]]; then
+  [ -f "$FAKE_DIR/run.json" ] || exit 1
+  jq -r "$(sed -n 's/.*--jq //p' <<<"$args")" "$FAKE_DIR/run.json"
 else
   exit 1
 fi
@@ -724,7 +729,7 @@ def test_mac_lane_dispatch_joins_on_pickup_and_falls_back_otherwise(tmp_path: Pa
     assert not any("/cancel" in call for call in calls)
 
     result, outputs, calls = _run_mac_lane(
-        tmp_path / "stuck", "dispatch", {**_DISPATCH_ENV, "PICKUP_SECONDS": "0"},
+        tmp_path / "stuck", "dispatch", {**_DISPATCH_ENV, "MAC_PICKUP_SECONDS": "0"},
         dispatch={"workflow_run_id": 42}, jobs={"jobs": [_mac_job("queued")]},
     )
     assert result.returncode == 0, result.stderr
@@ -741,13 +746,15 @@ def test_mac_lane_dispatch_joins_on_pickup_and_falls_back_otherwise(tmp_path: Pa
 
 
 def test_mac_lane_result_passes_fails_or_hands_back_to_hosted(tmp_path: Path) -> None:
-    env = {"GH_TOKEN": "token", "CHILD_RUN_ID": "42"}
+    env = {"GH_TOKEN": "token", "CHILD_RUN_ID": "42", "CHECKOUT_SHA": "abc"}
+    run = {"display_title": "Mac lane ios @ abc for parent"}
     result, outputs, _ = _run_mac_lane(
-        tmp_path / "pass", "result", env, jobs={"jobs": [_mac_job("completed", "success")]}
+        tmp_path / "pass", "result", env, run=run, jobs={"jobs": [_mac_job("completed", "success")]}
     )
     assert (result.returncode, outputs["infra"]) == (0, "false")
     result, outputs, _ = _run_mac_lane(
-        tmp_path / "fail", "result", env, jobs={"jobs": [_mac_job("completed", "failure", True)]}
+        tmp_path / "fail", "result", env, run=run,
+        jobs={"jobs": [_mac_job("completed", "failure", True)]},
     )
     assert (result.returncode, outputs["infra"]) == (1, "false")
     for index, jobs in enumerate([
@@ -756,10 +763,31 @@ def test_mac_lane_result_passes_fails_or_hands_back_to_hosted(tmp_path: Path) ->
         [_mac_job("completed", "timed_out")],
         [],
     ]):
-        result, outputs, _ = _run_mac_lane(tmp_path / f"lost-{index}", "result", env, jobs={"jobs": jobs})
+        result, outputs, _ = _run_mac_lane(
+            tmp_path / f"lost-{index}", "result", env, run=run, jobs={"jobs": jobs}
+        )
         assert (result.returncode, outputs["infra"]) == (0, "true")
-    result, outputs, _ = _run_mac_lane(tmp_path / "unreadable", "result", env)
-    assert (result.returncode, outputs["infra"]) == (0, "true")
+    # A child for another SHA, or an unreadable child, is never evidence.
+    for index, fixtures in enumerate([
+        {"run": {"display_title": "Mac lane ios @ other for parent"},
+         "jobs": {"jobs": [_mac_job("completed", "success")]}},
+        {"jobs": {"jobs": [_mac_job("completed", "success")]}},
+        {"run": run},
+    ]):
+        result, outputs, _ = _run_mac_lane(tmp_path / f"untrusted-{index}", "result", env, **fixtures)
+        assert (result.returncode, outputs["infra"]) == (0, "true")
+
+
+def test_mac_lanes_route_only_trusted_events_and_carry_no_secrets() -> None:
+    route = (_WORKFLOWS / "mac-lane-route.yml").read_text()
+    child = (_WORKFLOWS / "mac-lane.yml").read_text()
+    assert "contains(fromJSON('[\"merge_group\",\"push\",\"workflow_dispatch\"]'), github.event_name)" in route
+    assert "github.event.pull_request.head.repo.full_name == github.repository" in route
+    assert "pull_request_target" not in route.split("if: >-", 1)[1].split("runs-on:", 1)[0]
+    assert "MAC_PICKUP_SECONDS: '45'" in route
+    for text in (route, child):
+        assert "secrets." not in text
+        assert "secrets: inherit" not in text
 
 
 def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:

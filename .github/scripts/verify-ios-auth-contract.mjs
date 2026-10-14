@@ -56,7 +56,7 @@ async function captureLiveProviderRequest(identityURL) {
 
   try {
     const page = await browser.newPage();
-    await page.goto(identityURL.toString(), { waitUntil: 'networkidle' });
+    await page.goto(identityURL.toString(), { waitUntil: 'domcontentloaded' });
     const providerRequest = page.waitForRequest((request) =>
       request.url().endsWith('/api/auth/sign-in/social'),
     );

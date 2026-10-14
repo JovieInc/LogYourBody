@@ -18,6 +18,7 @@ public extension Color {
     static let jovieAction = Color.white
     static let jovieActionText = Color.black
     static let jovieMetricAccent = Color(hex: "#1EB4EA")
+    static let jovieCream = Color(hex: JoviePalette.creamHex)
 
     // MARK: - Primary Colors
     static let linearPurple = Color(hex: "#5B63D3")
