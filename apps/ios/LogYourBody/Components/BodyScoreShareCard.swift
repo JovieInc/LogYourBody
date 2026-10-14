@@ -60,8 +60,10 @@ struct BodyScoreSharePayload {
         return copy
     }
 
+    @MainActor
     func isOwned(by owns: (AuthManager.ProfileSessionOwnership) -> Bool) -> Bool {
-        accountSession.map(owns) ?? false
+        guard let accountSession else { return false }
+        return owns(accountSession)
     }
 
     var avatarMatch: AvatarBodyFatCatalog.Match {

@@ -185,6 +185,7 @@ extension BodyScoreSharePayload {
 }
 
 /// A frozen offer/composer retains the account lifetime that produced its health data.
+@MainActor
 struct AccountBoundShareCapture {
     private(set) var payload: BodyScoreSharePayload?
 

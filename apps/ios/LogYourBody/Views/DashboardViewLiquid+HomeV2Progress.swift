@@ -15,6 +15,7 @@ extension DashboardViewLiquid {
             onLogWeight: { presentHomeV2LogSheet() },
             isShareContextVisible: isMetricShareContextVisible && !isMetricDetailActive && !isStatsDestinationActive
         )
+        .id(authManager.captureAccountSession())
     }
 
     func openHomeV2Progress(metric: HomeV2ProgressMetric = .weight) {
