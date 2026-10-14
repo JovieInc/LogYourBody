@@ -428,6 +428,8 @@ export async function getOrCreateNextWorkout(input: {
     if ((existing.executionRevision ?? 0) > 0) {
       // Interruption decisions are this session's result. Rebuilding the base
       // plan would resurrect skipped work or drop a safety pause.
+      const paused = existing.safetyStop || existing.executionPaused;
+      const savedState = `Saved workout, week ${existing.week}${paused ? ', paused' : ''}`;
       return {
         kind: 'workout',
         session: {
@@ -437,6 +439,20 @@ export async function getOrCreateNextWorkout(input: {
         week: existing.week,
         weekCount: block.weekCount,
         weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+        decision: {
+          ...decision,
+          decision: { kind: 'hold', optionalBurdenReduction: false },
+          rationale:
+            'Retaining the saved session interruption decisions; no new change was applied.',
+          before: savedState,
+          after: savedState,
+          reviewPoint: paused ? 'Before resuming the saved session' : 'Next session action',
+          nextAction: existing.safetyStop
+            ? 'Training remains paused. Review the reported pain and seek qualified care if it persists or worsens.'
+            : existing.executionPaused
+              ? 'The saved session is paused. Resume when ready.'
+              : 'Continue the saved session from its current exercise.',
+        },
       };
     }
     const retained = activeRecord.initialPrescription;
