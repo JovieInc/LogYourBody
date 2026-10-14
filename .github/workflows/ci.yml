@@ -142,7 +142,8 @@ jobs:
 
   js:
     name: JavaScript/TypeScript
-    runs-on: ubuntu-latest
+    # Disposable SQL qualification requires this image's PostgreSQL16 binaries.
+    runs-on: ubuntu-24.04
     needs: detect-changes
     if: needs.detect-changes.outputs.web == 'true'
     steps:
@@ -172,6 +173,27 @@ jobs:
 
       - name: Neon migration layout checks
         run: pnpm db:schema:check
+
+      - name: Verify training mutations on disposable PostgreSQL16
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          mkdir -p artifacts/training-mutations/coverage
+          git rev-parse HEAD > artifacts/training-mutations/source-revision.txt
+          sha256sum apps/web/db/tests/verify-training-mutations.py apps/web/db/migrations/*.sql apps/web/src/lib/neon/user-directory-adapter.ts apps/web/src/lib/neon/native-account-admission.ts > artifacts/training-mutations/source-sha256.txt
+          python3 -m trace --count --summary --missing \
+            --ignore-dir "$(python3 -c 'import sys; print(sys.prefix)')" \
+            --coverdir artifacts/training-mutations/coverage \
+            apps/web/db/tests/verify-training-mutations.py --postgres-bin /usr/lib/postgresql/16/bin \
+            | tee artifacts/training-mutations/results.log
+
+      - name: Upload training mutation execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-mutations-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/training-mutations
+          if-no-files-found: warn
 
       - name: Type check
         run: pnpm typecheck

@@ -48,6 +48,27 @@ export type ExercisePrescription = {
   loadInstruction: string | null;
   progression: ProgressionAction;
   evidenceIds: string[];
+  substitutions: ExerciseSubstitution[];
+};
+
+/** Engine-approved alternatives for this session. A substitution deliberately
+ * carries no working load: an unfamiliar movement must be established by the user. */
+export type ExerciseSubstitution = Omit<
+  ExercisePrescription,
+  'substitutions' | 'targetLoadKg' | 'progression'
+> & {
+  targetLoadKg: null;
+  progression: 'hold';
+};
+
+export type WorkoutSessionEvent = {
+  id: string;
+  kind:
+    'reordered' | 'substituted' | 'shortened' | 'skipped' | 'paused' | 'resumed' | 'ended' | 'pain';
+  createdAt: string;
+  exerciseId?: string;
+  replacementExerciseId?: string;
+  minutes?: number;
 };
 
 export type Session = {
@@ -60,6 +81,9 @@ export type Session = {
   safetyStop: boolean;
   explanation: string | null;
   evidenceIds: string[];
+  executionRevision: number;
+  executionPaused: boolean;
+  executionEvents: WorkoutSessionEvent[];
 };
 
 export type SetLog = {
@@ -71,6 +95,12 @@ export type SetLog = {
   loadKg: number | null;
   rir: number;
   completedAt: string;
+  revision?: number;
+  corrections?: Array<{
+    id: string;
+    correctedAt: string;
+    previous: Pick<SetLog, 'reps' | 'loadKg' | 'rir'>;
+  }>;
 };
 
 export type DeloadState = {

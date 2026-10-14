@@ -5,6 +5,7 @@ import {
   type Equipment,
   type ExercisePattern,
   type ExercisePrescription,
+  type ExerciseSubstitution,
   type Microcycle,
   type MesoBlock,
   type MuscleContribution,
@@ -223,6 +224,86 @@ const EXERCISES: Record<Equipment, Record<ExercisePattern, ExerciseSeed[]>> = {
 
 const RIR_LADDER = [4, 3, 3, 2] as const;
 const REP_RANGE = { min: 8, max: 12 } as const;
+
+function eligibleSubstitutions(input: {
+  seed: ExerciseSeed;
+  equipment: Equipment;
+  pattern: ExercisePattern;
+  sets: number;
+  targetRir: number;
+}): ExerciseSubstitution[] {
+  const pools =
+    input.equipment === 'full_gym'
+      ? [EXERCISES.full_gym.A, EXERCISES.full_gym.B, EXERCISES.dumbbells.A, EXERCISES.dumbbells.B]
+      : [EXERCISES.dumbbells.A, EXERCISES.dumbbells.B];
+  const plannedIds = new Set(EXERCISES[input.equipment][input.pattern].map((item) => item.id));
+  const seen = new Set<string>();
+  return pools
+    .flat()
+    .filter((candidate) => {
+      if (
+        candidate.id === input.seed.id ||
+        candidate.primaryMuscle !== input.seed.primaryMuscle ||
+        plannedIds.has(candidate.id) ||
+        seen.has(candidate.id)
+      )
+        return false;
+      seen.add(candidate.id);
+      return true;
+    })
+    .map((candidate) => ({
+      ...candidate,
+      sets: input.sets,
+      repRange: REP_RANGE,
+      targetReps: REP_RANGE.min,
+      targetRir: input.targetRir,
+      targetLoadKg: null,
+      loadInstruction: 'Choose a conservative starting load for this unfamiliar alternative.',
+      progression: 'hold' as const,
+      evidenceIds: EFFORT_EVIDENCE,
+    }));
+}
+
+/** Re-validates a stored alternative at the execution boundary. Session data is
+ * durable and may predate the current library, so presence in a persisted
+ * `substitutions` array is not sufficient authorization to prescribe it. */
+export function isEligibleExerciseSubstitution(input: {
+  exercise: ExercisePrescription;
+  candidate: ExerciseSubstitution;
+  equipment: Equipment;
+}): boolean {
+  const allowedPools =
+    input.equipment === 'full_gym'
+      ? [EXERCISES.full_gym.A, EXERCISES.full_gym.B, EXERCISES.dumbbells.A, EXERCISES.dumbbells.B]
+      : [EXERCISES.dumbbells.A, EXERCISES.dumbbells.B];
+  const canonical = allowedPools
+    .flat()
+    .find(
+      (seed) =>
+        seed.id === input.candidate.id && seed.primaryMuscle === input.exercise.primaryMuscle,
+    );
+  const canonicalContributions = canonical ? Object.entries(canonical.muscleContribution) : [];
+  const candidateContributions = Object.entries(input.candidate.muscleContribution);
+  return Boolean(
+    canonical &&
+    canonical.id !== input.exercise.id &&
+    canonical.name === input.candidate.name &&
+    input.candidate.primaryMuscle === input.exercise.primaryMuscle &&
+    canonicalContributions.length === candidateContributions.length &&
+    canonicalContributions.every(
+      ([muscle, contribution]) =>
+        input.candidate.muscleContribution[muscle as MuscleGroup] === contribution,
+    ) &&
+    input.candidate.repRange.min === REP_RANGE.min &&
+    input.candidate.repRange.max === REP_RANGE.max &&
+    input.candidate.targetReps === REP_RANGE.min &&
+    input.candidate.targetRir === input.exercise.targetRir &&
+    input.candidate.targetLoadKg === null &&
+    input.candidate.progression === 'hold' &&
+    input.candidate.loadInstruction ===
+      'Choose a conservative starting load for this unfamiliar alternative.',
+  );
+}
 
 export function createMesoBlock(startDate: string, today: string): MesoBlock {
   const start = Date.parse(startDate);
@@ -677,6 +758,7 @@ export function buildSession(input: {
     ? []
     : EXERCISES[input.setup.equipment][pattern].map((seed) => {
         const muscleDeload = muscleDeloads.get(seed.primaryMuscle);
+        const sets = muscleDeload?.action === 'reduce_volume' ? 1 : 2;
         const progression = progressionForExercise(
           seed.id,
           input.logs,
@@ -689,7 +771,7 @@ export function buildSession(input: {
           name: seed.name,
           primaryMuscle: seed.primaryMuscle,
           muscleContribution: seed.muscleContribution,
-          sets: muscleDeload?.action === 'reduce_volume' ? 1 : 2,
+          sets,
           repRange: REP_RANGE,
           targetReps: progression.targetReps,
           targetRir,
@@ -697,6 +779,13 @@ export function buildSession(input: {
           loadInstruction: progression.loadInstruction,
           progression: progression.action,
           evidenceIds: progression.action === 'increase_load' ? LOAD_EVIDENCE : EFFORT_EVIDENCE,
+          substitutions: eligibleSubstitutions({
+            seed,
+            equipment: input.setup.equipment,
+            pattern,
+            sets,
+            targetRir,
+          }),
         };
       });
   const reducedMuscles = MUSCLE_GROUPS.filter(
@@ -724,6 +813,9 @@ export function buildSession(input: {
         ...[...muscleDeloads.values()].flatMap((decision) => decision.evidenceIds),
       ]),
     ],
+    executionRevision: 0,
+    executionPaused: false,
+    executionEvents: [],
   };
 }
 

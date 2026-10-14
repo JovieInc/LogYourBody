@@ -39,6 +39,8 @@ final class VoiceCaptureService {
     private(set) var isRecording = false
     private(set) var isFinishing = false
     private(set) var transcriptPreview = ""
+    private(set) var inputLevel: Double = 0
+    private(set) var recordingStartedAt: Date?
 
     init(locale: Locale = .current) {
         recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer()
@@ -46,6 +48,18 @@ final class VoiceCaptureService {
 
     func start() async throws {
         guard !isRecording, !isFinishing else { return }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestMicDenied") {
+            throw VoiceCaptureError.microphoneDenied
+        }
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestSilentVoiceCapture") {
+            transcriptPreview = ""
+            inputLevel = 0
+            recordingStartedAt = Date()
+            isRecording = true
+            return
+        }
+        #endif
         try await requestPermissions()
         guard let recognizer, recognizer.isAvailable else { throw VoiceCaptureError.unavailable }
 
@@ -70,11 +84,12 @@ final class VoiceCaptureService {
         recognitionRequest.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
         request = recognitionRequest
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { [weak self] buffer, _ in
             recognitionRequest.append(buffer)
+            let level = Self.measuredLevel(buffer)
+            Task { @MainActor in self?.inputLevel = level }
         }
 
-        isRecording = true
         task = recognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             Task { @MainActor in
                 guard let self else { return }
@@ -91,6 +106,8 @@ final class VoiceCaptureService {
         audioEngine.prepare()
         do {
             try audioEngine.start()
+            isRecording = true
+            recordingStartedAt = Date()
         } catch {
             cancel()
             throw VoiceCaptureError.unavailable
@@ -98,7 +115,16 @@ final class VoiceCaptureService {
     }
 
     func finish() async throws -> String {
-        guard isRecording, let request else { throw VoiceCaptureError.interrupted }
+        guard isRecording else { throw VoiceCaptureError.interrupted }
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestSilentVoiceCapture") {
+            isRecording = false
+            inputLevel = 0
+            recordingStartedAt = nil
+            throw VoiceCaptureError.emptyTranscript
+        }
+        #endif
+        guard let request else { throw VoiceCaptureError.interrupted }
         isRecording = false
         isFinishing = true
         audioEngine.stop()
@@ -118,6 +144,8 @@ final class VoiceCaptureService {
     func cancel() {
         isRecording = false
         isFinishing = false
+        inputLevel = 0
+        recordingStartedAt = nil
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         request?.endAudio()
@@ -149,6 +177,8 @@ final class VoiceCaptureService {
         guard let finishContinuation else { return }
         self.finishContinuation = nil
         isFinishing = false
+        inputLevel = 0
+        recordingStartedAt = nil
         timeoutTask?.cancel()
         timeoutTask = nil
         let transcript = transcriptPreview.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -166,12 +196,26 @@ final class VoiceCaptureService {
         guard let finishContinuation else { return }
         self.finishContinuation = nil
         isFinishing = false
+        inputLevel = 0
+        recordingStartedAt = nil
         timeoutTask?.cancel()
         timeoutTask = nil
         request = nil
         task = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         finishContinuation.resume(throwing: error)
+    }
+
+    nonisolated private static func measuredLevel(_ buffer: AVAudioPCMBuffer) -> Double {
+        guard let samples = buffer.floatChannelData?.pointee else { return 0 }
+        let count = Int(buffer.frameLength)
+        guard count > 0 else { return 0 }
+        var total: Float = 0
+        for index in 0..<count { total += samples[index] * samples[index] }
+        let rootMeanSquare = sqrt(total / Float(count))
+        guard rootMeanSquare > 0 else { return 0 }
+        let decibels = 20 * log10(rootMeanSquare)
+        return Double(max(0, min(1, (decibels + 50) / 50)))
     }
 }
 
@@ -222,6 +266,35 @@ struct VoiceIntentResponse: Decodable {
     let missingFields: [String]?
     let proposal: VoiceSetProposal?
     let heard: VoiceHeardIntent?
+    let action: VoiceWorkoutAction?
+    let requiresConfirmation: Bool?
+}
+
+struct VoiceWorkoutAction: Decodable, Equatable {
+    let kind: String
+    let exerciseId: String?
+    let minutes: Int?
+
+    var trainingAction: TrainingWorkoutAction? {
+        switch kind {
+        case "equipment_unavailable":
+            return exerciseId.map { .equipmentUnavailable($0) }
+        case "shorten":
+            return minutes.map { .shorten($0) }
+        case "skip":
+            return exerciseId.map { .skip($0) }
+        case "pain":
+            return exerciseId.map { .pain($0) }
+        case "pause":
+            return .pause
+        case "resume":
+            return .resume
+        case "end":
+            return .end
+        default:
+            return nil
+        }
+    }
 }
 
 struct VoiceHeardIntent: Decodable, Equatable {
@@ -242,6 +315,17 @@ private struct VoiceIntentRequest: Encodable {
 private struct VoiceIntentSession: Encodable {
     let id: String
     let exercises: [VoiceIntentExercise]
+    let currentSet: VoiceSetContext?
+    let lastCompletedSet: VoiceSetContext?
+}
+
+struct VoiceSetContext: Encodable, Equatable {
+    let exerciseId: String
+    let exerciseName: String
+    let setNumber: Int
+    let reps: Int
+    let loadKg: Double?
+    let rir: Int
 }
 
 private struct VoiceIntentExercise: Encodable {
@@ -280,12 +364,16 @@ final class URLSessionVoiceService {
         transcript: String,
         accessToken: String,
         session: TrainingSession?,
-        weightUnit: String
+        weightUnit: String,
+        currentSet: VoiceSetContext? = nil,
+        lastCompletedSet: VoiceSetContext? = nil
     ) async throws -> VoiceIntentResponse {
         let context = session.map { value in
             VoiceIntentSession(
                 id: value.id,
-                exercises: value.exercises.map { VoiceIntentExercise(id: $0.id, name: $0.name) }
+                exercises: value.exercises.map { VoiceIntentExercise(id: $0.id, name: $0.name) },
+                currentSet: currentSet,
+                lastCompletedSet: lastCompletedSet
             )
         }
         let request = try makeRequest(
