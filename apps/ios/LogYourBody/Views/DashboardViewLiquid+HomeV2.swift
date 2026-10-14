@@ -76,7 +76,8 @@ extension DashboardViewLiquid {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
             onDone: { homeV2Logged = nil },
-            onUndo: { Task { await undoHomeV2Logged() } }
+            onUndo: { Task { await undoHomeV2Logged() } },
+            onProvenancePresentationChange: { isHomeV2MetricProvenancePresented = $0 }
         )
         // Chart caches refresh centrally when measurements change. Phase copy
         // must also follow edits to an existing day, not just added rows.

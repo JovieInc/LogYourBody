@@ -435,6 +435,107 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertTrue(text.filter(\.isNumber).contains("7544"))
     }
 
+
+    func testImportedRawWeightRetainsEvidenceWhenTrendIsPreferred() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let context = (0..<7).map { shareWeightMetric(weight: 80, date: start.addingTimeInterval(Double($0) * 86_400)) }
+        let flagged = shareWeightMetric(weight: 18, date: context[3].date, source: "healthkit")
+        let snapshot = ContextualMetricSnapshot.weight(
+            flagged, metrics: context + [flagged], prefersTrend: true,
+            context: (unit: "kg", observation: "Selected record", range: "30 days"),
+            formatValue: { String(format: "%.1f", $0) })
+        XCTAssertEqual(snapshot.value, "18.0")
+        XCTAssertEqual(snapshot.provenance, "Apple Health")
+        XCTAssertEqual(snapshot.evidence, HomeV2WeightQuality.reviewMessage)
+        XCTAssertFalse(snapshot.detail(options: BodyScoreShareOptions(selectedMetric: .weight)).contains("7-day"))
+        var options = BodyScoreShareOptions(selectedMetric: .weight)
+        options.includeProvenance = true
+        XCTAssertTrue(snapshot.detail(options: options).contains("Apple Health"))
+        options.includeProvenance = false
+        XCTAssertFalse(snapshot.detail(options: options).contains("Apple Health"))
+        XCTAssertTrue(snapshot.detail(options: options).contains(HomeV2WeightQuality.reviewMessage))
+    }
+
+    func testInvalidWeightCannotBecomeAnAvailableShareValue() {
+        for invalid in [Double.nan, .infinity, -5, 0] {
+            let metric = shareWeightMetric(weight: invalid, date: Date(timeIntervalSince1970: 1_700_000_000))
+            let snapshot = ContextualMetricSnapshot.weight(
+                metric, metrics: [metric], prefersTrend: true,
+                context: (unit: "kg", observation: "Selected record", range: "30 days"),
+                formatValue: { String(format: "%.1f", $0) })
+            XCTAssertFalse(snapshot.isAvailable)
+            XCTAssertNil(BodyScoreSharePayload.contextual([snapshot], selected: .weight))
+        }
+    }
+
+    func testRecordedWeightDoesNotAcquireSmoothedEvidenceFromPreference() {
+        let metric = shareWeightMetric(weight: 82, date: Date(timeIntervalSince1970: 1_700_000_000))
+        let snapshot = ContextualMetricSnapshot.weight(
+            metric, metrics: [metric], prefersTrend: true,
+            context: (unit: "kg", observation: "Selected record", range: "30 days"),
+            formatValue: { String(format: "%.1f", $0) })
+        XCTAssertEqual(snapshot.value, "82.0")
+        XCTAssertNil(snapshot.evidence)
+        XCTAssertEqual(snapshot.provenance, HomeV2ContextCopy.typed)
+    }
+
+    func testPhotoOnlyWeightFallbackLabelsDerivedValueWithoutBorrowingPhotoSource() {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let context = (0..<7).map { shareWeightMetric(weight: 80, date: start.addingTimeInterval(Double($0) * 86_400)) }
+        let photo = shareWeightMetric(weight: nil, date: context[3].date, source: "photo")
+        let snapshot = ContextualMetricSnapshot.weight(
+            photo, metrics: context + [photo], prefersTrend: false,
+            context: (unit: "kg", observation: "Selected photo", range: "30 days"),
+            formatValue: { String(format: "%.1f", $0) })
+        XCTAssertEqual(snapshot.value, "80.0")
+        XCTAssertEqual(snapshot.evidence, "Smoothed")
+        XCTAssertNil(snapshot.provenance)
+    }
+
+    func testProgressSelectedDailyValueKeepsItsHistoricalSource() throws {
+        let first = Date(timeIntervalSince1970: 1_700_000_000)
+        let earlier = MetricChartDataPoint(date: first, value: 75, presence: .present)
+        let latest = MetricChartDataPoint(date: first.addingTimeInterval(86_400), value: 80, presence: .present)
+        let focus = HomeV2ChartIntegrity.Sample(date: first, value: 75)
+        let selected = try XCTUnwrap(ContextualMetricProgressPolicy.selection(points: [earlier, latest], focus: focus))
+        let entries = [
+            MetricHistoryEntry(id: "earlier", date: earlier.date, primaryValue: 75, secondaryValue: nil, source: .healthKit),
+            MetricHistoryEntry(id: "latest", date: latest.date, primaryValue: 80, secondaryValue: nil, source: .manual)
+        ]
+        XCTAssertEqual(selected.point.value, 75)
+        XCTAssertEqual(selected.point.date, first)
+        XCTAssertFalse(selected.isSmoothed)
+        XCTAssertEqual(selected.source(entries: entries), "Apple Health")
+        XCTAssertNil(selected.source(entries: []))
+    }
+
+    func testProgressAverageFocusKeepsActualAverageAndRejectsStaleRange() throws {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let raw = MetricChartDataPoint(date: date, value: 82, presence: .present)
+        let average = MetricChartDataPoint(date: date, value: 81, presence: .present)
+        let focus = HomeV2ChartIntegrity.Sample(date: date, value: 81, kind: .sevenDayAverage)
+        let selected = try XCTUnwrap(ContextualMetricProgressPolicy.selection(
+            points: [raw], averages: [average], focus: focus))
+        XCTAssertEqual(selected.point.value, 81)
+        XCTAssertTrue(selected.isSmoothed)
+        let misleadingSource = MetricHistoryEntry(
+            id: "same-number", date: date, primaryValue: 81, secondaryValue: nil, source: .healthKit)
+        XCTAssertNil(selected.source(entries: [misleadingSource]))
+        XCTAssertNil(ContextualMetricProgressPolicy.selection(points: [raw], averages: [], focus: focus))
+        XCTAssertNil(ContextualMetricProgressPolicy.selection(points: [], focus: .init(date: date, value: 82)))
+        let latest = try XCTUnwrap(ContextualMetricProgressPolicy.selection(points: [raw], focus: nil))
+        XCTAssertEqual(latest.point.value, 82)
+        XCTAssertFalse(latest.isSmoothed)
+    }
+
+    private func shareWeightMetric(weight: Double?, date: Date, source: String = "manual") -> BodyMetrics {
+        BodyMetrics(
+            id: UUID().uuidString, userId: "synthetic-share-fixture", date: date,
+            weight: weight, weightUnit: "kg", bodyFatPercentage: nil, bodyFatMethod: nil,
+            muscleMass: nil, boneMass: nil, notes: nil, photoUrl: nil, dataSource: source,
+            createdAt: date, updatedAt: date)
+    }
+
     private func recognizedShareText(_ image: UIImage) throws -> String {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate

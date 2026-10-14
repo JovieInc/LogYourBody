@@ -47,12 +47,58 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
              range: range, trend: nil, provenance: daily == nil ? nil : "Apple Health")
     }
 
+    /// Match the canonical measured-first headline, including its raw flagged fallback.
+    static func weight(
+        _ metric: BodyMetrics?, metrics: [BodyMetrics], prefersTrend: Bool,
+        context: (unit: String, observation: String, range: String), formatValue: (Double) -> String
+    ) -> Self {
+        let derived = metric.flatMap { HomeV2WeightQuality.trendWeight(for: $0, in: metrics) }
+        let kilograms = TimelineWeightHeadlinePolicy.kilograms(
+            measuredWeight: metric?.weight, trendWeight: derived, prefersTrend: prefersTrend
+        ).flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        let usesDerivedValue = metric?.weight == nil && kilograms != nil
+        let needsReview = metric?.weight != nil && !HomeV2WeightQuality.isWithinSupportedLoggingRange(metric?.weight)
+        return Self(
+            kind: .weight, value: kilograms.map(formatValue) ?? "—", unit: context.unit,
+            observation: context.observation, range: context.range, trend: nil,
+            provenance: usesDerivedValue ? nil : metric.map { HomeV2Provenance.label(for: $0) },
+            evidence: needsReview ? HomeV2WeightQuality.reviewMessage
+                : ContextualMetricEvidencePolicy.label(for: .weight, isEstimated: usesDerivedValue, isSmoothed: usesDerivedValue)
+        )
+    }
+
     func detail(options: BodyScoreShareOptions) -> String {
         [evidence, options.includeObservation ? observation : nil,
          options.includeRange ? range : nil,
          options.includeTrend ? trend : nil,
          options.includeProvenance ? provenance : nil]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+}
+
+enum ContextualMetricProgressPolicy {
+    struct Selection {
+        let point: MetricChartDataPoint
+        let isSmoothed: Bool
+
+        func source(entries: [MetricHistoryEntry]) -> String? {
+            isSmoothed ? nil : ContextualMetricSourcePolicy.source(for: point, entries: entries, fallback: nil)
+        }
+    }
+
+    static func selection(
+        points: [MetricChartDataPoint], averages: [MetricChartDataPoint] = [],
+        focus: HomeV2ChartIntegrity.Sample?
+    ) -> Selection? {
+        if let focus {
+            let candidates = focus.kind == .daily ? points : averages
+            guard let point = candidates.first(where: {
+                $0.date == focus.date && abs($0.value - focus.value) < 0.0001
+            }) else { return nil }
+            return Selection(point: point, isSmoothed: focus.kind == .sevenDayAverage)
+        }
+        return HomeV2MetricEditorial.observedPoints(points).max { $0.date < $1.date }
+            .map { Selection(point: $0, isSmoothed: false) }
     }
 }
 

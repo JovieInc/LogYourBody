@@ -31,6 +31,9 @@ struct HomeV2Surface: View {
     var onConnectHealth: () -> Void = {}
     let onDone: () -> Void
     let onUndo: () -> Void
+    var onProvenancePresentationChange: (Bool) -> Void = { _ in }
+
+    @State private var showsProvenance = false
 
     private var isLogged: Bool { loggedSentence != nil }
     private var isHealthOff: Bool { systemState == .healthOff }
@@ -69,6 +72,14 @@ struct HomeV2Surface: View {
             actionDock
                 .background(HomeV2Tokens.Colors.shell)
         }
+        .sheet(isPresented: $showsProvenance) {
+            if let detail = HomeV2MetricEditorial.timelineProvenance(for: metric) {
+                HomeV2ProvenanceSheet(detail: detail)
+            }
+        }
+        .onChange(of: metric.id) { _, _ in showsProvenance = false }
+        .onChange(of: showsProvenance) { _, presented in onProvenancePresentationChange(presented) }
+        .onDisappear { onProvenancePresentationChange(false) }
     }
 
     @ViewBuilder
@@ -137,11 +148,13 @@ struct HomeV2Surface: View {
 
     private var photoNumberBlock: some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-            Group {
-                Text(HomeV2Copy.dayCaption(date: dateText(metric), source: HomeV2Provenance.subline(for: metric)))
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .accessibilityIdentifier("home_v2_photo_caption")
+            Text(dateText(metric))
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .accessibilityIdentifier("home_v2_photo_caption")
+
+            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
+                HomeV2ProvenanceChip(detail: provenance) { showsProvenance = true }
             }
 
             if !hasSingleWeightHero {
@@ -164,12 +177,6 @@ struct HomeV2Surface: View {
 
             if hasPhoto {
                 compositionLine
-            } else if HomeV2EditorialPolicy.bodyFat(in: metric) == nil {
-                Text("Body fat not logged for this day.")
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("home_v2_composition_sentence")
             }
 
             if isLogged || !hasPhoto {
@@ -178,6 +185,12 @@ struct HomeV2Surface: View {
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
+        .sheet(isPresented: $showsProvenance) {
+            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
+                HomeV2ProvenanceSheet(detail: provenance)
+            }
+        }
+        .onChange(of: metric.id) { _, _ in showsProvenance = false }
     }
 
     private func numberRow(size: CGFloat, weight: Font.Weight, kerning: CGFloat) -> some View {
@@ -197,11 +210,19 @@ struct HomeV2Surface: View {
     }
 
     private var compositionLine: some View {
-        Text(HomeV2TimelinePolicy.bodyFatSentence(for: metric))
+        Text(visibleComposition)
             .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
             .foregroundStyle(HomeV2Tokens.Colors.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("home_v2_composition_sentence")
+    }
+
+    /// The missing-day sentence stays exact. A recorded percentage names no second source.
+    private var visibleComposition: String {
+        guard let reading = HomeV2EditorialPolicy.bodyFat(in: metric) else {
+            return HomeV2TimelinePolicy.bodyFatSentence(for: metric)
+        }
+        return HomeV2MetricEditorial.compositionLine(percentage: reading.percentage)
     }
 
     private var todayDetailsRow: some View {
@@ -315,7 +336,11 @@ struct HomeV2DataHero: View {
                         .rotationEffect(.degrees(-90))
                     VStack(spacing: HomeV2Tokens.Space.tight) {
                         Text(String(format: "%.1f%%", reading.percentage))
-                            .scaledSystemFont(size: 60, weight: .semibold, relativeTo: .largeTitle)
+                            .scaledSystemFont(
+                                size: HomeV2Tokens.TypeSize.progressValue,
+                                weight: .semibold,
+                                relativeTo: .largeTitle
+                            )
                             .minimumScaleFactor(0.5)
                             .lineLimit(1)
                             .foregroundStyle(HomeV2Tokens.Colors.ink)
@@ -329,11 +354,6 @@ struct HomeV2DataHero: View {
                 .frame(width: diameter, height: diameter)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            Text(reading.caption)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .multilineTextAlignment(.center)
         }
         .padding(44)
         .accessibilityElement(children: .ignore)
@@ -349,39 +369,34 @@ struct HomeV2DataHero: View {
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
             if weights.count > 1 {
-                Chart(weights) { point in
-                    PointMark(x: .value("Date", point.date), y: .value("Weight", displayWeight(point.kilograms)))
-                        .symbolSize(35)
-                        .foregroundStyle(HomeV2Tokens.Metric.weight)
-                }
-                .chartXAxis {
-                    AxisMarks(values: axisDates) { value in
-                        if let date = value.as(Date.self) {
-                            AxisValueLabel(anchor: value.index == 0 ? .topLeading : .topTrailing) {
-                                Text(chartAxisLabel(for: date, granularity: labelGranularity))
-                            }
-                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                        }
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) {
-                        AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
-                    }
-                }
-                .chartYScale(domain: .automatic(includesZero: false))
-                .accessibilityHidden(true)
+                HomeV2TrendChart(
+                    daily: weightPoints,
+                    trend: [],
+                    accent: HomeV2Tokens.Metric.weight,
+                    range: .constant(.month1),
+                    showsRangeTabs: false,
+                    showsDots: true,
+                    chartHeight: HomeV2Tokens.chartHeight,
+                    axis: .months,
+                    axisDates: axisDates,
+                    formatAxisDate: { chartAxisLabel(for: $0, granularity: labelGranularity) },
+                    metricTitle: "Weight",
+                    usesSevenDayAverage: false,
+                    anchorsToZero: false,
+                    requiresMinimumDays: false,
+                    plotIdentifier: "home_v2_weight_plot",
+                    allowsSelection: false,
+                    now: metric?.date ?? Date()
+                )
             } else if let reading = weights.first {
-                VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-                    Text(String(format: "%.1f", displayWeight(reading.kilograms)))
-                        .scaledSystemFont(size: 72, weight: .semibold, relativeTo: .largeTitle)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                        .accessibilityIdentifier("home_v2_weight_value")
-                    Text(unit)
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
-                }
-                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                HomeV2MetricHero(
+                    value: String(format: "%.1f", displayWeight(reading.kilograms)),
+                    unit: unit,
+                    comparison: "",
+                    valueIdentifier: "home_v2_weight_value",
+                    valueSize: HomeV2Tokens.TypeSize.progressValue,
+                    showsComparison: false
+                )
                 .frame(maxHeight: .infinity, alignment: .center)
             }
             Text("\(weights.count) weight \(weights.count == 1 ? "entry" : "entries") today · \(unit)")
@@ -451,6 +466,16 @@ struct HomeV2DataHero: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(HomeV2Tokens.Space.margin)
+    }
+
+    private var weightPoints: [MetricChartDataPoint] {
+        weights.map { reading in
+            MetricChartDataPoint(
+                date: reading.date,
+                value: displayWeight(reading.kilograms),
+                presence: .present
+            )
+        }
     }
 
     private func displayWeight(_ kilograms: Double) -> Double {

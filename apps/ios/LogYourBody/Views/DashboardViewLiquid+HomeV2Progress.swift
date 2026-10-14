@@ -49,9 +49,10 @@ extension DashboardViewLiquid {
                 unit: homeV2DisplayUnit,
                 deltaUnit: homeV2DisplayUnit,
                 target: weightGoal.map { convertWeight($0, to: system) ?? $0 },
-                sourceLine: nil,
+                provenance: HomeV2MetricEditorial.progressProvenance(metric: .weight, bodyFatSource: nil),
                 insightTitle: title,
-                insightBody: [insight.message, insight.detail].compactMap { $0 }.joined(separator: " ")
+                insightBody: [insight.message, insight.detail].compactMap { $0 }.joined(separator: " "),
+                shareEntries: cachedMetricEntries(for: .weight)?.entries ?? []
             )
         case .bodyFat:
             let latestSource = bodyMetrics
@@ -64,9 +65,10 @@ extension DashboardViewLiquid {
                 unit: "%",
                 deltaUnit: "points",
                 target: bodyFatGoal,
-                sourceLine: latestSource.map { HomeV2ProgressCopy.estimatedBy($0) },
-                insightTitle: HomeV2ProgressCopy.bodyFatInsightTitle,
-                insightBody: HomeV2ProgressCopy.bodyFatInsightBody
+                provenance: HomeV2MetricEditorial.progressProvenance(metric: .bodyFat, bodyFatSource: latestSource),
+                insightTitle: nil,
+                insightBody: nil,
+                shareEntries: cachedMetricEntries(for: .bodyFat)?.entries ?? []
             )
         case .ffmi:
             return HomeV2ProgressSeries(
@@ -75,20 +77,21 @@ extension DashboardViewLiquid {
                 unit: "",
                 deltaUnit: "",
                 target: ffmiGoal,
-                sourceLine: HomeV2ProgressCopy.ffmiSource,
-                insightTitle: HomeV2ProgressCopy.ffmiInsightTitle,
-                insightBody: HomeV2ProgressCopy.ffmiInsightBody
+                provenance: HomeV2MetricEditorial.progressProvenance(metric: .ffmi, bodyFatSource: nil),
+                insightTitle: nil,
+                insightBody: nil
             )
         case .steps:
             return HomeV2ProgressSeries(
                 daily: fullChartCache[.steps] ?? [],
                 trend: [],
-                unit: "",
+                unit: HomeV2MetricEditorial.stepsDisplayUnit,
                 deltaUnit: "",
                 target: Double(stepGoal),
-                sourceLine: HomeV2ProgressCopy.stepsSource,
-                insightTitle: HomeV2ProgressCopy.stepsInsightTitle,
-                insightBody: HomeV2ProgressCopy.stepsInsightBody
+                provenance: HomeV2MetricEditorial.progressProvenance(metric: .steps, bodyFatSource: nil),
+                insightTitle: nil,
+                insightBody: nil,
+                shareEntries: cachedMetricEntries(for: .steps)?.entries ?? []
             )
         }
     }

@@ -2334,6 +2334,7 @@ final class LogYourBodyUITests: XCTestCase {
             sharedMetrics.insert(identifier)
         }
         XCTAssertTrue(Set(["steps", "weight"]).isSubset(of: sharedMetrics), "Fixture must exercise Steps and Weight")
+        assertProgressProvenanceCoversShare(in: app)
     }
 
     func testDefaultHomeHeaderSwipesOpenProgressReturnHomeAndOpenSidebar() throws {
@@ -2430,6 +2431,19 @@ final class LogYourBodyUITests: XCTestCase {
             XCTAssertTrue(log.waitForExistence(timeout: 8))
             app.terminate()
         }
+    }
+
+    private func assertProgressProvenanceCoversShare(in app: XCUIApplication) {
+        app.buttons["home_v2_progress_tab_ffmi"].tap()
+        let chip = app.buttons["home_v2_provenance_chip"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "The derived FFMI fixture exposes its provenance")
+        chip.tap()
+        let detail = app.descendants(matching: .any)["home_v2_provenance_detail"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["home_v2_progress_share"].isHittable, "The underlying Share action is covered")
+        app.buttons["home_v2_provenance_done"].tap()
+        XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["home_v2_progress_share"].isHittable)
     }
 
     func testHomeV2ProgressIsOneMetricWorkspace() throws {

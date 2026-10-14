@@ -225,7 +225,7 @@ extension DashboardViewLiquid {
     var isMetricShareContextVisible: Bool {
         !showAddEntrySheet && !showSyncDetails && !isProgressPhotoAttachPresented
             && !isPhotoTimelineSettingsPresented && !isHomeV2ViewerPresented
-            && !isHomeV2ContextPresented && !isHomeV2EntriesPresented
+            && !isHomeV2ContextPresented && !isHomeV2EntriesPresented && !isHomeV2MetricProvenancePresented
             && !isHomeV2SettingsPresented && !isHomeV2HelpPresented && !isHomeV2AllPhotosPresented
             && !isShowingPhotoTimelineMenu && homeV2EditingMetric == nil && !showsHomeV2UndoError
             && bodyScoreSharePayload == nil && !isHomeChatExpanded
@@ -237,12 +237,13 @@ extension DashboardViewLiquid {
         let range = selectedRange.accessibilityLabel
         var snapshots = [
             ContextualMetricSnapshot.steps(dailyMetrics, value: formatSteps(dailyMetrics?.steps), range: range),
-            ContextualMetricSnapshot(
-                kind: .weight,
-                value: currentMetric.map { formatTrendWeightHeadline($0, usesTrend: weightUsesTrend) } ?? "—",
-                unit: weightUnit, observation: date, range: range,
-                trend: nil, provenance: weightUsesTrend ? nil : source,
-                evidence: ContextualMetricEvidencePolicy.label(for: .weight, isSmoothed: weightUsesTrend)),
+            ContextualMetricSnapshot.weight(
+                currentMetric, metrics: bodyMetrics, prefersTrend: weightUsesTrend,
+                context: (unit: weightUnit, observation: date, range: range),
+                formatValue: { kilograms in
+                    let value = convertWeight(kilograms, to: currentMeasurementSystem) ?? kilograms
+                    return String(format: "%.1f", value)
+                }),
             ContextualMetricSnapshot(
                 kind: .bodyFat,
                 value: currentMetric.flatMap { formatBodyFatValue($0.bodyFatPercentage) } ?? "—",

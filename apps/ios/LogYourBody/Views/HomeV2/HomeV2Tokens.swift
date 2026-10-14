@@ -19,7 +19,7 @@ enum HomeV2Tokens {
     enum TypeSize {
         static let heroPhoto: CGFloat = 38
         static let heroMetricFirst: CGFloat = 84
-        static let progressValue: CGFloat = 72
+        static let progressValue: CGFloat = 40
         static let lead: CGFloat = 18
         static let sheetValue: CGFloat = 60
         static let sheetTitle: CGFloat = 22
