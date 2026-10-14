@@ -41,6 +41,11 @@ final class TrainingSessionDraftTests: XCTestCase {
         TrainingSessionDraft(session: session(), ownerId: owner, store: store, isCurrent: { true })
     }
 
+    func testCompletionMotionBecomesImmediateWhenReduceMotionIsEnabled() {
+        XCTAssertTrue(TrainingCompletionMotionPolicy.shouldAnimate(reduceMotion: false))
+        XCTAssertFalse(TrainingCompletionMotionPolicy.shouldAnimate(reduceMotion: true))
+    }
+
     func testRawEditsSurviveFileReconstructionWithoutSubmitting() throws {
         let directory = root()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -429,5 +434,88 @@ final class TrainingSessionDraftTests: XCTestCase {
             send: { sentToken = $0 }
         )
         XCTAssertEqual(sentToken, "fixture-rotated-token")
+    }
+
+    func testNowAndUpNextAdvanceOnlyAfterDurableAcknowledgementAndResumeWithoutReplayAnimation() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        XCTAssertEqual(draft.currentPosition?.id, "fixture_press-1")
+        XCTAssertEqual(draft.upNextPosition?.id, "fixture_press-2")
+
+        let held = TrainingHeldResponse()
+        let started = expectation(description: "Save reached transport")
+        let operation = Task {
+            await draft.save(exercise, setNumber: 1) { _ in
+                started.fulfill()
+                await held.wait()
+            }
+        }
+        await fulfillment(of: [started], timeout: 3)
+        XCTAssertEqual(draft.currentPosition?.id, "fixture_press-1", "UI must not advance before ACK")
+        XCTAssertNil(draft.lastSaveReceipt)
+        held.release()
+        await operation.value
+        XCTAssertEqual(draft.currentPosition?.id, "fixture_press-2")
+        XCTAssertEqual(draft.lastSaveReceipt?.position.id, "fixture_press-1")
+
+        let saved = try XCTUnwrap(draft.loggedSets["fixture_press-1"])
+        let restored = TrainingSessionDraft(
+            session: session(saved: [saved]), ownerId: "owner-A", store: store, isCurrent: { true }
+        )
+        XCTAssertEqual(restored.currentPosition?.id, "fixture_press-2")
+        XCTAssertNil(restored.lastSaveReceipt, "Relaunch must not replay earned completion motion")
+    }
+
+    func testCorrectionKeepsIdentityAndRetriesExactAuditRequestAfterInterruption() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let original = TrainingSavedSet(
+            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1,
+            reps: 10, loadKg: 60, rir: 3, revision: 0, corrections: []
+        )
+        let draft = TrainingSessionDraft(
+            session: session(saved: [original]), ownerId: "owner-A", store: store, isCurrent: { true }
+        )
+        let position = try XCTUnwrap(draft.lastCompletedPosition)
+        draft.beginCorrection(position)
+        draft.update(exercise, setNumber: 1) { $0.repsText = "9"; $0.rir = 1 }
+        var attempts: [TrainingSetCorrectionRequest] = []
+        await draft.correct(position) { request in
+            attempts.append(request)
+            throw URLError(.networkConnectionLost)
+        }
+        XCTAssertEqual(draft.loggedSets[position.id], original)
+        XCTAssertNotNil(draft.rows[position.id]?.pendingCorrection)
+
+        let restored = TrainingSessionDraft(
+            session: session(saved: [original]), ownerId: "owner-A", store: store, isCurrent: { true }
+        )
+        await restored.correct(position) { request in
+            attempts.append(request)
+            return TrainingSavedSet(
+                sessionId: request.sessionId,
+                exerciseId: request.exerciseId,
+                setNumber: request.setNumber,
+                reps: request.reps,
+                loadKg: request.loadKg,
+                rir: request.rir,
+                revision: request.expectedRevision + 1,
+                corrections: [
+                    TrainingSetCorrectionAudit(
+                        id: request.correctionId,
+                        correctedAt: "2026-10-12T00:00:00.000Z",
+                        previous: .init(reps: 10, loadKg: 60, rir: 3)
+                    )
+                ]
+            )
+        }
+        XCTAssertEqual(attempts.count, 2)
+        XCTAssertEqual(attempts[0], attempts[1])
+        XCTAssertEqual(restored.loggedSets[position.id]?.reps, 9)
+        XCTAssertEqual(restored.loggedSets[position.id]?.revision, 1)
+        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: "fixture-session").isEmpty)
     }
 }
