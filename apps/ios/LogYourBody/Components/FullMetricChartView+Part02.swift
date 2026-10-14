@@ -332,8 +332,8 @@ var headlineValueText: String {
     }
 
 var headlineDateText: String {
-        if let point = selectedFocusPoint {
-            return point.date.formatted(.dateTime.month().day().year())
+        if let point = validatedActivePoint {
+            return point.date.formatted(date: .abbreviated, time: isStepsMetric ? .omitted : .shortened)
         }
         return currentDate
     }
