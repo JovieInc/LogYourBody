@@ -1560,10 +1560,12 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 5), "Critical chat prompt must be available")
         XCTAssertTrue(prompt.isHittable, "Critical chat prompt must be tappable")
         prompt.tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8),
-            "Critical chat prompt must open the chat root"
-        )
+        let openedChatRoot = app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8)
+        // Diagnostic only: the app's send/load trail if the tap did not open chat.
+        let sendProbe = openedChatRoot
+            ? ""
+            : String(describing: app.descendants(matching: .any)["home_chat_composer_dock"].value ?? "unavailable")
+        XCTAssertTrue(openedChatRoot, "Critical chat prompt must open the chat root (send probe: \(sendProbe))")
         attachScreenshot(named: "launch-quality-chat-tab", from: app)
         collapseHomeChat(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
@@ -2682,6 +2684,42 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-ask", from: app)
     }
 
+    func testDailyReminderIsOfferedAfterTheFirstLoggedWeighInNotBeforeToday() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestDailyReminderPromptFixture"
+        ])
+
+        // Home's dock appears once the fixture has seeded.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 45),
+            "A new subscriber lands on Today"
+        )
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].exists, "No reminder ask before Today")
+
+        logWeight.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 10),
+            "The first logged weigh-in is when a reminder has a job"
+        )
+        attachScreenshot(named: "daily-reminder-after-first-weigh-in", from: app)
+        let notNow = app.buttons["daily_reminder_skip_button"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 3))
+        notNow.tap()
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].waitForExistence(timeout: 5))
+    }
+
     func testHomeV2AskOpensFromProgressAndReturnsToProgress() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
@@ -2724,24 +2762,18 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 30),
-            "Without a photo the Home is metric first"
-        )
+        let card = app.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 30), "Without a photo, saved data fills the same editorial card")
+        let bodyFat = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+        XCTAssertTrue(bodyFat.exists)
+        XCTAssertTrue(bodyFat.label.contains("15.8 percent"))
         let value = app.descendants(matching: .any)["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
-
-        let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
-        XCTAssertTrue(chart.waitForExistence(timeout: 5), "Metric-first Home keeps the trend chart geometry even before 7 days")
-        XCTAssertGreaterThanOrEqual(chart.frame.minY, value.frame.maxY - 1, "The chart sits below the number")
-        XCTAssertTrue(
-            chart.label.contains("7 days") || chart.label.contains("7-day average"),
-            "The chart says whether it is a trend or still waiting for 7 days"
-        )
-        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Home keeps a fixed 30-day window; ranges live in Progress")
+        XCTAssertGreaterThanOrEqual(value.frame.minY, card.frame.maxY - 1, "Supporting weight sits below the card")
+        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Date ranges live in Progress")
         let viewProgress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 5), "Progress is one disclosure away")
-        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, chart.frame.maxY - 1)
+        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, value.frame.maxY - 1)
 
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")
@@ -3009,9 +3041,21 @@ final class LogYourBodyUITests: XCTestCase {
 
         let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
         let shareCard = app.descendants(matching: .any)["body_score_share_card"]
-        XCTAssertTrue(
-            app.descendants(matching: .any)["world_class_screen_shareBodyScore"].waitForExistence(timeout: 8)
-        )
+        let shareScreen = app.descendants(matching: .any)["world_class_screen_shareBodyScore"]
+        var shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
+        if !shareScreenVisible {
+            // A tap synthesized while the timeline stage re-lays out can land on
+            // a stale accessibility element; re-resolve and tap once before failing.
+            let retryShareButton = app.descendants(matching: .any)["body_score_hero_share_button"].firstMatch
+            if retryShareButton.exists {
+                scrollUntilHittable(retryShareButton, in: app)
+                if retryShareButton.isHittable {
+                    retryShareButton.tap()
+                    shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
+                }
+            }
+        }
+        XCTAssertTrue(shareScreenVisible)
         // Sheet identifier is preferred; card must remain discoverable for launch quality.
         let sheetVisible = shareSheet.waitForExistence(timeout: 8)
         let cardVisible = shareCard.waitForExistence(timeout: sheetVisible ? 4 : 8)
@@ -3061,6 +3105,92 @@ final class LogYourBodyUITests: XCTestCase {
             shareButton.waitForExistence(timeout: 5),
             "Home share control must return after dismissing share sheet"
         )
+    }
+
+    func testRecoveryEmailKeyboardDoneMeetsMinimumHitTarget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestRecoveryEmailPath",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        app.tap()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        app.buttons["body_score_onboarding_basics_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        app.buttons["CM"].tap()
+        let heightField = app.textFields["Height in centimeters"]
+        XCTAssertTrue(heightField.waitForExistence(timeout: 5))
+        heightField.tap()
+        heightField.typeText("178")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_height_continue_button"].tap()
+
+        let manual = app.buttons["body_score_onboarding_enter_manually_button"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 8))
+        manual.tap()
+        XCTAssertTrue(app.staticTexts["What’s your current weight?"].waitForExistence(timeout: 8))
+        app.buttons["LBS"].tap()
+        let weightField = app.textFields["Weight (lbs)"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        weightField.typeText("182")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_manual_weight_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How do you know your body fat?"].waitForExistence(timeout: 8))
+        app.buttons["body_score_onboarding_body_fat_manual_button"].tap()
+        XCTAssertTrue(app.staticTexts["Enter your body fat."].waitForExistence(timeout: 8))
+        let bodyFatField = app.textFields["Body fat percentage"]
+        XCTAssertTrue(bodyFatField.waitForExistence(timeout: 5))
+        bodyFatField.tap()
+        bodyFatField.typeText("18")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_body_fat_numeric_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs muscle."].waitForExistence(timeout: 15))
+        app.buttons["body_score_reveal_continue_button"].tap()
+        XCTAssertTrue(app.staticTexts["Add a recovery email."].waitForExistence(timeout: 8))
+
+        let emailField = app.textFields["you@domain.com"]
+        XCTAssertTrue(emailField.waitForExistence(timeout: 5))
+        emailField.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5))
+
+        let window = app.windows.firstMatch.frame
+        let done = app.buttons.matching(identifier: "body_score_email_keyboard_done_button").firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(done.frame), "email Done \(done.frame) window \(window)")
+        XCTAssertGreaterThanOrEqual(done.frame.width, 44, "email Done \(done.frame)")
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, "email Done \(done.frame)")
+
+        let labeledDones = app.buttons.matching(NSPredicate(format: "label == 'Done'"))
+        for index in 0..<labeledDones.count {
+            let control = labeledDones.element(boundBy: index)
+            guard control.exists, control.frame.width > 1, control.frame.height > 1 else { continue }
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "email Done \(control.frame)")
+        }
+
+        done.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Add a recovery email."].exists)
     }
 
     private func assertAndCaptureTimelineAnalytics(in app: XCUIApplication) throws {

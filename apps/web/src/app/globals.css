@@ -45,7 +45,7 @@
     --accent: 240 2% 12%; /* Linear hover state #1F2023 */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 352.8 90.4% 51.2%; /* Canonical error #F3122D */
+    --destructive: 354.5 100% 63.5%; /* Canonical error #FF4556 */
     --destructive-foreground: 0 0% 100%;
 
     --border: 240 2.3% 16.9%; /* Canonical border #2A2A2C */
@@ -109,7 +109,7 @@
     --accent: 240 2% 12%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 352.8 90.4% 51.2%; /* Canonical error #F3122D */
+    --destructive: 354.5 100% 63.5%; /* Canonical error #FF4556 */
     --destructive-foreground: 0 0% 100%;
 
     --border: 240 2.3% 16.9%; /* Canonical border #2A2A2C */

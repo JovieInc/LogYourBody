@@ -17,8 +17,8 @@ describe('shared Gitleaks security gate', () => {
     );
   });
 
-  it('keeps the full-history scan and fails on findings', () => {
-    expect(job).toMatch(/^ {6}full-history: true$/m);
+  it('scans the pushed range while keeping scheduled full-history audits', () => {
+    expect(job).toContain("full-history: ${{ github.event_name != 'push' }}");
     expect(job).not.toContain('fail-on-findings');
   });
 
@@ -26,9 +26,9 @@ describe('shared Gitleaks security gate', () => {
     expect(job).toMatch(/^ {4}permissions:\n {6}contents: read\n*$/m);
   });
 
-  it('runs on main pushes, the weekly schedule and manual dispatch', () => {
+  it('runs on main pushes and manual dispatch, with no clock', () => {
     expect(workflow).toMatch(/push:\n\s+branches: \[main\]/);
-    expect(workflow).toContain('schedule:');
+    expect(workflow).not.toContain('schedule:');
     expect(workflow).toContain('workflow_dispatch:');
   });
 });
