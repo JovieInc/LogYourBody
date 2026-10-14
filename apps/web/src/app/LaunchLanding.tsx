@@ -45,8 +45,8 @@ function PrimaryAction({ id }: { id: string }) {
   );
 }
 
-export function LaunchLanding() {
-  if (LANDING_FLAGS.ART_DIRECTION_V2_ENABLED) {
+export function LaunchLanding({ editorialEnabled = false }: { editorialEnabled?: boolean } = {}) {
+  if (editorialEnabled) {
     return <EditorialLanding appStoreLive={LANDING_FLAGS.APP_STORE_LIVE} />;
   }
 

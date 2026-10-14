@@ -18,8 +18,8 @@ describe('EditorialLanding', () => {
     jest.clearAllMocks();
   });
 
-  it('routes the existing art-direction gate to a product-led homepage with one signup form', () => {
-    const { container } = render(<LaunchLanding />);
+  it('renders an enabled server decision as a product-led homepage with one signup form', () => {
+    const { container } = render(<LaunchLanding editorialEnabled />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       logYourBody.messages.landing.headline,
     );
