@@ -300,7 +300,7 @@ export default function ChangelogPage() {
       {/* Hero Header */}
       <div className="relative">
         <div className="from-linear-purple/5 via-linear-bg to-linear-bg absolute inset-0 bg-gradient-to-br" />
-        <div className="container relative mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
+        <div className="relative container mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
           <div className="max-w-3xl">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-3">
               <div className="bg-linear-purple/10 flex h-12 w-12 items-center justify-center rounded-lg">
@@ -378,7 +378,7 @@ export default function ChangelogPage() {
               <div key={commit.sha} className="relative">
                 {/* Timeline line */}
                 {!isLastItem && (
-                  <div className="bg-linear-border absolute bottom-0 left-5 top-12 w-px" />
+                  <div className="bg-linear-border absolute top-12 bottom-0 left-5 w-px" />
                 )}
 
                 <div className="flex gap-4">
@@ -419,7 +419,7 @@ export default function ChangelogPage() {
                               {getShortSha(commit.sha)}
                             </code>
                           </div>
-                          <h3 className="text-linear-text mb-2 break-words text-lg font-semibold">
+                          <h3 className="text-linear-text mb-2 text-lg font-semibold break-words">
                             {title}
                           </h3>
                         </div>
