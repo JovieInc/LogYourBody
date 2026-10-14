@@ -605,10 +605,13 @@ struct MesocycleCanvasContainer: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Review before saving").font(.system(size: 15, weight: .semibold))
             ForEach(changes) { change in
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: theme.spacing.xs) {
                     Text(changeLabel(change)).font(.system(size: 14))
                     if change.kind == "updated" {
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
+                        LazyVGrid(
+                            columns: Array(repeating: GridItem(.flexible(), spacing: theme.spacing.xs), count: 4),
+                            spacing: theme.spacing.xs
+                        ) {
                             ForEach(1...8, id: \.self) { value in
                                 Button("\(value)") { Task { await model.amend(instanceId: change.instanceId, sets: value) } }
                                     .frame(minHeight: 44)
