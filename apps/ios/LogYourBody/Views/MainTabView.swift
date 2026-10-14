@@ -853,14 +853,10 @@ struct ChatTabView: View {
                             )
                         )
                     },
-                    onFeedback: { soreness, pump, performance, jointPain in
+                    onFeedback: { request in
                         try await recordTrainingFeedback(
                             ownership: ownership,
-                            sessionId: session.id,
-                            soreness: soreness,
-                            pump: pump,
-                            performance: performance,
-                            jointPain: jointPain
+                            request: request
                         )
                     }
                 )
@@ -1248,23 +1244,13 @@ struct ChatTabView: View {
 
     private func recordTrainingFeedback(
         ownership: AuthManager.ProfileSessionOwnership,
-        sessionId: String,
-        soreness: Int,
-        pump: Int,
-        performance: String,
-        jointPain: Int
+        request: TrainingFeedbackRequest
     ) async throws {
         try await TrainingOwnedRequest.perform(
             isCurrent: { authManager.ownsAccountSession(ownership) },
             getToken: { await chatAccessToken() },
             send: { accessToken in
-                try await trainingService.recordFeedback(
-                    accessToken: accessToken,
-                    request: TrainingFeedbackRequest(
-                        sessionId: sessionId, soreness: soreness, pump: pump,
-                        performance: performance, jointPain: jointPain
-                    )
-                )
+                try await trainingService.recordFeedback(accessToken: accessToken, request: request)
             }
         )
         await loadTrainingNext()

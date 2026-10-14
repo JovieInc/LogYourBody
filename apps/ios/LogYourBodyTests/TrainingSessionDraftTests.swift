@@ -41,6 +41,34 @@ final class TrainingSessionDraftTests: XCTestCase {
         TrainingSessionDraft(session: session(), ownerId: owner, store: store, isCurrent: { true })
     }
 
+    func testFeedbackRequestEncodesOptionalMuscleDetailAndTouchSource() throws {
+        let request = TrainingFeedbackRequest(
+            sessionId: "fixture-session",
+            jointPain: 0,
+            muscles: [
+                "chest": TrainingMuscleFeedbackRequest(
+                    soreness: 5,
+                    recovery: "limited",
+                    pump: 8,
+                    workload: "as_expected",
+                    performance: "down"
+                )
+            ]
+        )
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any]
+        )
+        XCTAssertEqual(object["source"] as? String, "touch")
+        let muscles = try XCTUnwrap(object["muscles"] as? [String: Any])
+        let chest = try XCTUnwrap(muscles["chest"] as? [String: Any])
+        XCTAssertEqual(chest["soreness"] as? Int, 5)
+        XCTAssertEqual(chest["recovery"] as? String, "limited")
+        XCTAssertEqual(chest["workload"] as? String, "as_expected")
+        XCTAssertNil(object["soreness"])
+        XCTAssertNil(object["pump"])
+        XCTAssertNil(object["performance"])
+    }
+
     func testRawEditsSurviveFileReconstructionWithoutSubmitting() throws {
         let directory = root()
         defer { try? FileManager.default.removeItem(at: directory) }

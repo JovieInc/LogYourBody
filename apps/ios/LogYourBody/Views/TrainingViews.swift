@@ -322,7 +322,7 @@ enum TrainingLoadInputPolicy {
 struct TrainingLiveSessionView: View {
     let session: TrainingSession
     let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
-    let onFeedback: (Int, Int, String, Int) async throws -> Void
+    let onFeedback: (TrainingFeedbackRequest) async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
@@ -332,6 +332,8 @@ struct TrainingLiveSessionView: View {
     @State private var pump = 0
     @State private var jointPain = 0
     @State private var performance = "stable"
+    @State private var feedbackMuscle = ""
+    @State private var muscleRecovery = "unknown"
     @State private var feedbackSaved = false
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -342,7 +344,7 @@ struct TrainingLiveSessionView: View {
         draftStore: TrainingDraftStore = .shared,
         isCurrent: @escaping () -> Bool,
         onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
-        onFeedback: @escaping (Int, Int, String, Int) async throws -> Void
+        onFeedback: @escaping (TrainingFeedbackRequest) async throws -> Void
     ) {
         self.session = session
         self.onLogSet = onLogSet
@@ -494,6 +496,26 @@ struct TrainingLiveSessionView: View {
                 Text("Up").tag("up")
             }
             .pickerStyle(.segmented)
+            if !feedbackMuscles.isEmpty {
+                Picker("Muscle detail", selection: $feedbackMuscle) {
+                    Text("Whole session").tag("")
+                    ForEach(feedbackMuscles, id: \.self) { muscle in
+                        Text(muscle.replacingOccurrences(of: "_", with: " ").capitalized).tag(muscle)
+                    }
+                }
+                .pickerStyle(.menu)
+                Text("Optional. Choose a muscle only when these answers describe it specifically.")
+                    .font(.footnote)
+                    .foregroundStyle(theme.colors.textSecondary)
+                if !feedbackMuscle.isEmpty {
+                    Picker("Recovery", selection: $muscleRecovery) {
+                        Text("Unknown").tag("unknown")
+                        Text("Limited").tag("limited")
+                        Text("Ready").tag("ready")
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
             Button(feedbackSaved ? "Feedback saved" : session.safetyStop ? "Save updated check-in" : "Save check-in") {
                 Task { await saveFeedback() }
             }
@@ -547,12 +569,35 @@ struct TrainingLiveSessionView: View {
         errorMessage = nil
         defer { isSaving = false }
         do {
-            try await onFeedback(soreness, pump, performance, jointPain)
+            let muscles: [String: TrainingMuscleFeedbackRequest]? = feedbackMuscle.isEmpty ? nil : [
+                feedbackMuscle: TrainingMuscleFeedbackRequest(
+                    soreness: soreness,
+                    recovery: muscleRecovery == "unknown" ? nil : muscleRecovery,
+                    pump: pump,
+                    workload: nil,
+                    performance: performance
+                )
+            ]
+            try await onFeedback(TrainingFeedbackRequest(
+                sessionId: session.id,
+                soreness: feedbackMuscle.isEmpty ? soreness : nil,
+                pump: feedbackMuscle.isEmpty ? pump : nil,
+                performance: feedbackMuscle.isEmpty ? performance : nil,
+                jointPain: jointPain,
+                muscles: muscles
+            ))
             feedbackSaved = true
         } catch let error as LocalizedError {
             errorMessage = error.errorDescription ?? "The check-in could not be saved."
         } catch {
             errorMessage = "The check-in could not be saved."
+        }
+    }
+
+    private var feedbackMuscles: [String] {
+        var seen = Set<String>()
+        return session.exercises.compactMap { exercise in
+            seen.insert(exercise.primaryMuscle).inserted ? exercise.primaryMuscle : nil
         }
     }
 }
@@ -754,7 +799,7 @@ struct TrainingLiveSessionFixtureView: View {
                     savedSets.append(saved)
                     Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
                     if losesResponse { throw URLError(.networkConnectionLost) }
-                }, onFeedback: { _, _, _, _ in
+                }, onFeedback: { _ in
                     guard !offline else { throw URLError(.notConnectedToInternet) }
                 }
             )

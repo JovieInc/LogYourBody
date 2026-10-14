@@ -18,7 +18,13 @@ import {
   type CatalogEquipment,
   type TrunkDemandLevel,
 } from './catalog';
-import { latestFeedbackPerSession, validTrainingFeedback, validateSetLog } from './engine';
+import {
+  evaluateNextSetReadiness,
+  latestFeedbackPerSession,
+  sameTrainingFeedbackObservation,
+  validTrainingFeedback,
+  validateSetLog,
+} from './engine';
 import {
   isWorkoutSessionRecord,
   loadTrainingRecords,
@@ -163,19 +169,38 @@ export async function logTrainingSet(input: {
   return { kind: 'logged', log: saved, sessionComplete };
 }
 
-export type FeedbackInput = Pick<
-  TrainingFeedback,
-  'sessionId' | 'soreness' | 'pump' | 'performance' | 'jointPain'
->;
+export type FeedbackInput = Omit<TrainingFeedback, 'id' | 'createdAt'>;
 
 export type FeedbackResult =
-  | { kind: 'recorded'; feedback: TrainingFeedback & { record_type: string } }
+  | {
+      kind: 'recorded';
+      feedback: TrainingFeedback & { record_type: string };
+      recommendation: ReturnType<typeof evaluateNextSetReadiness>;
+    }
   | { kind: 'program_not_enrolled' }
   | { kind: 'session_not_found' }
   | { kind: 'rejected' }
   | { kind: 'invalid' };
 
-/** Stores a post-session check-in. Shared by the mobile API and MCP. */
+function publicFeedbackRecord(
+  feedback: TrainingFeedback,
+): TrainingFeedback & { record_type: string } {
+  const {
+    user_id: _userId,
+    deleted_at: _deletedAt,
+    server_updated_at: _serverUpdatedAt,
+    record_type: _recordType,
+    ...observation
+  } = feedback as TrainingFeedback & {
+    user_id?: string;
+    deleted_at?: string | null;
+    server_updated_at?: string;
+    record_type?: string;
+  };
+  return { ...observation, record_type: 'session_feedback' };
+}
+
+/** Stores session or between-set observations. Shared by native, text and voice callers. */
 export async function recordTrainingFeedback(input: {
   records: NativeProductRecordsPort;
   subject: string;
@@ -197,29 +222,81 @@ export async function recordTrainingFeedback(input: {
         snapshot.setup?.id,
   );
   if (!sessionExists) return { kind: 'session_not_found' };
-  if (!validTrainingFeedback(input.feedback)) return { kind: 'invalid' };
-  const latest = latestFeedbackPerSession(snapshot.feedback).find(
-    (item) => item.sessionId === input.feedback.sessionId,
-  );
+  const normalized: FeedbackInput = {
+    ...input.feedback,
+    source: input.feedback.source ?? 'unknown',
+    observedAt: input.feedback.observedAt ?? input.now.toISOString(),
+  };
+  if (!validTrainingFeedback(normalized)) return { kind: 'invalid' };
+  const correctionTarget = normalized.correctsObservationId
+    ? snapshot.feedback.find((item) => item.id === normalized.correctsObservationId)
+    : undefined;
   if (
-    latest &&
-    latest.soreness === input.feedback.soreness &&
-    latest.pump === input.feedback.pump &&
-    latest.performance === input.feedback.performance &&
-    latest.jointPain === input.feedback.jointPain
+    normalized.correctsObservationId &&
+    (!correctionTarget || correctionTarget.sessionId !== normalized.sessionId)
   ) {
+    return { kind: 'invalid' };
+  }
+  const sourceDuplicate = normalized.sourceObservationId
+    ? snapshot.feedback.find((item) => item.sourceObservationId === normalized.sourceObservationId)
+    : undefined;
+  if (sourceDuplicate) {
+    if (sourceDuplicate.sessionId !== normalized.sessionId) return { kind: 'invalid' };
+    await requireCurrentTrainingAdmission(input.records, input.subject, admission);
+    return {
+      kind: 'recorded',
+      feedback: publicFeedbackRecord(sourceDuplicate),
+      recommendation: evaluateNextSetReadiness({
+        feedback: snapshot.feedback,
+        sessionId: normalized.sessionId,
+        now: input.now,
+      }),
+    };
+  }
+  const comparable: TrainingFeedback = {
+    id: 'candidate',
+    createdAt: normalized.observedAt ?? input.now.toISOString(),
+    ...normalized,
+  };
+  const exactDuplicate = normalized.correctsObservationId
+    ? undefined
+    : snapshot.feedback.find(
+        (item) =>
+          item.sessionId === normalized.sessionId &&
+          sameTrainingFeedbackObservation(item, comparable),
+      );
+  if (exactDuplicate) {
     // Keep the original observation time, even when another session has newer feedback.
     await requireCurrentTrainingAdmission(input.records, input.subject, admission);
     return {
       kind: 'recorded',
-      feedback: {
-        id: latest.id,
-        record_type: 'session_feedback',
-        ...input.feedback,
-        createdAt: latest.createdAt,
-      },
+      feedback: publicFeedbackRecord(exactDuplicate),
+      recommendation: evaluateNextSetReadiness({
+        feedback: snapshot.feedback,
+        sessionId: normalized.sessionId,
+        now: input.now,
+      }),
     };
   }
+  const isSessionSummary =
+    normalized.context?.setId === undefined &&
+    normalized.context?.setNumber === undefined &&
+    normalized.targetMuscleReadiness === undefined &&
+    normalized.breathingReadiness === undefined &&
+    normalized.generalReadiness === undefined &&
+    normalized.supportingReadiness === undefined;
+  const latest = latestFeedbackPerSession(
+    snapshot.feedback.filter(
+      (item) =>
+        item.sessionId === normalized.sessionId &&
+        item.context?.setId === undefined &&
+        item.context?.setNumber === undefined &&
+        item.targetMuscleReadiness === undefined &&
+        item.breathingReadiness === undefined &&
+        item.generalReadiness === undefined &&
+        item.supportingReadiness === undefined,
+    ),
+  ).find((item) => item.sessionId === normalized.sessionId);
   const latestFeedbackTime = snapshot.feedback.reduce(
     (latest, item) => Math.max(latest, Date.parse(item.createdAt)),
     0,
@@ -228,7 +305,12 @@ export async function recordTrainingFeedback(input: {
   const feedback: TrainingFeedback & { record_type: string } = {
     id: input.createId(),
     record_type: 'session_feedback',
-    ...input.feedback,
+    ...normalized,
+    ...(normalized.correctsObservationId
+      ? {}
+      : isSessionSummary && latest
+        ? { correctsObservationId: latest.id }
+        : {}),
     createdAt,
   };
   await commitTrainingMutation(
@@ -238,7 +320,15 @@ export async function recordTrainingFeedback(input: {
     'feedback_insert',
     feedback,
   );
-  return { kind: 'recorded', feedback };
+  return {
+    kind: 'recorded',
+    feedback,
+    recommendation: evaluateNextSetReadiness({
+      feedback: [...snapshot.feedback, feedback],
+      sessionId: feedback.sessionId,
+      now: input.now,
+    }),
+  };
 }
 
 export type SwapConstraints = {

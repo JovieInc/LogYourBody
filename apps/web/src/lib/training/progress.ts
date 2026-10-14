@@ -19,10 +19,10 @@ export type TrainingProgress = {
   setsLast7Days: number;
   exercises: ExerciseProgress[];
   latestCheckIn: {
-    soreness: number;
-    pump: number;
-    performance: 'up' | 'stable' | 'down';
-    jointPain: number;
+    soreness?: number;
+    pump?: number;
+    performance?: 'up' | 'stable' | 'down';
+    jointPain?: number;
     createdAt: string;
   } | null;
 };

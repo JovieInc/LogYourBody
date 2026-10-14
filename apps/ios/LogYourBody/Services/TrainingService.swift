@@ -92,12 +92,40 @@ struct TrainingSetLogRequest: Codable, Equatable, Sendable {
     let rir: Int
 }
 
+struct TrainingMuscleFeedbackRequest: Encodable, Equatable, Sendable {
+    let soreness: Int?
+    let recovery: String?
+    let pump: Int?
+    let workload: String?
+    let performance: String?
+}
+
 struct TrainingFeedbackRequest: Encodable, Equatable, Sendable {
     let sessionId: String
-    let soreness: Int
-    let pump: Int
-    let performance: String
-    let jointPain: Int
+    let soreness: Int?
+    let pump: Int?
+    let performance: String?
+    let jointPain: Int?
+    let muscles: [String: TrainingMuscleFeedbackRequest]?
+    let source: String
+
+    init(
+        sessionId: String,
+        soreness: Int? = nil,
+        pump: Int? = nil,
+        performance: String? = nil,
+        jointPain: Int? = nil,
+        muscles: [String: TrainingMuscleFeedbackRequest]? = nil,
+        source: String = "touch"
+    ) {
+        self.sessionId = sessionId
+        self.soreness = soreness
+        self.pump = pump
+        self.performance = performance
+        self.jointPain = jointPain
+        self.muscles = muscles
+        self.source = source
+    }
 }
 
 enum TrainingServiceError: LocalizedError, Equatable {

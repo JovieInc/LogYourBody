@@ -442,6 +442,61 @@ describe('authenticated training API', () => {
     expect(reopened.session.exercises[0].sets).toBe(2);
   });
 
+  it('accepts sparse native readiness observations and returns a typed next-set action', async () => {
+    const { handlers, records } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const response = await handlers.feedback(
+      request('POST', 'feedback', 'token-a', {
+        sessionId: session.id,
+        sourceObservationId: 'native-set-observation-1',
+        targetMuscle: 'back',
+        targetMuscleReadiness: 'ready',
+        breathingReadiness: 'limited',
+        context: {
+          exerciseId: 'one_arm_dumbbell_row',
+          setNumber: 2,
+          setOrder: 4,
+          loadKg: 25,
+          reps: 10,
+          rir: 2,
+          restSeconds: 120,
+          setFormat: 'straight',
+        },
+      }),
+    );
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toMatchObject({
+      feedback: {
+        source: 'touch',
+        sourceObservationId: 'native-set-observation-1',
+      },
+      nextSetRecommendation: {
+        scope: 'between_set',
+        action: 'extend_rest',
+        weeklyPlanChanged: false,
+        safetyCertified: false,
+      },
+    });
+    const saved = (await records.pull('subject-a', 'training_feedback')).records.find(
+      (row) => row.record_type === 'session_feedback',
+    );
+    expect(saved).toMatchObject({ source: 'touch', context: { setNumber: 2, rir: 2 } });
+    expect(saved).not.toHaveProperty('soreness');
+
+    const manualLog = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', {
+        sessionId: session.id,
+        exerciseId: session.exercises[0].id,
+        setNumber: 1,
+        reps: 10,
+        loadKg: 15,
+        rir: 3,
+      }),
+    );
+    expect(manualLog.status).toBe(201);
+  });
+
   it('counts concurrent duplicate check-ins as one session of recovery evidence', async () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
