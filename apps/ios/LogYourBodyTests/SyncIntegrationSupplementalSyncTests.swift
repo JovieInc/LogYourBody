@@ -901,7 +901,9 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         try await context.perform {
             let row = CachedBodyMetrics(context: context)
             row.id = id
-            row.userId = owner
+            // The current model requires an owner. Empty owners are persisted legacy rows;
+            // nil compatibility is a pending value in the same context used by both writes.
+            row.userId = owner ?? ""
             row.date = date
             row.localDate = BodyMetricLocalDate.key(for: date)
             row.weight = 70
@@ -909,8 +911,12 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
             row.notes = "legacy unowned"
             row.createdAt = date
             row.updatedAt = date
+            row.lastModified = date
             row.isSynced = true
             try context.save()
+            if owner == nil {
+                row.userId = nil
+            }
         }
     }
 
