@@ -28,10 +28,12 @@ enum HomeV2ChartIntegrity {
     struct Sample: Equatable, Identifiable {
         let date: Date
         let value: Double
+        enum Kind: String { case daily, sevenDayAverage }
+        var kind: Kind = .daily
         /// Distinguishes two readings that share a day and a value.
         var occurrence = 0
 
-        var id: String { "\(date.timeIntervalSinceReferenceDate)-\(value)-\(occurrence)" }
+        var id: String { "\(date.timeIntervalSinceReferenceDate)-\(value)-\(occurrence)-\(kind.rawValue)" }
     }
 
     struct Plot: Equatable {
@@ -46,6 +48,13 @@ enum HomeV2ChartIntegrity {
         let droppedMissing: Int
         let droppedCarried: Int
         let droppedNonFinite: Int
+
+        /// A date selects its daily value when available, otherwise its labeled average.
+        var selectionSamples: [Sample] {
+            Dictionary(grouping: marks, by: \.date).values.compactMap { sameDay in
+                sameDay.first { $0.kind == .daily } ?? sameDay.first
+            }.sorted { $0.date < $1.date }
+        }
 
         var yTicks: [Double] {
             let lower = anchorsToZero ? 0 : yDomain.lowerBound
@@ -70,7 +79,8 @@ enum HomeV2ChartIntegrity {
         keepsCarriedValues: Bool,
         calendar: Calendar = .current
     ) -> Plot {
-        let line = filter(points, keepsCarriedValues: keepsCarriedValues, calendar: calendar)
+        let line = filter(points, keepsCarriedValues: keepsCarriedValues, calendar: calendar,
+                          kind: keepsCarriedValues ? .sevenDayAverage : .daily)
         let dots = filter(dotPoints, keepsCarriedValues: false, calendar: calendar)
         let runs = contiguousRuns(line.samples, calendar: calendar)
         var seen = Set(line.samples.map(\.id))
@@ -97,7 +107,8 @@ enum HomeV2ChartIntegrity {
     static func filter(
         _ points: [MetricChartDataPoint],
         keepsCarriedValues: Bool,
-        calendar: Calendar
+        calendar: Calendar,
+        kind: Sample.Kind = .daily
     ) -> FilterResult {
         var droppedNegative = 0
         var droppedMissing = 0
@@ -130,7 +141,7 @@ enum HomeV2ChartIntegrity {
             let key = "\(day.timeIntervalSinceReferenceDate)-\(point.value)"
             let occurrence = occurrences[key] ?? 0
             occurrences[key] = occurrence + 1
-            samples.append(Sample(date: day, value: point.value, occurrence: occurrence))
+            samples.append(Sample(date: day, value: point.value, kind: kind, occurrence: occurrence))
         }
         return FilterResult(
             samples: samples,
@@ -234,12 +245,13 @@ enum HomeV2ChartIntegrity {
         }
     }
 
-    static func tooltip(date: Date, valueText: String, locale: Locale, calendar: Calendar = .current) -> String {
+    static func tooltip(date: Date, valueText: String, locale: Locale, calendar: Calendar = .current,
+                        kind: Sample.Kind = .daily) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.calendar = calendar
         formatter.setLocalizedDateFormatFromTemplate("MMMd")
-        return "\(formatter.string(from: date)) · \(valueText)"
+        return "\(formatter.string(from: date)) · \(valueText) · \(kind == .sevenDayAverage ? "7-day average" : "Daily value")"
     }
 
     static func tickLabel(_ value: Double, integers: Bool) -> String {
@@ -279,9 +291,21 @@ enum HomeV2MetricEditorial {
         let visibleLines: [String]
     }
 
+    /// Raw metric summaries use the same finite, observed/estimated samples as their plot.
+    /// Carried values remain available only in the separately labeled weight average.
+    static func observedPoints(_ points: [MetricChartDataPoint]) -> [MetricChartDataPoint] {
+        points.filter { point in
+            guard point.value.isFinite, point.value >= 0 else { return false }
+            switch point.presence {
+            case .present, .estimated: return true
+            case .missing, .interpolated, .lastKnown: return false
+            }
+        }
+    }
+
     static func canvas(_ request: HomeV2MetricCanvasRequest) -> Canvas {
         let stats = HomeV2ProgressPolicy.stats(
-            points: request.points,
+            points: observedPoints(request.points),
             prefersHigh: request.metric.prefersHigh,
             calendar: request.calendar
         )

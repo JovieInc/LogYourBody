@@ -145,6 +145,76 @@ final class HomeV2MetricEditorialTests: XCTestCase {
         XCTAssertEqual(average.runs.first?.count, 3)
     }
 
+    func testCarriedBodyMetricsDoNotBecomeHeroValuesOrTrendDays() {
+        let points = [sample(-6, 18)] + (0..<6).map {
+            sample(-5 + $0, Double(20 + $0), presence: $0 == 5 ? .lastKnown : .interpolated)
+        }
+        let observed = HomeV2MetricEditorial.observedPoints(points)
+        XCTAssertEqual(observed.map(\.value), [18])
+        XCTAssertFalse(HomeV2TrendPolicy.hasEnoughData(observed, calendar: calendar))
+        XCTAssertEqual(plot(points, anchorsToZero: false).marks.map(\.value), [18])
+        for metric in [HomeV2ProgressMetric.bodyFat, .ffmi] {
+            let canvas = HomeV2MetricEditorial.canvas(HomeV2MetricCanvasRequest(
+                metric: metric, points: points, unit: "", deltaUnit: "",
+                range: .month1, provenance: nil, target: nil,
+                hasEnoughData: HomeV2TrendPolicy.hasEnoughData(observed, calendar: calendar),
+                formatValue: { String(format: "%.1f", $0) },
+                dateText: { self.dayText($0) }, calendar: calendar
+            ))
+            XCTAssertEqual(canvas.value, "18.0")
+            XCTAssertEqual(canvas.comparison, "1 day of data in this range")
+            XCTAssertEqual(canvas.context.first { $0.id == "extreme" }?.value, "18.0")
+        }
+        let invalid = [sample(-3, -2), sample(-2, .nan), sample(-1, 1, presence: .missing),
+                       sample(0, 19, presence: .estimated)]
+        XCTAssertEqual(HomeV2MetricEditorial.observedPoints(invalid).map(\.value), [19])
+    }
+
+    func testMixedWeightSelectionUsesDailyValueAndLabelsAverageFallback() {
+        let average = [sample(-1, 181), sample(0, 182, presence: .interpolated)]
+        let raw = [sample(-1, 179)]
+        let mixed = HomeV2ChartIntegrity.plot(
+            points: average, dotPoints: raw,
+            anchorsToZero: false, keepsCarriedValues: true,
+            calendar: calendar
+        )
+        XCTAssertEqual(mixed.marks.count, 3)
+        XCTAssertEqual(mixed.selectionSamples.count, 2)
+        let daily = HomeV2ChartIntegrity.nearest(to: date(-1), in: mixed.selectionSamples)
+        XCTAssertEqual(daily?.value, 179)
+        XCTAssertEqual(daily?.kind, .daily)
+        let fallback = HomeV2ChartIntegrity.nearest(to: date(0), in: mixed.selectionSamples)
+        XCTAssertEqual(fallback?.value, 182)
+        XCTAssertEqual(fallback?.kind, .sevenDayAverage)
+        XCTAssertTrue(HomeV2ChartIntegrity.tooltip(
+            date: date(0), valueText: "182.0", locale: locale,
+            calendar: calendar, kind: .sevenDayAverage
+        )
+            .hasSuffix("7-day average"))
+        XCTAssertTrue(HomeV2ChartIntegrity.tooltip(
+            date: date(-1), valueText: "179.0", locale: locale,
+            calendar: calendar, kind: .daily
+        )
+            .hasSuffix("Daily value"))
+        // Equal raw/average values still retain provenance instead of deduplicating it away.
+        let equal = HomeV2ChartIntegrity.plot(
+            points: [sample(0, 180)], dotPoints: [sample(0, 180)],
+            anchorsToZero: false, keepsCarriedValues: true,
+            calendar: calendar
+        )
+        XCTAssertEqual(equal.marks.count, 2)
+        XCTAssertEqual(equal.selectionSamples.first?.kind, .daily)
+    }
+
+    func testUnevenDatesRemainActualTimeAxisPositions() {
+        let uneven = plot([sample(-13, 1), sample(-12, 2), sample(0, 3)], anchorsToZero: true)
+        XCTAssertEqual(uneven.xAxisDates, [-13, -12, 0].map { calendar.startOfDay(for: date($0)) })
+        let span = uneven.xAxisDates[2].timeIntervalSince(uneven.xAxisDates[0])
+        let middleOffset = uneven.xAxisDates[1].timeIntervalSince(uneven.xAxisDates[0])
+        XCTAssertEqual(middleOffset / span, 1.0 / 13.0, accuracy: 0.001)
+        // Production passes these dates to native AxisValueLabel, never an equally spaced HStack.
+    }
+
     func testWeightDomainLeavesRoomAboveZero() {
         let plotted = plot([sample(-4, 180), sample(0, 182)], anchorsToZero: false)
         XCTAssertGreaterThan(plotted.yDomain.lowerBound, 0)
@@ -159,10 +229,11 @@ final class HomeV2MetricEditorialTests: XCTestCase {
             date: date(0), valueText: "7,544", locale: locale, calendar: calendar
         )
         let pieces = text.split(separator: "·").map { $0.trimmingCharacters(in: .whitespaces) }
-        XCTAssertEqual(pieces.count, 2)
+        XCTAssertEqual(pieces.count, 3)
         XCTAssertEqual(pieces.first?.filter(\.isLetter) ?? "", "Oct")
         XCTAssertEqual(pieces.first?.filter(\.isNumber) ?? "", "14")
-        XCTAssertEqual(pieces.last ?? "", "7,544")
+        XCTAssertEqual(pieces[1], "7,544")
+        XCTAssertEqual(pieces.last ?? "", "Daily value")
         XCTAssertFalse(text.contains("..."))
         XCTAssertFalse(text.contains("…"))
         let nearer = HomeV2ChartIntegrity.nearest(to: date(-1), in: plotted.marks)

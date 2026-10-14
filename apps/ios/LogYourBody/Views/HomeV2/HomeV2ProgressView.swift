@@ -181,7 +181,9 @@ struct HomeV2ProgressView: View {
 
     var body: some View {
         let current = series(metric)
-        let visible = HomeV2TrendPolicy.points(current.daily, in: range, now: now)
+        let visible = HomeV2MetricEditorial.observedPoints(
+            HomeV2TrendPolicy.points(current.daily, in: range, now: now)
+        )
         let hasEnoughData = HomeV2TrendPolicy.hasEnoughData(visible)
         let presented = HomeV2MetricEditorial.canvas(
             HomeV2MetricCanvasRequest(

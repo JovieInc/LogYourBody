@@ -75,7 +75,7 @@ struct HomeV2TrendChart: View {
 
     private var visibleDaily: [MetricChartDataPoint] { HomeV2TrendPolicy.points(daily, in: range, now: now) }
     private var visibleTrend: [MetricChartDataPoint] { HomeV2TrendPolicy.points(trend, in: range, now: now) }
-    private var hasEnoughData: Bool { HomeV2TrendPolicy.hasEnoughData(visibleDaily) }
+    private var hasEnoughData: Bool { HomeV2TrendPolicy.hasEnoughData(HomeV2MetricEditorial.observedPoints(visibleDaily)) }
 
     private var plotted: HomeV2ChartIntegrity.Plot {
         HomeV2ChartIntegrity.plot(
@@ -93,7 +93,7 @@ struct HomeV2TrendChart: View {
 
     private var selectedSample: HomeV2ChartIntegrity.Sample? {
         guard let selectedX else { return nil }
-        return HomeV2ChartIntegrity.nearest(to: selectedX, in: plotted.marks)
+        return HomeV2ChartIntegrity.nearest(to: selectedX, in: plotted.selectionSamples)
     }
 
     private var selectedTooltip: String? {
@@ -101,7 +101,8 @@ struct HomeV2TrendChart: View {
         return HomeV2ChartIntegrity.tooltip(
             date: selectedSample.date,
             valueText: formatValue(selectedSample.value),
-            locale: .current
+            locale: .current,
+            kind: selectedSample.kind
         )
     }
 
@@ -141,7 +142,6 @@ struct HomeV2TrendChart: View {
                             .padding(.top, HomeV2Tokens.Space.tight)
                             .accessibilityHidden(true)
                     }
-                    dateAxis
                 }
             } else {
                 placeholder
@@ -218,8 +218,17 @@ struct HomeV2TrendChart: View {
         }
         .chartYScale(domain: plotted.yDomain)
         .chartXAxis {
-            AxisMarks(values: plotted.xAxisDates) { _ in
+            AxisMarks(values: plotted.xAxisDates) { value in
                 AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
+                if axis == .months, let date = value.as(Date.self) {
+                    AxisValueLabel {
+                        Text(HomeV2ChartIntegrity.axisLabel(date: date, range: range, locale: .current))
+                            .font(.caption)
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
             }
         }
         .chartYAxis {
@@ -251,31 +260,8 @@ struct HomeV2TrendChart: View {
         }
     }
 
-    private var dateAxis: some View {
-        let labels = HomeV2ChartIntegrity.axisLabels(dates: plotted.xAxisDates, range: range, locale: .current)
-        return HStack(spacing: HomeV2Tokens.Space.tight) {
-            ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
-                Text(label)
-                    .font(.caption)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .frame(maxWidth: .infinity, alignment: dateAlignment(index: index, count: labels.count))
-            }
-        }
-        .padding(.horizontal, HomeV2Tokens.Space.inset)
-        .padding(.top, HomeV2Tokens.Space.tight)
-        .accessibilityIdentifier("home_v2_chart_axis")
-    }
-
-    private func dateAlignment(index: Int, count: Int) -> Alignment {
-        if count < 2 || index == 0 { return .leading }
-        if index == count - 1 { return .trailing }
-        return .center
-    }
-
     private func adjustSelection(_ direction: AccessibilityAdjustmentDirection) {
-        let ordered = plotted.marks.sorted { $0.date < $1.date }
+        let ordered = plotted.selectionSamples
         guard !ordered.isEmpty else { return }
         let current = selectedSample.flatMap { sample in ordered.firstIndex { $0.id == sample.id } }
         let nextIndex: Int
