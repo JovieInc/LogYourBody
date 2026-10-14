@@ -219,7 +219,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testWhatsNewFixtureRendersTheRedesignedReleaseSurface() throws {
         let app = XCUIApplication()
         app.launchArguments = [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestResetWhatsNewReviewState"
         ]
         app.launch()
@@ -248,7 +248,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_whatsNew"].exists)
 
         app.terminate()
-        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
+        app.launchArguments = ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"]
         app.launch()
         XCTAssertTrue(
             app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
@@ -611,7 +611,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPhotoHUDFixtureRoutesToIntendedPostMVPDashboard() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
@@ -622,7 +622,7 @@ final class LogYourBodyUITests: XCTestCase {
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         if !analyticsPage.waitForExistence(timeout: 6) {
             launch(app, with: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-lybUITestPhotoTimelineAnalyticsFixture"
             ])
         }
@@ -642,7 +642,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPhotoHUDFixtureShowsFocusedNoPhotoTimelineWhenNoPhotoExists() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_home"].exists)
@@ -658,7 +658,7 @@ final class LogYourBodyUITests: XCTestCase {
     // Regression: the empty photo stage said "Add one to this day" but had no action once any data existed.
     func testEmptyPhotoStageOpensAttachSheetForThatDay() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         let addPhoto = app.buttons["launch_timeline_add_photo"]
@@ -672,11 +672,38 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "timeline-add-photo-for-day", from: app)
     }
 
+    func testProgressPhotoFixtureShowsReviewState() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestProgressPhotoAttachFixture",
+            "-lybUITestProgressPhotoReviewFixture"
+        ])
+
+        let addPhoto = app.buttons["launch_timeline_add_photo"]
+        XCTAssertTrue(addPhoto.waitForExistence(timeout: 10))
+        addPhoto.tap()
+
+        let fixtureButton = app.buttons["progress_photo_attach_fixture_button"]
+        XCTAssertTrue(fixtureButton.waitForExistence(timeout: 8))
+        fixtureButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Review photo"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Front · '")).firstMatch.exists)
+        let metadata = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Not saved · Pose matched to '")
+        ).firstMatch
+        XCTAssertTrue(metadata.exists)
+        XCTAssertTrue(app.buttons["progress_photo_review_retake"].exists)
+        XCTAssertTrue(app.buttons["progress_photo_review_save"].exists)
+        attachScreenshot(named: "progress-photo-review", from: app)
+    }
+
     // Regression: starter prompts and the composer used fixed point sizes, ignoring Dynamic Type.
     func testHomeChatPromptsScaleWithAccessibilityDynamicType() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture",
             "-UIPreferredContentSizeCategoryName",
             "UICTContentSizeCategoryAccessibilityXXXL"
@@ -732,7 +759,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testHomePinsChatComposerWithoutTabBar() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
 
@@ -769,7 +796,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatStreamsFixtureAnswer() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
 
@@ -794,7 +821,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatProviderFailureShowsRetry() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture",
             "-lybUITestChatErrorFixture"
         ])
@@ -1144,7 +1171,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatOfflineStateIsVisibleAndRetryable() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture",
             "-lybUITestChatOfflineFixture"
         ])
@@ -1168,7 +1195,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatCanCancelStreamingAnswer() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture",
             "-lybUITestChatSlowFixture"
         ])
@@ -1199,7 +1226,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatComposerKeepsOneGridFromPillToMultiline() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
 
@@ -1238,7 +1265,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testSettingsProfileFieldsOpenDirectEditors() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         openSettingsFromPhotoTimelineMenu(in: app)
 
@@ -1293,7 +1320,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testNarrowIPhoneSegmentedControlsKeepNativeHitTargets() throws {
         try assertNarrowSegmentedControls(
-            launchArguments: ["-lybUITestPhotoTimelineHUDFixture"],
+            launchArguments: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"],
             expectedViewportWidth: nil,
             screenshotPrefix: "narrow-segmented-controls"
         )
@@ -1302,7 +1329,7 @@ final class LogYourBodyUITests: XCTestCase {
     func test320PointViewportSegmentedControlsKeepNativeHitTargets() throws {
         try assertNarrowSegmentedControls(
             launchArguments: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-lybUITestViewportWidth",
                 "320"
             ],
@@ -1399,7 +1426,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testHorizontalSwipeOnTimelineHeroDoesNotOpenStatsPage() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         let strip = app.descendants(matching: .any)["launch_timeline_scrubber"]
         XCTAssertTrue(strip.waitForExistence(timeout: 12))
@@ -1420,7 +1447,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testMetricDetailOpensFromStatsAndShowsSharedTimelineContext() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture"
         ])
 
@@ -1473,7 +1500,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testLaunchQualityGateCapturesTimelineHomeSurface() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture",
             "-lybUITestGlp1WeeklyCheckInFixture",
             "-lybUITestChatFirstFixture"
@@ -1499,7 +1526,11 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testStatsStartsWithMetricCardsWithoutDecorativeIntroduction() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestPhotoTimelineAnalyticsFixture"])
+        launch(app, with: [
+            "-lybUITestHomeRollbackFixture",
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhotoTimelineAnalyticsFixture"
+        ])
         let stats = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         XCTAssertTrue(stats.waitForExistence(timeout: 12))
         attachScreenshot(named: "stats-content-hierarchy", from: app)
@@ -1516,8 +1547,15 @@ final class LogYourBodyUITests: XCTestCase {
     func testLaunchQualityGateCapturesCriticalSurfaces() throws {
         let app = XCUIApplication()
 
+        // Verify the ordinary default before explicitly exercising rollback surfaces.
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_weight_value"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_surface"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_chat_composer_dock"].exists)
+
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
@@ -1533,10 +1571,12 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 5), "Critical chat prompt must be available")
         XCTAssertTrue(prompt.isHittable, "Critical chat prompt must be tappable")
         prompt.tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8),
-            "Critical chat prompt must open the chat root"
-        )
+        let openedChatRoot = app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8)
+        // Diagnostic only: the app's send/load trail if the tap did not open chat.
+        let sendProbe = openedChatRoot
+            ? ""
+            : String(describing: app.descendants(matching: .any)["home_chat_composer_dock"].value ?? "unavailable")
+        XCTAssertTrue(openedChatRoot, "Critical chat prompt must open the chat root (send probe: \(sendProbe))")
         attachScreenshot(named: "launch-quality-chat-tab", from: app)
         collapseHomeChat(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
@@ -1547,7 +1587,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(
             app,
             with: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-lybUITestPhaseInsightFixture",
                 "-lybUITestGlp1WeeklyCheckInFixture"
             ]
@@ -1567,13 +1607,124 @@ final class LogYourBodyUITests: XCTestCase {
         launch(
             app,
             with: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-lybUITestPhaseInsightFixture",
                 "-lybUITestGlp1WeeklyCheckInFixture"
             ]
         )
 
         try assertAndCaptureBodyScoreShareSheet(in: app)
+    }
+
+    /// JOV-6089 gesture replay: horizontal and diagonal drags must never
+    /// dismiss the share sheet, a committed vertical drag must, and repeated
+    /// open/close must leave no orphan overlay or click-through surface.
+    func testShareSheetGestureArbitrationAndAccessibleEscape() throws {
+        let app = XCUIApplication()
+        launch(
+            app,
+            with: [
+                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestPhaseInsightFixture",
+                "-lybUITestGlp1WeeklyCheckInFixture"
+            ]
+        )
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+
+        let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
+        let closeButton = app.descendants(matching: .any)["body_score_share_close_button"]
+        let saveButton = app.descendants(matching: .any)["body_score_share_save_button"]
+
+        // Fast repeated open/close must leave no orphan overlay behind.
+        for _ in 0..<3 {
+            openBodyScoreShareSheet(in: app)
+            XCTAssertTrue(closeButton.isHittable, "Close must stay reachable with expanded controls")
+            closeButton.tap()
+            XCTAssertTrue(
+                shareSheet.waitForNonExistence(timeout: 3),
+                "Share sheet must fully dismiss on Close"
+            )
+        }
+
+        openBodyScoreShareSheet(in: app)
+
+        let window = app.windows.firstMatch
+        let midX = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.0)).screenPoint.x
+        let midY = window.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5)).screenPoint.y
+        let dragDistance = CGFloat(220)
+
+        func drag(fromX: CGFloat, fromY: CGFloat, toX: CGFloat, toY: CGFloat) {
+            window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: fromX, dy: fromY))
+                .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: toX, dy: toY)))
+        }
+
+        // Horizontal drag across the card (format-control axis): no dismissal.
+        drag(
+            fromX: midX - dragDistance, fromY: midY,
+            toX: midX + dragDistance, toY: midY
+        )
+        XCTAssertTrue(shareSheet.exists, "Horizontal drag must not dismiss the share sheet")
+
+        // Diagonal drag with a vertical component past the dismiss threshold:
+        // still no dismissal, because the gesture is not vertical-dominant.
+        drag(
+            fromX: midX - dragDistance * 0.7, fromY: midY - dragDistance * 0.5,
+            toX: midX + dragDistance * 0.7, toY: midY + dragDistance * 0.5
+        )
+        XCTAssertTrue(shareSheet.exists, "Diagonal drag must not dismiss the share sheet")
+
+        // Visible controls stay on-screen and hittable after the replays.
+        XCTAssertTrue(closeButton.isHittable, "Close must remain hittable after gesture replays")
+        XCTAssertTrue(saveButton.exists, "Save must remain reachable after gesture replays")
+
+        // A committed vertical drag is the drag-dismiss owner and must dismiss.
+        drag(
+            fromX: midX, fromY: midY,
+            toX: midX, toY: midY + dragDistance * 1.4
+        )
+        XCTAssertTrue(
+            shareSheet.waitForNonExistence(timeout: 3),
+            "Vertical drag past the threshold must dismiss the share sheet"
+        )
+
+        // Reopen and confirm accessible + hardware escape paths still work.
+        openBodyScoreShareSheet(in: app)
+        XCTAssertTrue(closeButton.isHittable)
+        closeButton.tap()
+        XCTAssertTrue(shareSheet.waitForNonExistence(timeout: 3))
+
+        openBodyScoreShareSheet(in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists
+        )
+        // Hardware escape (Esc) path mirrors the VoiceOver escape action.
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+        XCTAssertTrue(
+            shareSheet.waitForNonExistence(timeout: 3),
+            "Hardware escape must dismiss the share sheet"
+        )
+
+        // Focus returns to the invoking control: the home share button is back.
+        let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
+        XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
+        attachScreenshot(named: "share-sheet-gesture-arbitration", from: app)
+    }
+
+    private func openBodyScoreShareSheet(in app: XCUIApplication) {
+        let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
+        XCTAssertTrue(shareButton.exists || shareButton.waitForExistence(timeout: 5))
+        scrollUntilHittable(shareButton, in: app)
+        XCTAssertTrue(shareButton.isHittable)
+        shareButton.tap()
+
+        let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
+        XCTAssertTrue(
+            sheet.waitForExistence(timeout: 8) || app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists,
+            "Share overlay must appear after tapping share"
+        )
     }
 
     func testLaunchQualityGateCapturesOnboardingFixedCTA() throws {
@@ -1597,7 +1748,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(
             app,
             with: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-UIPreferredContentSizeCategoryName",
                 "UICTContentSizeCategoryAccessibilityXXXL"
             ]
@@ -1640,7 +1791,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testPhaseInsightFixtureShowsDeterministicCuttingInsight() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture"
         ])
 
@@ -1663,7 +1814,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testGlp1WeeklyCheckInFixtureShowsPromptAndOpensDoseFlow() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestGlp1WeeklyCheckInFixture"
         ])
 
@@ -1735,7 +1886,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testGlp1WeeklyCheckInFixtureOpensMedicationSelectorWhenEmpty() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestGlp1WeeklyCheckInFixture",
             "-lybUITestGlp1EmptyMedicationFixture"
         ])
@@ -1820,7 +1971,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testTimelinePerformanceTraceWorkflow() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestTimelinePerformanceTraceFixture",
             "-lybUITestPhaseInsightFixture",
             "-lybUITestGlp1WeeklyCheckInFixture"
@@ -2148,6 +2299,102 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 5))
     }
 
+    func testDefaultHomeHeaderSwipesOpenProgressReturnHomeAndOpenSidebar() throws {
+        let app = XCUIApplication()
+        launchDefaultHome(app, extra: ["-lybUITestChatFirstFixture"])
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        swipeHomeHeader(in: app, rightward: true)
+        let showsProgress = app.descendants(matching: .any)["home_v2_progress_value"].waitForExistence(timeout: 8)
+        attachScreenshot(named: "default-home-right-swipe-progress", from: app)
+        XCTAssertTrue(showsProgress, "A right swipe from ordinary Home opens Progress")
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context"].exists)
+
+        swipeHomeHeader(in: app, rightward: false)
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8), "Progress reverses to Today")
+        swipeHomeHeader(in: app, rightward: false)
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 8), "A left swipe from Today opens the sidebar")
+        XCTAssertTrue(app.buttons["home_v2_sidebar_settings"].exists)
+        attachScreenshot(named: "default-home-left-swipe-sidebar", from: app)
+
+        ask.tap()
+        XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["home_chat_collapse"].isHittable)
+        swipeHomeHeader(in: app, rightward: true)
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8), "Expanded Ask collapses to Today")
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context"].exists)
+    }
+
+    func testDefaultHomeKeepsEditorialCardForPhotoDataAndEmptyStates() throws {
+        try assertDefaultHomeStates(largestText: false)
+    }
+
+    func testDefaultHomeAtLargestTextKeepsEditorialCardAndLogActionReachable() throws {
+        try assertDefaultHomeStates(largestText: true)
+    }
+
+    func testDefaultPhotoHeroSwipeDoesNotNavigateTheRoot() throws {
+        let app = XCUIApplication()
+        launchDefaultHome(app, extra: ["-lybUITestPhotoTimelinePhotoFixture"])
+        let card = app.descendants(matching: .any)["home_v2_editorial_card"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 30))
+        let start = card.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: card.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)))
+        attachScreenshot(named: "default-home-photo-gesture-ownership", from: app)
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].isHittable)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_photo_stage"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_progress_value"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context"].exists)
+        XCTAssertFalse(app.buttons["home_v2_sidebar_ask"].exists)
+    }
+
+    private func launchDefaultHome(_ app: XCUIApplication, extra: [String] = []) {
+        let arguments = ["-lybUITestPhotoTimelineHUDFixture"] + extra
+        XCTAssertFalse(arguments.contains { $0.hasPrefix("-lybUITestHomeV2") || $0 == "-lybUITestHomeRollbackFixture" })
+        launch(app, with: arguments)
+        XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_surface"].exists)
+    }
+
+    private func swipeHomeHeader(in app: XCUIApplication, rightward: Bool) {
+        let header = app.descendants(matching: .any)["photo_timeline_root_nav"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
+        let start = header.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: rightward ? 100 : 320, dy: 12))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: rightward ? 220 : -220, dy: 0)))
+    }
+
+    private func assertDefaultHomeStates(largestText: Bool) throws {
+        let states = [
+            ("photo", ["-lybUITestPhotoTimelinePhotoFixture"], "home_v2_photo_stage"),
+            ("data", [], "home_v2_body_fat_graphic"),
+            ("empty", ["-lybUITestPhotoTimelineEmptyFixture"], "home_v2_day_zero")
+        ]
+        for (name, dataArguments, identifier) in states {
+            let app = XCUIApplication()
+            let typeArguments = largestText
+                ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] : []
+            launchDefaultHome(app, extra: dataArguments + typeArguments)
+            let card = app.descendants(matching: .any)["home_v2_editorial_card"].firstMatch
+            XCTAssertTrue(card.waitForExistence(timeout: 30))
+            XCTAssertTrue(app.descendants(matching: .any)[identifier].waitForExistence(timeout: 5))
+            let window = app.windows.firstMatch.frame
+            XCTAssertEqual(card.frame.minX, window.minX, accuracy: 1)
+            XCTAssertEqual(card.frame.width, window.width, accuracy: 1)
+            XCTAssertEqual(card.frame.height, card.frame.width / 0.8, accuracy: 1)
+            let log = app.buttons["home_v2_log_weight"]
+            XCTAssertTrue(log.isHittable)
+            XCTAssertTrue(window.insetBy(dx: -1, dy: -1).contains(log.frame))
+            XCTAssertGreaterThanOrEqual(log.frame.height, 44)
+            XCTAssertFalse(app.descendants(matching: .any)["home_chat_composer_dock"].exists)
+            attachScreenshot(named: "default-home-\(name)-\(largestText ? "ax5" : "compact")", from: app)
+            log.tap()
+            XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
+            app.buttons["Cancel"].tap()
+            XCTAssertTrue(log.waitForExistence(timeout: 8))
+            app.terminate()
+        }
+    }
+
     func testHomeV2ProgressIsOneMetricWorkspace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
@@ -2175,11 +2422,11 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home_v2_progress_log_weight"].exists, "Only weight is logged here")
         attachScreenshot(named: "home-v2-progress-body-fat", from: app)
 
-        // The root swipe lives on the header, as on the legacy Stats page; the leading edge opens the menu.
+        // LYB-88 returns from Progress to Today with a leftward header swipe.
         let header = app.descendants(matching: .any)["photo_timeline_root_nav"]
         XCTAssertTrue(header.waitForExistence(timeout: 5))
-        let start = header.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 120, dy: 12))
-        let end = start.withOffset(CGVector(dx: 220, dy: 0))
+        let start = header.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 320, dy: 12))
+        let end = start.withOffset(CGVector(dx: -220, dy: 0))
         start.press(forDuration: 0.05, thenDragTo: end)
         XCTAssertTrue(
             app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8),
@@ -2544,6 +2791,42 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-ask", from: app)
     }
 
+    func testDailyReminderIsOfferedAfterTheFirstLoggedWeighInNotBeforeToday() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestDailyReminderPromptFixture"
+        ])
+
+        // Home's dock appears once the fixture has seeded.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 45),
+            "A new subscriber lands on Today"
+        )
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].exists, "No reminder ask before Today")
+
+        logWeight.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 10),
+            "The first logged weigh-in is when a reminder has a job"
+        )
+        attachScreenshot(named: "daily-reminder-after-first-weigh-in", from: app)
+        let notNow = app.buttons["daily_reminder_skip_button"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 3))
+        notNow.tap()
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].waitForExistence(timeout: 5))
+    }
+
     func testHomeV2AskOpensFromProgressAndReturnsToProgress() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
@@ -2586,24 +2869,18 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 30),
-            "Without a photo the Home is metric first"
-        )
+        let card = app.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 30), "Without a photo, saved data fills the same editorial card")
+        let bodyFat = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+        XCTAssertTrue(bodyFat.exists)
+        XCTAssertTrue(bodyFat.label.contains("15.8 percent"))
         let value = app.descendants(matching: .any)["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
-
-        let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
-        XCTAssertTrue(chart.waitForExistence(timeout: 5), "Metric-first Home keeps the trend chart geometry even before 7 days")
-        XCTAssertGreaterThanOrEqual(chart.frame.minY, value.frame.maxY - 1, "The chart sits below the number")
-        XCTAssertTrue(
-            chart.label.contains("7 days") || chart.label.contains("7-day average"),
-            "The chart says whether it is a trend or still waiting for 7 days"
-        )
-        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Home keeps a fixed 30-day window; ranges live in Progress")
+        XCTAssertGreaterThanOrEqual(value.frame.minY, card.frame.maxY - 1, "Supporting weight sits below the card")
+        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Date ranges live in Progress")
         let viewProgress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 5), "Progress is one disclosure away")
-        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, chart.frame.maxY - 1)
+        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, value.frame.maxY - 1)
 
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")
@@ -2632,6 +2909,191 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(done.exists)
         done.tap()
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
+    }
+
+    func testHomeV2SwipeMovesPhotoDateAndMetricsTogether() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let stage = app.descendants(matching: .any)["home_v2_photo_stage"]
+        XCTAssertTrue(stage.waitForExistence(timeout: 30))
+
+        let caption = app.descendants(matching: .any)["home_v2_photo_caption"]
+        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 5))
+        XCTAssertTrue(value.waitForExistence(timeout: 5))
+        let beforeCaption = caption.label
+        let beforeValue = value.label
+
+        stage.swipeLeft()
+
+        let moved = expectation(
+            for: NSPredicate(format: "label != %@", beforeCaption),
+            evaluatedWith: caption
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [moved], timeout: 5),
+            .completed,
+            "Swiping left moves one day back through body history"
+        )
+        XCTAssertNotEqual(value.label, beforeValue, "The metric follows the selected day")
+        attachScreenshot(named: "home-v2-swipe-back", from: app)
+
+        stage.swipeRight()
+        let returned = expectation(
+            for: NSPredicate(format: "label == %@", beforeCaption),
+            evaluatedWith: caption
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [returned], timeout: 5),
+            .completed,
+            "Swiping right returns to the latest day"
+        )
+    }
+
+    func testHomeV2ScrubberJumpsThroughBodyHistory() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+
+        let scrubber = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(scrubber.waitForExistence(timeout: 30), "The bottom scrubber travels through time")
+
+        let caption = app.descendants(matching: .any)["home_v2_photo_caption"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 5))
+        let beforeCaption = caption.label
+
+        // Drag from the right edge to the left: fast scrub toward the oldest day.
+        let start = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.7))
+        let end = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.7))
+        start.press(forDuration: 0.05, thenDragTo: end)
+
+        let moved = expectation(
+            for: NSPredicate(format: "label != %@", beforeCaption),
+            evaluatedWith: caption
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [moved], timeout: 5),
+            .completed,
+            "Scrubbing resolves to the same selected day a swipe would reach"
+        )
+        attachScreenshot(named: "home-v2-scrubbed", from: app)
+    }
+
+    func testHomeV2TimelineCoachMarkDismissesPermanently() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestResetHomeV2TimelineCoach"
+        ])
+
+        let coach = app.buttons["home_v2_timeline_coach"]
+        XCTAssertTrue(coach.waitForExistence(timeout: 30), "First use teaches swipe and scrub once")
+        coach.tap()
+        XCTAssertTrue(coach.waitForNonExistence(timeout: 5), "Dismissal is immediate")
+
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_photo_stage"].waitForExistence(timeout: 30)
+        )
+        XCTAssertFalse(coach.exists, "The coach mark never occupies product space again")
+    }
+
+    func testHomeV2ChangingLogDateDoesNotCreateATodayUndoReceipt() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 30))
+        logWeight.tap()
+        let datePicker = app.datePickers.firstMatch
+        XCTAssertTrue(datePicker.waitForExistence(timeout: 8))
+        datePicker.tap()
+
+        let calendar = Calendar.current
+        let yesterday = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: Date()))
+        if calendar.component(.day, from: Date()) == 1 {
+            app.buttons["Previous Month"].tap()
+        }
+        let day = app.staticTexts[String(calendar.component(.day, from: yesterday))].firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 5))
+        day.tap()
+        app.buttons["home_v2_log_sheet_plus"].tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 10), "Saving another day returns without a today receipt")
+        XCTAssertFalse(app.buttons["home_v2_undo"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
+        attachScreenshot(named: "home-v2-log-another-day", from: app)
+    }
+
+    func testHomeV2UndoRestoresPhotoOnlyDayAfterRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["LYB_UI_TEST_UNDO_ACCOUNT"] = UUID().uuidString
+        let arguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2UndoPhotoOnlyFixture"
+        ]
+        launch(app, with: arguments)
+        try logWeightOnPhotoOnlyDay(in: app)
+
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        undo.tap()
+        XCTAssertTrue(undo.waitForNonExistence(timeout: 10), "Undo clears only after the restore saves")
+        app.buttons["home_v2_context_button"].tap()
+        assertPhotoOnlyDay(in: app)
+        attachScreenshot(named: "home-v2-undo-photo-only", from: app)
+
+        launch(app, with: arguments + ["-lybUITestReuseUndoFixtureData"])
+        let details = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(details.waitForExistence(timeout: 30))
+        details.tap()
+        assertPhotoOnlyDay(in: app)
+        attachScreenshot(named: "home-v2-undo-photo-only-relaunched", from: app)
+    }
+
+    func testHomeV2UndoFailureKeepsTheReceiptAndSavedWeight() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["LYB_UI_TEST_UNDO_ACCOUNT"] = UUID().uuidString
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2UndoPhotoOnlyFixture", "-lybUITestHomeV2UndoFailureFixture"
+        ])
+        try logWeightOnPhotoOnlyDay(in: app)
+
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        undo.tap()
+        let failure = app.alerts["Couldn’t undo this entry"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 5))
+        attachScreenshot(named: "home-v2-undo-save-failed", from: app)
+        failure.buttons["OK"].tap()
+        XCTAssertTrue(undo.exists, "A failed save keeps Undo available")
+        XCTAssertTrue(undo.isHittable, "The retained receipt can be retried")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
+        app.buttons["home_v2_context_button"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["home_v2_context_photo"].exists)
+    }
+
+    private func logWeightOnPhotoOnlyDay(in app: XCUIApplication) throws {
+        let details = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(details.waitForExistence(timeout: 30))
+        details.tap()
+        assertPhotoOnlyDay(in: app)
+        app.buttons["home_v2_edit_entry"].tap()
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 8))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 10))
+        app.buttons["home_v2_context_close"].tap()
+    }
+
+    private func assertPhotoOnlyDay(in app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["home_v2_context_photo"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForNonExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_body_fat"].waitForNonExistence(timeout: 8))
     }
 
     func testHomeV2ProgressRefreshesAfterEditingAnExistingDay() throws {
@@ -2774,9 +3236,21 @@ final class LogYourBodyUITests: XCTestCase {
 
         let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
         let shareCard = app.descendants(matching: .any)["body_score_share_card"]
-        XCTAssertTrue(
-            app.descendants(matching: .any)["world_class_screen_shareBodyScore"].waitForExistence(timeout: 8)
-        )
+        let shareScreen = app.descendants(matching: .any)["world_class_screen_shareBodyScore"]
+        var shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
+        if !shareScreenVisible {
+            // A tap synthesized while the timeline stage re-lays out can land on
+            // a stale accessibility element; re-resolve and tap once before failing.
+            let retryShareButton = app.descendants(matching: .any)["body_score_hero_share_button"].firstMatch
+            if retryShareButton.exists {
+                scrollUntilHittable(retryShareButton, in: app)
+                if retryShareButton.isHittable {
+                    retryShareButton.tap()
+                    shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
+                }
+            }
+        }
+        XCTAssertTrue(shareScreenVisible)
         // Sheet identifier is preferred; card must remain discoverable for launch quality.
         let sheetVisible = shareSheet.waitForExistence(timeout: 8)
         let cardVisible = shareCard.waitForExistence(timeout: sheetVisible ? 4 : 8)
@@ -2826,6 +3300,92 @@ final class LogYourBodyUITests: XCTestCase {
             shareButton.waitForExistence(timeout: 5),
             "Home share control must return after dismissing share sheet"
         )
+    }
+
+    func testRecoveryEmailKeyboardDoneMeetsMinimumHitTarget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestRecoveryEmailPath",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        app.tap()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        app.buttons["body_score_onboarding_basics_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        app.buttons["CM"].tap()
+        let heightField = app.textFields["Height in centimeters"]
+        XCTAssertTrue(heightField.waitForExistence(timeout: 5))
+        heightField.tap()
+        heightField.typeText("178")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_height_continue_button"].tap()
+
+        let manual = app.buttons["body_score_onboarding_enter_manually_button"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 8))
+        manual.tap()
+        XCTAssertTrue(app.staticTexts["What’s your current weight?"].waitForExistence(timeout: 8))
+        app.buttons["LBS"].tap()
+        let weightField = app.textFields["Weight (lbs)"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        weightField.typeText("182")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_manual_weight_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How do you know your body fat?"].waitForExistence(timeout: 8))
+        app.buttons["body_score_onboarding_body_fat_manual_button"].tap()
+        XCTAssertTrue(app.staticTexts["Enter your body fat."].waitForExistence(timeout: 8))
+        let bodyFatField = app.textFields["Body fat percentage"]
+        XCTAssertTrue(bodyFatField.waitForExistence(timeout: 5))
+        bodyFatField.tap()
+        bodyFatField.typeText("18")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_body_fat_numeric_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs muscle."].waitForExistence(timeout: 15))
+        app.buttons["body_score_reveal_continue_button"].tap()
+        XCTAssertTrue(app.staticTexts["Add a recovery email."].waitForExistence(timeout: 8))
+
+        let emailField = app.textFields["you@domain.com"]
+        XCTAssertTrue(emailField.waitForExistence(timeout: 5))
+        emailField.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5))
+
+        let window = app.windows.firstMatch.frame
+        let done = app.buttons.matching(identifier: "body_score_email_keyboard_done_button").firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(done.frame), "email Done \(done.frame) window \(window)")
+        XCTAssertGreaterThanOrEqual(done.frame.width, 44, "email Done \(done.frame)")
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, "email Done \(done.frame)")
+
+        let labeledDones = app.buttons.matching(NSPredicate(format: "label == 'Done'"))
+        for index in 0..<labeledDones.count {
+            let control = labeledDones.element(boundBy: index)
+            guard control.exists, control.frame.width > 1, control.frame.height > 1 else { continue }
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "email Done \(control.frame)")
+        }
+
+        done.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Add a recovery email."].exists)
     }
 
     private func assertAndCaptureTimelineAnalytics(in app: XCUIApplication) throws {

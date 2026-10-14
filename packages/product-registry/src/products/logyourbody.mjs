@@ -73,6 +73,9 @@ export const logYourBody = {
       'chat_usage_limits',
       'waitlist_entries',
       'native_records',
+      'training_revision_proposals',
+      'training_program_revisions',
+      'training_revision_state',
       'revenuecat_events',
       'progress_photos',
       'data_exports',
@@ -106,6 +109,8 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://raw.githubusercontent.com', reason: 'Immutable JovieKit source import; the canonical downloader validates repository, revision, paths and SHA-256 before materialization.' },
+      { value: 'https://transport.invalid', reason: 'Reserved URLProtocol fixture host in canonical JovieKit tests; not a runtime endpoint.' },
       { value: 'https://github.com/ChatPRD/lennys-podcast-transcripts', reason: 'Podcast transcript citation in docs/research; not a dependency.' },
       { value: 'https://threadreaderapp.com', reason: 'Research-note citation links in docs/research; not runtime endpoints.' },
       { value: 'https://www.lennysnewsletter.com', reason: 'Research-note citation links in docs/research; not runtime endpoints.' },

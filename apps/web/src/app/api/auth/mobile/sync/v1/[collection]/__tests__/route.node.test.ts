@@ -3,6 +3,7 @@
 import { NextRequest } from 'next/server';
 import { createNativeProductRecordHandlers } from '../route-handlers';
 import type {
+  NativeProductAccountMutationsPort,
   NativeProductRecord,
   NativeProductRecordCollection,
   NativeProductRecordsPort,
@@ -20,6 +21,13 @@ const morning = {
 };
 
 class MemoryNativeRecords implements NativeProductRecordsPort {
+  accountMutations: NativeProductAccountMutationsPort = {
+    capture: async (subject) => ({ subject, ownerId: morningId }),
+    push: (a, collection, records) => this.push(a.subject, collection, records),
+    remove: (a, collection, ids) => this.remove(a.subject, collection, ids),
+    endActiveGlp1Medications: (a, endedAt) => this.endActiveGlp1Medications(a.subject, endedAt),
+  };
+
   pushed: Array<{
     subject: string;
     collection: NativeProductRecordCollection;
@@ -188,6 +196,58 @@ describe('/api/auth/mobile/sync/v1/[collection]', () => {
     expect(response.status).toBe(200);
     expect(records.pushed[0]?.collection).toBe('dexa_results');
     expect(records.pushed[0]?.records).toHaveLength(1);
+  });
+
+  it.each([
+    { steps: 0, steps_present: true },
+    { steps: 8421, steps_present: true },
+    { steps: 2147483647, steps_present: true },
+    { steps: null, steps_present: false },
+  ])('preserves explicit daily step presence %p through the admitted route', async (value) => {
+    const { handlers, records } = makeHarness();
+    const record = { ...morning, ...value };
+    const response = await handlers.POST(request('POST', 'daily-metrics', 'access-a', [record]));
+    expect(response.status).toBe(200);
+    expect(records.pushed[0]).toMatchObject({ subject: 'owner-a', records: [record] });
+    await expect(response.json()).resolves.toMatchObject({ records: [value] });
+  });
+
+  it.each([
+    { steps_present: true },
+    { steps_present: true, steps: null },
+    { steps_present: true, steps: -1 },
+    { steps_present: true, steps: 0.5 },
+    { steps_present: true, steps: 2147483648 },
+    { steps_present: true, steps: '0' },
+    { steps_present: true, steps: false },
+    { steps_present: false },
+    { steps_present: false, steps: 0 },
+    { steps_present: false, steps: 8421 },
+    { steps_present: null, steps: 0 },
+    { steps_present: 'true', steps: 0 },
+    { steps_present: 1, steps: 0 },
+  ])(
+    'rejects contradictory or malformed daily presence %p before any batch write',
+    async (value) => {
+      const { handlers, records } = makeHarness();
+      const response = await handlers.POST(
+        request('POST', 'daily-metrics', 'access-a', [
+          morning,
+          { id: eveningId, date: morning.date, ...value },
+        ]),
+      );
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ error: 'invalid_records' });
+      expect(records.pushed).toEqual([]);
+    },
+  );
+
+  it('does not impose daily step metadata on another native collection', async () => {
+    const { handlers, records } = makeHarness();
+    const record = { id: morningId, steps_present: 'opaque', steps: 'not a step reading' };
+    const response = await handlers.POST(request('POST', 'dexa-results', 'access-a', [record]));
+    expect(response.status).toBe(200);
+    expect(records.pushed[0]?.records).toEqual([record]);
   });
 
   const reportedMeasurements = {
