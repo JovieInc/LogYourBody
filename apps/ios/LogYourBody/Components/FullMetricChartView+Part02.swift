@@ -316,12 +316,16 @@ var minSeriesValue: Double? {
         activeSeries.map(\.value).min()
     }
 
+var validatedActivePoint: MetricChartDataPoint? {
+        ContextualMetricDetailPolicy.validatedFocus(activePoint, in: activeSeries)
+    }
+
 var headlineValueText: String {
         // Only replace the card's latest/trend headline when the user is
         // actively inspecting a chart point. The stats card and this screen
         // must stay on the same number when metric detail opens at rest.
-        if let activePoint {
-            return formatHeadlineValue(activePoint.value)
+        if let point = validatedActivePoint {
+            return formatHeadlineValue(point.value)
         }
         return currentValue
     }
@@ -334,8 +338,8 @@ var headlineDateText: String {
     }
 
     var selectedFocusPoint: MetricChartDataPoint? {
-        if let activePoint {
-            return activePoint
+        if let point = validatedActivePoint {
+            return point
         }
 
         guard let selectedTimelineDate else { return nil }

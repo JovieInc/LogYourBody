@@ -116,6 +116,22 @@ enum ContextualMetricProgressPolicy {
     }
 }
 
+enum ContextualMetricDetailPolicy {
+    static func validatedFocus(
+        _ point: MetricChartDataPoint?, in series: [MetricChartDataPoint]
+    ) -> MetricChartDataPoint? {
+        guard let point else { return nil }
+        return series.first { $0.id == point.id }
+    }
+
+    static func source(
+        point: MetricChartDataPoint?, entries: [MetricHistoryEntry], fallback: String?, isSmoothed: Bool
+    ) -> String? {
+        guard !isSmoothed else { return nil }
+        return ContextualMetricSourcePolicy.source(for: point, entries: entries, fallback: fallback)
+    }
+}
+
 enum ContextualMetricEvidencePolicy {
     static func label(for kind: ContextualMetricKind, isEstimated: Bool = false,
                       bodyFatMethod: String? = nil, isSmoothed: Bool = false) -> String? {
@@ -168,45 +184,101 @@ extension BodyScoreSharePayload {
     }
 }
 
+/// A frozen offer/composer retains the account lifetime that produced its health data.
+struct AccountBoundShareCapture {
+    private(set) var payload: BodyScoreSharePayload?
+
+    mutating func freeze(_ payload: BodyScoreSharePayload, owner: AuthManager.ProfileSessionOwnership) {
+        self.payload = payload.owned(by: owner)
+    }
+
+    func authorizedPayload(owns: (AuthManager.ProfileSessionOwnership) -> Bool) -> BodyScoreSharePayload? {
+        guard let payload, payload.isOwned(by: owns) else { return nil }
+        return payload
+    }
+
+    mutating func reconcile(currentOwner: AuthManager.ProfileSessionOwnership?) {
+        guard payload?.accountSession != currentOwner else { return }
+        clear()
+    }
+
+    mutating func clear() { payload = nil }
+}
+
 /// Screenshot capture remains entirely owned by iOS. Only an explicit acceptance opens the composer.
 struct ContextualMetricShareModifier: ViewModifier {
+    @EnvironmentObject private var authManager: AuthManager
     @Environment(\.scenePhase) private var scenePhase
     let payload: BodyScoreSharePayload?
     var isVisible = true
     @Binding var directRequest: Bool
-    @State private var pendingPayload: BodyScoreSharePayload?
+    @State private var capture = AccountBoundShareCapture()
+    private var pendingPayload: BodyScoreSharePayload? {
+        capture.authorizedPayload(owns: authManager.ownsAccountSession)
+    }
+    @State private var contextOwner: AuthManager.ProfileSessionOwnership?
     @State private var isOnScreen = false
     @State private var showsOffer = false
     @State private var showsComposer = false
 
     func body(content: Content) -> some View {
         content
-            .onAppear { isOnScreen = true }
-            .onDisappear { isOnScreen = false }
+            .onAppear {
+                contextOwner = authManager.captureAccountSession()
+                isOnScreen = true
+            }
+            .onDisappear {
+                isOnScreen = false
+                invalidateShareContext()
+            }
+            .onChange(of: authManager.captureAccountSession()) { _, owner in
+                invalidateShareContext(currentOwner: owner)
+            }
             .onScreenshot {
-                guard payload != nil,
+                guard let payload, let contextOwner, authManager.ownsAccountSession(contextOwner),
                       ContextualMetricSharePolicy.canOfferScreenshot(
                         isActive: scenePhase == .active,
                         isVisible: isVisible && isOnScreen,
                         isPresenting: showsOffer || showsComposer
                       ) else { return }
-                pendingPayload = payload
+                capture.freeze(payload, owner: contextOwner)
                 showsOffer = true
             }
             .confirmationDialog("Create a share card?", isPresented: $showsOffer, titleVisibility: .visible) {
-                Button("Share \(pendingPayload?.preferredMetric?.title ?? "metric")") { showsComposer = true }
-                Button("Not now", role: .cancel) { pendingPayload = nil }
+                Button("Share \(pendingPayload?.preferredMetric?.title ?? "metric")") {
+                    guard pendingPayload?.isOwned(by: authManager.ownsAccountSession) == true else {
+                        invalidateShareContext()
+                        return
+                    }
+                    showsComposer = true
+                }
+                Button("Not now", role: .cancel) { capture.clear() }
             } message: {
                 Text("Your screenshot stays unchanged. Choose the details to include before sharing.")
             }
             .onChange(of: directRequest) { _, requested in
                 guard requested else { return }
                 directRequest = false
-                pendingPayload = payload
-                showsComposer = payload != nil
+                guard isVisible, isOnScreen, let payload, let contextOwner,
+                      authManager.ownsAccountSession(contextOwner) else {
+                    invalidateShareContext()
+                    return
+                }
+                capture.freeze(payload, owner: contextOwner)
+                showsComposer = true
             }
-            .sheet(isPresented: $showsComposer, onDismiss: { pendingPayload = nil }, content: {
-                if let pendingPayload { BodyScoreShareSheet(payload: pendingPayload) }
+            .sheet(isPresented: $showsComposer, onDismiss: { capture.clear() }, content: {
+                if let pendingPayload, pendingPayload.isOwned(by: authManager.ownsAccountSession) {
+                    BodyScoreShareSheet(payload: pendingPayload)
+                }
             })
+    }
+
+    private func invalidateShareContext(currentOwner: AuthManager.ProfileSessionOwnership? = nil) {
+        capture.reconcile(currentOwner: currentOwner)
+        contextOwner = nil
+        showsOffer = false
+        showsComposer = false
+        directRequest = false
     }
 }

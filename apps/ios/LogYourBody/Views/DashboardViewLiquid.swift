@@ -120,8 +120,20 @@ struct DashboardViewLiquid: View {
     @State var progressPhotoAttachTarget: BodyMetrics?
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
-    @State var bodyScoreSharePayload: BodyScoreSharePayload?
+    @State var bodyScoreShareCapture = AccountBoundShareCapture()
+    var bodyScoreSharePayload: BodyScoreSharePayload? {
+        get { bodyScoreShareCapture.authorizedPayload(owns: authManager.ownsAccountSession) }
+        nonmutating set {
+            guard let newValue, let owner = newValue.accountSession,
+                  authManager.ownsAccountSession(owner) else {
+                bodyScoreShareCapture.clear()
+                return
+            }
+            bodyScoreShareCapture.freeze(newValue, owner: owner)
+        }
+    }
     @State private var screenshotShareSnapshots: [ContextualMetricSnapshot] = []
+    @State private var screenshotShareOwner: AuthManager.ProfileSessionOwnership?
     @State private var showsScreenshotShareChoice = false
     @State var bodyScoreSharePresentationID: UUID?
     @State private var hasPerformedInitialRefresh = false
@@ -245,6 +257,7 @@ struct DashboardViewLiquid: View {
                 }
             }
             .onDisappear {
+                invalidateDashboardShareContext()
                 syncBannerDismissTask?.cancel()
                 metricCacheRefreshTask?.cancel()
                 metricCacheBuildID = UUID()
@@ -267,8 +280,18 @@ struct DashboardViewLiquid: View {
                 scheduleDashboardDerivedStateRefresh()
                 scheduleMetricCacheRefresh()
             }
-            .onChange(of: authManager.currentUser?.id) { _, _ in
+            .onChange(of: authManager.captureAccountSession()) { _, owner in
+                invalidateDashboardShareContext(currentOwner: owner)
                 homeV2TimelineSelection = nil
+                isMetricDetailActive = false
+                isStatsDestinationActive = false
+                selectedPhotoTimelineRootPage = .timeline
+                isHomeV2MetricProvenancePresented = false
+                metricCacheRefreshTask?.cancel()
+                metricCacheBuildID = UUID()
+                fullChartCache = [:]
+                fullTrendChartCache = [:]
+                metricEntriesCache = [:]
                 reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
             }
             .onChange(of: selectedRange) { _, newValue in
@@ -345,18 +368,32 @@ struct DashboardViewLiquid: View {
                 guard scenePhase == .active, selectedTab == .home,
                       selectedPhotoTimelineRootPage == .timeline,
                       !isMetricDetailActive, !isStatsDestinationActive,
-                      isMetricShareContextVisible, !showsScreenshotShareChoice else { return }
+                      isMetricShareContextVisible, !showsScreenshotShareChoice,
+                      let ownership = authManager.captureAccountSession(),
+                      dashboardMetricsBelong(to: ownership) else { return }
+                screenshotShareOwner = ownership
                 screenshotShareSnapshots = dashboardMetricShareSnapshots
                 showsScreenshotShareChoice = !screenshotShareSnapshots.isEmpty
             }
             .confirmationDialog("Choose a metric to share", isPresented: $showsScreenshotShareChoice, titleVisibility: .visible) {
                 ForEach(screenshotShareSnapshots) { snapshot in
                     Button(snapshot.kind.title) {
+                        guard let ownership = screenshotShareOwner,
+                              authManager.ownsAccountSession(ownership) else {
+                            invalidateDashboardShareContext()
+                            return
+                        }
                         bodyScoreSharePresentationID = UUID()
-                        bodyScoreSharePayload = .contextual(screenshotShareSnapshots, selected: snapshot.kind)
+                        bodyScoreSharePayload = BodyScoreSharePayload.contextual(
+                            screenshotShareSnapshots, selected: snapshot.kind)?.owned(by: ownership)
+                        screenshotShareSnapshots = []
+                        screenshotShareOwner = nil
                     }
                 }
-                Button("Not now", role: .cancel) { screenshotShareSnapshots = [] }
+                Button("Not now", role: .cancel) {
+                    screenshotShareSnapshots = []
+                    screenshotShareOwner = nil
+                }
             } message: {
                 Text("Your screenshot stays unchanged. Only the metric you choose is included.")
             }
@@ -387,9 +424,23 @@ struct DashboardViewLiquid: View {
         releaseReviewDestination = nil
     }
 
+    func dashboardMetricsBelong(to ownership: AuthManager.ProfileSessionOwnership) -> Bool {
+        authManager.ownsAccountSession(ownership)
+            && bodyMetrics.allSatisfy { $0.userId == ownership.subject }
+            && (dailyMetrics == nil || dailyMetrics?.userId == ownership.subject)
+    }
+
+    func invalidateDashboardShareContext(currentOwner: AuthManager.ProfileSessionOwnership? = nil) {
+        bodyScoreShareCapture.reconcile(currentOwner: currentOwner)
+        bodyScoreSharePresentationID = nil
+        screenshotShareSnapshots = []
+        screenshotShareOwner = nil
+        showsScreenshotShareChoice = false
+    }
+
     @ViewBuilder
     private var bodyScoreShareOverlay: some View {
-        if let payload = bodyScoreSharePayload {
+        if let payload = bodyScoreSharePayload, payload.isOwned(by: authManager.ownsAccountSession) {
             BodyScoreShareSheet(payload: payload) {
                 bodyScoreSharePayload = nil
                 bodyScoreSharePresentationID = nil

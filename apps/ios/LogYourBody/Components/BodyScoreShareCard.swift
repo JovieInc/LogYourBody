@@ -52,6 +52,17 @@ struct BodyScoreSharePayload {
     let photoImage: UIImage?
     var contextualMetrics: [ContextualMetricSnapshot] = []
     var preferredMetric: ContextualMetricKind?
+    var accountSession: AuthManager.ProfileSessionOwnership?
+
+    func owned(by ownership: AuthManager.ProfileSessionOwnership) -> Self {
+        var copy = self
+        copy.accountSession = ownership
+        return copy
+    }
+
+    func isOwned(by owns: (AuthManager.ProfileSessionOwnership) -> Bool) -> Bool {
+        accountSession.map(owns) ?? false
+    }
 
     var avatarMatch: AvatarBodyFatCatalog.Match {
         AvatarBodyFatCatalog.match(bodyFatPercentage: bodyFatPercentage, gender: gender)
@@ -510,6 +521,7 @@ struct ShareCardLayout {
 }
 
 struct BodyScoreShareSheet: View {
+    @EnvironmentObject private var authManager: AuthManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -538,7 +550,9 @@ struct BodyScoreShareSheet: View {
 
     var body: some View {
         Group {
-            if dynamicTypeSize.isAccessibilitySize {
+            if !payload.isOwned(by: authManager.ownsAccountSession) {
+                Color.clear
+            } else if dynamicTypeSize.isAccessibilitySize {
                 ScrollView(showsIndicators: false) {
                     shareSheetContent(previewHeight: 420)
                         .padding(.vertical, JovieTokens.itemGap)
@@ -568,7 +582,7 @@ struct BodyScoreShareSheet: View {
             }
         }
         .sheet(isPresented: $showSystemShareSheet) {
-            if let image = renderedImage {
+            if payload.isOwned(by: authManager.ownsAccountSession), let image = renderedImage {
                 ShareSheet(items: [image])
                     .ignoresSafeArea()
             }
@@ -581,6 +595,12 @@ struct BodyScoreShareSheet: View {
         } message: {
             Text(exportFailure ?? "Try again.")
         }
+        .onChange(of: authManager.captureAccountSession()) { _, _ in
+            guard !payload.isOwned(by: authManager.ownsAccountSession) else { return }
+            invalidatePrivateExport()
+            closeShareSheet()
+        }
+        .onDisappear { invalidatePrivateExport() }
         .onChange(of: payload.contextualMetrics) { _, _ in renderedImage = nil }
         .onChange(of: selectedAspect) { _, _ in
             renderedImage = nil
@@ -835,8 +855,18 @@ struct BodyScoreShareSheet: View {
         return CGSize(width: target.width * scale, height: target.height * scale)
     }
 
+    private func invalidatePrivateExport() {
+        renderedImage = nil
+        showSystemShareSheet = false
+        exportFailure = nil
+    }
+
     @MainActor
     private func renderImage() {
+        guard payload.isOwned(by: authManager.ownsAccountSession) else {
+            invalidatePrivateExport()
+            return
+        }
         isRendering = true
         defer { isRendering = false }
 
@@ -853,6 +883,10 @@ struct BodyScoreShareSheet: View {
 
     @MainActor
     private func shareImage() async {
+        guard payload.isOwned(by: authManager.ownsAccountSession) else {
+            invalidatePrivateExport()
+            return
+        }
         if renderedImage == nil {
             renderImage()
         }
@@ -865,6 +899,10 @@ struct BodyScoreShareSheet: View {
 
     @MainActor
     private func saveToPhotos() async {
+        guard payload.isOwned(by: authManager.ownsAccountSession) else {
+            invalidatePrivateExport()
+            return
+        }
         if renderedImage == nil {
             renderImage()
         }
@@ -873,7 +911,13 @@ struct BodyScoreShareSheet: View {
             return
         }
 
-        if !(await LivePhotoLibraryAdapter.shared.saveImage(image)) {
+        let saved = await LivePhotoLibraryAdapter.shared.saveImage(
+            image, whileOwned: { payload.isOwned(by: authManager.ownsAccountSession) })
+        guard payload.isOwned(by: authManager.ownsAccountSession) else {
+            invalidatePrivateExport()
+            return
+        }
+        if !saved {
             exportFailure = "Photos access is unavailable. Allow access in Settings or use Share to export the card."
         }
     }

@@ -29,6 +29,11 @@ extension DashboardViewLiquid {
 
     /// Series come from the prewarmed whole-history caches (display units).
     func homeV2ProgressSeries(for metric: HomeV2ProgressMetric) -> HomeV2ProgressSeries {
+        guard let ownership = authManager.captureAccountSession(), dashboardMetricsBelong(to: ownership) else {
+            return HomeV2ProgressSeries(
+                daily: [], trend: [], unit: "", deltaUnit: "", target: nil,
+                provenance: nil, insightTitle: nil, insightBody: nil)
+        }
         let system = currentMeasurementSystem
         switch metric {
         case .weight:

@@ -223,7 +223,8 @@ extension DashboardViewLiquid {
 
     /// Owner state gates the receiver even when SwiftUI keeps a covered view mounted.
     var isMetricShareContextVisible: Bool {
-        !showAddEntrySheet && !showSyncDetails && !isProgressPhotoAttachPresented
+        authManager.captureAccountSession().map { dashboardMetricsBelong(to: $0) } == true
+            && !showAddEntrySheet && !showSyncDetails && !isProgressPhotoAttachPresented
             && !isPhotoTimelineSettingsPresented && !isHomeV2ViewerPresented
             && !isHomeV2ContextPresented && !isHomeV2EntriesPresented && !isHomeV2MetricProvenancePresented
             && !isHomeV2SettingsPresented && !isHomeV2HelpPresented && !isHomeV2AllPhotosPresented

@@ -90,18 +90,21 @@ var body: some View {
 
 var contextualSharePayload: BodyScoreSharePayload? {
         guard let kind = ContextualMetricKind.from(title: title) else { return nil }
+        let point = validatedActivePoint
+        let isSmoothed = point != nil && chartMode == .trend
         let selected = ContextualMetricSnapshot(
             kind: kind, value: headlineValueText, unit: unit,
             observation: headlineDateText, range: selectedTimeRange.accessibilityLabel,
-            trend: chartMode == .trend ? "Smoothed" : nil,
-            provenance: ContextualMetricSourcePolicy.source(
-                for: activePoint, entries: metricEntries?.entries ?? [],
-                fallback: shareSnapshots.first { $0.kind == kind }?.provenance
+            trend: isSmoothed ? "Smoothed" : nil,
+            provenance: ContextualMetricDetailPolicy.source(
+                point: point, entries: metricEntries?.entries ?? [],
+                fallback: shareSnapshots.first { $0.kind == kind }?.provenance,
+                isSmoothed: isSmoothed
             ),
-            evidence: activePoint.map {
+            evidence: point.map {
                 ContextualMetricEvidencePolicy.label(
                     for: kind, isEstimated: $0.isEstimated,
-                    isSmoothed: chartMode == .trend && kind == .weight)
+                    isSmoothed: isSmoothed && kind == .weight)
             } ?? shareSnapshots.first { $0.kind == kind }?.evidence
         )
         return .contextual(shareSnapshots.filter { $0.kind != kind } + [selected], selected: kind)

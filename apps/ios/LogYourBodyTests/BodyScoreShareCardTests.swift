@@ -578,6 +578,129 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertEqual(refreshed.point.value, 86)
     }
 
+    func testAllShareRoutesRejectAccountReplacementAndSameSubjectNewGeneration() throws {
+        let original = AuthManager.ProfileSessionOwnership(subject: "synthetic-A", generation: 1)
+        let replacements: [AuthManager.ProfileSessionOwnership?] = [
+            .init(subject: "synthetic-B", generation: 2), nil,
+            .init(subject: "synthetic-A", generation: 3)
+        ]
+        var payloads = [makePayload(bodyFatPercentage: 16, gender: "male", photoImage: makeShareTestImage())]
+        payloads += try ContextualMetricKind.allCases.map { kind in
+            try XCTUnwrap(BodyScoreSharePayload.contextual([contextualSnapshot(kind: kind)], selected: kind))
+        }
+        for payload in payloads {
+            for replacement in replacements {
+                var current: AuthManager.ProfileSessionOwnership? = original
+                var pendingOffer = AccountBoundShareCapture()
+                var dashboardComposer = AccountBoundShareCapture()
+                pendingOffer.freeze(payload, owner: original)
+                dashboardComposer.freeze(payload, owner: original)
+                XCTAssertNotNil(pendingOffer.authorizedPayload { $0 == current })
+                XCTAssertNotNil(dashboardComposer.authorizedPayload { $0 == current })
+                current = replacement
+                XCTAssertNil(pendingOffer.authorizedPayload { $0 == current }, "A stale offer cannot be accepted")
+                XCTAssertNil(dashboardComposer.authorizedPayload { $0 == current }, "A stale composer cannot render/export")
+                pendingOffer.reconcile(currentOwner: replacement)
+                dashboardComposer.reconcile(currentOwner: replacement)
+                XCTAssertNil(pendingOffer.payload)
+                XCTAssertNil(dashboardComposer.payload)
+                // An old async photo completion cannot authorize itself for the replacement.
+                dashboardComposer.freeze(payload, owner: original)
+                XCTAssertNil(dashboardComposer.authorizedPayload { $0 == current })
+                dashboardComposer.clear()
+                XCTAssertNil(dashboardComposer.payload)
+            }
+        }
+    }
+
+    func testShareCaptureUsesAuthoritativeAuthGenerationForSameSubjectReplacement() throws {
+        let suite = "ShareAccountOwnershipTests." + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [HealthImportNoNetworkProtocol.self]
+        let auth = AuthManager(userDefaults: defaults, urlSession: URLSession(configuration: configuration))
+        auth.authSession = .localFixture(subject: "synthetic-share", email: "share@example.invalid", accessToken: "first")
+        auth.currentUser = LocalUser(
+            id: "synthetic-share", email: "share@example.invalid", name: "Synthetic Share",
+            avatarUrl: nil, profile: nil, onboardingCompleted: true)
+        let original = try XCTUnwrap(auth.captureAccountSession())
+        var capture = AccountBoundShareCapture()
+        capture.freeze(makePayload(bodyFatPercentage: 16, gender: nil), owner: original)
+        XCTAssertNotNil(capture.authorizedPayload(owns: auth.ownsAccountSession))
+        auth.authSession = .localFixture(subject: "synthetic-share", email: "share@example.invalid", accessToken: "replacement")
+        XCTAssertNotEqual(auth.captureAccountSession(), original)
+        XCTAssertNil(capture.authorizedPayload(owns: auth.ownsAccountSession))
+        capture.reconcile(currentOwner: auth.captureAccountSession())
+        XCTAssertNil(capture.payload)
+    }
+
+    func testPhotoExportRechecksAccountAfterAuthorizationSuspends() async {
+        let original = AuthManager.ProfileSessionOwnership(subject: "synthetic-A", generation: 1)
+        for replacement in [
+            AuthManager.ProfileSessionOwnership(subject: "synthetic-B", generation: 2),
+            AuthManager.ProfileSessionOwnership(subject: "synthetic-A", generation: 3)
+        ] {
+            var current = original
+            var writes = 0
+            let saved = await LivePhotoLibraryAdapter.saveAuthorizedImage(
+                makeShareTestImage(), whileOwned: { current == original },
+                authorize: {
+                    await Task.yield()
+                    current = replacement
+                    return true
+                }, write: { _ in writes += 1 })
+            XCTAssertFalse(saved)
+            XCTAssertEqual(writes, 0, "Authorization success cannot export the previous account's health pixels")
+        }
+    }
+
+    func testPhotoExportRejectsStaleAdmissionAndDeniedPermissionButSavesCurrentOwner() async {
+        let image = makeShareTestImage()
+        var requests = 0
+        var writes = 0
+        let stale = await LivePhotoLibraryAdapter.saveAuthorizedImage(
+            image, whileOwned: { false }, authorize: { requests += 1; return true },
+            write: { _ in writes += 1 })
+        XCTAssertFalse(stale)
+        XCTAssertEqual(requests, 0)
+        let denied = await LivePhotoLibraryAdapter.saveAuthorizedImage(
+            image, whileOwned: { true }, authorize: { requests += 1; return false },
+            write: { _ in writes += 1 })
+        XCTAssertFalse(denied)
+        XCTAssertEqual(writes, 0)
+        let saved = await LivePhotoLibraryAdapter.saveAuthorizedImage(
+            image, whileOwned: { true }, authorize: { requests += 1; return true },
+            write: { _ in writes += 1 })
+        XCTAssertTrue(saved)
+        XCTAssertEqual(requests, 2)
+        XCTAssertEqual(writes, 1)
+    }
+
+    func testDetailFocusRejectsSameRangeCorrectionDeletionAndTrendReplacement() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let selected = MetricChartDataPoint(date: date, value: 82, presence: .present)
+        let corrected = MetricChartDataPoint(date: date, value: 83, presence: .present)
+        XCTAssertEqual(ContextualMetricDetailPolicy.validatedFocus(selected, in: [selected])?.value, 82)
+        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(selected, in: [corrected]))
+        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(selected, in: []))
+        let revisedTrend = MetricChartDataPoint(date: date, value: 81, presence: .estimated)
+        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(selected, in: [revisedTrend]))
+    }
+
+    func testDetailAverageDoesNotBorrowEqualRawValueSourceButRestHeadlineKeepsSource() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let average = MetricChartDataPoint(date: date, value: 80, presence: .present)
+        let raw = MetricHistoryEntry(
+            id: "raw", date: date, primaryValue: 80, secondaryValue: nil, source: .healthKit)
+        XCTAssertNil(ContextualMetricDetailPolicy.source(
+            point: average, entries: [raw], fallback: "Apple Health", isSmoothed: true))
+        XCTAssertEqual(ContextualMetricDetailPolicy.source(
+            point: average, entries: [raw], fallback: nil, isSmoothed: false), "Apple Health")
+        XCTAssertEqual(ContextualMetricDetailPolicy.source(
+            point: nil, entries: [raw], fallback: "Apple Health", isSmoothed: false), "Apple Health")
+    }
+
     private func shareWeightMetric(weight: Double?, date: Date, source: String = "manual") -> BodyMetrics {
         BodyMetrics(
             id: UUID().uuidString, userId: "synthetic-share-fixture", date: date,
