@@ -339,6 +339,9 @@ describe('mesocycle optimizer golden fixtures', () => {
     expect(swap?.prescription.sets).toBe(3);
     expect(swap?.prescription.targetLoadKg).toBe(42);
     expect(swap?.prescription.targetLoadKg).not.toBe(30);
+    // The optimizer lacks a session/equipment-specific execution allowlist.
+    // A reviewed variant must not authorize additional in-session swaps.
+    expect(swap?.prescription.substitutions).toEqual([]);
     expect(certifyOptimization(body, proposal).ok).toBe(true);
 
     const edited = proposalFor({

@@ -342,3 +342,44 @@ test('required reported SQL qualification fails through tee and records exact so
     assert.match(fs.readFileSync(path.join(root, 'artifacts/reported-measurements/source-revision.txt'), 'utf8'), /fixture-head/);
   } finally { fs.rmSync(root, {recursive: true, force: true}); }
 });
+
+for (const file of [
+  'apps/web/db/migrations/20261014103000_training_execution_cas.sql',
+  'apps/web/db/tests/verify-training-mutations.py',
+  'apps/web/db/tests/test_verify_training_mutations.py',
+]) {
+  test(`SQL qualification runs the required JS gate for isolated change: ${file}`, () => {
+    const fx = queueFixture({ [file]: 'changed' });
+    try {
+      assert.deepEqual(detect(fx.workspace, mergeGroup(fx)).outputs, surfaces('true', 'false', 'false', 'false'));
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('required SQL CI step propagates verifier failure through tee', () => {
+  const step = ciWorkflow.match(/      - name: Verify training mutations on disposable PostgreSQL16\n([\s\S]*?)(?=\n      - name:)/)[1];
+  assert.match(step, /^        shell: bash$/m, 'explicit bash enables Actions errexit and pipefail');
+  const run = step.match(/        run: \|\n([\s\S]*)/)[1].replace(/^          /gm, '');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'training-sql-ci-failure-'));
+  try {
+    const bin = path.join(root, 'bin');
+    fs.mkdirSync(bin);
+    for (const [command, body] of Object.entries({
+      python3: 'echo injected-SQL-verifier-failure >&2; exit 17',
+      git: 'echo synthetic-source',
+      sha256sum: 'echo synthetic-hash',
+    })) {
+      fs.writeFileSync(path.join(bin, command), '#!/bin/sh\n' + body + '\n', { mode: 0o755 });
+    }
+    const result = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', run], {
+      cwd: root, encoding: 'utf8', env: { ...gitEnv, PATH: bin + ':' + process.env.PATH },
+    });
+    assert.equal(result.status, 17, result.stderr);
+    assert.match(result.stderr, /injected-SQL-verifier-failure/);
+    assert.ok(fs.existsSync(path.join(root, 'artifacts/training-mutations/results.log')), 'tee actually ran');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -225,6 +225,32 @@ export function createNeonNativeProductRecords(
       return existing[0] ? mapRecord(subject, existing[0]) : null;
     },
 
+    async correctTrainingSet(subject, id, expectedRevision, record) {
+      const mutations = createNeonTrainingMutations(database);
+      const admission = await mutations.captureAdmission(subject);
+      if (!admission) return null;
+      const result = await mutations.commit({
+        subject,
+        admission,
+        action: 'set_correct',
+        record: { ...record, id, expectedRevision },
+      });
+      return result.kind === 'saved' ? result.record : null;
+    },
+
+    async updateTrainingSession(subject, id, expectedRevision, expectedLoggedSetCount, record) {
+      const mutations = createNeonTrainingMutations(database);
+      const admission = await mutations.captureAdmission(subject);
+      if (!admission) return null;
+      const result = await mutations.commit({
+        subject,
+        admission,
+        action: 'session_update',
+        record: { ...record, expectedExecutionRevision: expectedRevision, expectedLoggedSetCount },
+      });
+      return result.kind === 'saved' ? result.record : null;
+    },
+
     push,
 
     async pull(subject, collection, input) {
@@ -311,6 +337,16 @@ export const neonNativeProductRecords: NativeProductRecordsPort = {
   },
   insertTrainingSet: (subject, record) =>
     createNeonNativeProductRecords().insertTrainingSet!(subject, record),
+  correctTrainingSet: (subject, id, expectedRevision, record) =>
+    createNeonNativeProductRecords().correctTrainingSet!(subject, id, expectedRevision, record),
+  updateTrainingSession: (subject, id, expectedRevision, expectedLoggedSetCount, record) =>
+    createNeonNativeProductRecords().updateTrainingSession!(
+      subject,
+      id,
+      expectedRevision,
+      expectedLoggedSetCount,
+      record,
+    ),
   push: (subject, collection, records) =>
     createNeonNativeProductRecords().push(subject, collection, records),
   pull: (subject, collection, input) =>
