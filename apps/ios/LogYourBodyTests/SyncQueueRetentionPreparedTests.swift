@@ -674,7 +674,7 @@ final class SyncQueueRetentionPreparedTests: XCTestCase {
             let nsError = error as NSError
             XCTAssertTrue(
                 error is CancellationError
-                    || (nsError.domain == NSURLErrorDomain && nsError.code == NSURLError.cancelled),
+                    || (nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled),
                 "Cancelling the pull must surface a cancellation, not \(error)"
             )
         }
