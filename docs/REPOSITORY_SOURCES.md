@@ -16,20 +16,20 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f9cf09f9630649ae4b9bf29c44c3a903592a02f7b85d1c1c38083f6c15e864cd`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4878995767441dc169a93f91289cc8e17d503b4590fe738189be3138a276c608`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11d9a680ec4c2c74193f2bd1bc9dd544c6ca3bc397bea165bfc08fd0e15933e0`)
 - `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `edc60551d0911cfbad4778b82a6d7376d2d123ee40be983e8376e1e5b7a2dd16`)
-- `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3b6c5e65f3fc8491ac4dccc17daefaac865808100ce350386a9d8589c00342fa`)
+- `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b43be4748356308f2098e4cf6e44f935a66d842588cb822752f27a4fcff636cb`)
 - `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `8c1c359b59caf6d266cc071752c51f6d6ac5b95fed7809dd209192782090a778`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `308eefa5e2f5b371d60eb5142243654503b53b67ba2f36477bf7d389a57e89f3`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11956a92eceafb5392139625818d29853dace83bb0d22cf5ccda565c6ffa8aca`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `24015f5812c3157efebc973c6aa0bbd00eae6e1747be4966eb9dff152e46377c`)
-- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a6881107567466785007e9db6848cc2aaf5260a1c36f52a48228ed4dec381a35`)
+- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c3927f763c224c45f43ef1a226740c6cd3334428f1db39a2d63e64a9d11931e4`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b497034ac102730cc4a952c06866a422db368424e352991f7f0dd68911e27be5`)
 
 ### `apps/web/package.json`: engines
 
@@ -105,7 +105,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-toast": "^1.2.23",
   "@radix-ui/react-toggle": "^1.1.18",
   "@radix-ui/react-toggle-group": "^1.1.19",
-  "@radix-ui/react-tooltip": "^1.2.16",
+  "@radix-ui/react-tooltip": "^1.3.0",
   "@radix-ui/react-visually-hidden": "^1.2.11",
   "@statsig/js-client": "^3.33.5",
   "@tailwindcss/postcss": "^4.3.3",
@@ -121,13 +121,13 @@ A changed fingerprint requires review of its related documentation; it does not 
   "date-fns": "^4.4.0",
   "embla-carousel-react": "^8.6.0",
   "exifr": "^7.1.3",
-  "framer-motion": "^12.43.0",
+  "framer-motion": "^14.0.0",
   "glob": "^11.1.0",
   "idb": "^8.0.3",
   "input-otp": "^1.5.0",
   "js-yaml": "5.4.3",
   "lodash": "^4.18.1",
-  "lucide-react": "^1.48.0",
+  "lucide-react": "^1.55.0",
   "next": "15.5.27",
   "next-themes": "^0.4.6",
   "openai": "^6.49.0",
@@ -378,7 +378,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3590f5fc9bca5f30a8eaac908a762e683611a4d4126b8b8d611c1515a38b13ea`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `d31d02f24b901f5eca4ad8dd497b0bc20c136906f29fc73813996bb17f44a8e5`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `0d57f91297867410d35bd3dc3cdfca0e3c0a7d07d1c932dfdae1eaaa6b74b887`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `f92b600361fe9d26b2a4c9a944c8c921d33feb8eafb756a77ab0b285b940a3f6`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `cdd99f5f4e4b9f559e4e3e3b6889e00d7fbbe612166e0872f812d0ed23eafd7b`)
