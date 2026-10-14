@@ -100,6 +100,21 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://www.allianceforeatingdisorders.com/find-treatment/',
+      reason:
+        'Verified official U.S. eating-disorder support resource in the health disclosure, checked 2026-10-14.',
+    },
+    {
+      value: 'https://www.crisistextline.org/',
+      reason:
+        'Verified official U.S. crisis support resource in the health disclosure, checked 2026-10-14.',
+    },
+    {
+      value: 'https://design-tokens.github.io/community-group/format/',
+      reason:
+        'Schema identifier in the immutable canonical Jovie color export; not a runtime endpoint.',
+    },
+    {
       value: 'https://raw.githubusercontent.com',
       reason:
         'Immutable JovieKit source import; the canonical downloader validates repository, revision, paths and SHA-256 before materialization.',
