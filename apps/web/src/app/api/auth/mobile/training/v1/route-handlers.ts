@@ -10,7 +10,13 @@ import {
   isTrainingRecordCollection,
   type NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import { logTrainingSet, recordTrainingFeedback, swapExercise } from '@/lib/training/commands';
+import {
+  applyWorkoutAction,
+  correctTrainingSet,
+  logTrainingSet,
+  recordTrainingFeedback,
+  swapExercise,
+} from '@/lib/training/commands';
 import {
   getOrCreateNextWorkout,
   pullAllTrainingRecords,
@@ -40,6 +46,11 @@ const LogSetBodySchema = z
   })
   .strict();
 
+const CorrectSetBodySchema = LogSetBodySchema.extend({
+  correctionId: z.string().uuid(),
+  expectedRevision: z.number().int().min(0),
+}).strict();
+
 const FeedbackBodySchema = z
   .object({
     sessionId: z.string().uuid(),
@@ -60,6 +71,25 @@ const SwapBodySchema = z
     excludedConcerns: z.array(z.string().trim().min(1).max(48)).max(16).optional(),
     preferTorsoSupport: z.boolean().optional(),
     maxTrunkDemand: z.enum(['low', 'moderate', 'high']).optional(),
+  })
+  .strict();
+
+const WorkoutActionBodySchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    eventId: z.string().uuid(),
+    expectedRevision: z.number().int().min(0),
+    action: z.discriminatedUnion('kind', [
+      z
+        .object({ kind: z.literal('equipment_unavailable'), exerciseId: z.string().min(1).max(64) })
+        .strict(),
+      z.object({ kind: z.literal('shorten'), minutes: z.number().int().min(5).max(180) }).strict(),
+      z.object({ kind: z.literal('skip'), exerciseId: z.string().min(1).max(64) }).strict(),
+      z.object({ kind: z.literal('pain'), exerciseId: z.string().min(1).max(64) }).strict(),
+      z.object({ kind: z.literal('pause') }).strict(),
+      z.object({ kind: z.literal('resume') }).strict(),
+      z.object({ kind: z.literal('end') }).strict(),
+    ]),
   })
   .strict();
 
@@ -364,6 +394,84 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             return apiError('session_not_found', 404);
           case 'invalid':
             return apiError('invalid_request', 400);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
+        }
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
+        return apiError('training_unavailable', 503);
+      }
+    },
+
+    async correctSet(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      const parsed = CorrectSetBodySchema.safeParse(await request.json().catch(() => null));
+      if (!parsed.success) return apiError('invalid_request', 400);
+      try {
+        const result = await correctTrainingSet({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          set: { ...parsed.data, loadKg: parsed.data.loadKg ?? null },
+        });
+        switch (result.kind) {
+          case 'corrected':
+            return json(withVersion({ log: result.log }));
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'set_not_found':
+            return apiError('set_not_found', 404);
+          case 'set_not_in_session':
+            return apiError('set_not_in_session', 400);
+          case 'set_conflict':
+            return apiError('set_conflict', 409);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
+        }
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
+        return apiError('training_unavailable', 503);
+      }
+    },
+
+    async action(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      const parsed = WorkoutActionBodySchema.safeParse(await request.json().catch(() => null));
+      if (!parsed.success) return apiError('invalid_request', 400);
+      try {
+        const result = await applyWorkoutAction({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          ...parsed.data,
+        });
+        switch (result.kind) {
+          case 'updated':
+            return json(withVersion({ decision: result.decision, session: result.session }));
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'session_not_active':
+            return apiError('session_not_active', 409);
+          case 'stale_revision':
+            return apiError('stale_revision', 409);
+          case 'stale_current_exercise':
+            return apiError('stale_current_exercise', 409);
+          case 'no_eligible_substitution':
+            return apiError('no_eligible_substitution', 409);
           case 'rejected':
             return apiError('training_unavailable', 503);
         }
