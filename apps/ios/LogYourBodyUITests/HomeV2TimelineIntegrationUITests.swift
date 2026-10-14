@@ -52,6 +52,24 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         capture(app, "today-largest-text")
     }
 
+    func testSelectedMomentBaselineHistoricalSwipeUpdatesDateAndMetrics() {
+        let app = launch()
+        let stage = app.buttons["home_v2_photo_stage"]
+        let caption = app.staticTexts["home_v2_photo_caption"]
+        let weight = app.staticTexts["home_v2_weight_value"]
+        let beforeCaption = caption.label, beforeWeight = weight.label
+        capture(app, "timeline-red-before-history-swipe")
+        XCTAssertFalse(beforeCaption.isEmpty)
+        XCTAssertFalse(beforeWeight.isEmpty)
+        drag(stage, from: 0.85, to: 0.3)
+        let changed = expectation(for: NSPredicate(format: "label != %@", beforeCaption), evaluatedWith: caption)
+        let result = XCTWaiter.wait(for: [changed], timeout: 5)
+        capture(app, "timeline-red-after-history-swipe")
+        XCTAssertEqual(result, .completed, "Historical swipe must update the selected moment date")
+        XCTAssertNotEqual(weight.label, beforeWeight, "Historical swipe must update that moment's exact weight")
+        XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
+    }
+
     private func launch(largestText: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [

@@ -1,0 +1,24 @@
+{
+  "schema": "pen-cold-readback/v2",
+  "mode": "canonical",
+  "workspace_profile": "jovie-founder-design-studio",
+  "target_path": "/Users/timwhite/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen",
+  "verdict": "cold_readback_failed",
+  "typed_reasons": ["safe_cold_manifest_unavailable"],
+  "semantic_manifest": null,
+  "semantic_manifest_complete": false,
+  "inspection_method": null,
+  "execute_invoked": false,
+  "save_invoked": false,
+  "document_opened": false,
+  "output_document_created": false,
+  "recorded_at": "2026-10-14T18:58:09.499Z",
+  "durability": "not_proven",
+  "exit_code": 1,
+  "blockers": [
+    {
+      "code": "safe_cold_manifest_unavailable",
+      "message": "Pinned Pen runtime exposes no native non-evaluating complete semantic inspector; execute, document-open, and file-read fallbacks are prohibited."
+    }
+  ]
+}

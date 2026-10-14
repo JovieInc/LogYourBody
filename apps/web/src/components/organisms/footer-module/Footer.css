@@ -3,23 +3,24 @@
    spacing, type, or hierarchy without a new lock. */
 
 .marketing-footer-premium {
-  --mf-text: rgba(255, 255, 255, 0.92);
-  --mf-text-secondary: rgba(255, 255, 255, 0.6);
-  --mf-text-tertiary: rgba(255, 255, 255, 0.48);
-  --mf-hairline: rgba(255, 255, 255, 0.07);
-  background: #06070a;
+  --mf-text: var(--color-primary-token);
+  --mf-text-secondary: var(--color-secondary-token);
+  --mf-text-tertiary: var(--color-tertiary-token);
+  --mf-hairline: var(--color-subtle);
+  background: var(--color-surface-page);
   color: var(--mf-text);
   border-top: 1px solid var(--mf-hairline);
 }
 
 .marketing-footer-premium .mf-eyebrow {
   display: block;
+  font-family: var(--font-body);
   font-size: 0.6875rem;
   color: var(--mf-text-tertiary);
   line-height: 1;
   margin-bottom: 1.25rem;
   text-transform: uppercase;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.2em;
 }
 
@@ -40,7 +41,7 @@
 }
 
 .marketing-footer-premium .mf-link:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -71,7 +72,7 @@
 }
 
 .marketing-footer-premium .mf-legal-link:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.25);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -87,4 +88,10 @@
   .marketing-footer-premium .mf-legal-link {
     transition: none;
   }
+}
+
+.marketing-footer-premium .mf-link,
+.marketing-footer-premium .mf-legal-link {
+  min-height: 44px;
+  align-items: center;
 }

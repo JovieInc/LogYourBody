@@ -1,5 +1,7 @@
 import Image from 'next/image';
+import { MarketingBrand } from '@/components/MarketingBrand';
 import Link from 'next/link';
+import { Button } from '@jovie/ui/atoms/button';
 import { MarketingFooter } from '@/components/MarketingFooter';
 import { APP_CONFIG } from '@/constants/app';
 import { LANDING_FLAGS } from '@/lib/flags/landing';
@@ -7,22 +9,6 @@ import { LANDING_PRODUCT_PROOF } from '@/lib/marketing/landing-registry';
 import styles from './LaunchLanding.module.css';
 import { launchLandingCopy, launchLandingFeatures } from './launch-landing-copy';
 import { WaitlistForm } from './WaitlistForm';
-
-function BrandMark() {
-  return (
-    <Link href="/" className="inline-flex items-center gap-3" aria-label="LogYourBody home">
-      <Image
-        src="/brand/logyourbody-app-icon.png"
-        alt=""
-        width={28}
-        height={28}
-        className="rounded-[7px]"
-        priority
-      />
-      <span className="text-[15px] font-medium tracking-[-0.01em]">LogYourBody</span>
-    </Link>
-  );
-}
 
 const HERO_ACTION_ID = 'early-access';
 
@@ -33,17 +19,21 @@ const HERO_ACTION_ID = 'early-access';
 function PrimaryAction({ id }: { id: string }) {
   if (LANDING_FLAGS.APP_STORE_LIVE) {
     return (
-      <Link href={APP_CONFIG.appStoreUrl} className={styles.pill} data-testid={id}>
-        {launchLandingCopy.appStoreCta}
-      </Link>
+      <Button asChild size="marketing" className="my-2">
+        <Link href={APP_CONFIG.appStoreUrl} data-testid={id}>
+          {launchLandingCopy.appStoreCta}
+        </Link>
+      </Button>
     );
   }
 
   if (id !== HERO_ACTION_ID) {
     return (
-      <a href={`#${HERO_ACTION_ID}`} className={styles.pill} data-testid={id}>
-        {launchLandingCopy.waitlistCta}
-      </a>
+      <Button asChild size="marketing" className="my-2">
+        <a href={`#${HERO_ACTION_ID}`} data-testid={id}>
+          {launchLandingCopy.waitlistCta}
+        </a>
+      </Button>
     );
   }
 
@@ -56,16 +46,16 @@ function PrimaryAction({ id }: { id: string }) {
 
 export function LaunchLanding() {
   return (
-    <div className={`${styles.page} lyb-landing min-h-screen overflow-x-hidden`}>
+    <div className={`${styles.page} lyb-marketing lyb-landing min-h-screen`}>
       <a
         href="#main-content"
-        className="sr-only z-50 rounded-full bg-white px-4 py-2 text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        className="sr-only z-50 rounded-full bg-white px-4 py-2 text-black focus:not-sr-only focus:fixed focus:top-4 focus:left-4"
       >
         Skip to content
       </a>
 
-      <header className="mx-auto flex h-20 w-full max-w-[1200px] items-center justify-between px-5 sm:px-8">
-        <BrandMark />
+      <header className="max-w-public-content mx-auto flex h-20 w-full items-center justify-between px-5 sm:px-8">
+        <MarketingBrand />
         <span className={`${styles.quiet} hidden text-[13px] sm:block`}>
           {launchLandingCopy.platformNote}
         </span>
@@ -74,17 +64,17 @@ export function LaunchLanding() {
       <main id="main-content" tabIndex={-1}>
         <section
           aria-labelledby="landing-heading"
-          className="mx-auto grid w-full max-w-[1200px] items-center gap-14 px-5 pb-20 pt-10 sm:px-8 sm:pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-20 lg:pb-32 lg:pt-20"
+          className="max-w-public-content mx-auto grid w-full items-center gap-14 px-5 pt-10 pb-20 sm:px-8 sm:pt-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-20 lg:pt-20 lg:pb-32"
         >
-          <div className={styles.rise}>
+          <div>
             <h1
               id="landing-heading"
-              className={`${styles.display} max-w-[11ch] text-balance text-[clamp(2.75rem,7.5vw,5.5rem)]`}
+              className={`${styles.display} max-w-[11ch] text-[clamp(2.75rem,7.5vw,5.5rem)] text-balance`}
             >
               {launchLandingCopy.headline}
             </h1>
             <p
-              className={`${styles.secondary} mt-6 max-w-[34rem] text-pretty text-lg leading-8 sm:text-xl sm:leading-9`}
+              className={`${styles.secondary} mt-6 max-w-[34rem] text-lg leading-8 text-pretty sm:text-xl sm:leading-9`}
             >
               {launchLandingCopy.subheading}
             </p>
@@ -93,7 +83,7 @@ export function LaunchLanding() {
             </div>
           </div>
 
-          <div className={`${styles.riseLate} mx-auto w-full max-w-[340px] lg:max-w-[360px]`}>
+          <div className={'mx-auto w-full max-w-[340px] lg:max-w-[360px]'}>
             <div className={styles.phone}>
               <Image
                 src={LANDING_PRODUCT_PROOF.src}
@@ -101,7 +91,7 @@ export function LaunchLanding() {
                 width={LANDING_PRODUCT_PROOF.width}
                 height={LANDING_PRODUCT_PROOF.height}
                 priority
-                sizes="(min-width: 1024px) 360px, 340px"
+                sizes="(min-width: 1024px) 360px, (max-width: 380px) calc(100vw - 40px), 340px"
                 className="block h-auto w-full"
               />
             </div>
@@ -110,13 +100,13 @@ export function LaunchLanding() {
 
         <section
           aria-label="How it keeps the answer honest"
-          className={`${styles.hairline} mx-auto w-full max-w-[1200px] border-t px-5 py-16 sm:px-8 lg:py-24`}
+          className={`${styles.hairline} max-w-public-content mx-auto w-full border-t px-5 py-16 sm:px-8 lg:py-24`}
         >
           <ol className="grid gap-10 sm:grid-cols-3 sm:gap-8">
             {launchLandingCopy.signals.map((signal) => (
               <li key={signal.title} className="max-w-[30ch]">
                 <h2 className="text-[19px] font-medium tracking-[-0.01em]">{signal.title}</h2>
-                <p className={`${styles.secondary} mt-2 text-[15px] leading-6`}>{signal.body}</p>
+                <p className={`${styles.secondary} mt-2 text-base leading-7`}>{signal.body}</p>
               </li>
             ))}
           </ol>
@@ -124,7 +114,7 @@ export function LaunchLanding() {
 
         <section
           aria-labelledby="features-heading"
-          className={`${styles.hairline} mx-auto w-full max-w-[1200px] border-t px-5 py-16 sm:px-8 lg:py-24`}
+          className={`${styles.hairline} max-w-public-content mx-auto w-full border-t px-5 py-16 sm:px-8 lg:py-24`}
         >
           <h2
             id="features-heading"
@@ -147,7 +137,7 @@ export function LaunchLanding() {
 
         <section
           aria-labelledby="pricing-heading"
-          className={`${styles.hairline} mx-auto w-full max-w-[1200px] border-t px-5 py-16 sm:px-8 lg:py-24`}
+          className={`${styles.hairline} max-w-public-content mx-auto w-full border-t px-5 py-16 sm:px-8 lg:py-24`}
         >
           <div className="max-w-[40rem]">
             <h2

@@ -34,6 +34,8 @@ const landingStructuredData = {
   ],
 };
 
+export const revalidate = false;
+
 export default function HomePage() {
   return (
     <>

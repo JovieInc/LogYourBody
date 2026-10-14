@@ -53,3 +53,26 @@ export const COMPACT_FOOTER_PATHS = new Set<string>([
   '/health-disclosure',
   '/security',
 ]);
+
+/** Public acquisition and information routes must not offer a second PWA funnel. */
+export function isMarketingPath(pathname: string | null | undefined) {
+  if (!pathname) return false;
+  if (pathname === '/') return true;
+  return [
+    '/about',
+    '/blog',
+    '/brand',
+    '/careers',
+    '/changelog',
+    '/contact',
+    '/delete-account',
+    '/download',
+    '/health-disclosure',
+    '/landing',
+    '/mobile',
+    '/privacy',
+    '/security',
+    '/support',
+    '/terms',
+  ].some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
