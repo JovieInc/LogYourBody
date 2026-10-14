@@ -26,7 +26,7 @@ export function bootstrap(root, env = process.env) {
   }
   const install = spawnSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline'], {
     ...options,
-    env: { ...env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1', ONNXRUNTIME_NODE_INSTALL: 'skip' },
+    env: { ...env, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' },
     stdio: 'inherit',
   });
   if (install.error) throw install.error;

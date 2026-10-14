@@ -31,7 +31,7 @@ if [[ "$*" == '--version' ]]; then
   ${behavior || "echo '9.15.9'"}
   exit 0
 fi
-printf '%s\\n' "$PWD" "$*" "$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD" "$ONNXRUNTIME_NODE_INSTALL" > "$PWD/install-receipt"
+printf '%s\\n' "$PWD" "$*" "$PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD" "\${ONNXRUNTIME_NODE_INSTALL:-unset}" > "$PWD/install-receipt"
 exit "\${INSTALL_STATUS:-0}"
 `,
     { mode: 0o755 },
@@ -44,7 +44,7 @@ test('installs frozen dependencies in the repository without touching environmen
   bootstrap(root, env);
   assert.equal(
     readFileSync(join(root, 'install-receipt'), 'utf8'),
-    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nskip\n`,
+    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nunset\n`,
   );
   assert.equal(readFileSync(join(root, '.env.local'), 'utf8'), 'preserve environment');
   assert.equal(readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8'), 'preserve lock');
