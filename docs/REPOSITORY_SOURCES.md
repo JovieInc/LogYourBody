@@ -21,12 +21,12 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11d9a680ec4c2c74193f2bd1bc9dd544c6ca3bc397bea165bfc08fd0e15933e0`)
 - `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `edc60551d0911cfbad4778b82a6d7376d2d123ee40be983e8376e1e5b7a2dd16`)
-- `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3b6c5e65f3fc8491ac4dccc17daefaac865808100ce350386a9d8589c00342fa`)
+- `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b43be4748356308f2098e4cf6e44f935a66d842588cb822752f27a4fcff636cb`)
 - `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `8c1c359b59caf6d266cc071752c51f6d6ac5b95fed7809dd209192782090a778`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `308eefa5e2f5b371d60eb5142243654503b53b67ba2f36477bf7d389a57e89f3`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11956a92eceafb5392139625818d29853dace83bb0d22cf5ccda565c6ffa8aca`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `24015f5812c3157efebc973c6aa0bbd00eae6e1747be4966eb9dff152e46377c`)
-- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a6881107567466785007e9db6848cc2aaf5260a1c36f52a48228ed4dec381a35`)
+- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b80196f02c3964184cacd19fe21c355bcc90b67d82148263b06cefa69bcbfcff`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
 - `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c3927f763c224c45f43ef1a226740c6cd3334428f1db39a2d63e64a9d11931e4`)
@@ -378,12 +378,12 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3590f5fc9bca5f30a8eaac908a762e683611a4d4126b8b8d611c1515a38b13ea`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `c4ce8412cc432cc14b4f4d4d9c935dea999a154102e5fd7aa11c9ef48c8805cf`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `a74d688235920ad60633080bd040d0ad5b551eeae91c101e13d766f38e33e773`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `f92b600361fe9d26b2a4c9a944c8c921d33feb8eafb756a77ab0b285b940a3f6`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `cdd99f5f4e4b9f559e4e3e3b6889e00d7fbbe612166e0872f812d0ed23eafd7b`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `9ac6daf85d8e8d5fa6dc9868e5317ced5ea3291a0ed0c6ee76e4bef0319990a9`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `8f360bd2a678c0f954ed7106821934ba8227ead4cb645717d086814cc9acd1ca`)
 
 ## Pinned shared sources
 
