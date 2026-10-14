@@ -335,7 +335,7 @@ export function latestFeedbackPerSession(feedback: TrainingFeedback[]): Training
     });
 }
 
-function hasConflictingFeedbackAtSameTime(
+export function hasConflictingFeedbackAtSameTime(
   observation: TrainingFeedback,
   feedback: TrainingFeedback[],
 ): boolean {

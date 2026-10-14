@@ -169,6 +169,7 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
               session: null,
               week: result.week,
               weeklyFractionalVolume: result.weeklyFractionalVolume,
+              decision: result.decision,
             }),
           );
         }
@@ -178,6 +179,7 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             week: result.week,
             weekCount: result.weekCount,
             weeklyFractionalVolume: result.weeklyFractionalVolume,
+            decision: result.decision,
           }),
         );
       } catch (error) {
