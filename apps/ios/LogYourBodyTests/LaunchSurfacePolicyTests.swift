@@ -90,7 +90,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         )
     }
 
-    func testHomeSwipeMatchesJovieEdgeAndPageRules() {
+    func testHomeSwipeMatchesFounderIAContract() {
         XCTAssertEqual(
             HomeChatChromePolicy.swipeDestination(
                 translationX: 80,
@@ -99,7 +99,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isOnStats: false,
                 isChatExpanded: false
             ),
-            .menu
+            .stats
         )
         XCTAssertEqual(
             HomeChatChromePolicy.swipeDestination(
@@ -109,11 +109,11 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isOnStats: false,
                 isChatExpanded: false
             ),
-            .stats
+            .menu
         )
         XCTAssertEqual(
             HomeChatChromePolicy.swipeDestination(
-                translationX: 90,
+                translationX: -90,
                 translationY: 8,
                 startX: 180,
                 isOnStats: true,
@@ -172,8 +172,8 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isOnStats: true,
                 isChatExpanded: true
             ),
-            .menu,
-            "The edge swipe still opens navigation while Ask is expanded"
+            .collapseChat,
+            "Ask must collapse to its owning workspace before navigation changes"
         )
     }
 
