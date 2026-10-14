@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { verifyIOSAuthContract } from './verify-ios-auth-contract.mjs';
+import { spawnSync } from 'node:child_process';
+import { captureProviderRequestFromBrowser, verifyIOSAuthContract } from './verify-ios-auth-contract.mjs';
 
 const ISSUER = 'https://jov.ie/api/auth';
 const OUTER_STATE = 'ios-release-probe-test';
@@ -135,3 +136,85 @@ test('fails when the live identity page drops the native OAuth transaction', asy
     /did not preserve the signed native OAuth transaction/,
   );
 });
+
+test('captures the real page helper payload after arming the waiter and closes the browser', async () => {
+  const payload = { provider: 'apple', oauth_query: SIGNED_IDENTITY_QUERY };
+  let resolveRequest;
+  let waiterArmed = false;
+  let closed = 0;
+  const request = new Promise((resolve) => { resolveRequest = resolve; });
+  const identityURL = new URL(`https://identity.invalid/identity?${SIGNED_IDENTITY_QUERY}`);
+  const page = {
+    async goto(url, options) {
+      assert.equal(url, identityURL.toString());
+      assert.deepEqual(options, { waitUntil: 'domcontentloaded' });
+    },
+    waitForRequest(predicate, options) {
+      // Keep Playwright's existing 30-second default and exact endpoint predicate.
+      assert.equal(options, undefined);
+      assert.equal(predicate({ url: () => 'https://identity.invalid/api/auth/sign-in/social' }), true);
+      assert.equal(predicate({ url: () => 'https://identity.invalid/api/auth/session' }), false);
+      assert.equal(predicate({ url: () => 'https://identity.invalid/api/auth/sign-in/social/extra' }), false);
+      waiterArmed = true;
+      return request;
+    },
+    getByRole(role, options) {
+      assert.equal(role, 'button');
+      assert.deepEqual(options, { name: 'Continue with Apple' });
+      return {
+        async click(...args) {
+          assert.equal(waiterArmed, true);
+          assert.deepEqual(args, []);
+          resolveRequest({ postDataJSON: () => payload });
+        },
+      };
+    },
+  };
+  const browser = { newPage: async () => page, close: async () => { closed += 1; } };
+  assert.equal(await captureProviderRequestFromBrowser(browser, identityURL), payload);
+  assert.equal(closed, 1);
+});
+
+for (const firstFailure of ['request', 'click']) {
+  test(`page capture handles ${firstFailure}-first rejection and its later peer rejection`, () => {
+    // A child with strict rejection handling proves the production helper has no
+    // orphaned promise; no process-level handler hides the regression from node:test.
+    const script = `
+      import assert from 'node:assert/strict';
+      import { setImmediate } from 'node:timers/promises';
+      import { captureProviderRequestFromBrowser } from ${JSON.stringify(new URL('./verify-ios-auth-contract.mjs', import.meta.url).href)};
+      function deferred() {
+        let resolve, reject;
+        const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+        return { promise, resolve, reject };
+      }
+      const pending = { request: deferred(), click: deferred() };
+      const started = deferred();
+      let closed = 0;
+      const page = {
+        goto: async () => {},
+        waitForRequest: () => pending.request.promise,
+        getByRole: () => ({ click: () => { started.resolve(); return pending.click.promise; } }),
+      };
+      const browser = { newPage: async () => page, close: async () => { closed += 1; } };
+      const outcome = captureProviderRequestFromBrowser(browser, new URL('https://identity.invalid/identity'))
+        .then(() => ({ unexpectedSuccess: true }), (error) => ({ error }));
+      await started.promise;
+      const first = ${JSON.stringify(firstFailure)};
+      const second = first === 'request' ? 'click' : 'request';
+      pending[first].reject(new Error(first + ' failed'));
+      await setImmediate();
+      pending[second].reject(new Error(second + ' failed'));
+      await setImmediate();
+      const result = await outcome;
+      assert.equal(result.error?.message, first + ' failed');
+      assert.equal(closed, 1);
+    `;
+    const result = spawnSync(process.execPath, ['--unhandled-rejections=strict', '--input-type=module', '--eval', script], {
+      encoding: 'utf8', timeout: 5000,
+    });
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.signal, null, result.stderr);
+    assert.equal(result.status, 0, result.stderr);
+  });
+}
