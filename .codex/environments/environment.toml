@@ -1,0 +1,23 @@
+version = 1
+name = "Log Your Body"
+
+[setup]
+script = "bash scripts/codex-setup.sh"
+
+[cleanup]
+script = "bash scripts/codex-cleanup.sh --dry-run"
+
+[[actions]]
+name = "Test"
+icon = "test"
+command = "bash scripts/codex-setup.sh --run test"
+
+[[actions]]
+name = "Typecheck"
+icon = "tool"
+command = "bash scripts/codex-setup.sh --run typecheck"
+
+[[actions]]
+name = "Cleanup report"
+icon = "tool"
+command = "bash scripts/codex-cleanup.sh --dry-run"
