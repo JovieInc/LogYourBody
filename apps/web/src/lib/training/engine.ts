@@ -396,7 +396,7 @@ export function evaluateDeload(feedback: TrainingFeedback[]): DeloadState {
   };
 }
 
-function progressionForExercise(
+export function progressionForExercise(
   exerciseId: string,
   logs: SetLog[],
   targetRir: number,

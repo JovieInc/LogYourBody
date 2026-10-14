@@ -193,6 +193,7 @@ describe('LogYourBody MCP route', () => {
       'control_workout',
       'correct_set',
       'log_session_feedback',
+      'swap_exercise',
       'get_training_progress',
     ]);
     for (const tool of result.tools) {
@@ -342,6 +343,58 @@ describe('LogYourBody MCP route', () => {
       revision: 1,
       corrections: [{ previous: { reps: 10, loadKg: 20, rir: 3 } }],
     });
+  });
+
+  it('keeps previewed targets after logging an exercise and honors a later pain stop', async () => {
+    const h = harness();
+    await enroll(h);
+    const original = (await call(h, 'get_todays_workout')).structuredContent;
+    expect(
+      (
+        await call(h, 'log_sets', {
+          exercise: 'goblet_squat',
+          sets: [
+            { reps: 10, load: 25, rir: 4 },
+            { reps: 10, load: 25, rir: 4 },
+          ],
+        })
+      ).isError,
+    ).toBeUndefined();
+    const rowsBefore = await h.records.listAll('subject-a');
+    const reopened = (await call(h, 'get_todays_workout')).structuredContent;
+    expect(reopened?.session.id).toBe(original?.session.id);
+    expect(reopened?.session.exercises).toEqual(
+      original?.session.exercises.map((exercise: Record<string, unknown>) => ({
+        ...exercise,
+        loggedSets:
+          exercise.id === 'goblet_squat'
+            ? [
+                { setNumber: 1, reps: 10, loadKg: 25, loadLb: 55.1, rir: 4 },
+                { setNumber: 2, reps: 10, loadKg: 25, loadLb: 55.1, rir: 4 },
+              ]
+            : [],
+      })),
+    );
+    expect(await h.records.listAll('subject-a')).toEqual(rowsBefore);
+    await call(h, 'log_session_feedback', {
+      soreness: 2,
+      pump: 5,
+      performance: 'stable',
+      jointPain: 5,
+    });
+    expect((await call(h, 'get_todays_workout')).structuredContent?.session).toMatchObject({
+      safetyStop: true,
+      exercises: [],
+    });
+    expect(
+      (
+        await call(h, 'log_sets', {
+          exercise: 'dumbbell bench press',
+          sets: [{ reps: 10, rir: 4 }],
+        })
+      ).isError,
+    ).toBe(true);
+    expect((await h.records.pull('subject-a', 'logged_sets')).records).toHaveLength(2);
   });
 
   it('does not turn repeated MCP check-ins into multiple sessions and still accepts pain updates', async () => {

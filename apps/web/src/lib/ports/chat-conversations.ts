@@ -10,6 +10,8 @@ export type StoredChatMessage = {
   content: string;
   clientMessageId: string | null;
   createdAt: string;
+  /** Additive history metadata for user messages; older clients may ignore it. */
+  turn?: { status: ChatTurnStatus; retryable: boolean };
 };
 
 export type StoredChatConversation = {

@@ -1,13 +1,21 @@
 name: CODEOWNERS check
 
-# Weekly check for a missing CODEOWNERS file or an invalid owner.
+# Event-driven check for a missing CODEOWNERS file or an invalid owner. It runs
+# when a CODEOWNERS file lands on main; there is no clock (an unchanged file
+# cannot drift, and this repo requires no code-owner review).
 # Upserts JOV-7549 (label remediation:codeowners-drift) and comments with this
 # repository. Files only when REMEDIATION_TRIGGERS_ENABLED is true and
 # LINEAR_API_KEY is set. Otherwise it prints the upsert and does not call Linear.
 
 on:
-  schedule:
-    - cron: '41 16 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - '.github/CODEOWNERS'
+      - 'CODEOWNERS'
+      - 'docs/CODEOWNERS'
+      - '.github/workflows/codeowners-check.yml'
+      - '.github/scripts/codeowners-check.mjs'
   workflow_dispatch:
   pull_request:
     paths:
@@ -36,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 

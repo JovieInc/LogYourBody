@@ -232,7 +232,8 @@ test('CODEOWNERS drift is missing file or invalid owner, and stays a dry-run unl
   assert.match(formatCodeownersDryRun(null, { reason: 'ok' }), /No Linear issue filed/);
 
   const workflow = readFileSync(resolve(root, '.github/workflows/codeowners-check.yml'), 'utf8');
-  assert.match(workflow, /cron: '41 16 \* \* 1'/);
+  assert.doesNotMatch(workflow, /cron:/);
+  assert.match(workflow, /push:\n\s+branches: \[main\]\n\s+paths:\n\s+- '\.github\/CODEOWNERS'/);
   assert.match(workflow, /workflow_dispatch/);
   assert.match(workflow, /vars\.REMEDIATION_TRIGGERS_ENABLED/);
   assert.match(workflow, /secrets\.LINEAR_API_KEY/);

@@ -760,6 +760,33 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "timeline-add-photo-for-day", from: app)
     }
 
+    func testProgressPhotoFixtureShowsReviewState() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestProgressPhotoAttachFixture",
+            "-lybUITestProgressPhotoReviewFixture"
+        ])
+
+        let addPhoto = app.buttons["launch_timeline_add_photo"]
+        XCTAssertTrue(addPhoto.waitForExistence(timeout: 10))
+        addPhoto.tap()
+
+        let fixtureButton = app.buttons["progress_photo_attach_fixture_button"]
+        XCTAssertTrue(fixtureButton.waitForExistence(timeout: 8))
+        fixtureButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Review photo"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Front · '")).firstMatch.exists)
+        let metadata = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH 'Not saved · Pose matched to '")
+        ).firstMatch
+        XCTAssertTrue(metadata.exists)
+        XCTAssertTrue(app.buttons["progress_photo_review_retake"].exists)
+        XCTAssertTrue(app.buttons["progress_photo_review_save"].exists)
+        attachScreenshot(named: "progress-photo-review", from: app)
+    }
+
     // Regression: starter prompts and the composer used fixed point sizes, ignoring Dynamic Type.
     func testHomeChatPromptsScaleWithAccessibilityDynamicType() throws {
         let app = XCUIApplication()
@@ -781,6 +808,40 @@ final class LogYourBodyUITests: XCTestCase {
             38 + 4,
             "Starter prompt text must grow with Dynamic Type beyond its 38pt default chip height"
         )
+    }
+
+    func testHomeChatStarterPromptPaddedAreaSendsAndExpands() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture"
+        ])
+        try waitForHomeChatComposer(in: app)
+
+        let prompt = app.buttons["How am I doing?"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 8))
+        XCTAssertTrue(prompt.isHittable)
+        let targetHeight = prompt.frame.height
+        attachScreenshot(named: "home-chat-prompt-padding-before-tap", from: app)
+
+        // The existing pill is visibly 38pt tall, while its glyph target is about 16pt.
+        // At the horizontal center, 14pt below the midpoint is inside the pill's
+        // visible padding and outside the text. A normal button tap only tests the text.
+        let paddedPoint = prompt.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .withOffset(CGVector(dx: 0, dy: 14))
+        XCTAssertTrue(app.frame.contains(paddedPoint.screenPoint))
+        paddedPoint.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8),
+            "Tapping the visible starter pill padding must expand chat"
+        )
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 8), "The padded tap must send the prompt")
+        attachScreenshot(named: "home-chat-prompt-padding-reply", from: app)
+        XCTAssertGreaterThanOrEqual(targetHeight, 44, "The native prompt target must include its label padding")
     }
 
     func testHomePinsChatComposerWithoutTabBar() throws {
@@ -866,6 +927,333 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(retry.isHittable)
         XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
         attachScreenshot(named: "chat-provider-retry", from: app)
+    }
+
+    func testReloadedChatFailureKeepsRetryAndOriginalMessage() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryFailedFixture"
+        ])
+        try waitForHomeChatComposer(in: app)
+        XCTAssertTrue(app.buttons["chat_retry_button"].waitForExistence(timeout: 8))
+        app.terminate()
+        app.launch()
+        try waitForHomeChatComposer(in: app)
+        let retry = app.buttons["chat_retry_button"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["The answer could not be completed. Retry when you’re ready."].exists)
+        attachScreenshot(named: "chat-reloaded-failure", from: app)
+        retry.tap()
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(
+            answer.waitForExistence(timeout: 8),
+            "The fixture completes only for the original conversation, client ID and message"
+        )
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        attachScreenshot(named: "chat-reloaded-retry-completed", from: app)
+    }
+
+    func testReloadedPendingChatOffersReloadWithoutResending() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryPendingFixture"
+        ])
+        try waitForHomeChatComposer(in: app)
+        XCTAssertTrue(app.buttons["chat_reload_button"].waitForExistence(timeout: 8))
+        XCTAssertEqual(app.buttons["chat_reload_button"].label, "Reload")
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        XCTAssertTrue(app.staticTexts["An answer is still in progress. Reload to check it."].exists)
+        app.buttons["chat_reload_button"].tap()
+        XCTAssertTrue(app.buttons["chat_reload_button"].waitForExistence(timeout: 8))
+        XCTAssertEqual(app.buttons["chat_reload_button"].label, "Reload")
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        attachScreenshot(named: "chat-reloaded-pending", from: app)
+    }
+
+    func testChatRecoveryActionsKeepMinimumTouchTargets() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryFailedFixture"
+        ])
+        try waitForHomeChatComposer(in: app)
+        let retry = app.buttons["chat_retry_button"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 8))
+        attachScreenshot(named: "chat-recovery-failed-compact", from: app)
+        XCTAssertGreaterThanOrEqual(retry.frame.width, 44, "Retry needs a full native touch target")
+        XCTAssertGreaterThanOrEqual(retry.frame.height, 44, "Retry needs a full native touch target")
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertLessThanOrEqual(retry.frame.maxY, app.textFields["chat_composer"].frame.minY)
+    }
+
+    func testPendingChatRecoveryScalesAndClearsKeyboard() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryPendingFixture",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 45))
+        try waitForHomeChatComposer(in: app)
+        let reload = app.buttons["chat_reload_button"]
+        let explanation = app.staticTexts["An answer is still in progress. Reload to check it."]
+        XCTAssertTrue(reload.waitForExistence(timeout: 8))
+        XCTAssertTrue(explanation.exists)
+        attachScreenshot(named: "chat-recovery-pending-largest-text", from: app)
+        XCTAssertGreaterThan(explanation.frame.height, 50, "Recovery text must grow with accessibility text size")
+        XCTAssertGreaterThanOrEqual(reload.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(reload.frame.height, 44)
+        assertRecoveryExplanationAccessible(explanation, above: reload, in: app, capture: "legacy-pending-before-keyboard")
+
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
+        composer.typeText("Trend")
+        let settled = NSPredicate { _, _ in
+            let scroll = app.scrollViews["chat_recovery_message_scroll"]
+            let visibleTop = scroll.exists ? scroll.frame.minY : explanation.frame.minY
+            return reload.frame.maxY <= composer.frame.minY && visibleTop >= app.frame.minY
+        }
+        expectation(for: settled, evaluatedWith: reload)
+        waitForExpectations(timeout: 5)
+        XCTAssertTrue(reload.isHittable)
+        let explanationScroll = app.scrollViews["chat_recovery_message_scroll"]
+        let explanationBottom = explanationScroll.exists ? explanationScroll.frame.maxY : explanation.frame.maxY
+        XCTAssertLessThanOrEqual(explanationBottom, reload.frame.minY + 1)
+        attachScreenshot(named: "chat-recovery-pending-largest-text-keyboard", from: app)
+        reload.tap()
+        XCTAssertTrue(reload.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        XCTAssertTrue(explanation.exists, "Reload checks the pending original turn without resending")
+        XCTAssertEqual(composer.value as? String, "Trend", "Reload must preserve the unsent draft")
+        XCTAssertTrue(app.keyboards.firstMatch.exists, "Reload must keep the focused composer available")
+        app.typeText(" next")
+        XCTAssertEqual(composer.value as? String, "Trend next", "Typing continues without refocusing the composer")
+    }
+
+    func testFailedChatRecoveryRemainsReachableAtLargestText() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryFailedFixture",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 45))
+        try waitForHomeChatComposer(in: app)
+        let retry = app.buttons["chat_retry_button"]
+        let explanation = app.staticTexts["The answer could not be completed. Retry when you’re ready."]
+        XCTAssertTrue(retry.waitForExistence(timeout: 8))
+        XCTAssertTrue(explanation.exists)
+        XCTAssertGreaterThan(explanation.frame.height, 50)
+        XCTAssertGreaterThanOrEqual(retry.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(retry.frame.height, 44)
+        assertRecoveryExplanationAccessible(explanation, above: retry, in: app, capture: "legacy-failed-before-keyboard")
+        XCTAssertLessThanOrEqual(retry.frame.maxY, app.textFields["chat_composer"].frame.minY)
+        XCTAssertTrue(retry.isHittable)
+        attachScreenshot(named: "chat-recovery-failed-largest-text", from: app)
+        retry.tap()
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 8), "Retry must still reuse the original message identity")
+        XCTAssertFalse(retry.exists)
+        attachScreenshot(named: "chat-recovery-largest-text-retry-completed", from: app)
+    }
+
+    func testHomeV2PendingRecoveryClearsKeyboardAtLargestText() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryPendingFixture",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        app.buttons["photo_timeline_root_menu"].tap()
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 8))
+        ask.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8))
+        let reload = app.buttons["chat_reload_button"]
+        let explanation = app.staticTexts["An answer is still in progress. Reload to check it."]
+        XCTAssertTrue(reload.waitForExistence(timeout: 8))
+        XCTAssertTrue(explanation.exists)
+        XCTAssertGreaterThanOrEqual(reload.frame.height, 44)
+        XCTAssertLessThanOrEqual(explanation.frame.maxY, reload.frame.minY + 1)
+        attachScreenshot(named: "home-v2-recovery-pending-largest-text", from: app)
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
+        let settled = NSPredicate { _, _ in
+            reload.frame.maxY <= composer.frame.minY && explanation.frame.minY >= app.frame.minY
+        }
+        expectation(for: settled, evaluatedWith: reload)
+        waitForExpectations(timeout: 5)
+        XCTAssertTrue(reload.isHittable)
+        let explanationScroll = app.scrollViews["chat_recovery_message_scroll"]
+        let explanationBottom = explanationScroll.exists ? explanationScroll.frame.maxY : explanation.frame.maxY
+        XCTAssertLessThanOrEqual(explanationBottom, reload.frame.minY + 1)
+        attachScreenshot(named: "home-v2-recovery-pending-largest-text-keyboard", from: app)
+    }
+
+    func testHomeV2PendingComposerClearsKeyboardAtLargestText() throws {
+        try assertPendingComposerClearsKeyboard(homeV2: true, largestText: true)
+    }
+
+    func testLegacyPendingComposerClearsKeyboardAtLargestText() throws {
+        try assertPendingComposerClearsKeyboard(homeV2: false, largestText: true)
+    }
+
+    func testHomeV2PendingComposerClearsKeyboardAtDefaultText() throws {
+        try assertPendingComposerClearsKeyboard(homeV2: true, largestText: false)
+    }
+
+    private func assertPendingComposerClearsKeyboard(homeV2: Bool, largestText: Bool) throws {
+        let app = XCUIApplication()
+        var arguments = [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestChatFirstFixture",
+            "-lybUITestChatHistoryPendingFixture"
+        ]
+        if homeV2 { arguments.append("-lybUITestHomeV2Fixture") }
+        if largestText {
+            arguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        }
+        launch(app, with: arguments)
+        if homeV2 {
+            XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+            app.buttons["photo_timeline_root_menu"].tap()
+            let ask = app.buttons["home_v2_sidebar_ask"]
+            XCTAssertTrue(ask.waitForExistence(timeout: 8))
+            ask.tap()
+            XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8))
+        } else {
+            try waitForHomeChatComposer(in: app)
+        }
+
+        let composer = app.textFields["chat_composer"]
+        let shell = app.descendants(matching: .any)["chat_composer_shell"]
+        let send = app.buttons["chat_send_button"]
+        let reload = app.buttons["chat_reload_button"]
+        let explanation = app.staticTexts["An answer is still in progress. Reload to check it."]
+        XCTAssertTrue(reload.waitForExistence(timeout: 8))
+        composer.tap()
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 8))
+        // The key grid excludes the predictive accessory row. Use its actual input container.
+        let keyboardSurface = app.otherElements["inputView"].firstMatch
+        XCTAssertTrue(keyboardSurface.waitForExistence(timeout: 8))
+        composer.typeText("Trend")
+        XCTAssertTrue(send.isEnabled, "Exercise the actionable Send control, not its empty-draft state")
+
+        let clearsKeyboard = NSPredicate { _, _ in
+            let visible = app.windows.firstMatch.frame
+            let frames = [shell.frame, send.frame, keyboard.frame, keyboardSurface.frame]
+            let hasUsableFrames = frames.allSatisfy { frame in
+                [frame.minX, frame.minY, frame.width, frame.height].allSatisfy(\.isFinite) &&
+                    frame.width > 0 && frame.height > 0
+            }
+            return keyboard.exists && keyboardSurface.exists && hasUsableFrames &&
+                keyboardSurface.frame.contains(keyboard.frame) &&
+                visible.contains(shell.frame) && visible.contains(send.frame) &&
+                shell.frame.maxY <= keyboardSurface.frame.minY + 0.01 &&
+                send.frame.maxY <= keyboardSurface.frame.minY + 0.01
+        }
+        let clearance = XCTNSPredicateExpectation(predicate: clearsKeyboard, object: shell)
+        let result = XCTWaiter.wait(for: [clearance], timeout: 5)
+        let capture = "chat-composer-\(homeV2 ? "home-v2" : "legacy")-\(largestText ? "ax5" : "default")"
+        attachScreenshot(named: capture, from: app)
+        let geometry = XCTAttachment(string:
+            "shell=\(shell.frame); send=\(send.frame); keys=\(keyboard.frame); " +
+            "input=\(keyboardSurface.frame); reload=\(reload.frame)")
+        geometry.name = capture + "-geometry"
+        geometry.lifetime = .keepAlways
+        add(geometry)
+        if !homeV2 { attachRecoveryLayoutGeometry(named: capture + "-parent", from: app) }
+        XCTAssertEqual(result, .completed,
+                       "Full composer \(shell.frame) and Send \(send.frame) must clear input surface \(keyboardSurface.frame)")
+        XCTAssertTrue(send.isHittable)
+        XCTAssertTrue(reload.isHittable)
+        XCTAssertGreaterThanOrEqual(send.frame.width, 44 - 0.01)
+        XCTAssertGreaterThanOrEqual(send.frame.height, 44 - 0.01)
+        XCTAssertGreaterThanOrEqual(reload.frame.width, 44 - 0.01)
+        XCTAssertGreaterThanOrEqual(reload.frame.height, 44 - 0.01)
+        XCTAssertLessThanOrEqual(reload.frame.maxY, shell.frame.minY)
+
+        if largestText {
+            let scroll = app.scrollViews["chat_recovery_message_scroll"]
+            if scroll.exists, explanation.frame.height > scroll.frame.height + 1 {
+                XCTAssertGreaterThanOrEqual(scroll.frame.height, reload.frame.height,
+                                            "Recovery scrolling needs at least a full action-row height")
+                let originalTop = explanation.frame.minY
+                scroll.swipeUp()
+                XCTAssertLessThan(explanation.frame.minY, originalTop, "The explanation must actually scroll")
+                XCTAssertLessThanOrEqual(explanation.frame.maxY, scroll.frame.maxY + 1,
+                                         "The final recovery line must be reachable")
+                XCTAssertTrue(keyboard.exists, "Reading recovery text must not dismiss the keyboard to hide overflow")
+                XCTAssertTrue(reload.isHittable, "Reload stays outside the explanation's scrolling area")
+                XCTAssertLessThanOrEqual(shell.frame.maxY, keyboardSurface.frame.minY + 0.01)
+                attachScreenshot(named: capture + "-recovery-scrolled", from: app)
+            }
+        }
+        send.tap()
+        XCTAssertTrue(app.buttons["chat_retry_button"].waitForExistence(timeout: 8),
+                      "The pending-history fixture must receive the new turn and expose its provider failure")
+        XCTAssertFalse(reload.exists)
+    }
+
+    private func assertRecoveryExplanationAccessible(
+        _ explanation: XCUIElement, above action: XCUIElement, in app: XCUIApplication, capture: String
+    ) {
+        attachScreenshot(named: capture, from: app)
+        attachRecoveryLayoutGeometry(named: capture, from: app)
+        let scroll = app.scrollViews["chat_recovery_message_scroll"]
+        if scroll.exists, explanation.frame.height > scroll.frame.height + 1 {
+            XCTAssertGreaterThanOrEqual(scroll.frame.height, 44 - 0.01, "Overflow needs a readable viewport")
+            XCTAssertGreaterThanOrEqual(scroll.frame.minY, app.windows.firstMatch.frame.minY)
+            XCTAssertLessThanOrEqual(scroll.frame.maxY, action.frame.minY + 1)
+            let originalTop = explanation.frame.minY
+            for _ in 0..<6 {
+                if explanation.frame.maxY <= scroll.frame.maxY + 1 { break }
+                scroll.swipeUp()
+            }
+            XCTAssertLessThan(explanation.frame.minY, originalTop, "Overflowing prose must actually scroll")
+            XCTAssertLessThanOrEqual(explanation.frame.maxY, scroll.frame.maxY + 1,
+                                     "The final recovery line must be reachable")
+            XCTAssertTrue(action.isHittable)
+            attachScreenshot(named: capture + "-scrolled", from: app)
+            attachRecoveryLayoutGeometry(named: capture + "-scrolled", from: app)
+        } else {
+            XCTAssertLessThanOrEqual(explanation.frame.maxY, action.frame.minY + 1,
+                                     "Fitting prose must stay fully above its action")
+        }
+    }
+
+    private func attachRecoveryLayoutGeometry(named name: String, from app: XCUIApplication) {
+        let scroll = app.scrollViews["chat_recovery_message_scroll"]
+        let explanation = app.staticTexts["chat_recovery_message"]
+        let action = app.buttons["chat_reload_button"].exists ?
+            app.buttons["chat_reload_button"] : app.buttons["chat_retry_button"]
+        let scrollFrame = scroll.exists ? scroll.frame : .zero
+        let geometry = XCTAttachment(string:
+            "window=\(app.windows.firstMatch.frame); scroll=\(scrollFrame); " +
+            "explanation=\(explanation.frame); action=\(action.frame)\n" + app.debugDescription)
+        geometry.name = name
+        geometry.lifetime = .keepAlways
+        add(geometry)
     }
 
     func testChatOfflineStateIsVisibleAndRetryable() throws {
@@ -1260,10 +1648,12 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 5), "Critical chat prompt must be available")
         XCTAssertTrue(prompt.isHittable, "Critical chat prompt must be tappable")
         prompt.tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8),
-            "Critical chat prompt must open the chat root"
-        )
+        let openedChatRoot = app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8)
+        // Diagnostic only: the app's send/load trail if the tap did not open chat.
+        let sendProbe = openedChatRoot
+            ? ""
+            : String(describing: app.descendants(matching: .any)["home_chat_composer_dock"].value ?? "unavailable")
+        XCTAssertTrue(openedChatRoot, "Critical chat prompt must open the chat root (send probe: \(sendProbe))")
         attachScreenshot(named: "launch-quality-chat-tab", from: app)
         collapseHomeChat(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
@@ -1301,6 +1691,117 @@ final class LogYourBodyUITests: XCTestCase {
         )
 
         try assertAndCaptureBodyScoreShareSheet(in: app)
+    }
+
+    /// JOV-6089 gesture replay: horizontal and diagonal drags must never
+    /// dismiss the share sheet, a committed vertical drag must, and repeated
+    /// open/close must leave no orphan overlay or click-through surface.
+    func testShareSheetGestureArbitrationAndAccessibleEscape() throws {
+        let app = XCUIApplication()
+        launch(
+            app,
+            with: [
+                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestPhaseInsightFixture",
+                "-lybUITestGlp1WeeklyCheckInFixture"
+            ]
+        )
+
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 20))
+
+        let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
+        let closeButton = app.descendants(matching: .any)["body_score_share_close_button"]
+        let saveButton = app.descendants(matching: .any)["body_score_share_save_button"]
+
+        // Fast repeated open/close must leave no orphan overlay behind.
+        for _ in 0..<3 {
+            openBodyScoreShareSheet(in: app)
+            XCTAssertTrue(closeButton.isHittable, "Close must stay reachable with expanded controls")
+            closeButton.tap()
+            XCTAssertTrue(
+                shareSheet.waitForNonExistence(timeout: 3),
+                "Share sheet must fully dismiss on Close"
+            )
+        }
+
+        openBodyScoreShareSheet(in: app)
+
+        let window = app.windows.firstMatch
+        let midX = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.0)).screenPoint.x
+        let midY = window.coordinate(withNormalizedOffset: CGVector(dx: 0.0, dy: 0.5)).screenPoint.y
+        let dragDistance = CGFloat(220)
+
+        func drag(fromX: CGFloat, fromY: CGFloat, toX: CGFloat, toY: CGFloat) {
+            window.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: fromX, dy: fromY))
+                .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: toX, dy: toY)))
+        }
+
+        // Horizontal drag across the card (format-control axis): no dismissal.
+        drag(
+            fromX: midX - dragDistance, fromY: midY,
+            toX: midX + dragDistance, toY: midY
+        )
+        XCTAssertTrue(shareSheet.exists, "Horizontal drag must not dismiss the share sheet")
+
+        // Diagonal drag with a vertical component past the dismiss threshold:
+        // still no dismissal, because the gesture is not vertical-dominant.
+        drag(
+            fromX: midX - dragDistance * 0.7, fromY: midY - dragDistance * 0.5,
+            toX: midX + dragDistance * 0.7, toY: midY + dragDistance * 0.5
+        )
+        XCTAssertTrue(shareSheet.exists, "Diagonal drag must not dismiss the share sheet")
+
+        // Visible controls stay on-screen and hittable after the replays.
+        XCTAssertTrue(closeButton.isHittable, "Close must remain hittable after gesture replays")
+        XCTAssertTrue(saveButton.exists, "Save must remain reachable after gesture replays")
+
+        // A committed vertical drag is the drag-dismiss owner and must dismiss.
+        drag(
+            fromX: midX, fromY: midY,
+            toX: midX, toY: midY + dragDistance * 1.4
+        )
+        XCTAssertTrue(
+            shareSheet.waitForNonExistence(timeout: 3),
+            "Vertical drag past the threshold must dismiss the share sheet"
+        )
+
+        // Reopen and confirm accessible + hardware escape paths still work.
+        openBodyScoreShareSheet(in: app)
+        XCTAssertTrue(closeButton.isHittable)
+        closeButton.tap()
+        XCTAssertTrue(shareSheet.waitForNonExistence(timeout: 3))
+
+        openBodyScoreShareSheet(in: app)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists
+        )
+        // Hardware escape (Esc) path mirrors the VoiceOver escape action.
+        app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+        XCTAssertTrue(
+            shareSheet.waitForNonExistence(timeout: 3),
+            "Hardware escape must dismiss the share sheet"
+        )
+
+        // Focus returns to the invoking control: the home share button is back.
+        let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
+        XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
+        attachScreenshot(named: "share-sheet-gesture-arbitration", from: app)
+    }
+
+    private func openBodyScoreShareSheet(in app: XCUIApplication) {
+        let shareButton = app.descendants(matching: .any)["body_score_hero_share_button"]
+        XCTAssertTrue(shareButton.exists || shareButton.waitForExistence(timeout: 5))
+        scrollUntilHittable(shareButton, in: app)
+        XCTAssertTrue(shareButton.isHittable)
+        shareButton.tap()
+
+        let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
+        XCTAssertTrue(
+            sheet.waitForExistence(timeout: 8) || app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists,
+            "Share overlay must appear after tapping share"
+        )
     }
 
     func testLaunchQualityGateCapturesOnboardingFixedCTA() throws {
@@ -2193,6 +2694,61 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "onboarding-v2-paywall", from: app)
     }
 
+    func testHomeV2UnsentAskDraftSurvivesCollapseAndReopenWithoutSending() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture", "-lybUITestChatFirstFixture"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+        let composer = app.textFields["chat_composer"]
+        let draft = "Unsent body composition question"
+        composer.tap()
+        composer.typeText(draft)
+        XCTAssertEqual(composer.value as? String, draft)
+        app.buttons["home_chat_collapse"].tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5))
+        openHomeV2AskForDraftCheck(in: app)
+        attachScreenshot(named: "home-v2-unsent-draft-reopened", from: app)
+        XCTAssertEqual(composer.value as? String, draft, "Closing Ask must preserve the unsent draft")
+        XCTAssertFalse(app.staticTexts[draft].exists, "Closing Ask must not submit the draft")
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+    }
+
+    func testHomeV2SentAskDraftStaysClearedAfterCollapseAndReopen() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture", "-lybUITestChatFirstFixture"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        composer.typeText("Send this fixture question")
+        let send = app.buttons["chat_send_button"]
+        let sendEnabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
+        XCTAssertEqual(XCTWaiter.wait(for: [sendEnabled], timeout: 8), .completed)
+        send.tap()
+        let answer = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Your fixture trend is stable")
+        ).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 8), "The fake provider must complete the actual send")
+        app.buttons["home_chat_collapse"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5))
+        openHomeV2AskForDraftCheck(in: app)
+        let value = try XCTUnwrap(composer.value as? String)
+        XCTAssertTrue(value.isEmpty || value == composer.placeholderValue, "Sent text must not return as an unsent draft")
+        attachScreenshot(named: "home-v2-sent-draft-remains-cleared", from: app)
+    }
+
+    private func openHomeV2AskForDraftCheck(in app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        app.buttons["photo_timeline_root_menu"].tap()
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 5))
+        ask.tap()
+        XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 8))
+    }
+
     func testHomeV2AskOpensFromTheSidebarWithTheQuietComposer() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
@@ -2214,6 +2770,42 @@ final class LogYourBodyUITests: XCTestCase {
             "The quiet composer is there"
         )
         attachScreenshot(named: "home-v2-ask", from: app)
+    }
+
+    func testDailyReminderIsOfferedAfterTheFirstLoggedWeighInNotBeforeToday() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestDailyReminderPromptFixture"
+        ])
+
+        // Home's dock appears once the fixture has seeded.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 45),
+            "A new subscriber lands on Today"
+        )
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].exists, "No reminder ask before Today")
+
+        logWeight.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 10),
+            "The first logged weigh-in is when a reminder has a job"
+        )
+        attachScreenshot(named: "daily-reminder-after-first-weigh-in", from: app)
+        let notNow = app.buttons["daily_reminder_skip_button"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 3))
+        notNow.tap()
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].waitForExistence(timeout: 5))
     }
 
     func testHomeV2AskOpensFromProgressAndReturnsToProgress() throws {
@@ -2258,24 +2850,18 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 30),
-            "Without a photo the Home is metric first"
-        )
+        let card = app.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 30), "Without a photo, saved data fills the same editorial card")
+        let bodyFat = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+        XCTAssertTrue(bodyFat.exists)
+        XCTAssertTrue(bodyFat.label.contains("15.8 percent"))
         let value = app.descendants(matching: .any)["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
-
-        let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
-        XCTAssertTrue(chart.waitForExistence(timeout: 5), "Metric-first Home keeps the trend chart geometry even before 7 days")
-        XCTAssertGreaterThanOrEqual(chart.frame.minY, value.frame.maxY - 1, "The chart sits below the number")
-        XCTAssertTrue(
-            chart.label.contains("7 days") || chart.label.contains("7-day average"),
-            "The chart says whether it is a trend or still waiting for 7 days"
-        )
-        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Home keeps a fixed 30-day window; ranges live in Progress")
+        XCTAssertGreaterThanOrEqual(value.frame.minY, card.frame.maxY - 1, "Supporting weight sits below the card")
+        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Date ranges live in Progress")
         let viewProgress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 5), "Progress is one disclosure away")
-        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, chart.frame.maxY - 1)
+        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, value.frame.maxY - 1)
 
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")
@@ -2304,6 +2890,103 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(done.exists)
         done.tap()
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
+    }
+
+    func testHomeV2ChangingLogDateDoesNotCreateATodayUndoReceipt() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 30))
+        logWeight.tap()
+        let datePicker = app.datePickers.firstMatch
+        XCTAssertTrue(datePicker.waitForExistence(timeout: 8))
+        datePicker.tap()
+
+        let calendar = Calendar.current
+        let yesterday = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: Date()))
+        if calendar.component(.day, from: Date()) == 1 {
+            app.buttons["Previous Month"].tap()
+        }
+        let day = app.staticTexts[String(calendar.component(.day, from: yesterday))].firstMatch
+        XCTAssertTrue(day.waitForExistence(timeout: 5))
+        day.tap()
+        app.buttons["home_v2_log_sheet_plus"].tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 10), "Saving another day returns without a today receipt")
+        XCTAssertFalse(app.buttons["home_v2_undo"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
+        attachScreenshot(named: "home-v2-log-another-day", from: app)
+    }
+
+    func testHomeV2UndoRestoresPhotoOnlyDayAfterRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["LYB_UI_TEST_UNDO_ACCOUNT"] = UUID().uuidString
+        let arguments = [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2UndoPhotoOnlyFixture"
+        ]
+        launch(app, with: arguments)
+        try logWeightOnPhotoOnlyDay(in: app)
+
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        undo.tap()
+        XCTAssertTrue(undo.waitForNonExistence(timeout: 10), "Undo clears only after the restore saves")
+        app.buttons["home_v2_context_button"].tap()
+        assertPhotoOnlyDay(in: app)
+        attachScreenshot(named: "home-v2-undo-photo-only", from: app)
+
+        launch(app, with: arguments + ["-lybUITestReuseUndoFixtureData"])
+        let details = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(details.waitForExistence(timeout: 30))
+        details.tap()
+        assertPhotoOnlyDay(in: app)
+        attachScreenshot(named: "home-v2-undo-photo-only-relaunched", from: app)
+    }
+
+    func testHomeV2UndoFailureKeepsTheReceiptAndSavedWeight() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["LYB_UI_TEST_UNDO_ACCOUNT"] = UUID().uuidString
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2UndoPhotoOnlyFixture", "-lybUITestHomeV2UndoFailureFixture"
+        ])
+        try logWeightOnPhotoOnlyDay(in: app)
+
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 10))
+        undo.tap()
+        let failure = app.alerts["Couldn’t undo this entry"]
+        XCTAssertTrue(failure.waitForExistence(timeout: 5))
+        attachScreenshot(named: "home-v2-undo-save-failed", from: app)
+        failure.buttons["OK"].tap()
+        XCTAssertTrue(undo.exists, "A failed save keeps Undo available")
+        XCTAssertTrue(undo.isHittable, "The retained receipt can be retried")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
+        app.buttons["home_v2_context_button"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["home_v2_context_photo"].exists)
+    }
+
+    private func logWeightOnPhotoOnlyDay(in app: XCUIApplication) throws {
+        let details = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(details.waitForExistence(timeout: 30))
+        details.tap()
+        assertPhotoOnlyDay(in: app)
+        app.buttons["home_v2_edit_entry"].tap()
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 8))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 10))
+        app.buttons["home_v2_context_close"].tap()
+    }
+
+    private func assertPhotoOnlyDay(in app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["home_v2_context_photo"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForNonExistence(timeout: 8))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_body_fat"].waitForNonExistence(timeout: 8))
     }
 
     func testHomeV2ProgressRefreshesAfterEditingAnExistingDay() throws {
@@ -2446,9 +3129,21 @@ final class LogYourBodyUITests: XCTestCase {
 
         let shareSheet = app.descendants(matching: .any)["body_score_share_sheet"]
         let shareCard = app.descendants(matching: .any)["body_score_share_card"]
-        XCTAssertTrue(
-            app.descendants(matching: .any)["world_class_screen_shareBodyScore"].waitForExistence(timeout: 8)
-        )
+        let shareScreen = app.descendants(matching: .any)["world_class_screen_shareBodyScore"]
+        var shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
+        if !shareScreenVisible {
+            // A tap synthesized while the timeline stage re-lays out can land on
+            // a stale accessibility element; re-resolve and tap once before failing.
+            let retryShareButton = app.descendants(matching: .any)["body_score_hero_share_button"].firstMatch
+            if retryShareButton.exists {
+                scrollUntilHittable(retryShareButton, in: app)
+                if retryShareButton.isHittable {
+                    retryShareButton.tap()
+                    shareScreenVisible = shareScreen.waitForExistence(timeout: 8)
+                }
+            }
+        }
+        XCTAssertTrue(shareScreenVisible)
         // Sheet identifier is preferred; card must remain discoverable for launch quality.
         let sheetVisible = shareSheet.waitForExistence(timeout: 8)
         let cardVisible = shareCard.waitForExistence(timeout: sheetVisible ? 4 : 8)
@@ -2498,6 +3193,92 @@ final class LogYourBodyUITests: XCTestCase {
             shareButton.waitForExistence(timeout: 5),
             "Home share control must return after dismissing share sheet"
         )
+    }
+
+    func testRecoveryEmailKeyboardDoneMeetsMinimumHitTarget() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestRecoveryEmailPath",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.forwardActualXCTestContext()
+        app.launch()
+        app.tap()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        XCTAssertTrue(start.waitForExistence(timeout: 15))
+        start.tap()
+        let male = app.buttons["Male"]
+        XCTAssertTrue(male.waitForExistence(timeout: 8))
+        male.tap()
+        app.buttons["body_score_onboarding_basics_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        app.buttons["CM"].tap()
+        let heightField = app.textFields["Height in centimeters"]
+        XCTAssertTrue(heightField.waitForExistence(timeout: 5))
+        heightField.tap()
+        heightField.typeText("178")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_height_continue_button"].tap()
+
+        let manual = app.buttons["body_score_onboarding_enter_manually_button"]
+        XCTAssertTrue(manual.waitForExistence(timeout: 8))
+        manual.tap()
+        XCTAssertTrue(app.staticTexts["What’s your current weight?"].waitForExistence(timeout: 8))
+        app.buttons["LBS"].tap()
+        let weightField = app.textFields["Weight (lbs)"]
+        XCTAssertTrue(weightField.waitForExistence(timeout: 5))
+        weightField.tap()
+        weightField.typeText("182")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_manual_weight_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["How do you know your body fat?"].waitForExistence(timeout: 8))
+        app.buttons["body_score_onboarding_body_fat_manual_button"].tap()
+        XCTAssertTrue(app.staticTexts["Enter your body fat."].waitForExistence(timeout: 8))
+        let bodyFatField = app.textFields["Body fat percentage"]
+        XCTAssertTrue(bodyFatField.waitForExistence(timeout: 5))
+        bodyFatField.tap()
+        bodyFatField.typeText("18")
+        if app.buttons["Done"].waitForExistence(timeout: 2) {
+            app.buttons["Done"].tap()
+        }
+        app.buttons["body_score_onboarding_body_fat_numeric_continue_button"].tap()
+
+        XCTAssertTrue(app.staticTexts["Here’s your fat vs muscle."].waitForExistence(timeout: 15))
+        app.buttons["body_score_reveal_continue_button"].tap()
+        XCTAssertTrue(app.staticTexts["Add a recovery email."].waitForExistence(timeout: 8))
+
+        let emailField = app.textFields["you@domain.com"]
+        XCTAssertTrue(emailField.waitForExistence(timeout: 5))
+        emailField.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 5))
+
+        let window = app.windows.firstMatch.frame
+        let done = app.buttons.matching(identifier: "body_score_email_keyboard_done_button").firstMatch
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertTrue(window.contains(done.frame), "email Done \(done.frame) window \(window)")
+        XCTAssertGreaterThanOrEqual(done.frame.width, 44, "email Done \(done.frame)")
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, "email Done \(done.frame)")
+
+        let labeledDones = app.buttons.matching(NSPredicate(format: "label == 'Done'"))
+        for index in 0..<labeledDones.count {
+            let control = labeledDones.element(boundBy: index)
+            guard control.exists, control.frame.width > 1, control.frame.height > 1 else { continue }
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "email Done \(control.frame)")
+        }
+
+        done.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Add a recovery email."].exists)
     }
 
     private func assertAndCaptureTimelineAnalytics(in app: XCUIApplication) throws {

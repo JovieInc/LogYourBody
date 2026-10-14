@@ -1,7 +1,23 @@
+import type { TrainingMutationAdmission } from '@/lib/ports/training-mutations';
+import {
+  captureTrainingAdmission,
+  requireAdmittedSetup,
+  requireCurrentTrainingAdmission,
+  commitTrainingMutation,
+} from './mutation-admission';
 import type {
   NativeProductRecord,
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
+import {
+  catalogVariantById,
+  isEligibleVariant,
+  missingEquipment,
+  resolveAvailableEquipment,
+  substitutionCandidates,
+  type CatalogEquipment,
+  type TrunkDemandLevel,
+} from './catalog';
 import {
   isEligibleExerciseSubstitution,
   latestFeedbackPerSession,
@@ -13,9 +29,16 @@ import {
   loadTrainingRecords,
   pullAllTrainingRecords,
   stableTrainingUuid,
+  swappedPrescription,
+  type ExerciseSwapRecord,
 } from './service';
-import type { SetLog, TrainingFeedback } from './types';
-import type { ExercisePrescription, Session, WorkoutSessionEvent } from './types';
+import type {
+  ExercisePrescription,
+  Session,
+  SetLog,
+  TrainingFeedback,
+  WorkoutSessionEvent,
+} from './types';
 
 export type LogSetInput = {
   sessionId: string;
@@ -45,13 +68,17 @@ export async function logTrainingSet(input: {
   subject: string;
   now: Date;
   set: LogSetInput;
+  admission?: TrainingMutationAdmission;
 }): Promise<LogSetResult> {
   const { records, subject, set } = input;
+  const admission = input.admission ?? (await captureTrainingAdmission(records, subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
   const [snapshot, sessions] = await Promise.all([
     loadTrainingRecords(records, subject),
     pullAllTrainingRecords(records, subject, 'training_sessions'),
   ]);
   if (!snapshot.setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, snapshot.setup);
   const sessionRecord = sessions.find((record) => record.id === set.sessionId);
   if (
     !sessionRecord ||
@@ -116,8 +143,7 @@ export async function logTrainingSet(input: {
     revision: 0,
     corrections: [],
   };
-  if (!records.insertTrainingSet) return { kind: 'rejected' };
-  const saved = await records.insertTrainingSet(subject, log);
+  const saved = await commitTrainingMutation(records, subject, admission, 'set_insert', log);
   if (!saved || saved.id !== logId || saved.deleted_at !== null || saved.record_type !== 'set_log')
     return { kind: 'rejected' };
   if (
@@ -141,17 +167,268 @@ export async function logTrainingSet(input: {
     ),
   );
   if (sessionComplete) {
-    if (!records.updateTrainingSession) return { kind: 'rejected' };
-    const completion = await records.updateTrainingSession(
-      subject,
-      session.id,
-      session.executionRevision ?? 0,
-      allLogs.filter((log) => log.sessionId === session.id).length,
-      { ...sessionRecord, status: 'completed', completedAt },
-    );
-    if (!completion) return { kind: 'rejected' };
+    await commitTrainingMutation(records, subject, admission, 'session_update', {
+      ...sessionRecord,
+      status: 'completed',
+      completedAt,
+    });
   }
   return { kind: 'logged', log: saved, sessionComplete };
+}
+
+export type FeedbackInput = Pick<
+  TrainingFeedback,
+  'sessionId' | 'soreness' | 'pump' | 'performance' | 'jointPain'
+>;
+
+export type FeedbackResult =
+  | { kind: 'recorded'; feedback: TrainingFeedback & { record_type: string } }
+  | { kind: 'program_not_enrolled' }
+  | { kind: 'session_not_found' }
+  | { kind: 'rejected' }
+  | { kind: 'invalid' };
+
+/** Stores a post-session check-in. Shared by the mobile API and MCP. */
+export async function recordTrainingFeedback(input: {
+  records: NativeProductRecordsPort;
+  subject: string;
+  now: Date;
+  createId: () => string;
+  feedback: FeedbackInput;
+  admission?: TrainingMutationAdmission;
+}): Promise<FeedbackResult> {
+  const admission =
+    input.admission ?? (await captureTrainingAdmission(input.records, input.subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
+  const snapshot = await loadTrainingRecords(input.records, input.subject);
+  if (!snapshot.setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, snapshot.setup);
+  const sessionExists = snapshot.sessions.some(
+    (record) =>
+      record.id === input.feedback.sessionId &&
+      (record as NativeProductRecord & { programSetupId?: string }).programSetupId ===
+        snapshot.setup?.id,
+  );
+  if (!sessionExists) return { kind: 'session_not_found' };
+  if (!validTrainingFeedback(input.feedback)) return { kind: 'invalid' };
+  const latest = latestFeedbackPerSession(snapshot.feedback).find(
+    (item) => item.sessionId === input.feedback.sessionId,
+  );
+  if (
+    latest &&
+    latest.soreness === input.feedback.soreness &&
+    latest.pump === input.feedback.pump &&
+    latest.performance === input.feedback.performance &&
+    latest.jointPain === input.feedback.jointPain
+  ) {
+    // Keep the original observation time, even when another session has newer feedback.
+    await requireCurrentTrainingAdmission(input.records, input.subject, admission);
+    return {
+      kind: 'recorded',
+      feedback: {
+        id: latest.id,
+        record_type: 'session_feedback',
+        ...input.feedback,
+        createdAt: latest.createdAt,
+      },
+    };
+  }
+  const latestFeedbackTime = snapshot.feedback.reduce(
+    (latest, item) => Math.max(latest, Date.parse(item.createdAt)),
+    0,
+  );
+  const createdAt = new Date(Math.max(input.now.getTime(), latestFeedbackTime + 1)).toISOString();
+  const feedback: TrainingFeedback & { record_type: string } = {
+    id: input.createId(),
+    record_type: 'session_feedback',
+    ...input.feedback,
+    createdAt,
+  };
+  await commitTrainingMutation(
+    input.records,
+    input.subject,
+    admission,
+    'feedback_insert',
+    feedback,
+  );
+  return { kind: 'recorded', feedback };
+}
+
+export type SwapConstraints = {
+  /** Session-only equipment loss; never rewrites stored setup preferences. */
+  unavailableEquipment?: string[];
+  /** Extra items the user explicitly confirmed are present (e.g. an EZ bar). */
+  declaredEquipment?: string[];
+  /** Concern tags that rule a variant out regardless of equipment. */
+  excludedConcerns?: string[];
+  preferTorsoSupport?: boolean;
+  maxTrunkDemand?: TrunkDemandLevel;
+};
+
+export type SwapExerciseInput = SwapConstraints & {
+  sessionId: string;
+  exerciseId: string;
+  /** Optional reviewed catalog variant to use; otherwise the best-ranked candidate. */
+  toVariantId?: string;
+};
+
+export type SwapExerciseResult =
+  | {
+      kind: 'swapped';
+      swap: ExerciseSwapRecord;
+      exercise: ExercisePrescription;
+      diff: string[];
+    }
+  | { kind: 'program_not_enrolled' }
+  | { kind: 'session_not_found' }
+  | { kind: 'session_not_active' }
+  | { kind: 'exercise_not_found' }
+  | { kind: 'variant_not_found' }
+  | { kind: 'variant_ineligible'; missing: CatalogEquipment[] }
+  | { kind: 'no_feasible_alternative' }
+  | { kind: 'rejected' };
+
+function swapDiff(from: ExercisePrescription, to: ExercisePrescription): string[] {
+  const diff = [`name: ${from.name} -> ${to.name}`];
+  const muscles = new Set([
+    ...Object.keys(from.muscleContribution),
+    ...Object.keys(to.muscleContribution),
+  ]);
+  for (const muscle of muscles) {
+    const before = Number(from.muscleContribution[muscle as keyof typeof from.muscleContribution]);
+    const after = Number(to.muscleContribution[muscle as keyof typeof to.muscleContribution]);
+    if (before !== after) diff.push(`${muscle} contribution: ${before} -> ${after}`);
+  }
+  return diff;
+}
+
+/** Replaces one prescribed movement with an eligible catalog variant of the
+ * same primary muscle. The swap is stored once (additive) so it persists for
+ * the rest of the block; sets, rep range, RIR and schedule are untouched. */
+export async function swapExercise(input: {
+  records: NativeProductRecordsPort;
+  subject: string;
+  now: Date;
+  swap: SwapExerciseInput;
+  admission?: TrainingMutationAdmission;
+}): Promise<SwapExerciseResult> {
+  const { records, subject, swap } = input;
+  const admission = input.admission ?? (await captureTrainingAdmission(records, subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
+  const [snapshot, sessions] = await Promise.all([
+    loadTrainingRecords(records, subject),
+    pullAllTrainingRecords(records, subject, 'training_sessions'),
+  ]);
+  const setup = snapshot.setup;
+  if (!setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, setup);
+  const sessionRecord = sessions.find((record) => record.id === swap.sessionId);
+  if (
+    !sessionRecord ||
+    sessionRecord.deleted_at !== null ||
+    !isWorkoutSessionRecord(sessionRecord) ||
+    sessionRecord.programSetupId !== setup.id
+  ) {
+    return { kind: 'session_not_found' };
+  }
+  const prescription = sessionRecord.prescription;
+  if (sessionRecord.status !== 'in_progress' || !prescription || prescription.safetyStop) {
+    return { kind: 'session_not_active' };
+  }
+  const exercise = prescription.exercises.find((item) => item.id === swap.exerciseId);
+  if (!exercise) return { kind: 'exercise_not_found' };
+
+  const available = resolveAvailableEquipment({
+    profile: setup.equipment,
+    declared: swap.declaredEquipment,
+    sessionUnavailable: swap.unavailableEquipment,
+  });
+  const eligibility = {
+    available,
+    excludedConcerns: swap.excludedConcerns,
+  };
+
+  let variant;
+  if (swap.toVariantId) {
+    const requested = catalogVariantById(swap.toVariantId);
+    if (!requested || requested.primaryMuscle !== exercise.primaryMuscle) {
+      return { kind: 'variant_not_found' };
+    }
+    if (!isEligibleVariant(requested, eligibility)) {
+      return { kind: 'variant_ineligible', missing: missingEquipment(requested, available) };
+    }
+    variant = requested;
+  } else {
+    variant = substitutionCandidates({
+      primaryMuscle: exercise.primaryMuscle,
+      currentExerciseId: exercise.id,
+      currentContribution: exercise.muscleContribution,
+      available,
+      excludedConcerns: swap.excludedConcerns,
+      preferTorsoSupport: swap.preferTorsoSupport,
+      maxTrunkDemand: swap.maxTrunkDemand,
+    })[0];
+    if (!variant) return { kind: 'no_feasible_alternative' };
+  }
+
+  const swapped = swappedPrescription(exercise, variant.id, snapshot.logs, exercise.targetRir);
+  if (!swapped) return { kind: 'variant_not_found' };
+
+  const programRevisionId =
+    typeof sessionRecord.programRevisionId === 'string'
+      ? sessionRecord.programRevisionId
+      : undefined;
+  const swapRecord: ExerciseSwapRecord = {
+    id: stableTrainingUuid(
+      subject,
+      setup.id,
+      String(sessionRecord.blockId ?? prescription.week),
+      sessionRecord.id,
+      exercise.id,
+      variant.id,
+    ),
+    record_type: 'exercise_swap',
+    programSetupId: setup.id,
+    ...(programRevisionId ? { programRevisionId } : {}),
+    blockId: String(sessionRecord.blockId ?? prescription.week),
+    sessionId: sessionRecord.id,
+    fromExerciseId: exercise.id,
+    toVariantId: variant.id,
+    deleted_at: null,
+    server_updated_at: input.now.toISOString(),
+  };
+  const savedSwap = await commitTrainingMutation(
+    records,
+    subject,
+    admission,
+    'swap_insert',
+    swapRecord,
+  );
+  if (
+    !savedSwap ||
+    savedSwap.id !== swapRecord.id ||
+    savedSwap.deleted_at !== null ||
+    savedSwap.record_type !== 'exercise_swap'
+  )
+    return { kind: 'rejected' };
+
+  const updated = {
+    ...prescription,
+    exercises: prescription.exercises.map((item) => (item.id === exercise.id ? swapped : item)),
+  };
+  const savedSession = await commitTrainingMutation(records, subject, admission, 'session_update', {
+    ...sessionRecord,
+    prescription: updated,
+  });
+  if (!savedSession || savedSession.id !== sessionRecord.id || savedSession.deleted_at !== null)
+    return { kind: 'rejected' };
+
+  return {
+    kind: 'swapped',
+    swap: swapRecord,
+    exercise: swapped,
+    diff: swapDiff(exercise, swapped),
+  };
 }
 
 export type CorrectSetInput = LogSetInput & {
@@ -175,13 +452,17 @@ export async function correctTrainingSet(input: {
   subject: string;
   now: Date;
   set: CorrectSetInput;
+  admission?: TrainingMutationAdmission;
 }): Promise<CorrectSetResult> {
   const { records, subject, set } = input;
+  const admission = input.admission ?? (await captureTrainingAdmission(records, subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
   const [snapshot, sessions] = await Promise.all([
     loadTrainingRecords(records, subject),
     pullAllTrainingRecords(records, subject, 'training_sessions'),
   ]);
   if (!snapshot.setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, snapshot.setup);
   const sessionRecord = sessions.find((record) => record.id === set.sessionId);
   if (
     !sessionRecord ||
@@ -216,9 +497,11 @@ export async function correctTrainingSet(input: {
   if (!existing) return { kind: 'set_not_found' };
   const priorCorrection = existing.corrections?.find((item) => item.id === set.correctionId);
   if (priorCorrection) {
-    return existing.reps === set.reps && existing.loadKg === set.loadKg && existing.rir === set.rir
-      ? { kind: 'corrected', log: { ...existing, record_type: 'set_log' } }
-      : { kind: 'set_conflict' };
+    if (existing.reps === set.reps && existing.loadKg === set.loadKg && existing.rir === set.rir) {
+      await requireCurrentTrainingAdmission(records, subject, admission);
+      return { kind: 'corrected', log: { ...existing, record_type: 'set_log' } };
+    }
+    return { kind: 'set_conflict' };
   }
   if ((existing.revision ?? 0) !== set.expectedRevision) return { kind: 'set_conflict' };
   if (!records.correctTrainingSet) return { kind: 'rejected' };
@@ -238,6 +521,7 @@ export async function correctTrainingSet(input: {
       },
     ],
   };
+  await requireCurrentTrainingAdmission(records, subject, admission);
   const saved = await records.correctTrainingSet(
     subject,
     existing.id,
@@ -246,73 +530,6 @@ export async function correctTrainingSet(input: {
   );
   if (!saved) return { kind: 'set_conflict' };
   return { kind: 'corrected', log: saved };
-}
-
-export type FeedbackInput = Pick<
-  TrainingFeedback,
-  'sessionId' | 'soreness' | 'pump' | 'performance' | 'jointPain'
->;
-
-export type FeedbackResult =
-  | { kind: 'recorded'; feedback: TrainingFeedback & { record_type: string } }
-  | { kind: 'program_not_enrolled' }
-  | { kind: 'session_not_found' }
-  | { kind: 'rejected' }
-  | { kind: 'invalid' };
-
-/** Stores a post-session check-in. Shared by the mobile API and MCP. */
-export async function recordTrainingFeedback(input: {
-  records: NativeProductRecordsPort;
-  subject: string;
-  now: Date;
-  createId: () => string;
-  feedback: FeedbackInput;
-}): Promise<FeedbackResult> {
-  const snapshot = await loadTrainingRecords(input.records, input.subject);
-  if (!snapshot.setup) return { kind: 'program_not_enrolled' };
-  const sessionExists = snapshot.sessions.some(
-    (record) =>
-      record.id === input.feedback.sessionId &&
-      (record as NativeProductRecord & { programSetupId?: string }).programSetupId ===
-        snapshot.setup?.id,
-  );
-  if (!sessionExists) return { kind: 'session_not_found' };
-  if (!validTrainingFeedback(input.feedback)) return { kind: 'invalid' };
-  const latest = latestFeedbackPerSession(snapshot.feedback).find(
-    (item) => item.sessionId === input.feedback.sessionId,
-  );
-  if (
-    latest &&
-    latest.soreness === input.feedback.soreness &&
-    latest.pump === input.feedback.pump &&
-    latest.performance === input.feedback.performance &&
-    latest.jointPain === input.feedback.jointPain
-  ) {
-    // Keep the original observation time, even when another session has newer feedback.
-    return {
-      kind: 'recorded',
-      feedback: {
-        id: latest.id,
-        record_type: 'session_feedback',
-        ...input.feedback,
-        createdAt: latest.createdAt,
-      },
-    };
-  }
-  const latestFeedbackTime = snapshot.feedback.reduce(
-    (latest, item) => Math.max(latest, Date.parse(item.createdAt)),
-    0,
-  );
-  const createdAt = new Date(Math.max(input.now.getTime(), latestFeedbackTime + 1)).toISOString();
-  const feedback: TrainingFeedback & { record_type: string } = {
-    id: input.createId(),
-    record_type: 'session_feedback',
-    ...input.feedback,
-    createdAt,
-  };
-  const saved = await input.records.push(input.subject, 'training_feedback', [feedback]);
-  if (saved.rejected_ids.includes(feedback.id)) return { kind: 'rejected' };
-  return { kind: 'recorded', feedback };
 }
 
 export type WorkoutActionInput =
@@ -388,19 +605,25 @@ export async function applyWorkoutAction(input: {
   eventId: string;
   expectedRevision: number;
   action: WorkoutActionInput;
+  admission?: TrainingMutationAdmission;
 }): Promise<WorkoutActionResult> {
+  const admission =
+    input.admission ?? (await captureTrainingAdmission(input.records, input.subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
   const [snapshot, records] = await Promise.all([
     loadTrainingRecords(input.records, input.subject),
     pullAllTrainingRecords(input.records, input.subject, 'training_sessions'),
   ]);
-  if (!snapshot.setup) return { kind: 'program_not_enrolled' };
+  const setup = snapshot.setup;
+  if (!setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, setup);
   const record = records.find((candidate) => candidate.id === input.sessionId) as
     MutableSessionRecord | undefined;
   if (
     !record ||
     record.deleted_at !== null ||
     !isWorkoutSessionRecord(record) ||
-    record.programSetupId !== snapshot.setup.id ||
+    record.programSetupId !== setup.id ||
     !record.prescription
   )
     return { kind: 'session_not_found' };
@@ -408,6 +631,7 @@ export async function applyWorkoutAction(input: {
   const sessionLogs = logsForSession(snapshot.logs, session.id);
   const priorEvent = session.executionEvents?.find((event) => event.id === input.eventId);
   if (priorEvent) {
+    await requireCurrentTrainingAdmission(input.records, input.subject, admission);
     return {
       kind: 'updated',
       decision: priorEvent.kind,
@@ -465,7 +689,7 @@ export async function applyWorkoutAction(input: {
             isEligibleExerciseSubstitution({
               exercise: current,
               candidate,
-              equipment: snapshot.setup!.equipment,
+              equipment: setup.equipment,
             }),
         );
         if (hasCompletedCurrentSet || !replacement) return { kind: 'no_eligible_substitution' };
@@ -549,6 +773,7 @@ export async function applyWorkoutAction(input: {
     executionEvents: [...(session.executionEvents ?? []), event],
   };
   if (!input.records.updateTrainingSession) return { kind: 'rejected' };
+  await requireCurrentTrainingAdmission(input.records, input.subject, admission);
   const saved = await input.records.updateTrainingSession(
     input.subject,
     record.id,

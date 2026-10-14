@@ -1,10 +1,13 @@
+import { captureTrainingAdmission } from '@/lib/training/mutation-admission';
 import { z } from 'zod';
 import type { NativeProductRecordsPort } from '@/lib/ports/native-product-records';
+import { EXERCISE_CATALOG } from '@/lib/training/catalog';
 import {
   applyWorkoutAction,
   correctTrainingSet,
   logTrainingSet,
   recordTrainingFeedback,
+  swapExercise,
 } from '@/lib/training/commands';
 import { summarizeTrainingProgress } from '@/lib/training/progress';
 import {
@@ -196,6 +199,15 @@ const correctSetInput = z
 
 const progressInput = z.object({ exercise: z.string().trim().min(1).max(80).optional() }).strict();
 
+const swapInput = z
+  .object({
+    exercise: z.string().trim().min(1).max(80),
+    variant: z.string().trim().min(1).max(80).optional(),
+    unavailableEquipment: z.array(z.string().trim().min(1).max(32)).max(16).optional(),
+    preferTorsoSupport: z.boolean().optional(),
+  })
+  .strict();
+
 const score = (description: string) => ({ type: 'integer', minimum: 0, maximum: 10, description });
 
 export const LYB_MCP_TOOLS: ToolDefinition[] = [
@@ -286,6 +298,8 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
       additionalProperties: false,
     },
     async run(subject, args: z.infer<typeof logSetsInput>, deps) {
+      const admission = await captureTrainingAdmission(deps.records, subject);
+      if (!admission) return failure(ENROLL_IN_APP);
       const now = deps.now();
       // Preview first so a misheard exercise never starts a session.
       const workout = await getOrCreateNextWorkout({
@@ -293,6 +307,7 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         subject,
         now,
         persist: false,
+        admission,
       });
       if (workout.kind === 'not_enrolled') return failure(ENROLL_IN_APP);
       if (workout.kind === 'week_complete')
@@ -306,7 +321,7 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         );
       }
       const { exercise } = match;
-      await getOrCreateNextWorkout({ records: deps.records, subject, now });
+      await getOrCreateNextWorkout({ records: deps.records, subject, now, admission });
       const snapshot = await loadTrainingRecords(deps.records, subject);
       const taken = new Set(
         snapshot.logs
@@ -343,6 +358,7 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
           continue;
         }
         const result = await logTrainingSet({
+          admission,
           records: deps.records,
           subject,
           now,
@@ -540,6 +556,8 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
       additionalProperties: false,
     },
     async run(subject, args: z.infer<typeof feedbackInput>, deps) {
+      const admission = await captureTrainingAdmission(deps.records, subject);
+      if (!admission) return failure(ENROLL_IN_APP);
       const snapshot = await loadTrainingRecords(deps.records, subject);
       if (!snapshot.setup) return failure(ENROLL_IN_APP);
       const latest = snapshot.sessions
@@ -553,6 +571,7 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         )[0];
       if (!latest) return failure('There is no session to check in on yet. Log a workout first.');
       const result = await recordTrainingFeedback({
+        admission,
         records: deps.records,
         subject,
         now: deps.now(),
@@ -566,6 +585,127 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
           ? ' Joint pain at that level pauses the affected work. If it persists or worsens, check with a qualified clinician.'
           : '';
       return text(`Check-in saved.${pain}`, { sessionId: latest.id, ...args });
+    },
+  },
+  {
+    name: 'swap_exercise',
+    title: 'Swap an exercise',
+    description:
+      "Replaces one movement in the user's current LogYourBody session with a reviewed catalog variant that trains the same primary muscle and is feasible with the equipment available. The swap holds for the rest of the training block; the new variant keeps its own progression history. Ask the user before swapping, and pass unavailableEquipment only for what is unavailable today.",
+    scope: LYB_MCP_SCOPES.trainingWrite,
+    readOnly: false,
+    input: swapInput,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        exercise: {
+          type: 'string',
+          description: 'Exercise to replace, as the user said it or by id.',
+        },
+        variant: {
+          type: 'string',
+          description:
+            'Optional catalog variant to swap to (name or id). Omit to pick the closest feasible option.',
+        },
+        unavailableEquipment: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Equipment unavailable for this session only, e.g. ["bench"]. Never stored.',
+        },
+        preferTorsoSupport: {
+          type: 'boolean',
+          description: 'Rank torso-supported variants first (e.g. low back discomfort).',
+        },
+      },
+      required: ['exercise'],
+      additionalProperties: false,
+    },
+    async run(subject, args: z.infer<typeof swapInput>, deps) {
+      const admission = await captureTrainingAdmission(deps.records, subject);
+      if (!admission) return failure(ENROLL_IN_APP);
+      const now = deps.now();
+      const workout = await getOrCreateNextWorkout({
+        records: deps.records,
+        subject,
+        now,
+        persist: false,
+        admission,
+      });
+      if (workout.kind === 'not_enrolled') return failure(ENROLL_IN_APP);
+      if (workout.kind === 'week_complete')
+        return failure(`All sessions for week ${workout.week} are already complete.`);
+      if (workout.session.safetyStop)
+        return failure(workout.session.explanation ?? 'Training is paused after a pain report.');
+      const match = matchExercise(workout.session, args.exercise);
+      if (match.kind !== 'match') {
+        return failure(
+          `${match.kind === 'ambiguous' ? 'That matches more than one exercise' : "That exercise is not in today's session"}. Today's exercises: ${match.options.join(', ')}.`,
+        );
+      }
+      await getOrCreateNextWorkout({ records: deps.records, subject, now, admission });
+      let toVariantId: string | undefined;
+      if (args.variant) {
+        const wanted = normalizeName(args.variant);
+        const pool = EXERCISE_CATALOG.filter(
+          (variant) =>
+            variant.primaryMuscle === match.exercise.primaryMuscle &&
+            variant.id !== match.exercise.id,
+        );
+        const picked = pool.filter(
+          (variant) => variant.id === args.variant || normalizeName(variant.name) === wanted,
+        );
+        if (picked.length === 0) {
+          return failure(
+            `There is no reviewed ${match.exercise.primaryMuscle} variant by that name. Options: ${pool.map((variant) => variant.name).join(', ') || 'none'}.`,
+          );
+        }
+        toVariantId = picked[0]!.id;
+      }
+      const result = await swapExercise({
+        records: deps.records,
+        subject,
+        now,
+        admission,
+        swap: {
+          sessionId: workout.session.id,
+          exerciseId: match.exercise.id,
+          toVariantId,
+          unavailableEquipment: args.unavailableEquipment,
+          preferTorsoSupport: args.preferTorsoSupport,
+        },
+      });
+      switch (result.kind) {
+        case 'swapped': {
+          const message = [
+            `Swapped ${match.exercise.name} for ${result.exercise.name}.`,
+            `Plan unchanged: ${result.exercise.sets} sets of ${result.exercise.targetReps} reps at ${result.exercise.targetRir} reps in reserve. It stays swapped for the rest of this block.`,
+            `Changes: ${result.diff.join('; ')}.`,
+          ].join(' ');
+          return text(message, {
+            sessionId: workout.session.id,
+            swap: { from: match.exercise.id, to: result.exercise.id },
+            exercise: result.exercise,
+            diff: result.diff,
+          });
+        }
+        case 'variant_not_found':
+          return failure('That variant is not in the reviewed catalog for this muscle.');
+        case 'variant_ineligible':
+          return failure(
+            `That variant needs equipment that is not available: ${result.missing.join(', ') || 'a required item'}.`,
+          );
+        case 'no_feasible_alternative':
+          return failure(
+            'No feasible alternative trains the same muscle with the equipment available.',
+          );
+        case 'session_not_active':
+          return failure('That session is no longer active.');
+        case 'exercise_not_found':
+        case 'session_not_found':
+          return failure('That exercise is not in the current session.');
+        default:
+          return failure('The swap could not be saved. Try again.');
+      }
     },
   },
   {
