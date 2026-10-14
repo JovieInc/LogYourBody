@@ -2865,6 +2865,143 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "onboarding-v2-paywall", from: app)
     }
 
+    func testComposerLoggingSelectorTapPathsKeepTheAskDraft() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestComposerLoggingPrototype"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+
+        let composer = app.textFields["chat_composer"]
+        let draft = "Compare this week with my previous body composition trend before I log anything"
+        composer.tap()
+        composer.typeText(draft)
+
+        let plus = app.buttons["composer_logging_plus"]
+        let shell = app.descendants(matching: .any)["chat_composer_shell"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        let multilineHeight = shell.frame.height
+        plus.tap()
+        XCTAssertTrue(app.buttons["composer_log_weight"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["composer_log_body_fat"].exists)
+        XCTAssertTrue(app.buttons["composer_log_photo"].exists)
+        XCTAssertEqual(shell.frame.height, multilineHeight, accuracy: 1)
+        for identifier in ["composer_logging_close", "composer_log_weight", "composer_log_body_fat", "composer_log_photo"] {
+            XCTAssertGreaterThanOrEqual(app.buttons[identifier].frame.height, 44)
+        }
+        attachScreenshot(named: "composer-logging-selector-keyboard-draft", from: app)
+
+        app.buttons["composer_logging_close"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 3))
+        XCTAssertEqual(composer.value as? String, draft)
+        XCTAssertFalse(app.staticTexts[draft].exists, "Opening or closing the selector must not send the draft")
+
+        plus.tap()
+        app.buttons["composer_log_weight"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].exists)
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertEqual(composer.value as? String, draft)
+
+        plus.tap()
+        app.buttons["composer_log_body_fat"].tap()
+        XCTAssertTrue(app.navigationBars["Body fat"].waitForExistence(timeout: 5))
+        let bodyFatField = app.textFields.matching(
+            NSPredicate(format: "label == %@", "Body fat percentage value")
+        ).firstMatch
+        XCTAssertTrue(bodyFatField.exists)
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertEqual(composer.value as? String, draft)
+
+        plus.tap()
+        app.buttons["composer_log_photo"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["progress_photo_attach_sheet"].waitForExistence(timeout: 5))
+        app.buttons["progress_photo_attach_cancel_button"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertEqual(composer.value as? String, draft)
+    }
+
+    func testComposerLoggingSelectorUsesExpandedTapFallbackAtAccessibilityTextSize() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestComposerLoggingPrototype",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+
+        app.buttons["composer_logging_plus"].tap()
+        let close = app.buttons["composer_logging_close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        XCTAssertEqual(close.label, "Close logging options")
+        for identifier in ["composer_log_weight", "composer_log_body_fat", "composer_log_photo"] {
+            let option = app.buttons[identifier]
+            XCTAssertTrue(option.exists)
+            XCTAssertGreaterThanOrEqual(option.frame.height, 44)
+        }
+        attachScreenshot(named: "composer-logging-selector-accessibility-expanded", from: app)
+
+        close.tap()
+        XCTAssertTrue(app.buttons["composer_logging_plus"].waitForExistence(timeout: 3))
+    }
+
+    func testComposerLoggingHoldDragCancelsOutsideAndCannotTriggerSave() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestComposerLoggingPrototype"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+
+        let composer = app.textFields["chat_composer"]
+        let draft = "Keep this draft"
+        composer.tap()
+        composer.typeText(draft)
+
+        let plus = app.buttons["composer_logging_plus"]
+        let shell = app.descendants(matching: .any)["chat_composer_shell"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        XCTAssertTrue(shell.exists)
+
+        let start = plus.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let outside = app.coordinate(withNormalizedOffset: .zero).withOffset(
+            CGVector(dx: shell.frame.midX, dy: max(shell.frame.minY - 80, 1))
+        )
+        start.press(forDuration: 0.4, thenDragTo: outside)
+        XCTAssertTrue(plus.waitForExistence(timeout: 3), "Release outside restores the composer")
+        XCTAssertEqual(composer.value as? String, draft)
+
+        let minimumHitTarget = CGFloat(44)
+        let modeWidth = (shell.frame.width - minimumHitTarget) / 3
+        let weightTarget = app.coordinate(withNormalizedOffset: .zero).withOffset(
+            CGVector(
+                dx: shell.frame.minX + minimumHitTarget + modeWidth / 2,
+                dy: shell.frame.midY
+            )
+        )
+        start.press(forDuration: 0.4, thenDragTo: weightTarget)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 5),
+            "Release selects Weight without another confirmation tap"
+        )
+        XCTAssertTrue(
+            app.buttons["home_v2_log_sheet_save"].exists,
+            "The release may reveal Save but must never activate it"
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertEqual(composer.value as? String, draft)
+    }
+
     func testHomeV2UnsentAskDraftSurvivesCollapseAndReopenWithoutSending() throws {
         let app = XCUIApplication()
         launch(app, with: [

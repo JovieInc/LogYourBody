@@ -1,5 +1,6 @@
 ---
-title: "Evidence-Based Body Recomposition: Building Muscle While Losing Fat"
+draft: true
+title: 'Evidence-Based Body Recomposition: Building Muscle While Losing Fat'
 date: 2024-11-10
 author: LogYourBody Team
 tags:
@@ -21,21 +22,25 @@ As Menno Henselmans' research demonstrates, body recomposition is not equally ef
 ### Best Candidates for Recomp
 
 **1. Complete Beginners**
+
 - Untrained individuals have the highest potential for recomp
 - "Newbie gains" allow muscle growth even in a deficit
 - Can expect 0.5-1lb muscle gain per month while losing fat
 
 **2. Detrained Individuals**
+
 - Those returning after a long layoff
 - Muscle memory effect accelerates regrowth
 - Can recomp for 3-6 months upon return
 
 **3. Enhanced Athletes**
+
 - Performance-enhancing drugs dramatically increase recomp potential
 - Not relevant for natural lifters
 - Outside the scope of this article
 
 **4. Overweight Beginners**
+
 - Higher body fat provides energy for muscle growth
 - Best recomp potential when combining training and fat loss
 - Can achieve dramatic transformations
@@ -43,11 +48,13 @@ As Menno Henselmans' research demonstrates, body recomposition is not equally ef
 ### Poor Candidates for Recomp
 
 **1. Advanced Natural Lifters**
+
 - Close to genetic potential
 - Must choose: bulk or cut
 - Recomp becomes painfully slow
 
 **2. Already Lean Individuals (<12% body fat for men, <22% for women)**
+
 - Insufficient energy reserves for muscle growth in a deficit
 - Better to slow bulk or maintain
 
@@ -58,6 +65,7 @@ Mike Israetel explains the energy systems at play:
 ### Energy Balance Paradox
 
 You can be in a:
+
 - **Systemic caloric deficit** (whole body)
 - While having a **local caloric surplus** (muscle tissue)
 
@@ -77,21 +85,25 @@ How? Your body uses stored fat as fuel while directing dietary protein and nutri
 Based on Renaissance Periodization's hypertrophy guidelines:
 
 **Volume:**
+
 - 12-20 sets per muscle group per week
 - Train each muscle 2-3x per week
 - Focus on compound movements
 
 **Intensity:**
+
 - Train close to failure (1-3 reps in reserve)
 - Use a variety of rep ranges: 5-30 reps
 - Emphasis on the 8-15 rep range for most work
 
 **Progressive Overload:**
+
 - Add weight or reps each week
 - Track your lifts meticulously
 - This is your muscle-building stimulus
 
 **Sample Split:**
+
 - Push/Pull/Legs 2x per week
 - Upper/Lower 4x per week
 - Full body 3-4x per week
@@ -99,21 +111,25 @@ Based on Renaissance Periodization's hypertrophy guidelines:
 ### Nutrition Protocol
 
 **Protein:**
+
 - **1-1.2g per lb of bodyweight** (higher than typical bulk)
 - Distributed across 4-5 meals
 - Minimum 30g per meal with 3g leucine
 
 **Caloric Deficit:**
+
 - **250-500 calorie deficit** (0.5-1lb loss per week)
 - Too aggressive = muscle loss
 - Too modest = minimal fat loss
 
 **Carbohydrates:**
+
 - Time around training (before/after workouts)
 - 1-2g per lb bodyweight for most
 - Provides training fuel and aids recovery
 
 **Fats:**
+
 - 0.3-0.5g per lb bodyweight minimum
 - Essential for hormone production
 - Fill remaining calories after protein and carbs
@@ -124,6 +140,7 @@ Based on Renaissance Periodization's hypertrophy guidelines:
 **Recomp Target:** 2,400 (-300)
 
 **Macros:**
+
 - Protein: 200g (800 cal)
 - Carbs: 250g (1,000 cal)
 - Fat: 67g (600 cal)
@@ -132,32 +149,37 @@ Based on Renaissance Periodization's hypertrophy guidelines:
 **Meal Distribution:**
 
 **Meal 1 (7 AM):**
+
 - 3 whole eggs + 3 egg whites
 - 1 cup oatmeal
 - 1 banana
-- *Protein: 40g | Carbs: 65g | Fat: 18g*
+- _Protein: 40g | Carbs: 65g | Fat: 18g_
 
 **Meal 2 (11 AM - Pre-Workout):**
+
 - 6oz chicken breast
 - 1 cup white rice
 - Vegetables
-- *Protein: 50g | Carbs: 55g | Fat: 5g*
+- _Protein: 50g | Carbs: 55g | Fat: 5g_
 
 **Meal 3 (2 PM - Post-Workout):**
+
 - 8oz lean ground beef
 - 1 large sweet potato
 - Vegetables
-- *Protein: 50g | Carbs: 60g | Fat: 15g*
+- _Protein: 50g | Carbs: 60g | Fat: 15g_
 
 **Meal 4 (6 PM):**
+
 - 6oz salmon
 - 1 cup quinoa
 - Mixed vegetables with olive oil
-- *Protein: 40g | Carbs: 50g | Fat: 20g*
+- _Protein: 40g | Carbs: 50g | Fat: 20g_
 
 **Meal 5 (9 PM):**
+
 - Greek yogurt with berries
-- *Protein: 20g | Carbs: 20g | Fat: 9g*
+- _Protein: 20g | Carbs: 20g | Fat: 9g_
 
 ## Realistic Expectations
 
@@ -166,17 +188,20 @@ Based on Renaissance Periodization's hypertrophy guidelines:
 Menno Henselmans' data suggests:
 
 **Months 1-3 (Beginners):**
+
 - Fat loss: 1-2 lbs per month
 - Muscle gain: 1-2 lbs per month
 - Net scale weight: Minimal change
 - Visual changes: Significant
 
 **Months 4-6:**
+
 - Fat loss: 1-2 lbs per month
 - Muscle gain: 0.5-1 lb per month
 - Progress slows but continues
 
 **Months 7-12:**
+
 - Recomp becomes very slow
 - Consider switching to bulk/cut cycles
 - Advanced trainees should abandon recomp
@@ -186,6 +211,7 @@ Menno Henselmans' data suggests:
 **Don't rely on the scale alone!** During recomp, bodyweight may barely change while composition improves dramatically.
 
 **Better Metrics:**
+
 1. **Progress photos** (weekly, same lighting/time)
 2. **Body measurements** (chest, waist, arms, thighs)
 3. **Performance in the gym** (strength should maintain or increase)
@@ -199,6 +225,7 @@ Use LogYourBody to track all these metrics consistently.
 ### 1. Too Aggressive on Calories
 
 **The Problem:** Cutting calories too low (>750 deficit)
+
 - Kills muscle-building potential
 - Becomes a regular cut with minimal muscle growth
 - Better to just cut faster at that point
@@ -208,6 +235,7 @@ Use LogYourBody to track all these metrics consistently.
 ### 2. Inadequate Protein
 
 **The Problem:** Eating "bulk protein" (0.7-0.8g/lb)
+
 - Not enough for muscle growth in a deficit
 - Increases risk of muscle loss
 
@@ -218,11 +246,13 @@ Use LogYourBody to track all these metrics consistently.
 Mike Israetel's principle: **"Stimulative reps build muscle, junk volume just creates fatigue."**
 
 **The Problem:**
+
 - Long workouts with lots of easy sets
 - Not training close to failure
 - Poor exercise selection
 
 **The Fix:**
+
 - 45-75 minute focused sessions
 - Train 1-3 reps from failure on working sets
 - Prioritize compound movements
@@ -234,6 +264,7 @@ Mike Israetel's principle: **"Stimulative reps build muscle, junk volume just cr
 Recomp is SLOW. You might lose 1-2 lbs of fat and gain 0.5-1 lb muscle in a month. Scale barely moves. People give up.
 
 **The Fix:**
+
 - Commit to 3-6 month blocks
 - Focus on non-scale metrics
 - Take monthly progress photos
@@ -246,6 +277,7 @@ Recomp is SLOW. You might lose 1-2 lbs of fat and gain 0.5-1 lb muscle in a mont
 If you're already lean (<12% men, <22% women) and have 2+ years of serious training, recomp is inefficient.
 
 **The Fix:**
+
 - Run proper bulk/cut cycles
 - Bulk: +200-300 calories, gain 0.5-1 lb per month
 - Cut: -500 calories, lose 1-2 lbs per month
@@ -254,6 +286,7 @@ If you're already lean (<12% men, <22% women) and have 2+ years of serious train
 ## Recomp vs. Bulk/Cut Cycles
 
 ### When to Recomp
+
 - You're a beginner (training age <1 year)
 - You're overweight (>20% body fat men, >30% women)
 - You're returning from a long layoff
@@ -261,6 +294,7 @@ If you're already lean (<12% men, <22% women) and have 2+ years of serious train
 - You have 3-6 months of patience
 
 ### When to Bulk/Cut Instead
+
 - Advanced trainee (2+ years serious training)
 - Already lean
 - Want faster results in either direction
