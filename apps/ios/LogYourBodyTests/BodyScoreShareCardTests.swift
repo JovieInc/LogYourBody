@@ -528,6 +528,56 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertFalse(latest.isSmoothed)
     }
 
+    func testProgressPresentationRejectsDeletedRefreshedAndSparseFocus() throws {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let daily = (0..<7).map {
+            MetricChartDataPoint(date: start.addingTimeInterval(Double($0) * 86_400),
+                                 value: 80 + Double($0), presence: .present)
+        }
+        let focus = HomeV2ChartIntegrity.Sample(date: daily[3].date, value: daily[3].value)
+        let valid = try XCTUnwrap(ContextualMetricProgressPolicy.presentationSelection(
+            points: daily, averages: [], focus: focus))
+        XCTAssertTrue(valid.isFocused)
+        XCTAssertEqual(valid.point.value, 83)
+
+        var refreshed = daily
+        refreshed[3] = MetricChartDataPoint(date: focus.date, value: 90, presence: .present)
+        let changed = try XCTUnwrap(ContextualMetricProgressPolicy.presentationSelection(
+            points: refreshed, averages: [], focus: focus))
+        XCTAssertFalse(changed.isFocused)
+        XCTAssertEqual(changed.point.value, 86, "Refresh must not retain the stale selected83")
+
+        let deleted = try XCTUnwrap(ContextualMetricProgressPolicy.presentationSelection(
+            points: daily.filter { $0.date != focus.date }, averages: [], focus: focus))
+        XCTAssertFalse(deleted.isFocused)
+        XCTAssertEqual(deleted.point.value, 86)
+        let sparse = try XCTUnwrap(ContextualMetricProgressPolicy.presentationSelection(
+            points: [daily[3]], averages: [], focus: focus))
+        XCTAssertFalse(sparse.isFocused, "A hidden chart cannot keep an active playhead")
+        XCTAssertEqual(sparse.point.value, 83, "The sole current record remains the headline")
+        XCTAssertNil(ContextualMetricProgressPolicy.presentationSelection(
+            points: [], averages: [], focus: focus))
+    }
+
+    func testProgressPresentationRejectsRemovedAverageAfterRefresh() throws {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let daily = (0..<7).map {
+            MetricChartDataPoint(date: start.addingTimeInterval(Double($0) * 86_400),
+                                 value: 80 + Double($0), presence: .present)
+        }
+        let average = MetricChartDataPoint(date: daily[6].date, value: 83, presence: .present)
+        let focus = HomeV2ChartIntegrity.Sample(date: average.date, value: 83, kind: .sevenDayAverage)
+        let valid = try XCTUnwrap(ContextualMetricProgressPolicy.presentationSelection(
+            points: daily, averages: [average], focus: focus))
+        XCTAssertTrue(valid.isFocused)
+        XCTAssertTrue(valid.isSmoothed)
+        let refreshed = try XCTUnwrap(ContextualMetricProgressPolicy.presentationSelection(
+            points: daily, averages: [], focus: focus))
+        XCTAssertFalse(refreshed.isFocused)
+        XCTAssertFalse(refreshed.isSmoothed)
+        XCTAssertEqual(refreshed.point.value, 86)
+    }
+
     private func shareWeightMetric(weight: Double?, date: Date, source: String = "manual") -> BodyMetrics {
         BodyMetrics(
             id: UUID().uuidString, userId: "synthetic-share-fixture", date: date,

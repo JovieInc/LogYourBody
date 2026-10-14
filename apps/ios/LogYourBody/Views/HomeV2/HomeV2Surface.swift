@@ -185,12 +185,6 @@ struct HomeV2Surface: View {
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
-        .sheet(isPresented: $showsProvenance) {
-            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
-                HomeV2ProvenanceSheet(detail: provenance)
-            }
-        }
-        .onChange(of: metric.id) { _, _ in showsProvenance = false }
     }
 
     private func numberRow(size: CGFloat, weight: Font.Weight, kerning: CGFloat) -> some View {

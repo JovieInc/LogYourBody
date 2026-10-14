@@ -200,6 +200,8 @@ struct HomeV2ProgressView: View {
             HomeV2TrendPolicy.points(current.daily, in: range, now: now)
         )
         let hasEnoughData = HomeV2TrendPolicy.hasEnoughData(visible)
+        let selected = shareSelection(for: metric, data: current)
+        let activeFocus = selected.flatMap { $0.isFocused ? $0.point : nil }
         let presented = HomeV2MetricEditorial.canvas(
             HomeV2MetricCanvasRequest(
                 metric: metric,
@@ -221,12 +223,12 @@ struct HomeV2ProgressView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     HomeV2MetricHero(
-                        value: focusedSample.map { formatValue(metric, $0.value) } ?? presented.value,
+                        value: activeFocus.map { formatValue(metric, $0.value) } ?? presented.value,
                         unit: presented.unit,
-                        comparison: focusedSample.map {
+                        comparison: activeFocus.map {
                             $0.date.formatted(date: .abbreviated, time: .omitted)
                         } ?? presented.comparison,
-                        provenance: focusedSample == nil ? presented.provenance : nil,
+                        provenance: activeFocus == nil ? presented.provenance : nil,
                         onProvenancePresentationChange: { showsProvenance = $0 }
                     )
                     .padding(.horizontal, HomeV2Tokens.Space.inset)
@@ -260,6 +262,7 @@ struct HomeV2ProgressView: View {
                             now: now
                         )
                         .id(metric)
+                        .onDisappear { focusedSample = nil }
                         .padding(.top, HomeV2Tokens.Space.tight)
                         if let title = current.insightTitle, let body = current.insightBody {
                             insightRow(title: title, body: body)
@@ -289,16 +292,23 @@ struct HomeV2ProgressView: View {
         ))
     }
 
+    private func shareSelection(
+        for candidate: HomeV2ProgressMetric, data: HomeV2ProgressSeries
+    ) -> ContextualMetricProgressPolicy.Selection? {
+        ContextualMetricProgressPolicy.presentationSelection(
+            points: HomeV2TrendPolicy.points(data.daily, in: range, now: now),
+            averages: HomeV2TrendPolicy.points(data.trend, in: range, now: now),
+            focus: candidate == metric ? focusedSample : nil
+        )
+    }
+
     private var contextualSharePayload: BodyScoreSharePayload? {
         let snapshots = HomeV2ProgressMetric.allCases.compactMap { candidate -> ContextualMetricSnapshot? in
             let data = series(candidate)
             let points = HomeV2TrendPolicy.points(data.daily, in: range, now: now)
-            let averages = HomeV2TrendPolicy.points(data.trend, in: range, now: now)
             let stats = HomeV2ProgressPolicy.stats(
                 points: HomeV2MetricEditorial.observedPoints(points), prefersHigh: candidate.prefersHigh)
-            let focus = candidate == metric ? focusedSample : nil
-            guard let selected = ContextualMetricProgressPolicy.selection(
-                points: points, averages: averages, focus: focus),
+            guard let selected = shareSelection(for: candidate, data: data),
                   let kind = ContextualMetricKind(rawValue: candidate.rawValue) else { return nil }
             let trend = candidate == .steps
                 ? HomeV2ProgressCopy.stepsAverageSentence(average: stats.average, range: range)

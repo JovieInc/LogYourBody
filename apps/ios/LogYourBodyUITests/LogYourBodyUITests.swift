@@ -2304,6 +2304,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
         let progress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(progress.waitForExistence(timeout: 30))
+        assertTodayProvenancePresentation(in: app)
         progress.tap()
         let value = app.staticTexts["home_v2_progress_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 8))
@@ -2431,6 +2432,18 @@ final class LogYourBodyUITests: XCTestCase {
             XCTAssertTrue(log.waitForExistence(timeout: 8))
             app.terminate()
         }
+    }
+
+    private func assertTodayProvenancePresentation(in app: XCUIApplication) {
+        let chip = app.buttons["home_v2_provenance_chip"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5))
+        chip.tap()
+        let detail = app.descendants(matching: .any)["home_v2_provenance_detail"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 5), "Today has one working provenance presenter")
+        XCTAssertFalse(app.buttons["home_v2_view_progress"].isHittable)
+        app.buttons["home_v2_provenance_done"].tap()
+        XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["home_v2_view_progress"].isHittable)
     }
 
     private func assertProgressProvenanceCoversShare(in app: XCUIApplication) {

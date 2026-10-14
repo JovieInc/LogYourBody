@@ -80,10 +80,24 @@ enum ContextualMetricProgressPolicy {
     struct Selection {
         let point: MetricChartDataPoint
         let isSmoothed: Bool
+        var isFocused = false
 
         func source(entries: [MetricHistoryEntry]) -> String? {
             isSmoothed ? nil : ContextualMetricSourcePolicy.source(for: point, entries: entries, fallback: nil)
         }
+    }
+
+    /// A removed, refreshed or hidden chart focus cannot outlive the current data.
+    static func presentationSelection(
+        points: [MetricChartDataPoint], averages: [MetricChartDataPoint],
+        focus: HomeV2ChartIntegrity.Sample?
+    ) -> Selection? {
+        let observed = HomeV2MetricEditorial.observedPoints(points)
+        if HomeV2TrendPolicy.hasEnoughData(observed), let focus,
+           let selected = selection(points: observed, averages: averages, focus: focus) {
+            return selected
+        }
+        return selection(points: observed, focus: nil)
     }
 
     static func selection(
@@ -95,7 +109,7 @@ enum ContextualMetricProgressPolicy {
             guard let point = candidates.first(where: {
                 $0.date == focus.date && abs($0.value - focus.value) < 0.0001
             }) else { return nil }
-            return Selection(point: point, isSmoothed: focus.kind == .sevenDayAverage)
+            return Selection(point: point, isSmoothed: focus.kind == .sevenDayAverage, isFocused: true)
         }
         return HomeV2MetricEditorial.observedPoints(points).max { $0.date < $1.date }
             .map { Selection(point: $0, isSmoothed: false) }
