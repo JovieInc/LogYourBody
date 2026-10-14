@@ -38,6 +38,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Native CI calls this before its build. Verify immutable source offline before
+# preparing development config; older checkouts without the import stay usable.
+if [[ -f "$IOS_DIR/Vendor/JovieKit.source.json" ]]; then
+  # The ESM CLI entry check needs a physical path when IOS_DIR uses a symlink.
+  JOVIEKIT_IMPORTER_PATH="$(cd "$IOS_DIR/Scripts" && pwd -P)/import-joviekit.mjs"
+  node "$JOVIEKIT_IMPORTER_PATH" check \
+    "$IOS_DIR/Vendor/JovieKit.source.json" "$IOS_DIR/Vendor/JovieKit"
+fi
+
 write_if_needed() {
   local path="$1"
   local label="$2"

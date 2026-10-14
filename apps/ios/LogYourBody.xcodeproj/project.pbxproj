@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5AAEA63151156B8F114A0B83 /* BodyRecordReviewConsumerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */; };
+		84230C7F619A7210787206E8 /* AppReviewNativeAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832C6BD896D896CCBEBAF565 /* AppReviewNativeAdapter.swift */; };
+		80341C4DDED4231D4589ED47 /* BodyRecordReviewConsumer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E6CF428B39B066C378F12CD /* BodyRecordReviewConsumer.swift */; };
 		5A1AE51CD34B4A8E812811B2 /* CoreDataManager+BodySpecImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */; };
 		D7B509EA4FE543A7A3E32A1F /* BodySpecAtomicImportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */; };
 		9A041FE1B8AF416FB7931540 /* DailyStepValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 577B839EE95E4F09A47A27E0 /* DailyStepValidationTests.swift */; };
@@ -476,6 +479,8 @@
 		7F3682C47FFCDC96AC7171E2 /* DexaReportedMeasurementsPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4240D5F0129EC16E29C2259 /* DexaReportedMeasurementsPersistenceTests.swift */; };
 		91EF9EABCFA5B86B70872411 /* ReportedMeasurementsMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 006434E8EF977B41ED40B4EA /* ReportedMeasurementsMigrationTests.swift */; };
 		7585611558F46F5B8916E402 /* DexaReportedMeasurementsCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 812F1687F7FE1C0FB873CD40 /* DexaReportedMeasurementsCompatibilityTests.swift */; };
+		1DFC02C32EE4A1927B9611F2 /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = 268B06CA55F3059A974968FA /* JovieKit */; };
+		CC51F90AD41E20451A31775A /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5975412524D066E7DFBA4A90 /* JovieKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -496,6 +501,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyRecordReviewConsumerTests.swift; sourceTree = "<group>"; };
+		832C6BD896D896CCBEBAF565 /* AppReviewNativeAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewNativeAdapter.swift; sourceTree = "<group>"; };
+		2E6CF428B39B066C378F12CD /* BodyRecordReviewConsumer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyRecordReviewConsumer.swift; sourceTree = "<group>"; };
 		12CA473A353C45778799E228 /* CoreDataManager+BodySpecImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CoreDataManager+BodySpecImport.swift"; sourceTree = "<group>"; };
 		435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodySpecAtomicImportTests.swift; sourceTree = "<group>"; };
 		577B839EE95E4F09A47A27E0 /* DailyStepValidationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyStepValidationTests.swift; sourceTree = "<group>"; };
@@ -1051,6 +1059,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1DFC02C32EE4A1927B9611F2 /* JovieKit in Frameworks */,
 				AD050C4F2EC135360082A313 /* RevenueCat in Frameworks */,
 				AD050C4D2EC135360082A313 /* ReceiptParser in Frameworks */,
 				AD8F12E92ED6A489003C4559 /* Statsig in Frameworks */,
@@ -1064,6 +1073,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC51F90AD41E20451A31775A /* JovieKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1282,6 +1292,7 @@
 				776620205152E0A15A875703 /* BodyMetricLocalDateContractTests.swift */,
 				192238EEFD8161597A0B99AA /* BodyMetricLoggingAndInsightTests.swift */,
 				C639B8116483011892C95543 /* BodyMetricLoggingServiceTests.swift */,
+				533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */,
 				3F2E34BC49376B87D43D81AD /* BodyMetricPhotoUpdateTests.swift */,
 				6EBD5BF3F1671BC8D17ABE5D /* BodyMetricSourceContractTests.swift */,
 				812F1687F7FE1C0FB873CD40 /* DexaReportedMeasurementsCompatibilityTests.swift */,
@@ -1473,9 +1484,11 @@
 				AD3150A12F15000100ABCDEF /* LogWeightFormValidator.swift */,
 				AD1036322F00000100ABCDEF /* BodyMetricAppIntents.swift */,
 				AD1036342F00000100ABCDEF /* BodyMetricLoggingService.swift */,
+				2E6CF428B39B066C378F12CD /* BodyRecordReviewConsumer.swift */,
 				AD1036362F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift */,
 				AD3134002F01313400D134A1 /* NotificationManager.swift */,
 				ADAD00012F10000000ABCDEF /* ExternalServicePorts.swift */,
+				832C6BD896D896CCBEBAF565 /* AppReviewNativeAdapter.swift */,
 				ADA4B7382ECD44C800F4262A /* BodyScoreCache.swift */,
 				ADA4B7362ECC3A7A00F4262A /* EntryVisibilityManager.swift */,
 				AD050C482EC12E390082A313 /* RevenueCatManager.swift */,
@@ -1975,6 +1988,7 @@
 			);
 			name = LogYourBody;
 			packageProductDependencies = (
+				268B06CA55F3059A974968FA /* JovieKit */,
 				AD050C4C2EC135360082A313 /* ReceiptParser */,
 				AD050C4E2EC135360082A313 /* RevenueCat */,
 				AD050C502EC135360082A313 /* RevenueCatUI */,
@@ -1999,6 +2013,9 @@
 				AD7D30A42E1490810072AA5B /* PBXTargetDependency */,
 			);
 			name = LogYourBodyTests;
+			packageProductDependencies = (
+				5975412524D066E7DFBA4A90 /* JovieKit */,
+			);
 			productName = LogYourBodyTests;
 			productReference = AD7D30A22E1490810072AA5B /* LogYourBodyTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -2058,6 +2075,7 @@
 			);
 			mainGroup = AD7D30892E14907F0072AA5B;
 			packageReferences = (
+				9E26E454BD4456AF479B6756 /* XCLocalSwiftPackageReference "JovieKit" */,
 				AD050C472EC061040082A313 /* XCRemoteSwiftPackageReference "purchases-ios" */,
 				AD8F12E42ED678D6003C4559 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 				AD8F12E72ED6A489003C4559 /* XCRemoteSwiftPackageReference "statsig-kit" */,
@@ -2147,6 +2165,7 @@
 				1564F129E1D9BAAC5F85C703 /* BodyMetricLocalDateContractTests.swift in Sources */,
 				8F1D82C327BC8A6B5FB2A6DB /* BodyMetricLoggingAndInsightTests.swift in Sources */,
 				B1F00834695D3233B62404FD /* BodyMetricLoggingServiceTests.swift in Sources */,
+				5AAEA63151156B8F114A0B83 /* BodyRecordReviewConsumerTests.swift in Sources */,
 				D5F71D2685408ED4D599FC28 /* BodyMetricPhotoUpdateTests.swift in Sources */,
 				04EB1D7AD1947D32BDE7AD70 /* BodyMetricSourceContractTests.swift in Sources */,
 				7585611558F46F5B8916E402 /* DexaReportedMeasurementsCompatibilityTests.swift in Sources */,
@@ -2302,12 +2321,14 @@
 				ADDC47AB2E2D89F3003C97E7 /* LogYourBody.xcdatamodeld in Sources */,
 				AD1036332F00000100ABCDEF /* BodyMetricAppIntents.swift in Sources */,
 				AD1036352F00000100ABCDEF /* BodyMetricLoggingService.swift in Sources */,
+				80341C4DDED4231D4589ED47 /* BodyRecordReviewConsumer.swift in Sources */,
 				AD1036372F00000200ABCDEF /* BodyMetricSpotlightIndexer.swift in Sources */,
 				AD3145D22F0A020100ABCDEF /* AvatarBodyRenderer.swift in Sources */,
 				AD3134012F01313400D134A1 /* NotificationManager.swift in Sources */,
 				AD8872452EB87F480041C426 /* LiquidGlassCard.swift in Sources */,
 				ADDC47AD2E2D89F3003C97E7 /* User.swift in Sources */,
 				ADAD00022F10000000ABCDEF /* ExternalServicePorts.swift in Sources */,
+				84230C7F619A7210787206E8 /* AppReviewNativeAdapter.swift in Sources */,
 				C7A700022F20000000C0A702 /* ChatService.swift in Sources */,
 				D0C0DE000000000000000001 /* VoiceCaptureService.swift in Sources */,
 				E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */,
@@ -2938,6 +2959,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		9E26E454BD4456AF479B6756 /* XCLocalSwiftPackageReference "JovieKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/JovieKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		AD050C472EC061040082A313 /* XCRemoteSwiftPackageReference "purchases-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -2990,6 +3018,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AD8F12E72ED6A489003C4559 /* XCRemoteSwiftPackageReference "statsig-kit" */;
 			productName = Statsig;
+		};
+		268B06CA55F3059A974968FA /* JovieKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9E26E454BD4456AF479B6756 /* XCLocalSwiftPackageReference "JovieKit" */;
+			productName = JovieKit;
+		};
+		5975412524D066E7DFBA4A90 /* JovieKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9E26E454BD4456AF479B6756 /* XCLocalSwiftPackageReference "JovieKit" */;
+			productName = JovieKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 
