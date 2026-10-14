@@ -32,6 +32,19 @@ describe('exercise catalog eligibility', () => {
     expect(isEligibleVariant(ezBar, { available: declared })).toBe(true);
   });
 
+  it('does not treat a Smith machine as part of the full-gym preset', () => {
+    const smith = catalogVariantById('smith_machine_incline_press')!;
+    expect(smith.name).toBe('Smith machine incline press');
+    expect(smith.requires).toEqual(['smith_machine', 'adjustable_bench']);
+    expect(missingEquipment(smith, fullGymSet)).toEqual(['smith_machine']);
+    expect(isEligibleVariant(smith, { available: fullGymSet })).toBe(false);
+    const declared = resolveAvailableEquipment({
+      profile: 'full_gym',
+      declared: ['smith_machine'],
+    });
+    expect(isEligibleVariant(smith, { available: declared })).toBe(true);
+  });
+
   it('fails eligibility when a bench is unavailable for the session only', () => {
     const incline = catalogVariantById('incline_dumbbell_curl')!;
     const sessionOnly = resolveAvailableEquipment({

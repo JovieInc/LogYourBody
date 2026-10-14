@@ -1,0 +1,154 @@
+.board {
+  min-height: 100vh;
+  background: #0c0d0f;
+  color: #f4f4f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.columns {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 24px 24px 128px;
+  align-items: flex-start;
+}
+
+.day {
+  flex: 1 0 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 240px;
+}
+
+.session {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #141518;
+}
+
+.card {
+  border-radius: 14px;
+  background: #1c1d21;
+  padding: 12px;
+  text-align: left;
+  color: inherit;
+  border: 1px solid transparent;
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease;
+}
+
+.card:focus-within {
+  outline: 2px solid #d6d3d1;
+  outline-offset: 2px;
+}
+
+.name {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+}
+
+.added {
+  border-color: #86efac;
+}
+
+.moved {
+  border-color: #93c5fd;
+}
+
+.replaced {
+  border-color: #fcd34d;
+}
+
+.updated {
+  border-color: #c4b5fd;
+}
+
+.kept {
+  border-color: #a1a1aa;
+}
+
+.composer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px;
+  background: #0c0d0f;
+  border-top: 1px solid #27272a;
+}
+
+.composer textarea {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: inherit;
+  padding: 12px;
+}
+
+.pager {
+  display: none;
+}
+
+.mobile .pager {
+  display: flex;
+  gap: 8px;
+  padding: 12px 24px 0;
+}
+
+.mobile .day {
+  display: none;
+}
+
+.mobile .day[data-active='true'] {
+  display: flex;
+  flex-basis: 100%;
+}
+
+.reduce .card,
+.reduce .session,
+.reduce .day {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .session,
+  .day {
+    transition: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .pager {
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px 0;
+  }
+
+  .day {
+    display: none;
+    flex-basis: 100%;
+  }
+
+  .day[data-active='true'] {
+    display: flex;
+  }
+}

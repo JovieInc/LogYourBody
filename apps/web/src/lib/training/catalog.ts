@@ -11,6 +11,7 @@ export type CatalogEquipment =
   | 'ez_bar'
   | 'machine'
   | 'cable'
+  | 'smith_machine'
   | 'bench'
   | 'adjustable_bench'
   | 'bodyweight';
@@ -207,6 +208,21 @@ export const EXERCISE_CATALOG: CatalogVariant[] = [
     pulley: null,
     unilateral: false,
     cues: ['Set the bench near 45 degrees', 'Press up and slightly back'],
+    exclusions: [],
+  },
+  {
+    id: 'smith_machine_incline_press',
+    name: 'Smith machine incline press',
+    primaryMuscle: 'chest',
+    muscleContribution: { chest: 1, triceps: 0.5, shoulders: 0.5 },
+    requires: ['smith_machine', 'adjustable_bench'],
+    torsoSupport: 'supported',
+    trunkDemand: reviewed('low', 'Back is supported by the bench; the Smith bar travels on rails.'),
+    bodyPosition: 'seated, back on an incline bench',
+    benchAngleDeg: 30,
+    pulley: null,
+    unilateral: false,
+    cues: ['Set the bench near 30 degrees', 'Wrists stay stacked over the elbows'],
     exclusions: [],
   },
   {
@@ -611,6 +627,7 @@ export const CATALOG_EQUIPMENT = [
   'ez_bar',
   'machine',
   'cable',
+  'smith_machine',
   'bench',
   'adjustable_bench',
   'bodyweight',

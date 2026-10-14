@@ -268,6 +268,7 @@ struct LogYourBodyApp: App {
                     guard !Self.isRunningUnitTests else { return }
 #if DEBUG
                     guard !ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") else { return }
+                    guard !ProcessInfo.processInfo.arguments.contains("-lybUITestMesocycleCanvasFixture") else { return }
 #endif
                     await performStartupSequence()
                     resolvePendingEntryDeepLinkIfPossible()
@@ -317,7 +318,9 @@ struct LogYourBodyApp: App {
     @ViewBuilder
     private var appContent: some View {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") {
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestMesocycleCanvasFixture") {
+            MesocycleCanvasFixtureView()
+        } else if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") {
             TrainingLiveSessionFixtureView()
         } else {
             ContentView()

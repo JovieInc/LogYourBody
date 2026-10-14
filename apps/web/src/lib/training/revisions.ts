@@ -16,6 +16,13 @@ import {
   type InitialTrainingProposal,
 } from './revision-contract';
 
+export {
+  reduceCanvas,
+  reviseCanvas,
+  parseCanvasUtterance,
+  canvasReadback,
+} from './mesocycle-canvas';
+
 export function trainingRequestHash(value: unknown): string {
   function canonical(item: unknown): unknown {
     if (Array.isArray(item)) return item.map(canonical);

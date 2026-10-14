@@ -868,6 +868,13 @@ struct ChatTabView: View {
                 VoiceSetReviewView(session: session, heard: heard) { proposal in
                     commitVoiceSet(proposal)
                 }
+            case .canvas:
+                MesocycleCanvasRemoteView {
+                    guard let token = await chatAccessToken() else {
+                        throw TrainingServiceError.authenticationExpired
+                    }
+                    return try await MesocycleCanvasClient().loadPlan(accessToken: token)
+                }
             }
         }
     }
@@ -947,6 +954,7 @@ struct ChatTabView: View {
                 LazyVStack(alignment: .leading, spacing: 20) {
                     if showsTranscript && trainingCoachEnabled {
                         trainingCard
+                        mesocycleCanvasEntry
                     }
 
                     if isLoadingConversation {
@@ -1140,6 +1148,18 @@ struct ChatTabView: View {
     private var voiceCoachEnabled: Bool {
         trainingCoachEnabled && VoiceCoachPolicy.isEnabled {
             AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0)
+        }
+    }
+
+    @ViewBuilder
+    private var mesocycleCanvasEntry: some View {
+        if MesocycleCanvasPolicy.isEnabled(checkGate: {
+            AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0)
+        }) {
+            Button("Edit mesocycle") { trainingPresentation = .canvas }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("training_open_canvas")
         }
     }
 
