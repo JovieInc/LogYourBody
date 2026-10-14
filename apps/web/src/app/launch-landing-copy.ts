@@ -36,6 +36,8 @@ export const launchLandingCopy = {
   ],
   featuresHeading: 'What it keeps',
   pricingHeading: proPlan.name,
+  monthlyReferencePrice: formatPrice(proPlan.pricing.monthly.amount),
+  annualReferencePrice: formatPrice(proPlan.pricing.annual.amount),
   pricingLine: `Reference pricing: ${formatPrice(proPlan.pricing.monthly.amount)} a month or ${formatPrice(proPlan.pricing.annual.amount)} a year (USD).`,
   pricingNote:
     'The App Store confirms your local price, any trial eligibility, and subscription terms before you subscribe. Manage or cancel your subscription there.',
