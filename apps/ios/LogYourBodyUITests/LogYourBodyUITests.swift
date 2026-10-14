@@ -219,7 +219,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testWhatsNewFixtureRendersTheRedesignedReleaseSurface() throws {
         let app = XCUIApplication()
         app.launchArguments = [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestResetWhatsNewReviewState"
         ]
         app.launch()
@@ -248,7 +248,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["world_class_screen_whatsNew"].exists)
 
         app.terminate()
-        app.launchArguments = ["-lybUITestPhotoTimelineHUDFixture"]
+        app.launchArguments = ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"]
         app.launch()
         XCTAssertTrue(
             app.descendants(matching: .any)["photo_timeline_root_page_timeline"]
@@ -611,7 +611,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPhotoHUDFixtureRoutesToIntendedPostMVPDashboard() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         XCTAssertFalse(app.descendants(matching: .any)["photo_timeline_hud_stats_button"].exists)
@@ -622,7 +622,7 @@ final class LogYourBodyUITests: XCTestCase {
         let analyticsPage = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         if !analyticsPage.waitForExistence(timeout: 6) {
             launch(app, with: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-lybUITestPhotoTimelineAnalyticsFixture"
             ])
         }
@@ -642,7 +642,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testPhotoHUDFixtureShowsFocusedNoPhotoTimelineWhenNoPhotoExists() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_home"].exists)
@@ -658,7 +658,7 @@ final class LogYourBodyUITests: XCTestCase {
     // Regression: the empty photo stage said "Add one to this day" but had no action once any data existed.
     func testEmptyPhotoStageOpensAttachSheetForThatDay() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
         let addPhoto = app.buttons["launch_timeline_add_photo"]
@@ -703,7 +703,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testHomeChatPromptsScaleWithAccessibilityDynamicType() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture",
             "-UIPreferredContentSizeCategoryName",
             "UICTContentSizeCategoryAccessibilityXXXL"
@@ -759,7 +759,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testHomePinsChatComposerWithoutTabBar() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
 
@@ -796,7 +796,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatStreamsFixtureAnswer() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
 
@@ -821,7 +821,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatProviderFailureShowsRetry() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture",
             "-lybUITestChatErrorFixture"
         ])
@@ -1171,7 +1171,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatOfflineStateIsVisibleAndRetryable() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture",
             "-lybUITestChatOfflineFixture"
         ])
@@ -1195,7 +1195,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatCanCancelStreamingAnswer() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture",
             "-lybUITestChatSlowFixture"
         ])
@@ -1226,7 +1226,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testChatComposerKeepsOneGridFromPillToMultiline() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
 
@@ -1265,7 +1265,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testSettingsProfileFieldsOpenDirectEditors() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         openSettingsFromPhotoTimelineMenu(in: app)
 
@@ -1320,7 +1320,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testNarrowIPhoneSegmentedControlsKeepNativeHitTargets() throws {
         try assertNarrowSegmentedControls(
-            launchArguments: ["-lybUITestPhotoTimelineHUDFixture"],
+            launchArguments: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"],
             expectedViewportWidth: nil,
             screenshotPrefix: "narrow-segmented-controls"
         )
@@ -1329,7 +1329,7 @@ final class LogYourBodyUITests: XCTestCase {
     func test320PointViewportSegmentedControlsKeepNativeHitTargets() throws {
         try assertNarrowSegmentedControls(
             launchArguments: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-lybUITestViewportWidth",
                 "320"
             ],
@@ -1426,7 +1426,7 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testHorizontalSwipeOnTimelineHeroDoesNotOpenStatsPage() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        launch(app, with: ["-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture"])
 
         let strip = app.descendants(matching: .any)["launch_timeline_scrubber"]
         XCTAssertTrue(strip.waitForExistence(timeout: 12))
@@ -1447,7 +1447,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testMetricDetailOpensFromStatsAndShowsSharedTimelineContext() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture"
         ])
 
@@ -1500,7 +1500,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testLaunchQualityGateCapturesTimelineHomeSurface() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture",
             "-lybUITestGlp1WeeklyCheckInFixture",
             "-lybUITestChatFirstFixture"
@@ -1526,7 +1526,11 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testStatsStartsWithMetricCardsWithoutDecorativeIntroduction() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestPhotoTimelineAnalyticsFixture"])
+        launch(app, with: [
+            "-lybUITestHomeRollbackFixture",
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhotoTimelineAnalyticsFixture"
+        ])
         let stats = app.descendants(matching: .any)["photo_timeline_root_page_analytics"]
         XCTAssertTrue(stats.waitForExistence(timeout: 12))
         attachScreenshot(named: "stats-content-hierarchy", from: app)
@@ -1543,8 +1547,15 @@ final class LogYourBodyUITests: XCTestCase {
     func testLaunchQualityGateCapturesCriticalSurfaces() throws {
         let app = XCUIApplication()
 
+        // Verify the ordinary default before explicitly exercising rollback surfaces.
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_weight_value"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_surface"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_chat_composer_dock"].exists)
+
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestChatFirstFixture"
         ])
         XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
@@ -1576,7 +1587,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(
             app,
             with: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-lybUITestPhaseInsightFixture",
                 "-lybUITestGlp1WeeklyCheckInFixture"
             ]
@@ -1596,7 +1607,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(
             app,
             with: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-lybUITestPhaseInsightFixture",
                 "-lybUITestGlp1WeeklyCheckInFixture"
             ]
@@ -1737,7 +1748,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(
             app,
             with: [
-                "-lybUITestPhotoTimelineHUDFixture",
+                "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
                 "-UIPreferredContentSizeCategoryName",
                 "UICTContentSizeCategoryAccessibilityXXXL"
             ]
@@ -1780,7 +1791,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testPhaseInsightFixtureShowsDeterministicCuttingInsight() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestPhaseInsightFixture"
         ])
 
@@ -1803,7 +1814,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testGlp1WeeklyCheckInFixtureShowsPromptAndOpensDoseFlow() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestGlp1WeeklyCheckInFixture"
         ])
 
@@ -1875,7 +1886,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testGlp1WeeklyCheckInFixtureOpensMedicationSelectorWhenEmpty() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestGlp1WeeklyCheckInFixture",
             "-lybUITestGlp1EmptyMedicationFixture"
         ])
@@ -1960,7 +1971,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testTimelinePerformanceTraceWorkflow() throws {
         let app = XCUIApplication()
         launch(app, with: [
-            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
             "-lybUITestTimelinePerformanceTraceFixture",
             "-lybUITestPhaseInsightFixture",
             "-lybUITestGlp1WeeklyCheckInFixture"
@@ -2325,6 +2336,102 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(Set(["steps", "weight"]).isSubset(of: sharedMetrics), "Fixture must exercise Steps and Weight")
     }
 
+    func testDefaultHomeHeaderSwipesOpenProgressReturnHomeAndOpenSidebar() throws {
+        let app = XCUIApplication()
+        launchDefaultHome(app, extra: ["-lybUITestChatFirstFixture"])
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        swipeHomeHeader(in: app, rightward: true)
+        let showsProgress = app.descendants(matching: .any)["home_v2_progress_value"].waitForExistence(timeout: 8)
+        attachScreenshot(named: "default-home-right-swipe-progress", from: app)
+        XCTAssertTrue(showsProgress, "A right swipe from ordinary Home opens Progress")
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context"].exists)
+
+        swipeHomeHeader(in: app, rightward: false)
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8), "Progress reverses to Today")
+        swipeHomeHeader(in: app, rightward: false)
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 8), "A left swipe from Today opens the sidebar")
+        XCTAssertTrue(app.buttons["home_v2_sidebar_settings"].exists)
+        attachScreenshot(named: "default-home-left-swipe-sidebar", from: app)
+
+        ask.tap()
+        XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["home_chat_collapse"].isHittable)
+        swipeHomeHeader(in: app, rightward: true)
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8), "Expanded Ask collapses to Today")
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context"].exists)
+    }
+
+    func testDefaultHomeKeepsEditorialCardForPhotoDataAndEmptyStates() throws {
+        try assertDefaultHomeStates(largestText: false)
+    }
+
+    func testDefaultHomeAtLargestTextKeepsEditorialCardAndLogActionReachable() throws {
+        try assertDefaultHomeStates(largestText: true)
+    }
+
+    func testDefaultPhotoHeroSwipeDoesNotNavigateTheRoot() throws {
+        let app = XCUIApplication()
+        launchDefaultHome(app, extra: ["-lybUITestPhotoTimelinePhotoFixture"])
+        let card = app.descendants(matching: .any)["home_v2_editorial_card"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 30))
+        let start = card.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: card.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)))
+        attachScreenshot(named: "default-home-photo-gesture-ownership", from: app)
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].isHittable)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_photo_stage"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_progress_value"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context"].exists)
+        XCTAssertFalse(app.buttons["home_v2_sidebar_ask"].exists)
+    }
+
+    private func launchDefaultHome(_ app: XCUIApplication, extra: [String] = []) {
+        let arguments = ["-lybUITestPhotoTimelineHUDFixture"] + extra
+        XCTAssertFalse(arguments.contains { $0.hasPrefix("-lybUITestHomeV2") || $0 == "-lybUITestHomeRollbackFixture" })
+        launch(app, with: arguments)
+        XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_surface"].exists)
+    }
+
+    private func swipeHomeHeader(in app: XCUIApplication, rightward: Bool) {
+        let header = app.descendants(matching: .any)["photo_timeline_root_nav"]
+        XCTAssertTrue(header.waitForExistence(timeout: 5))
+        let start = header.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: rightward ? 100 : 320, dy: 12))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: rightward ? 220 : -220, dy: 0)))
+    }
+
+    private func assertDefaultHomeStates(largestText: Bool) throws {
+        let states = [
+            ("photo", ["-lybUITestPhotoTimelinePhotoFixture"], "home_v2_photo_stage"),
+            ("data", [], "home_v2_body_fat_graphic"),
+            ("empty", ["-lybUITestPhotoTimelineEmptyFixture"], "home_v2_day_zero")
+        ]
+        for (name, dataArguments, identifier) in states {
+            let app = XCUIApplication()
+            let typeArguments = largestText
+                ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] : []
+            launchDefaultHome(app, extra: dataArguments + typeArguments)
+            let card = app.descendants(matching: .any)["home_v2_editorial_card"].firstMatch
+            XCTAssertTrue(card.waitForExistence(timeout: 30))
+            XCTAssertTrue(app.descendants(matching: .any)[identifier].waitForExistence(timeout: 5))
+            let window = app.windows.firstMatch.frame
+            XCTAssertEqual(card.frame.minX, window.minX, accuracy: 1)
+            XCTAssertEqual(card.frame.width, window.width, accuracy: 1)
+            XCTAssertEqual(card.frame.height, card.frame.width / 0.8, accuracy: 1)
+            let log = app.buttons["home_v2_log_weight"]
+            XCTAssertTrue(log.isHittable)
+            XCTAssertTrue(window.insetBy(dx: -1, dy: -1).contains(log.frame))
+            XCTAssertGreaterThanOrEqual(log.frame.height, 44)
+            XCTAssertFalse(app.descendants(matching: .any)["home_chat_composer_dock"].exists)
+            attachScreenshot(named: "default-home-\(name)-\(largestText ? "ax5" : "compact")", from: app)
+            log.tap()
+            XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
+            app.buttons["Cancel"].tap()
+            XCTAssertTrue(log.waitForExistence(timeout: 8))
+            app.terminate()
+        }
+    }
+
     func testHomeV2ProgressIsOneMetricWorkspace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
@@ -2352,11 +2459,11 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home_v2_progress_log_weight"].exists, "Only weight is logged here")
         attachScreenshot(named: "home-v2-progress-body-fat", from: app)
 
-        // The root swipe lives on the header, as on the legacy Stats page; the leading edge opens the menu.
+        // LYB-88 returns from Progress to Today with a leftward header swipe.
         let header = app.descendants(matching: .any)["photo_timeline_root_nav"]
         XCTAssertTrue(header.waitForExistence(timeout: 5))
-        let start = header.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 120, dy: 12))
-        let end = start.withOffset(CGVector(dx: 220, dy: 0))
+        let start = header.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 320, dy: 12))
+        let end = start.withOffset(CGVector(dx: -220, dy: 0))
         start.press(forDuration: 0.05, thenDragTo: end)
         XCTAssertTrue(
             app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8),
