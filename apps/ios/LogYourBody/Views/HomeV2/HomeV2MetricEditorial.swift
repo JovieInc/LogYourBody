@@ -51,9 +51,16 @@ enum HomeV2ChartIntegrity {
 
         /// A date selects its daily value when available, otherwise its labeled average.
         var selectionSamples: [Sample] {
-            Dictionary(grouping: marks, by: \.date).values.compactMap { sameDay in
-                sameDay.first { $0.kind == .daily } ?? sameDay.first
-            }.sorted { $0.date < $1.date }
+            let groupedByDate = Dictionary(grouping: marks, by: \.date)
+            var selected: [Sample] = []
+            for sameDay in groupedByDate.values {
+                if let daily = sameDay.first(where: { $0.kind == .daily }) {
+                    selected.append(daily)
+                } else if let fallback = sameDay.first {
+                    selected.append(fallback)
+                }
+            }
+            return selected.sorted { $0.date < $1.date }
         }
 
         var yTicks: [Double] {
@@ -115,7 +122,7 @@ enum HomeV2ChartIntegrity {
         var droppedCarried = 0
         var droppedNonFinite = 0
         var samples: [Sample] = []
-        var occurrences: [String: Int] = []
+        var occurrences: [String: Int] = [:]
         for point in points.sorted(by: { $0.date < $1.date }) {
             switch point.presence {
             case .missing:

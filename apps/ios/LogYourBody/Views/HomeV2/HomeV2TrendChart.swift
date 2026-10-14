@@ -185,36 +185,9 @@ struct HomeV2TrendChart: View {
 
     private var plotMarks: some View {
         Chart {
-            ForEach(Array(plotted.runs.enumerated()), id: \.offset) { index, run in
-                if run.count > 1 {
-                    ForEach(run) { sample in
-                        LineMark(
-                            x: .value("Day", sample.date),
-                            y: .value("Value", sample.value),
-                            series: .value("Run", index)
-                        )
-                        .interpolationMethod(.linear)
-                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                        .foregroundStyle(accent)
-                    }
-                }
-            }
-            ForEach(plotted.marks) { sample in
-                PointMark(x: .value("Day", sample.date), y: .value("Value", sample.value))
-                    .symbolSize(sample.id == plotted.marks.last?.id ? 56 : 18)
-                    .foregroundStyle(accent.opacity(sample.id == plotted.marks.last?.id ? 1 : 0.45))
-            }
-            if let selectedSample {
-                RuleMark(x: .value("Selected", selectedSample.date))
-                    .lineStyle(StrokeStyle(lineWidth: 1))
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                PointMark(
-                    x: .value("Selected", selectedSample.date),
-                    y: .value("Selected", selectedSample.value)
-                )
-                .symbolSize(80)
-                .foregroundStyle(accent)
-            }
+            lineMarks
+            pointMarks
+            selectionMarks
         }
         .chartYScale(domain: plotted.yDomain)
         .chartXAxis {
@@ -257,6 +230,48 @@ struct HomeV2TrendChart: View {
         .accessibilityIdentifier(plotIdentifier)
         .accessibilityAdjustableAction { direction in
             adjustSelection(direction)
+        }
+    }
+
+    @ChartContentBuilder
+    private var lineMarks: some ChartContent {
+        ForEach(Array(plotted.runs.enumerated()), id: \.offset) { index, run in
+            if run.count > 1 {
+                ForEach(run) { sample in
+                    LineMark(
+                        x: .value("Day", sample.date),
+                        y: .value("Value", sample.value),
+                        series: .value("Run", index)
+                    )
+                    .interpolationMethod(.linear)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(accent)
+                }
+            }
+        }
+    }
+
+    @ChartContentBuilder
+    private var pointMarks: some ChartContent {
+        ForEach(plotted.marks) { sample in
+            PointMark(x: .value("Day", sample.date), y: .value("Value", sample.value))
+                .symbolSize(sample.id == plotted.marks.last?.id ? 56 : 18)
+                .foregroundStyle(accent.opacity(sample.id == plotted.marks.last?.id ? 1 : 0.45))
+        }
+    }
+
+    @ChartContentBuilder
+    private var selectionMarks: some ChartContent {
+        if let selectedSample {
+            RuleMark(x: .value("Selected", selectedSample.date))
+                .lineStyle(StrokeStyle(lineWidth: 1))
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+            PointMark(
+                x: .value("Selected", selectedSample.date),
+                y: .value("Selected", selectedSample.value)
+            )
+            .symbolSize(80)
+            .foregroundStyle(accent)
         }
     }
 
