@@ -4,6 +4,7 @@
 //
 import SwiftUI
 import CoreData
+import UIKit
 
 struct MainTabView: View {
     @AppStorage(Constants.healthKitSyncEnabledKey) private var healthKitSyncEnabled = true
@@ -738,6 +739,8 @@ struct ChatTabView: View {
     @Binding var draft: String
     var showsTranscript: Bool = true
     var onExpandRequest: () -> Void = {}
+    var loggingPrototypeEnabled = false
+    var onLoggingModeSelected: (ComposerLoggingMode) -> Void = { _ in }
 
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.theme) private var theme
@@ -749,6 +752,11 @@ struct ChatTabView: View {
     @ScaledMetric(relativeTo: .body) private var composerMultilineThreshold: CGFloat =
         ChatComposerGeometry.multilineTextHeightThreshold
     @State private var composerTextHeight: CGFloat = 0
+    @State private var loggingSelector = ComposerLoggingSelectorState()
+    @State private var loggingTargetFrames: [ComposerLoggingMode: CGRect] = [:]
+    @State private var didRecognizeLoggingHold = false
+    @State private var isRoutingLoggingMode = false
+    @State private var loggingRouteID: UUID?
     @State private var isResponding = false
     @State private var isLoadingConversation = true
     /// UI-test-only trail of send and load events (LQ chat-root flake probe).
@@ -776,8 +784,10 @@ struct ChatTabView: View {
     @State private var pendingVoiceSet: VoiceSetProposal?
     @State private var isVoiceSetConfirmationPresented = false
     @State private var pendingSpokenReply = PendingSpokenReply()
+    @Namespace private var loggingHighlightNamespace
     private let trainingService: TrainingServicing = URLSessionTrainingService()
     @FocusState private var isComposerFocused: Bool
+    @AccessibilityFocusState private var isLoggingPlusAccessibilityFocused: Bool
 
     private var chatErrorMessage: String? {
         get { chatRecoveryPresentation.message }
@@ -815,6 +825,18 @@ struct ChatTabView: View {
             conversationLoadId = nil
             currentRequestTask?.cancel()
             voiceCapture.cancel()
+            loggingSelector.cancel()
+            didRecognizeLoggingHold = false
+            isRoutingLoggingMode = false
+            loggingRouteID = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            cancelLoggingSelection(restoreAccessibilityFocus: false)
+        }
+        .onChange(of: loggingPrototypeEnabled) { _, isEnabled in
+            if !isEnabled {
+                cancelLoggingSelection(restoreAccessibilityFocus: false)
+            }
         }
         .alert("Delete this chat?", isPresented: $isDeleteConfirmationPresented) {
             Button("Cancel", role: .cancel) {}
@@ -1321,65 +1343,15 @@ struct ChatTabView: View {
         )
         let cornerRadius = ChatComposerGeometry.cornerRadius(isMultiline: isMultiline)
 
-        return HStack(alignment: isMultiline ? .bottom : .center, spacing: JovieTokens.itemGap) {
-            TextField(usesHomeV2Style ? HomeV2AskCopy.composerPlaceholder : "Message LogYourBody", text: $draft, axis: .vertical)
-                .lineLimit(1...4)
-                .focused($isComposerFocused)
-                .font(.system(size: composerFontSize))
-                .foregroundStyle(theme.colors.text)
-                .tint(theme.colors.primary)
-                .submitLabel(.send)
-                .onSubmit {
-                    send(draft)
-                }
-                .accessibilityIdentifier("chat_composer")
-                .background {
-                    GeometryReader { geometry in
-                        Color.clear.preference(
-                            key: ChatComposerTextHeightPreferenceKey.self,
-                            value: geometry.size.height
-                        )
-                    }
-                }
+        return ZStack(alignment: .bottom) {
+            composerInputRow(isMultiline: isMultiline)
+                .opacity(loggingSelector.isPresented ? 0 : 1)
+                .allowsHitTesting(!loggingSelector.isPresented || loggingSelector.isDragging)
+                .accessibilityHidden(loggingSelector.isPresented)
 
-            Button {
-                if isResponding {
-                    stopResponse()
-                } else {
-                    send(draft)
-                }
-            } label: {
-                Image(systemName: isResponding ? "stop.fill" : "arrow.up")
-                    .font(.system(size: isResponding ? 11 : 15, weight: .bold))
-                    .foregroundStyle(
-                        (canSend || isResponding) ? theme.colors.background : theme.colors.textTertiary
-                    )
-                    .frame(
-                        width: JovieTokens.minimumHitTarget,
-                        height: JovieTokens.minimumHitTarget
-                    )
-                    .background(
-                        (canSend || isResponding) ? theme.colors.text : theme.colors.surface,
-                        in: Circle()
-                    )
-            }
-            .disabled((!canSend && !isResponding) || isLoadingConversation)
-            .buttonStyle(.plain)
-            .accessibilityLabel(isResponding ? "Stop answer" : "Send message")
-            .accessibilityIdentifier("chat_send_button")
-
-            if voiceCoachEnabled {
-                Button(action: toggleVoiceCapture) {
-                    Image(systemName: voiceCapture.isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(theme.colors.text)
-                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-                        .background(theme.colors.surface, in: Circle())
-                }
-                .disabled(isResponding || isLoadingConversation || voiceCapture.isFinishing)
-                .buttonStyle(.plain)
-                .accessibilityLabel(voiceCapture.isRecording ? "Stop Talk recording" : "Talk")
-                .accessibilityIdentifier("chat_voice_button")
+            if loggingSelector.isPresented {
+                loggingModeSelector
+                    .transition(.opacity)
             }
         }
         .padding(.leading, JovieTokens.compactInset)
@@ -1399,8 +1371,22 @@ struct ChatTabView: View {
         }
         .padding(.horizontal, JovieTokens.screenInset)
         .padding(.vertical, JovieTokens.itemGap)
+        .coordinateSpace(name: "composer_logging_selector")
         .onPreferenceChange(ChatComposerTextHeightPreferenceKey.self) { height in
             composerTextHeight = height
+        }
+        .onPreferenceChange(ComposerLoggingTargetFramePreferenceKey.self) { frames in
+            loggingTargetFrames = frames
+        }
+        .onKeyPress(.escape) {
+            guard loggingSelector.isPresented else { return .ignored }
+            cancelLoggingSelection()
+            return .handled
+        }
+        .accessibilityAction(.escape) {
+            if loggingSelector.isPresented {
+                cancelLoggingSelection()
+            }
         }
         .animation(
             ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
@@ -1414,6 +1400,284 @@ struct ChatTabView: View {
             ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
             value: voiceCapture.isRecording
         )
+        .animation(
+            ChatComposerGeometry.morphAnimation(reduceMotion: reduceMotion),
+            value: loggingSelector.isPresented
+        )
+        .animation(
+            ChatComposerGeometry.transitionAnimation(reduceMotion: reduceMotion),
+            value: loggingSelector.highlightedMode
+        )
+    }
+
+    private func composerInputRow(isMultiline: Bool) -> some View {
+        HStack(alignment: isMultiline ? .bottom : .center, spacing: JovieTokens.itemGap) {
+            if loggingPrototypeEnabled {
+                loggingPlusButton
+            }
+
+            TextField(
+                usesHomeV2Style ? HomeV2AskCopy.composerPlaceholder : "Message LogYourBody",
+                text: $draft,
+                axis: .vertical
+            )
+            .lineLimit(1...4)
+            .focused($isComposerFocused)
+            .font(.system(size: composerFontSize))
+            .foregroundStyle(theme.colors.text)
+            .tint(theme.colors.primary)
+            .submitLabel(.send)
+            .onSubmit {
+                send(draft)
+            }
+            .accessibilityIdentifier("chat_composer")
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: ChatComposerTextHeightPreferenceKey.self,
+                        value: geometry.size.height
+                    )
+                }
+            }
+
+            if loggingPrototypeEnabled, voiceCoachEnabled {
+                voiceButton
+            }
+
+            sendButton
+
+            if !loggingPrototypeEnabled, voiceCoachEnabled {
+                voiceButton
+            }
+        }
+    }
+
+    private var loggingPlusButton: some View {
+        Button {
+            guard !didRecognizeLoggingHold else { return }
+            isLoggingPlusAccessibilityFocused = false
+            loggingSelector.toggleTapSelection()
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(theme.colors.text)
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .simultaneousGesture(loggingHoldGesture)
+        .accessibilityLabel("Choose what to log")
+        .accessibilityHint("Shows Weight, Body fat, and Photo. Touch and hold, then drag for a shortcut.")
+        .accessibilityIdentifier("composer_logging_plus")
+        .accessibilityFocused($isLoggingPlusAccessibilityFocused)
+    }
+
+    private var sendButton: some View {
+        Button {
+            if isResponding {
+                stopResponse()
+            } else {
+                send(draft)
+            }
+        } label: {
+            Image(systemName: isResponding ? "stop.fill" : "arrow.up")
+                .font(.system(size: isResponding ? 11 : 15, weight: .bold))
+                .foregroundStyle(
+                    (canSend || isResponding) ? theme.colors.background : theme.colors.textTertiary
+                )
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .background(
+                    (canSend || isResponding) ? theme.colors.text : theme.colors.surface,
+                    in: Circle()
+                )
+        }
+        .disabled((!canSend && !isResponding) || isLoadingConversation)
+        .buttonStyle(.plain)
+        .accessibilityLabel(isResponding ? "Stop answer" : "Send message")
+        .accessibilityIdentifier("chat_send_button")
+    }
+
+    private var voiceButton: some View {
+        Button(action: toggleVoiceCapture) {
+            Image(systemName: voiceCapture.isRecording ? "stop.fill" : "mic.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.colors.text)
+                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                .background(theme.colors.surface, in: Circle())
+        }
+        .disabled(isResponding || isLoadingConversation || voiceCapture.isFinishing)
+        .buttonStyle(.plain)
+        .accessibilityLabel(voiceCapture.isRecording ? "Stop Talk recording" : "Talk")
+        .accessibilityIdentifier("chat_voice_button")
+    }
+
+    @ViewBuilder
+    private var loggingModeSelector: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: 0) {
+                Button {
+                    cancelLoggingSelection()
+                } label: {
+                    Label("Back", systemImage: "chevron.left")
+                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close logging options")
+                .accessibilityIdentifier("composer_logging_close")
+
+                ForEach(ComposerLoggingMode.allCases) { mode in
+                    loggingModeButton(mode)
+                }
+            }
+        } else {
+            HStack(spacing: 0) {
+                Button {
+                    cancelLoggingSelection()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close logging options")
+                .accessibilityIdentifier("composer_logging_close")
+
+                ForEach(ComposerLoggingMode.allCases) { mode in
+                    loggingModeButton(mode)
+                }
+            }
+        }
+    }
+
+    private func loggingModeButton(_ mode: ComposerLoggingMode) -> some View {
+        Button {
+            guard let selected = loggingSelector.selectFromTap(mode) else { return }
+            routeLoggingMode(selected)
+        } label: {
+            Text(mode.title)
+                .font(.system(.subheadline, design: .default, weight: .medium))
+                .foregroundStyle(theme.colors.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background {
+            if loggingSelector.highlightedMode == mode {
+                RoundedRectangle(cornerRadius: JovieTokens.controlRadius, style: .continuous)
+                    .fill(theme.colors.text.opacity(0.10))
+                    .matchedGeometryEffect(id: "composer_logging_indicator", in: loggingHighlightNamespace)
+            }
+        }
+        .background {
+            GeometryReader { geometry in
+                Color.clear.preference(
+                    key: ComposerLoggingTargetFramePreferenceKey.self,
+                    value: [mode: geometry.frame(in: .named("composer_logging_selector"))]
+                )
+            }
+        }
+        .accessibilityLabel("Log \(mode.title)")
+        .accessibilityIdentifier(mode.accessibilityIdentifier)
+    }
+
+    private var loggingHoldGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.28, maximumDistance: 18)
+            .sequenced(
+                before: DragGesture(
+                    minimumDistance: 0,
+                    coordinateSpace: .named("composer_logging_selector")
+                )
+            )
+            .onChanged { value in
+                switch value {
+                case .first(true):
+                    beginLoggingHoldIfNeeded()
+                case .second(true, let drag):
+                    beginLoggingHoldIfNeeded()
+                    updateLoggingHold(at: drag?.location)
+                default:
+                    break
+                }
+            }
+            .onEnded { value in
+                guard didRecognizeLoggingHold else { return }
+                let mode: ComposerLoggingMode?
+                if case .second(true, let drag) = value, let location = drag?.location {
+                    mode = loggingMode(at: location)
+                } else {
+                    mode = nil
+                }
+                finishLoggingHold(over: mode)
+            }
+    }
+
+    private func beginLoggingHoldIfNeeded() {
+        guard ComposerLoggingPrototypePolicy.allowsHoldDrag(
+            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+        ) else { return }
+        guard !didRecognizeLoggingHold else { return }
+        didRecognizeLoggingHold = true
+        loggingSelector.beginDragSelection()
+    }
+
+    private func updateLoggingHold(at location: CGPoint?) {
+        let mode = location.flatMap(loggingMode(at:))
+        if loggingSelector.updateDragSelection(over: mode), mode != nil {
+            HapticManager.shared.selection()
+        }
+    }
+
+    private func finishLoggingHold(over mode: ComposerLoggingMode?) {
+        let selected = loggingSelector.finishDragSelection(over: mode)
+        DispatchQueue.main.async {
+            didRecognizeLoggingHold = false
+        }
+        if let selected {
+            routeLoggingMode(selected)
+        } else {
+            isLoggingPlusAccessibilityFocused = true
+        }
+    }
+
+    private func loggingMode(at location: CGPoint) -> ComposerLoggingMode? {
+        ComposerLoggingMode.allCases.first { mode in
+            loggingTargetFrames[mode]?.contains(location) == true
+        }
+    }
+
+    private func routeLoggingMode(_ mode: ComposerLoggingMode) {
+        guard !isRoutingLoggingMode else { return }
+        isRoutingLoggingMode = true
+        let routeID = UUID()
+        loggingRouteID = routeID
+        isComposerFocused = false
+
+        Task { @MainActor in
+            // Present on the next run-loop turn so this release cannot activate
+            // a newly revealed Save or camera control.
+            await Task.yield()
+            guard loggingRouteID == routeID else { return }
+            onLoggingModeSelected(mode)
+            if loggingRouteID == routeID {
+                loggingRouteID = nil
+                isRoutingLoggingMode = false
+            }
+        }
+    }
+
+    private func cancelLoggingSelection(restoreAccessibilityFocus: Bool = true) {
+        guard loggingSelector.isPresented || isRoutingLoggingMode || didRecognizeLoggingHold else { return }
+        loggingSelector.cancel()
+        didRecognizeLoggingHold = false
+        isRoutingLoggingMode = false
+        loggingRouteID = nil
+        if restoreAccessibilityFocus {
+            isLoggingPlusAccessibilityFocused = true
+        }
     }
 
     private func accessibilityMarker(id: String, label: String) -> some View {
@@ -1925,6 +2189,17 @@ private struct ChatComposerTextHeightPreferenceKey: PreferenceKey {
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
+    }
+}
+
+private struct ComposerLoggingTargetFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [ComposerLoggingMode: CGRect] = [:]
+
+    static func reduce(
+        value: inout [ComposerLoggingMode: CGRect],
+        nextValue: () -> [ComposerLoggingMode: CGRect]
+    ) {
+        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
     }
 }
 
