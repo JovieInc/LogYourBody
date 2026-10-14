@@ -118,9 +118,10 @@ enum ContextualMetricProgressPolicy {
 
 enum ContextualMetricDetailPolicy {
     static func validatedFocus(
-        _ point: MetricChartDataPoint?, in series: [MetricChartDataPoint]
+        _ point: MetricChartDataPoint?, in series: [MetricChartDataPoint],
+        currentFingerprint: String, cachedFingerprint: String
     ) -> MetricChartDataPoint? {
-        guard let point else { return nil }
+        guard currentFingerprint == cachedFingerprint, let point else { return nil }
         return series.first { $0.id == point.id }
     }
 

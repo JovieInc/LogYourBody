@@ -681,11 +681,18 @@ final class BodyScoreShareCardTests: XCTestCase {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         let selected = MetricChartDataPoint(date: date, value: 82, presence: .present)
         let corrected = MetricChartDataPoint(date: date, value: 83, presence: .present)
-        XCTAssertEqual(ContextualMetricDetailPolicy.validatedFocus(selected, in: [selected])?.value, 82)
-        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(selected, in: [corrected]))
-        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(selected, in: []))
+        XCTAssertEqual(ContextualMetricDetailPolicy.validatedFocus(
+            selected, in: [selected], currentFingerprint: "current", cachedFingerprint: "current")?.value, 82)
+        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(
+            selected, in: [corrected], currentFingerprint: "current", cachedFingerprint: "current"))
+        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(
+            selected, in: [], currentFingerprint: "current", cachedFingerprint: "current"))
+        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(
+            selected, in: [selected], currentFingerprint: "corrected-source", cachedFingerprint: "previous-source"),
+                     "An async preprocessing cache must not authorize an old point after source correction")
         let revisedTrend = MetricChartDataPoint(date: date, value: 81, presence: .estimated)
-        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(selected, in: [revisedTrend]))
+        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(
+            selected, in: [revisedTrend], currentFingerprint: "current", cachedFingerprint: "current"))
     }
 
     func testDetailAverageDoesNotBorrowEqualRawValueSourceButRestHeadlineKeepsSource() {

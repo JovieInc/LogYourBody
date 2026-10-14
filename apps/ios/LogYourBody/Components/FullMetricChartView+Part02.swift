@@ -317,7 +317,8 @@ var minSeriesValue: Double? {
     }
 
 var validatedActivePoint: MetricChartDataPoint? {
-        ContextualMetricDetailPolicy.validatedFocus(activePoint, in: activeSeries)
+        ContextualMetricDetailPolicy.validatedFocus(
+            activePoint, in: activeSeries, currentFingerprint: chartDataFingerprint, cachedFingerprint: lastFingerprint)
     }
 
 var headlineValueText: String {
@@ -338,6 +339,7 @@ var headlineDateText: String {
     }
 
     var selectedFocusPoint: MetricChartDataPoint? {
+        guard lastFingerprint == chartDataFingerprint else { return nil }
         if let point = validatedActivePoint {
             return point
         }
