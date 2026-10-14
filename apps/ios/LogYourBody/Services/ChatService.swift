@@ -515,6 +515,9 @@ final class ChatFixtureReplayStore {
         var attempts: Int
         var status: String
     }
+    // The computed app port recreates this store for each call. Keep only live synthetic
+    // attempts in the existing nonce/file scope until matching terminal cleanup.
+    private static var activeAttempts: [URL: ChatFixtureAttemptGate] = [:]
     private let nonce: UUID
     private let url: URL
     private let writeData: (Data, URL, Data.WritingOptions) throws -> Void
@@ -555,11 +558,15 @@ final class ChatFixtureReplayStore {
                     throw ChatServiceError.invalidResponse
                 }
                 if existing.status == "completed" { result = existing; return true }
-                guard existing.status != "pending" else { throw ChatServiceError.requestInProgress }
+                if existing.status == "pending" {
+                    guard let previous = Self.activeAttempts[url], previous.id == existing.attemptId, previous.id != gate.id,
+                          !previous.whileActive({ true }) else { throw ChatServiceError.requestInProgress }
+                }
             }
             let row = Journal(nonce: nonce, conversationId: conversationId, clientMessageId: clientMessageId,
                               attemptId: gate.id, attempts: (existing?.attempts ?? 0) + 1, status: "pending")
             try persist(row)
+            Self.activeAttempts[url] = gate
             result = row
             return true
         }
@@ -574,6 +581,7 @@ final class ChatFixtureReplayStore {
             guard status == "completed" || status == "failed" else { throw ChatServiceError.invalidResponse }
             row.status = status
             try persist(row)
+            if Self.activeAttempts[url]?.id == gate.id { Self.activeAttempts.removeValue(forKey: url) }
             return true
         }
     }
@@ -583,6 +591,7 @@ final class ChatFixtureReplayStore {
         guard var row = try read(), row.attemptId == gate.id, row.status == "pending" else { return }
         row.status = "cancelled"
         try persist(row)
+        if Self.activeAttempts[url]?.id == gate.id { Self.activeAttempts.removeValue(forKey: url) }
     }
 
     func snapshot() throws -> ChatConversationSnapshot? {

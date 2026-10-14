@@ -2740,7 +2740,9 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "chat-synthetic-missing-done-failure", from: app)
         XCTAssertTrue(offered, "Full text without done must remain a recoverable failed turn")
         XCTAssertTrue(retry.isHittable)
-        XCTAssertTrue(app.descendants(matching: .any)["chat_error_state"].exists)
+        let recovery = app.staticTexts["chat_recovery_message"]
+        XCTAssertTrue(recovery.exists)
+        XCTAssertEqual(recovery.label, "The answer could not be read. Please try again.")
         XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
         retry.tap()
         assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-original-id-retry")
@@ -2756,8 +2758,8 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launchSyntheticChatReplay(app, extra: ["-lybUITestChatSlowFixture"])
         submitSyntheticChatQuestion(in: app)
-        let partial = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS %@", "Reviewing your authorized trend")
+        let partial = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "LogYourBody: Reviewing your authorized trend…")
         ).firstMatch
         let streaming = partial.waitForExistence(timeout: 8)
         attachScreenshot(named: "chat-synthetic-before-cancel", from: app)
@@ -2772,11 +2774,11 @@ final class LogYourBodyUITests: XCTestCase {
         let stopped = retry.waitForExistence(timeout: 8)
         attachScreenshot(named: "chat-synthetic-cancelled", from: app)
         XCTAssertTrue(stopped)
-        XCTAssertTrue(app.staticTexts["Stopped"].exists)
+        XCTAssertEqual(app.staticTexts["chat_recovery_message"].label, "Answer stopped. Retry when you’re ready.")
+        XCTAssertEqual(app.buttons["chat_send_button"].label, "Send message")
         XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
         retry.tap()
         assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-cancel-retry")
-        XCTAssertFalse(app.staticTexts["Stopped"].exists)
         XCTAssertEqual(app.descendants(matching: .any).matching(
             NSPredicate(format: "label == %@", "You: Synthetic full-turn question")).count, 1)
         let composer = app.textFields["chat_composer"]
@@ -2807,17 +2809,19 @@ final class LogYourBodyUITests: XCTestCase {
 
     private func assertSyntheticChatCompleted(in app: XCUIApplication, capture: String) {
         let response = "Your fixture trend is stable. Open Timeline to inspect the selected day."
-        let answer = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", response)).firstMatch
+        let answer = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "LogYourBody: " + response)
+        ).firstMatch
         let terminal = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             answer.exists && app.buttons["chat_send_button"].label == "Send message"
                 && !app.buttons["chat_retry_button"].exists
-                && !app.descendants(matching: .any)["chat_error_state"].exists
+                && !app.descendants(matching: .any)["chat_recovery_message"].exists
         }, object: app)
         let completed = XCTWaiter.wait(for: [terminal], timeout: 8) == .completed
         attachScreenshot(named: capture, from: app)
         XCTAssertTrue(completed, "Require the full rendered answer and terminal success, not a root, partial text or HTTP status")
         XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["chat_error_state"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_recovery_message"].exists)
         XCTAssertFalse(app.buttons["chat_retry_button"].exists)
         XCTAssertTrue(app.textFields["chat_composer"].isHittable)
     }

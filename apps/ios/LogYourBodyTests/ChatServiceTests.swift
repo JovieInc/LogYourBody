@@ -83,7 +83,8 @@ final class ChatServiceTests: XCTestCase {
     func testSyntheticChatRetryRetainsOriginalIdentity() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let store = ChatFixtureReplayStore(rootURL: root, nonce: UUID())
+        let nonce = UUID()
+        let store = ChatFixtureReplayStore(rootURL: root, nonce: nonce)
         let conversation = UUID().uuidString, client = UUID().uuidString
         let first = ChatFixtureAttemptGate()
         _ = try store.begin(
@@ -91,12 +92,28 @@ final class ChatServiceTests: XCTestCase {
             message: ChatFixtureReplayStore.question, gate: first
         )
         XCTAssertThrowsError(
-            try store.begin(
+            try ChatFixtureReplayStore(rootURL: root, nonce: nonce).begin(
                 conversationId: conversation, clientMessageId: client,
                 message: ChatFixtureReplayStore.question, gate: ChatFixtureAttemptGate()
             )
         )
+        XCTAssertThrowsError(
+            try store.begin(conversationId: conversation, clientMessageId: client,
+                            message: ChatFixtureReplayStore.question, gate: first)
+        ) { XCTAssertEqual($0 as? ChatServiceError, .requestInProgress) }
         XCTAssertEqual(try store.read()?.attempts, 1, "A duplicate pending request cannot create another attempt")
+        let restoredNonce = UUID()
+        let unknown = ChatFixtureReplayStore.Journal(
+            nonce: restoredNonce, conversationId: conversation, clientMessageId: client,
+            attemptId: UUID(), attempts: 1, status: "pending"
+        )
+        try JSONEncoder().encode(unknown).write(to: root.appendingPathComponent(restoredNonce.uuidString + ".json"))
+        XCTAssertThrowsError(
+            try ChatFixtureReplayStore(rootURL: root, nonce: restoredNonce).begin(
+                conversationId: conversation, clientMessageId: client,
+                message: ChatFixtureReplayStore.question, gate: ChatFixtureAttemptGate()
+            )
+        ) { XCTAssertEqual($0 as? ChatServiceError, .requestInProgress) }
         XCTAssertTrue(try store.finish("failed", gate: first))
         for (changedConversation, changedClient, changedMessage) in [
             (UUID().uuidString, client, ChatFixtureReplayStore.question),
@@ -153,18 +170,19 @@ final class ChatServiceTests: XCTestCase {
         // This is the termination callback's exact ordering: close admission before actor cleanup.
         cancelled.cancel()
         XCTAssertFalse(try store.finish("completed", gate: cancelled), "A noncooperative late callback cannot persist done")
-        try store.cancel(gate: cancelled)
-        XCTAssertEqual(try store.read()?.status, "cancelled")
         let retry = ChatFixtureAttemptGate()
-        _ = try store.begin(conversationId: conversation, clientMessageId: client,
-                            message: ChatFixtureReplayStore.question, gate: retry)
+        // Recreate the store exactly like ChatTabView's computed port, before queued cancellation cleanup.
+        let recreated = ChatFixtureReplayStore(rootURL: root, nonce: try XCTUnwrap(store.read()).nonce)
+        _ = try recreated.begin(conversationId: conversation, clientMessageId: client,
+                                message: ChatFixtureReplayStore.question, gate: retry)
         XCTAssertFalse(try store.finish("completed", gate: cancelled))
         try store.cancel(gate: cancelled)
         XCTAssertEqual(try store.read()?.status, "pending", "Old cleanup must not overwrite a newer retry")
         XCTAssertTrue(try store.finish("completed", gate: retry))
         XCTAssertEqual(try store.snapshot()?.messages.count, 2)
 
-        let liveStore = ChatFixtureReplayStore(rootURL: root, nonce: UUID())
+        let liveNonce = UUID()
+        let liveStore = ChatFixtureReplayStore(rootURL: root, nonce: liveNonce)
         let slow = FixtureChatService(mode: .slow, replayStore: liveStore)
         let started = expectation(description: "Actual fixture stream is in flight")
         let operation = Task { @MainActor in
@@ -175,16 +193,20 @@ final class ChatServiceTests: XCTestCase {
         }
         await fulfillment(of: [started], timeout: 3)
         operation.cancel()
+        XCTAssertEqual(try liveStore.read()?.status, "pending", "Actor cleanup has not run in this synchronous window")
+        let immediate = ChatFixtureAttemptGate()
+        let newPortStore = ChatFixtureReplayStore(rootURL: root, nonce: liveNonce)
+        _ = try newPortStore.begin(conversationId: conversation, clientMessageId: client,
+                                   message: ChatFixtureReplayStore.question, gate: immediate)
+        XCTAssertEqual(try newPortStore.read()?.attempts, 2, "Immediate same-ID retry needs no cleanup wait")
         do {
             try await operation.value
             XCTFail("Cancelled fixture stream cannot report success")
         } catch is CancellationError {} catch { XCTFail("Unexpected cancellation error: \(error)") }
-        for _ in 0..<100 {
-            if try liveStore.read()?.status == "cancelled" { break }
-            await Task.yield()
-        }
-        XCTAssertEqual(try liveStore.read()?.status, "cancelled", "Actual stream termination must close persistence admission")
-        XCTAssertEqual(try liveStore.snapshot()?.messages.count, 1)
+        XCTAssertEqual(try newPortStore.read()?.attemptId, immediate.id)
+        XCTAssertEqual(try newPortStore.read()?.status, "pending", "Old actual-stream cleanup cannot cancel the immediate retry")
+        XCTAssertTrue(try newPortStore.finish("completed", gate: immediate))
+        XCTAssertEqual(try newPortStore.snapshot()?.messages.count, 2)
     }
 
     func testSSEParserRequiresVersionedMetadataAndBuildsDeltas() throws {
