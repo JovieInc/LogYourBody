@@ -425,6 +425,66 @@ describe('LogYourBody MCP route', () => {
     expect((await call(h, 'get_todays_workout')).structuredContent?.session.safetyStop).toBe(false);
   });
 
+  it('accepts a voice-friendly per-muscle map without fabricating missing session scores', async () => {
+    const h = harness();
+    await enroll(h);
+    await call(h, 'get_todays_workout');
+    await call(h, 'log_sets', { exercise: 'goblet_squat', sets: [{ reps: 10, rir: 3 }] });
+    const result = await call(h, 'log_session_feedback', {
+      source: 'voice',
+      sourceObservationId: 'spoken-check-in-1',
+      originalStatement: 'The supported row gives me less back fatigue, I think.',
+      transcriptionUncertain: true,
+      interpretations: [
+        {
+          claim: 'tolerability',
+          timeframe: 'current',
+          confidence: 'moderate',
+          proposedExplanation: 'Less reported back fatigue in this setup; no hypertrophy claim.',
+        },
+      ],
+      muscles: {
+        back: {
+          soreness: 6,
+          recovery: 'limited',
+          pump: 7,
+          workload: 'as_expected',
+          performance: 'stable',
+        },
+      },
+      targetMuscle: 'back',
+      targetMuscleReadiness: 'ready',
+      breathingReadiness: 'ready',
+      supportingReadiness: { grip: 'limited' },
+      trunkFatigue: 3,
+    });
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({
+      source: 'voice',
+      muscles: { back: { recovery: 'limited', performance: 'stable' } },
+      nextSetRecommendation: {
+        action: 'adjust_or_skip_task',
+        weeklyPlanChanged: false,
+        safetyCertified: false,
+      },
+    });
+    const saved = (await h.records.pull('subject-a', 'training_feedback')).records.find(
+      (record) => record.record_type === 'session_feedback',
+    );
+    expect(saved).toMatchObject({
+      source: 'voice',
+      sourceObservationId: 'spoken-check-in-1',
+      originalStatement: 'The supported row gives me less back fatigue, I think.',
+      transcriptionUncertain: true,
+      interpretations: [{ claim: 'tolerability', confidence: 'moderate' }],
+      muscles: { back: { soreness: 6, recovery: 'limited' } },
+    });
+    expect(saved).not.toHaveProperty('soreness');
+    expect(saved).not.toHaveProperty('pump');
+    expect(saved).not.toHaveProperty('performance');
+    expect(saved).not.toHaveProperty('jointPain');
+  });
+
   it('validates tool input before touching records', async () => {
     const h = harness();
     const result = await call(h, 'log_sets', { exercise: 'x', sets: [{ reps: 0, rir: 9 }] });
