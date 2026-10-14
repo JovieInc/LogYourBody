@@ -143,7 +143,8 @@ test('captures the real page helper payload after arming the waiter and closes t
   let waiterArmed = false;
   let closed = 0;
   const request = new Promise((resolve) => { resolveRequest = resolve; });
-  const identityURL = new URL(`https://identity.invalid/identity?${SIGNED_IDENTITY_QUERY}`);
+  const identityURL = new URL('/identity', ISSUER);
+  identityURL.search = SIGNED_IDENTITY_QUERY;
   const page = {
     async goto(url, options) {
       assert.equal(url, identityURL.toString());
@@ -152,9 +153,9 @@ test('captures the real page helper payload after arming the waiter and closes t
     waitForRequest(predicate, options) {
       // Keep Playwright's existing 30-second default and exact endpoint predicate.
       assert.equal(options, undefined);
-      assert.equal(predicate({ url: () => 'https://identity.invalid/api/auth/sign-in/social' }), true);
-      assert.equal(predicate({ url: () => 'https://identity.invalid/api/auth/session' }), false);
-      assert.equal(predicate({ url: () => 'https://identity.invalid/api/auth/sign-in/social/extra' }), false);
+      assert.equal(predicate({ url: () => new URL('/api/auth/sign-in/social', ISSUER).href }), true);
+      assert.equal(predicate({ url: () => new URL('/api/auth/session', ISSUER).href }), false);
+      assert.equal(predicate({ url: () => new URL('/api/auth/sign-in/social/extra', ISSUER).href }), false);
       waiterArmed = true;
       return request;
     },
@@ -197,7 +198,7 @@ for (const firstFailure of ['request', 'click']) {
         getByRole: () => ({ click: () => { started.resolve(); return pending.click.promise; } }),
       };
       const browser = { newPage: async () => page, close: async () => { closed += 1; } };
-      const outcome = captureProviderRequestFromBrowser(browser, new URL('https://identity.invalid/identity'))
+      const outcome = captureProviderRequestFromBrowser(browser, new URL(${JSON.stringify(new URL('/identity', ISSUER).href)}))
         .then(() => ({ unexpectedSuccess: true }), (error) => ({ error }));
       await started.promise;
       const first = ${JSON.stringify(firstFailure)};
