@@ -81,7 +81,11 @@ gbrain query "what is the timeline scrubber convention?"   # hybrid
 - **Setup (one-time per machine):** `pnpm setup:gbrain` (or `bash scripts/setup-gbrain.sh`). It resolves the brain's Supabase URL from `GBRAIN_DATABASE_URL` or Doppler (`jovie-web/dev`) and writes `~/.gbrain/config.json`. The connection string is a secret and is never committed.
 - **Code-aware search (optional):** run `/sync-gbrain --full` in Claude Code to index this repo, enabling `gbrain code-def` / `code-refs` / `code-callers`. It pins the worktree with `.gbrain-source` (gitignored).
 - **Graceful degradation:** if gbrain is unreachable, fall back to normal repo exploration — never block on it.
-- **Writes are automatic** via the memory→gbrain sync hook; you do not push manually.
+- **Writeback:** after non-trivial work, write durable findings to GBrain and read the same slug back. A configured memory-sync hook or successful write request alone is not persistence proof. If unavailable, report the exact write/readback gap.
+
+Local worktrees and Codex Cloud use the dependency-only bootstrap in
+`scripts/codex-setup.sh`. See [`CODEX.md`](CODEX.md) for lifecycle setup,
+runtime pins, hook trust, cleanup, and cloud verification boundaries.
 
 ---
 
@@ -536,7 +540,7 @@ pnpm --filter apps/web build
 ### Test Coverage Requirements
 
 - iOS: Minimum 70% code coverage
-- Web: Minimum 80% code coverage
+- Web: 80% code coverage is aspirational; CI runs the test suite but does not enforce this threshold
 - All new features must include tests
 
 ### Running Tests
@@ -562,7 +566,7 @@ For iOS tests, see "Working with the iOS App" section above.
 ### Current Migrations
 
 1. **iOS Code Signing**: Moving to Fastlane Match for certificate management
-2. **CI Performance**: Migrating to macOS-14 runners for better performance
+2. **CI Performance**: CI jobs use macOS-15 runners; certificate regeneration remains on macOS-14 pending LYB-65
 3. **Design System**: Updating to iOS 26 Liquid Glass design patterns
 
 ---
@@ -756,3 +760,20 @@ pnpm --filter @jovieinc/product-registry test
 Remember: When in doubt, follow the existing patterns in the codebase. Consistency is more important than perfection.
 
 **Agents ship through gates. `main` only contains PR-merged, CI-passing, deployable code with release evidence.**
+
+## Repository documentation
+
+See [source parity](docs/DOCUMENTATION.md) and the generated
+[source map](docs/REPOSITORY_SOURCES.md). Shared policy is pinned; local
+manifest, build, test and release instructions remain owned by this repository.
+
+<!-- BEGIN:turborepo-agent-rules -->
+
+# This is NOT the Turborepo you know
+
+Turborepo configuration, task behavior, and CLI commands can vary between installed versions and may differ from your training data. Resolve the `turbo` package from this file's directory or relevant workspace; in monorepos, it may not be visible from the repository root. For example, run `node -p "require.resolve('turbo/package.json')"` from a workspace that depends on `turbo`.
+
+Read `docs/README.md` inside that installed package first, then read the relevant pages from its `docs/` directory before changing Turborepo configuration or commands. Heed deprecation notices. These bundled docs match the installed package version and are available without network access.
+
+This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
+<!-- END:turborepo-agent-rules -->

@@ -1,0 +1,139 @@
+name: iOS Quality
+# iOS launch quality and performance audits for one exact SHA. CI calls it with mac-first so an idle self-hosted jovie-mac
+# Mac runs it (mac-lane.yml child run); otherwise hosted macOS does. Policy:
+# JovieInc/Jovie .claude/rules/infra.md "macOS runners".
+
+on:
+  workflow_dispatch:
+    inputs:
+      checkout-ref:
+        description: Full SHA of a current branch head in this repository to qualify on hosted macOS.
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      checkout-ref:
+        description: Exact SHA to test; empty uses the event SHA.
+        required: false
+        default: ''
+        type: string
+      supersede-key:
+        description: Stable identity whose newer Mac child run supersedes an older one.
+        required: false
+        default: ''
+        type: string
+      mac-first:
+        description: Prefer an idle self-hosted Mac (mac-lane-route.yml); hosted otherwise.
+        required: false
+        default: false
+        type: boolean
+      mac-child:
+        description: Set only by mac-lane.yml; runs the lane on the self-hosted Macs.
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    name: Mac Route
+    if: ${{ !(github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))) && inputs.mac-first && !inputs.mac-child }}
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/mac-lane-route.yml
+    with:
+      lane: ios-quality
+      checkout-sha: ${{ inputs.checkout-ref || github.sha }}
+      supersede-key: ${{ inputs.supersede-key }}
+
+  quality:
+    name: Launch Quality
+    needs: [mac]
+    if: ${{ !cancelled() && (inputs.mac-child || needs.mac.result == 'skipped' || needs.mac.outputs.run_hosted == 'true') }}
+    runs-on: ${{ !(github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))) && inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
+    # Setup plus one 52-minute audit plus the 8-minute performance cap.
+    timeout-minutes: 64
+    steps:
+      - name: Validate manual qualification source
+        if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository)) }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKOUT_REF: ${{ inputs.checkout-ref }}
+        run: |
+          set -euo pipefail
+          reject() { printf '::error::%s\n' "$1"; exit 1; }
+          [[ "$GITHUB_REPOSITORY" == 'JovieInc/LogYourBody' &&
+             "$GITHUB_REF" == 'refs/heads/main' ]] || reject 'Dispatch the trusted main workflow in JovieInc/LogYourBody.'
+          [[ "$CHECKOUT_REF" =~ ^[0-9a-f]{40}$ ]] || reject 'checkout-ref must be a full lowercase 40-hex commit SHA.'
+          for actor in "$GITHUB_ACTOR" "${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}"; do
+            permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$actor/permission" --jq '.permission')" || reject 'Cannot verify dispatch actor permission.'
+            [[ "$permission" == 'write' || "$permission" == 'admin' ]] || reject 'Dispatch and rerun actors must have repository write access.'
+          done
+          head_proven="$(gh api "repos/$GITHUB_REPOSITORY/commits/$CHECKOUT_REF/branches-where-head" --jq 'type == "array" and any(.[]; (.name | type == "string" and length > 0) and .commit.sha == env.CHECKOUT_REF)')" || reject 'Cannot verify repository branch head.'
+          [[ "$head_proven" == 'true' ]] || reject 'checkout-ref must be a current branch head in this repository.'
+          printf 'Qualified source: %s@%s (dispatch actor %s; rerun actor %s)\n' "$GITHUB_REPOSITORY" "$CHECKOUT_REF" "$GITHUB_ACTOR" "${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout-ref || github.sha }}
+          fetch-depth: 0
+          persist-credentials: ${{ !(github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))) }}
+
+      - name: Setup iOS build environment
+        uses: ./.github/actions/setup-ios-build
+        with:
+          xcode-version: 'latest-stable'
+          working-directory: apps/ios
+          setup-ruby: 'true'
+          create-config-files: 'true'
+
+      # Hosted VMs start cold. A persistent Mac keeps these locally, and
+      # saving multi-GB caches over its home uplink would outlast the job.
+      - name: Cache Swift packages
+        if: ${{ runner.environment == 'github-hosted' }}
+        uses: actions/cache@v6
+        with:
+          path: |
+            apps/ios/.build
+            ~/Library/Developer/Xcode/DerivedData
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-quality-spm-xcode-latest-stable-${{ hashFiles('**/Package.resolved', '**/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-quality-spm-xcode-latest-stable-
+            ${{ runner.os }}-spm-
+
+      - name: Run launch quality audit
+        # Slow prefix plus the full chaos regression suite. The script does not
+        # retry a command timeout, so this budget is for a single attempt. Passing
+        # hosted runs took up to 38 min (p90 36) on 2026-10-11/12, so 40 left no
+        # headroom and timed out five merge groups.
+        timeout-minutes: 52
+        env:
+          DESTINATION: auto
+          ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality
+        run: bash scripts/ios/launch-quality-audit.sh
+
+      - name: Run performance budget audit
+        timeout-minutes: 8
+        env:
+          DESTINATION: auto
+          RUN_SWIFTLINT: false
+          RUN_LAUNCH_PERFORMANCE: false
+          ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/performance
+        run: bash scripts/ios/performance-audit.sh
+
+      # Hosted only: the Air spent 17 min uploading these over its home uplink
+      # (2026-10-12). A failed Mac run is rerun hosted (attempt 2), which
+      # uploads them.
+      - name: Upload quality gate artifacts
+        if: always() && runner.environment == 'github-hosted'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-launch-quality-gate-${{ github.run_id }}
+          path: apps/ios/test_results/quality-gate/ci-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 14

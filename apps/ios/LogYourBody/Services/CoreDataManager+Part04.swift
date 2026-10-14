@@ -16,15 +16,52 @@ enum BodyMetricSyncDateParser {
         wholeSeconds.formatOptions = [.withInternetDateTime]
         return wholeSeconds.date(from: string)
     }
+
+    /// True when a stored row is strictly newer than a parseable payload
+    /// `updated_at`. A missing or unparseable timestamp is not newer, so those
+    /// payloads still apply.
+    static func storedVersionIsNewer(_ stored: Date?, than data: [String: Any]) -> Bool {
+        guard let stored,
+              let updatedString = data["updated_at"] as? String,
+              let incoming = date(from: updatedString) else {
+            return false
+        }
+        return stored > incoming
+    }
+}
+
+/// Test seam that runs inside the context queue immediately before each
+/// `writeAdmission` check. A regression can land an account switch in the gap
+/// between a pull-side guard and the queued write deterministically.
+enum ServerApplyProbe {
+    nonisolated(unsafe) static var beforeWriteAdmission: (@MainActor () -> Void)?
 }
 
 extension CoreDataManager {
 // MARK: - Update from Server Data
 
-    func updateOrCreateBodyMetric(from data: [String: Any]) {
+    func updateOrCreateBodyMetric(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
+            // viewContext is the container's main-queue context. Admission and
+            // this synchronous write share the executor with auth replacement.
+            if let probe = ServerApplyProbe.beforeWriteAdmission {
+                ServerApplyProbe.beforeWriteAdmission = nil
+                MainActor.assumeIsolated { probe() }
+            }
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?()
+                    return
+                }
+            }
             let id = data["id"] as? String ?? UUID().uuidString
 
             let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
@@ -34,10 +71,15 @@ extension CoreDataManager {
             do {
                 let results = try context.fetch(request)
                 if results.first?.isMarkedDeleted == true {
+                    completion?()
                     return
                 }
 
                 let metric = results.first ?? CachedBodyMetrics(context: context)
+                if results.first != nil,
+                   BodyMetricSyncDateParser.storedVersionIsNewer(metric.updatedAt, than: data) {
+                    return
+                }
 
                 // Update fields
                 metric.id = id
@@ -135,6 +177,7 @@ extension CoreDataManager {
                 metric.lastModified = Date()
 
                 self.save()
+                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateBodyMetric", underlying: error)
                 let contextInfo = ErrorContext(
@@ -145,14 +188,42 @@ extension CoreDataManager {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating body metric from server: \(error)")
+                completion?()
             }
         }
     }
 
-func updateOrCreateDailyMetric(from data: [String: Any]) {
+    func updateOrCreateBodyMetricAndWait(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            updateOrCreateBodyMetric(from: data, writeAdmission: writeAdmission) {
+                continuation.resume()
+            }
+        }
+    }
+
+func updateOrCreateDailyMetric(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
+            if let probe = ServerApplyProbe.beforeWriteAdmission {
+                ServerApplyProbe.beforeWriteAdmission = nil
+                MainActor.assumeIsolated { probe() }
+            }
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?()
+                    return
+                }
+            }
             let id = data["id"] as? String ?? UUID().uuidString
 
             let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
@@ -160,6 +231,7 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
             request.fetchLimit = 1
 
             do {
+                let steps = try DailyStepCountPolicy.storedRemoteSteps(data["steps"])
                 let results = try context.fetch(request)
                 let payloadUserId = data["user_id"] as? String
                 if let existing = results.first,
@@ -169,11 +241,15 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
                     return
                 }
                 let metric = results.first ?? CachedDailyMetrics(context: context)
+                if results.first != nil,
+                   BodyMetricSyncDateParser.storedVersionIsNewer(metric.updatedAt, than: data) {
+                    return
+                }
 
                 // Update fields
                 metric.id = id
                 metric.userId = data["user_id"] as? String
-                metric.steps = Int32(data["steps"] as? Int ?? 0)
+                metric.steps = steps
                 metric.notes = data["notes"] as? String
 
                 if let dateString = data["date"] as? String,
@@ -196,6 +272,7 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
                 metric.lastModified = Date()
 
                 self.save()
+                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateDailyMetric", underlying: error)
                 let contextInfo = ErrorContext(
@@ -206,14 +283,42 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating daily metric from server: \(error)")
+                completion?()
             }
         }
     }
 
-func updateOrCreateProfile(from data: [String: Any]) {
+    func updateOrCreateDailyMetricAndWait(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            updateOrCreateDailyMetric(from: data, writeAdmission: writeAdmission) {
+                continuation.resume()
+            }
+        }
+    }
+
+func updateOrCreateProfile(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
+            if let probe = ServerApplyProbe.beforeWriteAdmission {
+                ServerApplyProbe.beforeWriteAdmission = nil
+                MainActor.assumeIsolated { probe() }
+            }
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?()
+                    return
+                }
+            }
             let userId = data["id"] as? String ?? ""
 
             let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
@@ -223,6 +328,10 @@ func updateOrCreateProfile(from data: [String: Any]) {
             do {
                 let results = try context.fetch(request)
                 let profile = results.first ?? CachedProfile(context: context)
+                if results.first != nil,
+                   BodyMetricSyncDateParser.storedVersionIsNewer(profile.updatedAt, than: data) {
+                    return
+                }
 
                 // Update fields
                 // profile.userId = userId // Using id field instead
@@ -244,6 +353,7 @@ func updateOrCreateProfile(from data: [String: Any]) {
                 profile.lastModified = Date()
 
                 self.save()
+                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateProfile", underlying: error)
                 let contextInfo = ErrorContext(
@@ -254,6 +364,18 @@ func updateOrCreateProfile(from data: [String: Any]) {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating profile from server: \(error)")
+                completion?()
+            }
+        }
+    }
+
+    func updateOrCreateProfileAndWait(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            updateOrCreateProfile(from: data, writeAdmission: writeAdmission) {
+                continuation.resume()
             }
         }
     }

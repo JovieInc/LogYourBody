@@ -68,6 +68,54 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    func testIntegrationDirectorySeparatesHealthAccessAndScanHistory() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestIntegrationsDirectoryFixture"])
+        assertTimelineRootAppears(in: app, timeout: 30)
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        settings.tap()
+
+        let integrations = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'settings_integrations_link'")
+        ).firstMatch
+        XCTAssertTrue(integrations.waitForExistence(timeout: 8))
+        for _ in 0..<4 where !integrations.isHittable { app.swipeUp() }
+        XCTAssertTrue(integrations.isHittable)
+        integrations.tap()
+        XCTAssertTrue(app.navigationBars["Integrations"].waitForExistence(timeout: 8))
+
+        let health = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_health_status'")
+        ).firstMatch
+        XCTAssertTrue(health.waitForExistence(timeout: 8))
+        XCTAssertTrue(health.label.contains("Apple Health"))
+        XCTAssertFalse(health.label.contains("Connected"), "A permission request must not prove read access.")
+        let healthStatus = health.value as? String ?? ""
+        XCTAssertTrue(["Set up access", "Sync enabled", "Sync paused", "Use on iPhone", "Unavailable"].contains(healthStatus))
+        XCTAssertFalse(healthStatus.contains("Connected"), "A permission request must not prove read access.")
+
+        let bodySpec = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_link'")
+        ).firstMatch
+        XCTAssertTrue(bodySpec.waitForExistence(timeout: 8))
+        XCTAssertTrue(bodySpec.label.contains("BodySpec"))
+        XCTAssertFalse(bodySpec.label.contains("Last synced"), "A scan date must not become sync freshness.")
+        XCTAssertFalse(bodySpec.label.contains("Connection saved"), "Device scope belongs in the disclosure.")
+        XCTAssertFalse(bodySpec.label.contains("Latest scan"), "Scan history belongs in the disclosure.")
+        XCTAssertFalse(app.staticTexts["Health & Fitness"].exists)
+        attachScreenshot(named: "integrations-directory-permission-and-history-fixture", from: app)
+        let history = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_history'")
+        ).firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 8))
+        XCTAssertTrue(history.isHittable)
+        history.tap()
+        attachScreenshot(named: "integrations-directory-expanded-history-fixture", from: app)
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     // MARK: - 1. Weight entry boundaries
 
     func testWeightEntryRejectsInvalidAndOutOfRangeValues() throws {
@@ -434,7 +482,10 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
     func testAddEntryAccepts300CharacterNote() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestGlp1WeeklyCheckInFixture"])
+        // The GLP-1 prompt belongs to legacy Stats; keep its note-entry contract covered during rollback.
+        launch(app, with: [
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture", "-lybUITestGlp1WeeklyCheckInFixture"
+        ])
         assertTimelineRootAppears(in: app, timeout: 30)
         openPhotoTimelineMenu(in: app)
         let stats = app.buttons["Stats"]
@@ -511,6 +562,9 @@ final class ChaosEdgeCaseUITests: XCTestCase {
     // MARK: - 13. Accessibility XXXL round trip has no layout anomalies
 
     func testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies() throws {
+        // A 120s kill retries all eleven chaos tests and blows the 40-minute
+        // gate. 180s is the audit's existing maximum, not a workflow change.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
@@ -586,6 +640,32 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         assertNoLayoutAnomalies(in: app, context: "timeline root after round trip")
     }
 
+    func testWeightKeyboardControlsMeetMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+        try openMVPWeightEntry(in: app)
+
+        let field = app.textFields["mvp_weight_text_field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        field.tap()
+        XCTAssertTrue(waitForKeyboard(in: app), "Keyboard did not appear after tapping the weight field.")
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_done_button").firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_save_weight_button").firstMatch.exists)
+
+        let window = app.windows.firstMatch.frame
+        for identifier in ["mvp_keyboard_bottom_done_button", "mvp_keyboard_save_weight_bar_button"] {
+            let control = app.buttons.matching(identifier: identifier).firstMatch
+            XCTAssertTrue(control.waitForExistence(timeout: 5), identifier)
+            let frame = control.frame
+            XCTAssertTrue(window.contains(frame), "\(identifier) \(frame) window \(window)")
+            XCTAssertGreaterThanOrEqual(frame.width, 44, "\(identifier) \(frame)")
+            XCTAssertGreaterThanOrEqual(frame.height, 44, "\(identifier) \(frame)")
+        }
+
+        app.buttons.matching(identifier: "mvp_keyboard_bottom_done_button").firstMatch.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+    }
+
     // MARK: - 14. Arabic locale renders the root with a hittable composer
 
     func testArabicLocaleRootRendersAndComposerIsHittable() throws {
@@ -606,6 +686,106 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertTrue(composer.isHittable)
         attachScreenshot(named: "edge-arabic-locale-root", from: app)
     }
+
+    // MARK: - 15. Privacy, export, and delete confirmation
+
+    func testPrivacyExportAndDeleteConfirmationStayReachable() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
+
+        assertTimelineRootAppears(in: app, timeout: 30)
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        settings.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+
+        let privacy = revealButton("settings_privacy_data_link", in: app)
+        XCTAssertTrue(privacy.waitForExistence(timeout: 5))
+        XCTAssertTrue(privacy.isHittable)
+        privacy.tap()
+        XCTAssertTrue(waitForSettingsDetailScreen(in: app, timeout: 8))
+        XCTAssertTrue(app.staticTexts["Remove from Photos after import"].waitForExistence(timeout: 5))
+        navigateBack(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+
+        let export = revealButton("home_v2_settings_export", in: app)
+        XCTAssertTrue(export.isHittable)
+        export.tap()
+        XCTAssertTrue(
+            app.staticTexts["Export your data"].waitForExistence(timeout: 8),
+            "The export row must open the export screen."
+        )
+        let exportAction = app.descendants(matching: .any)["export_data_action"]
+        for _ in 0..<4 where !exportAction.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(exportAction.waitForExistence(timeout: 3))
+        XCTAssertTrue(exportAction.isHittable)
+        navigateBack(in: app)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_settings"].waitForExistence(timeout: 8))
+
+        let delete = revealButton("home_v2_settings_delete", in: app)
+        XCTAssertTrue(delete.isHittable)
+        delete.tap()
+        let field = app.textFields["delete_account_confirmation_field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        let confirm = app.buttons["delete_account_confirm_button"]
+        for _ in 0..<6 where !(confirm.exists && confirm.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirm.isHittable)
+        XCTAssertFalse(confirm.isEnabled)
+
+        field.tap()
+        XCTAssertTrue(waitForKeyboard(in: app))
+        field.typeText("DELET")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["delete_account_confirmation_error"].waitForExistence(timeout: 3)
+        )
+        XCTAssertFalse(confirm.isEnabled)
+
+        clearText(in: field)
+        field.typeText("DELETE")
+        dismissKeyboardIfNeeded(in: app)
+        for _ in 0..<4 where !(confirm.exists && confirm.isHittable) {
+            app.swipeUp()
+        }
+        XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+        XCTAssertTrue(confirm.isHittable)
+        XCTAssertTrue(confirm.isEnabled)
+        confirm.tap()
+
+        let alert = app.alerts["Delete Account?"]
+        XCTAssertTrue(
+            alert.waitForExistence(timeout: 5),
+            "The final delete confirmation must present as an alert with a reachable Cancel control."
+        )
+        let cancel = app.buttons.matching(identifier: "delete_account_final_cancel").firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 2))
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Cancel width \(frame.width)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Cancel height \(frame.height)")
+        XCTAssertTrue(app.frame.contains(frame), "Cancel frame \(frame) must sit inside the screen")
+        cancel.tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertFalse(alert.exists)
+        XCTAssertFalse(app.staticTexts["Deleting your account..."].exists)
+    }
+
+    private func revealButton(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let button = app.buttons[identifier]
+        for _ in 0..<6 {
+            if button.exists, button.isHittable {
+                return button
+            }
+            app.swipeUp()
+        }
+        return button
+    }
+
+    // MARK: - 16. GLP-1 medication selector cancel hit target
 
     func testGlp1MedicationSelectorCancelMeetsMinimumHitTarget() throws {
         let app = XCUIApplication()
@@ -923,6 +1103,30 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
     // MARK: - Layout defect detection
 
+    /// Values belong to one stationary checkpoint, never to a later tap or scroll.
+    private struct LayoutSample {
+        let element: XCUIElement
+        let type: XCUIElement.ElementType
+        let identifier: String
+        let label: String
+        let frame: CGRect
+
+        init?(_ element: XCUIElement) {
+            guard element.exists else { return nil }
+            self.element = element
+            type = element.elementType
+            identifier = element.identifier
+            label = element.label
+            frame = element.frame
+        }
+
+        var description: String {
+            let identifier = self.identifier.isEmpty ? "(no identifier)" : self.identifier
+            let label = self.label.isEmpty ? "(no label)" : self.label
+            return "\(String(describing: type)) id=\(identifier) label=\"\(label)\" frame=\(frame)"
+        }
+    }
+
     /// Fails with a screenshot if `layoutAnomalies` finds anything at this
     /// checkpoint. Unlike the chaos monkey's soft per-step recording, these
     /// are dedicated, deterministic checkpoints under an extreme text size,
@@ -937,13 +1141,16 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         attachScreenshot(named: "layout-scan-\(context)", from: app)
         let window = app.windows.firstMatch.frame
         let elements = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
-        let geometry = elements.map { "\($0.identifier) \($0.label): \($0.frame)" }
+        let samples = elements.compactMap { LayoutSample($0) }
+        let geometry = samples.map { "\($0.identifier) \($0.label): \($0.frame)" }
         let attachment = XCTAttachment(string: "window=\(window)\n" + geometry.joined(separator: "\n"))
         attachment.name = "layout-scan-\(context)-geometry"
         attachment.lifetime = .keepAlways
         add(attachment)
         var observations: [String] = []
-        let findings = layoutAnomalies(in: app, observations: &observations)
+        let findings = layoutAnomalies(
+            candidates: samples, windowFrame: window, in: app, observations: &observations
+        )
         let clipping = XCTAttachment(string: observations.joined(separator: "\n"))
         clipping.name = "layout-scan-\(context)-expected-native-scroll-clipping"
         clipping.lifetime = .keepAlways
@@ -958,17 +1165,16 @@ final class ChaosEdgeCaseUITests: XCTestCase {
     /// zero-size frame while the element still reports as hittable, or a
     /// label clipped down to a single ellipsis. The keyboard and system
     /// alerts are excluded -- neither is the app's layout to fix.
-    private func layoutAnomalies(in app: XCUIApplication, observations: inout [String]) -> [String] {
+    private func layoutAnomalies(
+        candidates: [LayoutSample], windowFrame: CGRect,
+        in app: XCUIApplication, observations: inout [String]
+    ) -> [String] {
         guard !app.keyboards.element.exists, !app.alerts.firstMatch.exists else { return [] }
-        let windowFrame = app.windows.firstMatch.frame
         guard windowFrame.width > 0, windowFrame.height > 0 else { return [] }
-
-        let candidates = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
 
         let scrollGeometry = ChaosScrollGeometry(app: app)
         var findings: [String] = []
         for element in candidates {
-            guard element.exists else { continue }
             let frame = element.frame
 
             // `.isHittable` itself can hard-fail ("Failed to determine
@@ -981,40 +1187,37 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             // AccessibilityXXXL, before this reordering).
             guard frame.width.isFinite, frame.height.isFinite,
                 frame.origin.x.isFinite, frame.origin.y.isFinite else {
-                findings.append("non-finite frame: \(describeLayoutElement(element))")
+                findings.append("non-finite frame: \(element.description)")
                 continue
             }
             if frame.width <= 0 || frame.height <= 0 {
-                findings.append("zero-size frame: \(describeLayoutElement(element))")
+                findings.append("zero-size frame: \(element.description)")
                 continue
             }
 
             let overflowsWindow = frame.minX < windowFrame.minX - 1 || frame.maxX > windowFrame.maxX + 1
                 || frame.minY < windowFrame.minY - 1 || frame.maxY > windowFrame.maxY + 1
-            if overflowsWindow && scrollGeometry.isExpectedScrollClipping(element, window: windowFrame) {
-                observations.append("native scroll clipping: \(describeLayoutElement(element))")
+            if overflowsWindow && scrollGeometry.isExpectedScrollClipping(
+                type: element.type, identifier: element.identifier, label: element.label,
+                frame: frame, window: windowFrame
+            ) {
+                observations.append("native scroll clipping: \(element.description)")
                 continue
             }
             // Fully offscreen frames must never reach XCTest's activation-point query.
             guard frame.intersects(windowFrame) else {
-                findings.append("non-scroll frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                findings.append("non-scroll frame outside window bounds \(windowFrame): \(element.description)")
                 continue
             }
-            guard element.isHittable else { continue }
+            guard element.element.isHittable else { continue }
             if overflowsWindow {
-                findings.append("frame outside window bounds \(windowFrame): \(describeLayoutElement(element))")
+                findings.append("frame outside window bounds \(windowFrame): \(element.description)")
                 continue
             }
             if element.label == "\u{2026}" {
-                findings.append("label clipped to a single ellipsis: \(describeLayoutElement(element))")
+                findings.append("label clipped to a single ellipsis: \(element.description)")
             }
         }
         return findings
-    }
-
-    private func describeLayoutElement(_ element: XCUIElement) -> String {
-        let identifier = element.identifier.isEmpty ? "(no identifier)" : element.identifier
-        let label = element.label.isEmpty ? "(no label)" : element.label
-        return "\(String(describing: element.elementType)) id=\(identifier) label=\"\(label)\" frame=\(element.frame)"
     }
 }

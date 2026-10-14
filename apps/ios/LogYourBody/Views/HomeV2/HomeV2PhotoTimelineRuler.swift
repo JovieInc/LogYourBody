@@ -14,6 +14,8 @@ struct HomeV2PhotoTimelineRuler: View {
     var showsMonthLabels = true
     var allowsVerticalScrolling = false
     var calendar = Calendar.current
+    var accessibilityId = "home_v2_photo_ruler"
+    var accessibilityName = "Photo timeline"
 
     private static let monthFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -32,7 +34,7 @@ struct HomeV2PhotoTimelineRuler: View {
         }
         .padding(.horizontal, HomeV2Tokens.Space.inset)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Photo timeline")
+        .accessibilityLabel(accessibilityName)
         .accessibilityValue(dates.indices.contains(selected) ? HomeV2ContextCopy.dayFormatter.string(from: dates[selected]) : "")
         .accessibilityAdjustableAction { direction in
             switch direction {
@@ -41,21 +43,28 @@ struct HomeV2PhotoTimelineRuler: View {
             @unknown default: break
             }
         }
-        .accessibilityIdentifier("home_v2_photo_ruler")
+        .accessibilityIdentifier(accessibilityId)
     }
 
     private var monthLabels: some View {
-        GeometryReader { geometry in
-            let width = geometry.size.width
-            ForEach(HomeV2PhotoRulerPolicy.monthStarts(in: span, calendar: calendar), id: \.self) { month in
-                let x = HomeV2PhotoRulerPolicy.fraction(of: month, in: span) * width
-                Text(Self.monthFormatter.string(from: month))
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .position(x: min(max(x, 14), width - 14), y: 8)
+        // The intrinsic caption height must participate in the dock's safe-area
+        // measurement; a fixed row lets larger text overflow into scroll content.
+        Text(Self.monthFormatter.string(from: span.start))
+            .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
+            .hidden()
+            .frame(maxWidth: .infinity)
+            .overlay {
+                GeometryReader { geometry in
+                    let width = geometry.size.width
+                    ForEach(HomeV2PhotoRulerPolicy.monthStarts(in: span, calendar: calendar), id: \.self) { month in
+                        let x = HomeV2PhotoRulerPolicy.fraction(of: month, in: span) * width
+                        Text(Self.monthFormatter.string(from: month))
+                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                            .position(x: min(max(x, 14), width - 14), y: geometry.size.height / 2)
+                    }
+                }
             }
-        }
-        .frame(height: 16)
     }
 
     private var ticks: some View {

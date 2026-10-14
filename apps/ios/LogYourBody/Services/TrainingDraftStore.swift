@@ -10,6 +10,8 @@ struct TrainingSetDraft: Codable, Equatable {
     var rir: Int
     var revision = UUID()
     var pendingRequest: TrainingSetLogRequest?
+    var correctionBase: TrainingSavedSet?
+    var pendingCorrection: TrainingSetCorrectionRequest?
 
     var key: String { "\(exerciseId)-\(setNumber)" }
 }
@@ -125,7 +127,31 @@ final class TrainingDraftStore {
 
     private func validStoredRow(_ row: TrainingSetDraft, sessionId: String) -> Bool {
         guard row.setNumber > 0, (0...6).contains(row.rir) else { return false }
-        guard let pending = row.pendingRequest else { return true }
+        guard !(row.pendingRequest != nil && row.pendingCorrection != nil) else { return false }
+        if let correction = row.pendingCorrection {
+            guard let base = row.correctionBase,
+                  base.sessionId == sessionId,
+                  base.exerciseId == row.exerciseId,
+                  base.setNumber == row.setNumber,
+                  let reps = Int(row.repsText),
+                  (1...50).contains(reps)
+            else { return false }
+            do {
+                return correction == TrainingSetCorrectionRequest(
+                    sessionId: sessionId,
+                    exerciseId: row.exerciseId,
+                    setNumber: row.setNumber,
+                    reps: reps,
+                    loadKg: try TrainingLoadInputPolicy.loadKg(from: row.loadText),
+                    rir: row.rir,
+                    correctionId: correction.correctionId,
+                    expectedRevision: base.revision ?? 0
+                )
+            } catch {
+                return false
+            }
+        }
+        guard let pending = row.pendingRequest else { return row.correctionBase != nil || row.pendingCorrection == nil }
         guard let reps = Int(row.repsText), (1...50).contains(reps) else { return false }
         do {
             return pending == TrainingSetLogRequest(

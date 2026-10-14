@@ -29,6 +29,8 @@ struct DashboardViewLiquid: View {
 
     // Core data / selection
     @State var selectedIndex: Int = 0
+    @State var homeV2Timeline = HomeV2TimelinePolicy.Snapshot()
+    @State var homeV2TimelineSelection: HomeV2TimelinePolicy.Selection?
 
     // Metrics reordering state
     @AppStorage("metricsOrder") private var metricsOrderData = Data()
@@ -91,6 +93,7 @@ struct DashboardViewLiquid: View {
     @State private var isPhotosTabEnabled = true
     @State var selectedPhotoTimelineRootPage: PhotoTimelineRootPage = .timeline
     @State var isHomeChatExpanded = false
+    @State var homeChatDraft = AccountSessionChatDraft()
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false
     @State var isHomeV2ViewerPresented = false
@@ -98,13 +101,14 @@ struct DashboardViewLiquid: View {
     @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
-    @State var homeV2LogSheetDate = Date()
     @State var homeV2EditingMetric: BodyMetrics?
     @State var homeV2PhotoRoute: HomeV2PhotoRoute?
     @State var isHomeV2SettingsPresented = false
     @State var isHomeV2HelpPresented = false
     @State var isHomeV2AllPhotosPresented = false
     @State var homeV2Logged: HomeV2LoggedEntry?
+    @State var isHomeV2Undoing = false
+    @State var showsHomeV2UndoError = false
     @State var homeV2PhaseSentence: String?
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
@@ -123,9 +127,6 @@ struct DashboardViewLiquid: View {
     @State var addEntryInitialWeight: String?
     @State var addEntryInitialBodyFat: Double?
     @State var isHomeV2LoggingWeight = false
-    @State var homeV2LogHadExistingEntry = false
-    @State var homeV2LogPreviousWeightKilograms: Double?
-    @State var homeV2LogPreviousBodyFat: Double?
 
     init(
         layoutMode: LayoutMode = .photoTimelineHUD,
@@ -256,9 +257,14 @@ struct DashboardViewLiquid: View {
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
                 scheduleMetricCacheRefresh()
             }
-            .onReceive(viewModel.$bodyMetrics) { _ in
+            .onReceive(viewModel.$bodyMetrics) { metrics in
+                reconcileHomeV2Timeline(with: metrics)
                 scheduleDashboardDerivedStateRefresh()
                 scheduleMetricCacheRefresh()
+            }
+            .onChange(of: authManager.currentUser?.id) { _, _ in
+                homeV2TimelineSelection = nil
+                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
@@ -274,6 +280,7 @@ struct DashboardViewLiquid: View {
                 scheduleMetricCacheRefresh()
             }
             .onChange(of: selectedIndex) { _, newIndex in
+                recordHomeV2TimelineSelection(at: newIndex)
                 scheduleDashboardDerivedStateRefresh(animatedIndex: newIndex)
             }
             .onChange(of: selectedTab) { _, newTab in
@@ -289,6 +296,7 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
                 featureGateRefreshToken = UUID()
+                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 

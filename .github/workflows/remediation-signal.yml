@@ -28,6 +28,8 @@ on:
       - Deploy
     types: [completed]
   schedule:
+    # Kept clock (production liveness): an outage of logyourbody.com between
+    # deploys emits no GitHub event. Read-only probe; never holds shipping.
     - cron: '23 7 * * *'
   workflow_dispatch:
   pull_request:
@@ -57,7 +59,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -81,7 +83,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 

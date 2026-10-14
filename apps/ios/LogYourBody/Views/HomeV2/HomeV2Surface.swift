@@ -2,26 +2,26 @@
 // HomeV2Surface.swift
 // LogYourBody
 //
+import Charts
 import SwiftUI
 
-/// Home on the focus contract (Pencil H1/H2/C2): one check-in action, the
-/// number, a fixed 30-day trend, and quiet disclosures. Shows the metric-first
-/// layout (H1) until the selected day has a photo. Nothing is drawn over the
-/// person: the number sits below the photo.
+/// A shared editorial card keeps Home's geometry stable with or without a photo.
+/// The photo fills its card; a data graphic uses only the selected day's readings
+/// or its recorded weight history. Numbers and actions remain below the card.
 struct HomeV2Surface: View {
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
-    @Binding var selectedIndex: Int
+    let timeline: HomeV2TimelinePolicy.Snapshot
+    @Binding var selectedID: HomeV2TimelinePolicy.EntryID
     let weightValue: String
     let weightUnit: String
+    let ffmiValue: String
+    let bodyFatValue: String
     let changeSentence: String
-    let compositionSentence: String
+    let dateText: (BodyMetrics) -> String
     let phaseSentence: String?
     let loggedSentence: String?
-    let latestPhotoCaption: String?
     var systemState: HomeV2SystemState?
-    let chartDaily: [MetricChartDataPoint]
-    let chartTrend: [MetricChartDataPoint]
     let onOpenPhoto: () -> Void
     let onViewProgress: () -> Void
     let onTodayDetails: () -> Void
@@ -31,88 +31,171 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
 
+    @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
+    @State private var showsProvenance = false
+
     private var isLogged: Bool { loggedSentence != nil }
     private var isHealthOff: Bool { systemState == .healthOff }
+    private var hasAnyPhoto: Bool {
+        bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
+    }
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(alignment: .leading, spacing: 0) {
-                let hasPhoto = PhotoTimelineHUDPolicy.hasUsablePhoto(metric)
-                if systemState == .offline {
-                    HomeV2OfflineBanner()
-                } else if isHealthOff {
-                    HomeV2HealthOffRow()
-                }
-                if hasPhoto, let photoURL = metric.photoUrl {
-                    photoStage(photoURL: photoURL, size: geometry.size)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    systemBanner
+                    HomeV2TimelinePager(
+                        snapshot: timeline, selectedID: userSelection,
+                        size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
+                        unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto
+                    )
+                    .overlay(alignment: .bottom) {
+                        if hasPhoto { photoStatStrip }
+                    }
                     photoNumberBlock
-                } else {
-                    metricFirst
+                    if hasAnyPhoto {
+                        HomeV2DisclosureLink(
+                            title: HomeV2PhotoCopy.allPhotos,
+                            identifier: "home_v2_all_photos_row",
+                            action: onAllPhotos
+                        )
+                        .frame(maxWidth: .infinity)
+                    }
+                    rangeRow
+                    if !hasPhoto || isHealthOff { todayDetailsRow }
+                    if !coachDismissed {
+                        HomeV2TimelineCoachMark(onDismiss: { coachDismissed = true })
+                    }
                 }
-
-                Spacer(minLength: 0)
-
-                if hasPhoto {
-                    HomeV2DisclosureLink(
-                        title: HomeV2PhotoCopy.allPhotos,
-                        identifier: "home_v2_all_photos_row",
-                        action: onAllPhotos
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-
-                if isHealthOff, !isLogged {
-                    HomeV2Dock(
-                        title: HomeV2SystemCopy.connectAppleHealth,
-                        identifier: "home_v2_connect_health",
-                        action: onConnectHealth
-                    )
-                } else {
-                    HomeV2Dock(
-                        title: isLogged ? HomeV2Copy.done : HomeV2Copy.logWeight,
-                        identifier: isLogged ? "home_v2_done" : "home_v2_log_weight",
-                        action: isLogged ? onDone : onLogWeight
-                    )
-                }
+                .frame(minHeight: geometry.size.height, alignment: .top)
             }
-            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+            .scrollBounceBehavior(.basedOnSize)
+            .accessibilityIdentifier("home_v2_content_scroll")
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                timelineScrubber
+                actionDock
+            }
+            .background(HomeV2Tokens.Colors.shell)
         }
     }
 
-    private func photoStage(photoURL: String, size: CGSize) -> some View {
-        Button(action: onOpenPhoto) {
-            SubjectPlateView(
-                urlString: photoURL,
-                size: CGSize(width: size.width, height: HomeV2Layout.stageHeight(width: size.width, height: size.height))
-            )
-            .contentShape(Rectangle())
+    @ViewBuilder
+    private var systemBanner: some View {
+        if systemState == .offline {
+            HomeV2OfflineBanner()
+        } else if isHealthOff {
+            HomeV2HealthOffRow()
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Progress photo")
-        .accessibilityHint("Opens the photo")
-        .accessibilityIdentifier("home_v2_photo_stage")
+    }
+
+    @ViewBuilder
+    private var actionDock: some View {
+        if isHealthOff, !isLogged {
+            HomeV2Dock(
+                title: HomeV2SystemCopy.connectAppleHealth,
+                identifier: "home_v2_connect_health",
+                action: onConnectHealth
+            )
+        } else {
+            HomeV2Dock(
+                title: isLogged ? HomeV2Copy.done : HomeV2Copy.logWeight,
+                identifier: isLogged ? "home_v2_done" : "home_v2_log_weight",
+                action: isLogged ? onDone : onLogWeight
+            )
+        }
+    }
+
+    private var hasPhoto: Bool { PhotoTimelineHUDPolicy.hasUsablePhoto(metric) }
+
+    private var userSelection: Binding<HomeV2TimelinePolicy.EntryID> {
+        Binding(get: { selectedID }, set: { next in
+            guard next != selectedID else { return }
+            selectedID = next
+            coachDismissed = true
+        })
+    }
+
+    private var timelineScrubber: some View {
+        HomeV2PhotoTimelineRuler(
+            dates: timeline.chronologicalDates,
+            selected: timeline.chronologicalPosition(for: selectedID),
+            onSelect: { position in
+                if let next = timeline.id(atChronologicalPosition: position) { userSelection.wrappedValue = next }
+            },
+            allowsVerticalScrolling: true,
+            accessibilityId: "home_v2_timeline_scrubber",
+            accessibilityName: "Body timeline"
+        )
+        .padding(.top, HomeV2Tokens.Space.tight)
+    }
+
+    private var hasSingleWeightHero: Bool {
+        !hasPhoto && HomeV2EditorialPolicy.bodyFat(in: metric) == nil &&
+            HomeV2EditorialPolicy.weights(in: bodyMetrics, selected: metric).count == 1
+    }
+
+    /// Weight, FFMI and body fat overlaid on the selected photo's treated lower band.
+    private var photoStatStrip: some View {
+        HStack(spacing: HomeV2Tokens.Space.margin) {
+            HomeV2PhotoStat(label: "Weight", value: "\(weightValue) \(weightUnit)")
+            HomeV2PhotoStat(label: "FFMI", value: ffmiValue)
+            HomeV2PhotoStat(label: "Body fat", value: bodyFatValue)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, HomeV2Tokens.Space.inset)
+        .padding(.top, HomeV2Tokens.Space.margin)
+        .padding(.bottom, HomeV2Tokens.Space.row)
+        .background(
+            LinearGradient(
+                colors: [.clear, Color.black.opacity(0.55)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home_v2_photo_stats")
     }
 
     private var photoNumberBlock: some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-            if let latestPhotoCaption {
-                Text(latestPhotoCaption)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .accessibilityIdentifier("home_v2_photo_caption")
+            Text(dateText(metric))
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .accessibilityIdentifier("home_v2_photo_caption")
+
+            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
+                HomeV2ProvenanceChip(detail: provenance) { showsProvenance = true }
             }
 
-            numberRow(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .semibold, kerning: -1.2)
+            if !hasSingleWeightHero {
+                numberRow(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .semibold, kerning: -1.2)
+            }
 
             Text(changeSentence)
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .accessibilityIdentifier("home_v2_change_sentence")
 
-            compositionLine
+            if hasPhoto || HomeV2EditorialPolicy.bodyFat(in: metric) == nil {
+                compositionLine
+            }
+
+            if isLogged || !hasPhoto {
+                statusLine
+            }
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
+        .sheet(isPresented: $showsProvenance) {
+            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
+                HomeV2ProvenanceSheet(detail: provenance)
+            }
+        }
+        .onChange(of: metric.id) { _, _ in showsProvenance = false }
     }
 
     private func numberRow(size: CGFloat, weight: Font.Weight, kerning: CGFloat) -> some View {
@@ -131,51 +214,20 @@ struct HomeV2Surface: View {
         }
     }
 
-    private var metricFirst: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .topLeading) {
-                Color.clear
-                    .frame(height: 1)
-                    .accessibilityElement()
-                    .accessibilityLabel(HomeV2Copy.title)
-                    .accessibilityIdentifier("home_v2_metric_first")
-
-                VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-                    numberRow(size: HomeV2Tokens.TypeSize.heroMetricFirst, weight: .bold, kerning: -2.5)
-
-                    Text(changeSentence)
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                        .accessibilityIdentifier("home_v2_change_sentence")
-
-                    compositionLine
-
-                    statusLine
-                }
-                .padding(.top, HomeV2Tokens.Space.heroTop)
-            }
-            .padding(.horizontal, HomeV2Tokens.Space.margin)
-
-            HomeV2TrendChart(
-                daily: chartDaily,
-                trend: chartTrend,
-                accent: HomeV2Tokens.Metric.weight,
-                range: .constant(.month1),
-                showsRangeTabs: false
-            )
-            .padding(.top, HomeV2Tokens.Space.margin)
-
-            rangeRow
-            todayDetailsRow
-        }
-    }
-
     private var compositionLine: some View {
-        Text(compositionSentence)
+        Text(visibleComposition)
             .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
             .foregroundStyle(HomeV2Tokens.Colors.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("home_v2_composition_sentence")
+    }
+
+    /// The missing-day sentence stays exact. A recorded percentage names no second source.
+    private var visibleComposition: String {
+        guard let reading = HomeV2EditorialPolicy.bodyFat(in: metric) else {
+            return HomeV2TimelinePolicy.bodyFatSentence(for: metric)
+        }
+        return HomeV2MetricEditorial.compositionLine(percentage: reading.percentage)
     }
 
     private var todayDetailsRow: some View {
@@ -243,6 +295,169 @@ struct HomeV2Surface: View {
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .frame(minHeight: HomeV2Tokens.rowHeight)
+    }
+}
+/// The same full-bleed card as the photo, using only data the person has saved.
+struct HomeV2DataHero: View {
+    let metric: BodyMetrics?
+    let metrics: [BodyMetrics]
+    let unit: String
+
+    private var bodyFat: HomeV2EditorialPolicy.BodyFatReading? { HomeV2EditorialPolicy.bodyFat(in: metric) }
+    private var weights: [HomeV2EditorialPolicy.WeightReading] {
+        HomeV2EditorialPolicy.weights(in: metrics, selected: metric)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let bodyFat {
+                bodyFatGraphic(bodyFat)
+            } else if !weights.isEmpty {
+                weightGraphic
+            } else {
+                emptyGraphic
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(HomeV2Tokens.Colors.card)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func bodyFatGraphic(_ reading: HomeV2EditorialPolicy.BodyFatReading) -> some View {
+        VStack(spacing: HomeV2Tokens.Space.compact) {
+            GeometryReader { geometry in
+                let diameter = min(geometry.size.width, geometry.size.height)
+                ZStack {
+                    Circle().stroke(HomeV2Tokens.Colors.border, lineWidth: 12)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(reading.percentage / 100))
+                        .stroke(HomeV2Tokens.Metric.bodyFat, style: StrokeStyle(lineWidth: 12, lineCap: .butt))
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: HomeV2Tokens.Space.tight) {
+                        Text(String(format: "%.1f%%", reading.percentage))
+                            .scaledSystemFont(
+                                size: HomeV2Tokens.TypeSize.progressValue,
+                                weight: .semibold,
+                                relativeTo: .largeTitle
+                            )
+                            .minimumScaleFactor(0.5)
+                            .lineLimit(1)
+                            .foregroundStyle(HomeV2Tokens.Colors.ink)
+                        Text("body fat by weight")
+                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(20)
+                }
+                .frame(width: diameter, height: diameter)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .padding(44)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Body fat \(String(format: "%.1f", reading.percentage)) percent. \(reading.caption).")
+        .accessibilityIdentifier("home_v2_body_fat_graphic")
+    }
+
+    private var weightGraphic: some View {
+        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.margin) {
+            Text("Recorded weight")
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+            if weights.count > 1 {
+                HomeV2TrendChart(
+                    daily: weightPoints,
+                    trend: [],
+                    accent: HomeV2Tokens.Metric.weight,
+                    range: .constant(.month1),
+                    showsRangeTabs: false,
+                    showsDots: true,
+                    chartHeight: HomeV2Tokens.chartHeight,
+                    axis: .months,
+                    metricTitle: "Weight",
+                    usesSevenDayAverage: false,
+                    anchorsToZero: false,
+                    requiresMinimumDays: false,
+                    plotIdentifier: "home_v2_weight_plot",
+                    allowsSelection: false,
+                    now: metric?.date ?? Date()
+                )
+            } else if let reading = weights.first {
+                HomeV2MetricHero(
+                    value: String(format: "%.1f", displayWeight(reading.kilograms)),
+                    unit: unit,
+                    comparison: "",
+                    valueIdentifier: "home_v2_weight_value",
+                    valueSize: HomeV2Tokens.TypeSize.progressValue,
+                    showsComparison: false
+                )
+                .frame(maxHeight: .infinity, alignment: .center)
+            }
+            Text("\(weights.count) weight \(weights.count == 1 ? "entry" : "entries") in 30 days · \(unit)")
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(HomeV2Tokens.Space.margin)
+        .accessibilityElement(children: weights.count == 1 ? .contain : .ignore)
+        .accessibilityLabel(weightSummary)
+        .accessibilityIdentifier("home_v2_weight_graphic")
+    }
+
+    private var weightSummary: String {
+        guard let latest = weights.last else { return "No weight recorded." }
+        return "\(weights.count) recorded weight \(weights.count == 1 ? "entry" : "entries") in 30 days. " +
+            "Latest \(String(format: "%.1f", displayWeight(latest.kilograms))) \(unit). Body fat not logged for this day."
+    }
+
+    private var emptyGraphic: some View {
+        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+            Spacer(minLength: 0)
+            Text(metric == nil ? HomeV2Copy.firstCheckInTitle : "Your check-in")
+                .scaledSystemFont(size: 44, weight: .semibold, relativeTo: .largeTitle)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(metric == nil ? "home_v2_day_zero" : "home_v2_empty_graphic")
+            Spacer(minLength: 0)
+            Text("No weight or body fat logged.")
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(HomeV2Tokens.Space.margin)
+    }
+
+    private var weightPoints: [MetricChartDataPoint] {
+        weights.map { reading in
+            MetricChartDataPoint(
+                date: reading.date,
+                value: displayWeight(reading.kilograms),
+                presence: .present
+            )
+        }
+    }
+
+    private func displayWeight(_ kilograms: Double) -> Double {
+        unit == "lb" ? kilograms.kgToLbs : kilograms
+    }
+}
+
+/// One stat in the photo-stage overlay: quiet label over a white value.
+struct HomeV2PhotoStat: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, weight: .medium, relativeTo: .caption)
+                .foregroundStyle(.white.opacity(0.72))
+            Text(value)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .body)
+                .foregroundStyle(.white)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -358,7 +573,7 @@ struct HomeV2Filmstrip: View {
             CachedAsyncImage(urlString: bodyMetrics[index].photoUrl ?? "") { image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .scaledToFill()
             } placeholder: {
                 HomeV2Tokens.Colors.card
             }
@@ -382,6 +597,7 @@ struct SubjectPlateView: View {
 
     @State private var plate: UIImage?
     @State private var original: UIImage?
+    @State private var focus: CGPoint?
 
     var body: some View {
         ZStack {
@@ -399,27 +615,33 @@ struct SubjectPlateView: View {
     }
 
     private func stagePhoto(_ image: UIImage) -> some View {
-        Image(uiImage: AspectFillCropper.crop(image, to: size))
+        Image(uiImage: AspectFillCropper.crop(image, to: size, anchor: focus))
             .resizable()
-            .aspectRatio(contentMode: .fit)
+            .scaledToFit()
             .frame(width: size.width, height: size.height)
     }
 
     private func load() async {
         if let cached = SubjectPlateStore.shared.cachedPlate(for: urlString) {
             plate = cached
-            return
+        } else {
+            plate = nil
         }
+        focus = SubjectPlateStore.shared.cachedFocus(for: urlString)
 
-        plate = nil
         guard let image = await ImageCacheService.shared.loadImage(from: urlString), !Task.isCancelled else {
             return
         }
         original = image
 
-        let rendered = await SubjectPlateStore.shared.plate(for: urlString, image: image)
-        guard !Task.isCancelled else { return }
-        plate = rendered
+        if focus == nil {
+            focus = await SubjectPlateStore.shared.focus(for: urlString, image: image)
+            guard !Task.isCancelled else { return }
+        }
+
+        if plate == nil {
+            plate = await SubjectPlateStore.shared.plate(for: urlString, image: image)
+        }
     }
 }
 
@@ -440,9 +662,31 @@ enum AspectFillCropper {
         )
     }
 
+    /// Aspect-fill where `anchor` — a normalized point in image space (x
+    /// right, y down, 0–1) — lands on `anchorTarget`, a fraction of the
+    /// target. Offsets clamp so the drawn image still covers the frame;
+    /// a nil anchor is the centered fill above.
+    static func fillRect(imageSize: CGSize, in target: CGSize, anchor: CGPoint?, anchorTarget: CGPoint) -> CGRect {
+        let rect = fillRect(imageSize: imageSize, in: target)
+        guard let anchor else { return rect }
+
+        let offsetX = min(0, max(target.width - rect.width, anchorTarget.x * target.width - anchor.x * rect.width))
+        let offsetY = min(0, max(target.height - rect.height, anchorTarget.y * target.height - anchor.y * rect.height))
+        return CGRect(x: offsetX, y: offsetY, width: rect.width, height: rect.height)
+    }
+
     static func crop(_ image: UIImage, to target: CGSize) -> UIImage {
+        crop(image, to: target, anchor: nil)
+    }
+
+    static func crop(_ image: UIImage, to target: CGSize, anchor: CGPoint?) -> UIImage {
         guard target.width > 0, target.height > 0 else { return image }
-        let rect = fillRect(imageSize: image.size, in: target)
+        let rect = fillRect(
+            imageSize: image.size,
+            in: target,
+            anchor: anchor,
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
         return UIGraphicsImageRenderer(size: target).image { _ in
             image.draw(in: rect)
         }

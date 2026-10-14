@@ -125,6 +125,29 @@ final class DashboardMetricFormattingTests: XCTestCase {
         XCTAssertEqual(trend.caption, "All")
     }
 
+    // MARK: - JOV-6090 trend-chip contract
+
+    func testMakeTrendFlatKeepsNoChangeWithRangeCaption() throws {
+        // The flat trend renders "No change · 1M" as one coherent line; the
+        // card must never wrap the valueText itself at standard text size.
+        let trend = try XCTUnwrap(makeTrend(delta: 0, unit: "%", range: .month1))
+        XCTAssertEqual(directionLabel(trend.direction), "flat")
+        XCTAssertEqual(trend.valueText, "No change")
+        XCTAssertEqual(trend.caption, "1M")
+        XCTAssertFalse(trend.valueText.contains("\n"))
+        XCTAssertFalse(trend.valueText.contains("·"))
+    }
+
+    func testFFMIUnitlessTrendOmitsUnitSuffix() throws {
+        // Stats FFMI card ships unit "" (title already carries "FFMI"), so its
+        // trend value must be a bare formatted number with no duplicated unit.
+        let trend = try XCTUnwrap(makeTrend(delta: 0.4, unit: "", range: .month3))
+        XCTAssertEqual(directionLabel(trend.direction), "up")
+        XCTAssertEqual(trend.valueText, "0.4")
+        XCTAssertEqual(trend.caption, "3M")
+        XCTAssertFalse(trend.valueText.lowercased().contains("ffmi"))
+    }
+
     // MARK: - formatAverageFootnote
 
     func testFormatAverageFootnote() {

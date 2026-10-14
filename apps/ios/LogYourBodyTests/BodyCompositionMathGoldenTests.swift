@@ -213,6 +213,95 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         XCTAssertTrue(result.isLastKnown)
     }
 
+    // MARK: - DEXA-anchored body fat estimates
+
+    func testBodyFatEstimateBetweenDexaScansFollowsScaleWeight() throws {
+        var metrics = [
+            makeMetric(
+                date: date(daysAfterStart: 0),
+                weight: 100,
+                bodyFatPercentage: 20,
+                bodyFatMethod: "dexa",
+                dataSource: "bodyspec_dexa"
+            ),
+            makeMetric(
+                date: date(daysAfterStart: 90),
+                weight: 102,
+                bodyFatPercentage: 22,
+                bodyFatMethod: "dexa",
+                dataSource: "bodyspec_dexa"
+            )
+        ]
+        for day in stride(from: 1, to: 90, by: 1) {
+            metrics.append(makeMetric(date: date(daysAfterStart: day), weight: 104))
+        }
+
+        let context = try XCTUnwrap(
+            MetricsInterpolationService.shared.makeBodyFatInterpolationContext(for: metrics)
+        )
+        let estimate = try XCTUnwrap(context.estimate(for: date(daysAfterStart: 45)))
+
+        // Trend weight converges to 104 kg; lean mass is linearly interpolated
+        // between the scans: (100 * 0.8 + 102 * 0.78) / 2 = 79.78 kg.
+        // Body fat = (104 - 79.78) / 104 = 23.3%.
+        XCTAssertTrue(estimate.isInterpolated)
+        XCTAssertFalse(estimate.isLastKnown)
+        XCTAssertEqual(estimate.confidenceLevel?.rawValue, "low")
+        XCTAssertEqual(estimate.value, 23.3, accuracy: 0.05)
+    }
+
+    func testBodyFatEstimateGapOverThirtyDaysWithoutDexaAnchorsReturnsNil() throws {
+        var metrics = [
+            makeMetric(
+                date: date(daysAfterStart: 0),
+                weight: 100,
+                bodyFatPercentage: 20,
+                dataSource: "smart_scale"
+            ),
+            makeMetric(
+                date: date(daysAfterStart: 60),
+                weight: 102,
+                bodyFatPercentage: 22,
+                dataSource: "smart_scale"
+            )
+        ]
+        for day in stride(from: 1, to: 60, by: 1) {
+            metrics.append(makeMetric(date: date(daysAfterStart: day), weight: 104))
+        }
+
+        let context = try XCTUnwrap(
+            MetricsInterpolationService.shared.makeBodyFatInterpolationContext(for: metrics)
+        )
+        XCTAssertNil(context.estimate(for: date(daysAfterStart: 30)))
+    }
+
+    func testBodyFatEstimateBetweenDexaScansBeyondOneYearReturnsNil() throws {
+        var metrics = [
+            makeMetric(
+                date: date(daysAfterStart: 0),
+                weight: 100,
+                bodyFatPercentage: 20,
+                bodyFatMethod: "dexa",
+                dataSource: "bodyspec_dexa"
+            ),
+            makeMetric(
+                date: date(daysAfterStart: 400),
+                weight: 102,
+                bodyFatPercentage: 22,
+                bodyFatMethod: "dexa",
+                dataSource: "bodyspec_dexa"
+            )
+        ]
+        for day in stride(from: 1, to: 400, by: 10) {
+            metrics.append(makeMetric(date: date(daysAfterStart: day), weight: 104))
+        }
+
+        let context = try XCTUnwrap(
+            MetricsInterpolationService.shared.makeBodyFatInterpolationContext(for: metrics)
+        )
+        XCTAssertNil(context.estimate(for: date(daysAfterStart: 200)))
+    }
+
     private func makeWeightContext(
         _ points: [(dayOffset: Int, weight: Double)]
     ) throws -> MetricsInterpolationService.WeightInterpolationContext {
@@ -225,7 +314,13 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         return try XCTUnwrap(MetricsInterpolationService.shared.makeWeightInterpolationContext(for: metrics))
     }
 
-    private func makeMetric(date: Date, weight: Double, bodyFatPercentage: Double? = nil) -> BodyMetrics {
+    private func makeMetric(
+        date: Date,
+        weight: Double,
+        bodyFatPercentage: Double? = nil,
+        bodyFatMethod: String? = nil,
+        dataSource: String = "manual"
+    ) -> BodyMetrics {
         BodyMetrics(
             id: UUID().uuidString,
             userId: "body-comp-golden-tests",
@@ -233,12 +328,12 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
             weight: weight,
             weightUnit: "kg",
             bodyFatPercentage: bodyFatPercentage,
-            bodyFatMethod: nil,
+            bodyFatMethod: bodyFatMethod,
             muscleMass: nil,
             boneMass: nil,
             notes: nil,
             photoUrl: nil,
-            dataSource: "manual",
+            dataSource: dataSource,
             createdAt: date,
             updatedAt: date
         )

@@ -18,7 +18,20 @@ import type {
 } from '@/lib/ports/chat-model';
 import type { BodyMetricsPort, ProductBodyMetric } from '@/lib/ports/body-metrics';
 import type { ProductUserRecord, UserDirectoryPort } from '@/lib/ports/user-directory';
+import type { ControllerReceipt } from '@/lib/training/controller';
 import type { NextWorkoutResult } from '@/lib/training/service';
+
+const holdDecision: ControllerReceipt = {
+  decision: { kind: 'hold', optionalBurdenReduction: false },
+  actor: 'controller',
+  rationale: 'Trajectory matches plan.',
+  signalFreshness: { training: 'fresh', recovery: 'fresh', trajectory: 'missing' },
+  evidenceIds: ['k:81c218db'],
+  before: 'plan',
+  after: 'Plan unchanged.',
+  reviewPoint: 'Next scheduled session',
+  nextAction: 'On track.',
+};
 
 const now = '2026-08-02T22:00:00.000Z';
 const conversationId = '11111111-1111-4111-8111-111111111111';
@@ -50,7 +63,23 @@ class MemoryConversationStore implements ChatConversationPort {
 
   async getLatest(subject: string) {
     const values = [...this.conversations.values()].filter(({ owner }) => owner === subject);
-    return values.at(-1)?.conversation ?? null;
+    const conversation = values.at(-1)?.conversation;
+    if (!conversation) return null;
+    return {
+      ...conversation,
+      messages: conversation.messages.map((message) => {
+        const turn = this.turns.get(`${conversation.id}:${message.clientMessageId}`);
+        return message.role === 'user' && turn && turn.owner === subject
+          ? {
+              ...message,
+              turn: {
+                status: turn.status,
+                retryable: turn.status === 'failed' || turn.status === 'cancelled',
+              },
+            }
+          : message;
+      }),
+    };
   }
 
   async beginTurn(input: BeginChatTurnInput) {
@@ -338,6 +367,7 @@ describe('/api/auth/mobile/chat/v1', () => {
       week: 1,
       weekCount: 2,
       weeklyFractionalVolume: { chest: 4 },
+      decision: holdDecision,
       session: {
         id: conversationId,
         week: 1,
@@ -389,6 +419,7 @@ describe('/api/auth/mobile/chat/v1', () => {
       week: 1,
       weekCount: 4,
       weeklyFractionalVolume: { chest: 4 },
+      decision: holdDecision,
       session: {
         id: conversationId,
         week: 1,
@@ -459,6 +490,7 @@ describe('/api/auth/mobile/chat/v1', () => {
       week: 1,
       weekCount: 4,
       weeklyFractionalVolume: { chest: 4 },
+      decision: holdDecision,
       session: {
         id: conversationId,
         week: 1,
@@ -716,12 +748,27 @@ describe('/api/auth/mobile/chat/v1', () => {
     expect(await failed.text()).toContain('event: error');
     expect([...store.turns.values()][0]?.status).toBe('failed');
 
+    const reloaded = await (await handlers.GET(request('GET', 'user-a'))).json();
+    expect(reloaded.conversation.messages).toEqual([
+      expect.objectContaining({
+        clientMessageId,
+        content: chatBody().message,
+        turn: { status: 'failed', retryable: true },
+      }),
+    ]);
+    expect(reloaded.conversation.id).toBe(conversationId);
+
     model.shouldFail = false;
     const retried = await handlers.POST(request('POST', 'user-a', chatBody()));
     expect(await retried.text()).toContain('event: done');
     const conversation = await store.getLatest('user-a');
     expect(conversation?.messages.filter(({ role }) => role === 'user')).toHaveLength(1);
     expect(conversation?.messages.filter(({ role }) => role === 'assistant')).toHaveLength(1);
+    const completedHistory = await (await handlers.GET(request('GET', 'user-a'))).json();
+    expect(completedHistory.conversation.messages[0].turn).toEqual({
+      status: 'completed',
+      retryable: false,
+    });
   });
 
   it('delivers a terminal stream error even when failure persistence is unavailable', async () => {
