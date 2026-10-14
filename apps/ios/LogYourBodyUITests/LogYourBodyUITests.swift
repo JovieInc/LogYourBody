@@ -2288,6 +2288,43 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 5))
     }
 
+    func testProgressShareKeepsSelectedMetricAndVisibleValue() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+        let progress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 30))
+        progress.tap()
+        let value = app.staticTexts["home_v2_progress_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", "—"), object: value)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+        var sharedMetrics = Set<String>()
+        for (identifier, title) in [("steps", "Steps"), ("weight", "Weight"), ("body_fat", "Body fat"), ("ffmi", "FFMI")] {
+            app.buttons["home_v2_progress_tab_\(identifier)"].tap()
+            let expectedValue = value.label
+            let share = app.buttons["home_v2_progress_share"]
+            if ["—", "–"].contains(expectedValue) {
+                XCTAssertFalse(share.exists, "Missing data must not become Body Score")
+                continue
+            }
+            XCTAssertTrue(share.waitForExistence(timeout: 5))
+            share.tap()
+            let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
+            XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.staticTexts["Share \(title)"].exists)
+            XCTAssertEqual(app.staticTexts["body_score_share_score"].label, expectedValue)
+            XCTAssertFalse(app.staticTexts["Share Body Score"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["body_score_share_photo_visual"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["body_score_share_avatar_visual"].exists)
+            XCTAssertTrue(app.buttons["body_score_share_system_button"].exists)
+            attachScreenshot(named: "contextual-share-\(identifier)", from: app)
+            app.buttons["body_score_share_close_button"].tap()
+            XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))
+            sharedMetrics.insert(identifier)
+        }
+        XCTAssertTrue(Set(["steps", "weight"]).isSubset(of: sharedMetrics), "Fixture must exercise Steps and Weight")
+    }
+
     func testHomeV2ProgressIsOneMetricWorkspace() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])

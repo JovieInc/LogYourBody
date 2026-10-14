@@ -155,8 +155,10 @@ struct HomeV2ProgressView: View {
     let formatValue: (HomeV2ProgressMetric, Double) -> String
     let onLogWeight: () -> Void
     var now = Date()
+    var isShareContextVisible = true
 
     @State private var showsInsight = false
+    @State private var showsMetricShare = false
 
     var body: some View {
         let current = series(metric)
@@ -200,6 +202,32 @@ struct HomeV2ProgressView: View {
         }
         .background(HomeV2Tokens.Colors.canvas.ignoresSafeArea())
         .onChange(of: metric) { _, _ in showsInsight = false }
+        .modifier(ContextualMetricShareModifier(
+            payload: contextualSharePayload, isVisible: isShareContextVisible, directRequest: $showsMetricShare
+        ))
+    }
+
+    private var contextualSharePayload: BodyScoreSharePayload? {
+        let snapshots = HomeV2ProgressMetric.allCases.compactMap { candidate -> ContextualMetricSnapshot? in
+            let data = series(candidate)
+            let points = HomeV2TrendPolicy.points(data.daily, in: range, now: now)
+            let stats = HomeV2ProgressPolicy.stats(points: points, prefersHigh: candidate.prefersHigh)
+            guard let latest = stats.latest, let observed = points.max(by: { $0.date < $1.date }),
+                  let kind = ContextualMetricKind(rawValue: candidate.rawValue) else { return nil }
+            let trend = candidate == .steps
+                ? HomeV2ProgressCopy.stepsAverageSentence(average: stats.average, range: range)
+                : HomeV2ProgressCopy.deltaSentence(delta: stats.delta, unit: data.deltaUnit, range: range)
+            return ContextualMetricSnapshot(
+                kind: kind, value: formatValue(candidate, latest), unit: candidate == .steps ? "steps" : data.unit,
+                observation: observed.date.formatted(date: .abbreviated, time: .omitted),
+                range: range.accessibilityLabel,
+                trend: HomeV2TrendPolicy.hasEnoughData(points) ? trend : nil,
+                provenance: data.sourceLine,
+                evidence: ContextualMetricEvidencePolicy.label(for: kind, isEstimated: observed.isEstimated)
+            )
+        }
+        guard let kind = ContextualMetricKind(rawValue: metric.rawValue) else { return nil }
+        return .contextual(snapshots, selected: kind)
     }
 
     private var switcher: some View {
@@ -268,6 +296,16 @@ struct HomeV2ProgressView: View {
                         .scaledSystemFont(size: HomeV2Tokens.TypeSize.lead, relativeTo: .title3)
                         .foregroundStyle(HomeV2Tokens.Colors.muted)
                 }
+            }
+
+            if contextualSharePayload != nil {
+                Button { showsMetricShare = true } label: {
+                    Label("Share \(metric.title)", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.plain)
+                .font(.subheadline)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
+                .accessibilityIdentifier("home_v2_progress_share")
             }
 
             Text(deltaText(current, stats: stats, hasEnoughData: hasEnoughData))

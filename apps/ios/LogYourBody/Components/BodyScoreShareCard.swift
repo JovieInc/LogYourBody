@@ -4,6 +4,11 @@ import UIKit
 /// Controls precisely which personal details leave the app in a rendered card.
 /// The private default keeps the card to the Body Score until the person opts in.
 struct BodyScoreShareOptions: Equatable {
+    var selectedMetric: ContextualMetricKind?
+    var includeObservation = true
+    var includeRange = true
+    var includeTrend = true
+    var includeProvenance = false
     var includeWeight = false
     var includeBodyFat = false
     var includeFFMI = false
@@ -17,10 +22,11 @@ struct BodyScoreShareOptions: Equatable {
     )
 
     var hasMetrics: Bool {
-        includeWeight || includeBodyFat || includeFFMI
+        selectedMetric == nil && (includeWeight || includeBodyFat || includeFFMI)
     }
 
     var includedSummary: String {
+        if let selectedMetric { return selectedMetric.title }
         var items = ["Body Score"]
         if includeWeight { items.append("weight") }
         if includeBodyFat { items.append("body fat") }
@@ -44,6 +50,8 @@ struct BodyScoreSharePayload {
     let bodyFatPercentage: Double?
     let gender: String?
     let photoImage: UIImage?
+    var contextualMetrics: [ContextualMetricSnapshot] = []
+    var preferredMetric: ContextualMetricKind?
 
     var avatarMatch: AvatarBodyFatCatalog.Match {
         AvatarBodyFatCatalog.match(bodyFatPercentage: bodyFatPercentage, gender: gender)
@@ -149,7 +157,7 @@ struct BodyScoreShareCardView: View {
         .clipped()
         .dynamicTypeSize(.medium)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Body Score share card. Includes \(options.includedSummary).")
+        .accessibilityLabel("Share card. Includes \(options.includedSummary).")
         .accessibilityIdentifier("body_score_share_card")
     }
 
@@ -221,7 +229,7 @@ struct BodyScoreShareCardView: View {
     private func shareSummary(layout: ShareCardLayout) -> some View {
         VStack(alignment: .leading, spacing: layout.summarySpacing) {
             HStack(alignment: .lastTextBaseline, spacing: layout.scoreSpacing) {
-                Text(payload.scoreText)
+                Text(payload.snapshot(for: options)?.value ?? payload.scoreText)
                     .font(.system(size: layout.scoreFontSize, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundColor(.white)
@@ -231,7 +239,7 @@ struct BodyScoreShareCardView: View {
                     .accessibilityIdentifier("body_score_share_score")
 
                 VStack(alignment: .leading, spacing: layout.scoreLabelSpacing) {
-                    Text("Body Score")
+                    Text(options.selectedMetric?.title ?? "Body Score")
                         .font(.system(size: layout.scoreLabelFontSize, weight: .bold))
                         .foregroundColor(Color.white.opacity(0.66))
                         .textCase(.uppercase)
@@ -239,7 +247,7 @@ struct BodyScoreShareCardView: View {
                         .allowsTightening(true)
                         .minimumScaleFactor(0.7)
 
-                    Text(payload.tagline)
+                    Text(payload.snapshot(for: options)?.unit ?? payload.tagline)
                         .font(.system(size: layout.taglineFontSize, weight: .semibold, design: .rounded))
                         .foregroundColor(Color.white.opacity(0.9))
                         .lineLimit(2)
@@ -247,11 +255,11 @@ struct BodyScoreShareCardView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("body_score_share_tagline")
 
-                    if let deltaText = payload.deltaText {
+                    if let deltaText = payload.snapshot(for: options).map({ $0.detail(options: options) }) ?? payload.deltaText {
                         Text(deltaText)
                             .font(.system(size: layout.deltaFontSize, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.66))
-                            .lineLimit(1)
+                            .lineLimit(options.selectedMetric == nil ? 1 : 4)
                             .allowsTightening(true)
                             .minimumScaleFactor(0.72)
                             .accessibilityIdentifier("body_score_share_delta")
@@ -514,6 +522,7 @@ struct BodyScoreShareSheet: View {
     @State private var areContentControlsExpanded = false
     @State private var renderedImage: UIImage?
     @State private var isRendering = false
+    @State private var exportFailure: String?
     @State private var showSystemShareSheet = false
     @State private var dragOffsetY: CGFloat = 0
 
@@ -523,6 +532,7 @@ struct BodyScoreShareSheet: View {
     init(payload: BodyScoreSharePayload, onClose: (() -> Void)? = nil) {
         self.payload = payload
         self.onClose = onClose
+        _shareOptions = State(initialValue: BodyScoreShareOptions(selectedMetric: payload.preferredMetric))
         _selectedAspect = State(initialValue: BodyScoreShareAspect.preferredExportAspect(for: payload.photoImage))
     }
 
@@ -563,6 +573,15 @@ struct BodyScoreShareSheet: View {
                     .ignoresSafeArea()
             }
         }
+        .alert("Unable to export card", isPresented: Binding(
+            get: { exportFailure != nil },
+            set: { if !$0 { exportFailure = nil } }
+        )) {
+            Button("OK", role: .cancel) { exportFailure = nil }
+        } message: {
+            Text(exportFailure ?? "Try again.")
+        }
+        .onChange(of: payload.contextualMetrics) { _, _ in renderedImage = nil }
         .onChange(of: selectedAspect) { _, _ in
             renderedImage = nil
         }
@@ -669,7 +688,7 @@ struct BodyScoreShareSheet: View {
 
             Spacer()
 
-            Text("Share Body Score")
+            Text("Share \(shareOptions.selectedMetric?.title ?? "Body Score")")
                 .font(theme.typography.headlineSmall)
                 .foregroundColor(theme.colors.text)
                 .lineLimit(1)
@@ -698,6 +717,16 @@ struct BodyScoreShareSheet: View {
             .padding(.horizontal, JovieTokens.screenInset)
             .accessibilityLabel("Card format")
 
+            if !payload.contextualMetrics.isEmpty {
+                Picker("Metric", selection: $shareOptions.selectedMetric) {
+                    if payload.score > 0 { Text("Body Score").tag(Optional<ContextualMetricKind>.none) }
+                    ForEach(payload.contextualMetrics) { snapshot in
+                        Text(snapshot.kind.title).tag(Optional(snapshot.kind))
+                    }
+                }
+                .accessibilityIdentifier("contextual_share_metric_picker")
+            }
+
             contentControls
 
             cardPreview(height: previewHeight)
@@ -712,10 +741,17 @@ struct BodyScoreShareSheet: View {
     private var contentControls: some View {
         DisclosureGroup(isExpanded: $areContentControlsExpanded) {
             VStack(spacing: 0) {
+                if shareOptions.selectedMetric != nil {
+                    Toggle("Date", isOn: $shareOptions.includeObservation)
+                    Toggle("Range", isOn: $shareOptions.includeRange)
+                    Toggle("Trend", isOn: $shareOptions.includeTrend)
+                    Toggle("Source", isOn: $shareOptions.includeProvenance)
+                } else {
                 Toggle("Weight", isOn: $shareOptions.includeWeight)
                 Toggle("Body fat", isOn: $shareOptions.includeBodyFat)
                 Toggle("FFMI", isOn: $shareOptions.includeFFMI)
                 Toggle(payload.photoImage == nil ? "Body visual" : "Progress photo", isOn: $shareOptions.includeVisual)
+                }
             }
             .font(theme.typography.bodyMedium)
             .tint(theme.colors.info)
@@ -820,7 +856,10 @@ struct BodyScoreShareSheet: View {
         if renderedImage == nil {
             renderImage()
         }
-        guard renderedImage != nil else { return }
+        guard renderedImage != nil else {
+            exportFailure = "The card could not be rendered. Try again."
+            return
+        }
         showSystemShareSheet = true
     }
 
@@ -829,8 +868,13 @@ struct BodyScoreShareSheet: View {
         if renderedImage == nil {
             renderImage()
         }
-        guard let image = renderedImage else { return }
+        guard let image = renderedImage else {
+            exportFailure = "The card could not be rendered. Try again."
+            return
+        }
 
-        _ = await LivePhotoLibraryAdapter.shared.saveImage(image)
+        if !(await LivePhotoLibraryAdapter.shared.saveImage(image)) {
+            exportFailure = "Photos access is unavailable. Allow access in Settings or use Share to export the card."
+        }
     }
 }

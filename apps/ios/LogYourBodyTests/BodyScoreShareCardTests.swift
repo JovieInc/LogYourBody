@@ -9,6 +9,7 @@ import HealthKit
 import RevenueCat
 import SwiftUI
 import UIKit
+import Vision
 @testable import LogYourBody
 
 
@@ -283,6 +284,172 @@ final class BodyScoreShareCardTests: XCTestCase {
             XCTAssertEqual(image.size.width, size.width, accuracy: 0.5)
             XCTAssertEqual(image.size.height, size.height, accuracy: 0.5)
         }
+    }
+
+    func testContextualRoutesNeverSubstituteBodyScore() throws {
+        for kind in ContextualMetricKind.allCases {
+            let snapshot = contextualSnapshot(kind: kind)
+            let payload = try XCTUnwrap(BodyScoreSharePayload.contextual([snapshot], selected: kind))
+            let options = BodyScoreShareOptions(selectedMetric: payload.preferredMetric)
+            XCTAssertEqual(payload.snapshot(for: options), snapshot)
+            XCTAssertEqual(options.includedSummary, kind.title)
+            XCTAssertFalse(options.hasMetrics)
+            XCTAssertFalse(options.includeVisual)
+            XCTAssertNil(payload.photoImage)
+            XCTAssertEqual(payload.score, 0)
+        }
+        XCTAssertNil(ContextualMetricKind.from(title: "GLP-1 Dose"))
+        XCTAssertNil(BodyScoreSharePayload.contextual([contextualSnapshot(kind: .weight)], selected: .steps))
+    }
+
+    func testUnavailableMetricHasNoMisleadingShareFallback() {
+        for missing in ["", "—", "–", "  "] {
+            let snapshot = ContextualMetricSnapshot(
+                kind: .steps, value: missing, unit: "steps", observation: "", range: "30 days",
+                trend: nil, provenance: nil
+            )
+            XCTAssertNil(BodyScoreSharePayload.contextual([snapshot], selected: .steps))
+        }
+    }
+
+    func testContextPrivacyDoesNotExportOtherMeasurementsOrHiddenMetadata() throws {
+        let steps = contextualSnapshot(kind: .steps)
+        let weight = contextualSnapshot(kind: .weight)
+        let payload = try XCTUnwrap(BodyScoreSharePayload.contextual([steps, weight], selected: .steps))
+        var options = BodyScoreShareOptions(selectedMetric: .steps)
+        options.includeWeight = true
+        XCTAssertFalse(options.hasMetrics)
+        XCTAssertEqual(payload.snapshot(for: options)?.value, "7,544")
+        XCTAssertFalse(steps.detail(options: options).contains("Apple Health"))
+        options.includeObservation = false
+        options.includeRange = false
+        options.includeTrend = false
+        XCTAssertEqual(steps.detail(options: options), "")
+        options.includeProvenance = true
+        XCTAssertEqual(steps.detail(options: options), "Apple Health")
+        options.selectedMetric = .weight
+        XCTAssertEqual(payload.snapshot(for: options), weight)
+    }
+
+    func testHistoricalSourceIsBoundToExactObservationAndPrivacy() {
+        let date = Date(timeIntervalSince1970: 1_000)
+        let point = MetricChartDataPoint(date: date, value: 75)
+        let entry = MetricHistoryEntry(id: "historical", date: date, primaryValue: 75, secondaryValue: nil, source: .healthKit)
+        let source = ContextualMetricSourcePolicy.source(for: point, entries: [entry], fallback: "Latest scale")
+        XCTAssertEqual(source, "Apple Health")
+        let snapshot = ContextualMetricSnapshot(
+            kind: .weight, value: "75", unit: "kg", observation: "Jan 1",
+            range: "All time", trend: nil, provenance: source)
+        var options = BodyScoreShareOptions(selectedMetric: .weight)
+        XCTAssertFalse(snapshot.detail(options: options).contains("Apple Health"))
+        options.includeProvenance = true
+        XCTAssertTrue(snapshot.detail(options: options).contains("Apple Health"))
+        let unknown = MetricChartDataPoint(date: date.addingTimeInterval(1), value: 75)
+        XCTAssertNil(ContextualMetricSourcePolicy.source(for: unknown, entries: [entry], fallback: "Latest scale"))
+        let estimate = MetricChartDataPoint(date: date, value: 75, isEstimated: true)
+        XCTAssertEqual(
+            ContextualMetricSourcePolicy.source(for: estimate, entries: [entry], fallback: nil), "Apple Health"
+        )
+        var estimated = snapshot
+        estimated.evidence = "Estimated"
+        options.includeProvenance = false
+        XCTAssertTrue(estimated.detail(options: options).contains("Estimated"))
+        XCTAssertFalse(estimated.detail(options: options).contains("Apple Health"))
+    }
+
+    func testScreenshotOfferRequiresActiveVisibleUnpresentedScreen() {
+        XCTAssertTrue(ContextualMetricSharePolicy.canOfferScreenshot(isActive: true, isVisible: true, isPresenting: false))
+        XCTAssertFalse(ContextualMetricSharePolicy.canOfferScreenshot(isActive: false, isVisible: true, isPresenting: false))
+        XCTAssertFalse(ContextualMetricSharePolicy.canOfferScreenshot(isActive: true, isVisible: false, isPresenting: false))
+        XCTAssertFalse(ContextualMetricSharePolicy.canOfferScreenshot(isActive: true, isVisible: true, isPresenting: true))
+    }
+
+    func testContextualPNGExportRetainsEveryAspectAndVisibleSelection() throws {
+        for kind in [ContextualMetricKind.steps, .weight, .bodyFat, .ffmi] {
+            let payload = try XCTUnwrap(BodyScoreSharePayload.contextual([contextualSnapshot(kind: kind)], selected: kind))
+            let options = BodyScoreShareOptions(selectedMetric: kind)
+            for aspect in BodyScoreShareAspect.allCases {
+                let size = aspect.pixelSize
+                let renderer = ImageRenderer(content: BodyScoreShareCardView(payload: payload, aspect: aspect, options: options)
+                    .frame(width: size.width, height: size.height).environment(\.colorScheme, .dark))
+                renderer.scale = 1
+                let image = try XCTUnwrap(renderer.uiImage)
+                let png = try XCTUnwrap(image.pngData())
+                let decoded = try XCTUnwrap(UIImage(data: png))
+                XCTAssertEqual(decoded.size, size)
+                XCTAssertGreaterThan(png.count, 1_000)
+                let text = try recognizedShareText(decoded)
+                let expected = contextualSnapshot(kind: kind).value.filter(\.isNumber)
+                XCTAssertTrue(text.filter(\.isNumber).contains(expected), "Export must contain selected value for \(kind)")
+                XCTAssertFalse(text.lowercased().contains("body score"))
+            }
+        }
+    }
+
+    func testEvidenceMeaningCannotBeHiddenBySourcePrivacy() {
+        XCTAssertEqual(ContextualMetricEvidencePolicy.label(for: .ffmi), "Derived estimate")
+        XCTAssertEqual(ContextualMetricEvidencePolicy.label(for: .bodyScore), "Derived estimate")
+        XCTAssertEqual(ContextualMetricEvidencePolicy.label(for: .bodyFat, bodyFatMethod: "visual_estimate"), "Estimated")
+        XCTAssertNil(ContextualMetricEvidencePolicy.label(for: .bodyFat, bodyFatMethod: "dexa"))
+        XCTAssertEqual(ContextualMetricEvidencePolicy.label(for: .weight, isSmoothed: true), "Smoothed")
+        var snapshot = contextualSnapshot(kind: .ffmi)
+        snapshot.evidence = ContextualMetricEvidencePolicy.label(for: .ffmi)
+        var options = BodyScoreShareOptions(selectedMetric: .ffmi)
+        options.includeObservation = false
+        options.includeRange = false
+        options.includeTrend = false
+        options.includeProvenance = false
+        XCTAssertEqual(snapshot.detail(options: options), "Derived estimate")
+    }
+
+    func testStepsObservationKeepsSampleDayWhenSyncUpdatesLater() {
+        let observed = Date(timeIntervalSince1970: 1_000)
+        let synced = observed.addingTimeInterval(86_400 * 10)
+        let daily = DailyMetrics(
+            id: "day", userId: "synthetic", date: observed, steps: 7_544,
+            notes: nil, createdAt: observed, updatedAt: synced)
+        let snapshot = ContextualMetricSnapshot.steps(daily, value: "7,544", range: "30 days")
+        XCTAssertEqual(snapshot.observation, observed.formatted(date: .abbreviated, time: .omitted))
+        XCTAssertNotEqual(snapshot.observation, synced.formatted(date: .abbreviated, time: .omitted))
+    }
+
+    func testRenderedStepsRedactsUnselectedWeightAndMetadata() throws {
+        let selected = contextualSnapshot(kind: .steps)
+        let privateWeight = ContextualMetricSnapshot(
+            kind: .weight, value: "991.7", unit: "kg",
+            observation: "PRIVATE RECORD", range: "All history", trend: nil, provenance: "PRIVATE SOURCE")
+        let payload = try XCTUnwrap(BodyScoreSharePayload.contextual([selected, privateWeight], selected: .steps))
+        var options = BodyScoreShareOptions(selectedMetric: .steps)
+        options.includeWeight = true
+        options.includeObservation = false
+        options.includeRange = false
+        options.includeTrend = false
+        let size = BodyScoreShareAspect.portrait.pixelSize
+        let renderer = ImageRenderer(content: BodyScoreShareCardView(payload: payload, aspect: .portrait, options: options)
+            .frame(width: size.width, height: size.height).environment(\.colorScheme, .dark))
+        renderer.scale = 1
+        let text = try recognizedShareText(XCTUnwrap(renderer.uiImage))
+        XCTAssertFalse(text.contains("PRIVATE"))
+        XCTAssertFalse(text.filter(\.isNumber).contains("9917"))
+        XCTAssertFalse(text.contains("Apple Health"))
+        XCTAssertTrue(text.filter(\.isNumber).contains("7544"))
+    }
+
+    private func recognizedShareText(_ image: UIImage) throws -> String {
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US"]
+        request.usesLanguageCorrection = false
+        try VNImageRequestHandler(cgImage: XCTUnwrap(image.cgImage), options: [:]).perform([request])
+        return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+    }
+
+    private func contextualSnapshot(kind: ContextualMetricKind) -> ContextualMetricSnapshot {
+        ContextualMetricSnapshot(
+            kind: kind, value: kind == .steps ? "7,544" : "83.2", unit: kind == .steps ? "steps" : "kg",
+            observation: "Oct 14, 2026", range: "30 days", trend: "6,210 average",
+            provenance: "Apple Health"
+        )
     }
 
     private func makePayload(

@@ -22,6 +22,7 @@ struct DashboardViewLiquid: View {
 
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.theme) var theme
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @StateObject var viewModel = DashboardViewModel()
@@ -118,6 +119,8 @@ struct DashboardViewLiquid: View {
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
     @State var bodyScoreSharePayload: BodyScoreSharePayload?
+    @State private var screenshotShareSnapshots: [ContextualMetricSnapshot] = []
+    @State private var showsScreenshotShareChoice = false
     @State var bodyScoreSharePresentationID: UUID?
     @State private var hasPerformedInitialRefresh = false
     @State var featureGateRefreshToken = UUID()
@@ -337,14 +340,23 @@ struct DashboardViewLiquid: View {
                 photoTimelineStatsDestination
             }
             .onScreenshot {
-                guard selectedTab == .home else { return }
-                guard !isMetricDetailActive else { return }
-                guard let payload = makeBodyScoreSharePayload() else { return }
-                let presentationID = UUID()
-                DispatchQueue.main.async {
-                    bodyScoreSharePresentationID = presentationID
-                    bodyScoreSharePayload = payload
+                guard scenePhase == .active, selectedTab == .home,
+                      selectedPhotoTimelineRootPage == .timeline,
+                      !isMetricDetailActive, !isStatsDestinationActive,
+                      isMetricShareContextVisible, !showsScreenshotShareChoice else { return }
+                screenshotShareSnapshots = dashboardMetricShareSnapshots
+                showsScreenshotShareChoice = !screenshotShareSnapshots.isEmpty
+            }
+            .confirmationDialog("Choose a metric to share", isPresented: $showsScreenshotShareChoice, titleVisibility: .visible) {
+                ForEach(screenshotShareSnapshots) { snapshot in
+                    Button(snapshot.kind.title) {
+                        bodyScoreSharePresentationID = UUID()
+                        bodyScoreSharePayload = .contextual(screenshotShareSnapshots, selected: snapshot.kind)
+                    }
                 }
+                Button("Not now", role: .cancel) { screenshotShareSnapshots = [] }
+            } message: {
+                Text("Your screenshot stays unchanged. Only the metric you choose is included.")
             }
             .onChange(of: showAddEntrySheet) { _, isPresented in
                 guard !isPresented else { return }

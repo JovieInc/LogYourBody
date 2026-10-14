@@ -320,6 +320,8 @@ struct FullMetricChartView: View {
     let currentValue: String
     let unit: String
     let currentDate: String
+    let shareSnapshots: [ContextualMetricSnapshot]
+    let isShareContextVisible: Bool
     let chartData: [MetricChartDataPoint]
     /// Optional canonical trend series. Raw data remains the source for the
     /// Raw mode while the default Smoothed mode can use the same series as the
@@ -347,6 +349,8 @@ struct FullMetricChartView: View {
     @State var historyEntryPendingDeletion: MetricHistoryEntry?
     @State var showingHistoryDeleteConfirmation = false
 
+    @State var showsMetricShare = false
+
     @ScaledMetric(relativeTo: .largeTitle) var headlineValueFontSize: CGFloat = 56
 
     var chartHeight: CGFloat {
@@ -368,6 +372,8 @@ struct FullMetricChartView: View {
         goalValue: Double?,
         selectedTimeRange: Binding<TimeRange>,
         selectedTimelineDate: Binding<Date?> = .constant(nil),
+        shareSnapshots: [ContextualMetricSnapshot] = [],
+        isShareContextVisible: Bool = true,
         initialChartMode: ChartMode = .trend
     ) {
         self.title = title
@@ -376,6 +382,8 @@ struct FullMetricChartView: View {
         self.currentValue = currentValue
         self.unit = unit
         self.currentDate = currentDate
+        self.shareSnapshots = shareSnapshots
+        self.isShareContextVisible = isShareContextVisible
         self.chartData = chartData
         self.trendChartData = trendChartData
         self.onAdd = onAdd

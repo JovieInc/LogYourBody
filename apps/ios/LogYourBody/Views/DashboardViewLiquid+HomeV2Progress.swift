@@ -12,7 +12,8 @@ extension DashboardViewLiquid {
             range: $selectedRange,
             series: { homeV2ProgressSeries(for: $0) },
             formatValue: { homeV2ProgressValueText($0, $1) },
-            onLogWeight: { presentHomeV2LogSheet() }
+            onLogWeight: { presentHomeV2LogSheet() },
+            isShareContextVisible: isMetricShareContextVisible && !isMetricDetailActive && !isStatsDestinationActive
         )
     }
 

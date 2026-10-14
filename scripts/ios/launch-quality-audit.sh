@@ -312,6 +312,7 @@ assert_xcresult_evidence \
 # overran the 40-minute step with every test passing. Same tests, same exact
 # evidence checks, one runner launch.
 LAUNCH_QUALITY_UI_TESTS=(
+  "LogYourBodyUITests/testProgressShareKeepsSelectedMetricAndVisibleValue"
   "LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"

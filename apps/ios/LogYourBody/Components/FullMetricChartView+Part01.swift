@@ -25,10 +25,22 @@ var body: some View {
         }
         .accessibilityIdentifier("metric_detail_screen")
         .worldClassScreen(.metricDetail)
+        .modifier(ContextualMetricShareModifier(
+            payload: contextualSharePayload,
+            isVisible: isShareContextVisible && !showingHistoryDeleteConfirmation,
+            directRequest: $showsMetricShare
+        ))
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(false)
         .toolbar {
+            if contextualSharePayload != nil {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showsMetricShare = true } label: { Image(systemName: "square.and.arrow.up") }
+                        .accessibilityLabel("Share \(title)")
+                        .accessibilityIdentifier("metric_detail_share_button")
+                }
+            }
             if let onAdd {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -74,6 +86,25 @@ var body: some View {
         } message: { _ in
             Text("This will remove the entry and update your history.")
         }
+    }
+
+var contextualSharePayload: BodyScoreSharePayload? {
+        guard let kind = ContextualMetricKind.from(title: title) else { return nil }
+        let selected = ContextualMetricSnapshot(
+            kind: kind, value: headlineValueText, unit: unit,
+            observation: headlineDateText, range: selectedTimeRange.accessibilityLabel,
+            trend: chartMode == .trend ? "Smoothed" : nil,
+            provenance: ContextualMetricSourcePolicy.source(
+                for: activePoint, entries: metricEntries?.entries ?? [],
+                fallback: shareSnapshots.first { $0.kind == kind }?.provenance
+            ),
+            evidence: activePoint.map {
+                ContextualMetricEvidencePolicy.label(
+                    for: kind, isEstimated: $0.isEstimated,
+                    isSmoothed: chartMode == .trend && kind == .weight)
+            } ?? shareSnapshots.first { $0.kind == kind }?.evidence
+        )
+        return .contextual(shareSnapshots.filter { $0.kind != kind } + [selected], selected: kind)
     }
 
 var headlineBlock: some View {
