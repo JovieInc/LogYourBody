@@ -1560,10 +1560,12 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 5), "Critical chat prompt must be available")
         XCTAssertTrue(prompt.isHittable, "Critical chat prompt must be tappable")
         prompt.tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8),
-            "Critical chat prompt must open the chat root"
-        )
+        let openedChatRoot = app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8)
+        // Diagnostic only: the app's send/load trail if the tap did not open chat.
+        let sendProbe = openedChatRoot
+            ? ""
+            : String(describing: app.descendants(matching: .any)["home_chat_composer_dock"].value ?? "unavailable")
+        XCTAssertTrue(openedChatRoot, "Critical chat prompt must open the chat root (send probe: \(sendProbe))")
         attachScreenshot(named: "launch-quality-chat-tab", from: app)
         collapseHomeChat(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
@@ -2682,6 +2684,42 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-ask", from: app)
     }
 
+    func testDailyReminderIsOfferedAfterTheFirstLoggedWeighInNotBeforeToday() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestDailyReminderPromptFixture"
+        ])
+
+        // Home's dock appears once the fixture has seeded.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 45),
+            "A new subscriber lands on Today"
+        )
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].exists, "No reminder ask before Today")
+
+        logWeight.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 10),
+            "The first logged weigh-in is when a reminder has a job"
+        )
+        attachScreenshot(named: "daily-reminder-after-first-weigh-in", from: app)
+        let notNow = app.buttons["daily_reminder_skip_button"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 3))
+        notNow.tap()
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].waitForExistence(timeout: 5))
+    }
+
     func testHomeV2AskOpensFromProgressAndReturnsToProgress() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
@@ -2724,24 +2762,18 @@ final class LogYourBodyUITests: XCTestCase {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 30),
-            "Without a photo the Home is metric first"
-        )
+        let card = app.descendants(matching: .any)["home_v2_editorial_card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 30), "Without a photo, saved data fills the same editorial card")
+        let bodyFat = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
+        XCTAssertTrue(bodyFat.exists)
+        XCTAssertTrue(bodyFat.label.contains("15.8 percent"))
         let value = app.descendants(matching: .any)["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
-
-        let chart = app.descendants(matching: .any)["home_v2_trend_chart"]
-        XCTAssertTrue(chart.waitForExistence(timeout: 5), "Metric-first Home keeps the trend chart geometry even before 7 days")
-        XCTAssertGreaterThanOrEqual(chart.frame.minY, value.frame.maxY - 1, "The chart sits below the number")
-        XCTAssertTrue(
-            chart.label.contains("7 days") || chart.label.contains("7-day average"),
-            "The chart says whether it is a trend or still waiting for 7 days"
-        )
-        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Home keeps a fixed 30-day window; ranges live in Progress")
+        XCTAssertGreaterThanOrEqual(value.frame.minY, card.frame.maxY - 1, "Supporting weight sits below the card")
+        XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Date ranges live in Progress")
         let viewProgress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 5), "Progress is one disclosure away")
-        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, chart.frame.maxY - 1)
+        XCTAssertGreaterThanOrEqual(viewProgress.frame.minY, value.frame.maxY - 1)
 
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 5), "One check-in action")

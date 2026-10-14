@@ -113,6 +113,68 @@ is_simulator_infra_failure() {
     "$log_file"
 }
 
+# Diagnostic only (never fails the audit): every hosted test invocation spends
+# 6-10 min launching the test runner before its first test. Record what the
+# simulator and host are doing in that window so the dominant phase can be
+# fixed instead of bounded. Writes <label>.launch-probe/ next to the bundle.
+LQ_LAUNCH_PROBE="${LQ_LAUNCH_PROBE:-true}"
+LAUNCH_PROBE_PIDS=()
+
+simulator_udid() {
+  if [[ "$DESTINATION" =~ id=([0-9A-Fa-f-]+) ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+  else
+    xcrun simctl list devices booted 2>/dev/null | sed -nE 's/.*\(([0-9A-F-]{36})\) \(Booted\).*/\1/p' | head -1
+  fi
+}
+
+start_launch_probe() {
+  local label="$1"
+  [[ "$LQ_LAUNCH_PROBE" == "true" ]] || return 0
+  local dir="$ARTIFACT_DIR/$label.launch-probe"
+  local udid
+  mkdir -p "$dir"
+  udid="$(simulator_udid || true)"
+  {
+    echo "probe-start $(date -u +%FT%T)Z udid=${udid:-unknown}"
+    xcrun simctl list devices 2>/dev/null | grep -F "${udid:-none}" || true
+  } > "$dir/timeline.txt" 2>&1
+  # Host load every 10s: which processes own the CPU while the runner launches.
+  (
+    while true; do
+      echo "== $(date -u +%T)Z load=$(sysctl -n vm.loadavg 2>/dev/null)"
+      ps -Ao pcpu=,rss=,comm= -r 2>/dev/null | head -8 || true
+      sleep 10
+    done
+  ) > "$dir/host-top.txt" 2>&1 &
+  LAUNCH_PROBE_PIDS+=("$!")
+  # Simulator-side runner, test host, testmanagerd and launch services events.
+  if [[ -n "$udid" ]]; then
+    xcrun simctl spawn "$udid" log stream --style compact --level info --predicate \
+      'process CONTAINS "LogYourBody" OR process == "testmanagerd" OR process == "SpringBoard" OR process == "installd" OR subsystem == "com.apple.dt.xctest"' \
+      > "$dir/simulator.log" 2>&1 &
+    LAUNCH_PROBE_PIDS+=("$!")
+  fi
+}
+
+stop_launch_probe() {
+  local label="$1"
+  [[ "$LQ_LAUNCH_PROBE" == "true" ]] || return 0
+  local pid
+  for pid in ${LAUNCH_PROBE_PIDS[@]+"${LAUNCH_PROBE_PIDS[@]}"}; do
+    kill "$pid" >/dev/null 2>&1 || true
+    wait "$pid" >/dev/null 2>&1 || true
+  done
+  LAUNCH_PROBE_PIDS=()
+  local dir="$ARTIFACT_DIR/$label.launch-probe"
+  {
+    echo "probe-stop $(date -u +%FT%T)Z"
+    # First test-runner signals in the xcodebuild log, for the launch gap.
+    grep -nE 'Writing result bundle|Running tests\.\.\.|Test Suite .* started|IDETestOperationsObserverDebug' \
+      "$ARTIFACT_DIR/$label.log" 2>/dev/null | head -12 || true
+  } >> "$dir/timeline.txt" 2>&1 || true
+}
+
 run_xcodebuild_test() {
   local label="$1"
   local result_bundle="$2"
@@ -131,6 +193,7 @@ run_xcodebuild_test() {
     fi
 
     echo "Running $label (attempt $attempt)" | tee -a "$log_file"
+    start_launch_probe "$label"
     xcodebuild_command=(
       xcodebuild
       "${COMMON_XCODEBUILD_ARGS[@]}"
@@ -146,6 +209,7 @@ run_xcodebuild_test() {
       "${xcodebuild_command[@]}" 2>&1 | tee -a "$log_file"
     status="${PIPESTATUS[0]}"
     set -e
+    stop_launch_probe "$label"
 
     if [[ "$status" -eq 124 ]]; then
       echo "xcodebuild command timed out after ${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" | tee -a "$log_file"

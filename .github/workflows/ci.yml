@@ -155,7 +155,7 @@ jobs:
 
       - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -216,7 +216,10 @@ jobs:
       contents: read
     uses: ./.github/workflows/ios-quality.yml
     with:
-      mac-first: true
+      # Hosted until the launch-quality capture tests pass on the Macs: four
+      # LaunchQualityGate capture tests failed on every self-hosted run
+      # (2026-10-12, tw-mac-001 and tims-macbook-air) and pass hosted.
+      mac-first: false
       supersede-key: ${{ github.head_ref || '' }}
 
   ci-summary:

@@ -191,6 +191,7 @@ describe('LogYourBody MCP route', () => {
       'get_todays_workout',
       'log_sets',
       'log_session_feedback',
+      'swap_exercise',
       'get_training_progress',
     ]);
     for (const tool of result.tools) {
