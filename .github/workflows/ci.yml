@@ -133,6 +133,13 @@ jobs:
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
 
+      - name: Test agent environment lifecycle with coverage
+        run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-include=scripts/codex-setup.mjs
+          --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=100
+          scripts/codex-setup.test.mjs
+
       - name: Test post-merge Launch Quality
         run: node --test .github/scripts/post-merge-quality.test.mjs
 
