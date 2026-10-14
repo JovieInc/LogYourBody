@@ -43,7 +43,7 @@ struct HomeV2TrendChart: View {
     enum Axis {
         /// Start date on the left, "7-day average" on the right (Home).
         case trend
-        /// Month labels along the plot (Progress).
+        /// Full dates under the plot (Progress and the timeline).
         case months
     }
 
@@ -57,11 +57,19 @@ struct HomeV2TrendChart: View {
     var axis: Axis = .trend
     var metricTitle = "Weight"
     var usesSevenDayAverage = true
+    var anchorsToZero = false
+    var requiresMinimumDays = true
+    var plotIdentifier = "home_v2_trend_chart"
+    /// Progress can scrub a day. The home pager keeps the drag for changing days.
+    var allowsSelection = true
+    var formatValue: (Double) -> String = { String(format: "%.1f", $0) }
     var now = Date()
+
+    @State private var selectedX: Date?
 
     private static let startFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.setLocalizedDateFormatFromTemplate("MMM d")
+        formatter.setLocalizedDateFormatFromTemplate("MMMd")
         return formatter
     }()
 
@@ -69,8 +77,36 @@ struct HomeV2TrendChart: View {
     private var visibleTrend: [MetricChartDataPoint] { HomeV2TrendPolicy.points(trend, in: range, now: now) }
     private var hasEnoughData: Bool { HomeV2TrendPolicy.hasEnoughData(visibleDaily) }
 
+    private var plotted: HomeV2ChartIntegrity.Plot {
+        HomeV2ChartIntegrity.plot(
+            points: usesSevenDayAverage ? visibleTrend : visibleDaily,
+            dotPoints: showsDots ? visibleDaily : [],
+            anchorsToZero: anchorsToZero,
+            keepsCarriedValues: usesSevenDayAverage
+        )
+    }
+
+    private var showsPlot: Bool {
+        if requiresMinimumDays { return hasEnoughData && !plotted.marks.isEmpty }
+        return !plotted.marks.isEmpty
+    }
+
+    private var selectedSample: HomeV2ChartIntegrity.Sample? {
+        guard let selectedX else { return nil }
+        return HomeV2ChartIntegrity.nearest(to: selectedX, in: plotted.marks)
+    }
+
+    private var selectedTooltip: String? {
+        guard let selectedSample else { return nil }
+        return HomeV2ChartIntegrity.tooltip(
+            date: selectedSample.date,
+            valueText: formatValue(selectedSample.value),
+            locale: .current
+        )
+    }
+
     var accessibilitySummary: String {
-        guard hasEnoughData else {
+        guard showsPlot else {
             return "\(metricTitle) history. \(HomeV2TrendPolicy.notEnoughData)"
         }
         return usesSevenDayAverage
@@ -78,20 +114,39 @@ struct HomeV2TrendChart: View {
             : "\(metricTitle) history"
     }
 
+    var accessibilityValueText: String {
+        let ticks = plotted.yTicks
+        let low = HomeV2ChartIntegrity.tickLabel(ticks.first ?? 0, integers: anchorsToZero)
+        let high = HomeV2ChartIntegrity.tickLabel(ticks.last ?? 0, integers: anchorsToZero)
+        var parts = ["Scale from \(low) to \(high)"]
+        if anchorsToZero { parts.append("starting at zero") }
+        if let selectedTooltip { parts.append(selectedTooltip) }
+        return parts.joined(separator: ", ")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Group {
-                if hasEnoughData {
-                    chart
-                } else {
-                    placeholder
+            if showsPlot {
+                if allowsSelection {
+                    tooltipRow
                 }
+                chart
+                    .frame(height: chartHeight)
+                if axis == .months {
+                    if usesSevenDayAverage {
+                        Text(HomeV2TrendPolicy.sevenDayAverageLabel)
+                            .font(.caption)
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                            .padding(.horizontal, HomeV2Tokens.Space.inset)
+                            .padding(.top, HomeV2Tokens.Space.tight)
+                            .accessibilityHidden(true)
+                    }
+                    dateAxis
+                }
+            } else {
+                placeholder
+                    .frame(height: chartHeight)
             }
-            .frame(height: chartHeight)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(accessibilitySummary)
-            .accessibilityIdentifier("home_v2_trend_chart")
-
             if axis == .trend {
                 axisRow
             }
@@ -99,74 +154,161 @@ struct HomeV2TrendChart: View {
                 HomeV2RangePicker(range: $range)
             }
         }
+        .onChange(of: range) { _, _ in selectedX = nil }
+    }
+
+    private var tooltipRow: some View {
+        Text(selectedTooltip ?? " ")
+            .font(.caption)
+            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget / 2, alignment: .leading)
+            .padding(.horizontal, HomeV2Tokens.Space.inset)
+            .accessibilityIdentifier("home_v2_chart_tooltip")
+            .accessibilityHidden(selectedTooltip == nil)
     }
 
     private var chart: some View {
-        Chart {
-            if showsDots {
-                ForEach(visibleDaily) { point in
-                    PointMark(x: .value("Day", point.date), y: .value("Value", point.value))
-                        .symbolSize(10)
-                        .foregroundStyle(accent.opacity(0.35))
-                }
-            }
+        plottedChart
+            .animation(nil, value: range)
+    }
 
-            ForEach(visibleTrend) { point in
-                LineMark(x: .value("Day", point.date), y: .value("Trend", point.value))
-                    .interpolationMethod(.linear)
-                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                    .foregroundStyle(accent)
-            }
-
-            if let last = visibleTrend.last {
-                PointMark(x: .value("Day", last.date), y: .value("Trend", last.value))
-                    .symbolSize(60)
-                    .foregroundStyle(accent)
-            }
-        }
-        .chartXAxis {
-            if axis == .months {
-                AxisMarks(values: .automatic(desiredCount: 3)) {
-                    AxisValueLabel(format: monthAxisFormat)
-                        .foregroundStyle(HomeV2Tokens.Colors.quiet)
-                }
-            }
-        }
-        .chartYAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) {
-                AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
-            }
-        }
-        .chartYScale(domain: .automatic(includesZero: false))
-        .chartPlotStyle { plot in
-            plot.padding(.trailing, HomeV2Tokens.Space.compact)
+    @ViewBuilder
+    private var plottedChart: some View {
+        if allowsSelection {
+            plotMarks.chartXSelection(value: $selectedX)
+        } else {
+            plotMarks
         }
     }
 
-    /// Days inside one month need the day; longer ranges read by month.
-    private var monthAxisFormat: Date.FormatStyle {
-        if let days = range.days, days <= 31 {
-            return .dateTime.month(.abbreviated).day()
+    private var plotMarks: some View {
+        Chart {
+            ForEach(Array(plotted.runs.enumerated()), id: \.offset) { index, run in
+                if run.count > 1 {
+                    ForEach(run) { sample in
+                        LineMark(
+                            x: .value("Day", sample.date),
+                            y: .value("Value", sample.value),
+                            series: .value("Run", index)
+                        )
+                        .interpolationMethod(.linear)
+                        .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                        .foregroundStyle(accent)
+                    }
+                }
+            }
+            ForEach(plotted.marks) { sample in
+                PointMark(x: .value("Day", sample.date), y: .value("Value", sample.value))
+                    .symbolSize(sample.id == plotted.marks.last?.id ? 56 : 18)
+                    .foregroundStyle(accent.opacity(sample.id == plotted.marks.last?.id ? 1 : 0.45))
+            }
+            if let selectedSample {
+                RuleMark(x: .value("Selected", selectedSample.date))
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                PointMark(
+                    x: .value("Selected", selectedSample.date),
+                    y: .value("Selected", selectedSample.value)
+                )
+                .symbolSize(80)
+                .foregroundStyle(accent)
+            }
         }
-        return .dateTime.month(.abbreviated)
+        .chartYScale(domain: plotted.yDomain)
+        .chartXAxis {
+            AxisMarks(values: plotted.xAxisDates) { _ in
+                AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: plotted.yTicks) { _ in
+                AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
+                if anchorsToZero {
+                    AxisValueLabel(format: .number.precision(.fractionLength(0)))
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .font(.caption)
+                } else {
+                    AxisValueLabel(format: .number.precision(.fractionLength(1)))
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .font(.caption)
+                }
+            }
+        }
+        .chartPlotStyle { plot in
+            plot.padding(.horizontal, HomeV2Tokens.Space.tight)
+        }
+        .padding(.horizontal, HomeV2Tokens.Space.inset)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
+        .accessibilityValue(accessibilityValueText)
+        .accessibilityHint(allowsSelection ? "Drag across the chart to read a day" : "")
+        .accessibilityHidden(!allowsSelection)
+        .accessibilityIdentifier(plotIdentifier)
+        .accessibilityAdjustableAction { direction in
+            adjustSelection(direction)
+        }
+    }
+
+    private var dateAxis: some View {
+        let labels = HomeV2ChartIntegrity.axisLabels(dates: plotted.xAxisDates, range: range, locale: .current)
+        return HStack(spacing: HomeV2Tokens.Space.tight) {
+            ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .frame(maxWidth: .infinity, alignment: dateAlignment(index: index, count: labels.count))
+            }
+        }
+        .padding(.horizontal, HomeV2Tokens.Space.inset)
+        .padding(.top, HomeV2Tokens.Space.tight)
+        .accessibilityIdentifier("home_v2_chart_axis")
+    }
+
+    private func dateAlignment(index: Int, count: Int) -> Alignment {
+        if count < 2 || index == 0 { return .leading }
+        if index == count - 1 { return .trailing }
+        return .center
+    }
+
+    private func adjustSelection(_ direction: AccessibilityAdjustmentDirection) {
+        let ordered = plotted.marks.sorted { $0.date < $1.date }
+        guard !ordered.isEmpty else { return }
+        let current = selectedSample.flatMap { sample in ordered.firstIndex { $0.id == sample.id } }
+        let nextIndex: Int
+        switch direction {
+        case .increment:
+            nextIndex = min(ordered.count - 1, (current ?? -1) + 1)
+        case .decrement:
+            nextIndex = max(0, (current ?? 0) - 1)
+        @unknown default:
+            return
+        }
+        selectedX = ordered[nextIndex].date
     }
 
     private var placeholder: some View {
         Text(HomeV2TrendPolicy.notEnoughData)
             .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-            .foregroundStyle(HomeV2Tokens.Colors.quiet)
+            .foregroundStyle(HomeV2Tokens.Colors.secondary)
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilitySummary)
+            .accessibilityIdentifier(plotIdentifier)
     }
 
     private var axisRow: some View {
         HStack {
-            Text(hasEnoughData ? HomeV2TrendPolicy.startLabel(for: visibleDaily, formatter: Self.startFormatter) : " ")
+            Text(showsPlot ? HomeV2TrendPolicy.startLabel(for: visibleDaily, formatter: Self.startFormatter) : " ")
             Spacer(minLength: HomeV2Tokens.Space.tight)
-            Text(hasEnoughData ? HomeV2TrendPolicy.sevenDayAverageLabel : " ")
+            Text(showsPlot && usesSevenDayAverage ? HomeV2TrendPolicy.sevenDayAverageLabel : " ")
         }
         .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
-        .foregroundStyle(HomeV2Tokens.Colors.quiet)
+        .foregroundStyle(HomeV2Tokens.Colors.secondary)
         .padding(.horizontal, HomeV2Tokens.Space.inset)
         .padding(.top, HomeV2Tokens.Space.tight)
     }
