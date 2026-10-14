@@ -6,12 +6,13 @@ import Charts
 import SwiftUI
 
 /// A shared editorial card keeps Home's geometry stable with or without a photo.
-/// The photo fills its card; a data graphic uses only the selected day's readings
-/// or its recorded weight history. Numbers and actions remain below the card.
+/// The photo fills its card; a data graphic uses only today's selected readings.
+/// Historical entries remain in Entries and Progress. Numbers and actions stay below.
 struct HomeV2Surface: View {
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
     let timeline: HomeV2TimelinePolicy.Snapshot
+    let hasAnyPhotoInHistory: Bool
     @Binding var selectedID: HomeV2TimelinePolicy.EntryID
     let weightValue: String
     let weightUnit: String
@@ -31,13 +32,8 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
 
-    @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
-
     private var isLogged: Bool { loggedSentence != nil }
     private var isHealthOff: Bool { systemState == .healthOff }
-    private var hasAnyPhoto: Bool {
-        bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
-    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -53,7 +49,7 @@ struct HomeV2Surface: View {
                         if hasPhoto { photoStatStrip }
                     }
                     photoNumberBlock
-                    if hasAnyPhoto {
+                    if hasAnyPhotoInHistory {
                         HomeV2DisclosureLink(
                             title: HomeV2PhotoCopy.allPhotos,
                             identifier: "home_v2_all_photos_row",
@@ -63,9 +59,6 @@ struct HomeV2Surface: View {
                     }
                     rangeRow
                     if !hasPhoto || isHealthOff { todayDetailsRow }
-                    if !coachDismissed {
-                        HomeV2TimelineCoachMark(onDismiss: { coachDismissed = true })
-                    }
                 }
                 .frame(minHeight: geometry.size.height, alignment: .top)
             }
@@ -73,11 +66,8 @@ struct HomeV2Surface: View {
             .accessibilityIdentifier("home_v2_content_scroll")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                timelineScrubber
-                actionDock
-            }
-            .background(HomeV2Tokens.Colors.shell)
+            actionDock
+                .background(HomeV2Tokens.Colors.shell)
         }
     }
 
@@ -113,27 +103,13 @@ struct HomeV2Surface: View {
         Binding(get: { selectedID }, set: { next in
             guard next != selectedID else { return }
             selectedID = next
-            coachDismissed = true
         })
-    }
-
-    private var timelineScrubber: some View {
-        HomeV2PhotoTimelineRuler(
-            dates: timeline.chronologicalDates,
-            selected: timeline.chronologicalPosition(for: selectedID),
-            onSelect: { position in
-                if let next = timeline.id(atChronologicalPosition: position) { userSelection.wrappedValue = next }
-            },
-            allowsVerticalScrolling: true,
-            accessibilityId: "home_v2_timeline_scrubber",
-            accessibilityName: "Body timeline"
-        )
-        .padding(.top, HomeV2Tokens.Space.tight)
     }
 
     private var hasSingleWeightHero: Bool {
         !hasPhoto && HomeV2EditorialPolicy.bodyFat(in: metric) == nil &&
-            HomeV2EditorialPolicy.weights(in: bodyMetrics, selected: metric).count == 1
+            (HomeV2EditorialPolicy.weights(in: bodyMetrics, selected: metric).count == 1 ||
+             !HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight))
     }
 
     /// Weight, FFMI and body fat overlaid on the selected photo's treated lower band.
@@ -176,6 +152,15 @@ struct HomeV2Surface: View {
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .accessibilityIdentifier("home_v2_change_sentence")
+
+            if hasPhoto, let weight = metric.weight,
+               !HomeV2WeightQuality.isWithinSupportedLoggingRange(weight) {
+                Label(HomeV2WeightQuality.reviewMessage, systemImage: "exclamationmark.triangle")
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                    .foregroundStyle(HomeV2Tokens.Metric.steps)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("home_v2_weight_review")
+            }
 
             if hasPhoto {
                 compositionLine
@@ -291,16 +276,22 @@ struct HomeV2DataHero: View {
     let metric: BodyMetrics?
     let metrics: [BodyMetrics]
     let unit: String
-
+    let emptyTitle: String?
     private var bodyFat: HomeV2EditorialPolicy.BodyFatReading? { HomeV2EditorialPolicy.bodyFat(in: metric) }
     private var weights: [HomeV2EditorialPolicy.WeightReading] {
         HomeV2EditorialPolicy.weights(in: metrics, selected: metric)
+    }
+    private var weightNeedsReview: Bool {
+        guard let weight = metric?.weight else { return false }
+        return !HomeV2WeightQuality.isWithinSupportedLoggingRange(weight)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             if let bodyFat {
                 bodyFatGraphic(bodyFat)
+            } else if weightNeedsReview {
+                weightReviewGraphic
             } else if !weights.isEmpty {
                 weightGraphic
             } else {
@@ -351,7 +342,9 @@ struct HomeV2DataHero: View {
     }
 
     private var weightGraphic: some View {
-        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.margin) {
+        let axisDates = HomeV2RecordedWeightChartPolicy.axisDates(for: weights)
+        let labelGranularity = HomeV2RecordedWeightChartPolicy.labelGranularity(for: weights)
+        return VStack(alignment: .leading, spacing: HomeV2Tokens.Space.margin) {
             Text("Recorded weight")
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
@@ -362,18 +355,18 @@ struct HomeV2DataHero: View {
                         .foregroundStyle(HomeV2Tokens.Metric.weight)
                 }
                 .chartXAxis {
-                    AxisMarks(values: [weights[0].date, weights[weights.count - 1].date]) { value in
-                        AxisValueLabel(
-                            format: .dateTime.month(.abbreviated).day(),
-                            anchor: value.index == 0 ? .topLeading : .topTrailing
-                        )
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    AxisMarks(values: axisDates) { value in
+                        if let date = value.as(Date.self) {
+                            AxisValueLabel(anchor: value.index == 0 ? .topLeading : .topTrailing) {
+                                Text(chartAxisLabel(for: date, granularity: labelGranularity))
+                            }
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        }
                     }
                 }
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) {
                         AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
-                        AxisValueLabel().foregroundStyle(HomeV2Tokens.Colors.secondary)
                     }
                 }
                 .chartYScale(domain: .automatic(includesZero: false))
@@ -391,7 +384,7 @@ struct HomeV2DataHero: View {
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
                 .frame(maxHeight: .infinity, alignment: .center)
             }
-            Text("\(weights.count) weight \(weights.count == 1 ? "entry" : "entries") in 30 days · \(unit)")
+            Text("\(weights.count) weight \(weights.count == 1 ? "entry" : "entries") today · \(unit)")
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -402,16 +395,51 @@ struct HomeV2DataHero: View {
         .accessibilityIdentifier("home_v2_weight_graphic")
     }
 
+    private var weightReviewGraphic: some View {
+        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+            Spacer(minLength: 0)
+            if let weight = metric?.weight {
+                Text(String(format: "%.2f", displayWeight(weight)))
+                    .scaledSystemFont(size: 72, weight: .semibold, relativeTo: .largeTitle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                Text(unit)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+            }
+            Label(HomeV2WeightQuality.reviewMessage, systemImage: "exclamationmark.triangle")
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                .foregroundStyle(HomeV2Tokens.Metric.steps)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(HomeV2Tokens.Space.margin)
+        .foregroundStyle(HomeV2Tokens.Colors.ink)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home_v2_weight_review_graphic")
+    }
+
+    private func chartAxisLabel(
+        for date: Date,
+        granularity: HomeV2RecordedWeightChartPolicy.LabelGranularity
+    ) -> String {
+        switch granularity {
+        case .day:
+            return date.formatted(.dateTime.month(.abbreviated).day())
+        case .time:
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+    }
+
     private var weightSummary: String {
         guard let latest = weights.last else { return "No weight recorded." }
-        return "\(weights.count) recorded weight \(weights.count == 1 ? "entry" : "entries") in 30 days. " +
+        return "\(weights.count) recorded weight \(weights.count == 1 ? "entry" : "entries") today. " +
             "Latest \(String(format: "%.1f", displayWeight(latest.kilograms))) \(unit). Body fat not logged for this day."
     }
 
     private var emptyGraphic: some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
             Spacer(minLength: 0)
-            Text(metric == nil ? HomeV2Copy.firstCheckInTitle : "Your check-in")
+            Text(emptyTitle ?? (metric == nil ? HomeV2Copy.firstCheckInTitle : "Your check-in"))
                 .scaledSystemFont(size: 44, weight: .semibold, relativeTo: .largeTitle)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
                 .fixedSize(horizontal: false, vertical: true)

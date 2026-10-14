@@ -96,6 +96,8 @@ enum HomeV2Copy {
     static let viewProgress = "View progress"
     static let firstCheckInTitle = "Your first check-in"
     static let firstCheckInBody = "Track weight and body fat to follow changes in your shape over time."
+    static let nothingLoggedToday = "Nothing logged today"
+    static let earlierEntriesBody = "Your earlier entries are still in Entries. Log today’s weight when you’re ready."
     static let connectHealthInstead = "Connect Apple Health instead"
     static let logSheetTitle = "Log weight"
     static let addDetails = "Add details or photos"
@@ -170,9 +172,6 @@ enum HomeV2Copy {
 
     /// The editorial plate on a day without a photo.
     static let noPhotoThisDay = "No photo this day"
-    /// Shown once, then gone for good.
-    static let timelineCoachHint = "Swipe through your history. Drag the timeline to jump in time."
-    static let coachDismissedDefaultsKey = "home_v2_timeline_coach_dismissed"
 
     /// H1 status line: "Cutting for 9 weeks." Nothing is claimed about pace
     /// without a target, and nothing at all before there is a trend.
@@ -313,7 +312,7 @@ enum HomeV2WeightStepPolicy {
     static let bodyFatRange: ClosedRange<Double> = 2...70
 
     static func range(unit: String) -> ClosedRange<Double> {
-        unit == "kg" ? 20...500 : 44...1_100
+        unit == "kg" ? 32...300 : 70...660
     }
 
     static func defaultValue(unit: String) -> Double {
@@ -333,12 +332,79 @@ enum HomeV2WeightStepPolicy {
         clamped(value + Double(direction) * step, unit: unit)
     }
 
+    static func converted(_ value: Double, from sourceUnit: String, to destinationUnit: String) -> Double {
+        let source = sourceUnit.lowercased()
+        let destination = destinationUnit.lowercased()
+        guard source != destination else { return rounded(value) }
+        if source == "kg", destination == "lbs" || destination == "lb" {
+            return rounded(value.kgToLbs)
+        }
+        if source == "lbs" || source == "lb", destination == "kg" {
+            return rounded(value.lbsToKg)
+        }
+        return rounded(value)
+    }
+
     static func rounded(_ value: Double) -> Double {
         (value * 10).rounded() / 10
     }
 
     static func text(_ value: Double) -> String {
         String(format: "%.1f", rounded(value))
+    }
+}
+
+/// Manual entry and trend presentation share one adult logging range. Imported
+/// samples outside it remain stored and visible with provenance for correction.
+enum HomeV2WeightQuality {
+    static let supportedKilograms: ClosedRange<Double> = 32...300
+    static let reviewMessage = "Outside the supported logging range. Source value kept unchanged."
+
+    static func isWithinSupportedLoggingRange(_ kilograms: Double?) -> Bool {
+        guard let kilograms, kilograms.isFinite else { return false }
+        return supportedKilograms.contains(kilograms)
+    }
+}
+
+/// Today never falls back to the latest historical row. Earlier imports stay in
+/// Entries and the selected-day Context surface.
+enum HomeV2TodayPolicy {
+    static func metrics(
+        in metrics: [BodyMetrics],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [BodyMetrics] {
+        let today = BodyMetricLocalDate.key(for: now, calendar: calendar)
+        return metrics.filter { $0.localDate == today }
+            .sorted { $0.date == $1.date ? $0.id > $1.id : $0.date > $1.date }
+    }
+}
+
+/// Sparse recorded-weight charts label every unique sample for 0/1/2 points,
+/// then only their bounds. Repeated samples on one day use times, not duplicate
+/// day labels.
+enum HomeV2RecordedWeightChartPolicy {
+    enum LabelGranularity: Equatable {
+        case day
+        case time
+    }
+
+    static func axisDates(for readings: [HomeV2EditorialPolicy.WeightReading]) -> [Date] {
+        let unique = readings.map(\.date).sorted().reduce(into: [Date]()) { dates, date in
+            if dates.last != date { dates.append(date) }
+        }
+        guard unique.count > 2 else { return unique }
+        return [unique[0], unique[unique.count - 1]]
+    }
+
+    static func labelGranularity(
+        for readings: [HomeV2EditorialPolicy.WeightReading],
+        calendar: Calendar = .current
+    ) -> LabelGranularity {
+        let dates = axisDates(for: readings)
+        guard dates.count > 1,
+              dates.allSatisfy({ calendar.isDate($0, inSameDayAs: dates[0]) }) else { return .day }
+        return .time
     }
 }
 
@@ -419,7 +485,8 @@ enum HomeV2EditorialPolicy {
         return metrics.compactMap { metric in
             guard metric.userId == selected.userId,
                   metric.date >= start, metric.date <= selected.date,
-                  let weight = metric.weight, weight.isFinite, weight > 0 else { return nil }
+                  let weight = metric.weight,
+                  HomeV2WeightQuality.isWithinSupportedLoggingRange(weight) else { return nil }
             return WeightReading(id: metric.id, date: metric.date, kilograms: weight)
         }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date < $1.date }
     }

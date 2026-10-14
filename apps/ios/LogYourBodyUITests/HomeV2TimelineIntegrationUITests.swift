@@ -3,7 +3,7 @@ import XCTest
 final class HomeV2TimelineIntegrationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
-    func testHorizontalPhotoDragPagesPixelsAndMetricsWithoutOpeningViewer() throws {
+    func testHorizontalPhotoDragKeepsTodaySelectedWithoutOpeningViewer() throws {
         let app = launch()
         let stage = app.buttons["home_v2_photo_stage"]
         let caption = app.staticTexts["home_v2_photo_caption"]
@@ -12,18 +12,15 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         let firstCaption = caption.label, firstWeight = weight.label
         try assertPhotoColor(stage, red: true)
         drag(stage, from: 0.85, to: 0.3)
-        let moved = expectation(for: NSPredicate(format: "label != %@", firstCaption), evaluatedWith: caption)
-        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 5), .completed)
-        XCTAssertNotEqual(weight.label, firstWeight)
+        XCTAssertEqual(caption.label, firstCaption)
+        XCTAssertEqual(weight.label, firstWeight)
         XCTAssertTrue(app.buttons["home_v2_log_weight"].isHittable)
         XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
-        try assertPhotoColor(stage, red: false)
-        capture(app, "timeline-older-blue-photo")
+        try assertPhotoColor(stage, red: true)
+        capture(app, "today-remains-selected")
 
-        // Preserve the precise right-drag regression from the default-Home qualification.
         drag(stage, from: 0.3, to: 0.85)
-        let returned = expectation(for: NSPredicate(format: "label == %@", firstCaption), evaluatedWith: caption)
-        XCTAssertEqual(XCTWaiter.wait(for: [returned], timeout: 5), .completed)
+        XCTAssertEqual(caption.label, firstCaption)
         XCTAssertEqual(weight.label, firstWeight)
         XCTAssertTrue(app.buttons["home_v2_log_weight"].isHittable)
         XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
@@ -34,41 +31,25 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         )
     }
 
-    func testSelectedWeightOnlyDayNeverBorrowsTodaysBodyFat() {
+    func testHistoricalWeightOnlyDayInEntriesNeverBorrowsTodaysBodyFat() {
         let app = launch()
-        let stage = app.buttons["home_v2_photo_stage"]
-        let caption = app.staticTexts["home_v2_photo_caption"]
-        for _ in 0..<2 {
-            let previous = caption.label
-            stage.swipeLeft()
-            let changed = expectation(for: NSPredicate(format: "label != %@", previous), evaluatedWith: caption)
-            XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed)
-        }
-        let composition = app.staticTexts["home_v2_composition_sentence"]
-        let missing = expectation(
-            for: NSPredicate(format: "label == %@", "Body fat not logged for this day."), evaluatedWith: composition
-        )
-        XCTAssertEqual(XCTWaiter.wait(for: [missing], timeout: 5), .completed)
-        XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
-        capture(app, "timeline-selected-missing-body-fat")
+        app.buttons["photo_timeline_root_menu"].tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
+        let rows = app.buttons.matching(identifier: "home_v2_entries_row")
+        XCTAssertGreaterThan(rows.count, 2)
+        rows.element(boundBy: 2).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context_row_body_fat"].exists)
+        capture(app, "entries-selected-missing-body-fat")
     }
 
-    func testVerticalRulerDragDoesNotSelectOrNavigateAndHorizontalScrubStillWorks() {
+    func testLargestTextHasNoTimelineRulerAndKeepsLoggingReachable() {
         let app = launch(largestText: true)
-        let ruler = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
-        XCTAssertTrue(ruler.waitForExistence(timeout: 8))
-        let originalDate = ruler.value as? String
-        let start = ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.7))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -110)))
-        XCTAssertEqual(ruler.value as? String, originalDate)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
         XCTAssertTrue(app.buttons["home_v2_log_weight"].isHittable)
         XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
-        let end = ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.7))
-        ruler.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.7)).press(forDuration: 0.05, thenDragTo: end)
-        let changed = expectation(for: NSPredicate(format: "value != %@", originalDate ?? ""), evaluatedWith: ruler)
-        XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 5), .completed)
         XCTAssertTrue(app.windows.firstMatch.frame.contains(app.buttons["home_v2_log_weight"].frame))
-        capture(app, "timeline-ruler-largest-text")
+        capture(app, "today-largest-text")
     }
 
     private func launch(largestText: Bool = false) -> XCUIApplication {

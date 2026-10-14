@@ -106,6 +106,22 @@ enum HomeV2Provenance {
         }
     }
 
+    static func detailedLabel(for metric: BodyMetrics) -> String {
+        let named = metric.sourceMetadata?.sourceName?.trimmingCharacters(in: .whitespaces)
+        if metric.metricSource == .manual, let named, !named.isEmpty {
+            let cameThroughHealth = metric.sourceMetadata?.sourceBundleId != nil ||
+                metric.sourceMetadata?.quantityType != nil ||
+                metric.sourceMetadata?.vendor?.lowercased() == "healthkit"
+            let original = cameThroughHealth ? "\(named) via \(HomeV2ContextCopy.appleHealth)" : named
+            return "\(original) · corrected in LogYourBody"
+        }
+
+        let label = label(for: metric)
+        guard metric.metricSource == .healthKit,
+              label != HomeV2ContextCopy.appleHealth else { return label }
+        return "\(label) via \(HomeV2ContextCopy.appleHealth)"
+    }
+
     /// The time of day an entry was stored, or nil for midnight (a date-only entry).
     static func timeText(for date: Date, calendar: Calendar = .current) -> String? {
         let components = calendar.dateComponents([.hour, .minute], from: date)
@@ -115,9 +131,22 @@ enum HomeV2Provenance {
 
     /// "Apple Health, 7:02 AM" or just "Apple Health".
     static func subline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
-        let source = label(for: metric)
+        let source = detailedLabel(for: metric)
         guard let time = timeText(for: metric.date, calendar: calendar) else { return source }
         return "\(source), \(time)"
+    }
+
+    static func weightSubline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
+        let provenance = subline(for: metric, calendar: calendar)
+        guard !HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight) else { return provenance }
+        return "\(provenance). \(HomeV2WeightQuality.reviewMessage)"
+    }
+
+    static func weightText(displayValue: Double, metric: BodyMetrics, unit: String) -> String {
+        let value = HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight)
+            ? HomeV2WeightStepPolicy.text(displayValue)
+            : String(format: "%.2f", displayValue)
+        return "\(value) \(unit)"
     }
 
     /// Body fat names its method when that is more specific than the source.
@@ -127,6 +156,47 @@ enum HomeV2Provenance {
         case "caliper": return "Calipers"
         default: return subline(for: metric, calendar: calendar)
         }
+    }
+}
+
+/// A correction replaces only the selected record's measurements. Its stable
+/// identity, original timestamp, and import lineage remain available in Context.
+enum HomeV2CorrectionPolicy {
+    static func correctedMetric(
+        _ metric: BodyMetrics,
+        kilograms: Double,
+        bodyFatPercentage: Double?,
+        updatedAt: Date = Date()
+    ) -> BodyMetrics {
+        let bodyFatMethod: String? = if bodyFatPercentage == nil {
+            nil
+        } else if metric.bodyFatPercentage != nil {
+            metric.bodyFatMethod
+        } else {
+            BodyFatEntryMethod.bioelectrical.rawValue
+        }
+
+        return BodyMetrics(
+            id: metric.id,
+            userId: metric.userId,
+            date: metric.date,
+            localDate: metric.localDate,
+            weight: kilograms,
+            weightUnit: metric.weightUnit,
+            bodyFatPercentage: bodyFatPercentage,
+            bodyFatMethod: bodyFatMethod,
+            muscleMass: metric.muscleMass,
+            boneMass: metric.boneMass,
+            waistCm: metric.waistCm,
+            hipCm: metric.hipCm,
+            waistUnit: metric.waistUnit,
+            notes: metric.notes,
+            photoUrl: metric.photoUrl,
+            dataSource: metric.metricSource == .manual ? metric.dataSource : BodyMetricSource.manual.rawValue,
+            sourceMetadata: metric.sourceMetadata,
+            createdAt: metric.createdAt,
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -202,14 +272,21 @@ enum HomeV2EntriesPolicy {
         }
         return monthsNewestFirst.compactMap { key -> HomeV2EntriesSection? in
             guard let monthMetrics = grouped[key], let newest = monthMetrics.first else { return nil }
-            let chronological = monthMetrics.reversed().compactMap(weightValue)
+            let chronological = monthMetrics.reversed().compactMap { metric in
+                guard HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight) else { return nil }
+                return weightValue(metric)
+            }
             let rows = monthMetrics.map { metric -> HomeV2EntriesRow in
-                let value = weightValue(metric).map { "\(HomeV2WeightStepPolicy.text($0)) \(unit)" } ?? "—"
+                let value = weightValue(metric).map {
+                    HomeV2Provenance.weightText(displayValue: $0, metric: metric, unit: unit)
+                } ?? "—"
                 return HomeV2EntriesRow(
                     id: metric.id,
                     date: metric.date,
-                    dayText: HomeV2ContextCopy.weekdayDayFormatter.string(from: metric.date),
-                    source: HomeV2Provenance.label(for: metric),
+                    dayText: HomeV2ContextCopy.entryDateText(metric.date, calendar: calendar),
+                    source: metric.weight == nil
+                        ? HomeV2Provenance.subline(for: metric, calendar: calendar)
+                        : HomeV2Provenance.weightSubline(for: metric, calendar: calendar),
                     valueText: value,
                     photoURL: hasPhoto(metric) ? metric.photoUrl : nil
                 )

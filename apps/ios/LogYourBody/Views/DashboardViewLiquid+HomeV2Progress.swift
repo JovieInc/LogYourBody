@@ -32,11 +32,19 @@ extension DashboardViewLiquid {
         switch metric {
         case .weight:
             // ponytail: PhaseInsightPolicy sorts the metrics on every read; cache it if Progress ever feels slow.
-            let insight = PhaseInsightPolicy.insight(for: bodyMetrics)
+            let insight = PhaseInsightPolicy.insight(for: homeV2InsightMetrics)
             let title = homeV2PhaseSentence.map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 } ?? insight.title
+            let daily = HomeV2ProgressPolicy.supportedWeightPoints(
+                fullChartCache[.weight] ?? [],
+                system: system
+            )
+            let trend = HomeV2ProgressPolicy.supportedWeightPoints(
+                fullTrendChartCache[.weight] ?? [],
+                system: system
+            )
             return HomeV2ProgressSeries(
-                daily: fullChartCache[.weight] ?? [],
-                trend: fullTrendChartCache[.weight] ?? [],
+                daily: daily,
+                trend: trend,
                 unit: homeV2DisplayUnit,
                 deltaUnit: homeV2DisplayUnit,
                 target: weightGoal.map { convertWeight($0, to: system) ?? $0 },

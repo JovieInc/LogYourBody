@@ -46,44 +46,50 @@ var body: some View {
                         .accessibilityIdentifier(isHomeV2LogEntry ? "home_v2_log_sheet_date" : "add_entry_date")
                 }
 
-                Picker("Entry Type", selection: $selectedTab) {
-                    Label("Weight", systemImage: "scalemass").tag(0)
-                    Label("Body Fat", systemImage: "percent").tag(1)
-                    Label("Photos", systemImage: "photo.fill").tag(2)
-                    if includesGlp1Entry {
-                        Label("GLP-1", systemImage: "syringe").tag(3)
-                    }
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.vertical, 12)
-                .accessibilityLabel("Entry type selector")
-                .accessibilityHint("Select the type of entry you want to add")
-
-                Group {
-                    if isHomeV2WeightEntry {
-                        DatePicker("Date", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
-                            .font(.appBodySmall)
-                            .foregroundStyle(Color.jovieTextSecondary)
-                            .tint(.jovieText)
-                            .accessibilityIdentifier("home_v2_log_sheet_date")
-                    } else {
-                        HStack {
-                            Text("Date")
-                                .font(.appBodySmall)
-                                .foregroundColor(.appTextSecondary)
-
-                            Spacer()
-
-                            DatePicker("", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
-                                .labelsHidden()
+                if !isHomeV2LogEntry || showsHomeV2Advanced {
+                    Picker("Entry Type", selection: $selectedTab) {
+                        Label("Weight", systemImage: "scalemass").tag(0)
+                        Label("Body Fat", systemImage: "percent").tag(1)
+                        Label("Photos", systemImage: "photo.fill").tag(2)
+                        if includesGlp1Entry {
+                            Label("GLP-1", systemImage: "syringe").tag(3)
                         }
                     }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.vertical, 12)
+                    .accessibilityLabel("Entry type selector")
+                    .accessibilityHint("Select the type of entry you want to add")
                 }
-                .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.vertical, 8)
 
-                Divider()
+                if !isHomeV2LogEntry || showsHomeV2Advanced {
+                    Group {
+                        if isHomeV2WeightEntry {
+                            DatePicker("Date", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+                                .font(.appBodySmall)
+                                .foregroundStyle(Color.jovieTextSecondary)
+                                .tint(.jovieText)
+                                .accessibilityIdentifier("home_v2_log_sheet_date")
+                        } else {
+                            HStack {
+                                Text("Date")
+                                    .font(.appBodySmall)
+                                    .foregroundColor(.appTextSecondary)
+
+                                Spacer()
+
+                                DatePicker("", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+                                    .labelsHidden()
+                            }
+                        }
+                    }
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.vertical, 8)
+                }
+
+                if !isHomeV2LogEntry || showsHomeV2Advanced {
+                    Divider()
+                }
 
                 // Tab content
                 ScrollView {
@@ -547,6 +553,8 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                     .foregroundStyle(Color.jovieText)
                     .tint(.jovieText)
                     .frame(maxWidth: .infinity)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .accessibilityLabel("Weight value")
                     .accessibilityHint("Enter your weight")
                     .accessibilityIdentifier("home_v2_log_sheet_value")
@@ -564,8 +572,8 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                 .frame(minWidth: 64, minHeight: JovieTokens.minimumHitTarget)
                 .accessibilityValue(weightUnit)
                 .accessibilityIdentifier("home_v2_log_sheet_unit")
-                .onChange(of: weightUnit) { _, _ in
-                    validateWeight(weight)
+                .onChange(of: weightUnit) { previous, current in
+                    updateWeightUnit(from: previous, to: current)
                 }
             }
 
@@ -588,29 +596,32 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
 
-            Button {
-                selectedTab = 1
-            } label: {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Add body fat")
+            if !showsHomeV2Advanced {
+                Button {
+                    showsHomeV2Advanced = true
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("More options")
+                                .font(.body)
+                                .foregroundStyle(Color.jovieText)
+                            Text("Date, body fat, and photos")
+                                .font(.caption)
+                                .foregroundStyle(Color.jovieTextSecondary)
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.down")
                             .font(.body)
-                            .foregroundStyle(Color.jovieText)
-                        Text("Optional estimate or measurement")
-                            .font(.caption)
                             .foregroundStyle(Color.jovieTextSecondary)
                     }
-                    .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.body)
-                        .foregroundStyle(Color.jovieTextSecondary)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows date, body fat, and photo controls")
+                .accessibilityIdentifier("home_v2_log_sheet_details")
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("home_v2_log_sheet_details")
         }
         .padding(.horizontal, JovieTokens.screenInset)
         .padding(.vertical, 24)
@@ -658,8 +669,8 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 80)
                     .accessibilityLabel("Weight unit")
-                    .onChange(of: weightUnit) { _, _ in
-                        validateWeight(weight)
+                    .onChange(of: weightUnit) { previous, current in
+                        updateWeightUnit(from: previous, to: current)
                     }
                 }
 

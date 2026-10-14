@@ -83,6 +83,7 @@ struct HomeV2DisclosureLink: View {
 
 /// H0: the first check-in. One sentence, one quiet alternative, one action.
 struct HomeV2DayZero: View {
+    var hasHistory = false
     let onConnectHealth: () -> Void
     let onLogWeight: () -> Void
 
@@ -90,18 +91,27 @@ struct HomeV2DayZero: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    HomeV2DataHero(metric: nil, metrics: [], unit: "")
+                    HomeV2DataHero(
+                        metric: nil,
+                        metrics: [],
+                        unit: "",
+                        emptyTitle: hasHistory ? HomeV2Copy.nothingLoggedToday : nil
+                    )
                         .frame(width: geometry.size.width,
                                height: geometry.size.width / HomeV2Tokens.photoAspectRatio)
                         .accessibilityIdentifier("home_v2_editorial_card")
 
                     VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
-                        Text("Start with what you have.")
+                        Text(hasHistory ? HomeV2Copy.nothingLoggedToday : "Start with what you have.")
                             .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle,
                                               weight: .semibold, relativeTo: .title2)
                             .foregroundStyle(HomeV2Tokens.Colors.ink)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("Log your weight or connect Apple Health. No body fat or photo required.")
+                        Text(
+                            hasHistory
+                                ? HomeV2Copy.earlierEntriesBody
+                                : "Log your weight or connect Apple Health. No body fat or photo required."
+                        )
                             .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
                             .foregroundStyle(HomeV2Tokens.Colors.secondary)
                             .fixedSize(horizontal: false, vertical: true)

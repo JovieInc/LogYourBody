@@ -10,6 +10,16 @@ func stepWeight(by direction: Int) {
         HapticManager.shared.selection()
 }
 
+func updateWeightUnit(from previous: String, to current: String) {
+        if !previous.isEmpty, previous != current,
+           let value = HomeV2WeightStepPolicy.parse(weight) {
+            weight = HomeV2WeightStepPolicy.text(
+                HomeV2WeightStepPolicy.converted(value, from: previous, to: current)
+            )
+        }
+        validateWeight(weight)
+    }
+
 // MARK: - Photo Entry View
     var photoEntryView: some View {
         VStack(spacing: 16) {

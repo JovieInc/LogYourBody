@@ -51,7 +51,8 @@ enum HomeV2TimelinePolicy {
         /// one pass after the history sort. Future weights can never enter its window.
         private static func weightChanges(in metrics: [BodyMetrics], calendar: Calendar) -> [EntryID: Double] {
             let weights = metrics.reversed().compactMap { metric -> HomeV2EditorialPolicy.WeightReading? in
-                guard let weight = metric.weight, weight.isFinite, weight > 0 else { return nil }
+                guard let weight = metric.weight,
+                      HomeV2WeightQuality.isWithinSupportedLoggingRange(weight) else { return nil }
                 return .init(id: metric.id, date: metric.date, kilograms: weight)
             }
             var changes: [EntryID: Double] = [:]
@@ -136,7 +137,7 @@ struct HomeV2TimelinePager: View {
         .tabViewStyle(.page(indexDisplayMode: .never))
         .frame(width: size.width, height: size.height)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Body timeline")
+        .accessibilityLabel("Today’s entries")
         .accessibilityValue("Entry \(snapshot.chronologicalPosition(for: selectedID) + 1) of \(snapshot.metrics.count)")
         .accessibilityHint("Adjust up for newer entries or down for older entries")
         .accessibilityIdentifier("home_v2_timeline_pager")
@@ -170,7 +171,7 @@ private struct HomeV2TimelinePage: View {
             if PhotoTimelineHUDPolicy.hasUsablePhoto(metric), let photoURL = metric.photoUrl {
                 photo(url: photoURL)
             } else {
-                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit)
+                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit, emptyTitle: nil)
                     .frame(width: size.width, height: size.height)
                     .accessibilityIdentifier("home_v2_metric_first")
             }
@@ -188,7 +189,7 @@ private struct HomeV2TimelinePage: View {
             if let snapshot = editorialPhoto, snapshot.key == key, let image = snapshot.image {
                 Image(uiImage: image).resizable().scaledToFill()
             } else {
-                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit)
+                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit, emptyTitle: nil)
                 Text(failed ? "Photo unavailable" : "Loading photo…")
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
                     .foregroundStyle(HomeV2Tokens.Colors.ink)
@@ -239,29 +240,5 @@ private struct HomeV2PhotoTap: UIGestureRecognizerRepresentable {
 
     func handleUIGestureRecognizerAction(_ recognizer: UITapGestureRecognizer, context: Context) {
         if recognizer.state == .ended { onTap() }
-    }
-}
-
-/// One-time coach mark for the signature interactions (JOV-6016): it teaches
-/// swipe and scrub once, then leaves the surface permanently. Dismissal is
-/// stored in AppStorage by the surface.
-struct HomeV2TimelineCoachMark: View {
-    let onDismiss: () -> Void
-
-    var body: some View {
-        Button(action: onDismiss) {
-            Text(HomeV2Copy.timelineCoachHint)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, HomeV2Tokens.Space.margin)
-                .frame(minHeight: JovieTokens.minimumHitTarget)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(HomeV2Copy.timelineCoachHint)
-        .accessibilityHint("Double tap to dismiss")
-        .accessibilityIdentifier("home_v2_timeline_coach")
     }
 }

@@ -143,6 +143,16 @@ enum HomeV2ProgressPolicy {
             distinctDays: Set(sorted.map { calendar.startOfDay(for: $0.date) }).count
         )
     }
+
+    static func supportedWeightPoints(
+        _ points: [MetricChartDataPoint],
+        system: MeasurementSystem
+    ) -> [MetricChartDataPoint] {
+        points.filter { point in
+            let kilograms = system == .imperial ? point.value.lbsToKg : point.value
+            return HomeV2WeightQuality.isWithinSupportedLoggingRange(kilograms)
+        }
+    }
 }
 
 /// Progress (Pencil R1/R2/R3): one metric workspace. The selected metric and
