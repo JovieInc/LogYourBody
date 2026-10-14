@@ -49,6 +49,9 @@ jobs:
     if: ${{ !cancelled() && (inputs.mac-child || needs.mac.result == 'skipped' || needs.mac.outputs.run_hosted == 'true') }}
     runs-on: ${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
     timeout-minutes: 40
+    env:
+      # Fastlane otherwise rewrites tracked README.md after each lane.
+      FASTLANE_SKIP_DOCS: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,6 +81,11 @@ jobs:
             ${{ runner.os }}-spm-xcode-stable-
             ${{ runner.os }}-spm-
 
+      - name: Fastlane source integrity regression controls
+        run: |
+          cd apps/ios
+          bundle exec ruby ../../scripts/ios/test_fastlane_source_integrity.rb
+
       - name: Fastlane iOS CI
         run: |
           cd apps/ios
@@ -94,12 +102,20 @@ jobs:
           echo "UNIT_RESULTS=$UNIT_RESULTS" >> "$GITHUB_ENV"
           STARTED_AT="$(date +%s)"
           git rev-parse HEAD > "$UNIT_RESULTS/source-revision.txt"
-          git diff HEAD --binary > "$UNIT_RESULTS/source-working-tree.patch"
+          git diff HEAD --binary > "$UNIT_RESULTS/source-before-unit.patch"
+          [[ ! -s "$UNIT_RESULTS/source-before-unit.patch" ]] || { echo "Refusing dirty Unit-tier input"; exit 65; }
+          set +e
           (
+            set -e
             cd apps/ios
             DESTINATION=$(SCHEME=LogYourBodyTiers bash ../../scripts/ios/resolve-simulator-destination.sh)
             bundle exec fastlane ci_test_unit destination:"$DESTINATION" output_directory:"$UNIT_RESULTS"
           ) 2>&1 | tee "$UNIT_RESULTS/unit-tier.log"
+          UNIT_STATUS=$?
+          set -e
+          # Bind evidence to the actual post-test tree, including failure paths.
+          git diff HEAD --binary > "$UNIT_RESULTS/source-working-tree.patch"
+          [[ "$UNIT_STATUS" -eq 0 ]] || exit "$UNIT_STATUS"
           set -- "$UNIT_RESULTS"/*.xcresult
           [[ "$#" -eq 1 && -d "$1" ]] || { echo "Expected one current Unit-tier xcresult"; exit 65; }
           BUNDLE="$1"
@@ -120,6 +136,7 @@ jobs:
             ${{ env.UNIT_RESULTS }}/*.json
             ${{ env.UNIT_RESULTS }}/source-revision.txt
             ${{ env.UNIT_RESULTS }}/source-working-tree.patch
+            ${{ env.UNIT_RESULTS }}/source-before-unit.patch
             ${{ env.UNIT_RESULTS }}/unit-tier.log
           if-no-files-found: error
 

@@ -293,6 +293,9 @@ class EvidenceTests(unittest.TestCase):
 
     def test_shell_preserves_failed_attempt_and_stops_after_two(self):
         # Execute the real function definitions without running the product build.
+        # The extracted range includes the diagnostic launch probe. Its simctl
+        # calls can block longer than this timeout while CoreSimulatorService
+        # is still cold (CI run 38551518501), and they are not the retry contract.
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         functions = source[source.index('is_simulator_infra_failure() {'):source.index('assert_xcresult_evidence() {')]
         result_bundle = self.root / 'retry.xcresult'
@@ -311,7 +314,11 @@ run_with_timeout() {
   echo 'Failed to install or launch the test runner'
   return 65
 }
-""" + functions + '\nrun_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"\n'
+""" + functions + r"""
+start_launch_probe() { :; }
+stop_launch_probe() { :; }
+run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
+"""
         result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
                                 env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
         self.assertEqual(result.returncode, 65, result.stderr)
@@ -321,6 +328,7 @@ run_with_timeout() {
         self.assertIn('first attempt evidence', (result_bundle.with_name('retry.attempt-1.xcresult') / 'receipt').read_text())
 
     def test_shell_does_not_retry_xcodebuild_command_timeout(self):
+        # Same probe stub as the retry test: simctl is outside this contract.
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         functions = source[source.index('is_simulator_infra_failure() {'):source.index('assert_xcresult_evidence() {')]
         result_bundle = self.root / 'timeout.xcresult'
@@ -338,7 +346,11 @@ run_with_timeout() {
   echo 'xcodebuild command timed out after 720s'
   return 124
 }
-""" + functions + '\nrun_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"\n'
+""" + functions + r"""
+start_launch_probe() { :; }
+stop_launch_probe() { :; }
+run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
+"""
         result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
                                 env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
         self.assertEqual(result.returncode, 124, result.stderr)

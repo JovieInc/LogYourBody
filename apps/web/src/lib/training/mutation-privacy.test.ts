@@ -233,6 +233,91 @@ describe('training immutable request admission', () => {
     expect(await records.listAll(subject)).toEqual(rows);
   });
 
+  it('preserves structured provenance, deduplicates one source, and appends corrections', async () => {
+    const records = await fixture();
+    const session = await workout(records);
+    const original = await recordTrainingFeedback({
+      records,
+      subject,
+      now,
+      createId: () => '22222222-2222-4222-8222-000000000001',
+      feedback: {
+        sessionId: session.id,
+        source: 'voice',
+        observedAt: '2026-01-10T11:59:00.000Z',
+        sourceObservationId: 'utterance-1',
+        targetMuscle: 'back',
+        targetMuscleReadiness: 'ready',
+        breathingReadiness: 'limited',
+        supportingReadiness: { grip: 'ready', trunk: 'ready' },
+        context: {
+          exerciseId: 'one_arm_dumbbell_row',
+          setId: 'set-2',
+          setNumber: 2,
+          setOrder: 4,
+          reps: 10,
+          loadKg: 25,
+          rir: 2,
+          restSeconds: 120,
+          setup: 'bench supported',
+          rangeOfMotion: 'full',
+          setFormat: 'straight',
+        },
+      },
+    });
+    expect(original).toMatchObject({
+      kind: 'recorded',
+      feedback: { source: 'voice', sourceObservationId: 'utterance-1' },
+      recommendation: { action: 'extend_rest', weeklyPlanChanged: false },
+    });
+    const afterOriginal = await records.listAll(subject);
+    const replay = await recordTrainingFeedback({
+      records,
+      subject,
+      now: new Date(now.getTime() + 10_000),
+      createId: jest.fn(() => 'should-not-be-created'),
+      feedback: {
+        sessionId: session.id,
+        source: 'import',
+        sourceObservationId: 'utterance-1',
+        targetMuscle: 'back',
+        targetMuscleReadiness: 'limited',
+      },
+    });
+    expect(replay.kind).toBe('recorded');
+    expect(await records.listAll(subject)).toEqual(afterOriginal);
+
+    const originalId = original.kind === 'recorded' ? original.feedback.id : '';
+    const correction = await recordTrainingFeedback({
+      records,
+      subject,
+      now: new Date(now.getTime() + 20_000),
+      createId: () => '22222222-2222-4222-8222-000000000002',
+      feedback: {
+        sessionId: session.id,
+        source: 'voice',
+        observedAt: '2026-01-10T11:59:00.000Z',
+        sourceObservationId: 'utterance-2',
+        correctsObservationId: originalId,
+        targetMuscle: 'back',
+        targetMuscleReadiness: 'ready',
+        breathingReadiness: 'ready',
+      },
+    });
+    expect(correction).toMatchObject({
+      kind: 'recorded',
+      feedback: { correctsObservationId: originalId },
+      recommendation: { action: 'proceed' },
+    });
+    const history = (await records.pull(subject, 'training_feedback')).records.filter(
+      (row) => row.record_type === 'session_feedback',
+    );
+    expect(history.map((row) => row.id)).toEqual([
+      originalId,
+      '22222222-2222-4222-8222-000000000002',
+    ]);
+  });
+
   it.each(['next', 'set', 'feedback'] as const)(
     '%s captures incarnation before snapshot awaits',
     async (kind) => {

@@ -82,7 +82,8 @@ final class LogYourBodyUITests: XCTestCase {
         if app.menuItems["Select All"].waitForExistence(timeout: 2) { app.menuItems["Select All"].tap() }
         load.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "22,5")
         app.buttons["training_log_set_fixture_press_1"].tap()
-        XCTAssertTrue(app.buttons["Set logged"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["training_progress"].label, "1 of 2 sets")
         app.buttons["Close"].tap()
         XCTAssertEqual(app.staticTexts["training_fixture_saved_load"].label, "Saved load: 22.5")
         attachScreenshot(named: "training-acknowledged-manual-load", from: app)
@@ -91,11 +92,9 @@ final class LogYourBodyUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(open.waitForExistence(timeout: 10))
         open.tap()
-        XCTAssertTrue(load.waitForExistence(timeout: 5))
-        XCTAssertEqual(load.value as? String, "22.5")
-        let logged = app.buttons["training_log_set_fixture_press_1"]
-        XCTAssertEqual(logged.label, "Set logged")
-        XCTAssertFalse(logged.isEnabled)
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["training_progress"].label, "1 of 2 sets")
+        XCTAssertFalse(app.buttons["training_log_set_fixture_press_1"].exists)
         attachScreenshot(named: "training-restored-after-relaunch", from: app)
     }
 
@@ -139,13 +138,13 @@ final class LogYourBodyUITests: XCTestCase {
         app.buttons["training_log_set_fixture_press_1"].tap()
         XCTAssertTrue(app.staticTexts["The set could not be saved."].waitForExistence(timeout: 5))
         XCTAssertEqual(load.value as? String, "60")
-        XCTAssertEqual(app.buttons["training_log_set_fixture_press_1"].label, "Log set")
+        XCTAssertEqual(app.buttons["training_log_set_fixture_press_1"].label, "Retry set")
         app.buttons["Close"].tap()
         offlineSwitch.switches.firstMatch.tap()
         XCTAssertEqual(offlineSwitch.value as? String, "0")
         app.buttons["training_fixture_open"].tap()
         app.buttons["training_log_set_fixture_press_1"].tap()
-        XCTAssertTrue(app.buttons["Set logged"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
         app.buttons["Close"].tap()
         XCTAssertEqual(app.staticTexts["training_fixture_count"].label, "Acknowledged sets: 1")
         XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 2")
@@ -169,8 +168,7 @@ final class LogYourBodyUITests: XCTestCase {
         load.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3))
         XCTAssertTrue(log.isEnabled)
         log.tap()
-        XCTAssertTrue(app.buttons["Set logged"].waitForExistence(timeout: 5))
-        XCTAssertFalse(log.isEnabled)
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
         app.buttons["Close"].tap()
         XCTAssertEqual(app.staticTexts["training_fixture_saved_load"].label, "Saved load: bodyweight")
         XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 1")
@@ -192,8 +190,8 @@ final class LogYourBodyUITests: XCTestCase {
         if app.menuItems["Select All"].waitForExistence(timeout: 2) { app.menuItems["Select All"].tap() }
         load.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "22,5")
         app.buttons["training_log_set_fixture_press_1"].tap()
-        XCTAssertTrue(app.staticTexts["Retry this set to confirm it was saved."].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.buttons["training_log_set_fixture_press_1"].label, "Log set")
+        XCTAssertTrue(app.staticTexts["training_pending_sync"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["training_log_set_fixture_press_1"].label, "Retry set")
         XCTAssertFalse(load.isEnabled)
         attachScreenshot(named: "training-server-commit-response-lost", from: app)
         app.terminate()
@@ -207,13 +205,103 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertEqual(load.value as? String, "22,5")
         XCTAssertFalse(load.isEnabled)
         app.buttons["training_log_set_fixture_press_1"].tap()
-        XCTAssertTrue(app.buttons["Set logged"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["training_log_set_fixture_press_1"].isEnabled)
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
         app.buttons["Close"].tap()
         XCTAssertEqual(app.staticTexts["training_fixture_count"].label, "Acknowledged sets: 1")
         XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 2")
         XCTAssertEqual(app.staticTexts["training_fixture_saved_load"].label, "Saved load: 22.5")
         attachScreenshot(named: "training-response-loss-relaunch-exact-retry", from: app)
+    }
+
+    func testTrainingControllerKeepsNowDominantAndUpNextVisible() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["training_now_card"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["training_up_next"].exists)
+        XCTAssertEqual(app.staticTexts["training_progress"].label, "0 of 2 sets")
+        XCTAssertTrue(app.textFields["training_load_fixture_press_1"].isHittable)
+        XCTAssertFalse(app.textFields["training_load_fixture_press_2"].exists)
+
+        app.buttons["training_log_set_fixture_press_1"].tap()
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["training_progress"].label, "1 of 2 sets")
+        XCTAssertTrue(app.staticTexts["training_rest_timer"].exists)
+        attachScreenshot(named: "training-now-up-next-advanced-after-ack", from: app)
+    }
+
+    func testTrainingCompletionUsesImmediateReducedMotionState() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestReduceMotion"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        app.buttons["training_log_set_fixture_press_1"].tap()
+        XCTAssertTrue(app.images["training_set_completion_receipt"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].exists)
+        XCTAssertTrue(app.buttons["training_log_set_fixture_press_2"].isEnabled)
+    }
+
+    func testTrainingCurrentNumericRowAcceptsFocusWithoutHidingUpNext() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let reps = app.textFields["training_reps_fixture_press_1"]
+        XCTAssertTrue(reps.waitForExistence(timeout: 5))
+        reps.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["training_up_next"].exists)
+        XCTAssertFalse(app.textFields["training_reps_fixture_press_2"].exists)
+    }
+
+    func testTrainingVoiceCapsuleCancelAndSilentInputAreTruthful() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture",
+            "-lybUITestSilentVoiceCapture"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let talk = app.buttons["training_voice_button"]
+        if !talk.isHittable { app.swipeUp() }
+        XCTAssertTrue(talk.waitForExistence(timeout: 5))
+        talk.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["training_voice_capsule"].waitForExistence(timeout: 3))
+        app.buttons["Cancel"].tap()
+        XCTAssertFalse(app.descendants(matching: .any)["training_voice_capsule"].exists)
+        XCTAssertFalse(app.staticTexts["Review command"].exists)
+
+        talk.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["training_voice_capsule"].waitForExistence(timeout: 3))
+        app.buttons["Stop"].tap()
+        let error = app.staticTexts["training_live_error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 3))
+        XCTAssertEqual(error.label, "Nothing heard. Try again.")
+    }
+
+    func testTrainingMicrophoneDenialLeavesControllerUsable() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestMicDenied"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let talk = app.buttons["training_voice_button"]
+        if !talk.isHittable { app.swipeUp() }
+        talk.tap()
+        let error = app.staticTexts["training_live_error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 3))
+        XCTAssertTrue(error.label.contains("Microphone access is off"))
+        XCTAssertTrue(app.descendants(matching: .any)["training_now_card"].exists)
+        XCTAssertTrue(app.buttons["training_log_set_fixture_press_1"].isEnabled)
     }
 
     func testWhatsNewFixtureRendersTheRedesignedReleaseSurface() throws {
@@ -2711,6 +2799,256 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_paywall_restore"].exists, "Restore stays visible")
         XCTAssertTrue(app.buttons["paywall_more_menu"].exists, "A way out stays in the ••• menu")
         attachScreenshot(named: "onboarding-v2-paywall", from: app)
+    }
+
+    func testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch() throws {
+        let app = XCUIApplication()
+        launchSyntheticChatReplay(app)
+        submitSyntheticChatQuestion(in: app)
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-full-turn")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-foreground")
+        app.terminate()
+        app.launch()
+        openHomeV2AskForDraftCheck(in: app)
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-persisted-relaunch")
+        XCTAssertEqual(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "You: Synthetic full-turn question")).count, 1)
+        app.buttons["home_chat_collapse"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8))
+    }
+
+    func testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity() throws {
+        let app = XCUIApplication()
+        launchSyntheticChatReplay(app, extra: ["-lybUITestChatErrorFixture"])
+        submitSyntheticChatQuestion(in: app)
+        let retry = app.buttons["chat_retry_button"]
+        let offered = retry.waitForExistence(timeout: 8)
+        attachScreenshot(named: "chat-synthetic-missing-done-failure", from: app)
+        XCTAssertTrue(offered, "Full text without done must remain a recoverable failed turn")
+        XCTAssertTrue(retry.isHittable)
+        let recovery = app.staticTexts["chat_recovery_message"]
+        XCTAssertTrue(recovery.exists)
+        XCTAssertEqual(recovery.label, "The answer could not be read. Please try again.")
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        retry.tap()
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-original-id-retry")
+        XCTAssertEqual(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "You: Synthetic full-turn question")).count, 1)
+        app.terminate()
+        app.launch()
+        openHomeV2AskForDraftCheck(in: app)
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-retry-persisted")
+    }
+
+    func testHomeV2AskSyntheticCancelledTurnRecovers() throws {
+        let app = XCUIApplication()
+        launchSyntheticChatReplay(app, extra: ["-lybUITestChatSlowFixture"])
+        submitSyntheticChatQuestion(in: app)
+        let partial = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "LogYourBody: Reviewing your authorized trend…")
+        ).firstMatch
+        let streaming = partial.waitForExistence(timeout: 8)
+        attachScreenshot(named: "chat-synthetic-before-cancel", from: app)
+        XCTAssertTrue(streaming)
+        XCTAssertEqual(app.buttons["chat_send_button"].label, "Stop answer", "An active turn cannot expose another submit")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        let stop = app.buttons["Stop answer"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        stop.tap()
+        let retry = app.buttons["chat_retry_button"]
+        let stopped = retry.waitForExistence(timeout: 8)
+        attachScreenshot(named: "chat-synthetic-cancelled", from: app)
+        XCTAssertTrue(stopped)
+        XCTAssertEqual(app.staticTexts["chat_recovery_message"].label, "Answer stopped. Retry when you’re ready.")
+        XCTAssertEqual(app.buttons["chat_send_button"].label, "Send message")
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        retry.tap()
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-cancel-retry")
+        XCTAssertEqual(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "You: Synthetic full-turn question")).count, 1)
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        composer.typeText("Unsent synthetic recovery draft")
+        XCTAssertTrue(app.buttons["chat_send_button"].isEnabled)
+        app.buttons["home_chat_collapse"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8))
+    }
+
+    private func launchSyntheticChatReplay(_ app: XCUIApplication, extra: [String] = []) {
+        // A unique nonce starts empty; the same launch environment deliberately survives relaunch.
+        app.launchEnvironment["LYB_UI_TEST_CHAT_REPLAY_ID"] = UUID().uuidString
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestChatFirstFixture",
+                           "-lybUITestChatReplayFixture"] + extra)
+        openHomeV2AskForDraftCheck(in: app)
+    }
+
+    private func submitSyntheticChatQuestion(in app: XCUIApplication) {
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        composer.typeText("Synthetic full-turn question")
+        let send = app.buttons["chat_send_button"]
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 8), .completed)
+        send.tap()
+    }
+
+    private func assertSyntheticChatCompleted(in app: XCUIApplication, capture: String) {
+        let response = "Your fixture trend is stable. Open Timeline to inspect the selected day."
+        let answer = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "LogYourBody: " + response)
+        ).firstMatch
+        let terminal = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            answer.exists && app.buttons["chat_send_button"].label == "Send message"
+                && !app.buttons["chat_retry_button"].exists
+                && !app.descendants(matching: .any)["chat_recovery_message"].exists
+        }, object: app)
+        let completed = XCTWaiter.wait(for: [terminal], timeout: 8) == .completed
+        attachScreenshot(named: capture, from: app)
+        XCTAssertTrue(completed, "Require the full rendered answer and terminal success, not a root, partial text or HTTP status")
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_recovery_message"].exists)
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        XCTAssertTrue(app.textFields["chat_composer"].isHittable)
+    }
+
+    func testComposerLoggingSelectorTapPathsKeepTheAskDraft() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestComposerLoggingPrototype"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+
+        let composer = app.textFields["chat_composer"]
+        let draft = "Compare this week with my previous body composition trend before I log anything"
+        composer.tap()
+        composer.typeText(draft)
+
+        let plus = app.buttons["composer_logging_plus"]
+        let shell = app.descendants(matching: .any)["chat_composer_shell"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        let multilineHeight = shell.frame.height
+        plus.tap()
+        XCTAssertTrue(app.buttons["composer_log_weight"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["composer_log_body_fat"].exists)
+        XCTAssertTrue(app.buttons["composer_log_photo"].exists)
+        XCTAssertEqual(shell.frame.height, multilineHeight, accuracy: 1)
+        for identifier in ["composer_logging_close", "composer_log_weight", "composer_log_body_fat", "composer_log_photo"] {
+            XCTAssertGreaterThanOrEqual(app.buttons[identifier].frame.height, 44)
+        }
+        attachScreenshot(named: "composer-logging-selector-keyboard-draft", from: app)
+
+        app.buttons["composer_logging_close"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 3))
+        XCTAssertEqual(composer.value as? String, draft)
+        XCTAssertFalse(app.staticTexts[draft].exists, "Opening or closing the selector must not send the draft")
+
+        plus.tap()
+        app.buttons["composer_log_weight"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].exists)
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertEqual(composer.value as? String, draft)
+
+        plus.tap()
+        app.buttons["composer_log_body_fat"].tap()
+        XCTAssertTrue(app.navigationBars["Body fat"].waitForExistence(timeout: 5))
+        let bodyFatField = app.textFields.matching(
+            NSPredicate(format: "label == %@", "Body fat percentage value")
+        ).firstMatch
+        XCTAssertTrue(bodyFatField.exists)
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertEqual(composer.value as? String, draft)
+
+        plus.tap()
+        app.buttons["composer_log_photo"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["progress_photo_attach_sheet"].waitForExistence(timeout: 5))
+        app.buttons["progress_photo_attach_cancel_button"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertEqual(composer.value as? String, draft)
+    }
+
+    func testComposerLoggingSelectorUsesExpandedTapFallbackAtAccessibilityTextSize() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestComposerLoggingPrototype",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityXXXL"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+
+        app.buttons["composer_logging_plus"].tap()
+        let close = app.buttons["composer_logging_close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        XCTAssertEqual(close.label, "Close logging options")
+        for identifier in ["composer_log_weight", "composer_log_body_fat", "composer_log_photo"] {
+            let option = app.buttons[identifier]
+            XCTAssertTrue(option.exists)
+            XCTAssertGreaterThanOrEqual(option.frame.height, 44)
+        }
+        attachScreenshot(named: "composer-logging-selector-accessibility-expanded", from: app)
+
+        close.tap()
+        XCTAssertTrue(app.buttons["composer_logging_plus"].waitForExistence(timeout: 3))
+    }
+
+    func testComposerLoggingHoldDragCancelsOutsideAndCannotTriggerSave() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestComposerLoggingPrototype"
+        ])
+        openHomeV2AskForDraftCheck(in: app)
+
+        let composer = app.textFields["chat_composer"]
+        let draft = "Keep this draft"
+        composer.tap()
+        composer.typeText(draft)
+
+        let plus = app.buttons["composer_logging_plus"]
+        let shell = app.descendants(matching: .any)["chat_composer_shell"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        XCTAssertTrue(shell.exists)
+
+        let start = plus.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let outside = app.coordinate(withNormalizedOffset: .zero).withOffset(
+            CGVector(dx: shell.frame.midX, dy: max(shell.frame.minY - 80, 1))
+        )
+        start.press(forDuration: 0.4, thenDragTo: outside)
+        XCTAssertTrue(plus.waitForExistence(timeout: 3), "Release outside restores the composer")
+        XCTAssertEqual(composer.value as? String, draft)
+
+        let minimumHitTarget = CGFloat(44)
+        let modeWidth = (shell.frame.width - minimumHitTarget) / 3
+        let weightTarget = app.coordinate(withNormalizedOffset: .zero).withOffset(
+            CGVector(
+                dx: shell.frame.minX + minimumHitTarget + modeWidth / 2,
+                dy: shell.frame.midY
+            )
+        )
+        start.press(forDuration: 0.4, thenDragTo: weightTarget)
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 5),
+            "Release selects Weight without another confirmation tap"
+        )
+        XCTAssertTrue(
+            app.buttons["home_v2_log_sheet_save"].exists,
+            "The release may reveal Save but must never activate it"
+        )
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        XCTAssertEqual(composer.value as? String, draft)
     }
 
     func testHomeV2UnsentAskDraftSurvivesCollapseAndReopenWithoutSending() throws {

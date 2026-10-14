@@ -30,7 +30,8 @@
       "@/types/*": ["./src/types/*"],
       "@/constants/*": ["./src/constants/*"],
       "@/data/*": ["./src/data/*"],
-      "@/generated/*": ["./src/generated/*"]
+      "@/generated/*": ["./src/generated/*"],
+      "@jovie/ui/*": ["../../packages/jovie-ui/*"]
     },
     "incremental": true
   },
