@@ -187,7 +187,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `8d8734ec70ca047c45b9254fd00b5e2c08f9e671a03a0766b322c8d7b49156fb`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf5c356e7500423dd53e699e598e2a2af39d91a48f03bad07df27b9c1da91b51`)
 
 ### `package.json`: packageManager
 
@@ -378,10 +378,13 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3590f5fc9bca5f30a8eaac908a762e683611a4d4126b8b8d611c1515a38b13ea`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `961a9b9b5ba011ab37c12fd9d794eeabdf8d238b04a65a579aba59771405cc9d`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `beac3e0f017181ca7f5e302393dd4507aeb107b93d7d6bec94e06611cb2cb6df`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `f92b600361fe9d26b2a4c9a944c8c921d33feb8eafb756a77ab0b285b940a3f6`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `cdd99f5f4e4b9f559e4e3e3b6889e00d7fbbe612166e0872f812d0ed23eafd7b`)
+- `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `8f360bd2a678c0f954ed7106821934ba8227ead4cb645717d086814cc9acd1ca`)
+- `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `1e7d727805b3918f54714fbd84407bd30d6441bff56ee89542027b0bc69a0eab`)
 
 ## Pinned shared sources
 
@@ -391,3 +394,24 @@ Updates are independent reviewable consumer changes. Local instructions remain s
 - `scripts/repository_docs.py` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:scripts/repository_docs.py` (SHA-256 `578f1db8842d50b70bc2ec28bffb23cd8620222c8e9f8b896797f4de88f82d43`)
 - `tests/test_repository_docs.py` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:tests/test_repository_docs.py` (SHA-256 `9cb660d8c2fa145b17cc04e522a9e692ff8131f6126e6a584527ccbc3d3fbe80`)
 - `docs/company/CI_TOOL_LICENSE` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:LICENSE` (SHA-256 `c8465c8b9f97966f84ca0ef5f8440f37315a73ef76044b7bdfa74a3fbef4f143`)
+- `apps/ios/Scripts/import-joviekit.mjs` ← `JovieInc/Jovie@1e6c7f11ef1cc4fb64c59c1b1758d823e8c6bc48:apps/ios/scripts/import-joviekit.mjs` (SHA-256 `35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b`)
+- `apps/ios/Vendor/JovieKit.source.json` ← `JovieInc/Jovie@1e6c7f11ef1cc4fb64c59c1b1758d823e8c6bc48:apps/ios/Packages/JovieKit.source.json` (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
+- `apps/ios/Vendor/JovieKit/.jovie-source.json` ← `JovieInc/Jovie@1e6c7f11ef1cc4fb64c59c1b1758d823e8c6bc48:apps/ios/Packages/JovieKit.source.json` (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
+- `apps/ios/Vendor/JovieKit/.gitignore` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/.gitignore` (SHA-256 `acc718146d21aae829cba1761475e05de39d73209d83af2ab8487a74843cead0`)
+- `apps/ios/Vendor/JovieKit/Package.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Package.swift` (SHA-256 `aa88704f7220d98307ea057bc06e052605809218e64b40886c063b429c2521ab`)
+- `apps/ios/Vendor/JovieKit/Sources/JovieKit/AppReviewPolicy.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/AppReviewPolicy.swift` (SHA-256 `1e98c8a910ca08730e5b7ce843cbf22a259b035f6b36abe993b28a70ed379f12`)
+- `apps/ios/Vendor/JovieKit/Sources/JovieKit/EyesFreeCaptureAPI.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/EyesFreeCaptureAPI.swift` (SHA-256 `c2c70a21efa724a313c090fb111c2b4f15aabc957167d4eaf15f5a301bf42feb`)
+- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatAuthorizing.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatAuthorizing.swift` (SHA-256 `5580aaf71485ad4b6e88bd7a8ec6433d314b5038768d1fd3e5753081b827e02f`)
+- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatNDJSONParser.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatNDJSONParser.swift` (SHA-256 `b4723fff9354d795561020361850fd12a9e917b599581e08206db95f172b3ee8`)
+- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatNDJSONReader.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatNDJSONReader.swift` (SHA-256 `3ef2251781c1a7023d20a7d4502d2d83972662132b1e850fcef26f47b4dd1dee`)
+- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatStreamCoalescer.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatStreamCoalescer.swift` (SHA-256 `11595b916203e117f721b1eaa8f0253b7957b088d9b45cd1572bcca2071f0ff3`)
+- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatStreamEvent.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatStreamEvent.swift` (SHA-256 `6fc3a978e0786fac7abcc9cf979535d4193fce15b5261aeb0c3be054454df58b`)
+- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatTransport.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatTransport.swift` (SHA-256 `0f3829a8811b6020f6c872d66cf3f0d5630312fcb73ddf784165f55aab3246ba`)
+- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileConversationModels.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileConversationModels.swift` (SHA-256 `532510cc83b1124af92e0ea027da518a9480c4c52e7723603ccaafd615aa7775`)
+- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/AppReviewPolicyTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/AppReviewPolicyTests.swift` (SHA-256 `5a6744fac1c654fd769a0e5ca6504ef3db1f47dffdd802a8b1509a793978a79a`)
+- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatNDJSONParserTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatNDJSONParserTests.swift` (SHA-256 `4a3508df5567cbaa3d094d65b32826ef9cb170d8395c278bd50ee096198dfc7f`)
+- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatNDJSONReaderTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatNDJSONReaderTests.swift` (SHA-256 `247e989555ecbb27ba61121319126ec71feb969ec7061c6916a3247c71df3225`)
+- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatStreamCoalescerTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatStreamCoalescerTests.swift` (SHA-256 `1c5e23c756fe04ab422622d862e4b219fcea78ee75e8851dc374c49e0a085cf8`)
+- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatTransportTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatTransportTests.swift` (SHA-256 `77f477526edfec88f9a42e506f231c3acc2d000450ac21c7aa060d7ddce47380`)
+- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileConversationModelsTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileConversationModelsTests.swift` (SHA-256 `a2823075a5f0de5f9dd691db4fa5f6bdf53e87ae924c337205d52a8d039cceb3`)
+- `apps/ios/Vendor/JovieKit/LICENSE` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:LICENSE` (SHA-256 `b6eb8a4e5f2aa94db96d0ec35126fb88561f162ae3383d82330996ead3361526`)

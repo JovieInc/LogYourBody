@@ -100,6 +100,16 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://raw.githubusercontent.com',
+      reason:
+        'Immutable JovieKit source import; the canonical downloader validates repository, revision, paths and SHA-256 before materialization.',
+    },
+    {
+      value: 'https://transport.invalid',
+      reason:
+        'Reserved URLProtocol fixture host in canonical JovieKit tests; not a runtime endpoint.',
+    },
+    {
       value: 'https://github.com/ChatPRD/lennys-podcast-transcripts',
       reason: 'Podcast transcript citation in docs/research; not a dependency.',
     },

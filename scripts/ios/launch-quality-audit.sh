@@ -318,6 +318,7 @@ LAUNCH_QUALITY_UI_TESTS=(
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
   "LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail"
+  "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal"
 )
 
 # Security-sensitive chaos regressions use the same native execution and
@@ -344,7 +345,7 @@ for test_id in "${LAUNCH_QUALITY_UI_TESTS[@]}" "${CHAOS_REGRESSIONS[@]}"; do
 done
 UI_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui.xcresult"
 UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
-# One runner launch (up to ~9 min hosted) plus all seventeen UI tests (~6 min)
+# One runner launch (up to ~9 min hosted) plus all selected UI tests
 # replaces three separately bounded invocations, so its own bound is the
 # per-invocation limit plus the work the other two used to carry.
 UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1500}"
