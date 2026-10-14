@@ -98,7 +98,10 @@ export const logYourBody = {
         r2PublicHost: 'photos.logyourbody.com',
       },
       revenuecat: { apiHost: 'api.revenuecat.com' },
-      statsig: { apiHost: 'statsigapi.net' },
+      statsig: {
+        apiHost: 'statsigapi.net',
+        gateEvaluationUrl: 'https://api.statsig.com/v1/check_gate',
+      },
       sentry: { ingestHost: '*.ingest.sentry.io' },
       bodyspec: { authHost: 'auth.bodyspec.com' },
       pravatar: { host: 'i.pravatar.cc' },

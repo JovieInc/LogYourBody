@@ -59,16 +59,29 @@ const nextConfig: NextConfig = {
 
   // RFC 9728 protected-resource metadata for the MCP server (see src/lib/mcp/contract.ts).
   async rewrites() {
-    return [
-      {
-        source: '/.well-known/oauth-protected-resource/api/mcp',
-        destination: '/api/mcp/oauth-protected-resource',
-      },
-      {
-        source: '/.well-known/oauth-protected-resource',
-        destination: '/api/mcp/oauth-protected-resource',
-      },
-    ];
+    return {
+      afterFiles: [
+        {
+          source: '/.well-known/oauth-protected-resource/api/mcp',
+          destination: '/api/mcp/oauth-protected-resource',
+        },
+        {
+          source: '/.well-known/oauth-protected-resource',
+          destination: '/api/mcp/oauth-protected-resource',
+        },
+      ],
+      // Only after real files/pages/dynamic routes; ordinary HTML404 is untouched.
+      fallback: [
+        {
+          // Keep the same path exclusions as middleware so a skipped request
+          // cannot forge its gate-decision header.
+          source:
+            '/:path((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+          has: [{ type: 'header', key: 'x-lyb-public-markdown', value: '1' }],
+          destination: '/api/marketing/markdown-not-found',
+        },
+      ],
+    };
   },
 
   // Headers for apple-app-site-association
