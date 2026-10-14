@@ -3001,6 +3001,8 @@ final class LogYourBodyUITests: XCTestCase {
             app.descendants(matching: .any)["home_v2_photo_stage"].waitForExistence(timeout: 30)
         )
         XCTAssertFalse(coach.exists, "The coach mark never occupies product space again")
+    }
+
     func testHomeV2ChangingLogDateDoesNotCreateATodayUndoReceipt() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
