@@ -26,10 +26,10 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `308eefa5e2f5b371d60eb5142243654503b53b67ba2f36477bf7d389a57e89f3`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11956a92eceafb5392139625818d29853dace83bb0d22cf5ccda565c6ffa8aca`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `24015f5812c3157efebc973c6aa0bbd00eae6e1747be4966eb9dff152e46377c`)
-- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b80196f02c3964184cacd19fe21c355bcc90b67d82148263b06cefa69bcbfcff`)
+- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c3927f763c224c45f43ef1a226740c6cd3334428f1db39a2d63e64a9d11931e4`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b497034ac102730cc4a952c06866a422db368424e352991f7f0dd68911e27be5`)
 
 ### `apps/web/package.json`: engines
 
@@ -105,7 +105,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-toast": "^1.2.23",
   "@radix-ui/react-toggle": "^1.1.18",
   "@radix-ui/react-toggle-group": "^1.1.19",
-  "@radix-ui/react-tooltip": "^1.2.16",
+  "@radix-ui/react-tooltip": "^1.3.0",
   "@radix-ui/react-visually-hidden": "^1.2.11",
   "@statsig/js-client": "^3.33.5",
   "@tailwindcss/postcss": "^4.3.3",
@@ -121,13 +121,13 @@ A changed fingerprint requires review of its related documentation; it does not 
   "date-fns": "^4.4.0",
   "embla-carousel-react": "^8.6.0",
   "exifr": "^7.1.3",
-  "framer-motion": "^12.43.0",
+  "framer-motion": "^14.0.0",
   "glob": "^11.1.0",
   "idb": "^8.0.3",
   "input-otp": "^1.5.0",
   "js-yaml": "5.4.3",
   "lodash": "^4.18.1",
-  "lucide-react": "^1.48.0",
+  "lucide-react": "^1.55.0",
   "next": "15.5.27",
   "next-themes": "^0.4.6",
   "openai": "^6.49.0",
@@ -378,7 +378,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3590f5fc9bca5f30a8eaac908a762e683611a4d4126b8b8d611c1515a38b13ea`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `d31d02f24b901f5eca4ad8dd497b0bc20c136906f29fc73813996bb17f44a8e5`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `0d57f91297867410d35bd3dc3cdfca0e3c0a7d07d1c932dfdae1eaaa6b74b887`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `f92b600361fe9d26b2a4c9a944c8c921d33feb8eafb756a77ab0b285b940a3f6`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `cdd99f5f4e4b9f559e4e3e3b6889e00d7fbbe612166e0872f812d0ed23eafd7b`)

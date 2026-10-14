@@ -158,6 +158,22 @@ enum HomeV2Copy {
         "Latest photo · \(date)"
     }
 
+    /// Timeline caption above the number: "Sep 25 · Apple Health".
+    static func dayCaption(date: String, source: String) -> String {
+        "\(date) · \(source)"
+    }
+
+    /// Selected-day body fat with provenance: "Body fat 15.8% · DEXA".
+    static func dayBodyFatLine(value: String, source: String) -> String {
+        "Body fat \(value)% · \(source)"
+    }
+
+    /// The editorial plate on a day without a photo.
+    static let noPhotoThisDay = "No photo this day"
+    /// Shown once, then gone for good.
+    static let timelineCoachHint = "Swipe through your history. Drag the timeline to jump in time."
+    static let coachDismissedDefaultsKey = "home_v2_timeline_coach_dismissed"
+
     /// H1 status line: "Cutting for 9 weeks." Nothing is claimed about pace
     /// without a target, and nothing at all before there is a trend.
     static func phaseSentence(kind: PhaseInsightKind, weeks: Int) -> String? {
