@@ -21,12 +21,15 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # Self-hosted Macs keep their selected Xcode: setup-xcode needs sudo.
     - name: Setup Xcode
+      if: runner.environment == 'github-hosted'
       uses: maxim-lobanov/setup-xcode@v1
       with:
         xcode-version: ${{ inputs.xcode-version }}
 
     - name: Cache Homebrew packages
+      if: runner.environment == 'github-hosted'
       uses: actions/cache@v4
       id: homebrew-cache
       with:
@@ -47,11 +50,18 @@ runs:
         # picks up new/renamed default-enabled rules (e.g. legacy_swiftui_aspect_ratio)
         # and breaks --strict CI on unrelated PRs with no local repro.
         SWIFTLINT_VERSION="0.63.3"
+        # The tool cache is user-writable on hosted and self-hosted runners;
+        # /usr/local/bin is root-owned on the self-hosted Macs.
+        SWIFTLINT_DIR="${RUNNER_TOOL_CACHE}/swiftlint/${SWIFTLINT_VERSION}"
         if ! command -v swiftlint &> /dev/null || [[ "$(swiftlint version)" != "$SWIFTLINT_VERSION" ]]; then
-          echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
-          curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
-          unzip -o swiftlint.zip -d /usr/local/bin
-          chmod +x /usr/local/bin/swiftlint
+          if [[ ! -x "$SWIFTLINT_DIR/swiftlint" ]]; then
+            echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
+            mkdir -p "$SWIFTLINT_DIR"
+            curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
+            unzip -o swiftlint.zip -d "$SWIFTLINT_DIR"
+            chmod +x "$SWIFTLINT_DIR/swiftlint"
+          fi
+          echo "$SWIFTLINT_DIR" >> "$GITHUB_PATH"
         else
           echo "SwiftLint already installed: $(swiftlint version)"
         fi
@@ -75,7 +85,11 @@ runs:
         working-directory: ${{ inputs.working-directory }}
         cache-key-prefix: 'ios-gems'
 
+    # Hosted only: on a persistent Mac this globs every project's DerivedData
+    # and the post-job save uploaded for 30+ min over the home uplink until the
+    # job timed out (2026-10-12, tw-mac-001). The Macs keep packages locally.
     - name: Cache Swift Package Manager
+      if: runner.environment == 'github-hosted'
       uses: actions/cache@v4
       with:
         path: |

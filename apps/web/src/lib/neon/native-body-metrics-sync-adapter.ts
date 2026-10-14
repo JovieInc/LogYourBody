@@ -1,3 +1,9 @@
+import type { NativeAccountAdmission } from '@/lib/ports/native-account-admission';
+import {
+  type NativeMutationQuery,
+  captureNativeAccountAdmission,
+  executeNativeMutationQueries,
+} from './native-account-admission';
 import 'server-only';
 
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
@@ -136,13 +142,33 @@ function pushParams(subject: string, record: NativeBodyMetricPushInput) {
 export function createNeonNativeBodyMetricsSync(
   database: NeonQueryFunction<false, false> = getDatabase(),
 ): NativeBodyMetricsSyncPort {
-  return {
-    async push(subject, records) {
-      const accepted: NativeBodyMetricSyncRecord[] = [];
-      const rejectedIds: string[] = [];
+  async function remove(subject: string, ids: string[], admission?: NativeAccountAdmission) {
+    const [rows] = (await executeNativeMutationQueries(database, admission, [
+      database.query(
+        `update public.body_metrics
+         set deleted_at = coalesce(deleted_at, now()),
+             updated_at = now()
+         where user_subject = $1 and id = any($2::uuid[])
+         returning id`,
+        [subject, ids],
+      ),
+    ])) as Array<Array<{ id: string }>>;
+    return { deleted_ids: (rows ?? []).map((row) => row.id) };
+  }
 
-      for (const record of records) {
-        const rows = (await database.query(
+  async function push(
+    subject: string,
+    records: NativeBodyMetricPushInput[],
+    admission?: NativeAccountAdmission,
+  ) {
+    const accepted: NativeBodyMetricSyncRecord[] = [];
+    const rejectedIds: string[] = [];
+    const queries: NativeMutationQuery[] = [];
+    const submittedIds: string[] = [];
+
+    for (const record of records) {
+      queries.push(
+        database.query(
           `insert into public.body_metrics (
              id, user_subject, date, measured_at, local_date, origin,
              weight, weight_unit, body_fat_percentage, body_fat_method,
@@ -178,14 +204,28 @@ export function createNeonNativeBodyMetricsSync(
            where public.body_metrics.user_subject = excluded.user_subject
            returning ${columns}`,
           pushParams(subject, record),
-        )) as NativeBodyMetricRow[];
+        ),
+      );
+      submittedIds.push(record.id);
+    }
+    const results = await executeNativeMutationQueries(database, admission, queries);
+    for (const [index, result] of results.entries()) {
+      const rows = result as NativeBodyMetricRow[];
 
-        if (rows[0]) accepted.push(mapRecord(rows[0]));
-        else rejectedIds.push(record.id);
-      }
+      if (rows[0]) accepted.push(mapRecord(rows[0]));
+      else rejectedIds.push(submittedIds[index]!);
+    }
 
-      return { records: accepted, rejected_ids: rejectedIds };
+    return { records: accepted, rejected_ids: rejectedIds };
+  }
+
+  return {
+    accountMutations: {
+      capture: (subject) => captureNativeAccountAdmission(database, subject),
+      push: (admission, records) => push(admission.subject, records, admission),
+      remove: (admission, ids) => remove(admission.subject, ids, admission),
     },
+    push,
 
     async pull(subject, input) {
       const limit = Math.min(Math.max(input.limit ?? 200, 1), 500);
@@ -220,22 +260,18 @@ export function createNeonNativeBodyMetricsSync(
       };
     },
 
-    async remove(subject, ids) {
-      if (ids.length === 0) return { deleted_ids: [] };
-      const rows = (await database.query(
-        `update public.body_metrics
-         set deleted_at = coalesce(deleted_at, now()),
-             updated_at = now()
-         where user_subject = $1 and id = any($2::uuid[])
-         returning id`,
-        [subject, ids],
-      )) as Array<{ id: string }>;
-      return { deleted_ids: rows.map((row) => row.id) };
-    },
+    remove,
   };
 }
 
 export const neonNativeBodyMetricsSync: NativeBodyMetricsSyncPort = {
+  accountMutations: {
+    capture: (subject) => captureNativeAccountAdmission(getDatabase(), subject),
+    push: (admission, records) =>
+      createNeonNativeBodyMetricsSync().accountMutations!.push(admission, records),
+    remove: (admission, ids) =>
+      createNeonNativeBodyMetricsSync().accountMutations!.remove(admission, ids),
+  },
   push: (subject, records) => createNeonNativeBodyMetricsSync().push(subject, records),
   pull: (subject, input) => createNeonNativeBodyMetricsSync().pull(subject, input),
   remove: (subject, ids) => createNeonNativeBodyMetricsSync().remove(subject, ids),

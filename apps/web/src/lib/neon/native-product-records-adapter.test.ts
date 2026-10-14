@@ -37,6 +37,52 @@ function row(
 }
 
 describe('createNeonNativeProductRecords', () => {
+  it.each([
+    { steps_present: true },
+    { steps_present: true, steps: null },
+    { steps_present: true, steps: Number.NaN },
+    { steps_present: true, steps: Number.POSITIVE_INFINITY },
+    { steps_present: true, steps: -1 },
+    { steps_present: true, steps: 0.5 },
+    { steps_present: true, steps: 2147483648 },
+    { steps_present: false },
+    { steps_present: false, steps: 0 },
+    { steps_present: null, steps: 0 },
+    { steps_present: 'true', steps: 0 },
+    { steps_present: undefined, steps: 0 },
+  ])(
+    'rejects invalid daily presence from an internal caller without a write: %p',
+    async (value) => {
+      const query = jest.fn().mockResolvedValueOnce([row({ id: morningId, ...value })]);
+      const store = createNeonNativeProductRecords(databaseWith(query));
+      await expect(
+        store.push('owner-subject', 'daily_metrics', [{ id: morningId, ...value }]),
+      ).resolves.toEqual({ records: [], rejected_ids: [morningId] });
+      expect(query).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    {},
+    { steps: null },
+    { steps: 0 },
+    { steps: 8421 },
+    { steps: 0, steps_present: true },
+    { steps: 2147483647, steps_present: true },
+    { steps: null, steps_present: false },
+  ])('keeps raw legacy and explicit daily presence payloads distinct: %p', async (value) => {
+    const record = { id: morningId, date: morning.date, ...value };
+    const query = jest.fn().mockResolvedValueOnce([row(record)]);
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    const result = await store.push('owner-subject', 'daily_metrics', [record]);
+    expect(result.rejected_ids).toEqual([]);
+    expect(JSON.parse(String(query.mock.calls[0][1][3]))).toEqual(record);
+    expect(result.records[0]).toMatchObject(record);
+    if (!Object.hasOwn(value, 'steps_present')) {
+      expect(result.records[0]).not.toHaveProperty('steps_present');
+    }
+  });
+
   it('upserts jsonb payloads by client id without dropping extra native fields', async () => {
     const query = jest.fn().mockResolvedValueOnce([row(morning)]);
     const store = createNeonNativeProductRecords(databaseWith(query));
@@ -138,6 +184,29 @@ describe('createNeonNativeProductRecords', () => {
       'user_subject = $2 and deleted_at is null',
     );
     expect(query.mock.calls[1][1]).toEqual([morningId, 'owner-subject']);
+  });
+
+  it('rejects an explicit null DEXA payload even for an internal caller', async () => {
+    const query = jest.fn();
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    await expect(
+      store.push('owner-subject', 'dexa_results', [{ id: morningId, reported_measurements: null }]),
+    ).resolves.toEqual({ records: [], rejected_ids: [morningId] });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('retains an uninterpreted future envelope in both database parameters and returned records', async () => {
+    const envelope = {
+      schema_version: 2,
+      items: [{ kind: 'future', payload: { observed: 'unknown' } }],
+    };
+    const input = { id: morningId, reported_measurements: envelope };
+    const query = jest.fn().mockResolvedValue([row(input)]);
+    const store = createNeonNativeProductRecords(databaseWith(query));
+    const result = await store.push('owner-subject', 'dexa_results', [input]);
+    expect(JSON.parse(String(query.mock.calls[0]?.[1]?.[3]))).toEqual(input);
+    expect(result.records[0]?.reported_measurements).toEqual(envelope);
+    expect(result.records[0]).not.toHaveProperty('muscle_mass');
   });
 
   it('pulls incrementally for the authenticated subject including tombstones', async () => {
