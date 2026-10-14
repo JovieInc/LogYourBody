@@ -4,6 +4,12 @@ name: iOS Quality
 # JovieInc/Jovie .claude/rules/infra.md "macOS runners".
 
 on:
+  workflow_dispatch:
+    inputs:
+      checkout-ref:
+        description: Full SHA of a current branch head in this repository to qualify on hosted macOS.
+        required: true
+        type: string
   workflow_call:
     inputs:
       checkout-ref:
@@ -33,7 +39,7 @@ permissions:
 jobs:
   mac:
     name: Mac Route
-    if: ${{ inputs.mac-first && !inputs.mac-child }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))) && inputs.mac-first && !inputs.mac-child }}
     permissions:
       actions: write
       contents: read
@@ -47,13 +53,34 @@ jobs:
     name: Launch Quality
     needs: [mac]
     if: ${{ !cancelled() && (inputs.mac-child || needs.mac.result == 'skipped' || needs.mac.outputs.run_hosted == 'true') }}
-    runs-on: ${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
+    runs-on: ${{ !(github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))) && inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
     # Setup plus one 52-minute audit plus the 8-minute performance cap.
     timeout-minutes: 64
     steps:
+      - name: Validate manual qualification source
+        if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository)) }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKOUT_REF: ${{ inputs.checkout-ref }}
+        run: |
+          set -euo pipefail
+          reject() { printf '::error::%s\n' "$1"; exit 1; }
+          [[ "$GITHUB_REPOSITORY" == 'JovieInc/LogYourBody' &&
+             "$GITHUB_REF" == 'refs/heads/main' ]] || reject 'Dispatch the trusted main workflow in JovieInc/LogYourBody.'
+          [[ "$CHECKOUT_REF" =~ ^[0-9a-f]{40}$ ]] || reject 'checkout-ref must be a full lowercase 40-hex commit SHA.'
+          for actor in "$GITHUB_ACTOR" "${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}"; do
+            permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$actor/permission" --jq '.permission')" || reject 'Cannot verify dispatch actor permission.'
+            [[ "$permission" == 'write' || "$permission" == 'admin' ]] || reject 'Dispatch and rerun actors must have repository write access.'
+          done
+          head_proven="$(gh api "repos/$GITHUB_REPOSITORY/commits/$CHECKOUT_REF/branches-where-head" --jq 'type == "array" and any(.[]; (.name | type == "string" and length > 0) and .commit.sha == env.CHECKOUT_REF)')" || reject 'Cannot verify repository branch head.'
+          [[ "$head_proven" == 'true' ]] || reject 'checkout-ref must be a current branch head in this repository.'
+          printf 'Qualified source: %s@%s (dispatch actor %s; rerun actor %s)\n' "$GITHUB_REPOSITORY" "$CHECKOUT_REF" "$GITHUB_ACTOR" "${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}"
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.checkout-ref || github.sha }}
+          persist-credentials: ${{ !(github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))) }}
 
       - name: Setup iOS build environment
         uses: ./.github/actions/setup-ios-build
