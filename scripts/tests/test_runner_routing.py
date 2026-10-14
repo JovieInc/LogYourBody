@@ -1082,6 +1082,60 @@ def test_failed_query_and_unknown_state_select_hosted(tmp_path: Path) -> None:
     assert 'trusted heartbeat query failed' in output.read_text()
 
 
+
+def test_chat_corpus_selects_public_turns_and_requires_exact_unit_and_ui_passes() -> None:
+    import copy
+    import importlib.util
+    import pytest
+
+    source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
+    unit = "CHAT_QUALIFICATION_UNIT_TESTS=(" + source.split("CHAT_QUALIFICATION_UNIT_TESTS=(", 1)[1].split("# The whole unit target", 1)[0]
+    ui = "LAUNCH_QUALITY_UI_TESTS=(" + source.split("LAUNCH_QUALITY_UI_TESTS=(", 1)[1].split("UI_RESULT_BUNDLE=", 1)[0]
+    result = subprocess.run(["bash", "-e", "-u", "-c", unit + ui +
+        '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
+        'printf "ui:%s\\n" "${UI_EVIDENCE_ARGS[@]}"\n' +
+        'printf "unit:%s\\n" "${CHAT_UNIT_EVIDENCE_ARGS[@]}"\n'],
+        text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+    assert result.returncode == 0, result.stderr
+    selectors = [line.removeprefix("selector:") for line in result.stdout.splitlines() if line.startswith("selector:")]
+    expected_ui = [line.removeprefix("ui:") for line in result.stdout.splitlines() if line.startswith("ui:")][1::2]
+    expected_unit = [line.removeprefix("unit:") for line in result.stdout.splitlines() if line.startswith("unit:")][1::2]
+    required_ui = ["LogYourBodyUITests/" + name + "()" for name in [
+        "testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch",
+        "testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity",
+        "testHomeV2AskSyntheticCancelledTurnRecovers"]]
+    required_unit = ["ChatServiceTests/" + name + "()" for name in [
+        "testSyntheticChatCompletionRestoresThroughExistingHistoryPort",
+        "testSyntheticChatRetryRetainsOriginalIdentity",
+        "testSyntheticChatMissingDoneAndCancelledTurnNeverPersistComplete",
+        "testTurnRejectsDelayedReplacementTokenBeforeOpeningStream",
+        "testTurnDropsHeldMetadataDeltasCompletionAndFailureAfterReplacement",
+        "testTurnSuppressesDelayedProviderErrorButPreservesCurrentErrors",
+        "testHistoryLoadRejectsDelayedSuccessEmptyAndErrorAfterOwnershipOrLoadChanges",
+        "testHistoryLoadRejectsTokenFromReplacementSessionBeforeSending",
+        "testCurrentTurnAcceptsRotatedTokenEventsAndRequiresCompletion"]]
+    for identifier in required_ui:
+        assert selectors.count("-only-testing:LogYourBodyUITests/" + identifier.removesuffix("()")) == 1
+        assert expected_ui.count(identifier) == 1
+    assert expected_unit == required_unit
+    assert '--require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"' in source
+    spec = importlib.util.spec_from_file_location("chat_corpus_evidence", _REPO_ROOT / "scripts/ios/launch-quality-evidence.py")
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    required = required_ui + required_unit
+    passed = {"testNodes": [{"nodeType": "Test Case", "nodeIdentifier": name, "result": "Passed"} for name in required]}
+    assert len(evidence.validate_cases(passed, required)) == len(required)
+    for index in range(len(required)):
+        for status in [None, "Skipped", "Failed"]:
+            negative = copy.deepcopy(passed)
+            if status is None:
+                negative["testNodes"].pop(index)
+            else:
+                negative["testNodes"][index]["result"] = status
+            with pytest.raises(ValueError):
+                evidence.validate_cases(negative, required)
+
+
 def verify_coverage(report: Path) -> None:
     suites = json.loads(report.read_text())
     assert list(suites) == ['mac-runner-routing'], 'Unexpected or stale coverage suite'
