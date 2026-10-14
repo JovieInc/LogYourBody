@@ -687,12 +687,42 @@ final class BodyScoreShareCardTests: XCTestCase {
             selected, in: [corrected], currentFingerprint: "current", cachedFingerprint: "current"))
         XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(
             selected, in: [], currentFingerprint: "current", cachedFingerprint: "current"))
-        XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(
-            selected, in: [selected], currentFingerprint: "corrected-source", cachedFingerprint: "previous-source"),
-                     "An async preprocessing cache must not authorize an old point after source correction")
         let revisedTrend = MetricChartDataPoint(date: date, value: 81, presence: .estimated)
         XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(
             selected, in: [revisedTrend], currentFingerprint: "current", cachedFingerprint: "current"))
+    }
+
+    func testDetailFingerprintInvalidatesInteriorRawAndTrendCorrectionsBeforeAndAfterPreprocessing() throws {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let original = (0..<3).map {
+            MetricChartDataPoint(date: start.addingTimeInterval(Double($0) * 86_400),
+                                 value: 81 + Double($0), presence: .present)
+        }
+        let processor = ChartSeriesPreprocessor(referenceDate: original[2].date)
+        let oldCache = try XCTUnwrap(processor.seriesByRange(from: original)[.month1])
+        let oldFingerprint = ContextualMetricDetailPolicy.fingerprint(points: original, trend: original)
+        for correctedPoint in [
+            MetricChartDataPoint(date: original[1].date, value: 82.5, presence: .present),
+            MetricChartDataPoint(date: original[1].date, value: 82, presence: .estimated)
+        ] {
+            var corrected = original
+            corrected[1] = correctedPoint
+            let rawFingerprint = ContextualMetricDetailPolicy.fingerprint(points: corrected, trend: original)
+            let trendFingerprint = ContextualMetricDetailPolicy.fingerprint(points: original, trend: corrected)
+            XCTAssertNotEqual(rawFingerprint, oldFingerprint, "Same endpoints/count cannot hide an interior raw correction")
+            XCTAssertNotEqual(trendFingerprint, oldFingerprint, "Same endpoints/count cannot hide an interior average correction")
+            for currentFingerprint in [rawFingerprint, trendFingerprint] {
+                XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(
+                    original[1], in: oldCache, currentFingerprint: currentFingerprint, cachedFingerprint: oldFingerprint),
+                             "Pending preprocessing must not authorize the previous82point")
+            }
+            let newCache = try XCTUnwrap(processor.seriesByRange(from: corrected)[.month1])
+            XCTAssertNil(ContextualMetricDetailPolicy.validatedFocus(
+                original[1], in: newCache, currentFingerprint: rawFingerprint, cachedFingerprint: rawFingerprint))
+            XCTAssertEqual(ContextualMetricDetailPolicy.validatedFocus(
+                correctedPoint, in: newCache, currentFingerprint: rawFingerprint, cachedFingerprint: rawFingerprint)?.id,
+                           correctedPoint.id)
+        }
     }
 
     func testDetailAverageDoesNotBorrowEqualRawValueSourceButRestHeadlineKeepsSource() {

@@ -117,6 +117,13 @@ enum ContextualMetricProgressPolicy {
 }
 
 enum ContextualMetricDetailPolicy {
+    /// Every interior correction changes the identity, including an estimate's evidence kind.
+    static func fingerprint(points: [MetricChartDataPoint], trend: [MetricChartDataPoint]?) -> String {
+        let raw = points.map(\.id).joined(separator: "|")
+        let average = trend.map { $0.map(\.id).joined(separator: "|") } ?? "none"
+        return "raw:\(points.count):\(raw);trend:\(average)"
+    }
+
     static func validatedFocus(
         _ point: MetricChartDataPoint?, in series: [MetricChartDataPoint],
         currentFingerprint: String, cachedFingerprint: String

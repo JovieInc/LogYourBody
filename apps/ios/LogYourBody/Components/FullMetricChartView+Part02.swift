@@ -378,37 +378,7 @@ var headlineDateText: String {
     }
 
 var chartDataFingerprint: String {
-        guard let first = chartData.first, let last = chartData.last else {
-            return "empty-\(chartData.count)-trend-\(trendChartData?.count ?? 0)"
-        }
-        let rawFingerprint = [
-            "\(chartData.count)",
-            "\(first.date.timeIntervalSince1970)",
-            "\(last.date.timeIntervalSince1970)",
-            "\(first.value)",
-            "\(last.value)",
-            first.presence.rawValue,
-            last.presence.rawValue
-        ].joined(separator: "-")
-
-        let trendFingerprint: String
-        if let trendChartData,
-           let trendFirst = trendChartData.first,
-           let trendLast = trendChartData.last {
-            trendFingerprint = [
-                "\(trendChartData.count)",
-                "\(trendFirst.date.timeIntervalSince1970)",
-                "\(trendLast.date.timeIntervalSince1970)",
-                "\(trendFirst.value)",
-                "\(trendLast.value)",
-                trendFirst.presence.rawValue,
-                trendLast.presence.rawValue
-            ].joined(separator: "-")
-        } else {
-            trendFingerprint = "none"
-        }
-
-        return "\(rawFingerprint)|trend-\(trendFingerprint)"
+        ContextualMetricDetailPolicy.fingerprint(points: chartData, trend: trendChartData)
     }
 
 // MARK: - Helpers
