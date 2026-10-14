@@ -106,6 +106,22 @@ const surfaces = (web, iosChanged, unit, quality, deferred = 'false') => ({
   ios_quality_deferred: deferred,
 });
 
+test('large native source imports preserve detection under pipefail', () => {
+  const files = { 'apps/ios/App.swift': 'v3' };
+  for (let index = 0; index < 2000; index++) {
+    files[`docs/import-${String(index).padStart(5, '0')}-${'a'.repeat(60)}.md`] = 'fixture';
+  }
+  const fx = queueFixture(files);
+  try {
+    const result = detect(fx.workspace, {
+      ...mergeGroup(fx), GITHUB_EVENT_NAME: 'pull_request', PR_DRAFT: 'true',
+    });
+    assert.deepEqual(result.outputs, surfaces('false', 'true', 'false', 'false', 'true'));
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
 test('web-only merge group behind a queued iOS PR skips iOS', () => {
   const fx = queueFixture({ 'apps/web/page.tsx': 'v2' });
   const { outputs, calls } = detect(fx.workspace, mergeGroup(fx));
@@ -292,4 +308,45 @@ test('CI Summary requires exactly the iOS job each event selected', () => {
   assert.equal(runSummaryGate({ ...group, iosResult: 'success', qualityResult: 'skipped' }), 0);
   assert.notEqual(runSummaryGate({ ...group, iosResult: 'failure', qualityResult: 'skipped' }), 0);
   assert.notEqual(runSummaryGate({ ...group, iosResult: 'success', qualityResult: 'success' }), 0);
+});
+
+for (const file of [
+  'apps/web/db/migrations/20261014103000_training_execution_cas.sql',
+  'apps/web/db/tests/verify-training-mutations.py',
+  'apps/web/db/tests/test_verify_training_mutations.py',
+]) {
+  test(`SQL qualification runs the required JS gate for isolated change: ${file}`, () => {
+    const fx = queueFixture({ [file]: 'changed' });
+    try {
+      assert.deepEqual(detect(fx.workspace, mergeGroup(fx)).outputs, surfaces('true', 'false', 'false', 'false'));
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('required SQL CI step propagates verifier failure through tee', () => {
+  const step = ciWorkflow.match(/      - name: Verify training mutations on disposable PostgreSQL16\n([\s\S]*?)(?=\n      - name:)/)[1];
+  assert.match(step, /^        shell: bash$/m, 'explicit bash enables Actions errexit and pipefail');
+  const run = step.match(/        run: \|\n([\s\S]*)/)[1].replace(/^          /gm, '');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'training-sql-ci-failure-'));
+  try {
+    const bin = path.join(root, 'bin');
+    fs.mkdirSync(bin);
+    for (const [command, body] of Object.entries({
+      python3: 'echo injected-SQL-verifier-failure >&2; exit 17',
+      git: 'echo synthetic-source',
+      sha256sum: 'echo synthetic-hash',
+    })) {
+      fs.writeFileSync(path.join(bin, command), '#!/bin/sh\n' + body + '\n', { mode: 0o755 });
+    }
+    const result = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', run], {
+      cwd: root, encoding: 'utf8', env: { ...gitEnv, PATH: bin + ':' + process.env.PATH },
+    });
+    assert.equal(result.status, 17, result.stderr);
+    assert.match(result.stderr, /injected-SQL-verifier-failure/);
+    assert.ok(fs.existsSync(path.join(root, 'artifacts/training-mutations/results.log')), 'tee actually ran');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

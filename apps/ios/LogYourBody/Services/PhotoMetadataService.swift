@@ -220,7 +220,14 @@ class PhotoMetadataService {
                 updatedAt: Date()
             )
 
-            try await persistMetricsBeforeReturning(new, userId: userId)
+            if dataSource == nil, !preserveExistingMeasurements, photoUrl == nil,
+               weight != nil || bodyFatPercentage != nil {
+                try await BodyRecordReviewConsumer.shared.saveNewManualRecord(recordID: new.id, ownerID: userId) {
+                    try await self.persistMetricsBeforeReturning(new, userId: userId)
+                }
+            } else {
+                try await persistMetricsBeforeReturning(new, userId: userId)
+            }
             return PhotoMetricsUpdateResult(metrics: new, createdNewEntry: true)
         }
     }
