@@ -1,11 +1,25 @@
+import type { ControllerReceipt } from '@/lib/training/controller';
 import type { NextWorkoutResult } from '@/lib/training/service';
 import { hasUnauthorizedTrainingQuantity } from './training-number-boundary';
+
+const holdDecision: ControllerReceipt = {
+  decision: { kind: 'hold', optionalBurdenReduction: false },
+  actor: 'controller',
+  rationale: 'Trajectory matches plan.',
+  signalFreshness: { training: 'fresh', recovery: 'fresh', trajectory: 'missing' },
+  evidenceIds: ['k:81c218db'],
+  before: 'plan',
+  after: 'Plan unchanged.',
+  reviewPoint: 'Next scheduled session',
+  nextAction: 'On track.',
+};
 
 const engineOutput: NextWorkoutResult = {
   kind: 'workout',
   week: 1,
   weekCount: 4,
   weeklyFractionalVolume: { chest: 4 },
+  decision: holdDecision,
   session: {
     id: 'engine-session',
     week: 1,

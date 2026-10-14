@@ -40,16 +40,22 @@ function compactTrainingOutput(output: NextWorkoutResult | null | undefined) {
   const cited = (ids: string[]) => ids.map((id) => `[${id}]`);
   if (!output) return null;
   if (output.kind === 'not_enrolled') return null;
+  const decision = {
+    ...output.decision,
+    evidenceIds: cited(output.decision.evidenceIds),
+  };
   if (output.kind === 'week_complete') {
     return {
       status: 'week_complete',
       week: output.week,
       weeklyFractionalVolume: output.weeklyFractionalVolume,
+      decision,
       evidenceIds: cited(['k:81c218db', 'k:45b5a80f', 'k:ed46b889']),
     };
   }
   return {
     status: 'workout',
+    decision,
     week: output.week,
     weekCount: output.weekCount,
     session: {
