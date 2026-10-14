@@ -1,5 +1,6 @@
 ---
-title: "Muscle Protein Synthesis: The Complete Guide"
+draft: true
+title: 'Muscle Protein Synthesis: The Complete Guide'
 date: 2024-11-12
 author: LogYourBody Team
 tags:
@@ -24,6 +25,7 @@ As Mike Israetel often emphasizes, muscle growth occurs when muscle protein synt
 Menno Henselmans' research consistently shows that mechanical tension from resistance training is the primary driver of muscle growth. When you lift weights, you create micro-tears in muscle fibers, triggering an anabolic response.
 
 **Optimal Training Parameters:**
+
 - **Volume**: 10-20 sets per muscle group per week for most individuals
 - **Intensity**: Training close to failure (1-3 reps in reserve)
 - **Frequency**: 2-3 times per week per muscle group
@@ -42,6 +44,7 @@ Based on Renaissance Periodization's guidelines and Menno Henselmans' research:
 **Protein Distribution**
 
 Mike Israetel recommends:
+
 - **Frequency**: 3-6 protein feedings per day
 - **Per meal**: 0.4-0.5g per kg of bodyweight (approximately 30-50g for most people)
 - **Leucine threshold**: Minimum 2-3g of leucine per meal to maximize MPS
@@ -51,6 +54,7 @@ Mike Israetel recommends:
 Leucine is the amino acid that acts as the primary trigger for MPS. Think of it as the "key" that turns on your muscle-building machinery.
 
 **Leucine-Rich Foods:**
+
 - Whey protein: ~2.5-3g per 25g serving
 - Chicken breast: ~2.5g per 100g
 - Eggs: ~1.2g per 2 large eggs
@@ -74,6 +78,7 @@ Mike Israetel emphasizes that recovery is when muscle growth actually happens. D
 - Protein synthesis continues if amino acids are available
 
 **Recommendations:**
+
 - **Sleep duration**: 7-9 hours per night
 - **Pre-bed protein**: 30-40g of casein or whole food protein
 - **Sleep quality**: Dark room, cool temperature (65-68�F), consistent schedule
@@ -90,6 +95,7 @@ Mike Israetel emphasizes that recovery is when muscle growth actually happens. D
 ### In a Deficit (Cutting)
 
 Menno Henselmans' research shows:
+
 - MPS rates are blunted
 - Higher protein needed (1-1.2g/lb)
 - Training volume may need to be reduced
@@ -107,6 +113,7 @@ Menno Henselmans' research shows:
 As we age, the body becomes less responsive to the anabolic signals from protein and training. This is called "anabolic resistance."
 
 **Solutions for older individuals (40+):**
+
 - Higher protein per meal (40-50g vs. 30g)
 - More leucine per serving (3-4g)
 - Maintain higher training volumes
@@ -129,6 +136,7 @@ MPS occurs during recovery, not during training. Chronic sleep deprivation and e
 ### 4. Alcohol Consumption
 
 Research shows that alcohol directly impairs MPS:
+
 - Even moderate consumption (3-4 drinks) can reduce MPS by 20-30%
 - The effect lasts for 24+ hours
 - The negative impact is dose-dependent
@@ -138,16 +146,19 @@ Research shows that alcohol directly impairs MPS:
 ### Evidence-Based Supplements
 
 **Tier 1 (Highly Effective):**
+
 - **Whey protein**: Convenient leucine and protein source
 - **Creatine**: 5g daily improves training performance and MPS
 - **Caffeine**: Enhances training intensity (3-6mg/kg pre-workout)
 
 **Tier 2 (Potentially Helpful):**
+
 - **EAAs/BCAAs**: Only useful if total protein is inadequate
 - **HMB**: May help prevent muscle loss during severe deficits
 - **Beta-alanine**: Improves training capacity in the 60-240 second range
 
 **Not Recommended:**
+
 - Testosterone boosters (except actual TRT under medical supervision)
 - Most "muscle builders" with proprietary blends
 - Pre-workout formulas with underdosed ingredients
@@ -157,26 +168,33 @@ Research shows that alcohol directly impairs MPS:
 ### Sample Day for a 180lb Individual
 
 **6:00 AM - Wake Up**
+
 - 30g protein (Greek yogurt + whey)
 
 **10:00 AM - Pre-Workout Meal**
+
 - 40g protein, 50g carbs (chicken, rice, vegetables)
 
 **12:00 PM - Training**
+
 - High-quality resistance training session
 - 10-15 sets for target muscle groups
 - 1-3 reps from failure
 
 **1:00 PM - Post-Workout**
+
 - 40g protein, 80g carbs (post-workout meal)
 
 **4:00 PM - Afternoon Meal**
+
 - 40g protein, moderate carbs and fats
 
 **8:00 PM - Dinner**
+
 - 50g protein, moderate carbs and fats
 
 **10:30 PM - Pre-Bed**
+
 - 30g casein protein or cottage cheese
 
 **Total: 230g protein (1.28g/lb) across 6 feedings**
@@ -198,6 +216,7 @@ Track your progress with LogYourBody, stay consistent with the basics, and let t
 ## References
 
 The principles in this article are based on the work and research of:
+
 - Dr. Mike Israetel (Renaissance Periodization)
 - Menno Henselmans (Bayesian Bodybuilding)
 - Brad Schoenfeld's meta-analyses on hypertrophy

@@ -6,6 +6,16 @@ const reactHooksPlugin = require('eslint-plugin-react-hooks');
 const importPlugin = require('eslint-plugin-import');
 
 module.exports = [
+  {
+    // Immutable upstream source is checked byte-for-byte, never locally autofixed.
+    ignores: [
+      'packages/jovie-ui/atoms/button.tsx',
+      'packages/jovie-ui/atoms/button-contract.ts',
+      'packages/jovie-ui/atoms/input.tsx',
+      'packages/jovie-ui/atoms/spinner.tsx',
+      'packages/jovie-ui/lib/utils.ts',
+    ],
+  },
   js.configs.recommended,
   {
     files: ['**/*.cjs'],

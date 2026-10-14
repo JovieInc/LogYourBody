@@ -29,7 +29,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5bfaef9c21b12812c4b5677a2d32425c2fc31347b7df76cd87d9d589f7f2562b`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `43babc889f02d0dbe5c01ea0d8cc86afbc54180c8d2f6a75557cd2249f21f32c`)
 
 ### `apps/web/package.json`: engines
 
@@ -77,6 +77,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@ai-sdk/gateway": "^4.0.96",
   "@headlessui/react": "^2.2.10",
   "@hookform/resolvers": "^5.9.1",
+  "@jovie/ui": "workspace:*",
   "@jovieinc/product-registry": "workspace:*",
   "@neondatabase/serverless": "1.0.2",
   "@radix-ui/react-accordion": "^1.2.20",
