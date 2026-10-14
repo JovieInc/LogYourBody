@@ -188,52 +188,80 @@ struct HomeV2TrendChart: View {
     }
 
     private var plotMarks: some View {
+        accessiblePlot
+            .accessibilityIdentifier(plotIdentifier)
+            .accessibilityAdjustableAction { direction in
+                adjustSelection(direction)
+            }
+    }
+
+    private var accessiblePlot: some View {
+        styledPlot
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilitySummary)
+            .accessibilityValue(accessibilityValueText)
+            .accessibilityHint(allowsSelection ? "Drag across the chart to read a day" : "")
+            .accessibilityHidden(!allowsSelection)
+    }
+
+    private var styledPlot: some View {
+        chartWithAxes
+            .chartPlotStyle { plot in
+                plot.padding(.horizontal, HomeV2Tokens.Space.tight)
+            }
+            .padding(.horizontal, HomeV2Tokens.Space.inset)
+    }
+
+    private var chartWithAxes: some View {
+        chartWithXAxis
+            .chartYAxis {
+                AxisMarks(position: .leading, values: plotted.yTicks) { _ in
+                    AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
+                    if anchorsToZero {
+                        AxisValueLabel(format: .number.precision(.fractionLength(0)))
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                            .font(.caption)
+                    } else {
+                        AxisValueLabel(format: .number.precision(.fractionLength(1)))
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                            .font(.caption)
+                    }
+                }
+            }
+    }
+
+    private var chartWithXAxis: some View {
+        scaledChart
+            .chartXAxis {
+                AxisMarks(values: axisDates ?? plotted.xAxisDates) { value in
+                    AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
+                    if axis == .months, let date = value.as(Date.self) {
+                        AxisValueLabel {
+                            Text(xAxisLabel(for: date))
+                                .font(.caption)
+                                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                                .lineLimit(1)
+                                .fixedSize()
+                        }
+                    }
+                }
+            }
+    }
+
+    private func xAxisLabel(for date: Date) -> String {
+        formatAxisDate?(date) ?? HomeV2ChartIntegrity.axisLabel(date: date, range: range, locale: .current)
+    }
+
+    private var scaledChart: some View {
+        chartContent
+            .chartYScale(domain: plotted.yDomain)
+    }
+
+    private var chartContent: some View {
         Chart {
             lineMarks
             pointMarks
             selectionMarks
-        }
-        .chartYScale(domain: plotted.yDomain)
-        .chartXAxis {
-            AxisMarks(values: axisDates ?? plotted.xAxisDates) { value in
-                AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
-                if axis == .months, let date = value.as(Date.self) {
-                    AxisValueLabel {
-                        Text(formatAxisDate?(date) ?? HomeV2ChartIntegrity.axisLabel(date: date, range: range, locale: .current))
-                            .font(.caption)
-                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                }
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: plotted.yTicks) { _ in
-                AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
-                if anchorsToZero {
-                    AxisValueLabel(format: .number.precision(.fractionLength(0)))
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                        .font(.caption)
-                } else {
-                    AxisValueLabel(format: .number.precision(.fractionLength(1)))
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                        .font(.caption)
-                }
-            }
-        }
-        .chartPlotStyle { plot in
-            plot.padding(.horizontal, HomeV2Tokens.Space.tight)
-        }
-        .padding(.horizontal, HomeV2Tokens.Space.inset)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilitySummary)
-        .accessibilityValue(accessibilityValueText)
-        .accessibilityHint(allowsSelection ? "Drag across the chart to read a day" : "")
-        .accessibilityHidden(!allowsSelection)
-        .accessibilityIdentifier(plotIdentifier)
-        .accessibilityAdjustableAction { direction in
-            adjustSelection(direction)
         }
     }
 
