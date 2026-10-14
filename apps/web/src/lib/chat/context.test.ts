@@ -1,5 +1,18 @@
 import { buildChatModelMessages, isTrainingQuestion } from './context';
+import type { ControllerReceipt } from '@/lib/training/controller';
 import type { NextWorkoutResult } from '@/lib/training/service';
+
+const holdDecision: ControllerReceipt = {
+  decision: { kind: 'hold', optionalBurdenReduction: false },
+  actor: 'controller',
+  rationale: 'Trajectory matches plan.',
+  signalFreshness: { training: 'fresh', recovery: 'fresh', trajectory: 'missing' },
+  evidenceIds: ['k:81c218db'],
+  before: 'plan',
+  after: 'Plan unchanged.',
+  reviewPoint: 'Next scheduled session',
+  nextAction: 'On track.',
+};
 
 describe('buildChatModelMessages', () => {
   it('limits training guidance to authorized engine output and supplied evidence IDs', () => {
@@ -97,6 +110,7 @@ describe('buildChatModelMessages', () => {
       week: 2,
       weekCount: 2,
       weeklyFractionalVolume: { chest: 4 },
+      decision: holdDecision,
       session: {
         id: 'engine-session',
         week: 2,

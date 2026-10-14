@@ -2,6 +2,7 @@
 
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { createNeonNativeProductRecords } from './native-product-records-adapter';
+import { NATIVE_PRODUCT_RECORD_COLLECTIONS } from '@/lib/ports/native-product-records';
 
 function databaseWith(query: jest.Mock) {
   return { query } as unknown as NeonQueryFunction<false, false>;
@@ -273,5 +274,36 @@ describe('createNeonNativeProductRecords', () => {
       'delete from public.native_records where user_subject = $1',
     );
     expect(query.mock.calls[0]?.[1]).toEqual(['owner-subject']);
+  });
+
+  it('exports all eight owned collections without a sync-page cap or opaque-payload loss', async () => {
+    const rows = NATIVE_PRODUCT_RECORD_COLLECTIONS.flatMap((collection) =>
+      Array.from({ length: 501 }, (_, index) => ({
+        ...row({
+          id: `${collection}-${index}`,
+          future_field: { value: index, nested: [null, false, 0] },
+          photo_url: 'https://example.com/photo.jpg',
+          user_id: 'spoofed-owner',
+        }),
+        collection,
+      })),
+    );
+    const query = jest.fn().mockResolvedValue(rows);
+    const result = await createNeonNativeProductRecords(databaseWith(query)).listAll('owner-a');
+    for (const collection of NATIVE_PRODUCT_RECORD_COLLECTIONS) {
+      expect(result[collection]).toHaveLength(501);
+      expect(result[collection][500]).toMatchObject({
+        id: `${collection}-500`,
+        user_id: 'owner-a',
+        deleted_at: null,
+        future_field: { value: 500, nested: [null, false, 0] },
+        photo_url: 'https://example.com/photo.jpg',
+      });
+    }
+    const sql = normalized(query.mock.calls[0][0]);
+    expect(sql).toContain('where user_subject = $1 and deleted_at is null');
+    expect(sql).not.toMatch(/\blimit\b/i);
+    expect(query.mock.calls[0][1]).toEqual(['owner-a']);
+    expect(query).toHaveBeenCalledTimes(1);
   });
 });

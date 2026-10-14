@@ -15,6 +15,12 @@ import type {
 } from '@/lib/ports/native-product-records';
 import { catalogVariantById } from './catalog';
 import {
+  evaluateTrajectory,
+  type ControllerReceipt,
+  type GoalTrajectory,
+  type SituationalConstraint,
+} from './controller';
+import {
   buildMicrocycle,
   buildSession,
   createMesoBlock,
@@ -211,13 +217,19 @@ export async function loadTrainingRecords(
 
 export type NextWorkoutResult =
   | { kind: 'not_enrolled' }
-  | { kind: 'week_complete'; week: number; weeklyFractionalVolume: Record<string, number> }
+  | {
+      kind: 'week_complete';
+      week: number;
+      weeklyFractionalVolume: Record<string, number>;
+      decision: ControllerReceipt;
+    }
   | {
       kind: 'workout';
       session: Session & { loggedSets: SetLog[] };
       week: number;
       weekCount: number;
       weeklyFractionalVolume: Record<string, number>;
+      decision: ControllerReceipt;
     };
 
 const sessionPrescriptionSchema = z
@@ -272,6 +284,9 @@ export async function getOrCreateNextWorkout(input: {
   now: Date;
   /** false returns the same prescription without starting or updating a session record. */
   persist?: boolean;
+  /** Optional controller signals: weight trajectory and expiring situational constraints. */
+  trajectory?: GoalTrajectory | null;
+  constraints?: SituationalConstraint[];
   admission?: TrainingMutationAdmission;
 }): Promise<NextWorkoutResult> {
   const persist = input.persist ?? true;
@@ -364,6 +379,26 @@ export async function getOrCreateNextWorkout(input: {
   );
   const completedLogs = programLogs.filter((log) => completedSessionIds.has(log.sessionId));
 
+  const dayInWeek = Math.max(
+    0,
+    Math.floor((input.now.getTime() - Date.parse(setup.startedAt)) / (24 * 60 * 60 * 1000)) % 7,
+  );
+  const plannedSessionsByNow = Math.min(
+    setup.sessionsPerWeek,
+    Math.floor(((dayInWeek + 1) / 7) * setup.sessionsPerWeek),
+  );
+  const decision = evaluateTrajectory({
+    setup,
+    block,
+    sessions: periodSessions.filter((record) => record.programSetupId === setup.id),
+    feedback: programFeedback,
+    completedThisWeek: completedThisWeek.length,
+    plannedSessionsByNow,
+    trajectory: input.trajectory ?? null,
+    constraints: input.constraints,
+    now: input.now,
+  });
+
   const microcycle = buildMicrocycle({
     setup,
     block,
@@ -442,6 +477,7 @@ export async function getOrCreateNextWorkout(input: {
       week: existing.week,
       weekCount: block.weekCount,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+      decision,
     };
   }
 
@@ -450,6 +486,7 @@ export async function getOrCreateNextWorkout(input: {
       kind: 'week_complete',
       week: block.currentWeek,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+      decision,
     };
   }
 
@@ -460,6 +497,7 @@ export async function getOrCreateNextWorkout(input: {
       kind: 'week_complete',
       week: block.currentWeek,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+      decision,
     };
   const session = applyExerciseSwaps(planned, blockSwaps, completedLogs);
   const sessionRecord = {
@@ -491,6 +529,7 @@ export async function getOrCreateNextWorkout(input: {
     week: block.currentWeek,
     weekCount: block.weekCount,
     weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+    decision,
   };
 }
 

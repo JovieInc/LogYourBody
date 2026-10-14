@@ -52,9 +52,8 @@ jobs:
   cancel-superseded-merge-groups:
     name: Cancel Superseded Merge Groups
     # When the queue drops or rebuilds a group it deletes the gh-readonly-queue ref, but
-    # the old CI run keeps queueing and holding macOS runners. Each new group cancels
-    # merge-group CI runs whose ref no longer exists. GitHub deletes the old refs a few
-    # seconds after starting the new group, so a second pass runs 90s later.
+    # the old CI run keeps queueing and holding macOS runners. Sweep again at the end of
+    # each group, after GitHub has deleted any replaced refs.
     # Advisory: never fails CI.
     if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
@@ -64,30 +63,14 @@ jobs:
       actions: write
       contents: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
       - name: Cancel CI runs for deleted merge-group refs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -uo pipefail
-          sweep() {
-            for status in queued in_progress waiting pending; do
-              gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=merge_group&status=$status&per_page=100" \
-                --jq '.workflow_runs[] | "\(.id) \(.head_branch)"'
-            done | sort -u | while read -r run_id branch; do
-              [[ "$run_id" == "$GITHUB_RUN_ID" || "$branch" != gh-readonly-queue/* ]] && continue
-              # Only a definitive 404 proves the group is gone; any other error leaves the run.
-              # Capture first: under pipefail, `gh ... | grep -q` returns gh's 404 exit status
-              # even when grep matches, so the sweep never cancelled anything.
-              # Actions runs this under bash -e, so a 404 (gh exits 1) must not end the step.
-              ref_lookup=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --silent 2>&1) || true
-              if grep -q 'HTTP 404' <<<"$ref_lookup"; then
-                gh run cancel "$run_id" -R "$GITHUB_REPOSITORY" && echo "Cancelled superseded run $run_id ($branch)"
-              fi
-            done
-          }
-          sweep
-          sleep 90
-          sweep
+        run: bash .github/scripts/cancel-superseded-merge-groups.sh
 
   merge-group-fail-fast:
     name: Merge Group Fail Fast
@@ -130,8 +113,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node --test .github/scripts/verify-ruleset-targets.test.mjs && node .github/scripts/verify-ruleset-targets.mjs
 
+      # Whole-repo invariant: a docs-only change can add an unregistered URL, so this runs
+      # on every change instead of only inside the js job.
+      - name: Verify URL registry covers the whole repo
+        run: node packages/product-registry/scripts/url-drift.test.mjs
+
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
+
+      - name: Test agent environment lifecycle with coverage
+        run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-include=scripts/codex-setup.mjs
+          --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=100
+          scripts/codex-setup.test.mjs
 
       - name: Test post-merge Launch Quality
         run: node --test .github/scripts/post-merge-quality.test.mjs
@@ -267,3 +262,23 @@ jobs:
           fi
 
           echo "✅ All CI checks passed!" >> "$GITHUB_STEP_SUMMARY"
+
+  cancel-superseded-merge-groups-final:
+    name: Cancel Superseded Merge Groups (group end)
+    if: always() && github.event_name == 'merge_group'
+    needs: [ci-summary]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Cancel CI runs for deleted merge-group refs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/cancel-superseded-merge-groups.sh
