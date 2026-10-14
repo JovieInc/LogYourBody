@@ -16,20 +16,20 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `0884ed9eafefe7a3cd6b5f4e3ef10b0800d0de45d9a1a05546a0d414b0233c65`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f9cf09f9630649ae4b9bf29c44c3a903592a02f7b85d1c1c38083f6c15e864cd`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
-- `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `5b2192608219f43034c4a6c38a82c84ab25c6907c3ccd7de11863f5bcd15b8b2`)
+- `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11d9a680ec4c2c74193f2bd1bc9dd544c6ca3bc397bea165bfc08fd0e15933e0`)
-- `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d38b5542e5f33c488c19766a8b4a5b0da941b8683c31828f3bb3d8d9b1f223f8`)
-- `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3b6c5e65f3fc8491ac4dccc17daefaac865808100ce350386a9d8589c00342fa`)
-- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `971aec29022757206bdc8f3f71374fae9a1fbfe705f8d5b2b424335d7f9d9563`)
+- `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `edc60551d0911cfbad4778b82a6d7376d2d123ee40be983e8376e1e5b7a2dd16`)
+- `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b43be4748356308f2098e4cf6e44f935a66d842588cb822752f27a4fcff636cb`)
+- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `8c1c359b59caf6d266cc071752c51f6d6ac5b95fed7809dd209192782090a778`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `308eefa5e2f5b371d60eb5142243654503b53b67ba2f36477bf7d389a57e89f3`)
-- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d8b583c1e03eb3d93631ac1dd0e18986dd7905ccafe06816f2e662e7c2e29689`)
-- `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `533336c7050e4a5244f61b48e616b81337471ae6c305a52d3a1e78fa65235b2e`)
-- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `367b6f08c03fac7182cc49a5161e9565a90d2f1e55ba140add10e289996792cc`)
-- `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `69b14201b1c33c7ae1f7eba0ce6f3718e9a5e738ad69c89e07b171e0b8f3ce59`)
+- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11956a92eceafb5392139625818d29853dace83bb0d22cf5ccda565c6ffa8aca`)
+- `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `24015f5812c3157efebc973c6aa0bbd00eae6e1747be4966eb9dff152e46377c`)
+- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b80196f02c3964184cacd19fe21c355bcc90b67d82148263b06cefa69bcbfcff`)
+- `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ce11d368400a68b54d439d12b7ec9e1c50ce79980f1da3fd4536e8c6ac162297`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c3927f763c224c45f43ef1a226740c6cd3334428f1db39a2d63e64a9d11931e4`)
 
 ### `apps/web/package.json`: engines
 
@@ -125,9 +125,9 @@ A changed fingerprint requires review of its related documentation; it does not 
   "glob": "^11.1.0",
   "idb": "^8.0.3",
   "input-otp": "^1.5.0",
-  "js-yaml": "5.4.2",
+  "js-yaml": "5.4.3",
   "lodash": "^4.18.1",
-  "lucide-react": "^0.525.0",
+  "lucide-react": "^1.48.0",
   "next": "15.5.27",
   "next-themes": "^0.4.6",
   "openai": "^6.49.0",
@@ -135,7 +135,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "pdf-parse": "^1.1.4",
   "pdfjs-dist": "^6.3.289",
   "react": "^19.3.0",
-  "react-day-picker": "^9.14.0",
+  "react-day-picker": "^10.0.1",
   "react-dom": "^19.3.0",
   "react-hook-form": "^7.88.0",
   "react-markdown": "^10.1.0",
@@ -187,7 +187,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `2bcedbe54d69205213db08ce2d57b29e6df13e4c35686cd3d61caa32b313d726`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `8d8734ec70ca047c45b9254fd00b5e2c08f9e671a03a0766b322c8d7b49156fb`)
 
 ### `package.json`: packageManager
 
@@ -275,10 +275,10 @@ A changed fingerprint requires review of its related documentation; it does not 
   "husky": "^9.1.7",
   "lint-staged": "^15.5.2",
   "prettier": "^3.9.9",
-  "prettier-plugin-tailwindcss": "^0.6.14",
+  "prettier-plugin-tailwindcss": "^0.8.1",
   "turbo": "^2.11.7",
   "typescript": "^5.9.3",
-  "vitest": "^4.1.11"
+  "vitest": "^5.0.2"
 }
 ```
 
@@ -346,7 +346,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `95f45f0d8b5e738b2016f3666ac9a1c0ae38a2dc0ed586b83a69315bfed96f77`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f80bc9421299e419438bf514b21aedf5c7f49893a4a8e63bf5b3ec5fb32d8acb`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -372,16 +372,16 @@ A changed fingerprint requires review of its related documentation; it does not 
   "eslint-plugin-react": "^7.37.5",
   "eslint-plugin-react-hooks": "^5.2.0",
   "typescript": "^5.9.3",
-  "vitest": "^4.1.11"
+  "vitest": "^5.0.2"
 }
 ```
 
-- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b2b5444a1f0fedd65f01dfd873f436439576a088ae7c7c343c0ee052beccb2c0`)
+- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3590f5fc9bca5f30a8eaac908a762e683611a4d4126b8b8d611c1515a38b13ea`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `c128ddaa264be5e0fa2d24676fa52cfef77faa62bc478c3b69ba168cc3f8516c`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `d31d02f24b901f5eca4ad8dd497b0bc20c136906f29fc73813996bb17f44a8e5`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `f92b600361fe9d26b2a4c9a944c8c921d33feb8eafb756a77ab0b285b940a3f6`)
-- `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `a6b300cd1d6f78ffaa8f995998618ec710f27e0eefac28abde1b233b51d89875`)
+- `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `cdd99f5f4e4b9f559e4e3e3b6889e00d7fbbe612166e0872f812d0ed23eafd7b`)
 
 ## Pinned shared sources
 

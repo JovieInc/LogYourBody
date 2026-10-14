@@ -386,7 +386,7 @@ struct TrainingLiveSessionView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: JovieTokens.screenInset) {
                     sessionHeader
                     if draft.session.safetyStop {
                         safetyCard
@@ -475,7 +475,7 @@ struct TrainingLiveSessionView: View {
     }
 
     private var sessionHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: JovieTokens.tightGap) {
             Text("WEEK \(draft.session.week) · \(draft.session.title.uppercased())")
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .tracking(0.7)
@@ -490,9 +490,9 @@ struct TrainingLiveSessionView: View {
     private func currentCard(_ position: TrainingSetPosition) -> some View {
         let exercise = position.exercise
         let row = draft.row(for: exercise, setNumber: position.setNumber)
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("NOW")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .tracking(0.8)
@@ -518,7 +518,7 @@ struct TrainingLiveSessionView: View {
                     .font(.footnote)
                     .foregroundStyle(theme.colors.textSecondary)
             }
-            HStack(spacing: 10) {
+            HStack(spacing: JovieTokens.itemGap) {
                 labeledField(
                     "REPS",
                     placeholder: "Reps",
@@ -566,7 +566,7 @@ struct TrainingLiveSessionView: View {
                     .accessibilityIdentifier("training_pending_sync")
             }
         }
-        .padding(18)
+        .padding(JovieTokens.compactInset)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
@@ -595,7 +595,7 @@ struct TrainingLiveSessionView: View {
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 52)
-        .background(theme.colors.surface.opacity(0.65), in: RoundedRectangle(cornerRadius: 18))
+        .background(theme.colors.surface.opacity(0.65), in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius))
         .accessibilityIdentifier("training_up_next")
     }
 
@@ -612,15 +612,15 @@ struct TrainingLiveSessionView: View {
     }
 
     private var sessionControls: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(spacing: JovieTokens.itemGap) {
+            HStack(spacing: JovieTokens.itemGap) {
                 Button("Equipment occupied", systemImage: "arrow.triangle.swap") {
                     guard let current = draft.currentPosition else { return }
                     performAction(.equipmentUnavailable(current.exercise.id))
                 }
                 Button("30 min", systemImage: "clock") { performAction(.shorten(30)) }
             }
-            HStack(spacing: 10) {
+            HStack(spacing: JovieTokens.itemGap) {
                 Button("Correct", systemImage: "pencil") {
                     guard let last = draft.lastCompletedPosition else { return }
                     draft.beginCorrection(last)
@@ -644,7 +644,7 @@ struct TrainingLiveSessionView: View {
     @ViewBuilder private var commandControl: some View {
         if voiceCapture.isRecording {
             HStack(spacing: 12) {
-                HStack(alignment: .center, spacing: 3) {
+                HStack(alignment: .center, spacing: 4) {
                     ForEach(0..<4, id: \.self) { index in
                         Capsule()
                             .fill(theme.colors.accentTeal)
@@ -664,12 +664,12 @@ struct TrainingLiveSessionView: View {
                 Button("Stop") { finishVoiceCapture() }
                     .fontWeight(.semibold)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, JovieTokens.compactInset)
             .frame(minHeight: 48)
             .background(theme.colors.surface, in: Capsule())
             .accessibilityIdentifier("training_voice_capsule")
         } else {
-            HStack(spacing: 10) {
+            HStack(spacing: JovieTokens.itemGap) {
                 TextField("Type a workout command", text: $commandText)
                     .textFieldStyle(.roundedBorder)
                     .submitLabel(.send)
@@ -690,7 +690,7 @@ struct TrainingLiveSessionView: View {
     }
 
     private var safetyCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
             Label("Workout paused", systemImage: "exclamationmark.shield")
                 .font(.system(size: 18, weight: .semibold))
             Text(draft.session.explanation ?? "Pause and review this pain before continuing.")
@@ -700,8 +700,8 @@ struct TrainingLiveSessionView: View {
                 .font(.footnote)
                 .foregroundStyle(theme.colors.textSecondary)
         }
-        .padding(18)
-        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 22))
+        .padding(JovieTokens.compactInset)
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius))
         .accessibilityIdentifier("training_live_safety_stop")
     }
 
@@ -712,9 +712,9 @@ struct TrainingLiveSessionView: View {
             Button("Resume") { performAction(.resume) }
                 .buttonStyle(.borderedProminent)
         }
-        .padding(18)
+        .padding(JovieTokens.compactInset)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 22))
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius))
     }
 
     private var completeCard: some View {
@@ -726,9 +726,9 @@ struct TrainingLiveSessionView: View {
                 .font(.system(size: 14))
                 .foregroundStyle(theme.colors.textSecondary)
         }
-        .padding(18)
+        .padding(JovieTokens.compactInset)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 22))
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius))
     }
 
     private func labeledField(
@@ -738,7 +738,7 @@ struct TrainingLiveSessionView: View {
         keyboard: UIKeyboardType,
         id: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(theme.colors.textSecondary)
