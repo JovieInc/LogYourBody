@@ -5,24 +5,28 @@
 import CoreGraphics
 import Foundation
 
-/// Gate for the photo-first Home (Pencil H2, picked 2026-09-26). Evaluated
-/// through `FeatureReleaseEvaluator` (shared lifecycle contract, JOV-8056):
-/// dogfood-stage, so verified staff/agent principals see it automatically and
-/// ordinary customers need the Statsig enable gate. Debug fixtures force it
-/// on so XCUITest can cover both states without a network.
+/// Photo-first Home (Pencil H2, picked 2026-09-26). Graduated: ordinary users
+/// open it by default. Evaluated through `FeatureReleaseEvaluator` (shared
+/// lifecycle contract, JOV-8056). Statsig is an emergency kill switch only;
+/// an unavailable or unset gate must not fall back to the legacy Home.
+/// Debug fixtures explicitly choose Home V2 or rollback.
 enum HomeV2Policy {
     static let gateKey = "home_v2_photo_first"
-    /// Inverse-meaning emergency stop (shared lifecycle contract, JOV-8056).
-    /// Never a blanket default: only a fresh `true` stops the surface.
+    /// Inverse-meaning emergency stop. Only a fresh `true` stops the surface.
     static let killSwitchKey = "home_v2_kill_switch"
-    /// Dogfood stage: verified staff/agent principals are exposed
-    /// automatically; ordinary customers still need the enable gate.
+    /// Public baseline. The positive enable gate is recorded on the descriptor
+    /// and is not consulted: a missing or false gate must not hide Home.
     static let releaseDescriptor = FeatureReleaseDescriptor(
         flagKey: gateKey,
         killSwitchKey: killSwitchKey,
-        stage: .dogfood,
+        stage: .graduated,
         minimumBuild: nil
     )
+    #if DEBUG
+    /// Explicit legacy captures exercise rollback without changing remote gates.
+    /// Rollback wins if a test accidentally supplies both fixture modes.
+    static let rollbackFixtureArgument = "-lybUITestHomeRollbackFixture"
+    #endif
     static let fixtureArgument = "-lybUITestHomeV2Fixture"
     static let photoFixtureArgument = "-lybUITestHomeV2PhotoFixture"
     /// Signed in, nothing logged yet: the H0 day-zero state.
@@ -42,6 +46,7 @@ enum HomeV2Policy {
         isGateEnabled: ((String) -> Bool)? = nil
     ) -> Bool {
         #if DEBUG
+        if arguments.contains(rollbackFixtureArgument) { return false }
         if arguments.contains(fixtureArgument) || arguments.contains(photoFixtureArgument) ||
             arguments.contains(emptyFixtureArgument) ||
             arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument) ||
@@ -51,17 +56,16 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        // Query the kill switch first so `flagKey` remains the last gate
-        // consulted, matching the enable-gate call contract.
+        // Graduated Home does not consult the positive enable gate. Doing so
+        // would record an exposure for a flag that no longer decides the surface.
         let killSwitchEnabled = checkGate(killSwitchKey)
-        let enableGateEnabled = checkGate(gateKey)
         return FeatureReleaseEvaluator.evaluate(
             releaseDescriptor,
             context: FeatureReleaseContext(
                 actor: actor,
                 installedBuild: installedBuild,
                 configState: .fresh,
-                enableGate: enableGateEnabled,
+                enableGate: false,
                 killSwitch: killSwitchEnabled
             )
         ).isEnabled
