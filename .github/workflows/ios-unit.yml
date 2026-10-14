@@ -53,6 +53,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.checkout-ref || github.sha }}
+          fetch-depth: 0
 
       - name: Setup iOS build environment
         uses: ./.github/actions/setup-ios-build
@@ -82,16 +83,50 @@ jobs:
           cd apps/ios
           bundle exec fastlane ci_ios
 
-      - name: Unit-tier tests
+      - name: Unit-tier tests and native coverage ratchet
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: |
-          cd apps/ios
-          DESTINATION=$(SCHEME=LogYourBodyTiers bash ../../scripts/ios/resolve-simulator-destination.sh)
-          bundle exec fastlane ci_test_unit destination:"$DESTINATION"
+          UNIT_RESULTS="$GITHUB_WORKSPACE/apps/ios/test_results/unit-tier/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          [[ ! -e "$UNIT_RESULTS" ]] || { echo "Refusing stale Unit-tier output"; exit 65; }
+          mkdir -p "$UNIT_RESULTS"
+          echo "UNIT_RESULTS=$UNIT_RESULTS" >> "$GITHUB_ENV"
+          STARTED_AT="$(date +%s)"
+          git rev-parse HEAD > "$UNIT_RESULTS/source-revision.txt"
+          git diff HEAD --binary > "$UNIT_RESULTS/source-working-tree.patch"
+          (
+            cd apps/ios
+            DESTINATION=$(SCHEME=LogYourBodyTiers bash ../../scripts/ios/resolve-simulator-destination.sh)
+            bundle exec fastlane ci_test_unit destination:"$DESTINATION" output_directory:"$UNIT_RESULTS"
+          ) 2>&1 | tee "$UNIT_RESULTS/unit-tier.log"
+          set -- "$UNIT_RESULTS"/*.xcresult
+          [[ "$#" -eq 1 && -d "$1" ]] || { echo "Expected one current Unit-tier xcresult"; exit 65; }
+          BUNDLE="$1"
+          python3 scripts/ios/launch-quality-evidence.py --bundle "$BUNDLE" \
+            --started-at "$STARTED_AT" --export-coverage
+          python3 scripts/ios/native-coverage-ratchet.py \
+            --coverage "${BUNDLE%.xcresult}.coverage.json" --evidence "${BUNDLE%.xcresult}.evidence.json" \
+            --baseline scripts/ios/native-coverage-baseline.json --profile unit-tier \
+            --source-sha "$(git rev-parse HEAD)" --base-revision "${BASE_SHA:-}" --source-root "$GITHUB_WORKSPACE" \
+            --scheme LogYourBodyTiers --test-plan Unit > "$UNIT_RESULTS/native-coverage-ratchet.json"
+
+      - name: Upload Unit-tier coverage receipts
+        if: always() && runner.environment == 'github-hosted' && env.UNIT_RESULTS != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unit-native-coverage-${{ github.run_id }}
+          path: |
+            ${{ env.UNIT_RESULTS }}/*.json
+            ${{ env.UNIT_RESULTS }}/source-revision.txt
+            ${{ env.UNIT_RESULTS }}/source-working-tree.patch
+            ${{ env.UNIT_RESULTS }}/unit-tier.log
+          if-no-files-found: error
 
       - name: Unit test duration + coverage report
-        if: always()
+        if: always() && env.UNIT_RESULTS != ''
         run: |
-          BUNDLE=$(ls -d apps/ios/test_results/unit-tier/*.xcresult 2>/dev/null | head -1 || true)
+          BUNDLE=$(find "${UNIT_RESULTS:?}" -maxdepth 1 -name "*.xcresult" -type d | head -1)
           if [[ -n "$BUNDLE" ]]; then
             python3 scripts/ios/test-tier-report.py "$BUNDLE" | tee -a "$GITHUB_STEP_SUMMARY"
           else
