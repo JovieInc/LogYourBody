@@ -660,6 +660,80 @@ def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> Non
     assert 'heartbeat' not in summary
 
 
+def test_onboarding_golden_path_runs_in_the_reusable_lane_and_fails_closed(
+    tmp_path: Path,
+) -> None:
+    caller = _job_block("ci.yml", "ios")
+    assert "    uses: ./.github/workflows/ios-unit.yml" in caller
+    assert "      - name:" not in caller, "A reusable-workflow call cannot contain steps"
+    unit = _job_block("ios-unit.yml", "unit")
+    marker = "      - name: Onboarding golden-path UI test\n        run: |\n"
+    assert marker in unit, "Onboarding must execute on both hosted and Mac-child lanes"
+    command = unit.split(marker, 1)[1].split("\n      - name:", 1)[0]
+    command = textwrap.dedent(command)
+    assert "continue-on-error" not in unit
+    assert "if: always()" in unit.split("Upload onboarding UI test results", 1)[1]
+    assert "path: apps/ios/test_results/ui-tier" in unit
+
+    (tmp_path / "apps/ios").mkdir(parents=True)
+    scripts = tmp_path / "scripts/ios"
+    scripts.mkdir(parents=True)
+    (scripts / "resolve-simulator-destination.sh").write_text(
+        "#!/usr/bin/env bash\nprintf '%s\\n' 'platform=iOS Simulator,id=fixture-simulator'\n"
+    )
+    bundle = tmp_path / "bundle"
+    bundle.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' \"$@\" > \"$BUNDLE_ARGUMENTS\"\n"
+        "exit \"$BUNDLE_STATUS\"\n"
+    )
+    bundle.chmod(0o755)
+    arguments = tmp_path / "arguments"
+    for status in (0, 65):
+        result = subprocess.run(
+            ["bash", "-e", "-o", "pipefail", "-c", command],
+            cwd=tmp_path, text=True, capture_output=True, check=False,
+            env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
+                 "BUNDLE_ARGUMENTS": str(arguments), "BUNDLE_STATUS": str(status)},
+            pass_fds=_coverage_fds(),
+        )
+        assert result.returncode == status, result.stderr
+        assert arguments.read_text().splitlines() == [
+            "exec", "fastlane", "test_ui", "scheme:LogYourBodyTiers", "testplan:UITests",
+            "destination:platform=iOS Simulator,id=fixture-simulator",
+            "only_testing:LogYourBodyUITests/OnboardingGoldenPathUITests/"
+            "testBodyScoreOnboardingGoldenPathReachesReveal",
+            "output_directory:./test_results/ui-tier",
+        ]
+
+
+def test_fastlane_ui_lane_forwards_the_selected_plan_and_simulator() -> None:
+    fastfile = (_REPO_ROOT / "apps/ios/fastlane/Fastfile").read_text()
+    lane = "lane :test_ui" + fastfile.split("lane :test_ui", 1)[1].split(
+        "  # Helper method to bump build number", 1
+    )[0]
+    harness = (
+        "require 'json'\n"
+        "def lane(name, &body); $ui_lane = body; end\n"
+        "def run_tests(**options); puts JSON.generate(options); end\n"
+        "eval(ARGV.fetch(0))\n"
+        "$ui_lane.call(scheme: 'LogYourBodyTiers', testplan: 'UITests', "
+        "destination: 'platform=iOS Simulator,id=fixture-simulator', "
+        "only_testing: 'LogYourBodyUITests/OnboardingGoldenPathUITests/"
+        "testBodyScoreOnboardingGoldenPathReachesReveal')\n"
+    )
+    result = subprocess.run(
+        ["ruby", "-e", harness, lane], text=True, capture_output=True, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    options = json.loads(result.stdout)
+    assert options["scheme"] == "LogYourBodyTiers"
+    assert options["testplan"] == "UITests"
+    assert options["destination"] == "platform=iOS Simulator,id=fixture-simulator"
+    assert options["code_coverage"] is True
+    assert options["result_bundle"] is True
+
+
 _MAC_LANE_GH = """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$FAKE_DIR/calls"
 args="$*"
