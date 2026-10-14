@@ -716,6 +716,62 @@ def test_manual_quality_dispatch_uses_trusted_workflow_and_same_hosted_audit() -
     assert "permissions:\n  contents: read\n" in workflow and "secrets." not in workflow
 
 
+def test_manual_quality_checkout_retains_canonical_comparison_history(tmp_path: Path) -> None:
+    import re
+
+    quality = _job_block("ios-quality.yml", "quality")
+    checkout = quality.split("      - uses: actions/checkout@v4\n", 1)[1].split("\n      - ", 1)[0]
+    configured_depth = re.search(r"^          fetch-depth: (\d+)$", checkout, re.MULTILINE)
+    depth = int(configured_depth.group(1)) if configured_depth else 1
+
+    def git(directory: Path, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-c", "commit.gpgsign=false", "-c", "protocol.file.allow=always",
+             "-C", str(directory), *arguments], text=True, capture_output=True, check=check,
+        )
+
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git(origin, "init", "-q", "-b", "main")
+    git(origin, "config", "user.name", "Qualification fixture")
+    git(origin, "config", "user.email", "fixture@example.invalid")
+    (origin / "source").write_text("base")
+    git(origin, "add", ".")
+    git(origin, "commit", "-qm", "base")
+    base = git(origin, "rev-parse", "HEAD").stdout.strip()
+    (origin / "source").write_text("canonical")
+    git(origin, "commit", "-qam", "canonical")
+    canonical = git(origin, "rev-parse", "HEAD").stdout.strip()
+    git(origin, "checkout", "-qb", "candidate")
+    (origin / "source").write_text("candidate")
+    git(origin, "commit", "-qam", "candidate")
+    candidate = git(origin, "rev-parse", "HEAD").stdout.strip()
+
+    def fetch_checkout(name: str, fetch_depth: int) -> Path:
+        directory = tmp_path / name
+        directory.mkdir()
+        git(directory, "init", "-q")
+        git(directory, "remote", "add", "origin", origin.as_uri())
+        # Match checkout@v4: SHA-only uses no destination ref at positive depth;
+        # depth0 fetches all branch refs before checking out the requested SHA.
+        if fetch_depth > 0:
+            git(directory, "fetch", "--no-tags", f"--depth={fetch_depth}", "origin", candidate)
+        else:
+            git(directory, "fetch", "--no-tags", "origin", "+refs/heads/*:refs/remotes/origin/*")
+        git(directory, "checkout", "--detach", candidate)
+        assert git(directory, "rev-parse", "HEAD").stdout.strip() == candidate
+        return directory
+
+    shallow = fetch_checkout("depth1-counterfactual", 1)
+    assert git(shallow, "rev-parse", "--verify", "refs/remotes/origin/main^{commit}", check=False).returncode != 0
+    assert git(shallow, "rev-parse", "--verify", canonical + "^{commit}", check=False).returncode != 0
+
+    actual = fetch_checkout("workflow-configured", depth)
+    assert git(actual, "rev-parse", "--verify", "refs/remotes/origin/main^{commit}").stdout.strip() == canonical
+    assert git(actual, "rev-parse", "--verify", "refs/remotes/origin/main^").stdout.strip() == base
+    assert git(actual, "rev-parse", "--verify", canonical + "^{commit}").stdout.strip() == canonical
+
+
 def test_manual_quality_selection_preserves_reusable_dispatch_callers() -> None:
     import re
     from types import SimpleNamespace
