@@ -480,7 +480,137 @@ private struct HTTPErrorPayload: Decodable {
 }
 
 #if DEBUG
-private struct FixtureChatService: ChatServicing {
+/// A synchronous cancellation fence: termination closes admission before scheduling cleanup.
+/// DEBUG fixtures use it to reject even noncooperative late provider callbacks.
+final class ChatFixtureAttemptGate: @unchecked Sendable {
+    let id = UUID()
+    private let lock = NSLock()
+    private var active = true
+
+    func cancel() {
+        lock.lock()
+        defer { lock.unlock() }
+        active = false
+    }
+
+    func whileActive(_ operation: () throws -> Bool) rethrows -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard active else { return false }
+        return try operation()
+    }
+}
+
+/// Synthetic fixture history only. Production transcript persistence remains server-owned.
+/// Atomic writes follow TrainingDraftStore's isolated fixture pattern.
+@MainActor
+final class ChatFixtureReplayStore {
+    static let question = "Synthetic full-turn question"
+    static let answer = "Your fixture trend is stable. Open Timeline to inspect the selected day."
+    struct Journal: Codable {
+        let nonce: UUID
+        let conversationId: String
+        let clientMessageId: String
+        var attemptId: UUID
+        var attempts: Int
+        var status: String
+    }
+    private let nonce: UUID
+    private let url: URL
+    private let writeData: (Data, URL, Data.WritingOptions) throws -> Void
+
+    init(rootURL: URL, nonce: UUID,
+         writeData: @escaping (Data, URL, Data.WritingOptions) throws -> Void = { try $0.write(to: $1, options: $2) }) {
+        self.nonce = nonce
+        url = rootURL.appendingPathComponent(nonce.uuidString + ".json")
+        self.writeData = writeData
+    }
+
+    func read() throws -> Journal? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let row = try JSONDecoder().decode(Journal.self, from: Data(contentsOf: url))
+        guard row.nonce == nonce, UUID(uuidString: row.conversationId) != nil,
+              UUID(uuidString: row.clientMessageId) != nil,
+              ["pending", "failed", "cancelled", "completed"].contains(row.status) else {
+            throw ChatServiceError.invalidResponse
+        }
+        return row
+    }
+
+    private func persist(_ row: Journal) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try writeData(JSONEncoder().encode(row), url, .atomic)
+    }
+
+    /// Returns the attempt count; completed same-ID submissions replay without another write.
+    func begin(conversationId: String, clientMessageId: String, message: String,
+               gate: ChatFixtureAttemptGate) throws -> Journal {
+        guard message == Self.question, UUID(uuidString: conversationId) != nil,
+              UUID(uuidString: clientMessageId) != nil else { throw ChatServiceError.invalidResponse }
+        var result: Journal?
+        let admitted = try gate.whileActive {
+            let existing = try read()
+            if let existing {
+                guard existing.conversationId == conversationId, existing.clientMessageId == clientMessageId else {
+                    throw ChatServiceError.invalidResponse
+                }
+                if existing.status == "completed" { result = existing; return true }
+                guard existing.status != "pending" else { throw ChatServiceError.requestInProgress }
+            }
+            let row = Journal(nonce: nonce, conversationId: conversationId, clientMessageId: clientMessageId,
+                              attemptId: gate.id, attempts: (existing?.attempts ?? 0) + 1, status: "pending")
+            try persist(row)
+            result = row
+            return true
+        }
+        guard admitted, let result else { throw CancellationError() }
+        return result
+    }
+
+    @discardableResult
+    func finish(_ status: String, gate: ChatFixtureAttemptGate) throws -> Bool {
+        try gate.whileActive {
+            guard var row = try read(), row.attemptId == gate.id, row.status == "pending" else { return false }
+            guard status == "completed" || status == "failed" else { throw ChatServiceError.invalidResponse }
+            row.status = status
+            try persist(row)
+            return true
+        }
+    }
+
+    func cancel(gate: ChatFixtureAttemptGate) throws {
+        gate.cancel()
+        guard var row = try read(), row.attemptId == gate.id, row.status == "pending" else { return }
+        row.status = "cancelled"
+        try persist(row)
+    }
+
+    func snapshot() throws -> ChatConversationSnapshot? {
+        guard let row = try read() else { return nil }
+        let date = "2026-10-14T00:00:00.000Z"
+        var messages: [[String: Any]] = [[
+            "id": row.clientMessageId, "role": "user", "content": Self.question,
+            "clientMessageId": row.clientMessageId, "createdAt": date,
+            "turn": ["status": row.status, "retryable": row.status == "failed" || row.status == "cancelled"]
+        ]]
+        if row.status == "completed" {
+            messages.append(["id": "fixture-assistant-message", "role": "assistant",
+                             "content": Self.answer, "createdAt": date])
+        }
+        let body: [String: Any] = [
+            "id": row.conversationId, "title": Self.question, "createdAt": date,
+            "updatedAt": date, "expiresAt": "2026-11-14", "messages": messages
+        ]
+        return try JSONDecoder().decode(ChatConversationSnapshot.self, from: JSONSerialization.data(withJSONObject: body))
+    }
+
+    func delete(conversationId: String) throws {
+        guard let row = try read(), row.conversationId == conversationId else { return }
+        try FileManager.default.removeItem(at: url)
+    }
+}
+
+struct FixtureChatService: ChatServicing {
     enum Mode: Equatable {
         case success
         case providerError
@@ -488,11 +618,23 @@ private struct FixtureChatService: ChatServicing {
         case slow
         case historyFailed
         case historyPending
+        case invalidScope
     }
 
     let mode: Mode
+    let replayStore: ChatFixtureReplayStore?
+
+    init(mode: Mode, replayStore: ChatFixtureReplayStore? = nil) {
+        self.mode = mode
+        self.replayStore = replayStore
+    }
 
     func loadLatest(accessToken: String) async throws -> ChatConversationSnapshot? {
+        if mode == .invalidScope { throw ChatServiceError.invalidResponse }
+        if let replayStore {
+            guard accessToken == "ui-test-bearer-token" else { throw ChatServiceError.authenticationExpired }
+            return try await replayStore.snapshot()
+        }
         if mode == .offline { throw ChatServiceError.offline }
         if mode == .historyFailed || mode == .historyPending {
             let body = """
@@ -516,7 +658,13 @@ private struct FixtureChatService: ChatServicing {
         voiceMode: Bool
     ) -> AsyncThrowingStream<ChatStreamEvent, Error> {
         AsyncThrowingStream { continuation in
-            let task = Task {
+            let gate = ChatFixtureAttemptGate()
+            let task = Task { @MainActor in
+                if let replayStore {
+                    await replayMessage(accessToken: accessToken, identity: (conversationId, clientMessageId, message),
+                                        store: replayStore, gate: gate, continuation: continuation)
+                    return
+                }
                 if mode == .historyFailed &&
                     (conversationId != "history-conversation" || clientMessageId != "history-client" ||
                      message != "How am I doing?") {
@@ -548,6 +696,9 @@ private struct FixtureChatService: ChatServicing {
                 case .offline:
                     continuation.finish(throwing: ChatServiceError.offline)
                     return
+                case .invalidScope:
+                    continuation.finish(throwing: ChatServiceError.invalidResponse)
+                    return
                 case .slow:
                     continuation.yield(.delta("Reviewing your authorized trend…"))
                     do {
@@ -570,11 +721,60 @@ private struct FixtureChatService: ChatServicing {
                 )
                 continuation.finish()
             }
-            continuation.onTermination = { _ in task.cancel() }
+            continuation.onTermination = { termination in
+                if case .cancelled = termination {
+                    // Close admission synchronously, before either actor cleanup or a late callback.
+                    gate.cancel()
+                    if let replayStore { Task { @MainActor in try? replayStore.cancel(gate: gate) } }
+                }
+                task.cancel()
+            }
         }
     }
 
-    func deleteConversation(accessToken: String, conversationId: String) async throws {}
+    @MainActor
+    private func replayMessage(accessToken: String, identity: (conversationId: String, clientMessageId: String, message: String),
+                               store: ChatFixtureReplayStore, gate: ChatFixtureAttemptGate,
+                               continuation: AsyncThrowingStream<ChatStreamEvent, Error>.Continuation) async {
+        let (conversationId, clientMessageId, message) = identity
+        do {
+            guard accessToken == "ui-test-bearer-token" else { throw ChatServiceError.authenticationExpired }
+            let row = try store.begin(conversationId: conversationId, clientMessageId: clientMessageId,
+                                      message: message, gate: gate)
+            let replayed = row.status == "completed"
+            continuation.yield(.metadata(conversationId: conversationId, clientMessageId: clientMessageId, replayed: replayed))
+            if mode == .providerError && row.attempts == 1 && !replayed {
+                // Deliberate transport-red control: correct full text without terminal completion.
+                continuation.yield(.delta(ChatFixtureReplayStore.answer))
+                guard try store.finish("failed", gate: gate) else { throw CancellationError() }
+                continuation.finish()
+                return
+            }
+            if mode == .slow && row.attempts == 1 && !replayed {
+                continuation.yield(.delta("Reviewing your authorized trend…"))
+                try await Task.sleep(nanoseconds: 30_000_000_000)
+            }
+            try Task.checkCancellation()
+            continuation.yield(.delta(ChatFixtureReplayStore.answer))
+            if !replayed {
+                guard try store.finish("completed", gate: gate) else { throw CancellationError() }
+            }
+            continuation.yield(.completed(messageId: "fixture-assistant-message", createdAt: "2026-10-14", replayed: replayed))
+            continuation.finish()
+        } catch is CancellationError {
+            try? store.cancel(gate: gate)
+            continuation.finish(throwing: CancellationError())
+        } catch {
+            _ = try? store.finish("failed", gate: gate)
+            continuation.finish(throwing: error)
+        }
+    }
+
+    func deleteConversation(accessToken: String, conversationId: String) async throws {
+        guard let replayStore else { return }
+        guard accessToken == "ui-test-bearer-token" else { throw ChatServiceError.authenticationExpired }
+        try await replayStore.delete(conversationId: conversationId)
+    }
 }
 #endif
 
@@ -597,6 +797,12 @@ extension AppServicePorts {
                 mode = .slow
             } else {
                 mode = .success
+            }
+            if arguments.contains("-lybUITestChatReplayFixture") {
+                guard let value = ProcessInfo.processInfo.environment["LYB_UI_TEST_CHAT_REPLAY_ID"],
+                      let nonce = UUID(uuidString: value) else { return FixtureChatService(mode: .invalidScope) }
+                let root = FileManager.default.temporaryDirectory.appendingPathComponent("Chat-UIFixture", isDirectory: true)
+                return FixtureChatService(mode: mode, replayStore: ChatFixtureReplayStore(rootURL: root, nonce: nonce))
             }
             return FixtureChatService(mode: mode)
         }

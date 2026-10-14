@@ -2713,6 +2713,115 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "onboarding-v2-paywall", from: app)
     }
 
+    func testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch() throws {
+        let app = XCUIApplication()
+        launchSyntheticChatReplay(app)
+        submitSyntheticChatQuestion(in: app)
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-full-turn")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-foreground")
+        app.terminate()
+        app.launch()
+        openHomeV2AskForDraftCheck(in: app)
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-persisted-relaunch")
+        XCTAssertEqual(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "You: Synthetic full-turn question")).count, 1)
+        app.buttons["home_chat_collapse"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8))
+    }
+
+    func testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity() throws {
+        let app = XCUIApplication()
+        launchSyntheticChatReplay(app, extra: ["-lybUITestChatErrorFixture"])
+        submitSyntheticChatQuestion(in: app)
+        let retry = app.buttons["chat_retry_button"]
+        let offered = retry.waitForExistence(timeout: 8)
+        attachScreenshot(named: "chat-synthetic-missing-done-failure", from: app)
+        XCTAssertTrue(offered, "Full text without done must remain a recoverable failed turn")
+        XCTAssertTrue(retry.isHittable)
+        XCTAssertTrue(app.descendants(matching: .any)["chat_error_state"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        retry.tap()
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-original-id-retry")
+        XCTAssertEqual(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "You: Synthetic full-turn question")).count, 1)
+        app.terminate()
+        app.launch()
+        openHomeV2AskForDraftCheck(in: app)
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-retry-persisted")
+    }
+
+    func testHomeV2AskSyntheticCancelledTurnRecovers() throws {
+        let app = XCUIApplication()
+        launchSyntheticChatReplay(app, extra: ["-lybUITestChatSlowFixture"])
+        submitSyntheticChatQuestion(in: app)
+        let partial = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@", "Reviewing your authorized trend")
+        ).firstMatch
+        let streaming = partial.waitForExistence(timeout: 8)
+        attachScreenshot(named: "chat-synthetic-before-cancel", from: app)
+        XCTAssertTrue(streaming)
+        XCTAssertEqual(app.buttons["chat_send_button"].label, "Stop answer", "An active turn cannot expose another submit")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        let stop = app.buttons["Stop answer"]
+        XCTAssertTrue(stop.waitForExistence(timeout: 5))
+        stop.tap()
+        let retry = app.buttons["chat_retry_button"]
+        let stopped = retry.waitForExistence(timeout: 8)
+        attachScreenshot(named: "chat-synthetic-cancelled", from: app)
+        XCTAssertTrue(stopped)
+        XCTAssertTrue(app.staticTexts["Stopped"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        retry.tap()
+        assertSyntheticChatCompleted(in: app, capture: "chat-synthetic-cancel-retry")
+        XCTAssertFalse(app.staticTexts["Stopped"].exists)
+        XCTAssertEqual(app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "You: Synthetic full-turn question")).count, 1)
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        composer.typeText("Unsent synthetic recovery draft")
+        XCTAssertTrue(app.buttons["chat_send_button"].isEnabled)
+        app.buttons["home_chat_collapse"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 8))
+    }
+
+    private func launchSyntheticChatReplay(_ app: XCUIApplication, extra: [String] = []) {
+        // A unique nonce starts empty; the same launch environment deliberately survives relaunch.
+        app.launchEnvironment["LYB_UI_TEST_CHAT_REPLAY_ID"] = UUID().uuidString
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestChatFirstFixture",
+                           "-lybUITestChatReplayFixture"] + extra)
+        openHomeV2AskForDraftCheck(in: app)
+    }
+
+    private func submitSyntheticChatQuestion(in app: XCUIApplication) {
+        let composer = app.textFields["chat_composer"]
+        composer.tap()
+        composer.typeText("Synthetic full-turn question")
+        let send = app.buttons["chat_send_button"]
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 8), .completed)
+        send.tap()
+    }
+
+    private func assertSyntheticChatCompleted(in app: XCUIApplication, capture: String) {
+        let response = "Your fixture trend is stable. Open Timeline to inspect the selected day."
+        let answer = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", response)).firstMatch
+        let terminal = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            answer.exists && app.buttons["chat_send_button"].label == "Send message"
+                && !app.buttons["chat_retry_button"].exists
+                && !app.descendants(matching: .any)["chat_error_state"].exists
+        }, object: app)
+        let completed = XCTWaiter.wait(for: [terminal], timeout: 8) == .completed
+        attachScreenshot(named: capture, from: app)
+        XCTAssertTrue(completed, "Require the full rendered answer and terminal success, not a root, partial text or HTTP status")
+        XCTAssertFalse(app.descendants(matching: .any)["chat_thinking_indicator"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["chat_error_state"].exists)
+        XCTAssertFalse(app.buttons["chat_retry_button"].exists)
+        XCTAssertTrue(app.textFields["chat_composer"].isHittable)
+    }
+
     func testHomeV2UnsentAskDraftSurvivesCollapseAndReopenWithoutSending() throws {
         let app = XCUIApplication()
         launch(app, with: [
