@@ -37,7 +37,7 @@ export default {
         'linear-border': '#2A2A2C',
         'linear-text': '#F7F8F8',
         'linear-text-secondary': '#9CA0A8',
-        'linear-text-tertiary': '#6E7178',
+        'linear-text-tertiary': '#8B909B',
         // Core accent colors for rotation
         'accent-cyan': '#5de7ff', // Linear cyan
         'accent-purple': '#5E6AD2', // Linear purple

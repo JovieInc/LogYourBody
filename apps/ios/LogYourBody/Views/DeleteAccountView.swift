@@ -116,7 +116,6 @@ struct DeleteAccountView: View {
 
             Section {
                 Button("Delete account", role: .destructive) {
-                    isTextFieldFocused = false
                     deleteAccount()
                 }
                 .disabled(!hasValidConfirmation || isDeleting)
@@ -139,11 +138,15 @@ struct DeleteAccountView: View {
         .navigationTitle("Delete Account")
         .navigationBarTitleDisplayMode(.inline)
         .standardErrorAlert(isPresented: $showError, message: errorMessage)
-        .confirmationDialog("Delete Account?", isPresented: $showConfirmation) {
+        // confirmationDialog on this List presents as a popover and omits Cancel,
+        // so the destructive confirmation has no reachable escape hatch.
+        .alert("Delete Account?", isPresented: $showConfirmation) {
             Button("Delete", role: .destructive) {
                 performDeletion()
             }
+            .accessibilityIdentifier("delete_account_final_delete")
             Button("Cancel", role: .cancel) { }
+                .accessibilityIdentifier("delete_account_final_cancel")
         } message: {
             Text(
                 "This permanently deletes your account and app-stored data. Apple Health data stays in Health. " +
@@ -159,8 +162,13 @@ struct DeleteAccountView: View {
     }
 
     private func deleteAccount() {
-        guard hasValidConfirmation else { return }
-        showConfirmation = true
+        guard hasValidConfirmation, !isDeleting else { return }
+        // Resigning focus in the same turn as presentation drops the alert.
+        isTextFieldFocused = false
+        Task { @MainActor in
+            guard hasValidConfirmation, !isDeleting else { return }
+            showConfirmation = true
+        }
     }
 
     private func performDeletion() {

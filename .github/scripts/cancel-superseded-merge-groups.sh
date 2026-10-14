@@ -13,7 +13,8 @@ for run_status in queued in_progress waiting pending; do
     --jq '.workflow_runs[] | "\(.id) \(.head_branch)"'
 done | sort -u | while read -r run_id branch; do
   [[ "$run_id" == "$self" || "$branch" != gh-readonly-queue/* ]] && continue
-  if gh api "repos/$repo/git/ref/heads/$branch" --silent 2>&1 | grep -q 'HTTP 404'; then
+  ref_lookup=$(gh api "repos/$repo/git/ref/heads/$branch" --silent 2>&1) || true
+  if grep -q 'HTTP 404' <<<"$ref_lookup"; then
     gh run cancel "$run_id" -R "$repo" && echo "Cancelled superseded run $run_id ($branch)"
   fi
 done

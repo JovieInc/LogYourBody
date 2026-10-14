@@ -13,6 +13,59 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testWeightGoalCancelMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestWeightLoggerMVPFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Weight log"].waitForExistence(timeout: 20))
+        let settings = app.buttons["mvp_settings_button"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        settings.tap()
+
+        let tracking = app.descendants(matching: .any)["settings_tracking_link"]
+        var swipes = 0
+        while !tracking.exists && swipes < 4 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(tracking.waitForExistence(timeout: 8))
+        tracking.tap()
+
+        let weightGoal = app.buttons["settings_weight_goal_edit_button"]
+        swipes = 0
+        while !weightGoal.exists && swipes < 4 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(weightGoal.waitForExistence(timeout: 8))
+        weightGoal.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings_goal_editor_text_field"].waitForExistence(timeout: 8)
+        )
+        let cancel = app.buttons["Cancel editing"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Goal cancel \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Goal cancel \(frame)")
+
+        let save = app.descendants(matching: .any)["settings_goal_editor_save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        let saveFrame = save.frame
+        XCTAssertGreaterThanOrEqual(saveFrame.width, 44, "Goal save \(saveFrame)")
+        XCTAssertGreaterThanOrEqual(saveFrame.height, 44, "Goal save \(saveFrame)")
+        cancel.tap()
+        XCTAssertTrue(weightGoal.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings_goal_editor_text_field"].waitForNonExistence(timeout: 5)
+        )
+    }
+
     func testLaunch() throws {
         let app = XCUIApplication()
         app.launch()
@@ -24,6 +77,168 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         attachment.name = "Launch Screen"
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    func testTrainingEnrollmentCloseMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+
+        let open = app.buttons["training_fixture_enroll"]
+        XCTAssertTrue(open.waitForExistence(timeout: 15))
+        open.tap()
+
+        XCTAssertTrue(app.navigationBars["Training coach"].waitForExistence(timeout: 8))
+        let close = app.descendants(matching: .any)["training_enroll_close_button"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        let frame = close.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Training enrollment close \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Training enrollment close \(frame)")
+        close.tap()
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Training coach"].exists)
+    }
+
+    func testVoiceReviewCancelMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+
+        let open = app.buttons["training_fixture_voice_review"]
+        XCTAssertTrue(open.waitForExistence(timeout: 15))
+        open.tap()
+
+        XCTAssertTrue(app.navigationBars["Review set"].waitForExistence(timeout: 8))
+        let cancel = app.descendants(matching: .any)["voice_set_review_cancel_button"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        let frame = cancel.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Voice review cancel \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Voice review cancel \(frame)")
+        cancel.tap()
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Review set"].exists)
+    }
+
+    func testDexaPDFCloseMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestFullDashboardFixture",
+            "-lybUITestDexaPDFSheetFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["legacy_full_dashboard_beta"].waitForExistence(timeout: 20))
+        let settings = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "Open profile and settings")
+        ).firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        settings.tap()
+
+        let integrations = app.descendants(matching: .any)["settings_integrations_link"]
+        scrollUntilHittable(integrations, in: app)
+        XCTAssertTrue(integrations.waitForExistence(timeout: 8))
+        integrations.tap()
+
+        let dexa = app.buttons["integrations_bodyspec_link"]
+        scrollUntilHittable(dexa, in: app)
+        XCTAssertTrue(dexa.waitForExistence(timeout: 8))
+        dexa.tap()
+
+        let importButton = app.buttons["body_spec_pdf_import"]
+        scrollUntilHittable(importButton, in: app)
+        XCTAssertTrue(importButton.waitForExistence(timeout: 8))
+        importButton.tap()
+
+        XCTAssertTrue(app.navigationBars["Import scan PDF"].waitForExistence(timeout: 8))
+        let close = app.descendants(matching: .any)["dexa_pdf_import_close_button"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        let frame = close.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "DEXA PDF close \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "DEXA PDF close \(frame)")
+        close.tap()
+        XCTAssertTrue(importButton.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Import scan PDF"].exists)
+    }
+
+    func testSyncDetailsCloseMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestFullDashboardFixture",
+            "-lybUITestSyncDetailsFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["legacy_full_dashboard_beta"].waitForExistence(timeout: 20))
+        let status = app.descendants(matching: .any)["dashboard_sync_status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 8))
+        status.tap()
+
+        XCTAssertTrue(app.navigationBars["Sync"].waitForExistence(timeout: 8))
+        let close = app.descendants(matching: .any)["dashboard_sync_close_button"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        let frame = close.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Sync close \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Sync close \(frame)")
+        close.tap()
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Sync"].exists)
+    }
+
+    private func scrollUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<8 {
+            if element.exists, element.isHittable { return }
+            app.swipeUp()
+        }
+    }
+
+    func testPaywallLegalDoneMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestPaywallFixture",
+            "-lybUITestSuppressWhatsNew"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_paywall"].waitForExistence(timeout: 20))
+        let terms = app.buttons["Terms of Service"].firstMatch
+        XCTAssertTrue(terms.waitForExistence(timeout: 8))
+        terms.tap()
+
+        let done = app.descendants(matching: .any)["paywall_legal_done_button"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        let frame = done.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Paywall legal done \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Paywall legal done \(frame)")
+        done.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_paywall"].waitForExistence(timeout: 5))
+        XCTAssertFalse(done.exists)
+    }
+
+    func testTrainingSessionCloseMeetsMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture",
+            "-lybUITestResetTrainingFixture"
+        ]
+        app.launch()
+
+        let open = app.buttons["training_fixture_open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 15))
+        open.tap()
+
+        XCTAssertTrue(app.navigationBars["Live session"].waitForExistence(timeout: 8))
+        let close = app.descendants(matching: .any)["training_live_session_close_button"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        let frame = close.frame
+        XCTAssertGreaterThanOrEqual(frame.width, 44, "Training close \(frame)")
+        XCTAssertGreaterThanOrEqual(frame.height, 44, "Training close \(frame)")
+        close.tap()
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.navigationBars["Live session"].exists)
     }
 
     func testExportCancelMeetsMinimumHitTarget() throws {

@@ -120,6 +120,9 @@ final class BodyMetricLoggingService {
 
         Self.donateLoggedMetricActivity(metrics)
         BodyMetricSpotlightIndexer.indexLatestMetric(metrics)
+        if metrics.weight != nil {
+            await MainActor.run { NotificationManager.shared.recordWeighInLogged() }
+        }
 
         return BodyMetricLoggingResult(
             metrics: metrics,
