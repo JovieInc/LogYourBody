@@ -14,7 +14,9 @@ final class MesocycleCanvasTests: XCTestCase {
         let exercise = CanvasExercise(
             instanceId: "a", variantId: "a", name: "Press", sets: 3, targetReps: 10, priority: "standard"
         )
-        let session = CanvasSession(id: "session:monday:single", day: "monday", slot: "single", title: "Monday", exercises: [exercise])
+        let session = CanvasSession(
+            id: "session:monday:single", day: "monday", slot: "single", title: "Monday", exercises: [exercise]
+        )
         let performed = CanvasPerformedExercise(instanceId: "a", variantId: "a", name: "Press", sets: 9, targetReps: 10)
         let workout = CanvasExecutionSession(
             sessionId: session.id, day: session.day, slot: session.slot, title: session.title, exercises: [performed]
