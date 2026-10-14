@@ -35,7 +35,10 @@ final class MesocycleCanvasUITests: XCTestCase {
         send(app, "Prioritize upper chest and triceps")
         tap(app, "canvas_sets_6_incline_dumbbell_press:monday:single:0")
         tap(app, "canvas_accept")
-        XCTAssertTrue(app.staticTexts.matching(identifier: "canvas_card_incline_dumbbell_press:monday:single:0").firstMatch.waitForExistence(timeout: 8))
+        let inclinePressCard = app.staticTexts.matching(
+            identifier: "canvas_card_incline_dumbbell_press:monday:single:0"
+        ).firstMatch
+        XCTAssertTrue(inclinePressCard.waitForExistence(timeout: 8))
 
         send(app, "five training days")
         tap(app, "canvas_accept")

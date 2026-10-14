@@ -378,7 +378,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3590f5fc9bca5f30a8eaac908a762e683611a4d4126b8b8d611c1515a38b13ea`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `2ccae5f8ae61f82202ecac2483285dd3ea9039a9064bbc6eec6b45126596da5d`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `b211c0497df80e804d40f9395187168fff791c98120c304ec64cdb6e3369fe44`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `f92b600361fe9d26b2a4c9a944c8c921d33feb8eafb756a77ab0b285b940a3f6`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `cdd99f5f4e4b9f559e4e3e3b6889e00d7fbbe612166e0872f812d0ed23eafd7b`)
