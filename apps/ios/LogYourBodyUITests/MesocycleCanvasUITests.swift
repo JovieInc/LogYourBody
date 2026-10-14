@@ -9,8 +9,12 @@ final class MesocycleCanvasUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestCanvasFixture", "-lybUITestReduceMotion"]
         app.launch()
+        send(app, "Build a 4-week hypertrophy plan for a full gym")
+        tap(app, "canvas_accept")
+        XCTAssertTrue(app.staticTexts["Incline dumbbell press"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.descendants(matching: .any)["canvas_layout_stack"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.descendants(matching: .any)["canvas_motion_reduced"].waitForExistence(timeout: 8))
+        attachScreenshot(named: "launch-quality-canvas-reduced-motion", from: app)
     }
 
     func testGoalThroughUndoKeepsTheCanvasAndReadbackTogether() {
@@ -75,12 +79,17 @@ final class MesocycleCanvasUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["canvas_day_friday_single"].waitForExistence(timeout: 8))
         tap(app, "canvas_reload")
         XCTAssertTrue(app.staticTexts["Standing calf raise"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["canvas_execution"].label.contains("Smith machine incline press"))
+        revealReadback(app)
+        attachScreenshot(named: "launch-quality-canvas-replay-readback", from: app)
 
         send(app, "undo")
         tap(app, "canvas_accept")
         XCTAssertTrue(app.descendants(matching: .any)["canvas_day_tuesday_single"].waitForExistence(timeout: 8))
         XCTAssertTrue(app.staticTexts["Leg press"].exists)
         XCTAssertTrue(app.staticTexts["Standing calf raise"].exists)
+        revealReadback(app)
+        attachScreenshot(named: "launch-quality-canvas-undo-readback", from: app)
 
         tap(app, "canvas_inject_missed")
         XCTAssertTrue(narration(app).localizedCaseInsensitiveContains("unchanged"))
@@ -98,10 +107,33 @@ final class MesocycleCanvasUITests: XCTestCase {
     private func tap(_ app: XCUIApplication, _ identifier: String) {
         let control = app.descendants(matching: .any)[identifier]
         XCTAssertTrue(control.waitForExistence(timeout: 8), identifier)
+        let scroll = app.scrollViews.firstMatch
+        // Previews appear above the plan; move/check controls live inside or below it.
+        let abovePlan = identifier == "canvas_accept" || identifier == "canvas_reject"
+            || identifier.hasPrefix("canvas_sets_") || identifier == "canvas_voice_confirm"
+        for _ in 0..<12 where !control.isHittable {
+            if abovePlan { scroll.swipeDown() } else { scroll.swipeUp() }
+        }
+        XCTAssertTrue(control.isHittable, identifier)
         control.tap()
     }
 
     private func narration(_ app: XCUIApplication) -> String {
         app.descendants(matching: .any)["canvas_narration"].label
+    }
+
+    private func revealReadback(_ app: XCUIApplication) {
+        let readback = app.descendants(matching: .any)["canvas_execution"]
+        for _ in 0..<12 where !readback.isHittable {
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(readback.isHittable)
+    }
+
+    private func attachScreenshot(named name: String, from app: XCUIApplication) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

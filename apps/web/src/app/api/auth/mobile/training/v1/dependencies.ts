@@ -1,6 +1,6 @@
 import { mesocycleCanvasApiEnabled } from '@/lib/flags/mesocycle-canvas';
 import { mesocycleOptimizerEnabled } from '@/lib/flags/mesocycle-optimizer';
-import { neonCanvasLedger } from '@/lib/neon/training-canvas-adapter';
+import { createNeonCanvasLedger, neonCanvasAccounts } from '@/lib/neon/training-canvas-adapter';
 import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
 import { createCanvasRouteHandlers } from './canvas-route-handlers';
 import { createTrainingOptimizerHandlers } from './optimizer-route-handlers';
@@ -46,7 +46,8 @@ export const trainingOptimizerHandlers = createTrainingOptimizerHandlers({
 
 export const canvasHandlers = createCanvasRouteHandlers({
   authenticate,
-  ledger: neonCanvasLedger,
+  accounts: neonCanvasAccounts,
+  ledgerForAccount: createNeonCanvasLedger,
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   now: () => new Date(),
   enabled: () => mesocycleCanvasApiEnabled(),

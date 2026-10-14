@@ -1,6 +1,6 @@
 -- Compare-and-swap storage for the mesocycle canvas ledger.
 -- The revision rules live in the application service. This function only
--- locks the owner row and refuses a write when the write token moved.
+-- fences the admitted owner incarnation and refuses a moved write token.
 create table if not exists public.training_canvas_ledgers (
   identity_provider text not null default 'jovie' check (identity_provider = 'jovie'),
   user_subject text primary key,
@@ -20,17 +20,16 @@ returns jsonb language sql stable as $$
   select payload from public.training_canvas_ledgers where user_subject = p_subject;
 $$;
 
+-- Do not retain the unadmitted overload if this preview migration is reapplied.
+drop function if exists public.training_canvas_save(text, bigint, jsonb);
 create or replace function public.training_canvas_save(
-  p_subject text, p_expected bigint, p_payload jsonb
+  p_subject text, p_owner uuid, p_expected bigint, p_payload jsonb
 ) returns jsonb language plpgsql as $$
 declare
-  v_owner uuid;
   v_write bigint;
   v_next bigint;
 begin
-  select id into v_owner from public.app_users
-    where identity_provider = 'jovie' and identity_subject = p_subject for update;
-  if not found then return jsonb_build_object('kind', 'owner_missing'); end if;
+  perform public.lyb_native_account_admit(p_subject, p_owner);
   if p_payload->>'version' is distinct from '1'
      or p_payload->>'write' is null
      or p_payload->>'generation' is null then

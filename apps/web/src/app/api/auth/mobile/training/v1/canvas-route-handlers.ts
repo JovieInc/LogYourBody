@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
+import {
+  nativeAccountFailureStatus,
+  requireNativeAccountAdmission,
+  type NativeAccountAdmission,
+  type NativeAccountAdmissionPort,
+} from '@/lib/ports/native-account-admission';
 import type { CanvasLedgerPort, PlanOperation } from '@/lib/training/mesocycle-canvas';
 import {
   decideCanvasProposal,
@@ -13,7 +19,8 @@ import {
 
 type Dependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
-  ledger: CanvasLedgerPort;
+  accounts: NativeAccountAdmissionPort;
+  ledgerForAccount: (admission: NativeAccountAdmission) => CanvasLedgerPort;
   reserveRequest: (subject: string) => Promise<ChatRateLimitResult>;
   now: () => Date;
   enabled: () => boolean;
@@ -72,32 +79,35 @@ export function createCanvasRouteHandlers(deps: Dependencies) {
       const owner = await deps.authenticate(request);
       if (!owner) return json({ error: 'unauthorized' }, 401);
       if (!deps.enabled()) return json({ error: 'not_found' }, 404);
-      const limit = await deps.reserveRequest(owner.sub);
-      if (!limit.allowed) {
-        return NextResponse.json(
-          { version: 1, error: 'rate_limited' },
-          {
-            status: 429,
-            headers: {
-              'Cache-Control': 'no-store',
-              'Retry-After': String(limit.retryAfterSeconds),
-            },
-          },
-        );
-      }
-      const body = requestSchema.safeParse(await request.json().catch(() => null));
-      if (!body.success) return json({ error: 'invalid_request' }, 400);
-      const now = deps.now().toISOString();
       try {
+        // Capture once before rate limiting or body reads; never adopt a recreated owner.
+        const admission = requireNativeAccountAdmission(await deps.accounts.capture(owner.sub));
+        const ledger = deps.ledgerForAccount(admission);
+        const limit = await deps.reserveRequest(owner.sub);
+        if (!limit.allowed) {
+          return NextResponse.json(
+            { version: 1, error: 'rate_limited' },
+            {
+              status: 429,
+              headers: {
+                'Cache-Control': 'no-store',
+                'Retry-After': String(limit.retryAfterSeconds),
+              },
+            },
+          );
+        }
+        const body = requestSchema.safeParse(await request.json().catch(() => null));
+        if (!body.success) return json({ error: 'invalid_request' }, 400);
+        const now = deps.now().toISOString();
         if (body.data.action === 'read') {
-          const result = await readCanvas(deps.ledger, owner.sub);
+          const result = await readCanvas(ledger, owner.sub);
           return json(result, result.kind === 'ledger_invalid' ? 503 : 200);
         }
         if (body.data.action === 'submit') {
           const operation = interpretPlanUtterance(body.data.transcript);
           if (!operation)
             return json({ error: 'unsupported_or_invalid_intent', applied: false }, 400);
-          const result = await proposeCanvasEdit(deps.ledger, owner.sub, {
+          const result = await proposeCanvasEdit(ledger, owner.sub, {
             requestId: crypto.randomUUID(),
             expectedWrite: body.data.expectedWrite,
             operation,
@@ -106,7 +116,7 @@ export function createCanvasRouteHandlers(deps: Dependencies) {
           return json({ ...result, applied: false }, commandStatus(result.kind));
         }
         if (body.data.action === 'propose') {
-          const result = await proposeCanvasEdit(deps.ledger, owner.sub, {
+          const result = await proposeCanvasEdit(ledger, owner.sub, {
             requestId: crypto.randomUUID(),
             expectedWrite: body.data.expectedWrite,
             operation: body.data.operation as PlanOperation,
@@ -115,10 +125,10 @@ export function createCanvasRouteHandlers(deps: Dependencies) {
           return json(result, commandStatus(result.kind));
         }
         if (body.data.action === 'amend') {
-          const result = await amendCanvasProposal(deps.ledger, owner.sub, body.data);
+          const result = await amendCanvasProposal(ledger, owner.sub, body.data);
           return json(result, commandStatus(result.kind));
         }
-        const result = await decideCanvasProposal(deps.ledger, owner.sub, {
+        const result = await decideCanvasProposal(ledger, owner.sub, {
           requestId: crypto.randomUUID(),
           proposalId: body.data.proposalId,
           decision: body.data.decision,
@@ -126,7 +136,9 @@ export function createCanvasRouteHandlers(deps: Dependencies) {
           now,
         });
         return json(result, commandStatus(result.kind));
-      } catch {
+      } catch (error) {
+        const status = nativeAccountFailureStatus(error);
+        if (status) return json({ error: (error as Error).message }, status);
         return json({ error: 'training_unavailable' }, 503);
       }
     },

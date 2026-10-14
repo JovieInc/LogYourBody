@@ -13,7 +13,10 @@ CRITICAL_TEST = 'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurface
 TIMELINE_TEST = 'LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces()'
 ONBOARDING_TEST = 'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA()'
 FIRST_PHOTO_TEST = 'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA()'
-REQUIRED_TESTS = (CRITICAL_TEST, ONBOARDING_TEST, FIRST_PHOTO_TEST, TIMELINE_TEST)
+CANVAS_REDUCED_TEST = 'MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards()'
+CANVAS_REPLAY_TEST = 'MesocycleCanvasUITests/testGoalThroughUndoKeepsTheCanvasAndReadbackTogether()'
+REQUIRED_TESTS = (CRITICAL_TEST, ONBOARDING_TEST, FIRST_PHOTO_TEST, TIMELINE_TEST,
+                  CANVAS_REDUCED_TEST, CANVAS_REPLAY_TEST)
 REQUIRED_CAPTURES = (
     'launch-quality-chat-composer',
     'launch-quality-chat-tab',
@@ -22,11 +25,15 @@ REQUIRED_CAPTURES = (
     'launch-quality-home-timeline',
     'launch-quality-body-score-share',
     'launch-quality-analytics',
+    'launch-quality-canvas-reduced-motion',
+    'launch-quality-canvas-replay-readback',
+    'launch-quality-canvas-undo-readback',
 )
 
 CAPTURE_OWNERS = dict(zip(REQUIRED_CAPTURES, (
     CRITICAL_TEST, CRITICAL_TEST, ONBOARDING_TEST, FIRST_PHOTO_TEST,
     TIMELINE_TEST, TIMELINE_TEST, TIMELINE_TEST,
+    CANVAS_REDUCED_TEST, CANVAS_REPLAY_TEST, CANVAS_REPLAY_TEST,
 )))
 
 def walk(nodes):
@@ -76,6 +83,26 @@ def validate_function_coverage(payload, requirements, target_name="LogYourBody.a
             results.append({'file': filename, 'function': name, 'coveredLines': executed, 'executableLines': total})
     return results
 
+def validate_canvas_coverage(payload):
+    files = [file for target in payload.get('targets', []) if target.get('name') == 'LogYourBody.app'
+             for file in target.get('files', [])
+             if file.get('path', '').endswith('/apps/ios/LogYourBody/Views/MesocycleCanvas.swift')]
+    if len(files) != 1:
+        raise ValueError('Missing or ambiguous MesocycleCanvas app coverage')
+    source = files[0]
+    bodies = [function for function in source.get('functions', [])
+              if function.get('name') == 'MesocycleCanvasContainer.body.getter']
+    for item in [source, *bodies]:
+        executed, total = item.get('coveredLines'), item.get('executableLines')
+        if type(executed) is not int or type(total) is not int or not 0 < executed <= total:
+            raise ValueError('MesocycleCanvas app/view has no executed lines')
+    if len(bodies) != 1:
+        raise ValueError('Missing or ambiguous MesocycleCanvasContainer body coverage')
+    return {'file': 'Views/MesocycleCanvas.swift',
+            'coveredLines': source['coveredLines'], 'executableLines': source['executableLines'],
+            'viewBody': bodies[0]}
+
+
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -123,6 +150,7 @@ def main():
     parser.add_argument('--require-settings-row-coverage', action='store_true')
     parser.add_argument('--require-biometric-coverage', action='store_true')
     parser.add_argument('--require-chaos-accounting-coverage', action='store_true')
+    parser.add_argument('--require-canvas-coverage', action='store_true')
     parser.add_argument('--started-at', type=float, required=True)
     args = parser.parse_args()
     output = args.bundle.with_suffix('.evidence.json')
@@ -186,10 +214,12 @@ def main():
         if args.require_biometric_coverage:
             requirements['Views/BiometricLockView.swift'] = [
                 'static BiometricLockPolicy.shouldDisableForUITests(arguments:environment:userId:)']
-        if requirements or args.require_chaos_accounting_coverage:
+        if requirements or args.require_chaos_accounting_coverage or args.require_canvas_coverage:
             coverage = json.loads(subprocess.check_output(
                 ['xcrun', 'xccov', 'view', '--report', '--json', str(args.bundle)], text=True))
             receipt['requiredFunctionCoverage'] = validate_function_coverage(coverage, requirements)
+            if args.require_canvas_coverage:
+                receipt['canvasCoverage'] = validate_canvas_coverage(coverage)
             if args.require_chaos_accounting_coverage:
                 receipt['requiredFunctionCoverage'] += validate_function_coverage(coverage, {
                     'ChaosMonkeyUITests.swift': [

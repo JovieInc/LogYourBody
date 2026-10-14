@@ -3,6 +3,7 @@
 import { NextRequest } from 'next/server';
 import { createCanvasRouteHandlers } from '../canvas-route-handlers';
 import { memoryCanvasPort, readCanvas } from '@/lib/training/mesocycle-canvas';
+import { NativeAccountAdmissionError } from '@/lib/ports/native-account-admission';
 
 function handlers(overrides: Partial<Parameters<typeof createCanvasRouteHandlers>[0]> = {}) {
   const ledger = memoryCanvasPort();
@@ -11,7 +12,10 @@ function handlers(overrides: Partial<Parameters<typeof createCanvasRouteHandlers
       request.headers.get('authorization')?.match(/^Bearer\s+\S+$/i)
         ? ({ sub: 'owner' } as never)
         : null,
-    ledger,
+    accounts: {
+      capture: async (subject) => ({ subject, ownerId: '11111111-1111-4111-8111-111111111111' }),
+    },
+    ledgerForAccount: () => ledger,
     reserveRequest: async () => ({ allowed: true, remainingInWindow: 10, remainingToday: 10 }),
     now: () => new Date('2026-10-14T18:00:00.000Z'),
     enabled: () => true,
@@ -32,6 +36,33 @@ function post(body: unknown, authorization = 'Bearer token') {
 }
 
 describe('mesocycle canvas route', () => {
+  it.each([
+    [null, 404, 'account_not_found'],
+    [new NativeAccountAdmissionError('account_changed'), 409, 'account_changed'],
+    [
+      new NativeAccountAdmissionError('account_admission_unavailable'),
+      503,
+      'account_admission_unavailable',
+    ],
+  ] as const)('fails closed when account admission is %s', async (failure, status, error) => {
+    const capture = jest.fn(async () => {
+      if (failure) throw failure;
+      return null;
+    });
+    const reserveRequest = jest.fn();
+    const ledgerForAccount = jest.fn();
+    const { route } = handlers({ accounts: { capture }, reserveRequest, ledgerForAccount });
+    const request = post({ action: 'read' });
+    const read = jest.spyOn(request, 'json');
+    const response = await route.POST(request);
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ error });
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(reserveRequest).not.toHaveBeenCalled();
+    expect(ledgerForAccount).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+  });
+
   it('hides the route until the caller is signed in and the flag is on', async () => {
     const disabled = handlers({ enabled: () => false });
     const hidden = await disabled.route.POST(post({ action: 'read' }));
