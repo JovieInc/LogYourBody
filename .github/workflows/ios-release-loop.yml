@@ -279,7 +279,7 @@ jobs:
       contents: write
     uses: ./.github/workflows/ios-testflight-deploy.yml
     with:
-      distribution_group: production
+      distribution_group: alpha
       build_number: ${{ needs.validate-release.outputs.build_number }}
       version_name: ${{ needs.validate-release.outputs.version }}
       artifact_name: ios-release-build

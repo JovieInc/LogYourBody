@@ -220,8 +220,12 @@ struct MetricFormatterKey: Hashable {
 
 enum MetricFormatterCache {
     private static var cache: [MetricFormatterKey: NumberFormatter] = [:]
+    private static let lock = NSLock()
 
     static func formatter(minFractionDigits: Int, maxFractionDigits: Int) -> NumberFormatter {
+        lock.lock()
+        defer { lock.unlock() }
+
         let key = MetricFormatterKey(minFractionDigits: minFractionDigits, maxFractionDigits: maxFractionDigits)
         if let formatter = cache[key] {
             return formatter
