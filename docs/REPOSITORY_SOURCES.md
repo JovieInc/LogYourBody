@@ -16,7 +16,7 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `15e39c068a7e161df9fe2b088e43f7c0022299c9c7153e47148a3d07e3280db8`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a5abcfce96e0594405d8032f932892881a7e669944ba45d04b5ad3ba37c0e50c`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11d9a680ec4c2c74193f2bd1bc9dd544c6ca3bc397bea165bfc08fd0e15933e0`)
@@ -29,7 +29,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b497034ac102730cc4a952c06866a422db368424e352991f7f0dd68911e27be5`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5bfaef9c21b12812c4b5677a2d32425c2fc31347b7df76cd87d9d589f7f2562b`)
 
 ### `apps/web/package.json`: engines
 
@@ -96,7 +96,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-progress": "^1.1.16",
   "@radix-ui/react-radio-group": "^1.4.7",
   "@radix-ui/react-scroll-area": "^1.2.18",
-  "@radix-ui/react-select": "^2.3.7",
+  "@radix-ui/react-select": "^2.3.8",
   "@radix-ui/react-separator": "^1.1.15",
   "@radix-ui/react-slider": "^1.4.7",
   "@radix-ui/react-slot": "^1.3.3",
@@ -282,7 +282,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/design-tokens/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `80ae7dc9ef2d6b212897d208c9799c2e8ba4c7a061acda46a3ea10fde1553dbb`)
+- `packages/design-tokens/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f6ea52cfe8adbccfb9ce5bb7220d6f670efa7d4e2eca235becf84568f7240f0f`)
 
 ### `packages/design-tokens/package.json`: scripts
 
@@ -304,7 +304,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "style-dictionary": "^5.5.5"
+  "style-dictionary": "^5.6.1"
 }
 ```
 
