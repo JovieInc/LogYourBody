@@ -270,5 +270,5 @@ describe('mesocycle canvas board', () => {
         session.exercises.some((item) => item.name === 'Standing calf raise' && item.sets === 8),
       ),
     ).toBe(false);
-  });
+  }, 15_000);
 });

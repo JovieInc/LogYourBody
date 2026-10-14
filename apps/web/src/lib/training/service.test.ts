@@ -2,7 +2,7 @@ import type {
   NativeProductRecord,
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import { logTrainingSet, recordTrainingFeedback } from './commands';
+import { applyWorkoutAction, logTrainingSet, recordTrainingFeedback } from './commands';
 import { MemoryTrainingRecords } from './memory-records.testing';
 import { getOrCreateNextWorkout, pullAllTrainingRecords, storeProgramSetup } from './service';
 import type { Session } from './types';
@@ -94,6 +94,44 @@ async function logExercises(records: MemoryTrainingRecords, session: Session, al
 }
 
 describe('active training prescription', () => {
+  it.each(['pause', 'pain', 'resume'] as const)(
+    'returns an unchanged saved-session receipt after %s without repeating a mutation',
+    async (kind) => {
+      const records = await enrolledRecords();
+      const original = await nextWorkout(records);
+      const action = async (actionKind: typeof kind, revision: number) =>
+        applyWorkoutAction({
+          records,
+          subject: 'subject-a',
+          now: startedAt,
+          sessionId: original.session.id,
+          eventId: `event-${actionKind}`,
+          expectedRevision: revision,
+          action:
+            actionKind === 'pain'
+              ? { kind: 'pain', exerciseId: original.session.exercises[0]!.id }
+              : { kind: actionKind },
+        });
+      if (kind === 'resume') expect(await action('pause', 0)).toMatchObject({ kind: 'updated' });
+      const updated = await action(kind, kind === 'resume' ? 1 : 0);
+      expect(updated.kind).toBe('updated');
+      if (updated.kind !== 'updated') throw new Error('Expected action to persist');
+      const before = await records.listAll('subject-a');
+      const reopened = await nextWorkout(records, followingWeek);
+      expect(reopened.session).toEqual(updated.session);
+      expect(await records.listAll('subject-a')).toEqual(before);
+      expect(reopened.decision).toMatchObject({
+        actor: 'controller',
+        decision: { kind: 'hold', optionalBurdenReduction: false },
+        before: expect.any(String),
+        after: expect.any(String),
+      });
+      expect(reopened.decision.after).toBe(reopened.decision.before);
+      expect(reopened.decision.nextAction).toMatch(kind === 'resume' ? /continue/i : /paused/i);
+      expect(reopened.decision.rationale).toMatch(/no new change/i);
+    },
+  );
+
   it.each([true, false])(
     'retains targets after partial logging and a week boundary (persist=%s)',
     async (persist) => {
