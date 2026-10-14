@@ -337,7 +337,7 @@ struct TrainingLiveSessionView: View {
     let onCorrectSet: (TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
     let onWorkoutAction: (TrainingWorkoutActionRequest) async throws -> TrainingSession
     let onVoiceIntent: (TrainingSession, String, VoiceSetContext?, VoiceSetContext?) async throws -> VoiceIntentResponse
-    let onFeedback: (Int, Int, String, Int) async throws -> Void
+    let onFeedback: (TrainingFeedbackRequest) async throws -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
@@ -348,6 +348,8 @@ struct TrainingLiveSessionView: View {
     @State private var pump = 0
     @State private var jointPain = 0
     @State private var performance = "stable"
+    @State private var feedbackMuscle = ""
+    @State private var muscleRecovery = "unknown"
     @State private var feedbackSaved = false
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -372,7 +374,7 @@ struct TrainingLiveSessionView: View {
         onVoiceIntent: @escaping (
             TrainingSession, String, VoiceSetContext?, VoiceSetContext?
         ) async throws -> VoiceIntentResponse,
-        onFeedback: @escaping (Int, Int, String, Int) async throws -> Void
+        onFeedback: @escaping (TrainingFeedbackRequest) async throws -> Void
     ) {
         self.voiceEnabled = voiceEnabled
         self.onLogSet = onLogSet
@@ -804,7 +806,30 @@ struct TrainingLiveSessionView: View {
                     Text("Up").tag("up")
                 }
                 .pickerStyle(.segmented)
-                Button(feedbackSaved ? "Feedback saved" : "Save check-in") {
+                if !feedbackMuscles.isEmpty {
+                    Picker("Muscle detail", selection: $feedbackMuscle) {
+                        Text("Whole session").tag("")
+                        ForEach(feedbackMuscles, id: \.self) { muscle in
+                            Text(muscle.replacingOccurrences(of: "_", with: " ").capitalized).tag(muscle)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    Text("Optional. Choose a muscle only when these answers describe it specifically.")
+                        .font(.footnote)
+                        .foregroundStyle(theme.colors.textSecondary)
+                    if !feedbackMuscle.isEmpty {
+                        Picker("Recovery", selection: $muscleRecovery) {
+                            Text("Unknown").tag("unknown")
+                            Text("Limited").tag("limited")
+                            Text("Ready").tag("ready")
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
+                Button(
+                    feedbackSaved ? "Feedback saved" :
+                        draft.session.safetyStop ? "Save updated check-in" : "Save check-in"
+                ) {
                     Task { await saveFeedback() }
                 }
                 .disabled(feedbackSaved || isSaving || draft.isSaving)
@@ -1055,12 +1080,35 @@ struct TrainingLiveSessionView: View {
         errorMessage = nil
         defer { isSaving = false }
         do {
-            try await onFeedback(soreness, pump, performance, jointPain)
+            let muscles: [String: TrainingMuscleFeedbackRequest]? = feedbackMuscle.isEmpty ? nil : [
+                feedbackMuscle: TrainingMuscleFeedbackRequest(
+                    soreness: soreness,
+                    recovery: muscleRecovery == "unknown" ? nil : muscleRecovery,
+                    pump: pump,
+                    workload: nil,
+                    performance: performance
+                )
+            ]
+            try await onFeedback(TrainingFeedbackRequest(
+                sessionId: draft.session.id,
+                soreness: feedbackMuscle.isEmpty ? soreness : nil,
+                pump: feedbackMuscle.isEmpty ? pump : nil,
+                performance: feedbackMuscle.isEmpty ? performance : nil,
+                jointPain: jointPain,
+                muscles: muscles
+            ))
             feedbackSaved = true
         } catch let error as LocalizedError {
             errorMessage = error.errorDescription ?? "The check-in could not be saved."
         } catch {
             errorMessage = "The check-in could not be saved."
+        }
+    }
+
+    private var feedbackMuscles: [String] {
+        var seen = Set<String>()
+        return draft.session.exercises.compactMap { exercise in
+            seen.insert(exercise.primaryMuscle).inserted ? exercise.primaryMuscle : nil
         }
     }
 }
@@ -1291,7 +1339,7 @@ struct TrainingLiveSessionFixtureView: View {
                     return session
                 }, onVoiceIntent: { _, _, _, _ in
                     throw VoiceAPIError.unavailable
-                }, onFeedback: { _, _, _, _ in
+                }, onFeedback: { _ in
                     guard !offline else { throw URLError(.notConnectedToInternet) }
                 }
             )
