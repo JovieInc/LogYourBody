@@ -56,7 +56,11 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
         capture(app, named: "single-log-weight-heading")
         XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label == %@", "Log weight")).count, 1)
+        XCTAssertFalse(app.segmentedControls.firstMatch.exists, "Advanced entry types stay out of the default flow")
+        XCTAssertFalse(app.datePickers["home_v2_log_sheet_date"].exists)
+        app.buttons["home_v2_log_sheet_details"].tap()
         XCTAssertTrue(app.segmentedControls.firstMatch.exists)
+        XCTAssertTrue(app.datePickers["home_v2_log_sheet_date"].exists)
         XCTAssertTrue(app.buttons["home_v2_log_sheet_plus"].exists)
         XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].exists)
     }
@@ -67,7 +71,7 @@ final class HomeV2LayoutUITests: XCTestCase {
         app.buttons["home_v2_log_weight"].tap()
         let field = app.textFields["home_v2_log_sheet_value"]
         XCTAssertTrue(field.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.datePickers["home_v2_log_sheet_date"].exists)
+        XCTAssertFalse(app.datePickers["home_v2_log_sheet_date"].exists)
         capture(app, named: "polished-log-weight-compact")
 
         let unit = app.buttons["home_v2_log_sheet_unit"]
@@ -115,6 +119,8 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertTrue(app.windows.firstMatch.frame.contains(save.frame))
         capture(app, named: "polished-log-weight-largest-text-scrolled")
         details.tap()
+        XCTAssertTrue(app.datePickers["home_v2_log_sheet_date"].waitForExistence(timeout: 5))
+        app.segmentedControls.firstMatch.buttons["Body Fat"].tap()
         XCTAssertTrue(app.staticTexts["Enter body fat percentage"].waitForExistence(timeout: 5))
     }
 
@@ -159,7 +165,7 @@ final class HomeV2LayoutUITests: XCTestCase {
             let graphic = app.descendants(matching: .any)["home_v2_editorial_card"]
             XCTAssertTrue(graphic.waitForExistence(timeout: 30))
             let summary = app.descendants(matching: .any).matching(
-                NSPredicate(format: "label CONTAINS %@", "4 recorded weight entries")
+                NSPredicate(format: "label CONTAINS %@", "1 recorded weight entry")
             ).firstMatch
             XCTAssertTrue(summary.waitForExistence(timeout: 8), app.debugDescription)
             XCTAssertTrue(summary.label.contains("Latest 181.0 lb"), summary.label)
@@ -217,6 +223,33 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
     }
 
+    func testHistoricalOnlyDataLeavesTodayEmptyAndReachableAtLargestText() {
+        let app = launchEditorial(extra: ["-lybUITestHomeV2HistoricalOnlyFixture"], largestText: true)
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_day_zero"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["Nothing logged today"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_graphic"].exists)
+        assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "historical-only-today-empty")
+
+        app.buttons["photo_timeline_root_menu"].tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_entries"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["November 2018"].exists)
+        let rows = app.buttons.matching(identifier: "home_v2_entries_row")
+        XCTAssertEqual(rows.count, 2)
+        let sourceSample = rows.matching(NSPredicate(format: "label CONTAINS %@", "17.99 kg")).firstMatch
+        XCTAssertTrue(sourceSample.exists)
+        XCTAssertTrue(sourceSample.label.contains("Withings via Apple Health"))
+        XCTAssertTrue(sourceSample.label.contains("Source value kept unchanged"))
+        sourceSample.tap()
+
+        let contextWeight = app.descendants(matching: .any)["home_v2_context_row_weight"]
+        XCTAssertTrue(contextWeight.waitForExistence(timeout: 8))
+        XCTAssertTrue(contextWeight.label.contains("17.99 kg"))
+        XCTAssertTrue(contextWeight.label.contains("Withings via Apple Health"))
+    }
+
     private func launchEditorial(
         fixture: String = "-lybUITestHomeV2Fixture", extra: [String] = [], largestText: Bool = false
     ) -> XCUIApplication {
@@ -262,9 +295,8 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertTrue(scroll.waitForExistence(timeout: 5))
         let target = app.buttons[identifier]
         // XCUI includes the covered safe-area inset in ScrollView.frame. A tappable
-        // point there can hit the ruler/dock instead of the intended content row.
-        let pinned = [app.descendants(matching: .any)["home_v2_timeline_scrubber"],
-                      app.buttons["home_v2_log_weight"], app.buttons["home_v2_connect_health"]]
+        // point there can hit the dock instead of the intended content row.
+        let pinned = [app.buttons["home_v2_log_weight"], app.buttons["home_v2_connect_health"]]
         let bottom = pinned.filter(\.exists).map { $0.frame.minY }.min() ?? scroll.frame.maxY
         let viewport = CGRect(x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
                               height: max(0, min(bottom, scroll.frame.maxY) - scroll.frame.minY))

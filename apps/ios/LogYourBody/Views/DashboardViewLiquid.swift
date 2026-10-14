@@ -102,6 +102,7 @@ struct DashboardViewLiquid: View {
     @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
+    @State var homeV2ContextMetricID: String?
     @State var homeV2EditingMetric: BodyMetrics?
     @State var homeV2PhotoRoute: HomeV2PhotoRoute?
     @State var isHomeV2SettingsPresented = false

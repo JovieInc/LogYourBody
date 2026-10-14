@@ -175,6 +175,7 @@ struct AddEntrySheet: View {
     let includesGlp1Entry: Bool
     let isHomeV2LogEntry: Bool
     @State var selectedDate = Date()
+    @State var showsHomeV2Advanced = false
     let onWeightSaved: ((PhotoMetricsUpdateResult) -> Void)?
     @AppStorage(Constants.preferredMeasurementSystemKey) var measurementSystem = PreferencesView.defaultMeasurementSystem
 

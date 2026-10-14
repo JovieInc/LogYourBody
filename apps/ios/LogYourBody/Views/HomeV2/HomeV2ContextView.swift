@@ -7,6 +7,8 @@ import SwiftUI
 /// Context (Pencil N2): the selected day. Month, week strip, the day's
 /// photos, entries with provenance, the note, and one action.
 struct HomeV2ContextView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let bodyMetrics: [BodyMetrics]
     @Binding var selectedDay: Date
     let detail: (Date) -> HomeV2DayDetail
@@ -192,24 +194,23 @@ struct HomeV2ContextView: View {
             }
 
             ForEach(day.rows) { row in
-                HStack(spacing: HomeV2Tokens.Space.tight) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(row.label)
-                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
-                            .foregroundStyle(HomeV2Tokens.Colors.ink)
-                        Text(row.subline)
-                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
+                            contextEntryIdentity(row)
+                            contextEntryValue(row)
+                        }
+                    } else {
+                        HStack(spacing: HomeV2Tokens.Space.tight) {
+                            contextEntryIdentity(row)
+                            Spacer(minLength: HomeV2Tokens.Space.tight)
+                            contextEntryValue(row)
+                        }
                     }
-
-                    Spacer(minLength: HomeV2Tokens.Space.tight)
-
-                    Text(row.value)
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
-                        .foregroundStyle(HomeV2Tokens.Colors.ink)
-                        .lineLimit(1)
                 }
                 .padding(.horizontal, HomeV2Tokens.Space.inset)
+                .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? HomeV2Tokens.Space.tight : 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(minHeight: 64)
                 .overlay(alignment: .bottom) { HomeV2Hairline() }
                 .accessibilityElement(children: .combine)
@@ -217,6 +218,25 @@ struct HomeV2ContextView: View {
             }
         }
         .overlay(alignment: .top) { HomeV2Hairline() }
+    }
+
+    private func contextEntryIdentity(_ row: HomeV2DayEntryRow) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(row.label)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+                .foregroundStyle(HomeV2Tokens.Colors.ink)
+            Text(row.subline)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func contextEntryValue(_ row: HomeV2DayEntryRow) -> some View {
+        Text(row.value)
+            .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
+            .foregroundStyle(HomeV2Tokens.Colors.ink)
+            .lineLimit(1)
     }
 
     private func noteRow(_ note: String) -> some View {

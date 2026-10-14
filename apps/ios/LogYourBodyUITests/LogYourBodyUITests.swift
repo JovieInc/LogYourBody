@@ -2948,7 +2948,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
     }
 
-    func testHomeV2SwipeMovesPhotoDateAndMetricsTogether() throws {
+    func testHomeV2TodayDoesNotSwipeIntoHistoricalDates() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
 
@@ -2964,76 +2964,37 @@ final class LogYourBodyUITests: XCTestCase {
 
         stage.swipeLeft()
 
-        let moved = expectation(
-            for: NSPredicate(format: "label != %@", beforeCaption),
-            evaluatedWith: caption
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [moved], timeout: 5),
-            .completed,
-            "Swiping left moves one day back through body history"
-        )
-        XCTAssertNotEqual(value.label, beforeValue, "The metric follows the selected day")
-        attachScreenshot(named: "home-v2-swipe-back", from: app)
-
-        stage.swipeRight()
-        let returned = expectation(
-            for: NSPredicate(format: "label == %@", beforeCaption),
-            evaluatedWith: caption
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [returned], timeout: 5),
-            .completed,
-            "Swiping right returns to the latest day"
-        )
+        XCTAssertEqual(caption.label, beforeCaption, "Today must not page into historical dates")
+        XCTAssertEqual(value.label, beforeValue, "Today keeps today’s metric selected")
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
+        attachScreenshot(named: "home-v2-today-scoped", from: app)
     }
 
-    func testHomeV2ScrubberJumpsThroughBodyHistory() throws {
+    func testHomeV2HistoricalDatesLiveInEntriesInsteadOfTodayScrubber() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
 
-        let scrubber = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
-        XCTAssertTrue(scrubber.waitForExistence(timeout: 30), "The bottom scrubber travels through time")
-
-        let caption = app.descendants(matching: .any)["home_v2_photo_caption"]
-        XCTAssertTrue(caption.waitForExistence(timeout: 5))
-        let beforeCaption = caption.label
-
-        // Drag from the right edge to the left: fast scrub toward the oldest day.
-        let start = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.7))
-        let end = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.7))
-        start.press(forDuration: 0.05, thenDragTo: end)
-
-        let moved = expectation(
-            for: NSPredicate(format: "label != %@", beforeCaption),
-            evaluatedWith: caption
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [moved], timeout: 5),
-            .completed,
-            "Scrubbing resolves to the same selected day a swipe would reach"
-        )
-        attachScreenshot(named: "home-v2-scrubbed", from: app)
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
+        app.buttons["photo_timeline_root_menu"].tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_entries"].waitForExistence(timeout: 8))
+        XCTAssertGreaterThan(app.buttons.matching(identifier: "home_v2_entries_row").count, 1)
+        attachScreenshot(named: "home-v2-history-in-entries", from: app)
     }
 
-    func testHomeV2TimelineCoachMarkDismissesPermanently() throws {
+    func testHomeV2TodayDoesNotTeachRemovedTimelineGestures() throws {
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
-            "-lybUITestHomeV2PhotoFixture",
-            "-lybUITestResetHomeV2TimelineCoach"
+            "-lybUITestHomeV2PhotoFixture"
         ])
 
-        let coach = app.buttons["home_v2_timeline_coach"]
-        XCTAssertTrue(coach.waitForExistence(timeout: 30), "First use teaches swipe and scrub once")
-        coach.tap()
-        XCTAssertTrue(coach.waitForNonExistence(timeout: 5), "Dismissal is immediate")
-
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
         XCTAssertTrue(
             app.descendants(matching: .any)["home_v2_photo_stage"].waitForExistence(timeout: 30)
         )
-        XCTAssertFalse(coach.exists, "The coach mark never occupies product space again")
+        XCTAssertFalse(app.buttons["home_v2_timeline_coach"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
     }
 
     func testHomeV2ChangingLogDateDoesNotCreateATodayUndoReceipt() throws {
@@ -3042,6 +3003,7 @@ final class LogYourBodyUITests: XCTestCase {
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 30))
         logWeight.tap()
+        app.buttons["home_v2_log_sheet_details"].tap()
         let datePicker = app.datePickers.firstMatch
         XCTAssertTrue(datePicker.waitForExistence(timeout: 8))
         datePicker.tap()

@@ -20,18 +20,41 @@ extension DashboardViewLiquid {
     }
 
     var homeV2TodayMetric: BodyMetrics? {
-        bodyMetrics.first { Calendar.current.isDateInToday($0.date) }
+        homeV2TodayMetrics.first
+    }
+
+    var homeV2TodayMetrics: [BodyMetrics] {
+        HomeV2TodayPolicy.metrics(in: bodyMetrics)
+    }
+
+    var homeV2InsightMetrics: [BodyMetrics] {
+        bodyMetrics.filter {
+            $0.weight == nil || HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight)
+        }
+    }
+
+    var homeV2SelectedTodayMetric: BodyMetrics? {
+        guard let selection = homeV2TimelineSelection,
+              let selected = homeV2TodayMetrics.first(where: {
+                  HomeV2TimelinePolicy.EntryID($0) == selection.id
+              }) else { return homeV2TodayMetric }
+        return selected
     }
 
     /// Photo-first Home behind `HomeV2Policy`; the legacy `LaunchTimelineSurface`
     /// keeps serving when the gate is off.
     func homeV2Surface(for metric: BodyMetrics) -> some View {
         let unit = homeV2DisplayUnit
+        let todayTimeline = HomeV2TimelinePolicy.Snapshot(
+            metrics: homeV2TodayMetrics,
+            owner: authManager.currentUser?.id
+        )
 
         return HomeV2Surface(
             metric: metric,
-            bodyMetrics: homeV2Timeline.metrics,
-            timeline: homeV2Timeline,
+            bodyMetrics: todayTimeline.metrics,
+            timeline: todayTimeline,
+            hasAnyPhotoInHistory: bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) },
             selectedID: Binding(get: { HomeV2TimelinePolicy.EntryID(metric) }, set: selectHomeV2TimelineEntry),
             weightValue: formatTrendWeightHeadline(metric, usesTrend: weightUsesTrend),
             weightUnit: unit,
@@ -58,10 +81,10 @@ extension DashboardViewLiquid {
         // Chart caches refresh centrally when measurements change. Phase copy
         // must also follow edits to an existing day, not just added rows.
         .task(id: bodyMetrics) {
-            let insight = PhaseInsightPolicy.insight(for: bodyMetrics)
+            let insight = PhaseInsightPolicy.insight(for: homeV2InsightMetrics)
             homeV2PhaseSentence = HomeV2Copy.phaseSentence(
                 kind: insight.kind,
-                weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: bodyMetrics)
+                weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: homeV2InsightMetrics)
             )
         }
     }
@@ -108,6 +131,7 @@ extension DashboardViewLiquid {
     /// H0, shown instead of the legacy empty state while the gate is on.
     var homeV2DayZero: some View {
         HomeV2DayZero(
+            hasHistory: !bodyMetrics.isEmpty,
             onConnectHealth: {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
@@ -117,8 +141,11 @@ extension DashboardViewLiquid {
 
     func presentHomeV2LogSheet(for date: Date = Date()) {
         let existing = homeV2Metric(on: date)
-        let latestKilograms = existing?.weight
-            ?? bodyMetrics.filter { $0.weight != nil && $0.date <= date }.max { $0.date < $1.date }?.weight
+        let latestKilograms = existing?.weight.flatMap {
+            HomeV2WeightQuality.isWithinSupportedLoggingRange($0) ? $0 : nil
+        } ?? bodyMetrics.filter {
+            $0.date <= date && HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight)
+        }.max { $0.date < $1.date }?.weight
         let initial = latestKilograms.map { convertWeight($0, to: currentMeasurementSystem) ?? $0 }
             ?? HomeV2WeightStepPolicy.defaultValue(unit: homeV2DisplayUnit)
         HapticManager.shared.selection()
@@ -149,44 +176,6 @@ extension DashboardViewLiquid {
 
         Task { @MainActor in
             await refreshHomeV2AfterWrite(selecting: saved.id)
-        }
-    }
-
-    /// Saves a weight (and optional body fat) for a day. Today gets the C2
-    /// logged state with Undo; other days just save and refresh.
-    @MainActor
-    func saveHomeV2Weight(value: Double, bodyFat: Double?, on date: Date = Date()) async -> Bool {
-        guard let userId = authManager.currentUser?.id else { return false }
-        let kilograms = currentMeasurementSystem == .imperial ? value.lbsToKg : value
-
-        do {
-            let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
-                for: date,
-                weight: kilograms,
-                bodyFatPercentage: bodyFat,
-                bodyFatMethod: bodyFat == nil ? nil : BodyFatEntryMethod.bioelectrical.rawValue,
-                userId: userId
-            )
-            let saved = result.metrics
-            RealtimeSyncManager.shared.syncIfNeeded()
-            BodyScoreCache.shared.invalidate(for: userId)
-            BodyScoreRecalculationService.shared.scheduleRecalculation()
-            HapticManager.shared.successAction()
-
-            if Calendar.current.isDateInToday(saved.date) {
-                homeV2Logged = HomeV2LoggedEntry(
-                    metricId: saved.id,
-                    userId: userId,
-                    date: saved.date,
-                    previousMetric: result.previousMetric,
-                    valueText: HomeV2WeightStepPolicy.text(value),
-                    unit: homeV2DisplayUnit
-                )
-            }
-            await refreshHomeV2AfterWrite(selecting: saved.id)
-            return true
-        } catch {
-            return false
         }
     }
 
