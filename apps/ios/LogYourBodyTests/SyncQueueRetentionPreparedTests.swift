@@ -668,7 +668,16 @@ final class SyncQueueRetentionPreparedTests: XCTestCase {
             )
         }
         pull = task
-        try await task.value
+        do {
+            try await task.value
+        } catch {
+            let nsError = error as NSError
+            XCTAssertTrue(
+                error is CancellationError
+                    || (nsError.domain == NSURLErrorDomain && nsError.code == NSURLError.cancelled),
+                "Cancelling the pull must surface a cancellation, not \(error)"
+            )
+        }
         let stored = await storedStalePull()
         XCTAssertNil(stored.body, "Cancelling the pull must cancel its queued writes")
         XCTAssertNil(stored.daily)
