@@ -1,5 +1,8 @@
+import { mesocycleCanvasApiEnabled } from '@/lib/flags/mesocycle-canvas';
 import { mesocycleOptimizerEnabled } from '@/lib/flags/mesocycle-optimizer';
+import { neonCanvasLedger } from '@/lib/neon/training-canvas-adapter';
 import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
+import { createCanvasRouteHandlers } from './canvas-route-handlers';
 import { createTrainingOptimizerHandlers } from './optimizer-route-handlers';
 import { createTrainingRevisionHandlers } from './revision-route-handlers';
 import { randomUUID } from 'node:crypto';
@@ -39,4 +42,12 @@ export const trainingOptimizerHandlers = createTrainingOptimizerHandlers({
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   coachEnabled: () => process.env.LYB_HYPERTROPHY_COACH_API_ENABLED === 'true',
   optimizerEnabled: () => mesocycleOptimizerEnabled(),
+});
+
+export const canvasHandlers = createCanvasRouteHandlers({
+  authenticate,
+  ledger: neonCanvasLedger,
+  reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
+  now: () => new Date(),
+  enabled: () => mesocycleCanvasApiEnabled(),
 });
