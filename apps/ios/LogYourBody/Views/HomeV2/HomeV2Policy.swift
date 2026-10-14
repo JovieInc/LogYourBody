@@ -5,16 +5,17 @@
 import CoreGraphics
 import Foundation
 
-/// Photo-first Home (Pencil H2, picked 2026-09-26). Graduated public baseline
-/// through `FeatureReleaseEvaluator`: on unless a fresh kill switch stops it.
+/// Photo-first Home (Pencil H2, picked 2026-09-26). Graduated: ordinary users
+/// open it by default. Evaluated through `FeatureReleaseEvaluator` (shared
+/// lifecycle contract, JOV-8056). Statsig is an emergency kill switch only;
+/// an unavailable or unset gate must not fall back to the legacy Home.
 /// Debug fixtures explicitly choose Home V2 or rollback.
 enum HomeV2Policy {
     static let gateKey = "home_v2_photo_first"
-    /// Inverse-meaning emergency stop (shared lifecycle contract, JOV-8056).
-    /// Never a blanket default: only a fresh `true` stops the surface.
+    /// Inverse-meaning emergency stop. Only a fresh `true` stops the surface.
     static let killSwitchKey = "home_v2_kill_switch"
-    /// Public baseline. Ordinary customers see Home without an enable gate;
-    /// a fresh kill switch is the only remote stop.
+    /// Public baseline. The positive enable gate is recorded on the descriptor
+    /// and is not consulted: a missing or false gate must not hide Home.
     static let releaseDescriptor = FeatureReleaseDescriptor(
         flagKey: gateKey,
         killSwitchKey: killSwitchKey,
@@ -55,16 +56,16 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        // Kill switch first so the enable gate stays the last check.
+        // Graduated Home does not consult the positive enable gate. Doing so
+        // would record an exposure for a flag that no longer decides the surface.
         let killSwitchEnabled = checkGate(killSwitchKey)
-        let enableGateEnabled = checkGate(gateKey)
         return FeatureReleaseEvaluator.evaluate(
             releaseDescriptor,
             context: FeatureReleaseContext(
                 actor: actor,
                 installedBuild: installedBuild,
                 configState: .fresh,
-                enableGate: enableGateEnabled,
+                enableGate: false,
                 killSwitch: killSwitchEnabled
             )
         ).isEnabled

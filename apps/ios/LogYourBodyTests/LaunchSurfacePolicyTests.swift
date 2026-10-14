@@ -172,8 +172,8 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isOnStats: true,
                 isChatExpanded: true
             ),
-            .menu,
-            "The edge swipe still opens navigation while Ask is expanded"
+            .collapseChat,
+            "Ask must collapse to its owning workspace before navigation changes"
         )
     }
 

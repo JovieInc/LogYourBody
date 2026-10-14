@@ -9,28 +9,29 @@ import UIKit
 @MainActor
 final class HomeV2PolicyTests: XCTestCase {
     func testHomeV2DefaultsOnWhenKillSwitchIsOff() {
-        var asked: [String] = []
+        var askedKey: String?
         XCTAssertTrue(
             HomeV2Policy.isEnabled(
                 arguments: ["-lybUITestPhotoTimelineHUDFixture"],
                 isGateEnabled: { key in
-                    asked.append(key)
+                    askedKey = key
                     return false
                 }
             )
         )
-        XCTAssertEqual(asked, [HomeV2Policy.killSwitchKey, HomeV2Policy.gateKey])
+        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
+        XCTAssertEqual(HomeV2Policy.releaseDescriptor.stage, .graduated)
     }
 
     func testKillSwitchDisablesHomeV2() {
-        var asked: [String] = []
+        var askedKey: String?
         XCTAssertFalse(
             HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { key in
-                asked.append(key)
+                askedKey = key
                 return true
             })
         )
-        XCTAssertEqual(asked, [HomeV2Policy.killSwitchKey, HomeV2Policy.gateKey])
+        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
     }
 
     func testKillSwitchOverridesTheEnableGate() {

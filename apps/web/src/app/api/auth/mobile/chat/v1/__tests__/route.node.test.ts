@@ -18,7 +18,20 @@ import type {
 } from '@/lib/ports/chat-model';
 import type { BodyMetricsPort, ProductBodyMetric } from '@/lib/ports/body-metrics';
 import type { ProductUserRecord, UserDirectoryPort } from '@/lib/ports/user-directory';
+import type { ControllerReceipt } from '@/lib/training/controller';
 import type { NextWorkoutResult } from '@/lib/training/service';
+
+const holdDecision: ControllerReceipt = {
+  decision: { kind: 'hold', optionalBurdenReduction: false },
+  actor: 'controller',
+  rationale: 'Trajectory matches plan.',
+  signalFreshness: { training: 'fresh', recovery: 'fresh', trajectory: 'missing' },
+  evidenceIds: ['k:81c218db'],
+  before: 'plan',
+  after: 'Plan unchanged.',
+  reviewPoint: 'Next scheduled session',
+  nextAction: 'On track.',
+};
 
 const now = '2026-08-02T22:00:00.000Z';
 const conversationId = '11111111-1111-4111-8111-111111111111';
@@ -354,6 +367,7 @@ describe('/api/auth/mobile/chat/v1', () => {
       week: 1,
       weekCount: 2,
       weeklyFractionalVolume: { chest: 4 },
+      decision: holdDecision,
       session: {
         id: conversationId,
         week: 1,
@@ -405,6 +419,7 @@ describe('/api/auth/mobile/chat/v1', () => {
       week: 1,
       weekCount: 4,
       weeklyFractionalVolume: { chest: 4 },
+      decision: holdDecision,
       session: {
         id: conversationId,
         week: 1,
@@ -475,6 +490,7 @@ describe('/api/auth/mobile/chat/v1', () => {
       week: 1,
       weekCount: 4,
       weeklyFractionalVolume: { chest: 4 },
+      decision: holdDecision,
       session: {
         id: conversationId,
         week: 1,
