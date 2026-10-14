@@ -34,7 +34,11 @@
         "$TURBO_ROOT$/apps/ios/Vendor/**",
         "!$TURBO_ROOT$/apps/ios/Vendor/JovieKit/.build/**",
         "!$TURBO_ROOT$/apps/ios/Vendor/JovieKit/.swiftpm/**",
-        "$TURBO_ROOT$/scripts/ios/bootstrap-local-config.sh"
+        "$TURBO_ROOT$/scripts/ios/bootstrap-local-config.sh",
+        "$TURBO_ROOT$/scripts/neon/test-reported-measurements.py",
+        "$TURBO_ROOT$/scripts/neon/test_reported_measurements_harness.py",
+        "$TURBO_ROOT$/apps/web/db/tests/verify-training-mutations.py",
+        "$TURBO_ROOT$/apps/web/db/tests/test_verify_training_mutations.py"
       ]
     }
   }

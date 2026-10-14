@@ -136,3 +136,5 @@ sentry-wizard
 .gbrain-source
 .gbrain/
 .env*
+
+__pycache__/

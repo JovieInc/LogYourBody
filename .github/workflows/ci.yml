@@ -195,6 +195,28 @@ jobs:
           path: artifacts/training-mutations
           if-no-files-found: warn
 
+      - name: Verify reported measurements on disposable PostgreSQL16
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/reported-measurements/coverage
+          git rev-parse HEAD > artifacts/reported-measurements/source-revision.txt
+          sha256sum scripts/neon/test-reported-measurements.py apps/web/db/migrations/20260813130000_native_product_records.sql apps/web/src/lib/neon/native-product-records-adapter.ts apps/web/src/lib/ports/reported-measurements.ts > artifacts/reported-measurements/source-sha256.txt
+          python3 -m trace --count --summary --missing \
+            --ignore-dir "$(python3 -c 'import sys; print(sys.prefix)')" \
+            --coverdir artifacts/reported-measurements/coverage \
+            scripts/neon/test-reported-measurements.py --run --postgres-bin /usr/lib/postgresql/16/bin \
+            | tee artifacts/reported-measurements/results.log
+
+      - name: Upload reported measurement execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reported-measurements-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/reported-measurements
+          if-no-files-found: warn
+
       - name: Type check
         run: pnpm typecheck
 
