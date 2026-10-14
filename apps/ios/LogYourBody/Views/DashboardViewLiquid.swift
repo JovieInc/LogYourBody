@@ -115,7 +115,7 @@ struct DashboardViewLiquid: View {
     @State var homeV2PhaseSentence: String?
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
-    @State private var isStatsDestinationActive = false
+    @State var isStatsDestinationActive = false
     @State var isProgressPhotoAttachPresented = false
     @State var progressPhotoAttachTarget: BodyMetrics?
     @State private var chartMode: ChartMode = .trend

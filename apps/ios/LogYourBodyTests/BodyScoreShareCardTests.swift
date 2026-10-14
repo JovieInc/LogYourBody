@@ -375,6 +375,10 @@ final class BodyScoreShareCardTests: XCTestCase {
                 renderer.scale = 1
                 let image = try XCTUnwrap(renderer.uiImage)
                 let png = try XCTUnwrap(image.pngData())
+                let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+                attachment.name = "contextual-\(kind.rawValue)-\(aspect.rawValue).png"
+                attachment.lifetime = .keepAlways
+                add(attachment)
                 let decoded = try XCTUnwrap(UIImage(data: png))
                 XCTAssertEqual(decoded.size, size)
                 XCTAssertGreaterThan(png.count, 1_000)

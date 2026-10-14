@@ -311,7 +311,7 @@ struct HomeV2ProgressView: View {
             guard let selected = shareSelection(for: candidate, data: data),
                   let kind = ContextualMetricKind(rawValue: candidate.rawValue) else { return nil }
             let trend = candidate == .steps
-                ? HomeV2ProgressCopy.stepsAverageSentence(average: stats.average, range: range)
+                ? HomeV2ProgressCopy.stepsComparison(latest: selected.point.value, average: stats.average, range: range)
                 : HomeV2ProgressCopy.deltaSentence(delta: stats.delta, unit: data.deltaUnit, range: range)
             return ContextualMetricSnapshot(
                 kind: kind, value: formatValue(candidate, selected.point.value), unit: candidate == .steps ? "steps" : data.unit,
