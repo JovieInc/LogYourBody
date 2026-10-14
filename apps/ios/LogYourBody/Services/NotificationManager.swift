@@ -13,11 +13,14 @@ enum DailyReminderPolicy {
     static let defaultHour = 7
     static let defaultMinute = 0
 
+    /// The reminder is offered after the first weigh-in someone logs in the
+    /// app, when a reminder has an obvious job, not between the paywall and Today.
     static func shouldShowPostPaywallPrompt(
         isSubscribed: Bool,
-        hasCompletedPrompt: Bool
+        hasCompletedPrompt: Bool,
+        hasLoggedFirstWeighIn: Bool
     ) -> Bool {
-        isSubscribed && !hasCompletedPrompt
+        isSubscribed && !hasCompletedPrompt && hasLoggedFirstWeighIn
     }
 
     static func normalizedTime(hour: Int, minute: Int) -> (hour: Int, minute: Int) {
@@ -70,6 +73,7 @@ final class NotificationManager: ObservableObject {
     @Published private(set) var dailyWeighInHour: Int
     @Published private(set) var dailyWeighInMinute: Int
     @Published private(set) var hasCompletedDailyWeighInPrompt: Bool
+    @Published private(set) var hasLoggedFirstWeighIn: Bool
 
     private let center: NotificationSchedulingClient
     private let defaults: UserDefaults
@@ -87,6 +91,7 @@ final class NotificationManager: ObservableObject {
         dailyWeighInMinute = defaults.object(forKey: Constants.dailyWeighInReminderMinuteKey) as? Int
             ?? DailyReminderPolicy.defaultMinute
         hasCompletedDailyWeighInPrompt = defaults.bool(forKey: Constants.dailyWeighInReminderPromptCompletedKey)
+        hasLoggedFirstWeighIn = defaults.bool(forKey: Constants.hasLoggedFirstWeighInKey)
 
         let normalized = DailyReminderPolicy.normalizedTime(hour: dailyWeighInHour, minute: dailyWeighInMinute)
         dailyWeighInHour = normalized.hour
@@ -108,9 +113,27 @@ final class NotificationManager: ObservableObject {
     func shouldShowPostPaywallPrompt(isSubscribed: Bool) -> Bool {
         DailyReminderPolicy.shouldShowPostPaywallPrompt(
             isSubscribed: isSubscribed,
-            hasCompletedPrompt: hasCompletedDailyWeighInPrompt
+            hasCompletedPrompt: hasCompletedDailyWeighInPrompt,
+            hasLoggedFirstWeighIn: hasLoggedFirstWeighIn
         )
     }
+
+    /// Call after a weigh-in is saved from the app; it unlocks the reminder offer.
+    func recordWeighInLogged() {
+        guard !hasLoggedFirstWeighIn else { return }
+        hasLoggedFirstWeighIn = true
+        defaults.set(true, forKey: Constants.hasLoggedFirstWeighInKey)
+    }
+
+    #if DEBUG
+    /// UI tests start from a fresh account: no reminder answer, no weigh-in yet.
+    func resetDailyWeighInPromptForUITests() {
+        hasCompletedDailyWeighInPrompt = false
+        hasLoggedFirstWeighIn = false
+        defaults.set(false, forKey: Constants.dailyWeighInReminderPromptCompletedKey)
+        defaults.set(false, forKey: Constants.hasLoggedFirstWeighInKey)
+    }
+    #endif
 
     func refreshAuthorizationStatus() async {
         let settings = await center.notificationSettings()

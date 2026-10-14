@@ -511,6 +511,8 @@ struct LogYourBodyApp: App {
         )
         if isSubscribed && !usesDailyReminderPromptFixture {
             NotificationManager.shared.skipDailyWeighInPrompt()
+        } else if usesDailyReminderPromptFixture {
+            NotificationManager.shared.resetDailyWeighInPromptForUITests()
         }
 
         UserDefaults.standard.set(
@@ -685,7 +687,7 @@ struct LogYourBodyApp: App {
             .map { "\(metricIdPrefix)_\($0.daysAgo)" })
         precondition(
             savedIds.count == expectedIds.count && Set(savedIds) == expectedIds,
-            "Dashboard UI fixture expected \(entries.count) saved measurements, found \(savedIds.count)"
+            "Dashboard UI fixture expected \(expectedIds.count) saved measurements, found \(savedIds.count)"
         )
     }
 

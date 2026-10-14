@@ -56,6 +56,7 @@ def main():
             run(client + ['-f', str(args.admission_migration or web / 'db/migrations/20261010103000_training_mutation_admission.sql')])
 
             run(client + ['-f', str(web / 'db/migrations/20261010120000_native_account_admission.sql')])
+            run(client + ['-f', str(web / 'db/migrations/20261013100000_training_swap_mutation.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -164,6 +165,9 @@ def main():
                 if action=='set_insert':
                     return dict(id=str(uuid.uuid4()),record_type='set_log',sessionId=session['id'],exerciseId='exercise',
                         setNumber=1,reps=10,loadKg=20,rir=2,completedAt='2026-01-01T00:00:00Z')
+                if action=='swap_insert':
+                    return dict(id=str(uuid.uuid4()),record_type='exercise_swap',programSetupId=session['programSetupId'],
+                        blockId='block-1',sessionId=session['id'],fromExerciseId='exercise',toVariantId='variant')
                 return dict(id=str(uuid.uuid4()),record_type='session_feedback',sessionId=session['id'],soreness=2,
                     pump=2,performance='stable',jointPain=0,createdAt='2026-01-01T00:00:00Z')
 
@@ -185,7 +189,7 @@ def main():
                 return guard+';'+ ';'.join(s.replace('${subject}',quote(subject)) for s in statements)+';'
 
             for boundary in ['revoke','delete']:
-                for action in ['session_insert','session_update','completion','set_insert','feedback_insert']:
+                for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert']:
                     for first in ['boundary','mutation']:
                         subject,setup,admission,session=fixture(); row=record_for(action,session)
                         action_name='session_update' if action=='completion' else action
