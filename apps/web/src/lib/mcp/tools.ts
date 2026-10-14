@@ -15,7 +15,12 @@ import {
   loadTrainingRecords,
   type NextWorkoutResult,
 } from '@/lib/training/service';
-import type { ExercisePrescription, Session, SetLog } from '@/lib/training/types';
+import {
+  MUSCLE_GROUPS,
+  type ExercisePrescription,
+  type Session,
+  type SetLog,
+} from '@/lib/training/types';
 import { poundsToKg } from '@/lib/voice/intent-parser';
 import { LYB_MCP_SCOPES, type LybMcpScope } from './contract';
 
@@ -167,12 +172,102 @@ const logSetsInput = z
   })
   .strict();
 
+const feedbackScore = z.number().int().min(0).max(10);
+const feedbackReadiness = z.enum(['ready', 'limited', 'unknown']);
+const muscleFeedbackInput = z
+  .object({
+    soreness: feedbackScore.optional(),
+    recovery: feedbackReadiness.optional(),
+    pump: feedbackScore.optional(),
+    workload: z.enum(['below_expected', 'as_expected', 'above_expected']).optional(),
+    performance: z.enum(['up', 'stable', 'down']).optional(),
+  })
+  .strict()
+  .refine((value) => Object.values(value).some((item) => item !== undefined));
+
 const feedbackInput = z
   .object({
-    soreness: z.number().int().min(0).max(10),
-    pump: z.number().int().min(0).max(10),
-    performance: z.enum(['up', 'stable', 'down']),
-    jointPain: z.number().int().min(0).max(10),
+    soreness: feedbackScore.optional(),
+    pump: feedbackScore.optional(),
+    performance: z.enum(['up', 'stable', 'down']).optional(),
+    jointPain: feedbackScore.optional(),
+    muscles: z.partialRecord(z.enum(MUSCLE_GROUPS), muscleFeedbackInput).optional(),
+    targetMuscle: z.enum(MUSCLE_GROUPS).optional(),
+    targetMuscleReadiness: feedbackReadiness.optional(),
+    breathingReadiness: feedbackReadiness.optional(),
+    generalReadiness: feedbackReadiness.optional(),
+    supportingReadiness: z
+      .object({
+        grip: feedbackReadiness.optional(),
+        trunk: feedbackReadiness.optional(),
+        muscles: z.partialRecord(z.enum(MUSCLE_GROUPS), feedbackReadiness).optional(),
+      })
+      .strict()
+      .optional(),
+    trunkFatigue: feedbackScore.optional(),
+    generalExhaustion: feedbackScore.optional(),
+    symptomFlags: z
+      .array(z.enum(['pain', 'neurologic', 'other_concerning']))
+      .min(1)
+      .max(3)
+      .optional(),
+    symptomNote: z.string().trim().min(1).max(500).optional(),
+    originalStatement: z.string().trim().min(1).max(1_000).optional(),
+    transcriptionUncertain: z.boolean().optional(),
+    interpretations: z
+      .array(
+        z
+          .object({
+            claim: z.enum([
+              'goal_preference',
+              'self_assessed_development',
+              'performance',
+              'tolerability',
+              'symptom',
+              'recovery',
+              'pump',
+              'causal_hypothesis',
+              'dose_history',
+            ]),
+            timeframe: z.enum(['current', 'historical']),
+            confidence: z.enum(['low', 'moderate', 'high']),
+            corroboratesObservationIds: z
+              .array(z.string().trim().min(1).max(160))
+              .min(1)
+              .max(20)
+              .optional(),
+            conflictsWithObservationIds: z
+              .array(z.string().trim().min(1).max(160))
+              .min(1)
+              .max(20)
+              .optional(),
+            proposedExplanation: z.string().trim().min(1).max(500).optional(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(8)
+      .optional(),
+    source: z.enum(['voice', 'text', 'import']).optional(),
+    observedAt: z.string().datetime().optional(),
+    sourceObservationId: z.string().trim().min(1).max(160).optional(),
+    correctsObservationId: z.string().trim().min(1).max(160).optional(),
+    context: z
+      .object({
+        exerciseId: z.string().trim().min(1).max(80).optional(),
+        setId: z.string().trim().min(1).max(160).optional(),
+        setNumber: z.number().int().min(1).max(50).optional(),
+        setOrder: z.number().int().min(1).max(50).optional(),
+        reps: z.number().int().min(0).max(100).optional(),
+        loadKg: z.number().finite().min(0).max(500).nullable().optional(),
+        rir: z.number().int().min(0).max(6).optional(),
+        restSeconds: z.number().int().min(0).max(3600).optional(),
+        setup: z.string().trim().min(1).max(160).optional(),
+        rangeOfMotion: z.enum(['full', 'partial', 'unknown']).optional(),
+        setFormat: z.literal('straight').optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -536,7 +631,7 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
     name: 'log_session_feedback',
     title: 'Log session check-in',
     description:
-      "Adds the user's check-in for their most recent LogYourBody session: soreness, pump and joint pain from 0 to 10, and whether performance went up, stayed stable or went down. The training engine uses it to adjust or pause the next session. Ask the user for each value; never guess.",
+      'Adds only the observations the user provided for their most recent LogYourBody session or current set. It supports optional per-muscle soreness, recovery, pump, workload and performance plus distinct target, breathing, general, grip/trunk and symptom signals. Missing values stay unknown; never guess or turn a timer into clearance.',
     scope: LYB_MCP_SCOPES.trainingWrite,
     readOnly: false,
     input: feedbackInput,
@@ -551,8 +646,138 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
           description: 'Performance versus last time.',
         },
         jointPain: score('Joint pain, 0 none to 10 severe.'),
+        muscles: {
+          type: 'object',
+          description:
+            'Optional observations keyed by muscle; include only muscles the user described.',
+          properties: Object.fromEntries(
+            MUSCLE_GROUPS.map((muscle) => [
+              muscle,
+              {
+                type: 'object',
+                properties: {
+                  soreness: score('Reported soreness for this muscle.'),
+                  recovery: { type: 'string', enum: ['ready', 'limited', 'unknown'] },
+                  pump: score('Reported pump for this muscle.'),
+                  workload: {
+                    type: 'string',
+                    enum: ['below_expected', 'as_expected', 'above_expected'],
+                  },
+                  performance: { type: 'string', enum: ['up', 'stable', 'down'] },
+                },
+                additionalProperties: false,
+                minProperties: 1,
+              },
+            ]),
+          ),
+          additionalProperties: false,
+          minProperties: 1,
+        },
+        targetMuscle: { type: 'string', enum: [...MUSCLE_GROUPS] },
+        targetMuscleReadiness: { type: 'string', enum: ['ready', 'limited', 'unknown'] },
+        breathingReadiness: { type: 'string', enum: ['ready', 'limited', 'unknown'] },
+        generalReadiness: { type: 'string', enum: ['ready', 'limited', 'unknown'] },
+        supportingReadiness: {
+          type: 'object',
+          properties: {
+            grip: { type: 'string', enum: ['ready', 'limited', 'unknown'] },
+            trunk: { type: 'string', enum: ['ready', 'limited', 'unknown'] },
+            muscles: {
+              type: 'object',
+              properties: Object.fromEntries(
+                MUSCLE_GROUPS.map((muscle) => [
+                  muscle,
+                  { type: 'string', enum: ['ready', 'limited', 'unknown'] },
+                ]),
+              ),
+              additionalProperties: false,
+              minProperties: 1,
+            },
+          },
+          additionalProperties: false,
+          minProperties: 1,
+        },
+        trunkFatigue: score('Non-pain trunk or back fatigue, 0 none to 10 extreme.'),
+        generalExhaustion: score('General exhaustion, 0 none to 10 extreme.'),
+        symptomFlags: {
+          type: 'array',
+          items: { type: 'string', enum: ['pain', 'neurologic', 'other_concerning'] },
+          minItems: 1,
+          maxItems: 3,
+        },
+        symptomNote: { type: 'string', maxLength: 500 },
+        originalStatement: {
+          type: 'string',
+          maxLength: 1000,
+          description: 'The user’s original wording. Preserve uncertain transcription as heard.',
+        },
+        transcriptionUncertain: { type: 'boolean' },
+        interpretations: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 8,
+          description:
+            'Claim-specific interpretations. Confidence belongs to each claim, never to the user globally.',
+          items: {
+            type: 'object',
+            properties: {
+              claim: {
+                type: 'string',
+                enum: [
+                  'goal_preference',
+                  'self_assessed_development',
+                  'performance',
+                  'tolerability',
+                  'symptom',
+                  'recovery',
+                  'pump',
+                  'causal_hypothesis',
+                  'dose_history',
+                ],
+              },
+              timeframe: { type: 'string', enum: ['current', 'historical'] },
+              confidence: { type: 'string', enum: ['low', 'moderate', 'high'] },
+              corroboratesObservationIds: {
+                type: 'array',
+                items: { type: 'string', maxLength: 160 },
+                minItems: 1,
+                maxItems: 20,
+              },
+              conflictsWithObservationIds: {
+                type: 'array',
+                items: { type: 'string', maxLength: 160 },
+                minItems: 1,
+                maxItems: 20,
+              },
+              proposedExplanation: { type: 'string', maxLength: 500 },
+            },
+            required: ['claim', 'timeframe', 'confidence'],
+            additionalProperties: false,
+          },
+        },
+        source: { type: 'string', enum: ['voice', 'text', 'import'] },
+        observedAt: { type: 'string', format: 'date-time' },
+        sourceObservationId: { type: 'string', maxLength: 160 },
+        correctsObservationId: { type: 'string', maxLength: 160 },
+        context: {
+          type: 'object',
+          properties: {
+            exerciseId: { type: 'string', maxLength: 80 },
+            setId: { type: 'string', maxLength: 160 },
+            setNumber: { type: 'integer', minimum: 1, maximum: 50 },
+            setOrder: { type: 'integer', minimum: 1, maximum: 50 },
+            reps: { type: 'integer', minimum: 0, maximum: 100 },
+            loadKg: { type: ['number', 'null'], minimum: 0, maximum: 500 },
+            rir: { type: 'integer', minimum: 0, maximum: 6 },
+            restSeconds: { type: 'integer', minimum: 0, maximum: 3600 },
+            setup: { type: 'string', maxLength: 160 },
+            rangeOfMotion: { type: 'string', enum: ['full', 'partial', 'unknown'] },
+            setFormat: { type: 'string', enum: ['straight'] },
+          },
+          additionalProperties: false,
+        },
       },
-      required: ['soreness', 'pump', 'performance', 'jointPain'],
+      minProperties: 1,
       additionalProperties: false,
     },
     async run(subject, args: z.infer<typeof feedbackInput>, deps) {
@@ -570,21 +795,31 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
             Date.parse(String((a as { startedAt?: string }).startedAt ?? a.server_updated_at)),
         )[0];
       if (!latest) return failure('There is no session to check in on yet. Log a workout first.');
+      const now = deps.now();
       const result = await recordTrainingFeedback({
         admission,
         records: deps.records,
         subject,
-        now: deps.now(),
+        now,
         createId: deps.createId,
-        feedback: { sessionId: latest.id, ...args },
+        feedback: {
+          sessionId: latest.id,
+          ...args,
+          source: args.source ?? 'text',
+          observedAt: args.observedAt ?? now.toISOString(),
+        },
       });
       if (result.kind !== 'recorded')
         return failure('That check-in could not be saved. Try again.');
       const pain =
-        args.jointPain >= 4
-          ? ' Joint pain at that level pauses the affected work. If it persists or worsens, check with a qualified clinician.'
+        (args.jointPain ?? 0) >= 4 || args.symptomFlags?.length
+          ? ' A pain or concerning symptom report pauses the affected work and follows the existing safety pathway. If it persists or worsens, check with a qualified clinician.'
           : '';
-      return text(`Check-in saved.${pain}`, { sessionId: latest.id, ...args });
+      return text(`Check-in saved.${pain}`, {
+        sessionId: latest.id,
+        ...args,
+        nextSetRecommendation: result.recommendation,
+      });
     },
   },
   {

@@ -109,6 +109,67 @@ export type DeloadState = {
   evidenceIds: string[];
 };
 
+export type ReadinessState = 'ready' | 'limited' | 'unknown';
+export type TrainingFeedbackSource = 'touch' | 'voice' | 'text' | 'import' | 'unknown';
+export type TrainingPerformance = 'up' | 'stable' | 'down';
+
+export type MuscleFeedbackObservation = {
+  soreness?: number;
+  recovery?: ReadinessState;
+  pump?: number;
+  workload?: 'below_expected' | 'as_expected' | 'above_expected';
+  performance?: TrainingPerformance;
+};
+
+export type SupportingReadinessObservation = {
+  grip?: ReadinessState;
+  trunk?: ReadinessState;
+  muscles?: Partial<Record<MuscleGroup, ReadinessState>>;
+};
+
+export type TrainingSetContext = {
+  exerciseId?: string;
+  setId?: string;
+  setNumber?: number;
+  setOrder?: number;
+  reps?: number;
+  loadKg?: number | null;
+  rir?: number;
+  restSeconds?: number;
+  setup?: string;
+  rangeOfMotion?: 'full' | 'partial' | 'unknown';
+  setFormat?: 'straight';
+};
+
+export type TrainingObservationInterpretation = {
+  claim:
+    | 'goal_preference'
+    | 'self_assessed_development'
+    | 'performance'
+    | 'tolerability'
+    | 'symptom'
+    | 'recovery'
+    | 'pump'
+    | 'causal_hypothesis'
+    | 'dose_history';
+  timeframe: 'current' | 'historical';
+  confidence: 'low' | 'moderate' | 'high';
+  corroboratesObservationIds?: string[];
+  conflictsWithObservationIds?: string[];
+  proposedExplanation?: string;
+};
+
+export type NextSetRecommendation = {
+  scope: 'between_set';
+  action: 'proceed' | 'extend_rest' | 'adjust_or_skip_task' | 'clarify' | 'symptom_safety';
+  reasons: string[];
+  uncertainty: 'low' | 'moderate' | 'high';
+  observationIds: string[];
+  /** Immediate protection never rewrites the weekly plan or certifies safety. */
+  weeklyPlanChanged: false;
+  safetyCertified: false;
+};
+
 export type TrainingProgramSetup = {
   id: string;
   consentVersion: typeof TRAINING_CONSENT_VERSION;
@@ -124,10 +185,32 @@ export type TrainingProgramSetup = {
 export type TrainingFeedback = {
   id: string;
   sessionId: string;
-  soreness: number;
-  pump: number;
-  performance: 'up' | 'stable' | 'down';
-  jointPain: number;
+  /** Legacy session-level fallback. Missing values are unknown. */
+  soreness?: number;
+  pump?: number;
+  performance?: TrainingPerformance;
+  jointPain?: number;
+  muscles?: Partial<Record<MuscleGroup, MuscleFeedbackObservation>>;
+  targetMuscle?: MuscleGroup;
+  targetMuscleReadiness?: ReadinessState;
+  breathingReadiness?: ReadinessState;
+  generalReadiness?: ReadinessState;
+  supportingReadiness?: SupportingReadinessObservation;
+  trunkFatigue?: number;
+  generalExhaustion?: number;
+  symptomFlags?: Array<'pain' | 'neurologic' | 'other_concerning'>;
+  symptomNote?: string;
+  /** Original user wording is retained separately from claim-specific interpretations. */
+  originalStatement?: string;
+  transcriptionUncertain?: boolean;
+  interpretations?: TrainingObservationInterpretation[];
+  source?: TrainingFeedbackSource;
+  observedAt?: string;
+  /** Stable upstream identity so imports and summaries do not create corroboration. */
+  sourceObservationId?: string;
+  /** Append-only link to the observation this record corrects. */
+  correctsObservationId?: string;
+  context?: TrainingSetContext;
   createdAt: string;
 };
 
