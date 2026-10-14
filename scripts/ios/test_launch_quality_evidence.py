@@ -302,6 +302,7 @@ set -euo pipefail
 COMMON_XCODEBUILD_ARGS=(fixture)
 XCODEBUILD_SETTINGS_ARRAY=(fixture)
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS=10
+LQ_LAUNCH_PROBE=false
 cleanup_booted_simulator_apps() { :; }
 sleep() { :; }
 run_with_timeout() {
@@ -329,6 +330,7 @@ set -euo pipefail
 COMMON_XCODEBUILD_ARGS=(fixture)
 XCODEBUILD_SETTINGS_ARRAY=(fixture)
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS=10
+LQ_LAUNCH_PROBE=false
 cleanup_booted_simulator_apps() { :; }
 sleep() { :; }
 run_with_timeout() {
