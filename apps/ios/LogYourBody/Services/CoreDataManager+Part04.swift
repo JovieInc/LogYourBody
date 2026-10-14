@@ -30,13 +30,38 @@ enum BodyMetricSyncDateParser {
     }
 }
 
+/// Test seam that runs inside the context queue immediately before each
+/// `writeAdmission` check. A regression can land an account switch in the gap
+/// between a pull-side guard and the queued write deterministically.
+enum ServerApplyProbe {
+    nonisolated(unsafe) static var beforeWriteAdmission: (@MainActor () -> Void)?
+}
+
 extension CoreDataManager {
 // MARK: - Update from Server Data
 
-    func updateOrCreateBodyMetric(from data: [String: Any]) {
+    func updateOrCreateBodyMetric(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
+            // viewContext is the container's main-queue context. Admission and
+            // this synchronous write share the executor with auth replacement.
+            if let probe = ServerApplyProbe.beforeWriteAdmission {
+                ServerApplyProbe.beforeWriteAdmission = nil
+                MainActor.assumeIsolated { probe() }
+            }
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?()
+                    return
+                }
+            }
             let id = data["id"] as? String ?? UUID().uuidString
 
             let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
@@ -46,6 +71,7 @@ extension CoreDataManager {
             do {
                 let results = try context.fetch(request)
                 if results.first?.isMarkedDeleted == true {
+                    completion?()
                     return
                 }
 
@@ -151,6 +177,7 @@ extension CoreDataManager {
                 metric.lastModified = Date()
 
                 self.save()
+                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateBodyMetric", underlying: error)
                 let contextInfo = ErrorContext(
@@ -161,14 +188,42 @@ extension CoreDataManager {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating body metric from server: \(error)")
+                completion?()
             }
         }
     }
 
-func updateOrCreateDailyMetric(from data: [String: Any]) {
+    func updateOrCreateBodyMetricAndWait(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            updateOrCreateBodyMetric(from: data, writeAdmission: writeAdmission) {
+                continuation.resume()
+            }
+        }
+    }
+
+func updateOrCreateDailyMetric(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
+            if let probe = ServerApplyProbe.beforeWriteAdmission {
+                ServerApplyProbe.beforeWriteAdmission = nil
+                MainActor.assumeIsolated { probe() }
+            }
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?()
+                    return
+                }
+            }
             let id = data["id"] as? String ?? UUID().uuidString
 
             let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
@@ -217,6 +272,7 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
                 metric.lastModified = Date()
 
                 self.save()
+                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateDailyMetric", underlying: error)
                 let contextInfo = ErrorContext(
@@ -227,14 +283,42 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating daily metric from server: \(error)")
+                completion?()
             }
         }
     }
 
-func updateOrCreateProfile(from data: [String: Any]) {
+    func updateOrCreateDailyMetricAndWait(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            updateOrCreateDailyMetric(from: data, writeAdmission: writeAdmission) {
+                continuation.resume()
+            }
+        }
+    }
+
+func updateOrCreateProfile(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
+            if let probe = ServerApplyProbe.beforeWriteAdmission {
+                ServerApplyProbe.beforeWriteAdmission = nil
+                MainActor.assumeIsolated { probe() }
+            }
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    completion?()
+                    return
+                }
+            }
             let userId = data["id"] as? String ?? ""
 
             let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
@@ -269,6 +353,7 @@ func updateOrCreateProfile(from data: [String: Any]) {
                 profile.lastModified = Date()
 
                 self.save()
+                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateProfile", underlying: error)
                 let contextInfo = ErrorContext(
@@ -279,6 +364,18 @@ func updateOrCreateProfile(from data: [String: Any]) {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating profile from server: \(error)")
+                completion?()
+            }
+        }
+    }
+
+    func updateOrCreateProfileAndWait(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            updateOrCreateProfile(from: data, writeAdmission: writeAdmission) {
+                continuation.resume()
             }
         }
     }

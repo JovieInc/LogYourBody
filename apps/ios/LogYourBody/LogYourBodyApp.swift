@@ -645,13 +645,13 @@ struct LogYourBodyApp: App {
 
             let isPhotoOnly = usesUndoPhotoFixture && entry.daysAgo == 0
             let fixturePhotoURL: String?
-            if editorialArguments.contains("-lybUITestHomeV2SinglePhotoFixture"), entry.daysAgo != 0 {
+            if editorialArguments.contains("-lybUITestHomeV2TimelineFixture") {
+                fixturePhotoURL = writeHomeV2FixturePhoto(variant: entry.daysAgo)
+            } else if editorialArguments.contains("-lybUITestHomeV2SinglePhotoFixture"), entry.daysAgo != 0 {
                 fixturePhotoURL = nil
             } else if editorialArguments.contains("-lybUITestHomeV2ShareMissingPhotoFixture"), entry.daysAgo != 0 {
                 fixturePhotoURL = FileManager.default.temporaryDirectory
                     .appendingPathComponent("lyb-ui-test-missing-share-photo.jpg").absoluteString
-            } else if editorialArguments.contains("-lybUITestHomeV2TimelineFixture") {
-                fixturePhotoURL = writeHomeV2FixturePhoto(variant: entry.daysAgo)
             } else {
                 fixturePhotoURL = photoURL
             }
@@ -661,8 +661,9 @@ struct LogYourBodyApp: App {
                 date: date,
                 weight: isPhotoOnly ? nil : entry.weight,
                 weightUnit: "kg",
-                bodyFatPercentage: isPhotoOnly || usesWeightOnlyHero || usesSingleWeightHero ? nil : entry.bodyFat,
-                bodyFatMethod: isPhotoOnly || usesWeightOnlyHero || usesSingleWeightHero || entry.bodyFat == nil
+                bodyFatPercentage: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly
+                    ? nil : entry.bodyFat,
+                bodyFatMethod: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly || entry.bodyFat == nil
                     ? nil : (usesVisualEstimateHero ? "visual_estimate" : entry.source),
                 muscleMass: isPhotoOnly ? nil : entry.muscle,
                 boneMass: nil,

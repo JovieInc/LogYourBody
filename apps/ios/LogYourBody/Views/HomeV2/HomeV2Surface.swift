@@ -15,6 +15,8 @@ struct HomeV2Surface: View {
     @Binding var selectedID: HomeV2TimelinePolicy.EntryID
     let weightValue: String
     let weightUnit: String
+    let ffmiValue: String
+    let bodyFatValue: String
     let changeSentence: String
     let dateText: (BodyMetrics) -> String
     let phaseSentence: String?
@@ -47,6 +49,9 @@ struct HomeV2Surface: View {
                         size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto
                     )
+                    .overlay(alignment: .bottom) {
+                        if hasPhoto { photoStatStrip }
+                    }
                     photoNumberBlock
                     if hasAnyPhoto {
                         HomeV2DisclosureLink(
@@ -129,6 +134,29 @@ struct HomeV2Surface: View {
     private var hasSingleWeightHero: Bool {
         !hasPhoto && HomeV2EditorialPolicy.bodyFat(in: metric) == nil &&
             HomeV2EditorialPolicy.weights(in: bodyMetrics, selected: metric).count == 1
+    }
+
+    /// Weight, FFMI and body fat overlaid on the selected photo's treated lower band.
+    private var photoStatStrip: some View {
+        HStack(spacing: HomeV2Tokens.Space.margin) {
+            HomeV2PhotoStat(label: "Weight", value: "\(weightValue) \(weightUnit)")
+            HomeV2PhotoStat(label: "FFMI", value: ffmiValue)
+            HomeV2PhotoStat(label: "Body fat", value: bodyFatValue)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, HomeV2Tokens.Space.inset)
+        .padding(.top, HomeV2Tokens.Space.margin)
+        .padding(.bottom, HomeV2Tokens.Space.row)
+        .background(
+            LinearGradient(
+                colors: [.clear, Color.black.opacity(0.55)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home_v2_photo_stats")
     }
 
     private var photoNumberBlock: some View {
@@ -399,6 +427,24 @@ struct HomeV2DataHero: View {
 
     private func displayWeight(_ kilograms: Double) -> Double {
         unit == "lb" ? kilograms.kgToLbs : kilograms
+    }
+}
+
+/// One stat in the photo-stage overlay: quiet label over a white value.
+struct HomeV2PhotoStat: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, weight: .medium, relativeTo: .caption)
+                .foregroundStyle(.white.opacity(0.72))
+            Text(value)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .body)
+                .foregroundStyle(.white)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
