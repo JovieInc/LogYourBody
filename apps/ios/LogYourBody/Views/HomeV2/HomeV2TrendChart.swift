@@ -214,11 +214,11 @@ struct HomeV2TrendChart: View {
                 AxisMarks(position: .leading, values: plotted.yTicks) { _ in
                     AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
                     if anchorsToZero {
-                        AxisValueLabel(format: .number.precision(.fractionLength(0)))
+                        AxisValueLabel(format: FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0)))
                             .foregroundStyle(HomeV2Tokens.Colors.secondary)
                             .font(.caption)
                     } else {
-                        AxisValueLabel(format: .number.precision(.fractionLength(1)))
+                        AxisValueLabel(format: FloatingPointFormatStyle<Double>.number.precision(.fractionLength(1)))
                             .foregroundStyle(HomeV2Tokens.Colors.secondary)
                             .font(.caption)
                     }
