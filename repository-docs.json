@@ -1,11 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "JovieInc/LogYourBody",
-  "entrypoints": [
-    "README.md",
-    "AGENTS.md",
-    "docs/DOCUMENTATION.md"
-  ],
+  "entrypoints": ["README.md", "AGENTS.md", "docs/DOCUMENTATION.md"],
   "sources": [
     {
       "path": ".github/workflows/advisory-ai-review.yml",

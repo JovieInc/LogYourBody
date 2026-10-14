@@ -1,4 +1,6 @@
+import { mesocycleOptimizerEnabled } from '@/lib/flags/mesocycle-optimizer';
 import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
+import { createTrainingOptimizerHandlers } from './optimizer-route-handlers';
 import { createTrainingRevisionHandlers } from './revision-route-handlers';
 import { randomUUID } from 'node:crypto';
 import type { NextRequest } from 'next/server';
@@ -30,4 +32,11 @@ export const trainingRevisionHandlers = createTrainingRevisionHandlers({
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   now: () => new Date(),
   enabled: () => process.env.LYB_HYPERTROPHY_COACH_API_ENABLED === 'true',
+});
+
+export const trainingOptimizerHandlers = createTrainingOptimizerHandlers({
+  authenticate,
+  reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
+  coachEnabled: () => process.env.LYB_HYPERTROPHY_COACH_API_ENABLED === 'true',
+  optimizerEnabled: () => mesocycleOptimizerEnabled(),
 });

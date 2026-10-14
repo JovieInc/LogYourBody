@@ -19,6 +19,7 @@ function fixture(t, behavior = '') {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'jovie-codex-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, 'bin'));
+  symlinkSync(process.execPath, join(root, 'bin/node'));
   writeFileSync(join(root, '.nvmrc'), process.versions.node);
   writeFileSync(join(root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@9.15.9' }));
   writeFileSync(join(root, 'pnpm-lock.yaml'), 'preserve lock');

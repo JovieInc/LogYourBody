@@ -47,6 +47,7 @@ final class HomeV2LayoutUITests: XCTestCase {
         assertDockVisible(in: app, identifier: "home_v2_connect_health", screenshot: "metric-health-off-largest-text-scrolled")
         app.buttons["home_v2_today_details"].tap()
         XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        capture(app, named: "revealed-link-manual-log-destination")
     }
 
     func testLogSheetHasOneHeadingAndKeepsEntryControls() {
@@ -149,6 +150,7 @@ final class HomeV2LayoutUITests: XCTestCase {
         assertReachableByScrolling("home_v2_view_progress", in: app)
         app.buttons["home_v2_view_progress"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_progress_value"].waitForExistence(timeout: 8))
+        capture(app, named: "revealed-link-progress-destination")
     }
 
     func testEditorialWeightOnlyHeroShowsActualSparseReadings() {
@@ -259,11 +261,28 @@ final class HomeV2LayoutUITests: XCTestCase {
         let scroll = app.scrollViews["home_v2_content_scroll"]
         XCTAssertTrue(scroll.waitForExistence(timeout: 5))
         let target = app.buttons[identifier]
-        for _ in 0..<6 where !target.isHittable || !scroll.frame.contains(target.frame) {
-            scroll.swipeUp()
+        // XCUI includes the covered safe-area inset in ScrollView.frame. A tappable
+        // point there can hit the ruler/dock instead of the intended content row.
+        let pinned = [app.descendants(matching: .any)["home_v2_timeline_scrubber"],
+                      app.buttons["home_v2_log_weight"], app.buttons["home_v2_connect_health"]]
+        let bottom = pinned.filter(\.exists).map { $0.frame.minY }.min() ?? scroll.frame.maxY
+        let viewport = CGRect(x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
+                              height: max(0, min(bottom, scroll.frame.maxY) - scroll.frame.minY))
+        XCTAssertGreaterThan(viewport.height, 88, "Home must leave a usable scrolling viewport")
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        let start = origin.withOffset(CGVector(dx: viewport.midX, dy: viewport.maxY - 40))
+        let end = origin.withOffset(CGVector(dx: viewport.midX, dy: viewport.minY + 40))
+        for _ in 0..<6 where !target.isHittable || !viewport.contains(target.frame) {
+            start.press(forDuration: 0.05, thenDragTo: end)
         }
-        XCTAssertTrue(target.isHittable, "Home details must remain reachable with large text")
-        XCTAssertTrue(scroll.frame.contains(target.frame), "Home details must scroll above the dock")
+        let frames = "target=\(target.frame), viewport=\(viewport), pinned=\(pinned.filter(\.exists).map { $0.frame })"
+        let geometry = XCTAttachment(string: frames)
+        geometry.name = "visible-link-geometry-\(identifier)"
+        geometry.lifetime = .keepAlways
+        add(geometry)
+        capture(app, named: "reachable-\(identifier)")
+        XCTAssertTrue(target.isHittable, "Home details must remain reachable with large text: \(frames)")
+        XCTAssertTrue(viewport.contains(target.frame), "The complete target must scroll above the pinned controls: \(frames)")
     }
 
     private func assertHealthLabelCanWrap(in app: XCUIApplication) {
