@@ -122,8 +122,8 @@
         "value": "{color.base.blue.600}"
       },
       "error": {
-        "value": "#F3122D",
-        "comment": "Error red (as shipped on iOS)"
+        "value": "#FF4556",
+        "comment": "Error red with WCAG AA contrast on dark surfaces"
       },
       "errorHover": {
         "value": "{color.base.red.600}"
@@ -151,8 +151,8 @@
           "comment": "Secondary text - medium contrast"
         },
         "tertiary": {
-          "value": "#6E7178",
-          "comment": "Tertiary text - low contrast"
+          "value": "#8B909B",
+          "comment": "Tertiary text - WCAG AA contrast on dark surfaces"
         },
         "disabled": {
           "value": "#4B5563",
