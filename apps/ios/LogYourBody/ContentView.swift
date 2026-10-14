@@ -82,6 +82,7 @@ struct ContentView: View {
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
     @State private var showWhatsNew = false
+    @State private var showDailyReminderOffer = false
     @State private var releaseReviewItems: [ReleaseReviewItem] = []
     @State private var releaseReviewDestination: ReleaseReviewDestination?
     @State private var pendingDexaPDF: DexaPDFFileSelection?
@@ -343,12 +344,32 @@ struct ContentView: View {
                 PaywallView()
                     .environmentObject(authManager)
                     .environmentObject(subscriptionManager)
-            } else if shouldShowDailyReminderPrompt {
-                DailyWeighInReminderPromptView(notificationManager: notificationManager)
             } else {
                 MainTabView(releaseReviewDestination: $releaseReviewDestination)
                     .onAppear {
                         AppServicePorts.analyticsTracker.track(event: "dashboard_view")
+                        showDailyReminderOffer = shouldShowDailyReminderPrompt
+                    }
+                    .onChange(of: shouldShowDailyReminderPrompt) { _, shouldShow in
+                        guard shouldShow else { return }
+                        // Let the log sheet finish dismissing and the "Logged" line land first.
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(900))
+                            showDailyReminderOffer = shouldShowDailyReminderPrompt
+                        }
+                    }
+                    // Sibling of Today, not a modifier on it. An ancestor sheet drops
+                    // the edit-entry sheet while Context is pushed.
+                    .background {
+                        DailyReminderOfferSheetHost(
+                            isPresented: $showDailyReminderOffer,
+                            notificationManager: notificationManager,
+                            onDismiss: {
+                                if !notificationManager.hasCompletedDailyWeighInPrompt {
+                                    notificationManager.skipDailyWeighInPrompt()
+                                }
+                            }
+                        )
                     }
             }
         }
@@ -398,6 +419,25 @@ struct ContentView: View {
                 .transition(.opacity)
             }
         }
+    }
+}
+
+/// Offered over Today once a first weigh-in is logged. A swipe-away counts as
+/// "Not now" so it is asked once. The sheet stays on this sibling so it is not
+/// an ancestor of Today's log sheet.
+private struct DailyReminderOfferSheetHost: View {
+    @Binding var isPresented: Bool
+    var notificationManager: NotificationManager
+    var onDismiss: () -> Void
+
+    var body: some View {
+        Color.clear
+            .accessibilityHidden(true)
+            .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
+                DailyWeighInReminderPromptView(notificationManager: notificationManager) {
+                    isPresented = false
+                }
+            }
     }
 }
 

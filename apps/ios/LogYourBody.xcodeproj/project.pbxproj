@@ -187,6 +187,7 @@
 		AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */; };
 		B39A732AA4894B1DB77C9901 /* HomeV2PhotoViewerLayoutUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B39A732AA4894B1DB77C9902 /* HomeV2PhotoViewerLayoutUITests.swift */; };
 		AD7D30B32E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */; };
+		E4BD849D58744A00A126F801 /* HomeV2LayoutUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4BD849D58744A00A126F802 /* HomeV2LayoutUITests.swift */; };
 		AD8872402EB87EF80041C426 /* BuildFile in Sources */ = {isa = PBXBuildFile; };
 		AD8872412EB87EF80041C426 /* DashboardViewLiquid.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD88723E2EB87EF80041C426 /* DashboardViewLiquid.swift */; };
 		AD8872432EB87F290041C426 /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8872422EB87F290041C426 /* ProgressRing.swift */; };
@@ -456,7 +457,10 @@
 		FE10B0B000000000000000BA /* DashboardTimelineProviderPerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE10B0B000000000000000FA /* DashboardTimelineProviderPerformanceTests.swift */; };
 		FE11C1C100000000000000BB /* ImageCacheServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */; };
 		FE12D2D100000000000000BC /* GoldenPathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE12D2D100000000000000FC /* GoldenPathTests.swift */; };
+		FE13A3A300000000000000C1 /* FeatureReleasePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE13A3A300000000000000C2 /* FeatureReleasePolicy.swift */; };
+		FE13A3A300000000000000C3 /* FeatureReleasePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE13A3A300000000000000C4 /* FeatureReleasePolicyTests.swift */; };
 		FE20A0A100000000000000B1 /* JovieTokensTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A100000000000000F1 /* JovieTokensTests.swift */; };
+		FE20A0A500000000000000B5 /* SemanticContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A500000000000000F5 /* SemanticContrastTests.swift */; };
 		FE20A0A200000000000000B2 /* JovieGlassSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */; };
 		FE20A0A300000000000000B3 /* WorldClassScreenInventoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */; };
 		FE20A0A400000000000000B4 /* MetricAccentContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */; };
@@ -728,6 +732,7 @@
 		AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITests.swift; sourceTree = "<group>"; };
 		B39A732AA4894B1DB77C9902 /* HomeV2PhotoViewerLayoutUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2PhotoViewerLayoutUITests.swift; sourceTree = "<group>"; };
 		AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		E4BD849D58744A00A126F802 /* HomeV2LayoutUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2LayoutUITests.swift; sourceTree = "<group>"; };
 		AD8056FC2E25F5180028C0DD /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		AD8552532E19A2A1003552EE /* ProfileSettingsPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSettingsPolicy.swift; sourceTree = "<group>"; };
 		AD8552552E19A5B5003552EE /* RealtimeSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeSyncManager.swift; sourceTree = "<group>"; };
@@ -1012,7 +1017,10 @@
 		FE10B0B000000000000000FA /* DashboardTimelineProviderPerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardTimelineProviderPerformanceTests.swift; sourceTree = "<group>"; };
 		FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheServiceTests.swift; sourceTree = "<group>"; };
 		FE12D2D100000000000000FC /* GoldenPathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldenPathTests.swift; sourceTree = "<group>"; };
+		FE13A3A300000000000000C2 /* FeatureReleasePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureReleasePolicy.swift; sourceTree = "<group>"; };
+		FE13A3A300000000000000C4 /* FeatureReleasePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureReleasePolicyTests.swift; sourceTree = "<group>"; };
 		FE20A0A100000000000000F1 /* JovieTokensTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JovieTokensTests.swift; sourceTree = "<group>"; };
+		FE20A0A500000000000000F5 /* SemanticContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticContrastTests.swift; sourceTree = "<group>"; };
 		FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JovieGlassSurfaceTests.swift; sourceTree = "<group>"; };
 		FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldClassScreenInventoryTests.swift; sourceTree = "<group>"; };
 		FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricAccentContrastTests.swift; sourceTree = "<group>"; };
@@ -1154,6 +1162,7 @@
 				0D09F39EA8F6241DE176F54C /* Molecules */,
 				FE20A0A100000000000000F1 /* JovieTokensTests.swift */,
 				FE20A0A200000000000000F2 /* JovieGlassSurfaceTests.swift */,
+				FE20A0A500000000000000F5 /* SemanticContrastTests.swift */,
 				FE20A0A300000000000000F3 /* WorldClassScreenInventoryTests.swift */,
 				FE20A0A400000000000000F4 /* MetricAccentContrastTests.swift */,
 			);
@@ -1465,6 +1474,7 @@
 				AD933DFF2E249EA000801078 /* PhotoLibraryScanner.swift */,
 				AD8552552E19A5B5003552EE /* RealtimeSyncManager.swift */,
 				FE03A3A300000000000000F3 /* BatterySyncIntervalPolicy.swift */,
+				FE13A3A300000000000000C2 /* FeatureReleasePolicy.swift */,
 				AD8552932E1CC15B003552EE /* BackgroundRemovalService.swift */,
 				ADF5C1B32E1CDB9C00E3FB4D /* PhotoMetadataService.swift */,
 				75034CADEA1D4697BDCB5555 /* ImageCacheService.swift */,
@@ -1687,6 +1697,7 @@
 				FE11C1C100000000000000FB /* ImageCacheServiceTests.swift */,
 				AD9E00302F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift */,
 				FE12D2D100000000000000FC /* GoldenPathTests.swift */,
+				FE13A3A300000000000000C4 /* FeatureReleasePolicyTests.swift */,
 			);
 			path = LogYourBodyTests;
 			sourceTree = "<group>";
@@ -1697,6 +1708,7 @@
 				AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */,
 				B39A732AA4894B1DB77C9902 /* HomeV2PhotoViewerLayoutUITests.swift */,
 				AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */,
+				E4BD849D58744A00A126F802 /* HomeV2LayoutUITests.swift */,
 				DB6F742008744039AA49CA02 /* HomeV2ShareRecoveryUITests.swift */,
 			);
 			path = LogYourBodyUITests;
@@ -2105,6 +2117,7 @@
 				FE11C1C100000000000000BB /* ImageCacheServiceTests.swift in Sources */,
 				AD9E00312F20003000ABCDEF /* HeroMetricInterpolationCacheTests.swift in Sources */,
 				FE12D2D100000000000000BC /* GoldenPathTests.swift in Sources */,
+				FE13A3A300000000000000C3 /* FeatureReleasePolicyTests.swift in Sources */,
 				A7876ACC0BAFED8A57643661 /* AccountDeletionAndShareCardTests.swift in Sources */,
 				5A5834631DA85239D455F320 /* AccountDeletionCleanupServiceTests.swift in Sources */,
 				FA261B144FF5A5876CA6D0DB /* AuthConfigurationValidationTests.swift in Sources */,
@@ -2175,6 +2188,7 @@
 				D2184ADBFB25DEB92514F85D /* DSCircularProgressTests.swift in Sources */,
 				FE20A0A100000000000000B1 /* JovieTokensTests.swift in Sources */,
 				FE20A0A200000000000000B2 /* JovieGlassSurfaceTests.swift in Sources */,
+				FE20A0A500000000000000B5 /* SemanticContrastTests.swift in Sources */,
 				FE20A0A300000000000000B3 /* WorldClassScreenInventoryTests.swift in Sources */,
 				FE20A0A400000000000000B4 /* MetricAccentContrastTests.swift in Sources */,
 				E740BE7171B6D98EEC5796B5 /* ErrorStateViewTests.swift in Sources */,
@@ -2243,6 +2257,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AD7D30B32E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift in Sources */,
+				E4BD849D58744A00A126F801 /* HomeV2LayoutUITests.swift in Sources */,
 				DB6F742008744039AA49CA01 /* HomeV2ShareRecoveryUITests.swift in Sources */,
 				AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */,
 				B39A732AA4894B1DB77C9901 /* HomeV2PhotoViewerLayoutUITests.swift in Sources */,
@@ -2257,6 +2272,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AD8F12EA2ED6AA76003C4559 /* AnalyticsService.swift in Sources */,
+				FE13A3A300000000000000C1 /* FeatureReleasePolicy.swift in Sources */,
 				ADE146462EBF090D00B64DA0 /* ProgressTimelineView.swift in Sources */,
 				FE05A5A500000000000000B5 /* Glp1DoseCardData.swift in Sources */,
 				ADDC47A32E2D89F3003C97E7 /* SettingsComponents.swift in Sources */,

@@ -87,59 +87,61 @@ extension HealthKitManager {
     }
 
 func fetchTodayStepCount() async throws -> Int {
-        guard isAuthorized else {
+        guard isAuthorized, let ownership = await captureImportOwnership() else {
             throw HealthKitError.notAuthorized
         }
-        guard await MainActor.run(body: { self.admitsAutomaticImportForCurrentAccount() }) else {
-            throw HealthKitError.notAuthorized
-        }
+        try await requireImportOwnership(ownership)
 
         let calendar = Calendar.current
         let now = Date()
         let startOfDay = calendar.startOfDay(for: now)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? now
+        let stepCount: Int
+        do {
+            let quantity: Double?
+            if let todayStepQuantityQuery {
+                quantity = try await todayStepQuantityQuery(startOfDay, endOfDay)
+            } else {
+                quantity = try await queryTodayStepQuantity(from: startOfDay, to: endOfDay)
+            }
+            stepCount = try HealthKitStepCountPolicy.stepCount(from: quantity)
+        } catch {
+            guard let noData = HealthKitStepCountPolicy.stepCount(forNoData: error) else { throw error }
+            stepCount = noData
+        }
 
+        try Task.checkCancellation()
+        return try await MainActor.run {
+            try Task.checkCancellation()
+            guard self.isAuthorized,
+                  (self.importAuthManager ?? .shared).ownsAccountSession(ownership),
+                  self.admitsAutomaticImportForCurrentAccount() else {
+                throw HealthKitError.notAuthorized
+            }
+            self.todayStepCountOwner = ownership
+            self.todayStepCount = stepCount
+            self.latestStepCount = stepCount
+            self.latestStepCountDate = now
+            return stepCount
+        }
+    }
+
+    private func queryTodayStepQuantity(from startDate: Date, to endDate: Date) async throws -> Double? {
         let predicate = HKQuery.predicateForSamples(
-            withStart: startOfDay,
-            end: endOfDay,
-            options: .strictStartDate
+            withStart: startDate, end: endDate, options: .strictStartDate
         )
-
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKStatisticsQuery(
                 quantityType: stepCountType,
                 quantitySamplePredicate: predicate,
                 options: .cumulativeSum
             ) { _, statistics, error in
-                let stepCount: Int
                 if let error {
-                    guard let noData = HealthKitStepCountPolicy.stepCount(forNoData: error) else {
-                        continuation.resume(throwing: error)
-                        return
-                    }
-                    stepCount = noData
+                    continuation.resume(throwing: error)
                 } else {
-                    do {
-                        stepCount = try HealthKitStepCountPolicy.stepCount(
-                            from: statistics?.sumQuantity()?.doubleValue(for: HKUnit.count())
-                        )
-                    } catch {
-                        continuation.resume(throwing: error)
-                        return
-                    }
+                    continuation.resume(returning: statistics?.sumQuantity()?.doubleValue(for: HKUnit.count()))
                 }
-
-                Task {
-                    await MainActor.run {
-                        self.todayStepCount = stepCount
-                        self.latestStepCount = stepCount
-                        self.latestStepCountDate = now
-                    }
-                }
-
-                continuation.resume(returning: stepCount)
             }
-
             healthStore.execute(query)
         }
     }

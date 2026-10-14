@@ -28,9 +28,9 @@ describe('shared Gitleaks security gate', () => {
     expect(job).toMatch(/^ {4}permissions:\n {6}contents: read\n*$/m);
   });
 
-  it('runs on main pushes, the weekly schedule and manual dispatch', () => {
+  it('runs on main pushes and manual dispatch, with no clock', () => {
     expect(workflow).toMatch(/push:\n\s+branches: \[main\]/);
-    expect(workflow).toContain('schedule:');
+    expect(workflow).not.toContain('schedule:');
     expect(workflow).toContain('workflow_dispatch:');
   });
 });
