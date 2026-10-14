@@ -368,6 +368,23 @@ enum HomeV2WeightQuality {
         guard let kilograms, kilograms.isFinite else { return false }
         return supportedKilograms.contains(kilograms)
     }
+
+    /// Exclude flagged source measurements before interpolation and smoothing:
+    /// an average containing an unsupported reading can itself look supported.
+    static func trendContext(
+        for metrics: [BodyMetrics]
+    ) -> MetricsInterpolationService.WeightInterpolationContext? {
+        MetricsInterpolationService.shared.makeWeightInterpolationContext(
+            for: metrics.filter { isWithinSupportedLoggingRange($0.weight) }
+        )
+    }
+
+    static func trendWeight(for metric: BodyMetrics, in metrics: [BodyMetrics]) -> Double? {
+        // Keep the original flagged measurement visible for correction; do not
+        // replace it with a trend from otherwise supported surrounding records.
+        guard metric.weight == nil || isWithinSupportedLoggingRange(metric.weight) else { return nil }
+        return trendContext(for: metrics)?.trendWeight(for: metric.date)?.value
+    }
 }
 
 /// Today never falls back to the latest historical row. Earlier imports stay in

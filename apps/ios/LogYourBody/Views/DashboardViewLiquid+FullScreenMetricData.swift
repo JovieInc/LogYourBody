@@ -391,13 +391,12 @@ private func buildFullScreenWeightTrendChartData(
     bodyMetrics: [BodyMetrics],
     measurementSystem: MeasurementSystem
 ) -> [MetricChartDataPoint] {
-    guard let interpolationContext = MetricsInterpolationService.shared
-        .makeWeightInterpolationContext(for: bodyMetrics) else {
+    guard let interpolationContext = HomeV2WeightQuality.trendContext(for: bodyMetrics) else {
         return []
     }
 
     return sortedBodyMetricsAscending.compactMap { metric in
-        guard metric.weight != nil,
+        guard HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight),
               let trend = interpolationContext.trendWeight(for: metric.date) else {
             return nil
         }
