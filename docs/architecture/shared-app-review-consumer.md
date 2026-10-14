@@ -96,6 +96,8 @@ vendor source, importer and registry, so updates cannot reuse a stale integrity
 result. Commit-hook Swift selection matches the existing SwiftLint app/test
 scope; immutable vendor source is checked through provenance and its owner tests.
 No product lint rule or required workflow is removed.
+CI surface matching drains its input under `pipefail`, so a large source import
+cannot silently hide native changes. Existing draft deferral remains unchanged.
 
 `BodyRecordReviewConsumerTests` is registered in `LogYourBodyTests` and included
 by the real `LogYourBodyTiers` / `Unit` selector. Full app build, native Unit

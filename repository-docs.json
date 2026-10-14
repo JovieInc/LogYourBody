@@ -110,6 +110,10 @@
     {
       "path": "packages/shared-lib/turbo.json",
       "purpose": "Test cache inputs include immutable native sources and import tool"
+    },
+    {
+      "path": ".github/scripts/detect-changes.sh",
+      "purpose": "CI surface detection must preserve native matches under pipefail"
     }
   ],
   "imports": [

@@ -384,6 +384,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `cdd99f5f4e4b9f559e4e3e3b6889e00d7fbbe612166e0872f812d0ed23eafd7b`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
 - `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `8f360bd2a678c0f954ed7106821934ba8227ead4cb645717d086814cc9acd1ca`)
+- `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `1e7d727805b3918f54714fbd84407bd30d6441bff56ee89542027b0bc69a0eab`)
 
 ## Pinned shared sources
 
