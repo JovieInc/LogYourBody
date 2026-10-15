@@ -132,7 +132,8 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         todayQuery: HeldTodayStepQuantityQuery? = nil,
         earliestQuery: (() async throws -> Date?)? = nil,
         metricStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil,
-        rawStore: (([HKRawSample]) async -> Void)? = nil
+        rawStore: (([HKRawSample]) async -> Void)? = nil,
+        bodyFatOnlyEnabled: Bool = false
     ) -> HealthKitManager {
         let manager = HealthKitManager(
             userDefaults: defaults, authManager: auth, coreDataManager: coreData,
@@ -151,7 +152,8 @@ final class HealthKitImportOwnershipTests: XCTestCase {
             // A background-QoS detached import stayed unscheduled for the full 30s
             // weight-query wait on a loaded runner (merge group 38341522837). The
             // ownership assertions do not depend on scheduling priority.
-            historicalImportPriority: .userInitiated
+            historicalImportPriority: .userInitiated,
+            bodyFatOnlyImportEnabled: { bodyFatOnlyEnabled }
         )
         manager.isAuthorized = true
         return manager
@@ -483,6 +485,294 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertEqual(record.sourceMetadata?.bodyFatSampleId, "synthetic-fat")
         XCTAssertEqual(completedOwners, ["synthetic-health-A"])
         XCTAssertEqual(syncTriggers, 1)
+    }
+
+    func testBodyFatOnlyPolicyForwardsAnalyticsGate() {
+        var keys: [String] = []
+        XCTAssertFalse(HealthKitBodyFatOnlyImportPolicy.isEnabled {
+            keys.append($0)
+            return false
+        })
+        XCTAssertEqual(keys, ["healthkit_body_fat_only_import_v1"])
+        XCTAssertTrue(HealthKitBodyFatOnlyImportPolicy.isEnabled { _ in true })
+    }
+
+    private func standaloneBodyFatSample() -> HealthKitBodyFatImportSample {
+        HealthKitBodyFatImportSample(
+            percentage: 18.4, date: Date(timeIntervalSince1970: 1_700_000_123),
+            sourceMetadata: BodyMetricSourceMetadata(
+                vendor: "apple_health", sourceName: "Synthetic Scale", sourceBundleId: "test.health.scale",
+                deviceId: "synthetic-device", deviceManufacturer: "Synthetic", deviceModel: "Scale",
+                sampleId: "synthetic-body-fat-only", quantityType: HKQuantityTypeIdentifier.bodyFatPercentage.rawValue
+            )
+        )
+    }
+
+    private func durableImportedMetrics(for userId: String = "synthetic-health-A") async throws -> [BodyMetrics] {
+        let context = coreData.persistentContainer.newBackgroundContext()
+        return try await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "userId == %@", userId)
+            return try context.fetch(request).compactMap { $0.toBodyMetrics() }
+        }
+    }
+
+    func testBodyFatOnlyGateOffPreservesNoCanonicalWrite() async throws {
+        let manager = manager()
+        let result = await manager.processBatchHealthKitData(
+            weightHistory: [], bodyFatHistory: [standaloneBodyFatSample()]
+        )
+        XCTAssertEqual(result.imported, 0)
+        XCTAssertEqual(result.skipped, 0)
+        let rows = try await durableImportedMetrics()
+        XCTAssertTrue(rows.isEmpty)
+        XCTAssertEqual(syncTriggers, 0)
+        XCTAssertTrue(completedOwners.isEmpty)
+    }
+
+    func testBodyFatOnlyImportPreservesProvenanceAndIsIdempotent() async throws {
+        let manager = manager(bodyFatOnlyEnabled: true)
+        let sample = standaloneBodyFatSample()
+        let first = await manager.processBatchHealthKitData(weightHistory: [], bodyFatHistory: [sample])
+        let before = try await durableImportedMetrics()
+        let second = await manager.processBatchHealthKitData(weightHistory: [], bodyFatHistory: [sample, sample])
+        let after = try await durableImportedMetrics()
+        let row = try XCTUnwrap(after.first)
+        XCTAssertEqual(first.imported, 1)
+        XCTAssertEqual(second.imported, 0)
+        XCTAssertEqual(second.skipped, 2)
+        XCTAssertEqual(after.count, 1)
+        XCTAssertEqual(row.id, before.first?.id)
+        XCTAssertNil(row.weight)
+        XCTAssertEqual(row.bodyFatPercentage, sample.percentage)
+        XCTAssertEqual(row.date, sample.date)
+        XCTAssertEqual(row.localDate, BodyMetricLocalDate.key(for: sample.date))
+        XCTAssertEqual(row.dataSource, BodyMetricSource.healthKit.rawValue)
+        XCTAssertEqual(row.bodyFatMethod, "HealthKit")
+        XCTAssertEqual(row.sourceMetadata, sample.sourceMetadata)
+        XCTAssertEqual(syncTriggers, 1)
+        XCTAssertEqual(completedOwners, ["synthetic-health-A"])
+    }
+
+    func testConcurrentBodyFatOnlyImportsAdmitOneDurableRow() async throws {
+        let manager = manager(bodyFatOnlyEnabled: true)
+        let sample = standaloneBodyFatSample()
+        async let first = manager.processBatchHealthKitData(weightHistory: [], bodyFatHistory: [sample])
+        async let second = manager.processBatchHealthKitData(weightHistory: [], bodyFatHistory: [sample])
+        let results = await (first, second)
+        XCTAssertEqual(results.0.imported + results.1.imported, 1)
+        XCTAssertEqual(results.0.skipped + results.1.skipped, 1)
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertNil(rows.first?.weight)
+        XCTAssertEqual(syncTriggers, 1)
+    }
+
+    func testBodyFatOnlyRepeatPreservesCombinedWeightAndBodyFatRow() async throws {
+        let manager = manager(bodyFatOnlyEnabled: true)
+        let fat = standaloneBodyFatSample()
+        let weight = HealthKitWeightImportSample(
+            weight: 70.123, date: fat.date,
+            sourceMetadata: BodyMetricSourceMetadata(vendor: "apple_health", sampleId: "synthetic-weight")
+        )
+        let combined = await manager.processBatchHealthKitData(weightHistory: [weight], bodyFatHistory: [fat])
+        let before = try await durableImportedMetrics()
+        let repeated = await manager.processBatchHealthKitData(weightHistory: [], bodyFatHistory: [fat])
+        let after = try await durableImportedMetrics()
+        XCTAssertEqual(combined.imported, 1)
+        XCTAssertEqual(combined.skipped, 0)
+        XCTAssertEqual(repeated.imported, 0)
+        XCTAssertEqual(repeated.skipped, 1)
+        XCTAssertEqual(after.count, 1)
+        XCTAssertEqual(after.first?.id, before.first?.id)
+        XCTAssertEqual(after.first?.weight, 70.123)
+        XCTAssertEqual(after.first?.bodyFatPercentage, 18.4)
+        XCTAssertEqual(after.first?.sourceMetadata, before.first?.sourceMetadata)
+        XCTAssertEqual(after.first?.updatedAt, before.first?.updatedAt)
+    }
+
+    private func assertLaterWeightIsNotSuppressed(bodyFatGateEnabled: Bool) async throws {
+        let fat = standaloneBodyFatSample()
+        let importer = manager(bodyFatOnlyEnabled: true)
+        let initial = await importer.processBatchHealthKitData(weightHistory: [], bodyFatHistory: [fat])
+        let initialRows = try await durableImportedMetrics()
+        let original = try XCTUnwrap(initialRows.first)
+        let weight = HealthKitWeightImportSample(
+            weight: 70.123, date: fat.date,
+            sourceMetadata: BodyMetricSourceMetadata(vendor: "apple_health", sampleId: "later-weight")
+        )
+        let later = manager(bodyFatOnlyEnabled: bodyFatGateEnabled)
+        let result = await later.processBatchHealthKitData(weightHistory: [weight], bodyFatHistory: [fat])
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(initial.imported, 1)
+        XCTAssertEqual(result.imported, 1)
+        XCTAssertEqual(rows.count, 2)
+        let retained = try XCTUnwrap(rows.first { $0.id == original.id })
+        XCTAssertNil(retained.weight)
+        XCTAssertEqual(retained.sourceMetadata, original.sourceMetadata)
+        XCTAssertEqual(retained.bodyFatPercentage, fat.percentage)
+        XCTAssertEqual(retained.updatedAt, original.updatedAt)
+        let added = try XCTUnwrap(rows.first { $0.id != original.id })
+        XCTAssertEqual(added.weight, weight.weight)
+        XCTAssertEqual(added.date, weight.date)
+        XCTAssertNil(added.bodyFatPercentage)
+        XCTAssertNil(added.bodyFatMethod)
+        XCTAssertEqual(added.sourceMetadata, weight.sourceMetadata)
+        XCTAssertEqual(rows.filter { row in
+            row.sourceMetadata?.sampleId == fat.sourceMetadata?.sampleId ||
+            row.sourceMetadata?.bodyFatSampleId == fat.sourceMetadata?.sampleId
+        }.count, 1)
+    }
+
+    func testBodyFatOnlyRowDoesNotSuppressLaterWeight() async throws {
+        try await assertLaterWeightIsNotSuppressed(bodyFatGateEnabled: true)
+    }
+
+    func testBodyFatOnlyRowDoesNotSuppressLaterWeightAfterGateDisabled() async throws {
+        try await assertLaterWeightIsNotSuppressed(bodyFatGateEnabled: false)
+    }
+
+    private func assertConcurrentBodyFatAndCombinedArrival(holdCombined: Bool) async throws {
+        let gate = HeldWeightImportQuery()
+        let store = try XCTUnwrap(coreData)
+        let fat = standaloneBodyFatSample()
+        let weight = HealthKitWeightImportSample(
+            weight: 70.123, date: fat.date,
+            sourceMetadata: BodyMetricSourceMetadata(
+                vendor: "apple_health", sourceName: "Synthetic Weight Scale", deviceModel: "Weight Scale",
+                sampleId: "concurrent-weight", quantityType: HKQuantityTypeIdentifier.bodyMass.rawValue
+            )
+        )
+        let manager = manager(metricStore: { metric, admission in
+            let isCombined = metric.weight != nil && metric.bodyFatPercentage != nil
+            if (holdCombined && isCombined) || (!holdCombined && metric.weight == nil) {
+                _ = await gate.fetch()
+            }
+            try await store.saveBodyMetricsAndWait(metric, userId: metric.userId, writeAdmission: admission)
+        }, bodyFatOnlyEnabled: true)
+        let first = Task {
+            await manager.processBatchHealthKitData(
+                weightHistory: holdCombined ? [weight] : [], bodyFatHistory: [fat]
+            )
+        }
+        defer { gate.complete([]) }
+        await fulfillment(of: [gate.started], timeout: 3)
+        _ = await manager.processBatchHealthKitData(
+            weightHistory: holdCombined ? [] : [weight], bodyFatHistory: [fat]
+        )
+        gate.complete([])
+        _ = await first.value
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, holdCombined ? 2 : 1)
+        XCTAssertEqual(rows.filter { row in
+            row.sourceMetadata?.sampleId == fat.sourceMetadata?.sampleId ||
+            row.sourceMetadata?.bodyFatSampleId == fat.sourceMetadata?.sampleId
+        }.count, 1)
+        let weightRow = try XCTUnwrap(rows.first { $0.weight != nil })
+        XCTAssertEqual(weightRow.weight, weight.weight)
+        XCTAssertEqual(weightRow.date, weight.date)
+        if holdCombined {
+            XCTAssertNil(weightRow.bodyFatPercentage)
+            XCTAssertNil(weightRow.bodyFatMethod)
+            XCTAssertEqual(weightRow.sourceMetadata, weight.sourceMetadata)
+            let fatRow = try XCTUnwrap(rows.first { $0.weight == nil })
+            XCTAssertEqual(fatRow.bodyFatPercentage, fat.percentage)
+            XCTAssertEqual(fatRow.sourceMetadata, fat.sourceMetadata)
+        } else {
+            XCTAssertEqual(weightRow.bodyFatPercentage, fat.percentage)
+            XCTAssertEqual(weightRow.sourceMetadata?.bodyFatSampleId, fat.sourceMetadata?.sampleId)
+        }
+    }
+
+    func testHeldCombinedArrivalAdmitsOnlyWeightAfterBodyFatWins() async throws {
+        try await assertConcurrentBodyFatAndCombinedArrival(holdCombined: true)
+    }
+
+    func testHeldBodyFatArrivalSkipsAfterCombinedWins() async throws {
+        try await assertConcurrentBodyFatAndCombinedArrival(holdCombined: false)
+    }
+
+    func testSkippedExistingWeightStillImportsNewBodyFatIdentity() async throws {
+        let manager = manager(bodyFatOnlyEnabled: true)
+        let fat = standaloneBodyFatSample()
+        let weight = HealthKitWeightImportSample(
+            weight: 70.123, date: fat.date,
+            sourceMetadata: BodyMetricSourceMetadata(vendor: "apple_health", sampleId: "earlier-weight")
+        )
+        _ = await manager.processBatchHealthKitData(weightHistory: [weight], bodyFatHistory: [])
+        let initialRows = try await durableImportedMetrics()
+        let original = try XCTUnwrap(initialRows.first)
+        let result = await manager.processBatchHealthKitData(weightHistory: [weight], bodyFatHistory: [fat])
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(result.imported, 1)
+        XCTAssertEqual(result.skipped, 1)
+        XCTAssertEqual(rows.count, 2)
+        let retained = try XCTUnwrap(rows.first { $0.id == original.id })
+        XCTAssertEqual(retained.weight, original.weight)
+        XCTAssertNil(retained.bodyFatPercentage)
+        XCTAssertEqual(retained.updatedAt, original.updatedAt)
+        let added = try XCTUnwrap(rows.first { $0.id != original.id })
+        XCTAssertNil(added.weight)
+        XCTAssertEqual(added.bodyFatPercentage, fat.percentage)
+        XCTAssertEqual(added.date, fat.date)
+        XCTAssertEqual(added.sourceMetadata, fat.sourceMetadata)
+        let repeated = await manager.processBatchHealthKitData(weightHistory: [weight], bodyFatHistory: [fat])
+        XCTAssertEqual(repeated.imported, 0)
+        let repeatedRows = try await durableImportedMetrics()
+        XCTAssertEqual(repeatedRows.count, 2)
+    }
+
+    func testBodyFatOnlyRepeatDoesNotResurrectTombstone() async throws {
+        let manager = manager(bodyFatOnlyEnabled: true)
+        let sample = standaloneBodyFatSample()
+        _ = await manager.processBatchHealthKitData(weightHistory: [], bodyFatHistory: [sample])
+        let context = coreData.viewContext
+        try await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            let row = try XCTUnwrap(try context.fetch(request).first)
+            row.isMarkedDeleted = true
+            try context.save()
+        }
+        let repeated = await manager.processBatchHealthKitData(weightHistory: [], bodyFatHistory: [sample])
+        XCTAssertEqual(repeated.imported, 0)
+        XCTAssertEqual(repeated.skipped, 1)
+        let fresh = coreData.persistentContainer.newBackgroundContext()
+        let tombstones = try await fresh.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            return try fresh.fetch(request).map(\.isMarkedDeleted)
+        }
+        XCTAssertEqual(tombstones, [true])
+    }
+
+    private func assertHeldBodyFatWriteRejectsReplacement(_ subject: String) async throws {
+        let gate = HeldWeightImportQuery()
+        let store = try XCTUnwrap(coreData)
+        let manager = manager(metricStore: { metric, admission in
+            _ = await gate.fetch()
+            try await store.saveBodyMetricsAndWait(metric, userId: metric.userId, writeAdmission: admission)
+        }, bodyFatOnlyEnabled: true)
+        let sample = standaloneBodyFatSample()
+        let task = Task { await manager.processBatchHealthKitData(weightHistory: [], bodyFatHistory: [sample]) }
+        defer { gate.complete([]) }
+        await fulfillment(of: [gate.started], timeout: 3)
+        setAccount(subject)
+        gate.complete([])
+        let result = await task.value
+        XCTAssertEqual(result.imported, 0)
+        let rowsA = try await durableImportedMetrics()
+        let rowsB = try await durableImportedMetrics(for: "synthetic-health-B")
+        XCTAssertTrue(rowsA.isEmpty)
+        XCTAssertTrue(rowsB.isEmpty)
+        XCTAssertEqual(syncTriggers, 0)
+        XCTAssertTrue(completedOwners.isEmpty)
+    }
+
+    func testBodyFatOnlyQueuedWriteRejectsDifferentAccount() async throws {
+        try await assertHeldBodyFatWriteRejectsReplacement("synthetic-health-B")
+    }
+
+    func testBodyFatOnlyQueuedWriteRejectsSameAccountNewSession() async throws {
+        try await assertHeldBodyFatWriteRejectsReplacement("synthetic-health-A")
     }
 
     private func metric() -> BodyMetrics {
