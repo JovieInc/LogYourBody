@@ -569,6 +569,375 @@ final class SyncIntegrationSupplementalSyncTests: XCTestCase {
         XCTAssertNil(withoutVat.vatMassKg)
         XCTAssertNil(withoutVat.vatVolumeCm3)
     }
+
+    func testLogBodyMetricsDoesNotReassignAnotherAccountsRow() async throws {
+        let ownerId = "sync_test_owner_\(UUID().uuidString)"
+        let otherId = "sync_test_other_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(90)
+        let metric = BodyMetrics(
+            id: id,
+            userId: ownerId,
+            date: date,
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "owner-entry",
+            photoUrl: nil,
+            dataSource: "Manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: ownerId, markAsSynced: true)
+
+        let authManager = AuthManager()
+        authManager.currentUser = LocalUser(
+            id: otherId,
+            email: "other@example.com",
+            name: "Other",
+            avatarUrl: nil,
+            profile: nil,
+            onboardingCompleted: true
+        )
+        let manager = RealtimeSyncManager(
+            coreDataManager: CoreDataManager.shared,
+            authManager: authManager,
+            productAPIClient: StubProductAPIClient()
+        )
+        manager.isOnline = false
+        manager.logBodyMetrics(
+            BodyMetrics(
+                id: id,
+                userId: ownerId,
+                date: date,
+                weight: 55,
+                weightUnit: "kg",
+                bodyFatPercentage: nil,
+                bodyFatMethod: nil,
+                muscleMass: nil,
+                boneMass: nil,
+                notes: "stolen",
+                photoUrl: nil,
+                dataSource: "Manual",
+                createdAt: date,
+                updatedAt: date
+            )
+        )
+
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, ownerId)
+        XCTAssertEqual(row.weight, 80, accuracy: 0.001)
+        XCTAssertEqual(row.notes, "owner-entry")
+        XCTAssertTrue(row.isSynced)
+        XCTAssertFalse(row.isMarkedDeleted)
+    }
+
+    func testUpdateOrCreateBodyMetricDoesNotReassignAnotherAccountsRow() async throws {
+        let ownerId = "sync_test_owner_\(UUID().uuidString)"
+        let otherId = "sync_test_other_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(120)
+        let metric = BodyMetrics(
+            id: id,
+            userId: ownerId,
+            date: date,
+            weight: 80,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "owner-entry",
+            photoUrl: nil,
+            dataSource: "Manual",
+            sourceMetadata: BodyMetricSourceMetadata(vendor: "fixture", sampleId: "owned-sample"),
+            createdAt: date,
+            updatedAt: date
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(metric, userId: ownerId, markAsSynced: true)
+
+        let stored = await cachedBodyMetric(id: id)
+        let before = try XCTUnwrap(stored)
+        let storedUpdatedAt = before.updatedAt
+        let storedMetadata = before.sourceMetadataJSON
+        XCTAssertNotNil(storedMetadata)
+        let formatter = ISO8601DateFormatter()
+        let rejected = expectation(description: "Foreign-owner apply completes without mutation")
+        CoreDataManager.shared.updateOrCreateBodyMetric(from: [
+            "id": id,
+            "user_id": otherId,
+            "date": formatter.string(from: date),
+            "weight": 55.0,
+            "weight_unit": "kg",
+            "notes": "foreign-payload",
+            "data_source": "manual",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: date)
+        ], completion: { rejected.fulfill() })
+        await fulfillment(of: [rejected], timeout: 2)
+
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, ownerId)
+        XCTAssertEqual(row.weight, 80, accuracy: 0.001)
+        XCTAssertEqual(row.notes, "owner-entry")
+        XCTAssertFalse(row.isMarkedDeleted)
+        XCTAssertTrue(row.isSynced)
+        XCTAssertEqual(row.date, date)
+        XCTAssertEqual(row.createdAt, date)
+        XCTAssertEqual(row.updatedAt, storedUpdatedAt)
+        XCTAssertEqual(row.sourceMetadataJSON, storedMetadata)
+    }
+
+    func testPhotoTimelineFixtureReseedKeepsTheNewUsersMeasurements() async throws {
+        let firstUser = "ui_test_photo_hud_user_first"
+        let secondUser = "ui_test_photo_hud_user_second"
+        let date = wholeSecondDate(180)
+        let unrelatedId = "unrelated-\(UUID().uuidString)"
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+            dashboardFixtureMetric(id: unrelatedId, userId: firstUser, date: date, notes: "unrelated"),
+            userId: firstUser,
+            markAsSynced: true
+        )
+
+        try await UITestFixtureIsolation.seedDashboardMetrics(userId: firstUser, photoURL: nil, now: date)
+        try await UITestFixtureIsolation.seedDashboardMetrics(userId: secondUser, photoURL: nil, now: date)
+
+        let saved = await CoreDataManager.shared.fetchBodyMetrics(for: secondUser)
+        let savedIds = Set(saved.compactMap { $0.toBodyMetrics()?.id })
+        XCTAssertEqual(savedIds, Set(UITestFixtureIsolation.dashboardMetricIDs))
+        let firstSaved = await CoreDataManager.shared.fetchBodyMetrics(for: firstUser)
+        let firstIds = Set(firstSaved.compactMap { $0.toBodyMetrics()?.id })
+        XCTAssertFalse(firstIds.contains("ui_test_full_dashboard_metric_0"))
+        let cachedUnrelated = await cachedBodyMetric(id: unrelatedId)
+        let unrelated = try XCTUnwrap(cachedUnrelated)
+        XCTAssertEqual(unrelated.userId, firstUser)
+        XCTAssertEqual(unrelated.notes, "unrelated")
+    }
+
+    func testForeignLocalSaveReportsFailureAndPreservesStoredMeasurement() async throws {
+        let owner = "sync_test_owner_\(UUID().uuidString)"
+        let other = "sync_test_other_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(200)
+        let original = dashboardFixtureMetric(id: id, userId: owner, date: date, notes: "original")
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(original, userId: owner, markAsSynced: true)
+
+        do {
+            try await CoreDataManager.shared.saveBodyMetricsAndWait(
+                dashboardFixtureMetric(id: id, userId: other, date: date, notes: "replacement"),
+                userId: other
+            )
+            XCTFail("A foreign-owner save must report failure")
+        } catch {
+            XCTAssertEqual((error as NSError).domain, "CoreDataManager")
+            XCTAssertEqual((error as NSError).code, 3)
+        }
+
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, owner)
+        XCTAssertEqual(row.weight, 82.1, accuracy: 0.001)
+        XCTAssertEqual(row.bodyFatPercentage, 15.8, accuracy: 0.001)
+        XCTAssertEqual(row.bodyFatMethod, "manual")
+        XCTAssertEqual(row.notes, "original")
+        XCTAssertEqual(row.date, date)
+        XCTAssertEqual(row.createdAt, date)
+        XCTAssertTrue(row.isSynced)
+        XCTAssertFalse(row.isMarkedDeleted)
+    }
+
+    func testSameOwnerLocalAndRemoteBodyMetricUpdatesRemainAvailable() async throws {
+        let owner = "sync_test_owner_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(220)
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+            dashboardFixtureMetric(id: id, userId: owner, date: date, notes: "original"),
+            userId: owner, markAsSynced: true
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+            dashboardFixtureMetric(id: id, userId: owner, date: date, notes: "local correction"),
+            userId: owner
+        )
+        let localCached = await cachedBodyMetric(id: id)
+        let local = try XCTUnwrap(localCached)
+        XCTAssertEqual(local.notes, "local correction")
+        XCTAssertFalse(local.isSynced)
+
+        let formatter = ISO8601DateFormatter()
+        await CoreDataManager.shared.updateOrCreateBodyMetricAndWait(from: [
+            "id": id, "user_id": owner,
+            "date": formatter.string(from: date), "weight": 83.0, "weight_unit": "kg",
+            "body_fat_percentage": 16.0, "body_fat_method": "manual",
+            "notes": "remote correction", "data_source": "manual",
+            "created_at": formatter.string(from: date),
+            "updated_at": formatter.string(from: Date().addingTimeInterval(60))
+        ])
+        let remoteCached = await cachedBodyMetric(id: id)
+        let remote = try XCTUnwrap(remoteCached)
+        XCTAssertEqual(remote.userId, owner)
+        XCTAssertEqual(remote.weight, 83.0, accuracy: 0.001)
+        XCTAssertEqual(remote.notes, "remote correction")
+        XCTAssertEqual(remote.createdAt, date)
+        XCTAssertFalse(remote.isMarkedDeleted)
+    }
+
+    func testMissingRemoteOwnerCannotEraseStoredOwnerAndStillCompletes() async throws {
+        let owner = "sync_test_owner_\(UUID().uuidString)"
+        let id = UUID().uuidString
+        let date = wholeSecondDate(240)
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+            dashboardFixtureMetric(id: id, userId: owner, date: date, notes: "original"),
+            userId: owner, markAsSynced: true
+        )
+        let rejected = expectation(description: "Missing-owner apply completes without mutation")
+        CoreDataManager.shared.updateOrCreateBodyMetric(from: [
+            "id": id, "weight": 55.0, "weight_unit": "kg", "notes": "missing owner"
+        ], completion: { rejected.fulfill() })
+        await fulfillment(of: [rejected], timeout: 2)
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
+        XCTAssertEqual(row.userId, owner)
+        XCTAssertEqual(row.weight, 82.1, accuracy: 0.001)
+        XCTAssertEqual(row.notes, "original")
+        XCTAssertTrue(row.isSynced)
+    }
+
+    func testDashboardFixtureRetainsCurrentHeroAndUndoVariants() async throws {
+        let date = wholeSecondDate(260)
+        let variants: [[String]] = [
+            ["-lybUITestHomeV2WeightOnlyHeroFixture"],
+            ["-lybUITestHomeV2SingleWeightHeroFixture"],
+            ["-lybUITestHomeV2SingleReadingFixture"],
+            ["-lybUITestHomeV2EstimateHeroFixture"],
+            ["-lybUITestHomeV2UndoPhotoOnlyFixture"],
+            ["-lybUITestHomeV2TimelineFixture"]
+        ]
+        for arguments in variants {
+            let owner = "ui_test_variant_\(UUID().uuidString)"
+            let ids = try await UITestFixtureIsolation.seedDashboardMetrics(
+                userId: owner, photoURL: "fixture-default.jpg", now: date, arguments: arguments,
+                timelinePhoto: { "fixture-timeline-\($0).jpg" }
+            )
+            let stored = await CoreDataManager.shared.fetchBodyMetrics(for: owner)
+            let rows = stored.compactMap { $0.toBodyMetrics() }
+            XCTAssertEqual(Set(rows.map(\.id)), Set(ids))
+            let latest = try XCTUnwrap(rows.first { Calendar.current.isDate($0.date, inSameDayAs: date) })
+            let single = arguments.contains("-lybUITestHomeV2SingleWeightHeroFixture") ||
+                arguments.contains("-lybUITestHomeV2SingleReadingFixture")
+            XCTAssertEqual(rows.count, single ? 1 : 5)
+            if arguments.contains("-lybUITestHomeV2UndoPhotoOnlyFixture") {
+                XCTAssertNil(latest.weight)
+                XCTAssertNil(latest.bodyFatPercentage)
+                XCTAssertEqual(latest.photoUrl, "fixture-default.jpg")
+                XCTAssertTrue(ids.allSatisfy { $0.hasPrefix(owner + "_metric_") })
+            } else {
+                XCTAssertEqual(try XCTUnwrap(latest.weight), 82.1, accuracy: 0.001)
+            }
+            if arguments.contains("-lybUITestHomeV2WeightOnlyHeroFixture") ||
+                arguments.contains("-lybUITestHomeV2SingleWeightHeroFixture") {
+                XCTAssertTrue(rows.allSatisfy { $0.bodyFatPercentage == nil && $0.bodyFatMethod == nil })
+            }
+            if arguments.contains("-lybUITestHomeV2EstimateHeroFixture") {
+                XCTAssertEqual(latest.bodyFatMethod, "visual_estimate")
+            }
+            if arguments.contains("-lybUITestHomeV2TimelineFixture") {
+                XCTAssertEqual(latest.photoUrl, "fixture-timeline-0.jpg")
+            }
+        }
+    }
+
+    // Nil/empty owner compatibility is existing behavior for legacy unowned rows.
+    // A populated owner remains immutable; these fixtures do not relax that guard.
+    func testLegacyUnownedLocalBodyMetricCanStillReceiveItsOwner() async throws {
+        let legacyOwners: [String?] = [nil, ""]
+        for legacyOwner in legacyOwners {
+            let owner = "sync_test_owner_\(UUID().uuidString)"
+            let id = UUID().uuidString
+            let date = wholeSecondDate(280)
+            try await insertLegacyUnownedBodyMetric(id: id, owner: legacyOwner, date: date)
+            try await CoreDataManager.shared.saveBodyMetricsAndWait(
+                dashboardFixtureMetric(id: id, userId: owner, date: date, notes: "local owner claim"),
+                userId: owner
+            )
+            let cached = await cachedBodyMetric(id: id)
+            let row = try XCTUnwrap(cached)
+            XCTAssertEqual(row.userId, owner)
+            XCTAssertEqual(row.weight, 82.1, accuracy: 0.001)
+            XCTAssertEqual(row.notes, "local owner claim")
+            XCTAssertEqual(row.createdAt, date)
+        }
+    }
+
+    func testLegacyUnownedRemoteBodyMetricCanStillReceiveItsOwner() async throws {
+        let legacyOwners: [String?] = [nil, ""]
+        for legacyOwner in legacyOwners {
+            let owner = "sync_test_owner_\(UUID().uuidString)"
+            let id = UUID().uuidString
+            let date = wholeSecondDate(300)
+            try await insertLegacyUnownedBodyMetric(id: id, owner: legacyOwner, date: date)
+            let formatter = ISO8601DateFormatter()
+            await CoreDataManager.shared.updateOrCreateBodyMetricAndWait(from: [
+                "id": id, "user_id": owner, "date": formatter.string(from: date),
+                "weight": 83.0, "weight_unit": "kg", "notes": "remote owner claim",
+                "created_at": formatter.string(from: date),
+                "updated_at": formatter.string(from: Date().addingTimeInterval(60))
+            ])
+            let cached = await cachedBodyMetric(id: id)
+            let row = try XCTUnwrap(cached)
+            XCTAssertEqual(row.userId, owner)
+            XCTAssertEqual(row.weight, 83.0, accuracy: 0.001)
+            XCTAssertEqual(row.notes, "remote owner claim")
+            XCTAssertEqual(row.createdAt, date)
+        }
+    }
+
+    private func insertLegacyUnownedBodyMetric(id: String, owner: String?, date: Date) async throws {
+        let context = CoreDataManager.shared.viewContext
+        try await context.perform {
+            let row = CachedBodyMetrics(context: context)
+            row.id = id
+            // The current model requires an owner. Empty owners are persisted legacy rows;
+            // nil compatibility is a pending value in the same context used by both writes.
+            row.userId = owner ?? ""
+            row.date = date
+            row.localDate = BodyMetricLocalDate.key(for: date)
+            row.weight = 70
+            row.weightUnit = "kg"
+            row.notes = "legacy unowned"
+            row.createdAt = date
+            row.updatedAt = date
+            row.lastModified = date
+            row.isSynced = true
+            try context.save()
+            if owner == nil {
+                row.userId = nil
+            }
+        }
+    }
+
+    private func dashboardFixtureMetric(id: String, userId: String, date: Date, notes: String) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 82.1,
+            weightUnit: "kg",
+            bodyFatPercentage: 15.8,
+            bodyFatMethod: "manual",
+            muscleMass: 66.2,
+            boneMass: nil,
+            notes: notes,
+            photoUrl: nil,
+            dataSource: "manual",
+            createdAt: date,
+            updatedAt: date
+        )
+    }
 }
 
 private final class DeferredDexaProductAPIClient: ProductAPIClient {

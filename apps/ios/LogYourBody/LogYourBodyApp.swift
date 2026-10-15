@@ -4,6 +4,7 @@
 //
 import SwiftUI
 import AppIntents
+import CoreData
 
 enum LogYourBodyDeepLink {
     enum Destination: Equatable {
@@ -617,77 +618,15 @@ struct LogYourBodyApp: App {
     }
 
     private func seedFullDashboardUITestFixtureData(userId: String, photoURL: String? = nil) async {
-        let calendar = Calendar.current
-        let now = Date()
-        let usesUndoPhotoFixture = ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2UndoPhotoOnlyFixture")
-        let metricIdPrefix = usesUndoPhotoFixture ? "\(userId)_metric" : "ui_test_full_dashboard_metric"
-        let entries: [
-            (daysAgo: Int, weight: Double, bodyFat: Double?, muscle: Double, notes: String, source: String)
-        ] = [
-            (0, 82.1, 15.8, 66.2, "Latest check-in", "manual"),
-            (7, 82.8, 16.2, 66.0, "Weekly check-in", "healthkit"),
-            (14, 83.4, nil, 65.9, "Weight-only import", "healthkit"),
-            (21, 84.0, 16.9, 65.7, "DEXA baseline", "bodyspec_dexa"),
-            (35, 84.7, 17.4, 65.4, "Manual baseline", "manual")
-        ]
-
-        let editorialArguments = ProcessInfo.processInfo.arguments
-        let usesWeightOnlyHero = editorialArguments.contains("-lybUITestHomeV2WeightOnlyHeroFixture")
-        let usesSingleWeightHero = editorialArguments.contains("-lybUITestHomeV2SingleWeightHeroFixture")
-        let usesSingleReading = usesSingleWeightHero ||
-            editorialArguments.contains("-lybUITestHomeV2SingleReadingFixture")
-        let usesVisualEstimateHero = editorialArguments.contains("-lybUITestHomeV2EstimateHeroFixture")
-        for entry in entries {
-            if usesSingleReading && entry.daysAgo != 0 { continue }
-            guard let date = calendar.date(byAdding: .day, value: -entry.daysAgo, to: now) else {
-                continue
-            }
-
-            let isPhotoOnly = usesUndoPhotoFixture && entry.daysAgo == 0
-            let fixturePhotoURL: String?
-            if editorialArguments.contains("-lybUITestHomeV2TimelineFixture") {
-                fixturePhotoURL = writeHomeV2FixturePhoto(variant: entry.daysAgo)
-            } else if editorialArguments.contains("-lybUITestHomeV2SinglePhotoFixture"), entry.daysAgo != 0 {
-                fixturePhotoURL = nil
-            } else if editorialArguments.contains("-lybUITestHomeV2ShareMissingPhotoFixture"), entry.daysAgo != 0 {
-                fixturePhotoURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("lyb-ui-test-missing-share-photo.jpg").absoluteString
-            } else {
-                fixturePhotoURL = photoURL
-            }
-            let metric = BodyMetrics(
-                id: "\(metricIdPrefix)_\(entry.daysAgo)",
-                userId: userId,
-                date: date,
-                weight: isPhotoOnly ? nil : entry.weight,
-                weightUnit: "kg",
-                bodyFatPercentage: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly
-                    ? nil : entry.bodyFat,
-                bodyFatMethod: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly || entry.bodyFat == nil
-                    ? nil : (usesVisualEstimateHero ? "visual_estimate" : entry.source),
-                muscleMass: isPhotoOnly ? nil : entry.muscle,
-                boneMass: nil,
-                waistCm: nil,
-                hipCm: nil,
-                waistUnit: nil,
-                notes: entry.notes,
-                photoUrl: fixturePhotoURL,
-                dataSource: entry.source,
-                createdAt: date,
-                updatedAt: now
-            )
-
-            try? await CoreDataManager.shared.saveBodyMetricsAndWait(
-                metric,
-                userId: userId,
-                markAsSynced: entry.source != "manual"
-            )
+        guard let expectedMetricIDs = try? await UITestFixtureIsolation.seedDashboardMetrics(
+            userId: userId, photoURL: photoURL, now: Date(),
+            timelinePhoto: { writeHomeV2FixturePhoto(variant: $0) }
+        ) else {
+            preconditionFailure("Dashboard UI fixture could not persist its measurements")
         }
-
         let savedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
         let savedIds = savedMetrics.compactMap { $0.toBodyMetrics()?.id }
-        let expectedIds = Set(entries.filter { !usesSingleReading || $0.daysAgo == 0 }
-            .map { "\(metricIdPrefix)_\($0.daysAgo)" })
+        let expectedIds = Set(expectedMetricIDs)
         precondition(
             savedIds.count == expectedIds.count && Set(savedIds) == expectedIds,
             "Dashboard UI fixture expected \(expectedIds.count) saved measurements, found \(savedIds.count)"
@@ -786,3 +725,104 @@ struct LogYourBodyApp: App {
         )
     }
 }
+
+
+#if DEBUG
+enum UITestFixtureIsolation {
+    static let dashboardMetricIDs = [0, 7, 14, 21, 35].map { "ui_test_full_dashboard_metric_\($0)" }
+
+    /// UI launches mint a new fixture user but reuse these ids. Production writes
+    /// must still refuse a different account; remove only these DEBUG fixture ids.
+    @discardableResult
+    static func seedDashboardMetrics(
+        userId: String, photoURL: String?, now: Date,
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        timelinePhoto: ((Int) -> String?)? = nil
+    ) async throws -> [String] {
+        let calendar = Calendar.current
+        let usesUndoPhotoFixture = arguments.contains("-lybUITestHomeV2UndoPhotoOnlyFixture")
+        let metricIdPrefix = usesUndoPhotoFixture ? "\(userId)_metric" : "ui_test_full_dashboard_metric"
+        let entries: [
+            (daysAgo: Int, weight: Double, bodyFat: Double?, muscle: Double, notes: String, source: String)
+        ] = [
+            (0, 82.1, 15.8, 66.2, "Latest check-in", "manual"),
+            (7, 82.8, 16.2, 66.0, "Weekly check-in", "healthkit"),
+            (14, 83.4, nil, 65.9, "Weight-only import", "healthkit"),
+            (21, 84.0, 16.9, 65.7, "DEXA baseline", "bodyspec_dexa"),
+            (35, 84.7, 17.4, 65.4, "Manual baseline", "manual")
+        ]
+
+        try await removeBodyMetrics(ids: entries.map { "\(metricIdPrefix)_\($0.daysAgo)" })
+
+        let editorialArguments = arguments
+        let usesWeightOnlyHero = editorialArguments.contains("-lybUITestHomeV2WeightOnlyHeroFixture")
+        let usesSingleWeightHero = editorialArguments.contains("-lybUITestHomeV2SingleWeightHeroFixture")
+        let usesSingleReading = usesSingleWeightHero ||
+            editorialArguments.contains("-lybUITestHomeV2SingleReadingFixture")
+        let usesVisualEstimateHero = editorialArguments.contains("-lybUITestHomeV2EstimateHeroFixture")
+        for entry in entries {
+            if usesSingleReading && entry.daysAgo != 0 { continue }
+            guard let date = calendar.date(byAdding: .day, value: -entry.daysAgo, to: now) else {
+                continue
+            }
+
+            let isPhotoOnly = usesUndoPhotoFixture && entry.daysAgo == 0
+            let fixturePhotoURL: String?
+            if editorialArguments.contains("-lybUITestHomeV2TimelineFixture") {
+                fixturePhotoURL = timelinePhoto?(entry.daysAgo)
+            } else if editorialArguments.contains("-lybUITestHomeV2SinglePhotoFixture"), entry.daysAgo != 0 {
+                fixturePhotoURL = nil
+            } else if editorialArguments.contains("-lybUITestHomeV2ShareMissingPhotoFixture"), entry.daysAgo != 0 {
+                fixturePhotoURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("lyb-ui-test-missing-share-photo.jpg").absoluteString
+            } else {
+                fixturePhotoURL = photoURL
+            }
+            let metric = BodyMetrics(
+                id: "\(metricIdPrefix)_\(entry.daysAgo)",
+                userId: userId,
+                date: date,
+                weight: isPhotoOnly ? nil : entry.weight,
+                weightUnit: "kg",
+                bodyFatPercentage: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly
+                    ? nil : entry.bodyFat,
+                bodyFatMethod: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly || entry.bodyFat == nil
+                    ? nil : (usesVisualEstimateHero ? "visual_estimate" : entry.source),
+                muscleMass: isPhotoOnly ? nil : entry.muscle,
+                boneMass: nil,
+                waistCm: nil,
+                hipCm: nil,
+                waistUnit: nil,
+                notes: entry.notes,
+                photoUrl: fixturePhotoURL,
+                dataSource: entry.source,
+                createdAt: date,
+                updatedAt: now
+            )
+
+            try await CoreDataManager.shared.saveBodyMetricsAndWait(
+                metric,
+                userId: userId,
+                markAsSynced: entry.source != "manual"
+            )
+        }
+
+        return entries.filter { !usesSingleReading || $0.daysAgo == 0 }
+            .map { "\(metricIdPrefix)_\($0.daysAgo)" }
+    }
+
+    static func removeBodyMetrics(ids: [String]) async throws {
+        guard !ids.isEmpty else { return }
+        let context = CoreDataManager.shared.viewContext
+        try await context.perform {
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id IN %@", ids as NSArray)
+            let rows = try context.fetch(request)
+            rows.forEach(context.delete)
+            if context.hasChanges {
+                try context.save()
+            }
+        }
+    }
+}
+#endif
