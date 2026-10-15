@@ -116,7 +116,19 @@ extension DashboardViewLiquid {
         }
         .sheet(item: $homeV2EditingMetric) { metric in
             homeV2EditEntrySheet(for: metric)
+                #if DEBUG
+                .onAppear { recordHomeEditTransition("sheet.appear") }
+                .onDisappear { recordHomeEditTransition("sheet.disappear") }
+                #endif
         }
+        #if DEBUG
+        .onChange(of: homeV2EditingMetric?.id) { _, _ in
+            recordHomeEditTransition("item.changed")
+        }
+        .onChange(of: isHomeV2ContextPresented) { _, _ in
+            recordHomeEditTransition("context.changed")
+        }
+        #endif
         .navigationDestination(isPresented: $isHomeV2ContextPresented) {
             homeV2ContextView
         }

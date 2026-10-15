@@ -63,6 +63,7 @@ extension CoreDataManager {
         let context = viewContext
 
         context.perform {
+            defer { completion?() }
             // viewContext is the container's main-queue context. Admission and
             // this synchronous write share the executor with auth replacement.
             if let probe = ServerApplyProbe.beforeWriteAdmission {
@@ -73,7 +74,6 @@ extension CoreDataManager {
                 do {
                     try MainActor.assumeIsolated { try writeAdmission() }
                 } catch {
-                    completion?()
                     return
                 }
             }
@@ -88,11 +88,9 @@ extension CoreDataManager {
                 let payloadUserId = data["user_id"] as? String
                 if let existing = results.first {
                     if existing.isMarkedDeleted {
-                        completion?()
                         return
                     }
                     if let owner = existing.userId, !owner.isEmpty, payloadUserId != owner {
-                        completion?()
                         return
                     }
                 }
@@ -199,7 +197,6 @@ extension CoreDataManager {
                 metric.lastModified = Date()
 
                 self.save()
-                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateBodyMetric", underlying: error)
                 let contextInfo = ErrorContext(
@@ -210,7 +207,6 @@ extension CoreDataManager {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating body metric from server: \(error)")
-                completion?()
             }
         }
     }
@@ -234,6 +230,8 @@ func updateOrCreateDailyMetric(
         let context = viewContext
 
         context.perform {
+            // Skipping a remote record must still release its waiting batch.
+            defer { completion?() }
             if let probe = ServerApplyProbe.beforeWriteAdmission {
                 ServerApplyProbe.beforeWriteAdmission = nil
                 MainActor.assumeIsolated { probe() }
@@ -242,7 +240,6 @@ func updateOrCreateDailyMetric(
                 do {
                     try MainActor.assumeIsolated { try writeAdmission() }
                 } catch {
-                    completion?()
                     return
                 }
             }
@@ -294,7 +291,6 @@ func updateOrCreateDailyMetric(
                 metric.lastModified = Date()
 
                 self.save()
-                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateDailyMetric", underlying: error)
                 let contextInfo = ErrorContext(
@@ -305,7 +301,6 @@ func updateOrCreateDailyMetric(
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating daily metric from server: \(error)")
-                completion?()
             }
         }
     }
@@ -329,6 +324,8 @@ func updateOrCreateProfile(
         let context = viewContext
 
         context.perform {
+            // Skipping a remote record must still release its waiting batch.
+            defer { completion?() }
             if let probe = ServerApplyProbe.beforeWriteAdmission {
                 ServerApplyProbe.beforeWriteAdmission = nil
                 MainActor.assumeIsolated { probe() }
@@ -337,7 +334,6 @@ func updateOrCreateProfile(
                 do {
                     try MainActor.assumeIsolated { try writeAdmission() }
                 } catch {
-                    completion?()
                     return
                 }
             }
@@ -376,7 +372,6 @@ func updateOrCreateProfile(
                 profile.lastModified = Date()
 
                 self.save()
-                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateProfile", underlying: error)
                 let contextInfo = ErrorContext(
@@ -387,7 +382,6 @@ func updateOrCreateProfile(
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating profile from server: \(error)")
-                completion?()
             }
         }
     }

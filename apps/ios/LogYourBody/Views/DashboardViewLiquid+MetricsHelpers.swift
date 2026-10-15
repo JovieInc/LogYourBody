@@ -404,23 +404,12 @@ extension DashboardViewLiquid {
             return (dailyMetrics?.steps, dailyMetrics?.date)
         }
 
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let lookup = dailyMetricsLookup()
-
-        // Look back up to 30 days for the latest non-zero steps entry
-        for offset in 0..<30 {
-            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
-            if let entry = lookup[date], let steps = entry.steps, steps > 0 {
-                return (steps, entry.date)
-            }
-        }
-
-        if let metrics = dailyMetrics {
-            return (metrics.steps, metrics.date)
-        }
-
-        return (nil, nil)
+        return DashboardStepsSnapshotPolicy.latest(
+            in: dailyMetricsLookup(),
+            fallback: dailyMetrics,
+            now: Date(),
+            calendar: .current
+        )
     }
 
     func dailyMetricsLookup() -> [Date: DailyMetrics] {
@@ -585,5 +574,26 @@ extension DashboardViewLiquid {
         return computeRangeStats(metrics: filteredMetrics(for: selectedRange)) { metric in
             interpolationContext.estimate(for: metric.date)?.value
         }
+    }
+}
+
+enum DashboardStepsSnapshotPolicy {
+    static func latest(
+        in lookup: [Date: DailyMetrics],
+        fallback: DailyMetrics?,
+        now: Date,
+        calendar: Calendar
+    ) -> (value: Int?, date: Date?) {
+        let today = calendar.startOfDay(for: now)
+
+        // A recorded zero is present data; only missing or invalid counts are skipped.
+        for offset in 0..<30 {
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
+            if let entry = lookup[date], let steps = entry.steps, steps >= 0 {
+                return (steps, entry.date)
+            }
+        }
+
+        return (fallback?.steps, fallback?.date)
     }
 }
