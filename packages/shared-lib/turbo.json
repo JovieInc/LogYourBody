@@ -5,6 +5,8 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/ios/LogYourBody/ContentView.swift",
+        "$TURBO_ROOT$/apps/ios/LogYourBody/Services/PhotoUploadManager.swift",
+        "$TURBO_ROOT$/apps/web/src/app/api/auth/mobile/photos/route.ts",
         "$TURBO_ROOT$/scripts/ios/launch-quality-audit.sh",
         "$TURBO_ROOT$/scripts/ios/launch-quality-evidence.py",
         "$TURBO_ROOT$/scripts/ios/test_launch_quality_evidence.py",
