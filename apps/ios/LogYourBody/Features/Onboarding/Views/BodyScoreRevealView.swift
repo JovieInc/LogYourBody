@@ -1,4 +1,7 @@
 import SwiftUI
+#if DEBUG
+import OSLog
+#endif
 
 enum BodyScoreRevealPolicy {
     /// Comparison-group copy follows the entered sex at birth, with a neutral
@@ -174,7 +177,18 @@ struct BodyScoreRevealView: View {
                 } footer: {
                     VStack(spacing: 12) {
                         Button("Continue") {
+                            #if DEBUG
+                            BodyScoreRevealTransitionDiagnostic.record(
+                                "continue.begin step=\(viewModel.currentStep.rawValue) " +
+                                "authenticatedEmail=\(viewModel.hasAuthenticatedAccountEmail)"
+                            )
+                            #endif
                             viewModel.goToNextStep()
+                            #if DEBUG
+                            BodyScoreRevealTransitionDiagnostic.record(
+                                "continue.return step=\(viewModel.currentStep.rawValue)"
+                            )
+                            #endif
                         }
                         .buttonStyle(OnboardingPrimaryButtonStyle())
                         .accessibilityIdentifier("body_score_reveal_continue_button")
@@ -189,9 +203,17 @@ struct BodyScoreRevealView: View {
             }
         }
         .onAppear {
+            #if DEBUG
+            BodyScoreRevealTransitionDiagnostic.record("reveal.appear step=\(viewModel.currentStep.rawValue)")
+            #endif
             guard FatVsMuscleSummary(input: viewModel.bodyScoreInput) != nil else { return }
             triggerRevealFeedback()
         }
+        #if DEBUG
+        .onDisappear {
+            BodyScoreRevealTransitionDiagnostic.record("reveal.disappear step=\(viewModel.currentStep.rawValue)")
+        }
+        #endif
     }
 
     private var changeText: String? {
@@ -305,3 +327,23 @@ struct BodyScoreRevealView: View {
     return BodyScoreRevealView(viewModel: vm)
         .preferredColorScheme(.dark)
 }
+
+#if DEBUG
+/// Observes only the explicitly selected real XCTest onboarding fixture.
+private enum BodyScoreRevealTransitionDiagnostic {
+    private static let logger = Logger(subsystem: "com.logyourbody.reveal-transition-diagnostic", category: "fixture")
+
+    @MainActor
+    static func record(_ message: @autoclosure () -> String) {
+        let process = ProcessInfo.processInfo
+        guard process.arguments.contains("-lybUITestBodyScoreOnboardingFixture"),
+              process.arguments.contains("-lybUITestRevealTransitionDiagnostic"),
+              let session = process.environment["XCTestSessionIdentifier"],
+              UUID(uuidString: session) != nil,
+              let bundle = process.environment["XCTestBundlePath"],
+              bundle.hasSuffix("/LogYourBodyUITests.xctest") else { return }
+        let value = message()
+        logger.notice("\(value, privacy: .public)")
+    }
+}
+#endif
