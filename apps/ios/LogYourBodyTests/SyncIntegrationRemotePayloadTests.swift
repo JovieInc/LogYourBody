@@ -677,7 +677,7 @@ extension SyncIntegrationRemotePayloadTests {
     func testProfilePullPersistsDateOnlyBirthDateFromMobileAPI() async throws {
         let id = UUID().uuidString
         try await seedBirthDateProfile(id: id)
-        await coreData.updateOrCreateProfileAndWait(from: [
+        await applyBirthDateProfileThroughSave(from: [
             "id": id, "full_name": "Mobile profile", "date_of_birth": "1990-01-01"
         ])
         let date = try await persistedProfileBirthDate(id: id)
@@ -689,7 +689,7 @@ extension SyncIntegrationRemotePayloadTests {
         for timestamp in ["1990-01-01T00:00:00Z", "1990-01-01T00:00:00.125Z"] {
             let id = UUID().uuidString
             try await seedBirthDateProfile(id: id)
-            await coreData.updateOrCreateProfileAndWait(from: [
+            await applyBirthDateProfileThroughSave(from: [
                 "id": id, "full_name": "Legacy profile", "date_of_birth": timestamp
             ])
             let stored = try await persistedProfileBirthDate(id: id)
@@ -703,19 +703,27 @@ extension SyncIntegrationRemotePayloadTests {
         let id = UUID().uuidString
         try await seedBirthDateProfile(id: id)
         let expected = try XCTUnwrap(BodyMetricSyncDateParser.date(from: "1990-01-01T00:00:00Z"))
-        await coreData.updateOrCreateProfileAndWait(from: [
+        await applyBirthDateProfileThroughSave(from: [
             "id": id, "full_name": "Existing profile", "date_of_birth": "1990-01-01T00:00:00Z"
         ])
         for value in ["1990-02-30", "1990-13-01", "1990-1-1", "not-a-date", "", NSNull()] as [Any] {
-            await coreData.updateOrCreateProfileAndWait(from: [
+            await applyBirthDateProfileThroughSave(from: [
                 "id": id, "full_name": "Existing profile", "date_of_birth": value
             ])
             let stored = try await persistedProfileBirthDate(id: id)
             XCTAssertEqual(stored, expected)
         }
-        await coreData.updateOrCreateProfileAndWait(from: ["id": id, "full_name": "Existing profile"])
+        await applyBirthDateProfileThroughSave(from: ["id": id, "full_name": "Existing profile"])
         let stored = try await persistedProfileBirthDate(id: id)
         XCTAssertEqual(stored, expected)
+    }
+
+    private func applyBirthDateProfileThroughSave(from payload: [String: Any]) async {
+        // Apply completion runs before saveQueue dispatches the actual context save.
+        // Observe that save; this test must never perform the production save itself.
+        let saved = expectation(forNotification: .NSManagedObjectContextDidSave, object: coreData.viewContext)
+        await coreData.updateOrCreateProfileAndWait(from: payload)
+        await fulfillment(of: [saved], timeout: 5)
     }
 
     private func persistedProfileBirthDate(id: String) async throws -> Date? {
