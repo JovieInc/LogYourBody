@@ -27,6 +27,9 @@ describe('first-party progress photo auth boundary', () => {
     expect(iosPhotoUploadManager).toContain(
       'let token = try await authenticatedJWT(for: ownership)',
     );
+    expect(iosPhotoUploadManager).toMatch(
+      /private func authenticatedJWT\(for ownership: AuthManager\.ProfileSessionOwnership\) async throws -> String \{\s*guard authManager\.ownsAccountSession\(ownership\),\s*let token = await accessTokenProvider\(\),\s*authManager\.ownsAccountSession\(ownership\) else \{\s*throw PhotoError\.notAuthenticated\s*\}\s*return token\s*\}/,
+    );
     expect(iosPhotoUploadManager).toContain('/api/auth/mobile/photos');
     expect(iosPhotoUploadManager).toContain(
       'request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")',
