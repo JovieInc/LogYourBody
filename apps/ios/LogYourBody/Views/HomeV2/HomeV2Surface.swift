@@ -12,6 +12,7 @@ struct HomeV2Surface: View {
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
     let timeline: HomeV2TimelinePolicy.Snapshot
+    let hasAnyPhotoInHistory: Bool
     @Binding var selectedID: HomeV2TimelinePolicy.EntryID
     let weightValue: String
     let weightUnit: String
@@ -31,6 +32,7 @@ struct HomeV2Surface: View {
     var onConnectHealth: () -> Void = {}
     let onDone: () -> Void
     let onUndo: () -> Void
+    var onProvenancePresentationChange: (Bool) -> Void = { _ in }
 
     @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
     @State private var showsProvenance = false
@@ -38,9 +40,6 @@ struct HomeV2Surface: View {
 
     private var isLogged: Bool { loggedSentence != nil }
     private var isHealthOff: Bool { systemState == .healthOff }
-    private var hasAnyPhoto: Bool {
-        bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
-    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -53,7 +52,7 @@ struct HomeV2Surface: View {
                         unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto
                     )
                     photoNumberBlock
-                    if hasAnyPhoto {
+                    if hasAnyPhotoInHistory {
                         HomeV2DisclosureLink(
                             title: HomeV2PhotoCopy.allPhotos,
                             identifier: "home_v2_all_photos_row",
@@ -79,6 +78,14 @@ struct HomeV2Surface: View {
             }
             .background(HomeV2Tokens.Colors.shell)
         }
+        .sheet(isPresented: $showsProvenance) {
+            if let detail = HomeV2MetricEditorial.timelineProvenance(for: metric) {
+                HomeV2ProvenanceSheet(detail: detail)
+            }
+        }
+        .onChange(of: metric.id) { _, _ in showsProvenance = false }
+        .onChange(of: showsProvenance) { _, presented in onProvenancePresentationChange(presented) }
+        .onDisappear { onProvenancePresentationChange(false) }
     }
 
     @ViewBuilder
@@ -178,12 +185,6 @@ struct HomeV2Surface: View {
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
-        .sheet(isPresented: $showsProvenance) {
-            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
-                HomeV2ProvenanceSheet(detail: provenance)
-            }
-        }
-        .onChange(of: metric.id) { _, _ in showsProvenance = false }
     }
 
     private var ffmiSummary: some View {
@@ -363,16 +364,21 @@ struct HomeV2DataHero: View {
     let metric: BodyMetrics?
     let metrics: [BodyMetrics]
     let unit: String
-
     private var bodyFat: HomeV2EditorialPolicy.BodyFatReading? { HomeV2EditorialPolicy.bodyFat(in: metric) }
     private var weights: [HomeV2EditorialPolicy.WeightReading] {
         HomeV2EditorialPolicy.weights(in: metrics, selected: metric)
+    }
+    private var weightNeedsReview: Bool {
+        guard let weight = metric?.weight else { return false }
+        return !HomeV2WeightQuality.isWithinSupportedLoggingRange(weight)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             if let bodyFat {
                 bodyFatGraphic(bodyFat)
+            } else if weightNeedsReview {
+                weightReviewGraphic
             } else {
                 let readings = weights
                 if !readings.isEmpty {
@@ -425,7 +431,9 @@ struct HomeV2DataHero: View {
     }
 
     private func weightGraphic(_ weights: [HomeV2EditorialPolicy.WeightReading]) -> some View {
-        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.margin) {
+        let axisDates = HomeV2RecordedWeightChartPolicy.axisDates(for: weights)
+        let labelGranularity = HomeV2RecordedWeightChartPolicy.labelGranularity(for: weights)
+        return VStack(alignment: .leading, spacing: HomeV2Tokens.Space.margin) {
             Text("Recorded weight")
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
@@ -439,6 +447,8 @@ struct HomeV2DataHero: View {
                     showsDots: true,
                     chartHeight: HomeV2Tokens.chartHeight,
                     axis: .months,
+                    axisDates: axisDates,
+                    formatAxisDate: { chartAxisLabel(for: $0, granularity: labelGranularity) },
                     metricTitle: "Weight",
                     usesSevenDayAverage: false,
                     anchorsToZero: false,
@@ -467,6 +477,41 @@ struct HomeV2DataHero: View {
         .accessibilityElement(children: weights.count == 1 ? .contain : .ignore)
         .accessibilityLabel(weightSummary(weights))
         .accessibilityIdentifier("home_v2_weight_graphic")
+    }
+
+    private var weightReviewGraphic: some View {
+        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+            Spacer(minLength: 0)
+            if let weight = metric?.weight {
+                Text(String(format: "%.2f", displayWeight(weight)))
+                    .scaledSystemFont(size: 72, weight: .semibold, relativeTo: .largeTitle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                Text(unit)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+            }
+            Label(HomeV2WeightQuality.reviewMessage, systemImage: "exclamationmark.triangle")
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                .foregroundStyle(HomeV2Tokens.Metric.steps)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(HomeV2Tokens.Space.margin)
+        .foregroundStyle(HomeV2Tokens.Colors.ink)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home_v2_weight_review_graphic")
+    }
+
+    private func chartAxisLabel(
+        for date: Date,
+        granularity: HomeV2RecordedWeightChartPolicy.LabelGranularity
+    ) -> String {
+        switch granularity {
+        case .day:
+            return date.formatted(.dateTime.month(.abbreviated).day())
+        case .time:
+            return date.formatted(date: .omitted, time: .shortened)
+        }
     }
 
     private func weightSummary(_ weights: [HomeV2EditorialPolicy.WeightReading]) -> String {

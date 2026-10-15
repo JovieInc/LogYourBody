@@ -57,6 +57,7 @@ struct HomeV2ProgressSeries {
     let provenance: HomeV2ProvenanceDetail?
     let insightTitle: String?
     let insightBody: String?
+    var shareEntries: [MetricHistoryEntry] = []
 }
 
 enum HomeV2ProgressCopy {
@@ -158,6 +159,16 @@ enum HomeV2ProgressPolicy {
             distinctDays: Set(sorted.map { calendar.startOfDay(for: $0.date) }).count
         )
     }
+
+    static func supportedWeightPoints(
+        _ points: [MetricChartDataPoint],
+        system: MeasurementSystem
+    ) -> [MetricChartDataPoint] {
+        points.filter { point in
+            let kilograms = system == .imperial ? point.value.lbsToKg : point.value
+            return HomeV2WeightQuality.isWithinSupportedLoggingRange(kilograms)
+        }
+    }
 }
 
 /// Progress (Pencil R1/R2/R3): one metric workspace. The selected metric and
@@ -170,8 +181,12 @@ struct HomeV2ProgressView: View {
     let formatValue: (HomeV2ProgressMetric, Double) -> String
     let onLogWeight: () -> Void
     var now = Date()
+    var isShareContextVisible = true
 
     @State private var showsInsight = false
+    @State private var showsMetricShare = false
+    @State private var focusedSample: HomeV2ChartIntegrity.Sample?
+    @State private var showsProvenance = false
 
     private static let contextDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -185,6 +200,8 @@ struct HomeV2ProgressView: View {
             HomeV2TrendPolicy.points(current.daily, in: range, now: now)
         )
         let hasEnoughData = HomeV2TrendPolicy.hasEnoughData(visible)
+        let selected = shareSelection(for: metric, data: current)
+        let activeFocus = selected.flatMap { $0.isFocused ? $0.point : nil }
         let presented = HomeV2MetricEditorial.canvas(
             HomeV2MetricCanvasRequest(
                 metric: metric,
@@ -206,13 +223,27 @@ struct HomeV2ProgressView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     HomeV2MetricHero(
-                        value: presented.value,
+                        value: activeFocus.map { formatValue(metric, $0.value) } ?? presented.value,
                         unit: presented.unit,
-                        comparison: presented.comparison,
-                        provenance: presented.provenance
+                        comparison: activeFocus.map {
+                            $0.date.formatted(date: .abbreviated, time: .omitted)
+                        } ?? presented.comparison,
+                        provenance: activeFocus == nil ? presented.provenance : nil,
+                        onProvenancePresentationChange: { showsProvenance = $0 }
                     )
                     .padding(.horizontal, HomeV2Tokens.Space.inset)
                     .padding(.vertical, HomeV2Tokens.Space.margin)
+
+                    if contextualSharePayload != nil, !showsProvenance {
+                        Button { showsMetricShare = true } label: {
+                            Label("Share \(metric.title)", systemImage: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.plain)
+                        .font(.subheadline)
+                        .frame(minHeight: JovieTokens.minimumHitTarget)
+                        .padding(.horizontal, HomeV2Tokens.Space.inset)
+                        .accessibilityIdentifier("home_v2_progress_share")
+                    }
 
                     if hasEnoughData {
                         HomeV2TrendChart(
@@ -227,8 +258,11 @@ struct HomeV2ProgressView: View {
                             usesSevenDayAverage: !current.trend.isEmpty,
                             anchorsToZero: metric.anchorsChartToZero,
                             formatValue: { formatValue(metric, $0) },
+                            onSelection: { focusedSample = $0 },
                             now: now
                         )
+                        .id(metric)
+                        .onDisappear { focusedSample = nil }
                         .padding(.top, HomeV2Tokens.Space.tight)
                         if let title = current.insightTitle, let body = current.insightBody {
                             insightRow(title: title, body: body)
@@ -247,7 +281,52 @@ struct HomeV2ProgressView: View {
             }
         }
         .background(HomeV2Tokens.Colors.canvas.ignoresSafeArea())
-        .onChange(of: metric) { _, _ in showsInsight = false }
+        .onChange(of: metric) { _, _ in
+            showsInsight = false
+            focusedSample = nil
+        }
+        .onChange(of: range) { _, _ in focusedSample = nil }
+        .modifier(ContextualMetricShareModifier(
+            payload: contextualSharePayload, isVisible: isShareContextVisible && !showsProvenance,
+            directRequest: $showsMetricShare
+        ))
+    }
+
+    private func shareSelection(
+        for candidate: HomeV2ProgressMetric, data: HomeV2ProgressSeries
+    ) -> ContextualMetricProgressPolicy.Selection? {
+        ContextualMetricProgressPolicy.presentationSelection(
+            points: HomeV2TrendPolicy.points(data.daily, in: range, now: now),
+            averages: HomeV2TrendPolicy.points(data.trend, in: range, now: now),
+            focus: candidate == metric ? focusedSample : nil
+        )
+    }
+
+    private var contextualSharePayload: BodyScoreSharePayload? {
+        let snapshots = HomeV2ProgressMetric.allCases.compactMap { candidate -> ContextualMetricSnapshot? in
+            let data = series(candidate)
+            let points = HomeV2TrendPolicy.points(data.daily, in: range, now: now)
+            let stats = HomeV2ProgressPolicy.stats(
+                points: HomeV2MetricEditorial.observedPoints(points), prefersHigh: candidate.prefersHigh)
+            guard let selected = shareSelection(for: candidate, data: data),
+                  let kind = ContextualMetricKind(rawValue: candidate.rawValue) else { return nil }
+            let trend = candidate == .steps
+                ? HomeV2ProgressCopy.stepsComparison(latest: selected.point.value, average: stats.average, range: range)
+                : HomeV2ProgressCopy.deltaSentence(delta: stats.delta, unit: data.deltaUnit, range: range)
+            return ContextualMetricSnapshot(
+                kind: kind, value: formatValue(candidate, selected.point.value), unit: candidate == .steps ? "steps" : data.unit,
+                observation: selected.point.date.formatted(
+                    date: .abbreviated, time: candidate == .steps ? .omitted : .shortened),
+                range: range.accessibilityLabel,
+                trend: HomeV2TrendPolicy.hasEnoughData(points) ? trend : nil,
+                provenance: selected.source(entries: data.shareEntries),
+                evidence: ContextualMetricEvidencePolicy.label(
+                    for: kind, isEstimated: selected.point.isEstimated || selected.isSmoothed,
+                    isSmoothed: kind == .weight && selected.isSmoothed)
+            )
+        }
+        guard let kind = ContextualMetricKind(rawValue: metric.rawValue) else { return nil }
+        return .contextual(snapshots, selected: kind)
     }
 
     private var switcher: some View {

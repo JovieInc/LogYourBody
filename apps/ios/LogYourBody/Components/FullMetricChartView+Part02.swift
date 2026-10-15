@@ -318,26 +318,32 @@ var minSeriesValue: Double? {
         activeSeries.map(\.value).min()
     }
 
+var validatedActivePoint: MetricChartDataPoint? {
+        ContextualMetricDetailPolicy.validatedFocus(
+            activePoint, in: activeSeries, currentFingerprint: chartDataFingerprint, cachedFingerprint: lastFingerprint)
+    }
+
 var headlineValueText: String {
         // Only replace the card's latest/trend headline when the user is
         // actively inspecting a chart point. The stats card and this screen
         // must stay on the same number when metric detail opens at rest.
-        if let activePoint {
-            return formatHeadlineValue(activePoint.value)
+        if let point = validatedActivePoint {
+            return formatHeadlineValue(point.value)
         }
         return currentValue
     }
 
 var headlineDateText: String {
-        if let point = selectedFocusPoint {
-            return point.date.formatted(.dateTime.month().day().year())
+        if let point = validatedActivePoint {
+            return point.date.formatted(date: .abbreviated, time: isStepsMetric ? .omitted : .shortened)
         }
         return currentDate
     }
 
     var selectedFocusPoint: MetricChartDataPoint? {
-        if let activePoint {
-            return activePoint
+        guard lastFingerprint == chartDataFingerprint else { return nil }
+        if let point = validatedActivePoint {
+            return point
         }
 
         guard let selectedTimelineDate else { return nil }
@@ -374,37 +380,7 @@ var headlineDateText: String {
     }
 
 var chartDataFingerprint: String {
-        guard let first = chartData.first, let last = chartData.last else {
-            return "empty-\(chartData.count)-trend-\(trendChartData?.count ?? 0)"
-        }
-        let rawFingerprint = [
-            "\(chartData.count)",
-            "\(first.date.timeIntervalSince1970)",
-            "\(last.date.timeIntervalSince1970)",
-            "\(first.value)",
-            "\(last.value)",
-            first.presence.rawValue,
-            last.presence.rawValue
-        ].joined(separator: "-")
-
-        let trendFingerprint: String
-        if let trendChartData,
-           let trendFirst = trendChartData.first,
-           let trendLast = trendChartData.last {
-            trendFingerprint = [
-                "\(trendChartData.count)",
-                "\(trendFirst.date.timeIntervalSince1970)",
-                "\(trendLast.date.timeIntervalSince1970)",
-                "\(trendFirst.value)",
-                "\(trendLast.value)",
-                trendFirst.presence.rawValue,
-                trendLast.presence.rawValue
-            ].joined(separator: "-")
-        } else {
-            trendFingerprint = "none"
-        }
-
-        return "\(rawFingerprint)|trend-\(trendFingerprint)"
+        ContextualMetricDetailPolicy.fingerprint(points: chartData, trend: trendChartData)
     }
 
 // MARK: - Helpers
