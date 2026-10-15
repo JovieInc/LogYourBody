@@ -292,21 +292,25 @@ class PhotoMetadataService {
     /// Create or reuse the metrics row for an upload and mark empty placeholders in flight atomically.
     func createOrUpdateMetricsForPhotoUpload(
         for date: Date,
-        userId: String
+        userId: String,
+        writeAdmission: CoreDataManager.WriteAdmission? = nil
     ) async throws -> PhotoMetricsUpdateResult {
         try await CoreDataManager.shared.createOrUpdatePhotoUploadMetricsPlaceholder(
             for: date,
-            userId: userId
+            userId: userId,
+            writeAdmission: writeAdmission
         )
     }
 
     func prepareExistingMetricsForPhotoUpload(
         id: String,
-        userId: String
+        userId: String,
+        writeAdmission: CoreDataManager.WriteAdmission? = nil
     ) async throws -> PhotoMetricsUpdateResult {
         let metrics = try await CoreDataManager.shared.prepareExistingPhotoUploadMetrics(
             id: id,
-            userId: userId
+            userId: userId,
+            writeAdmission: writeAdmission
         )
         return PhotoMetricsUpdateResult(metrics: metrics, createdNewEntry: false)
     }

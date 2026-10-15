@@ -586,7 +586,8 @@ func saveBodyMetricsAndWait(
 
 func createOrUpdatePhotoUploadMetricsPlaceholder(
         for date: Date,
-        userId: String
+        userId: String,
+        writeAdmission: WriteAdmission? = nil
     ) async throws -> PhotoMetricsUpdateResult {
         let context = viewContext
         let startOfDay = Calendar.current.startOfDay(for: date)
@@ -594,6 +595,7 @@ func createOrUpdatePhotoUploadMetricsPlaceholder(
         let normalizedLocalDate = BodyMetricLocalDate.normalized(localDate, fallback: date)
 
         return try await context.perform {
+            try MainActor.assumeIsolated { try writeAdmission?() }
             let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
             fetchRequest.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
                 NSCompoundPredicate(andPredicateWithSubpredicates: [
@@ -659,10 +661,15 @@ func createOrUpdatePhotoUploadMetricsPlaceholder(
         }
     }
 
-func prepareExistingPhotoUploadMetrics(id: String, userId: String) async throws -> BodyMetrics {
+func prepareExistingPhotoUploadMetrics(
+        id: String,
+        userId: String,
+        writeAdmission: WriteAdmission? = nil
+    ) async throws -> BodyMetrics {
         let context = viewContext
 
         return try await context.perform {
+            try MainActor.assumeIsolated { try writeAdmission?() }
             let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
             fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
                 NSPredicate(format: "id == %@", id),

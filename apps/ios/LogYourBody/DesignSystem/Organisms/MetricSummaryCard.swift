@@ -39,6 +39,22 @@ public struct MetricSummaryCard: View {
             self.valueText = valueText
             self.caption = caption
         }
+
+        var accessibilityDescription: String {
+            let description: String
+            switch direction {
+            case .up:
+                description = "Up \(valueText)"
+            case .down:
+                description = "Down \(valueText)"
+            case .flat:
+                description = valueText.isEmpty || valueText == "No change"
+                    ? "No change"
+                    : "No change \(valueText)"
+            }
+            guard let caption, !caption.isEmpty else { return description }
+            return "\(description), \(caption)"
+        }
     }
 
     public struct Content {
@@ -517,7 +533,7 @@ public struct MetricSummaryCard: View {
         case .data(let content):
             var components: [String] = [content.title, content.value + (content.unit.isEmpty ? "" : " " + content.unit)]
             if let trend = content.trend {
-                components.append(trendAccessibilityText(trend))
+                components.append(trend.accessibilityDescription)
             }
             if let timestamp = content.timestamp {
                 components.append("Updated \(timestamp)")
@@ -536,17 +552,6 @@ public struct MetricSummaryCard: View {
             return action == nil ? nil : "Double tap to retry"
         case .data:
             return isButtonContext ? "Double tap for details" : nil
-        }
-    }
-
-    private func trendAccessibilityText(_ trend: Trend) -> String {
-        switch trend.direction {
-        case .up:
-            return "Up \(trend.valueText)"
-        case .down:
-            return "Down \(trend.valueText)"
-        case .flat:
-            return "No change \(trend.valueText)"
         }
     }
 }
