@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf5c356e7500423dd53e699e598e2a2af39d91a48f03bad07df27b9c1da91b51`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `59bd692e6f0a61ed3df5d783db0b523b692f232c82cf07e10ba42e47a74adeb4`)
 
 ### `package.json`: packageManager
 
@@ -378,7 +378,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3590f5fc9bca5f30a8eaac908a762e683611a4d4126b8b8d611c1515a38b13ea`)
+- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3228ca0acd307954a34b4b5518a2b9a51aa9570e96aa4ea99a26ccff503ba140`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
 - `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `2ccae5f8ae61f82202ecac2483285dd3ea9039a9064bbc6eec6b45126596da5d`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
