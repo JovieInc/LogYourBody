@@ -675,7 +675,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
 
     func testMobileProfilePullPersistsRequiredFieldsIntoIndependentContext() async throws {
         let before = Date()
-        await coreData.updateOrCreateProfileAndWait(from: [
+        await applyRequiredProfileThroughSave(from: [
             "id": "fresh-mobile-profile", "email": "fresh@example.com", "full_name": "Fresh profile"
         ])
         let storedValue = try await durableRemoteProfile(id: "fresh-mobile-profile")
@@ -690,19 +690,19 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testProfilePullPreservesKnownMetadataWhenMobilePayloadOmitsIt() async throws {
-        await coreData.updateOrCreateProfileAndWait(from: [
+        await applyRequiredProfileThroughSave(from: [
             "id": "existing-mobile-profile", "email": "known@example.com", "full_name": "Before",
             "created_at": "2024-01-01T00:00:00Z", "updated_at": "2025-01-01T00:00:00.123Z"
         ])
         let first = try await durableRemoteProfile(id: "existing-mobile-profile")
         let initial = try XCTUnwrap(first)
         for missingEmail: Any in [NSNull(), "", "   "] {
-            await coreData.updateOrCreateProfileAndWait(from: [
+            await applyRequiredProfileThroughSave(from: [
                 "id": "existing-mobile-profile", "email": missingEmail, "full_name": "Updated",
                 "created_at": "invalid", "updated_at": "invalid"
             ])
         }
-        await coreData.updateOrCreateProfileAndWait(from: ["id": "existing-mobile-profile", "full_name": "Final"])
+        await applyRequiredProfileThroughSave(from: ["id": "existing-mobile-profile", "full_name": "Final"])
         let final = try await durableRemoteProfile(id: "existing-mobile-profile")
         let stored = try XCTUnwrap(final)
         XCTAssertEqual(stored.email, "known@example.com")
@@ -728,7 +728,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         await coreData.viewContext.perform { }
         XCTAssertFalse(coreData.viewContext.hasChanges)
         XCTAssertEqual(try coreData.viewContext.count(for: CachedProfile.fetchRequest()), 0)
-        await coreData.updateOrCreateProfileAndWait(from: [
+        await applyRequiredProfileThroughSave(from: [
             "id": "valid-after-invalid", "email": "valid@example.com", "full_name": "Valid"
         ])
         let storedValue = try await durableRemoteProfile(id: "valid-after-invalid")
@@ -738,11 +738,11 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
     }
 
     func testProfilePullUpdatesEmailAndVersionWithoutReplacingCreationDate() async throws {
-        await coreData.updateOrCreateProfileAndWait(from: [
+        await applyRequiredProfileThroughSave(from: [
             "id": "versioned-profile", "email": "before@example.com",
             "created_at": "2024-01-01T00:00:00Z", "updated_at": "2025-01-01T00:00:00Z"
         ])
-        await coreData.updateOrCreateProfileAndWait(from: [
+        await applyRequiredProfileThroughSave(from: [
             "id": "versioned-profile", "email": "after@example.com",
             "created_at": "2024-06-01T00:00:00Z", "updated_at": "2025-02-01T00:00:00Z"
         ])
@@ -751,6 +751,14 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         XCTAssertEqual(stored.email, "after@example.com")
         XCTAssertEqual(stored.createdAt, BodyMetricSyncDateParser.date(from: "2024-01-01T00:00:00Z"))
         XCTAssertEqual(stored.updatedAt, BodyMetricSyncDateParser.date(from: "2025-02-01T00:00:00Z"))
+    }
+
+    private func applyRequiredProfileThroughSave(from payload: [String: Any]) async {
+        // Wait for production persistence before reading through an independent context.
+        // Calling save from this test would mask a missing production save.
+        let saved = expectation(forNotification: .NSManagedObjectContextDidSave, object: coreData.viewContext)
+        await coreData.updateOrCreateProfileAndWait(from: payload)
+        await fulfillment(of: [saved], timeout: 5)
     }
 
     private struct DurableRemoteProfile {
