@@ -178,7 +178,7 @@ struct DeleteAccountView: View {
             do {
                 try await AccountDeletionCleanupService.live(
                     authManager: authManager,
-                    deleteProductAccount: authManager.deleteCurrentAccount
+                    deleteProductAccount: authManager.deleteCurrentAccountForCleanup
                 ).performDeletion()
             } catch {
                 await MainActor.run {
@@ -202,6 +202,21 @@ struct AccountDeletionCleanupService {
         var clearUserDefaults: () -> [String]
         var logoutAuthSession: () async -> Void
         var deleteTrainingDrafts: () async throws -> Void = {}
+        var admitLocalCleanup: @MainActor () throws -> Void = {}
+    }
+
+    @MainActor
+    final class LocalCleanupAdmission {
+        private let authManager: AuthManager
+        private var ownership: AuthManager.SignedOutSessionOwnership?
+
+        init(authManager: AuthManager) { self.authManager = authManager }
+
+        func bind(_ ownership: AuthManager.SignedOutSessionOwnership) { self.ownership = ownership }
+
+        func requireCurrent() throws {
+            guard let ownership, authManager.ownsSignedOutSession(ownership) else { throw AuthError.invalidToken }
+        }
     }
 
     static let accountUserDefaultsKeys: [String] = [
@@ -247,9 +262,10 @@ struct AccountDeletionCleanupService {
     @MainActor
     static func live(
         authManager: AuthManager,
-        deleteProductAccount: @escaping () async throws -> Void
+        deleteProductAccount: @escaping () async throws -> AuthManager.SignedOutSessionOwnership
     ) -> AccountDeletionCleanupService {
         let ownership = authManager.captureAccountSession()
+        let admission = LocalCleanupAdmission(authManager: authManager)
         return AccountDeletionCleanupService(
             dependencies: Dependencies(
                 logoutSubscriptionProvider: {
@@ -267,10 +283,11 @@ struct AccountDeletionCleanupService {
                     guard let ownership, await authManager.ownsAccountSession(ownership) else {
                         throw AuthError.invalidToken
                     }
-                    try await deleteProductAccount()
+                    let signedOutOwnership = try await deleteProductAccount()
+                    admission.bind(signedOutOwnership)
                 },
                 deleteCoreData: {
-                    try await CoreDataManager.shared.deleteAllDataAndWait()
+                    try await CoreDataManager.shared.deleteAllDataAndWait(writeAdmission: admission.requireCurrent)
                 },
                 clearKeychain: {
                     try? KeychainManager.shared.clearAll()
@@ -281,15 +298,18 @@ struct AccountDeletionCleanupService {
                 clearUserDefaults: {
                     clearAccountUserDefaults(in: .standard)
                 },
-                logoutAuthSession: {
+                logoutAuthSession: { @MainActor in
+                    guard (try? admission.requireCurrent()) != nil else { return }
                     await authManager.logout()
                 },
                 deleteTrainingDrafts: {
                     guard let ownership else { throw AuthError.invalidToken }
                     try await MainActor.run {
+                        try admission.requireCurrent()
                         try TrainingDraftStore.shared.purge(ownerId: ownership.subject)
                     }
-                }
+                },
+                admitLocalCleanup: admission.requireCurrent
             )
         )
     }
@@ -306,23 +326,27 @@ struct AccountDeletionCleanupService {
         await subscriptionManager.waitForBillingIdentity(request)
     }
 
+    @MainActor
     func performDeletion() async throws {
         await dependencies.logoutSubscriptionProvider()
         await dependencies.resetHealthKitAnchors()
         try await dependencies.deleteProductAccount()
 
+        try dependencies.admitLocalCleanup()
         var localCleanupError: Error?
         do {
             try await dependencies.deleteTrainingDrafts()
         } catch {
             localCleanupError = error
         }
+        try dependencies.admitLocalCleanup()
         do {
             try await dependencies.deleteCoreData()
         } catch {
             localCleanupError = localCleanupError ?? error
         }
 
+        try dependencies.admitLocalCleanup()
         dependencies.clearKeychain()
         _ = dependencies.clearUserDefaults()
         dependencies.deleteSpotlightMetrics()

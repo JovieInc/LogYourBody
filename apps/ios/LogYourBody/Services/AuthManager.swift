@@ -869,7 +869,17 @@ final class AuthManager: NSObject, ObservableObject {
         }
     }
 
-    func performLogout(exitReason: AuthExitReason, knownAccountId: String? = nil) async {
+    /// Captures the signed-out lifetime before asynchronous logout cleanup can yield.
+    struct SignedOutSessionOwnership: Hashable, Sendable {
+        fileprivate let generation: UInt64
+    }
+
+    func ownsSignedOutSession(_ ownership: SignedOutSessionOwnership) -> Bool {
+        !Task.isCancelled && authSession == nil && currentUser == nil && profileGeneration == ownership.generation
+    }
+
+    @discardableResult
+    func performLogout(exitReason: AuthExitReason, knownAccountId: String? = nil) async -> SignedOutSessionOwnership {
         let signedInUserId = currentUser?.id
         // A cold restore can fail before currentUser exists. The keychain
         // subject still owns any unstamped local goals.
@@ -886,7 +896,9 @@ final class AuthManager: NSObject, ObservableObject {
         lastExitReason = exitReason
         expiredRequestSession = expiredOwnership.map { ($0, authGeneration) }
         AppServicePorts.analyticsTracker.reset()
+        let signedOutOwnership = SignedOutSessionOwnership(generation: profileGeneration)
         await suspendHealthImport?()
+        return signedOutOwnership
     }
 
     func updateProfileDurably(_ updates: [String: Any]) async throws {
@@ -1168,10 +1180,14 @@ final class AuthManager: NSObject, ObservableObject {
     }
 
     func deleteCurrentAccount() async throws {
+        _ = try await deleteCurrentAccountForCleanup()
+    }
+
+    func deleteCurrentAccountForCleanup() async throws -> SignedOutSessionOwnership {
         guard let ownership = currentProfileSession() else { throw AuthError.invalidToken }
         try await deleteProductAccount()
         try requireCurrentProfileSession(ownership)
-        await performLogout(exitReason: .userInitiated)
+        return await performLogout(exitReason: .userInitiated)
     }
 
     func fetchActiveSessions() async throws -> [SessionInfo] {

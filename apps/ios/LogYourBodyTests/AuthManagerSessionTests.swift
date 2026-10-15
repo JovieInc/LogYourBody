@@ -1047,3 +1047,179 @@ final class AuthManagerSessionTests: XCTestCase {
         )
     }
 }
+
+extension AuthManagerSessionTests {
+    private enum AccountCleanupHold { case healthImport, trainingDrafts }
+
+    func testAccountDeletionCleanupPreservesReplacementDuringHealthSuspension() async throws {
+        try await assertAccountDeletionCleanup(holdAt: .healthImport)
+    }
+
+    func testAccountDeletionCleanupPreservesReplacementDuringTrainingDraftSuspension() async throws {
+        try await assertAccountDeletionCleanup(holdAt: .trainingDrafts)
+    }
+
+    func testAccountDeletionCleanupCompletesForItsUnchangedSignedOutLifetime() async throws {
+        try await assertAccountDeletionCleanup(holdAt: nil)
+    }
+
+    private func assertAccountDeletionCleanup(holdAt boundary: AccountCleanupHold?) async throws {
+        let manager = makeManager()
+        let subject = "cleanup-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subject, name: "Departing")
+        let original = try XCTUnwrap(manager.captureAccountSession())
+        AuthStubURLProtocol.requestHandler = { request in
+            .init(statusCode: request.httpMethod == "DELETE" ? 204 : 404, body: Data())
+        }
+        let store = makeAccountCleanupStore()
+        let profile = seedAccountCleanupProfile(store, subject: subject, name: "Departing")
+        try store.viewContext.save()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let drafts = TrainingDraftStore(rootURL: directory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = TrainingSetDraft(exerciseId: "fixture", setNumber: 1, repsText: "5", loadText: "10", rir: 2)
+        try drafts.put(draft, ownerId: subject, sessionId: "training")
+        defaults.set(70.0, forKey: Constants.goalWeightKey)
+        let gate = HeldAccountCleanupBoundary()
+        defer { gate.release() }
+        var suspended = false
+        manager.suspendHealthImport = {
+            if boundary == .healthImport, !suspended {
+                suspended = true
+                await gate.hold()
+            }
+        }
+        let admission = AccountDeletionCleanupService.LocalCleanupAdmission(authManager: manager)
+        var spotlightCalls = 0
+        let service = AccountDeletionCleanupService(dependencies: .init(
+            logoutSubscriptionProvider: {}, resetHealthKitAnchors: {},
+            deleteProductAccount: {
+                guard manager.ownsAccountSession(original) else { throw AuthError.invalidToken }
+                let signedOut = try await manager.deleteCurrentAccountForCleanup()
+                admission.bind(signedOut)
+            },
+            deleteCoreData: { try await store.deleteAllDataAndWait(writeAdmission: admission.requireCurrent) },
+            clearKeychain: { try? self.keychain.delete(forKey: self.storedSessionKey) },
+            deleteSpotlightMetrics: { spotlightCalls += 1 },
+            clearUserDefaults: { AccountDeletionCleanupService.clearAccountUserDefaults(in: self.defaults) },
+            logoutAuthSession: { @MainActor in
+                guard (try? admission.requireCurrent()) != nil else { return }
+                await manager.logout()
+            },
+            deleteTrainingDrafts: {
+                if boundary == .trainingDrafts { await gate.hold() }
+                try await MainActor.run {
+                    try admission.requireCurrent()
+                    try drafts.purge(ownerId: subject)
+                }
+            },
+            admitLocalCleanup: admission.requireCurrent
+        ))
+        let deletion = Task { @MainActor in
+            do {
+                try await service.performDeletion()
+                return true
+            } catch { return false }
+        }
+        var replacement: ProductAuthSession?
+        var replacementOwner: AuthManager.ProfileSessionOwnership?
+        if boundary != nil {
+            await fulfillment(of: [gate.started], timeout: 3)
+            XCTAssertNil(manager.authSession)
+            applyProfileAccount(manager, subject: subject, name: "Replacement")
+            replacement = try XCTUnwrap(manager.authSession)
+            replacementOwner = try XCTUnwrap(manager.captureAccountSession())
+            try keychain.save(try XCTUnwrap(replacement), forKey: storedSessionKey)
+            profile.fullName = "Replacement"
+            try store.viewContext.save()
+            try drafts.put(draft, ownerId: subject, sessionId: "training")
+            defaults.set(88.0, forKey: Constants.goalWeightKey)
+            gate.release()
+        }
+        let accepted = await deletion.value
+        let rows = try store.viewContext.fetch(CachedProfile.fetchRequest())
+        let remainingDrafts = try drafts.load(ownerId: subject, sessionId: "training")
+        if boundary == nil {
+            XCTAssertTrue(accepted)
+            XCTAssertTrue(rows.isEmpty)
+            XCTAssertTrue(remainingDrafts.isEmpty)
+            XCTAssertNil(defaults.object(forKey: Constants.goalWeightKey))
+            XCTAssertNil(manager.authSession)
+            XCTAssertNil(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self))
+            XCTAssertEqual(spotlightCalls, 1)
+        } else {
+            XCTAssertFalse(accepted)
+            XCTAssertEqual(rows.count, 1)
+            XCTAssertEqual(rows.first?.fullName, "Replacement")
+            XCTAssertEqual(remainingDrafts[draft.key]?.revision, draft.revision)
+            XCTAssertEqual(defaults.double(forKey: Constants.goalWeightKey), 88.0)
+            XCTAssertEqual(manager.authSession, replacement)
+            XCTAssertTrue(manager.ownsAccountSession(try XCTUnwrap(replacementOwner)))
+            XCTAssertEqual(try keychain.get(forKey: storedSessionKey, as: ProductAuthSession.self), replacement)
+            XCTAssertEqual(spotlightCalls, 0)
+        }
+        XCTAssertEqual(AuthStubURLProtocol.recordedRequests.filter { $0.httpMethod == "DELETE" }.count, 1)
+    }
+
+    func testAccountDeletionCoreDataChecksAdmissionInsideItsQueueBeforeMutation() async throws {
+        let manager = makeManager()
+        let subject = "cleanup-queue-\(UUID().uuidString)"
+        applyProfileAccount(manager, subject: subject, name: "Departing")
+        let signedOut = await manager.performLogout(exitReason: .userInitiated)
+        let admission = AccountDeletionCleanupService.LocalCleanupAdmission(authManager: manager)
+        admission.bind(signedOut)
+        let store = makeAccountCleanupStore()
+        let row = seedAccountCleanupProfile(store, subject: subject, name: "Replacement")
+        try store.viewContext.save()
+        var admissions = 0
+        do {
+            try await store.deleteAllDataAndWait(writeAdmission: {
+                admissions += 1
+                self.applyProfileAccount(manager, subject: subject, name: "Replacement")
+                try admission.requireCurrent()
+            })
+            XCTFail("A replaced lifetime must reject at the actual Core Data queue boundary")
+        } catch {}
+        XCTAssertEqual(admissions, 1)
+        XCTAssertFalse(row.isDeleted)
+        XCTAssertEqual(try store.viewContext.count(for: CachedProfile.fetchRequest()), 1)
+        XCTAssertFalse(store.viewContext.hasChanges)
+        XCTAssertEqual(manager.currentUser?.name, "Replacement")
+    }
+
+    private func makeAccountCleanupStore() -> CoreDataManager {
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        description.shouldAddStoreAsynchronously = false
+        return CoreDataManager(persistentStoreDescriptions: [description])
+    }
+
+    private func seedAccountCleanupProfile(_ store: CoreDataManager, subject: String, name: String) -> CachedProfile {
+        let row = CachedProfile(context: store.viewContext)
+        row.id = subject
+        row.email = "cleanup@example.com"
+        row.fullName = name
+        row.createdAt = Date(timeIntervalSince1970: 1_800_000_000)
+        row.updatedAt = row.createdAt
+        row.lastModified = row.createdAt
+        return row
+    }
+}
+
+@MainActor
+private final class HeldAccountCleanupBoundary {
+    let started = XCTestExpectation(description: "Account cleanup reached its held boundary")
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func hold() async {
+        await withCheckedContinuation {
+            continuation = $0
+            started.fulfill()
+        }
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
+    }
+}

@@ -554,11 +554,15 @@ func fetchOrCreateSyncMetadata(entityName: String, entityId: String) -> SyncMeta
 
 // MARK: - Delete All Data
 
-    func deleteAllData(completion: ((Result<Void, Error>) -> Void)? = nil) {
+    func deleteAllData(
+        writeAdmission: WriteAdmission? = nil,
+        completion: ((Result<Void, Error>) -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
             do {
+                try MainActor.assumeIsolated { try writeAdmission?() }
                 self.syncAcknowledgementVersions.removeAll()
                 // Delete all body metrics
                 let bodyMetricsRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
@@ -645,9 +649,9 @@ func fetchOrCreateSyncMetadata(entityName: String, entityId: String) -> SyncMeta
         }
     }
 
-func deleteAllDataAndWait() async throws {
+func deleteAllDataAndWait(writeAdmission: WriteAdmission? = nil) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            deleteAllData { result in
+            deleteAllData(writeAdmission: writeAdmission) { result in
                 continuation.resume(with: result)
             }
         }
