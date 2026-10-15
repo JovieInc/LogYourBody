@@ -273,7 +273,7 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         let image = screenshot.image.cgImage
         let diagnostic: [String: Any] = [
             "requestedVariant": requested,
-            "stageFrame": NSStringFromCGRect(stage.frame),
+            "stageFrame": NSCoder.string(for: stage.frame),
             "caption": app.staticTexts["home_v2_photo_caption"].label,
             "weight": app.staticTexts["home_v2_weight_value"].label,
             "luminanceSignature": image.flatMap(LuminanceFixtureIdentity.signature) as Any? ?? NSNull(),
