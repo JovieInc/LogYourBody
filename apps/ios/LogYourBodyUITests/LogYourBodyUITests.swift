@@ -3122,7 +3122,13 @@ final class LogYourBodyUITests: XCTestCase {
         app.buttons["photo_timeline_root_menu"].tap()
         let ask = app.buttons["home_v2_sidebar_ask"]
         XCTAssertTrue(ask.waitForExistence(timeout: 5))
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true AND enabled == true"), object: ask
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
         ask.tap()
+        XCTAssertTrue(ask.waitForNonExistence(timeout: 5), "One Ask tap must dismiss the sidebar")
+        XCTAssertTrue(app.buttons["home_chat_collapse"].waitForExistence(timeout: 5), "Ask must expand before typing")
         XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 8))
     }
 
@@ -3137,7 +3143,15 @@ final class LogYourBodyUITests: XCTestCase {
         menu.tap()
         let ask = app.buttons["home_v2_sidebar_ask"]
         XCTAssertTrue(ask.waitForExistence(timeout: 8), "The sidebar lists Ask")
+        // Swipes starting on a row still dismiss; observing them must not consume a later row tap.
+        ask.swipeLeft()
+        XCTAssertTrue(ask.waitForNonExistence(timeout: 5), "A left swipe dismisses the sidebar")
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].isHittable, "A dismissal swipe must keep Today open")
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        XCTAssertTrue(ask.waitForExistence(timeout: 8))
         ask.tap()
+        XCTAssertTrue(ask.waitForNonExistence(timeout: 5), "One Ask tap dismisses the sidebar")
 
         XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8), "Ask opens the chat surface")
         XCTAssertTrue(app.staticTexts["Ask"].waitForExistence(timeout: 5), "The root header owns the title")
