@@ -2234,7 +2234,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(
             value.frame.minY,
             stage.frame.maxY - 1,
-            "Nothing is drawn over the person: the number sits below the photo. stage=\(stage.frame) value=\(value.frame)"
+            "Supporting weight sits below the composition-led photo. stage=\(stage.frame) value=\(value.frame)"
         )
         XCTAssertGreaterThanOrEqual(stage.frame.width, app.frame.width - 1, "The photo runs edge to edge")
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_photo_caption"].waitForExistence(timeout: 5))
@@ -2495,7 +2495,10 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(value.waitForExistence(timeout: 8), "View progress opens the metric workspace")
         let weightTab = app.buttons["home_v2_progress_tab_weight"]
         XCTAssertTrue(weightTab.waitForExistence(timeout: 5))
-        XCTAssertTrue(weightTab.isSelected, "Weight is selected on arrival")
+        let initialBodyFatTab = app.buttons["home_v2_progress_tab_body_fat"]
+        XCTAssertTrue(initialBodyFatTab.isSelected, "Body fat is selected on arrival")
+        weightTab.tap()
+        XCTAssertTrue(weightTab.isSelected, "Weight remains available in the same workspace")
         XCTAssertTrue(
             app.descendants(matching: .any)["home_v2_trend_chart"].waitForExistence(timeout: 5),
             "Sparse history keeps a compact explanation in the metric workspace"
@@ -3231,6 +3234,7 @@ final class LogYourBodyUITests: XCTestCase {
             "Log weight opens the sheet"
         )
         let plus = app.buttons["home_v2_log_sheet_plus"]
+        app.segmentedControls.firstMatch.buttons["Weight"].tap()
         XCTAssertTrue(plus.waitForExistence(timeout: 5))
         plus.tap()
         XCTAssertTrue(app.buttons["home_v2_log_sheet_details"].exists, "Optional detail sits behind one disclosure")
@@ -3444,6 +3448,9 @@ final class LogYourBodyUITests: XCTestCase {
         let viewProgress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
         viewProgress.tap()
+        let weightTab = app.buttons["home_v2_progress_tab_weight"]
+        XCTAssertTrue(weightTab.waitForExistence(timeout: 5))
+        weightTab.tap()
         let value = app.staticTexts["home_v2_progress_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 8))
         let loaded = XCTNSPredicateExpectation(
@@ -3460,6 +3467,9 @@ final class LogYourBodyUITests: XCTestCase {
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 8))
         logWeight.tap()
+        let weightEntry = app.segmentedControls["Entry type selector"].buttons["Weight"]
+        XCTAssertTrue(weightEntry.waitForExistence(timeout: 5))
+        weightEntry.tap()
         let plus = app.buttons["home_v2_log_sheet_plus"]
         XCTAssertTrue(plus.waitForExistence(timeout: 5))
         plus.tap()
@@ -3471,6 +3481,8 @@ final class LogYourBodyUITests: XCTestCase {
         done.tap()
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 8))
         viewProgress.tap()
+        XCTAssertTrue(weightTab.waitForExistence(timeout: 5))
+        weightTab.tap()
         XCTAssertTrue(value.waitForExistence(timeout: 8))
 
         let refreshed = XCTNSPredicateExpectation(
