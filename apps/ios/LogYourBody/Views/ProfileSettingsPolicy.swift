@@ -69,7 +69,7 @@ enum ProfileSettingsPolicy {
 
     /// Formats the age row label from a date of birth.
     static func formattedAge(dateOfBirth: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
-        let age = calendar.dateComponents([.year], from: dateOfBirth, to: now).year ?? 0
+        let age = ProfileBirthDatePolicy.age(from: dateOfBirth, now: now, localCalendar: calendar) ?? 0
         return age > 0 ? "\(age) years" : "Not set"
     }
 

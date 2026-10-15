@@ -46,10 +46,7 @@ extension DashboardViewLiquid {
     /// Calculate age from date of birth
     func calculateAge(from dateOfBirth: Date?) -> Int? {
         guard let dob = dateOfBirth else { return nil }
-        let calendar = Calendar.current
-        let now = Date()
-        let ageComponents = calendar.dateComponents([.year], from: dob, to: now)
-        return ageComponents.year
+        return ProfileBirthDatePolicy.age(from: dob)
     }
 
     var currentMetric: BodyMetrics? {

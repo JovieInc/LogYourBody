@@ -519,11 +519,10 @@ private func buildBodyScoreChartAndEntriesData(
         return ([], nil)
     }
 
-    let calendar = Calendar.current
     guard let dateOfBirth = profile.dateOfBirth else {
         return ([], nil)
     }
-    let birthYear = calendar.component(.year, from: dateOfBirth)
+    let birthYear = ProfileBirthDatePolicy.year(from: dateOfBirth)
 
     guard let heightCm = profile.height, heightCm > 0 else {
         return ([], nil)

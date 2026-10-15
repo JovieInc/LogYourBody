@@ -2,6 +2,99 @@ import XCTest
 @testable import LogYourBody
 
 final class ProfileSettingsPolicyTests: XCTestCase {
+    func testBirthdayAgeChangesOnTheLocalBirthdayAcrossTimeZones() throws {
+        let birthday = try XCTUnwrap(ProfileBirthDatePolicy.date(year: 2_008))
+        for zone in ["America/Los_Angeles", "Pacific/Honolulu", "Europe/London", "Asia/Tokyo", "Pacific/Kiritimati"] {
+            let calendar = try birthDateCalendar(zone)
+            let before = try XCTUnwrap(calendar.date(from: DateComponents(
+                year: 2_026, month: 12, day: 31, hour: 23, minute: 59)))
+            let onBirthday = try XCTUnwrap(calendar.date(from: DateComponents(year: 2_027, month: 1, day: 1)))
+            XCTAssertEqual(ProfileBirthDatePolicy.age(from: birthday, now: before, localCalendar: calendar), 18, zone)
+            XCTAssertEqual(ProfileBirthDatePolicy.age(from: birthday, now: onBirthday, localCalendar: calendar), 19, zone)
+            XCTAssertEqual(
+                ProfileSettingsPolicy.formattedAge(dateOfBirth: birthday, now: before, calendar: calendar),
+                "18 years", zone
+            )
+        }
+    }
+
+    func testBirthdayValidationDoesNotAdmitAnUnderageUserBeforeTheirLocalBirthday() throws {
+        let birthday = try XCTUnwrap(ProfileBirthDatePolicy.date(year: 2_010))
+        let calendar = try birthDateCalendar("America/Los_Angeles")
+        let before = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2_025, month: 12, day: 31, hour: 18)))
+        let onBirthday = try XCTUnwrap(calendar.date(from: DateComponents(year: 2_026, month: 1, day: 1)))
+        XCTAssertFalse(ProfileDetailsValidationPolicy.isDateOfBirthWithinValidRange(
+            birthday, now: before, calendar: calendar))
+        XCTAssertTrue(ProfileDetailsValidationPolicy.isDateOfBirthWithinValidRange(
+            birthday, now: onBirthday, calendar: calendar))
+    }
+
+    func testBirthdayPresentationAndBirthYearPreserveTheAPIJanFirstDate() throws {
+        let birthday = try XCTUnwrap(ISO8601DateFormatter().date(from: "1990-01-01T00:00:00Z"))
+        XCTAssertEqual(ProfileBirthDatePolicy.year(from: birthday), 1_990)
+        XCTAssertEqual(
+            ProfileBirthDatePolicy.formatted(birthday, locale: Locale(identifier: "en_US")),
+            "Jan 1, 1990"
+        )
+        XCTAssertEqual(
+            ProfileBirthDatePolicy.formatted(birthday, style: .long, locale: Locale(identifier: "en_US")),
+            "January 1, 1990"
+        )
+    }
+
+    func testBirthdayPickerCalendarRoundTripsThroughTheActualProfilePayload() throws {
+        let pickerCalendar = ProfileBirthDatePolicy.calendar
+        for components in [
+            DateComponents(year: 1_990, month: 1, day: 1),
+            DateComponents(year: 2_000, month: 2, day: 29),
+            DateComponents(year: 2_004, month: 12, day: 31)
+        ] {
+            let selected = try XCTUnwrap(pickerCalendar.date(from: components))
+            let payload = try ProductAPIClient.firstPartyProfilePatchBody(["dateOfBirth": selected])
+            let day = try XCTUnwrap(payload["dateOfBirth"] as? String)
+            let expected = String(format: "%04d-%02d-%02d", components.year!, components.month!, components.day!)
+            XCTAssertEqual(day, expected)
+            let decoded = try XCTUnwrap(AuthManager.parseProductProfileDate(day))
+            let decodedComponents = pickerCalendar.dateComponents([.year, .month, .day], from: decoded)
+            XCTAssertEqual(decodedComponents.year, components.year)
+            XCTAssertEqual(decodedComponents.month, components.month)
+            XCTAssertEqual(decodedComponents.day, components.day)
+        }
+    }
+
+    func testBirthdayTodayBoundaryUsesTheLocalDayOnEitherSideOfTheDateLine() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-01-01T03:00:00Z"))
+        for (zone, expected) in [("America/Los_Angeles", "Dec 31, 2025"), ("Asia/Tokyo", "Jan 1, 2026")] {
+            let today = ProfileBirthDatePolicy.today(now: now, localCalendar: try birthDateCalendar(zone))
+            XCTAssertEqual(ProfileBirthDatePolicy.formatted(today, locale: Locale(identifier: "en_US")), expected)
+        }
+    }
+
+    func testBirthdayAgeUsesGregorianYearsWithANonGregorianUserCalendar() throws {
+        let birthday = try XCTUnwrap(ProfileBirthDatePolicy.date(year: 2_000))
+        let gregorian = try birthDateCalendar("Asia/Bangkok")
+        let now = try XCTUnwrap(gregorian.date(from: DateComponents(year: 2_026, month: 1, day: 1)))
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = gregorian.timeZone
+        XCTAssertEqual(ProfileBirthDatePolicy.age(from: birthday, now: now, localCalendar: buddhist), 26)
+    }
+
+    func testBirthdayAgeRetainsLeapDayAndIgnoresLegacyTimestampTimeOfDay() throws {
+        let birthday = try XCTUnwrap(ISO8601DateFormatter().date(from: "2000-02-29T18:20:00Z"))
+        let calendar = try birthDateCalendar("America/Los_Angeles")
+        for (year, month, day, expected) in [(2_024, 2, 28, 23), (2_024, 2, 29, 24), (2_025, 3, 1, 25)] {
+            let now = try XCTUnwrap(calendar.date(from: DateComponents(year: year, month: month, day: day)))
+            XCTAssertEqual(ProfileBirthDatePolicy.age(from: birthday, now: now, localCalendar: calendar), expected)
+        }
+    }
+
+    private func birthDateCalendar(_ zone: String) throws -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: zone))
+        return calendar
+    }
+
     // MARK: - joinedDisplayName
 
     func testJoinedDisplayNameCombinesFirstAndLast() {

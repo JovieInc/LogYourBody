@@ -2,7 +2,8 @@ import SwiftUI
 import Combine
 
 func defaultProfileDateOfBirth() -> Date {
-    Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
+    let today = ProfileBirthDatePolicy.today()
+    return ProfileBirthDatePolicy.calendar.date(byAdding: .year, value: -25, to: today) ?? today
 }
 
 @MainActor
@@ -431,7 +432,7 @@ struct OnboardingProfileUpdateBuilder {
         }
 
         if let birthYear = bodyScoreInput.birthYear,
-           let dateOfBirth = Calendar.current.date(from: DateComponents(year: birthYear, month: 1, day: 1)) {
+           let dateOfBirth = ProfileBirthDatePolicy.date(year: birthYear) {
             updates["dateOfBirth"] = dateOfBirth
         }
 

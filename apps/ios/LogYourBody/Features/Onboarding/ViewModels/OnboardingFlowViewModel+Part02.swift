@@ -113,7 +113,7 @@ func applyFirstPhotoUITestFixtureIfNeeded() {
         defaultHomeMode = .photo
         profileFirstName = "Onboarding"
         profileLastName = "UI"
-        profileDateOfBirth = Calendar.current.date(from: DateComponents(year: 1_990, month: 1, day: 1))
+        profileDateOfBirth = ProfileBirthDatePolicy.date(year: 1_990)
             ?? defaultProfileDateOfBirth()
         profileBiologicalSex = .male
         profileHeightUnit = .centimeters
@@ -465,7 +465,7 @@ func planProfileDetailsFromEarlierAnswers(knownDateOfBirth: Date?, knownHeightCe
         var hasDateOfBirth = knownDateOfBirth != nil
         if !hasDateOfBirth,
            let birthYear = bodyScoreInput.birthYear,
-           let dateOfBirth = Calendar.current.date(from: DateComponents(year: birthYear, month: 1, day: 1)) {
+           let dateOfBirth = ProfileBirthDatePolicy.date(year: birthYear) {
             profileDateOfBirth = dateOfBirth
             hasDateOfBirth = true
         }
@@ -497,7 +497,7 @@ func recomputeProfileDetailsActiveSubstep() {
         }
 
         let trimmedFirstName = profileFirstName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let age = Calendar.current.dateComponents([.year], from: profileDateOfBirth, to: Date()).year
+        let age = ProfileBirthDatePolicy.age(from: profileDateOfBirth)
 
         if trimmedFirstName.isEmpty {
             profileDetailsActiveSubstep = .firstName
