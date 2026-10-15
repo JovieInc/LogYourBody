@@ -62,7 +62,10 @@ platform :ios do
     options
   end
   
-  before_all do
+  before_all do |lane|
+    # Validation must not regenerate tracked documentation before source provenance is captured.
+    skip_docs if [:ci_ios, :build_check, :ci_test_unit].include?(lane)
+
     # Setup CI environment if running in CI
     setup_ci if ENV['CI']
     
@@ -429,12 +432,14 @@ platform :ios do
       )
     end
     
-    # Handle build number - use timestamp if not provided
-    build_number = options[:build_number] || Time.now.strftime("%Y%m%d%H%M%S")
-    increment_build_number(
-      build_number: build_number,
-      xcodeproj: project_path
-    )
+    # Validation builds preserve tracked metadata; release builds still get a fresh build number.
+    if options[:skip_build_number_increment] != true
+      build_number = options[:build_number] || Time.now.strftime("%Y%m%d%H%M%S")
+      increment_build_number(
+        build_number: build_number,
+        xcodeproj: project_path
+      )
+    end
     
     # Get the actual build and version numbers for logging
     version = get_version_number(xcodeproj: project_path)
@@ -566,6 +571,7 @@ platform :ios do
       export_method: "development",
       clean: false,
       clean_artifacts: false,
+      skip_build_number_increment: true,
       xcargs: "#{options[:xcargs]} CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO"
     )
   end
