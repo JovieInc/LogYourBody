@@ -152,12 +152,14 @@ class PhotoMetadataService {
         let startOfDay = calendar.startOfDay(for: date)
         let localDate = BodyMetricLocalDate.key(for: date)
 
-        // Check if metrics already exist for this date
-        let existingMetrics = await CoreDataManager.shared.fetchBodyMetrics(
+        // A day can hold more than one row. Edit passes the captured row's
+        // timestamp, so that row wins. A log whose timestamp matches nothing
+        // still updates the newest row for the day.
+        let sameDayMetrics = await CoreDataManager.shared.fetchBodyMetrics(
             for: userId,
             localDate: localDate
-        )
-        .first?.toBodyMetrics()
+        ).compactMap { $0.toBodyMetrics() }
+        let existingMetrics = Self.metricToUpdate(on: date, among: sameDayMetrics)
 
         if let existing = existingMetrics {
             let updatedWeight = preserveExistingMeasurements ? existing.weight ?? weight : weight ?? existing.weight
@@ -230,6 +232,12 @@ class PhotoMetadataService {
             }
             return PhotoMetricsUpdateResult(metrics: new, createdNewEntry: true)
         }
+    }
+
+    /// Exact timestamp identifies the row Edit captured. Otherwise the newest
+    /// same-day row stays the destination, matching the previous day lookup.
+    private static func metricToUpdate(on date: Date, among metrics: [BodyMetrics]) -> BodyMetrics? {
+        metrics.first { $0.date == date } ?? metrics.max { $0.date < $1.date }
     }
 
     /// The Add Entry sheet dismisses as soon as this method returns. A fire-and-
