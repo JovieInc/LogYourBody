@@ -164,36 +164,62 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
     func testBodyFatEntryRejectsOutOfRangeValues() throws {
         let app = XCUIApplication()
-        // The empty-fixture flag skips seeding a "logged today" metric, so the
-        // Home dock shows "Log weight" (home_v2_log_weight) instead of "Done".
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2EmptyFixture"])
-        try openAddEntrySheetFromHome(in: app)
-
-        let detailsButton = app.buttons["home_v2_log_sheet_details"]
-        guard detailsButton.waitForExistence(timeout: 5) else {
-            throw XCTSkip("Body fat and more tab is not reachable from this fixture.")
+        attachScreenshot(named: "body-fat-boundary-home-before-route", from: app)
+        let logButton = app.buttons["home_v2_log_weight"]
+        guard logButton.waitForExistence(timeout: 10), logButton.isHittable else {
+            attachDiagnosticTree(from: app, named: "body-fat-boundary-route-missing")
+            XCTFail("The required body-fat rejection case must reach the current Home check-in")
+            return
         }
-        detailsButton.tap()
-
-        let bodyFatField = app.textFields.matching(
-            NSPredicate(format: "placeholderValue == '0.0'")
-        ).firstMatch
+        logButton.tap()
+        let sheet = app.staticTexts["home_v2_log_sheet"]
+        guard sheet.waitForExistence(timeout: 8) else {
+            XCTFail("The current check-in editor must remain mounted")
+            return
+        }
+        let bodyFatTab = app.segmentedControls["Entry type selector"].buttons["Body Fat"]
+        guard bodyFatTab.waitForExistence(timeout: 5), bodyFatTab.isHittable else {
+            XCTFail("Body Fat must be an actual current entry type, not an optional details route")
+            return
+        }
+        bodyFatTab.tap()
+        XCTAssertTrue(bodyFatTab.isSelected)
+        let bodyFatField = app.textFields["Body fat percentage value"]
         guard bodyFatField.waitForExistence(timeout: 5) else {
-            throw XCTSkip("Body fat field is not reachable from this fixture.")
+            XCTFail("The current typed body-fat field must exist")
+            return
         }
 
-        for value in ["0", "100", "101"] {
+        // A valid unsaved value proves this is a live validation gate, not a permanently disabled/missing Save.
+        for (value, valid) in [("20", true), ("0", false), ("100", false), ("101", false)] {
             bodyFatField.tap()
-            XCTAssertTrue(waitForKeyboard(in: app), "Keyboard did not appear after tapping the field.")
+            guard waitForKeyboard(in: app) else {
+                XCTFail("Keyboard did not appear after tapping the field.")
+                return
+            }
             clearText(in: bodyFatField)
             bodyFatField.typeText(value)
             dismissKeyboardIfNeeded(in: app)
+            attachScreenshot(named: "body-fat-boundary-before-save-assert-\(value)", from: app)
 
             let saveButton = app.buttons["home_v2_log_sheet_save"]
-            XCTAssertFalse(
-                saveButton.exists && saveButton.isEnabled,
-                "Body fat '\(value)%' is out of the valid 3-60% range and must not be saveable."
-            )
+            guard sheet.exists, bodyFatTab.isSelected, bodyFatField.exists, saveButton.exists else {
+                attachDiagnosticTree(from: app, named: "body-fat-boundary-editor-lost-\(value)")
+                XCTFail("The same Body Fat editor, field and Save must remain after keyboard dismissal")
+                return
+            }
+            XCTAssertEqual(saveButton.label, "Save Body Fat")
+            XCTAssertEqual(Double(bodyFatField.value as? String ?? ""), Double(value))
+            if valid {
+                XCTAssertTrue(saveButton.isHittable)
+                XCTAssertTrue(saveButton.isEnabled, "An unsaved valid 20% must enable the real Body Fat Save")
+            } else {
+                XCTAssertFalse(
+                    saveButton.isEnabled,
+                    "Body fat '\(value)%' is out of the valid 3-60% range and must not be saveable."
+                )
+            }
         }
 
         XCTAssertEqual(app.state, .runningForeground)
