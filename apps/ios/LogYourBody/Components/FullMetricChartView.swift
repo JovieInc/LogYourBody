@@ -344,7 +344,7 @@ struct FullMetricChartView: View {
     @State var isHistoryScrubbing = false
 
     @State var localHistorySections: [HistorySection]?
-    @State var historyEntryPendingDeletion: MetricHistoryEntry?
+    @State var historyEntryPendingDeletion: MetricHistoryDeletionRequest?
     @State var showingHistoryDeleteConfirmation = false
 
     @ScaledMetric(relativeTo: .largeTitle) var headlineValueFontSize: CGFloat = 56
@@ -443,4 +443,33 @@ func makeHistorySections(from entries: [MetricHistoryEntry]) -> [HistorySection]
     }
 
     return sections
+}
+
+/// Capture the row and its entity kind together before confirmation or an async wait.
+struct MetricHistoryDeletionRequest: Identifiable {
+    let entry: MetricHistoryEntry
+    let metricType: DashboardViewLiquid.MetricType
+    var id: String { entry.id }
+}
+
+/// Only body-measurement history IDs may reach the body-measurement delete API.
+enum MetricHistoryDeletion {
+    static func supportsBodyMetricDeletion(_ type: DashboardViewLiquid.MetricType?) -> Bool {
+        switch type {
+        case .weight, .bodyFat, .ffmi, .bodyScore:
+            return true
+        case .steps, .glp1, nil:
+            return false
+        }
+    }
+
+    @MainActor
+    static func deleteBodyEntry(
+        id: String,
+        metricType: DashboardViewLiquid.MetricType?,
+        using deleteBodyMetric: (String) async -> Bool
+    ) async -> Bool {
+        guard !id.isEmpty, supportsBodyMetricDeletion(metricType) else { return false }
+        return await deleteBodyMetric(id)
+    }
 }

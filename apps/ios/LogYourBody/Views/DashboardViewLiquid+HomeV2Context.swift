@@ -3,6 +3,9 @@
 // LogYourBody
 //
 import SwiftUI
+#if DEBUG
+import OSLog
+#endif
 
 /// Record identity and account lifetime are captured together at the Edit action.
 struct HomeV2EditSession: Identifiable {
@@ -53,7 +56,13 @@ extension DashboardViewLiquid {
             onClose: { isHomeV2ContextPresented = false },
             onEditEntry: { metric in
                 guard let owner = authManager.captureAccountSession(), owner.subject == metric.userId else { return }
+                #if DEBUG
+                recordHomeEditTransition("callback.begin")
+                #endif
                 homeV2EditingSession = HomeV2EditSession(metric: metric, owner: owner)
+                #if DEBUG
+                recordHomeEditTransition("callback.assigned")
+                #endif
             },
             onLogWeight: { presentHomeV2LogSheet(for: $0) },
             onAddPhoto: { presentProgressPhotoAttach(for: $0) },
@@ -216,3 +225,26 @@ extension DashboardViewLiquid {
         return true
     }
 }
+
+#if DEBUG
+extension DashboardViewLiquid {
+    /// Observe only this explicitly selected XCTest fixture, without recording account or measurement data.
+    @MainActor
+    func recordHomeEditTransition(_ event: String) {
+        let process = ProcessInfo.processInfo
+        guard process.arguments.contains("-lybUITestHomeEditPresentationDiagnostic"),
+              process.arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
+              process.arguments.contains("-lybUITestHomeV2PhotoFixture"),
+              let session = process.environment["XCTestSessionIdentifier"],
+              UUID(uuidString: session) != nil,
+              let bundle = process.environment["XCTestBundlePath"],
+              bundle.hasSuffix("/LogYourBodyUITests.xctest") else { return }
+        let state = "event=\(event) context=\(isHomeV2ContextPresented) " +
+            "item=\(homeV2EditingSession != nil) addEntry=\(showAddEntrySheet) " +
+            "photoAttach=\(isProgressPhotoAttachPresented) viewer=\(isHomeV2ViewerPresented) " +
+            "allPhotos=\(isHomeV2AllPhotosPresented) menu=\(isShowingPhotoTimelineMenu) help=\(isHomeV2HelpPresented)"
+        Logger(subsystem: "com.logyourbody.home-edit-transition-diagnostic", category: "fixture")
+            .notice("\(state, privacy: .public)")
+    }
+}
+#endif

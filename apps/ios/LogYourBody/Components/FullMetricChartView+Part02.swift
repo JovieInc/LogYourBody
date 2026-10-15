@@ -58,7 +58,9 @@ var historyBlock: some View {
                                 historyRow(for: entry, config: payload.config)
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                         Button(role: .destructive) {
-                                            historyEntryPendingDeletion = entry
+                                            historyEntryPendingDeletion = MetricHistoryDeletionRequest(
+                                                entry: entry, metricType: payload.config.metricType
+                                            )
                                             showingHistoryDeleteConfirmation = true
                                         } label: {
                                             Label("Delete", systemImage: "trash")
@@ -618,13 +620,18 @@ func deltaColor(for delta: Double) -> Color {
     }
 
 @MainActor
-    func deleteHistoryEntry(_ entry: MetricHistoryEntry) async {
+    func deleteHistoryEntry(
+        _ entry: MetricHistoryEntry, metricType: DashboardViewLiquid.MetricType
+    ) async {
         defer {
             historyEntryPendingDeletion = nil
             showingHistoryDeleteConfirmation = false
         }
 
-        let success = await RealtimeSyncManager.shared.deleteBodyMetric(id: entry.id)
+        let success = await MetricHistoryDeletion.deleteBodyEntry(
+            id: entry.id, metricType: metricType,
+            using: { await RealtimeSyncManager.shared.deleteBodyMetric(id: $0) }
+        )
         guard success else { return }
 
         var sections = localHistorySections ?? historySections

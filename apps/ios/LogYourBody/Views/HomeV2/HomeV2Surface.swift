@@ -373,10 +373,13 @@ struct HomeV2DataHero: View {
         VStack(spacing: 0) {
             if let bodyFat {
                 bodyFatGraphic(bodyFat)
-            } else if !weights.isEmpty {
-                weightGraphic
             } else {
-                emptyGraphic
+                let readings = weights
+                if !readings.isEmpty {
+                    weightGraphic(readings)
+                } else {
+                    emptyGraphic
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -421,14 +424,14 @@ struct HomeV2DataHero: View {
         .accessibilityIdentifier("home_v2_body_fat_graphic")
     }
 
-    private var weightGraphic: some View {
+    private func weightGraphic(_ weights: [HomeV2EditorialPolicy.WeightReading]) -> some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.margin) {
             Text("Recorded weight")
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
             if weights.count > 1 {
                 HomeV2TrendChart(
-                    daily: weightPoints,
+                    daily: weightPoints(weights),
                     trend: [],
                     accent: HomeV2Tokens.Metric.weight,
                     range: .constant(.month1),
@@ -462,11 +465,11 @@ struct HomeV2DataHero: View {
         }
         .padding(HomeV2Tokens.Space.margin)
         .accessibilityElement(children: weights.count == 1 ? .contain : .ignore)
-        .accessibilityLabel(weightSummary)
+        .accessibilityLabel(weightSummary(weights))
         .accessibilityIdentifier("home_v2_weight_graphic")
     }
 
-    private var weightSummary: String {
+    private func weightSummary(_ weights: [HomeV2EditorialPolicy.WeightReading]) -> String {
         guard let latest = weights.last else { return "No weight recorded." }
         return "\(weights.count) recorded weight \(weights.count == 1 ? "entry" : "entries") in 30 days. " +
             "Latest \(String(format: "%.1f", displayWeight(latest.kilograms))) \(unit). Body fat not logged for this day."
@@ -489,7 +492,7 @@ struct HomeV2DataHero: View {
         .padding(HomeV2Tokens.Space.margin)
     }
 
-    private var weightPoints: [MetricChartDataPoint] {
+    private func weightPoints(_ weights: [HomeV2EditorialPolicy.WeightReading]) -> [MetricChartDataPoint] {
         weights.map { reading in
             MetricChartDataPoint(
                 date: reading.date,
