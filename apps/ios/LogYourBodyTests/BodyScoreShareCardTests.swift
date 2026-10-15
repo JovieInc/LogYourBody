@@ -396,11 +396,15 @@ final class BodyScoreShareCardTests: XCTestCase {
                 let decoded = try XCTUnwrap(UIImage(data: png))
                 XCTAssertEqual(decoded.size, size)
                 XCTAssertGreaterThan(png.count, 1_000)
-                let text = try recognizedShareText(decoded)
+                let text = try recognizedShareText(
+                    decoded, diagnosticName: "contextual-\(kind.rawValue)-\(aspect.rawValue).png")
                 let expected = expectation.value.filter(\.isNumber)
                 XCTAssertTrue(text.filter(\.isNumber).contains(expected), "Export must contain selected value for \(kind)")
                 XCTAssertFalse(text.lowercased().contains("body score"))
-                XCTAssertEqual(pngTruthMismatches(text, expected: expectation), [])
+                XCTAssertEqual(
+                    pngTruthMismatches(text, expected: expectation), [],
+                    "\(kind.rawValue)/\(aspect.rawValue): \(text)"
+                )
             }
             if kind == .bodyFat || kind == .ffmi {
                 // Real bad-input output calibrates the same OCR validator; not a production mutation.
@@ -863,13 +867,40 @@ final class BodyScoreShareCardTests: XCTestCase {
             createdAt: date, updatedAt: date)
     }
 
-    private func recognizedShareText(_ image: UIImage) throws -> String {
+    private func recognizedShareText(_ image: UIImage, diagnosticName: String = "share-render") throws -> String {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.recognitionLanguages = ["en-US"]
         request.usesLanguageCorrection = false
         try VNImageRequestHandler(cgImage: XCTUnwrap(image.cgImage), options: [:]).perform([request])
-        return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        let observations = request.results ?? []
+        let text = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        let records: [[String: Any]] = observations.map { observation in
+            let candidate = observation.topCandidates(1).first
+            let bounds = observation.boundingBox
+            return [
+                "text": candidate?.string ?? "",
+                "confidence": Double(candidate?.confidence ?? 0),
+                "normalizedLowerLeftBoundingBox": [
+                    "x": Double(bounds.origin.x), "y": Double(bounds.origin.y),
+                    "width": Double(bounds.size.width), "height": Double(bounds.size.height)
+                ]
+            ]
+        }
+        let diagnostic = try JSONSerialization.data(withJSONObject: [
+            "pngName": diagnosticName,
+            "textUsedByAssertions": text,
+            "recognitionLevelRawValue": request.recognitionLevel.rawValue,
+            "revision": request.revision,
+            "recognitionLanguages": request.recognitionLanguages,
+            "usesLanguageCorrection": request.usesLanguageCorrection,
+            "observations": records
+        ], options: [.prettyPrinted, .sortedKeys])
+        let attachment = XCTAttachment(data: diagnostic, uniformTypeIdentifier: "public.json")
+        attachment.name = diagnosticName + ".ocr.json"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        return text
     }
 
 
@@ -948,7 +979,7 @@ final class BodyScoreShareCardTests: XCTestCase {
         let decoded = try XCTUnwrap(UIImage(data: png))
         XCTAssertEqual(decoded.size, size)
         XCTAssertGreaterThan(png.count, 1_000)
-        return try recognizedShareText(decoded)
+        return try recognizedShareText(decoded, diagnosticName: name)
     }
 
     private func pngTruthMismatches(_ text: String, expected: SharePNGTruth) -> Set<String> {
