@@ -389,18 +389,17 @@ func updateOrCreateProfile(
 
 // MARK: - Export Methods
 
-    /// Async version - does NOT block the main thread
+    /// Fetch on the view context, then yield between bounded conversion batches.
     func fetchAllBodyMetrics(for userId: String) async -> [BodyMetrics] {
         let context = viewContext
 
-        return await context.perform {
+        let cached: [CachedBodyMetrics] = await context.perform {
             let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "userId == %@", userId)
             fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: true)]
 
             do {
-                let cachedMetrics = try context.fetch(fetchRequest)
-                return cachedMetrics.compactMap { $0.toBodyMetrics() }
+                return try context.fetch(fetchRequest)
             } catch {
                 #if DEBUG
                 // print("Error fetching all body metrics: \(error)")
@@ -408,6 +407,7 @@ func updateOrCreateProfile(
                 return []
             }
         }
+        return await CachedBodyMetrics.bodyMetricsInBatches(from: cached)
     }
 
 @available(*, unavailable, message: "Use async fetchAllBodyMetrics(for:) instead")

@@ -122,11 +122,11 @@ struct MetricChartDataHelper {
     private static func bodyMetricsAsync(for userId: String, from startDate: Date?, to endDate: Date?) async -> [BodyMetrics] {
         let context = CoreDataManager.shared.viewContext
 
-        let metrics = await context.perform {
+        let cached: [CachedBodyMetrics] = await context.perform {
             let request = bodyMetricsFetchRequest(for: userId, from: startDate, to: endDate)
-            let fetched = (try? context.fetch(request)) ?? []
-            return fetched.compactMap { $0.toBodyMetrics() }
+            return (try? context.fetch(request)) ?? []
         }
+        let metrics = await CachedBodyMetrics.bodyMetricsInBatches(from: cached)
 
         return EntryVisibilityManager.shared.resolvedVisibleMetrics(metrics, userId: userId)
     }

@@ -115,7 +115,7 @@ func fetchDisplayableBodyMetrics(
         to endDate: Date? = nil
     ) async -> (visible: [BodyMetrics], hidden: [BodyMetrics]) {
         let cached = await fetchBodyMetrics(for: userId, from: startDate, to: endDate)
-        let metrics = cached.compactMap { $0.toBodyMetrics() }
+        let metrics = await CachedBodyMetrics.bodyMetricsInBatches(from: cached)
         return EntryVisibilityManager.shared.prepareMetricsForDisplay(metrics, userId: userId)
     }
 

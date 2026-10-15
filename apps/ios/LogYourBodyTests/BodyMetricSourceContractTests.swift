@@ -73,6 +73,85 @@ final class BodyMetricSourceContractTests: XCTestCase {
         XCTAssertEqual(decoded.jsonObject["vendor"], "BodySpec")
     }
 
+    @MainActor
+    func testHistoryMetadataConversionServicesMainQueueBeforeFinishing() async throws {
+        let (context, cached) = try cachedHistory(count: 151)
+        defer { context.reset() }
+        let heartbeat = expectation(description: "Main queue serviced during history conversion")
+        var conversionFinished = false
+
+        // Queue from inside the main actor, immediately before conversion. An uninterrupted
+        // compactMap finishes decoding the entire history before this heartbeat can run.
+        DispatchQueue.main.async {
+            XCTAssertFalse(conversionFinished, "History metadata decoding monopolized the main queue")
+            heartbeat.fulfill()
+        }
+
+        let metrics = await CachedBodyMetrics.bodyMetricsInBatches(from: cached)
+        conversionFinished = true
+
+        await fulfillment(of: [heartbeat], timeout: 1)
+        XCTAssertEqual(metrics.map(\.id), cached.compactMap(\.id))
+        XCTAssertEqual(metrics.last?.sourceMetadata?.sampleId, "sample-150")
+    }
+
+    @MainActor
+    func testBatchedHistoryPreservesUnsavedValuesOrderAndCorruptRowHandling() async throws {
+        let (context, cached) = try cachedHistory(count: 103)
+        defer { context.reset() }
+        cached[49].sourceMetadataJSON = "invalid-json"
+        cached[50].id = nil
+        cached[100].notes = "Unsaved local edit"
+        let expected = cached.compactMap { $0.toBodyMetrics() }
+
+        let metrics = await CachedBodyMetrics.bodyMetricsInBatches(from: cached)
+
+        XCTAssertEqual(metrics, expected)
+        XCTAssertEqual(metrics.count, 102)
+        XCTAssertNil(metrics.first { $0.id == "metric-49" }?.sourceMetadata)
+        XCTAssertEqual(metrics.first { $0.id == "metric-100" }?.notes, "Unsaved local edit")
+        XCTAssertEqual(metrics.last?.sourceMetadata?.sampleId, "sample-102")
+        XCTAssertTrue(cached[0].managedObjectContext?.hasChanges == true)
+    }
+
+    @MainActor
+    func testBatchedHistoryHandlesEmptyAndSingleRecord() async throws {
+        let empty = await CachedBodyMetrics.bodyMetricsInBatches(from: [])
+        XCTAssertTrue(empty.isEmpty)
+
+        let (context, cached) = try cachedHistory(count: 1)
+        defer { context.reset() }
+        let metrics = await CachedBodyMetrics.bodyMetricsInBatches(from: cached)
+        XCTAssertEqual(metrics, cached.compactMap { $0.toBodyMetrics() })
+    }
+
+    @MainActor
+    private func cachedHistory(count: Int) throws -> (NSManagedObjectContext, [CachedBodyMetrics]) {
+        let model = CoreDataManager.makeManagedObjectModel()
+        let entity = try XCTUnwrap(model.entitiesByName["CachedBodyMetrics"])
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+
+        let cached = (0..<count).map { index in
+            let cached = CachedBodyMetrics(entity: entity, insertInto: context)
+            let date = Date(timeIntervalSince1970: 1_800_000_000 - Double(index) * 86_400)
+            cached.id = "metric-\(index)"
+            cached.userId = "history-owner"
+            cached.date = date
+            cached.localDate = BodyMetricLocalDate.key(for: date)
+            cached.createdAt = date
+            cached.updatedAt = date
+            cached.weight = 70
+            cached.weightUnit = "kg"
+            cached.dataSource = BodyMetricSource.healthKit.rawValue
+            cached.sourceMetadataJSON = BodyMetricSourceMetadata(
+                vendor: "apple_health", sourceName: "Test scale", sampleId: "sample-\(index)"
+            ).jsonString
+            return cached
+        }
+        return (context, cached)
+    }
+
     func testUnconfiguredBuildCannotClaimAnExistingConnectionIsAvailable() {
         XCTAssertEqual(IntegrationStatusPolicy.bodySpecConnection(configured: false, connected: true), "Unavailable")
         XCTAssertEqual(IntegrationStatusPolicy.bodySpecConnection(configured: false, connected: false), "Unavailable")
