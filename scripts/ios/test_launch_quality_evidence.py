@@ -181,7 +181,38 @@ class EvidenceTests(unittest.TestCase):
         selectors = source[source.index('LAUNCH_QUALITY_UI_TESTS=('):source.index('UI_RESULT_BUNDLE=')]
         command = 'set -euo pipefail\n' + selectors + '\nprintf "%s\\n" "${UI_SELECTORS[@]}" "${UI_EVIDENCE_ARGS[@]}"'
         output = subprocess.check_output(['bash', '-c', command], text=True).splitlines()
-        self.assertEqual(sum(line.startswith('-only-testing:') for line in output), 20)
+        # Preserve each inherited case, while allowing newly merged regressions.
+        inherited_cases = (
+            'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces',
+            'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA',
+            'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA',
+            'LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces',
+            'LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail',
+            'OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal',
+            'MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards',
+            'MesocycleCanvasUITests/testGoalThroughUndoKeepsTheCanvasAndReadbackTogether',
+            'ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration',
+            'ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory',
+            'ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote',
+            'ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies',
+            'ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor',
+            'ChaosMonkeyUITests/testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates',
+            'ChaosMonkeyUITests/testSystemAlertsRequireKnownDenyOnlyAction',
+            'ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending',
+            'ChaosMonkeyUITests/testProfilePhotoImportIsExcludedFromMonkeyCandidates',
+            'ChaosMonkeyUITests/testMissingActionTargetsDoNotCompleteMonkeySteps',
+            'ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget',
+            'ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion',
+        )
+        selected = [line.removeprefix('-only-testing:LogYourBodyUITests/')
+                    for line in output if line.startswith('-only-testing:')]
+        expected = [output[index + 1] for index, line in enumerate(output)
+                    if line == '--expected-test']
+        self.assertEqual(len(selected), len(set(selected)), 'A native case must be selected exactly once')
+        self.assertCountEqual([identifier + '()' for identifier in selected], expected,
+                              'Every selected native case must require its exact execution evidence')
+        for identifier in inherited_cases:
+            self.assertIn(identifier, selected)
         for identifier in evidence.REQUIRED_TESTS:
             self.assertIn('-only-testing:LogYourBodyUITests/' + identifier.removesuffix('()'), output)
             self.assertIn(identifier, output)
