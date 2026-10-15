@@ -11,17 +11,17 @@ import SwiftUI
 struct HomeV2Surface: View {
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
-    @Binding var selectedIndex: Int
+    let timeline: HomeV2TimelinePolicy.Snapshot
+    @Binding var selectedID: HomeV2TimelinePolicy.EntryID
     let weightValue: String
     let weightUnit: String
+    let ffmiValue: String
+    let bodyFatValue: String
     let changeSentence: String
-    let compositionSentence: String
+    let dateText: (BodyMetrics) -> String
     let phaseSentence: String?
     let loggedSentence: String?
-    let latestPhotoCaption: String?
     var systemState: HomeV2SystemState?
-    let chartDaily: [MetricChartDataPoint]
-    let chartTrend: [MetricChartDataPoint]
     let onOpenPhoto: () -> Void
     let onViewProgress: () -> Void
     let onTodayDetails: () -> Void
@@ -31,28 +31,41 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
 
-    @State private var editorialPhoto: (key: String, image: UIImage?)?
+    @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
+    @State private var showsProvenance = false
 
     private var isLogged: Bool { loggedSentence != nil }
     private var isHealthOff: Bool { systemState == .healthOff }
+    private var hasAnyPhoto: Bool {
+        bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
+    }
 
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     systemBanner
-                    editorialCard(width: geometry.size.width)
+                    HomeV2TimelinePager(
+                        snapshot: timeline, selectedID: userSelection,
+                        size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
+                        unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto
+                    )
+                    .overlay(alignment: .bottom) {
+                        if hasPhoto { photoStatStrip }
+                    }
                     photoNumberBlock
-                    if hasPhoto {
+                    if hasAnyPhoto {
                         HomeV2DisclosureLink(
                             title: HomeV2PhotoCopy.allPhotos,
                             identifier: "home_v2_all_photos_row",
                             action: onAllPhotos
                         )
                         .frame(maxWidth: .infinity)
-                    } else {
-                        rangeRow
-                        todayDetailsRow
+                    }
+                    rangeRow
+                    if !hasPhoto || isHealthOff { todayDetailsRow }
+                    if !coachDismissed {
+                        HomeV2TimelineCoachMark(onDismiss: { coachDismissed = true })
                     }
                 }
                 .frame(minHeight: geometry.size.height, alignment: .top)
@@ -61,8 +74,11 @@ struct HomeV2Surface: View {
             .accessibilityIdentifier("home_v2_content_scroll")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            actionDock
-                .background(HomeV2Tokens.Colors.shell)
+            VStack(spacing: 0) {
+                timelineScrubber
+                actionDock
+            }
+            .background(HomeV2Tokens.Colors.shell)
         }
     }
 
@@ -94,48 +110,26 @@ struct HomeV2Surface: View {
 
     private var hasPhoto: Bool { PhotoTimelineHUDPolicy.hasUsablePhoto(metric) }
 
-    private func editorialCard(width: CGFloat) -> some View {
-        let size = CGSize(width: width, height: width / HomeV2Tokens.photoAspectRatio)
-        return ZStack {
-            if hasPhoto, let photoURL = metric.photoUrl {
-                let photoKey = metric.userId + "|" + photoURL
-                let photoLoadFailed = editorialPhoto?.key == photoKey && editorialPhoto?.image == nil
-                Button(action: onOpenPhoto) {
-                    ZStack(alignment: .top) {
-                        if let snapshot = editorialPhoto, snapshot.key == photoKey, let image = snapshot.image {
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                        } else {
-                            HomeV2DataHero(metric: metric, metrics: bodyMetrics, unit: weightUnit)
-                            Text(photoLoadFailed ? "Photo unavailable" : "Loading photo…")
-                                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                                .foregroundStyle(HomeV2Tokens.Colors.ink)
-                                .padding(HomeV2Tokens.Space.tight)
-                                .background(HomeV2Tokens.Colors.shell)
-                        }
-                    }
-                    .frame(width: size.width, height: size.height)
-                    .clipped()
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(photoLoadFailed ? "Photo unavailable. Saved measurements shown." : "Progress photo")
-                .accessibilityHint("Open the photo")
-                .accessibilityIdentifier("home_v2_photo_stage")
-                .task(id: photoKey) {
-                    let image = await ImageCacheService.shared.loadImage(from: photoURL)
-                    guard !Task.isCancelled else { return }
-                    editorialPhoto = (photoKey, image)
-                }
-            } else {
-                HomeV2DataHero(metric: metric, metrics: bodyMetrics, unit: weightUnit)
-                    .frame(width: size.width, height: size.height)
-                    .accessibilityIdentifier("home_v2_metric_first")
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("home_v2_editorial_card")
+    private var userSelection: Binding<HomeV2TimelinePolicy.EntryID> {
+        Binding(get: { selectedID }, set: { next in
+            guard next != selectedID else { return }
+            selectedID = next
+            coachDismissed = true
+        })
+    }
+
+    private var timelineScrubber: some View {
+        HomeV2PhotoTimelineRuler(
+            dates: timeline.chronologicalDates,
+            selected: timeline.chronologicalPosition(for: selectedID),
+            onSelect: { position in
+                if let next = timeline.id(atChronologicalPosition: position) { userSelection.wrappedValue = next }
+            },
+            allowsVerticalScrolling: true,
+            accessibilityId: "home_v2_timeline_scrubber",
+            accessibilityName: "Body timeline"
+        )
+        .padding(.top, HomeV2Tokens.Space.tight)
     }
 
     private var hasSingleWeightHero: Bool {
@@ -143,33 +137,51 @@ struct HomeV2Surface: View {
             HomeV2EditorialPolicy.weights(in: bodyMetrics, selected: metric).count == 1
     }
 
+    /// Weight, FFMI and body fat overlaid on the selected photo's treated lower band.
+    private var photoStatStrip: some View {
+        HStack(spacing: HomeV2Tokens.Space.margin) {
+            HomeV2PhotoStat(label: "Weight", value: "\(weightValue) \(weightUnit)")
+            HomeV2PhotoStat(label: "FFMI", value: ffmiValue)
+            HomeV2PhotoStat(label: "Body fat", value: bodyFatValue)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, HomeV2Tokens.Space.inset)
+        .padding(.top, HomeV2Tokens.Space.margin)
+        .padding(.bottom, HomeV2Tokens.Space.row)
+        .background(
+            LinearGradient(
+                colors: [.clear, Color.black.opacity(0.55)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home_v2_photo_stats")
+    }
+
     private var photoNumberBlock: some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-            if hasPhoto, let latestPhotoCaption {
-                Text(latestPhotoCaption)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .accessibilityIdentifier("home_v2_photo_caption")
+            Text(dateText(metric))
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                .accessibilityIdentifier("home_v2_photo_caption")
+
+            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
+                HomeV2ProvenanceChip(detail: provenance) { showsProvenance = true }
             }
 
             if !hasSingleWeightHero {
                 numberRow(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .semibold, kerning: -1.2)
             }
 
-            Text(HomeV2EditorialPolicy.supportsWeightComparison(in: bodyMetrics, selected: metric)
-                 ? changeSentence : "No 30-day trend yet")
+            Text(changeSentence)
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .accessibilityIdentifier("home_v2_change_sentence")
 
-            if hasPhoto {
+            if hasPhoto || HomeV2EditorialPolicy.bodyFat(in: metric) == nil {
                 compositionLine
-            } else if HomeV2EditorialPolicy.bodyFat(in: metric) == nil {
-                Text("Body fat not logged for this day.")
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("home_v2_composition_sentence")
             }
 
             if isLogged || !hasPhoto {
@@ -178,6 +190,12 @@ struct HomeV2Surface: View {
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
+        .sheet(isPresented: $showsProvenance) {
+            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
+                HomeV2ProvenanceSheet(detail: provenance)
+            }
+        }
+        .onChange(of: metric.id) { _, _ in showsProvenance = false }
     }
 
     private func numberRow(size: CGFloat, weight: Font.Weight, kerning: CGFloat) -> some View {
@@ -197,11 +215,19 @@ struct HomeV2Surface: View {
     }
 
     private var compositionLine: some View {
-        Text(compositionSentence)
+        Text(visibleComposition)
             .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
             .foregroundStyle(HomeV2Tokens.Colors.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("home_v2_composition_sentence")
+    }
+
+    /// The missing-day sentence stays exact. A recorded percentage names no second source.
+    private var visibleComposition: String {
+        guard let reading = HomeV2EditorialPolicy.bodyFat(in: metric) else {
+            return HomeV2TimelinePolicy.bodyFatSentence(for: metric)
+        }
+        return HomeV2MetricEditorial.compositionLine(percentage: reading.percentage)
     }
 
     private var todayDetailsRow: some View {
@@ -309,7 +335,11 @@ struct HomeV2DataHero: View {
                         .rotationEffect(.degrees(-90))
                     VStack(spacing: HomeV2Tokens.Space.tight) {
                         Text(String(format: "%.1f%%", reading.percentage))
-                            .scaledSystemFont(size: 60, weight: .semibold, relativeTo: .largeTitle)
+                            .scaledSystemFont(
+                                size: HomeV2Tokens.TypeSize.progressValue,
+                                weight: .semibold,
+                                relativeTo: .largeTitle
+                            )
                             .minimumScaleFactor(0.5)
                             .lineLimit(1)
                             .foregroundStyle(HomeV2Tokens.Colors.ink)
@@ -323,11 +353,6 @@ struct HomeV2DataHero: View {
                 .frame(width: diameter, height: diameter)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            Text(reading.caption)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .multilineTextAlignment(.center)
         }
         .padding(44)
         .accessibilityElement(children: .ignore)
@@ -341,39 +366,32 @@ struct HomeV2DataHero: View {
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
             if weights.count > 1 {
-                Chart(weights) { point in
-                    PointMark(x: .value("Date", point.date), y: .value("Weight", displayWeight(point.kilograms)))
-                        .symbolSize(35)
-                        .foregroundStyle(HomeV2Tokens.Metric.weight)
-                }
-                .chartXAxis {
-                    AxisMarks(values: [weights[0].date, weights[weights.count - 1].date]) { value in
-                        AxisValueLabel(
-                            format: .dateTime.month(.abbreviated).day(),
-                            anchor: value.index == 0 ? .topLeading : .topTrailing
-                        )
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) {
-                        AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
-                        AxisValueLabel().foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    }
-                }
-                .chartYScale(domain: .automatic(includesZero: false))
-                .accessibilityHidden(true)
+                HomeV2TrendChart(
+                    daily: weightPoints,
+                    trend: [],
+                    accent: HomeV2Tokens.Metric.weight,
+                    range: .constant(.month1),
+                    showsRangeTabs: false,
+                    showsDots: true,
+                    chartHeight: HomeV2Tokens.chartHeight,
+                    axis: .months,
+                    metricTitle: "Weight",
+                    usesSevenDayAverage: false,
+                    anchorsToZero: false,
+                    requiresMinimumDays: false,
+                    plotIdentifier: "home_v2_weight_plot",
+                    allowsSelection: false,
+                    now: metric?.date ?? Date()
+                )
             } else if let reading = weights.first {
-                VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-                    Text(String(format: "%.1f", displayWeight(reading.kilograms)))
-                        .scaledSystemFont(size: 72, weight: .semibold, relativeTo: .largeTitle)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                        .accessibilityIdentifier("home_v2_weight_value")
-                    Text(unit)
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
-                }
-                .foregroundStyle(HomeV2Tokens.Colors.ink)
+                HomeV2MetricHero(
+                    value: String(format: "%.1f", displayWeight(reading.kilograms)),
+                    unit: unit,
+                    comparison: "",
+                    valueIdentifier: "home_v2_weight_value",
+                    valueSize: HomeV2Tokens.TypeSize.progressValue,
+                    showsComparison: false
+                )
                 .frame(maxHeight: .infinity, alignment: .center)
             }
             Text("\(weights.count) weight \(weights.count == 1 ? "entry" : "entries") in 30 days · \(unit)")
@@ -410,8 +428,36 @@ struct HomeV2DataHero: View {
         .padding(HomeV2Tokens.Space.margin)
     }
 
+    private var weightPoints: [MetricChartDataPoint] {
+        weights.map { reading in
+            MetricChartDataPoint(
+                date: reading.date,
+                value: displayWeight(reading.kilograms),
+                presence: .present
+            )
+        }
+    }
+
     private func displayWeight(_ kilograms: Double) -> Double {
         unit == "lb" ? kilograms.kgToLbs : kilograms
+    }
+}
+
+/// One stat in the photo-stage overlay: quiet label over a white value.
+struct HomeV2PhotoStat: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, weight: .medium, relativeTo: .caption)
+                .foregroundStyle(.white.opacity(0.72))
+            Text(value)
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .body)
+                .foregroundStyle(.white)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

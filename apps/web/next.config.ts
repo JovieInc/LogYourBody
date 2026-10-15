@@ -9,6 +9,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@jovie/ui'],
   // Enable static export for Capacitor when needed
   output: process.env.BUILD_TARGET === 'capacitor' ? 'export' : undefined,
 
@@ -44,7 +45,7 @@ const nextConfig: NextConfig = {
   },
 
   // Server external packages
-  serverExternalPackages: ['pdf-parse'],
+  serverExternalPackages: ['pdf-parse', '@statsig/statsig-node-core'],
 
   // Don't skip TypeScript checks
   typescript: {

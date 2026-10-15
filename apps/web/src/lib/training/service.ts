@@ -15,6 +15,12 @@ import type {
 } from '@/lib/ports/native-product-records';
 import { catalogVariantById } from './catalog';
 import {
+  evaluateTrajectory,
+  type ControllerReceipt,
+  type GoalTrajectory,
+  type SituationalConstraint,
+} from './controller';
+import {
   buildMicrocycle,
   buildSession,
   createMesoBlock,
@@ -211,13 +217,19 @@ export async function loadTrainingRecords(
 
 export type NextWorkoutResult =
   | { kind: 'not_enrolled' }
-  | { kind: 'week_complete'; week: number; weeklyFractionalVolume: Record<string, number> }
+  | {
+      kind: 'week_complete';
+      week: number;
+      weeklyFractionalVolume: Record<string, number>;
+      decision: ControllerReceipt;
+    }
   | {
       kind: 'workout';
       session: Session & { loggedSets: SetLog[] };
       week: number;
       weekCount: number;
       weeklyFractionalVolume: Record<string, number>;
+      decision: ControllerReceipt;
     };
 
 const sessionPrescriptionSchema = z
@@ -246,8 +258,16 @@ const sessionPrescriptionSchema = z
     safetyStop: z.boolean(),
     explanation: z.string().nullable(),
     evidenceIds: z.array(z.string()),
+    // In-session pain keeps the exercises and records executionPaused. An engine
+    // safety stop still has no exercises.
+    executionRevision: z.number().int().nonnegative().optional(),
+    executionPaused: z.boolean().optional(),
   })
-  .refine((session) => session.safetyStop === (session.exercises.length === 0));
+  .refine(
+    (session) =>
+      session.safetyStop === (session.exercises.length === 0) ||
+      (session.safetyStop && session.executionPaused === true),
+  );
 
 function isSessionPrescription(value: unknown, sessionId: string): value is Session {
   const result = sessionPrescriptionSchema.safeParse(value);
@@ -272,6 +292,9 @@ export async function getOrCreateNextWorkout(input: {
   now: Date;
   /** false returns the same prescription without starting or updating a session record. */
   persist?: boolean;
+  /** Optional controller signals: weight trajectory and expiring situational constraints. */
+  trajectory?: GoalTrajectory | null;
+  constraints?: SituationalConstraint[];
   admission?: TrainingMutationAdmission;
 }): Promise<NextWorkoutResult> {
   const persist = input.persist ?? true;
@@ -364,6 +387,26 @@ export async function getOrCreateNextWorkout(input: {
   );
   const completedLogs = programLogs.filter((log) => completedSessionIds.has(log.sessionId));
 
+  const dayInWeek = Math.max(
+    0,
+    Math.floor((input.now.getTime() - Date.parse(setup.startedAt)) / (24 * 60 * 60 * 1000)) % 7,
+  );
+  const plannedSessionsByNow = Math.min(
+    setup.sessionsPerWeek,
+    Math.floor(((dayInWeek + 1) / 7) * setup.sessionsPerWeek),
+  );
+  const decision = evaluateTrajectory({
+    setup,
+    block,
+    sessions: periodSessions.filter((record) => record.programSetupId === setup.id),
+    feedback: programFeedback,
+    completedThisWeek: completedThisWeek.length,
+    plannedSessionsByNow,
+    trajectory: input.trajectory ?? null,
+    constraints: input.constraints,
+    now: input.now,
+  });
+
   const microcycle = buildMicrocycle({
     setup,
     block,
@@ -382,6 +425,36 @@ export async function getOrCreateNextWorkout(input: {
 
   if (activeRecord?.prescription) {
     const existing = activeRecord.prescription;
+    if ((existing.executionRevision ?? 0) > 0) {
+      // Interruption decisions are this session's result. Rebuilding the base
+      // plan would resurrect skipped work or drop a safety pause.
+      const paused = existing.safetyStop || existing.executionPaused;
+      const savedState = `Saved workout, week ${existing.week}${paused ? ', paused' : ''}`;
+      return {
+        kind: 'workout',
+        session: {
+          ...existing,
+          loggedSets: programLogs.filter((log) => log.sessionId === existing.id),
+        },
+        week: existing.week,
+        weekCount: block.weekCount,
+        weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+        decision: {
+          ...decision,
+          decision: { kind: 'hold', optionalBurdenReduction: false },
+          rationale:
+            'Retaining the saved session interruption decisions; no new change was applied.',
+          before: savedState,
+          after: savedState,
+          reviewPoint: paused ? 'Before resuming the saved session' : 'Next session action',
+          nextAction: existing.safetyStop
+            ? 'Training remains paused. Review the reported pain and seek qualified care if it persists or worsens.'
+            : existing.executionPaused
+              ? 'The saved session is paused. Resume when ready.'
+              : 'Continue the saved session from its current exercise.',
+        },
+      };
+    }
     const retained = activeRecord.initialPrescription;
     const initial =
       isSessionPrescription(retained, existing.id) &&
@@ -442,6 +515,7 @@ export async function getOrCreateNextWorkout(input: {
       week: existing.week,
       weekCount: block.weekCount,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+      decision,
     };
   }
 
@@ -450,6 +524,7 @@ export async function getOrCreateNextWorkout(input: {
       kind: 'week_complete',
       week: block.currentWeek,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+      decision,
     };
   }
 
@@ -460,6 +535,7 @@ export async function getOrCreateNextWorkout(input: {
       kind: 'week_complete',
       week: block.currentWeek,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+      decision,
     };
   const session = applyExerciseSwaps(planned, blockSwaps, completedLogs);
   const sessionRecord = {
@@ -491,6 +567,7 @@ export async function getOrCreateNextWorkout(input: {
     week: block.currentWeek,
     weekCount: block.weekCount,
     weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+    decision,
   };
 }
 

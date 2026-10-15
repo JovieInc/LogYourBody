@@ -1,4 +1,5 @@
 ---
+draft: true
 title: The Truth About Walking, Steps, and NEAT for Body Composition
 date: 2024-11-06
 author: LogYourBody Team
@@ -15,6 +16,7 @@ excerpt: Why 10,000 steps might be the most underrated tool for fat loss and mus
 NEAT stands for **Non-Exercise Activity Thermogenesis**the calories you burn from all activities that aren't formal exercise, sleeping, or eating.
 
 Examples of NEAT:
+
 - Walking and standing
 - Fidgeting and gesturing
 - Household chores
@@ -62,6 +64,7 @@ Mike Israetel points out a shocking fact:
 ### Walking vs. Cardio for Fat Loss
 
 **Walking advantages:**
+
 - Doesn't interfere with recovery from lifting
 - Doesn't increase appetite significantly
 - Doesn't cause muscle loss
@@ -71,6 +74,7 @@ Mike Israetel points out a shocking fact:
 - Can be done while doing other things (calls, podcasts, audiobooks)
 
 **Traditional cardio drawbacks:**
+
 - Increases fatigue and recovery demands
 - Often increases appetite
 - Can interfere with lifting performance
@@ -81,6 +85,7 @@ Mike Israetel points out a shocking fact:
 ### The Research on Steps and Health
 
 Studies consistently show that daily step count correlates with:
+
 - Lower body fat percentage
 - Better insulin sensitivity
 - Improved cardiovascular health
@@ -88,6 +93,7 @@ Studies consistently show that daily step count correlates with:
 - Better mental health outcomes
 
 **Dose-response relationship:**
+
 - 5,000 steps: Sedentary (poor health outcomes)
 - 7,500 steps: Moderate activity (health benefits start)
 - 10,000 steps: Active (significant health benefits)
@@ -100,21 +106,25 @@ Studies consistently show that daily step count correlates with:
 Menno Henselmans' recommendations based on goals:
 
 **Maintenance/Health:**
+
 - 7,500-10,000 steps per day
 - Maintain body composition
 - General health benefits
 
 **Fat Loss (Moderate):**
+
 - 10,000-12,500 steps per day
 - Creates 200-300 calorie deficit
 - Sustainable long-term
 
 **Fat Loss (Aggressive):**
+
 - 12,500-15,000 steps per day
 - Creates 300-500 calorie deficit
 - May need to reduce as you get leaner
 
 **Muscle Gain (Bulking):**
+
 - 6,000-8,000 steps per day
 - Don't want to create deficit
 - Focus energy on recovery and growth
@@ -124,6 +134,7 @@ Menno Henselmans' recommendations based on goals:
 The 10,000 step guideline came from a 1960s Japanese marketing campaign, but research has since validated it as a reasonable target for most people.
 
 **Why 10,000 is solid:**
+
 - Creates meaningful energy expenditure
 - Achievable for most people
 - Provides health benefits
@@ -137,6 +148,7 @@ The 10,000 step guideline came from a 1960s Japanese marketing campaign, but res
 When you diet, your body doesn't just reduce BMRit also unconsciously reduces NEAT.
 
 **Research shows:**
+
 - In a 500-calorie deficit, BMR might drop 50-100 calories
 - But NEAT can drop 200-500 calories!
 - You fidget less
@@ -153,12 +165,14 @@ Mike Israetel calls this "the body's sneaky way of defending fat stores." Your b
 **The solution: Track and defend your step count.**
 
 **During a cut:**
+
 - Set a step target (10,000+)
 - Monitor daily via smartphone or fitness tracker
 - **Don't let steps drop as diet progresses**
 - May need to intentionally add walks to compensate
 
 **Example:**
+
 - Week 1 of cut: Naturally hitting 10,000 steps
 - Week 8 of cut: Only hitting 6,500 steps without trying
 - **Solution:** Add 2 deliberate walks to hit 10,000 again
@@ -170,11 +184,13 @@ Mike Israetel calls this "the body's sneaky way of defending fat stores." Your b
 ### Easy Ways to Add Steps
 
 **Morning routine:**
+
 - 10-minute walk after waking
 - Walk to get coffee
 - Park farther away
 
 **Work strategies:**
+
 - Walking meetings
 - Walk during phone calls
 - Take stairs instead of elevator
@@ -182,11 +198,13 @@ Mike Israetel calls this "the body's sneaky way of defending fat stores." Your b
 - Walk during lunch break
 
 **Evening routine:**
+
 - Walk after dinner (bonus: improves glucose control)
 - Walk the dog
 - Walk while listening to podcasts/audiobooks
 
 **Weekend activities:**
+
 - Hiking
 - Walking to errands
 - Playing outdoor sports
@@ -197,6 +215,7 @@ Mike Israetel calls this "the body's sneaky way of defending fat stores." Your b
 **The key: Make walking enjoyable, not a chore.**
 
 **Pair walking with enjoyment:**
+
 - Audiobooks or podcasts
 - Music playlists
 - Phone calls with friends/family
@@ -205,6 +224,7 @@ Mike Israetel calls this "the body's sneaky way of defending fat stores." Your b
 - Walking meetings
 
 **Use environmental design:**
+
 - Put walking shoes by door
 - Set phone reminders
 - Schedule walks in calendar
@@ -217,16 +237,19 @@ Mike Israetel calls this "the body's sneaky way of defending fat stores." Your b
 When you're in a caloric deficit, your body can break down muscle for energy. Walking helps prevent this through several mechanisms:
 
 **1. Low-Stress Energy Expenditure**
+
 - Doesn't compete with lifting for recovery
 - Doesn't deplete glycogen stores
 - Doesn't create additional cortisol stress
 
 **2. Improved Nutrient Partitioning**
+
 - Better insulin sensitivity
 - Improved glucose disposal
 - Enhanced fat oxidation
 
 **3. Maintained Training Performance**
+
 - More total calories available
 - Can keep protein and carbs higher
 - Better gym performance = muscle preservation
@@ -236,18 +259,16 @@ When you're in a caloric deficit, your body can break down muscle for energy. Wa
 Mike Israetel's hierarchy for creating a caloric deficit:
 
 **Tier 1 (Do This First):**
+
 1. Reduce food intake slightly
 2. Increase daily steps to 10,000+
 
-**Tier 2 (If Tier 1 Isn't Enough):**
-3. Reduce food intake further
-4. Add 1-2 low-intensity cardio sessions
+**Tier 2 (If Tier 1 Isn't Enough):** 3. Reduce food intake further 4. Add 1-2 low-intensity cardio sessions
 
-**Tier 3 (Advanced/Aggressive Cuts):**
-5. Reduce food further (not below ~1,200 for women, ~1,800 for men)
-6. Add more cardio if absolutely necessary
+**Tier 3 (Advanced/Aggressive Cuts):** 5. Reduce food further (not below ~1,200 for women, ~1,800 for men) 6. Add more cardio if absolutely necessary
 
 **Why this order?**
+
 - Walking has the best sustainability
 - Preserves recovery capacity
 - Least hunger-inducing
@@ -260,12 +281,14 @@ Mike Israetel's hierarchy for creating a caloric deficit:
 When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 
 **Problems with too many steps during a bulk:**
+
 - Burns calories needed for growth
 - Uses recovery capacity
 - May reduce strength in gym
 - Requires eating even MORE food
 
 **Menno Henselmans' recommendation:**
+
 - 6,000-8,000 steps during muscle gain phases
 - Enough for health and digestion
 - Not so much that it creates unwanted deficit
@@ -276,11 +299,13 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 ### Tools for Tracking
 
 **Smartphone (Free):**
+
 - iPhone Health app
 - Google Fit
 - Most phones track steps automatically
 
 **Fitness Trackers ($):**
+
 - Apple Watch
 - Fitbit
 - Garmin
@@ -288,6 +313,7 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 - Oura Ring
 
 **Tips for accuracy:**
+
 - Wear tracker consistently
 - Calibrate stride length if possible
 - Understand that all trackers have ~10% error
@@ -296,21 +322,25 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 ### How to Use Step Data
 
 **Daily monitoring:**
+
 - Check steps each evening
 - If below target, take a walk before bed
 - Use as accountability tool
 
 **Weekly analysis:**
+
 - Calculate weekly average
 - Look for patterns (weekday vs. weekend)
 - Identify opportunities to add steps
 
 **Monthly trends:**
+
 - Compare to previous month
 - Watch for unconscious reductions during diet
 - Adjust targets based on goals
 
 **Integration with LogYourBody:**
+
 - Track daily steps alongside body weight
 - Monitor correlation with body composition changes
 - See how steps affect your rate of progress
@@ -322,24 +352,28 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 **The goal: Engineer your environment for natural movement.**
 
 **Home setup:**
+
 - No TV remote (get up to change channel)
 - Pets to walk
 - Garden to maintain
 - Keep items on different floors
 
 **Work setup:**
+
 - Standing desk option
 - Walking breaks every hour
 - Active commute (walk, bike, park far)
 - Opt for stairs
 
 **Social life:**
+
 - Active dates (walks, hiking, sports)
 - Walk-and-talk with friends
 - Active hobbies
 - Dog ownership
 
 **Mindset:**
+
 - View walking as "you time," not exercise
 - Make it enjoyable
 - Don't stress about hitting target every single day
@@ -350,10 +384,12 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 ### Mistake 1: "I worked out, so I'm active"
 
 **The problem:**
+
 - 1 hour of exercise ` active lifestyle
 - The other 23 hours matter MORE
 
 **The fix:**
+
 - Track total daily steps
 - Realize gym time is small portion of day
 - Increase NEAT outside the gym
@@ -361,11 +397,13 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 ### Mistake 2: "More is always better"
 
 **The problem:**
+
 - Excessive steps can impair recovery
 - Diminishing returns above 15,000 steps
 - Can create unwanted deficit when bulking
 
 **The fix:**
+
 - Match steps to your goal
 - 10,000 for fat loss
 - 6,000-8,000 for muscle gain
@@ -374,12 +412,14 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 ### Mistake 3: "I'll burn fat with intense cardio instead"
 
 **The problem:**
+
 - Intense cardio increases appetite
 - Harder to recover from
 - Less sustainable
 - May lose muscle
 
 **The fix:**
+
 - Prioritize steps and walking
 - Add intense cardio sparingly
 - Walking is the foundation
@@ -387,6 +427,7 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 ### Myth: "Walking doesn't burn enough calories to matter"
 
 **The reality:**
+
 - 10,000 steps H 400-500 calories
 - That's the equivalent of a large meal
 - Over a week: 2,800-3,500 calories
@@ -400,6 +441,7 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 **Target:** 10,000-12,500 steps daily
 
 **Sample day:**
+
 - 6:30 AM: 15-min morning walk (2,000 steps)
 - 12:00 PM: Walk during lunch (3,000 steps)
 - 3:00 PM: Walk around office (1,000 steps)
@@ -408,6 +450,7 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 - **Total: 11,000 steps**
 
 **Diet:**
+
 - Calories: 2,200 (500 deficit)
 - Protein: 180g
 - Resistance training: 4x per week
@@ -417,12 +460,14 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 **Target:** 6,000-8,000 steps daily
 
 **Sample day:**
+
 - Lunch walk (2,000 steps)
 - Evening walk (2,500 steps)
 - Daily movement (2,500 steps)
 - **Total: 7,000 steps**
 
 **Diet:**
+
 - Calories: 3,000 (300 surplus)
 - Protein: 160g
 - Resistance training: 4-5x per week
@@ -432,6 +477,7 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 **Target:** 8,000-10,000 steps daily
 
 **Sample day:**
+
 - Morning routine (1,500 steps)
 - Work movement (3,000 steps)
 - Afternoon walk (2,500 steps)
@@ -439,6 +485,7 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 - **Total: 9,000 steps**
 
 **Diet:**
+
 - Calories: 2,700 (maintenance)
 - Protein: 170g
 - Resistance training: 3-4x per week
@@ -448,6 +495,7 @@ When the goal is maximum muscle growth, excessive NEAT can be counterproductive:
 NEAT, and particularly walking, is one of the most powerful and underutilized tools for body composition.
 
 **Key takeaways:**
+
 1. **10,000 steps creates a meaningful energy deficit** without impacting recovery
 2. **NEAT often exceeds gym calorie burn** over the course of a day
 3. **Walking preserves muscle during cuts** better than traditional cardio
@@ -463,6 +511,7 @@ Get your steps in. Your body composition (and health) will thank you.
 ## References
 
 Principles based on research and teachings from:
+
 - Menno Henselmans (Bayesian Bodybuilding)
 - Dr. Mike Israetel (Renaissance Periodization)
 - Dr. Layne Norton (Biolayne)

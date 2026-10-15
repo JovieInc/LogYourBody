@@ -159,6 +159,15 @@ struct ContentView: View {
         )
     }
 
+    private var isProductReadyForReviewRequest: Bool {
+        authManager.isAuthenticated && isLoadingComplete &&
+            !shouldShowOnboarding && !shouldShowProfileCompletion && subscriptionManager.isSubscribed &&
+            (!isBiometricLockArmed || isUnlocked) && !finishedOnboardingThisLaunch &&
+            !authManager.needsLegalConsent && !showLegalConsent && !showWhatsNew &&
+            !showDailyReminderOffer && !shouldShowDailyReminderPrompt && pendingDexaPDF == nil &&
+            !bugReportManager.isPromptPresented && !bugReportManager.isFormPresented
+    }
+
     private func completeLaunchOverlayIfReady() {
         guard !isLoadingComplete,
               loadingManager.progress >= 1.0 else {
@@ -180,6 +189,11 @@ struct ContentView: View {
             loadingOverlay
         }
         .preferredColorScheme(.dark)
+        .modifier(BodyRecordReviewPresentation(
+            currentOwnerID: authManager.currentUser?.id,
+            isProductReady: isProductReadyForReviewRequest,
+            isOnline: realtimeSyncManager.isOnline
+        ))
         .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         // Toast presenter removed - handle notifications at view level
         .fullScreenCover(isPresented: $showLegalConsent) {

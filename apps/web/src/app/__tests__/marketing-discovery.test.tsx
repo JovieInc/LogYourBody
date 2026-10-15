@@ -2,6 +2,14 @@ import { render } from '@testing-library/react';
 import HomePage from '../page';
 import robots from '../robots';
 import sitemap from '../sitemap';
+import { LANDING_FLAGS } from '@/lib/flags/landing';
+
+jest.mock('@/lib/flags/landing', () => ({
+  LANDING_FLAGS: { ART_DIRECTION_V2_ENABLED: false, APP_STORE_LIVE: false },
+}));
+jest.mock('@/lib/flags/publicLanding.server', () => ({
+  readEditorialHomepageRollout: jest.fn().mockResolvedValue(true),
+}));
 
 jest.mock('@/lib/analytics', () => ({
   analytics: { track: jest.fn() },
@@ -34,8 +42,9 @@ describe('marketing discovery routes', () => {
     expect(urls.some((url) => url.includes('/dashboard'))).toBe(false);
   });
 
-  it('always emits verified structured data on the default landing', () => {
-    const { container } = render(<HomePage />);
+  it.each([false, true])('emits verified structured data with editorial=%p', async (editorial) => {
+    (LANDING_FLAGS as { ART_DIRECTION_V2_ENABLED: boolean }).ART_DIRECTION_V2_ENABLED = editorial;
+    const { container } = render(await HomePage());
     const script = container.querySelector('script[type="application/ld+json"]');
     expect(script).not.toBeNull();
 

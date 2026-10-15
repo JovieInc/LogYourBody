@@ -190,6 +190,8 @@ describe('LogYourBody MCP route', () => {
     expect(Object.keys(byName)).toEqual([
       'get_todays_workout',
       'log_sets',
+      'control_workout',
+      'correct_set',
       'log_session_feedback',
       'swap_exercise',
       'get_training_progress',
@@ -200,6 +202,8 @@ describe('LogYourBody MCP route', () => {
     }
     expect(byName.get_todays_workout.annotations.readOnlyHint).toBe(true);
     expect(byName.log_sets.annotations.readOnlyHint).toBe(false);
+    expect(byName.control_workout.annotations.readOnlyHint).toBe(false);
+    expect(byName.correct_set.annotations.readOnlyHint).toBe(false);
     expect(byName.log_sets.securitySchemes).toEqual([
       { type: 'oauth2', scopes: [LYB_MCP_SCOPES.trainingWrite] },
     ]);
@@ -309,6 +313,38 @@ describe('LogYourBody MCP route', () => {
     expect(checkIn.content[0]?.text).toContain('qualified clinician');
   });
 
+  it('uses the canonical workout action and correction services from MCP', async () => {
+    const h = harness();
+    await enroll(h);
+    const reordered = await call(h, 'control_workout', { action: 'equipment_unavailable' });
+    expect(reordered.isError).toBeUndefined();
+    expect(reordered.structuredContent).toMatchObject({ decision: 'reordered', revision: 1 });
+
+    const workout = await call(h, 'get_todays_workout');
+    const current = workout.structuredContent?.session.exercises[0].name;
+    const logged = await call(h, 'log_sets', {
+      exercise: current,
+      sets: [{ reps: 10, rir: 3, load: 20, setNumber: 1 }],
+    });
+    expect(logged.isError).toBeUndefined();
+    const corrected = await call(h, 'correct_set', {
+      exercise: current,
+      setNumber: 1,
+      reps: 9,
+      rir: 2,
+      load: 20,
+    });
+    expect(corrected.isError).toBeUndefined();
+    expect(corrected.structuredContent).toMatchObject({ reps: 9, rir: 2, loadKg: 20 });
+    const rows = (await h.records.pull('subject-a', 'logged_sets')).records;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      reps: 9,
+      revision: 1,
+      corrections: [{ previous: { reps: 10, loadKg: 20, rir: 3 } }],
+    });
+  });
+
   it('keeps previewed targets after logging an exercise and honors a later pain stop', async () => {
     const h = harness();
     await enroll(h);
@@ -387,6 +423,66 @@ describe('LogYourBody MCP route', () => {
       ).isError,
     ).toBeUndefined();
     expect((await call(h, 'get_todays_workout')).structuredContent?.session.safetyStop).toBe(false);
+  });
+
+  it('accepts a voice-friendly per-muscle map without fabricating missing session scores', async () => {
+    const h = harness();
+    await enroll(h);
+    await call(h, 'get_todays_workout');
+    await call(h, 'log_sets', { exercise: 'goblet_squat', sets: [{ reps: 10, rir: 3 }] });
+    const result = await call(h, 'log_session_feedback', {
+      source: 'voice',
+      sourceObservationId: 'spoken-check-in-1',
+      originalStatement: 'The supported row gives me less back fatigue, I think.',
+      transcriptionUncertain: true,
+      interpretations: [
+        {
+          claim: 'tolerability',
+          timeframe: 'current',
+          confidence: 'moderate',
+          proposedExplanation: 'Less reported back fatigue in this setup; no hypertrophy claim.',
+        },
+      ],
+      muscles: {
+        back: {
+          soreness: 6,
+          recovery: 'limited',
+          pump: 7,
+          workload: 'as_expected',
+          performance: 'stable',
+        },
+      },
+      targetMuscle: 'back',
+      targetMuscleReadiness: 'ready',
+      breathingReadiness: 'ready',
+      supportingReadiness: { grip: 'limited' },
+      trunkFatigue: 3,
+    });
+    expect(result.isError).toBeUndefined();
+    expect(result.structuredContent).toMatchObject({
+      source: 'voice',
+      muscles: { back: { recovery: 'limited', performance: 'stable' } },
+      nextSetRecommendation: {
+        action: 'adjust_or_skip_task',
+        weeklyPlanChanged: false,
+        safetyCertified: false,
+      },
+    });
+    const saved = (await h.records.pull('subject-a', 'training_feedback')).records.find(
+      (record) => record.record_type === 'session_feedback',
+    );
+    expect(saved).toMatchObject({
+      source: 'voice',
+      sourceObservationId: 'spoken-check-in-1',
+      originalStatement: 'The supported row gives me less back fatigue, I think.',
+      transcriptionUncertain: true,
+      interpretations: [{ claim: 'tolerability', confidence: 'moderate' }],
+      muscles: { back: { soreness: 6, recovery: 'limited' } },
+    });
+    expect(saved).not.toHaveProperty('soreness');
+    expect(saved).not.toHaveProperty('pump');
+    expect(saved).not.toHaveProperty('performance');
+    expect(saved).not.toHaveProperty('jointPain');
   });
 
   it('validates tool input before touching records', async () => {

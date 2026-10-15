@@ -17,8 +17,8 @@ describe('MinimalWaitlistLanding', () => {
     );
     expect(screen.getByText(waitlistLandingCopy.subheading)).toBeInTheDocument();
     const primaryCta = screen.getByRole('button', { name: waitlistLandingCopy.submitLabel });
-    expect(primaryCta).toHaveClass('min-h-11');
-    expect(primaryCta.firstElementChild).toHaveClass('h-8');
+    expect(primaryCta).toHaveAttribute('data-state', 'idle');
+    expect(primaryCta).toHaveClass('min-h-7');
     expect(screen.getAllByText(waitlistLandingCopy.submitLabel)).toHaveLength(1);
     expect(screen.getByRole('link', { name: /back to email/i })).toHaveAttribute(
       'href',

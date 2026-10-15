@@ -13,7 +13,8 @@ export type CatalogEquipment =
   | 'cable'
   | 'bench'
   | 'adjustable_bench'
-  | 'bodyweight';
+  | 'bodyweight'
+  | 'smith';
 
 export type TrunkDemandLevel = 'low' | 'moderate' | 'high';
 
@@ -41,6 +42,8 @@ export type CatalogVariant = {
   cues: string[];
   /** Concern tags a reviewer flagged this variant as unsuitable for. */
   exclusions: string[];
+  /** False keeps a reviewed variant addressable without offering it as a substitute. */
+  substitutionEligible?: boolean;
 };
 
 const reviewed = (level: TrunkDemandLevel, note: string): TrunkDemand => ({
@@ -570,6 +573,58 @@ export const EXERCISE_CATALOG: CatalogVariant[] = [
     cues: ['Elbows stay by the ribs', 'Curl without leaning back'],
     exclusions: [],
   },
+  {
+    id: 'wrist_curl',
+    name: 'Dumbbell wrist curl',
+    primaryMuscle: 'biceps',
+    muscleContribution: { biceps: 1 },
+    requires: ['dumbbells'],
+    torsoSupport: 'supported',
+    trunkDemand: reviewed('low', 'Forearms rest on the thighs; the trunk carries nothing.'),
+    bodyPosition: 'seated, forearms on the thighs',
+    benchAngleDeg: null,
+    pulley: null,
+    unilateral: false,
+    cues: ['Forearms stay on the thighs', 'Curl at the wrist through a comfortable range'],
+    exclusions: ['wrist_intolerance'],
+    substitutionEligible: false,
+  },
+  {
+    id: 'pull_up',
+    name: 'Pull-up',
+    primaryMuscle: 'back',
+    muscleContribution: { back: 1, biceps: 0.5 },
+    requires: ['bodyweight'],
+    torsoSupport: 'unsupported',
+    trunkDemand: reviewed(
+      'moderate',
+      'The body hangs from the hands; the trunk braces in the air.',
+    ),
+    bodyPosition: 'hanging from a bar',
+    benchAngleDeg: null,
+    pulley: null,
+    unilateral: false,
+    cues: ['Start from a full hang', 'Pull until the chin is level with the bar'],
+    exclusions: ['shoulder_overhead_intolerance'],
+  },
+  {
+    id: 'smith_incline_press',
+    name: 'Smith machine incline press',
+    primaryMuscle: 'chest',
+    muscleContribution: { chest: 1, triceps: 0.5, shoulders: 0.5 },
+    requires: ['smith', 'adjustable_bench'],
+    torsoSupport: 'supported',
+    trunkDemand: reviewed(
+      'low',
+      'Torso is supported by the bench; the bar travels on the Smith rails.',
+    ),
+    bodyPosition: 'seated, back on the bench',
+    benchAngleDeg: 45,
+    pulley: null,
+    unilateral: false,
+    cues: ['Set the bench near 45 degrees', 'Press along the Smith rail path'],
+    exclusions: [],
+  },
 ];
 
 const catalogById = new Map(EXERCISE_CATALOG.map((variant) => [variant.id, variant]));
@@ -578,8 +633,8 @@ export function catalogVariantById(id: string): CatalogVariant | undefined {
   return catalogById.get(id);
 }
 
-/** Standard inventory each profile can prove. Specialty items (e.g. an EZ bar)
- * are never assumed; a full-gym preset alone cannot prove they are present. */
+/** Standard inventory each profile can prove. Specialty items (an EZ bar, a
+ * Smith machine) are never assumed; a full-gym preset alone cannot prove them. */
 export function profileEquipment(profile: Equipment): Set<CatalogEquipment> {
   return new Set<CatalogEquipment>(
     profile === 'full_gym'
@@ -614,6 +669,7 @@ export const CATALOG_EQUIPMENT = [
   'bench',
   'adjustable_bench',
   'bodyweight',
+  'smith',
 ] as const satisfies readonly CatalogEquipment[];
 
 export function missingEquipment(
@@ -660,6 +716,7 @@ export function substitutionCandidates(input: {
   const maxDemand = input.maxTrunkDemand ? TRUNK_ORDER[input.maxTrunkDemand] : null;
   return EXERCISE_CATALOG.filter(
     (variant) =>
+      variant.substitutionEligible !== false &&
       variant.primaryMuscle === input.primaryMuscle &&
       variant.id !== input.currentExerciseId &&
       (maxDemand === null || TRUNK_ORDER[variant.trunkDemand.level] <= maxDemand) &&
