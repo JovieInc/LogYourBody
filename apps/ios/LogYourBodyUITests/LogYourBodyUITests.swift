@@ -3364,9 +3364,15 @@ final class LogYourBodyUITests: XCTestCase {
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 30))
         logWeight.tap()
-        let datePicker = app.datePickers.firstMatch
+        let weightEntry = app.segmentedControls["Entry type selector"].buttons["Weight"]
+        XCTAssertTrue(weightEntry.waitForExistence(timeout: 8))
+        weightEntry.tap()
+        XCTAssertTrue(weightEntry.isSelected)
+        let datePicker = app.datePickers["home_v2_log_sheet_date"]
+        captureHistoricalCalendarDiagnostic(app, datePicker: datePicker, phase: "before-DatePicker-discovery")
         XCTAssertTrue(datePicker.waitForExistence(timeout: 8))
         datePicker.tap()
+        captureHistoricalCalendarDiagnostic(app, datePicker: datePicker, phase: "before-selection")
 
         let calendar = Calendar.current
         let yesterday = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: Date()))
@@ -3375,14 +3381,64 @@ final class LogYourBodyUITests: XCTestCase {
         }
         let day = app.staticTexts[String(calendar.component(.day, from: yesterday))].firstMatch
         XCTAssertTrue(day.waitForExistence(timeout: 5))
+        // Diagnostic candidate uses the old observed day query until owning popup AX establishes its real scope.
+        // Full-date admission below fails closed; this is not a claimed corrected calendar selector.
         day.tap()
+        captureHistoricalCalendarDiagnostic(app, datePicker: datePicker, phase: "after-selection")
+        guard historicalPickerValue(datePicker.value, matches: yesterday) else {
+            XCTFail("Diagnostic calendar did not prove the requested full day/month/year; no plus or save performed")
+            return
+        }
+        // Existing principal title is outside the compact calendar; no new dismissal control is invented.
+        app.staticTexts["home_v2_log_sheet"].tap()
+        let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: day)
+        let closeResult = XCTWaiter.wait(for: [closed], timeout: 5)
+        captureHistoricalCalendarDiagnostic(app, datePicker: datePicker, phase: "before-save-admission")
+        guard closeResult == .completed,
+              historicalPickerValue(datePicker.value, matches: yesterday),
+              app.buttons["home_v2_log_sheet_save"].isHittable else {
+            XCTFail("Diagnostic calendar is not admitted for the requested historical save")
+            return
+        }
         app.buttons["home_v2_log_sheet_plus"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].isHittable)
         app.buttons["home_v2_log_sheet_save"].tap()
 
         XCTAssertTrue(logWeight.waitForExistence(timeout: 10), "Saving another day returns without a today receipt")
         XCTAssertFalse(app.buttons["home_v2_undo"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
         attachScreenshot(named: "home-v2-log-another-day", from: app)
+    }
+
+    private func captureHistoricalCalendarDiagnostic(
+        _ app: XCUIApplication, datePicker: XCUIElement, phase: String
+    ) {
+        attachScreenshot(named: "historical-calendar-" + phase, from: app)
+        let ax = XCTAttachment(string: app.debugDescription)
+        ax.name = "historical-calendar-" + phase + "-owning-AX"
+        ax.lifetime = .keepAlways
+        add(ax)
+        let rawValue = datePicker.exists ? String(describing: datePicker.value) : "<DatePicker TYPE+ID absent>"
+        let value = XCTAttachment(string: "locale=\(Locale.current.identifier)\nvalue=\(rawValue)")
+        value.name = "historical-calendar-" + phase + "-picker-value"
+        value.lifetime = .keepAlways
+        add(value)
+    }
+
+    private func historicalPickerValue(_ value: Any?, matches requested: Date) -> Bool {
+        guard let value = value as? String else { return false }
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        for style in [DateFormatter.Style.short, .medium, .long, .full] {
+            let formatter = DateFormatter()
+            formatter.locale = .current
+            formatter.calendar = .current
+            formatter.isLenient = false
+            formatter.dateStyle = style
+            formatter.timeStyle = .none
+            guard let parsed = formatter.date(from: text), formatter.string(from: parsed) == text else { continue }
+            if Calendar.current.isDate(parsed, inSameDayAs: requested) { return true }
+        }
+        return false
     }
 
     func testHomeV2UndoRestoresPhotoOnlyDayAfterRelaunch() throws {

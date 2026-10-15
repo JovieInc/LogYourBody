@@ -538,7 +538,7 @@ struct LogYourBodyApp: App {
         if (usesFullDashboardFixture || usesPhotoTimelineHUDFixture) && !usesEmptyHomeData {
             let usesPhotoData = arguments.contains(HomeV2Policy.photoFixtureArgument) ||
                 arguments.contains("-lybUITestPhotoTimelinePhotoFixture")
-            let fixturePhotoURL = usesPhotoData ? writeHomeV2FixturePhoto() : nil
+            let fixturePhotoURL = usesPhotoData ? writeHomeV2FixturePhoto(fixtureUserId: userId) : nil
             if usesUndoPhotoFixture && arguments.contains("-lybUITestReuseUndoFixtureData") {
                 let persisted = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
                 precondition(!persisted.isEmpty, "Undo relaunch must read persisted rows without reseeding")
@@ -589,11 +589,30 @@ struct LogYourBodyApp: App {
 
     /// A deterministic 4:5 "photo" so the photo-first Home is testable without a
     /// network: a soft gradient with a darker figure in the middle.
-    private func writeHomeV2FixturePhoto(variant: Int? = nil) -> String? {
+    private func writeHomeV2FixturePhoto(variant: Int? = nil, fixtureUserId: String? = nil) -> String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        let option = "-lybUITestHomeV2TimelinePhotoCalibration"
+        let hasFixtureSession = arguments.contains("-lybUITestPhotoTimelineHUDFixture") &&
+            arguments.contains("-lybUITestHomeV2TimelineFixture") &&
+            BiometricLockPolicy.shouldDisableForUITests(
+                arguments: arguments, environment: ProcessInfo.processInfo.environment,
+                userId: fixtureUserId
+            )
+        let requested = arguments.firstIndex(of: option).flatMap { index in
+            arguments.indices.contains(index + 1) ? arguments[index + 1] : nil
+        }
+        let calibration = hasFixtureSession && ["0", "7", "gray", "blank"].contains(requested ?? "")
+            ? requested : nil
+        let effectiveVariant = calibration == "gray" ? nil : calibration.flatMap(Int.init) ?? variant
         let size = CGSize(width: 400, height: 500)
         let image = UIGraphicsImageRenderer(size: size).image { context in
+            if calibration == "blank" {
+                UIColor.black.setFill()
+                context.fill(CGRect(origin: .zero, size: size))
+                return
+            }
             let palette: [Int: UIColor] = [0: .red, 7: .blue, 14: .green, 21: .purple, 35: .orange]
-            let tint = variant.flatMap { palette[$0] }
+            let tint = effectiveVariant.flatMap { palette[$0] }
             let colors = [(tint ?? .lightGray).cgColor, (tint ?? .darkGray).cgColor] as CFArray
             if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
                 context.cgContext.drawLinearGradient(
@@ -603,12 +622,24 @@ struct LogYourBodyApp: App {
                     options: []
                 )
             }
+            // DEBUG-only independent photo identity remains visible after subject-plate treatment.
+            let identityCodes = [0: 0b101, 7: 0b011, 14: 0b110, 21: 0b100, 35: 0b001]
+            if let effectiveVariant, let code = identityCodes[effectiveVariant] {
+                for (index, x) in [0.0, 155.0, 310.0].enumerated() {
+                    ((code & (1 << (2 - index))) == 0 ? UIColor.black : UIColor.white).setFill()
+                    context.fill(CGRect(x: x, y: 0, width: 90, height: 80))
+                }
+            }
             UIColor.black.withAlphaComponent(0.85).setFill()
             UIBezierPath(roundedRect: CGRect(x: 150, y: 90, width: 100, height: 360), cornerRadius: 48).fill()
         }
         guard let data = image.jpegData(compressionQuality: 0.9) else { return nil }
-        let suffix = variant.map { "-\($0)" } ?? ""
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lyb-ui-test-home-v2-photo\(suffix).jpg")
+        let suffix = effectiveVariant.map { "-\($0)" } ?? ""
+        // Both existing image caches key by URL, not image bytes; never reuse the old unmarked URL.
+        let identityVersion = calibration.map { "-identity-v1-calibration-\($0)" } ??
+            (effectiveVariant == nil ? "" : "-identity-v1")
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("lyb-ui-test-home-v2-photo\(suffix)\(identityVersion).jpg")
         do {
             try data.write(to: url, options: .atomic)
         } catch {
@@ -620,7 +651,7 @@ struct LogYourBodyApp: App {
     private func seedFullDashboardUITestFixtureData(userId: String, photoURL: String? = nil) async {
         guard let expectedMetricIDs = try? await UITestFixtureIsolation.seedDashboardMetrics(
             userId: userId, photoURL: photoURL, now: Date(),
-            timelinePhoto: { writeHomeV2FixturePhoto(variant: $0) }
+            timelinePhoto: { writeHomeV2FixturePhoto(variant: $0, fixtureUserId: userId) }
         ) else {
             preconditionFailure("Dashboard UI fixture could not persist its measurements")
         }

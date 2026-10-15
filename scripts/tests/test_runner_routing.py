@@ -1177,3 +1177,112 @@ def test_failed_merge_group_cancels_its_mac_jobs_instead_of_holding_them() -> No
     summary = _job_block("ci.yml", "ci-summary")
     # The required check must still conclude after the cancel.
     assert "if: always()" in summary
+
+
+def test_current_home_diagnostic_cases_use_real_combined_selection_and_passed_evidence() -> None:
+    import copy
+    import importlib.util
+    import re
+    import pytest
+
+    source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
+    selection = "LAUNCH_QUALITY_UI_TESTS=(" + source.split(
+        "LAUNCH_QUALITY_UI_TESTS=(", 1
+    )[1].split("UI_RESULT_BUNDLE=", 1)[0]
+    result = subprocess.run(
+        ["bash", "-e", "-u", "-c", selection +
+         '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
+         'printf "evidence:%s\\n" "${UI_EVIDENCE_ARGS[@]}"\n'],
+        text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+    )
+    assert result.returncode == 0, result.stderr
+    selectors = [line.removeprefix("selector:") for line in result.stdout.splitlines()
+                 if line.startswith("selector:")]
+    arguments = [line.removeprefix("evidence:") for line in result.stdout.splitlines()
+                 if line.startswith("evidence:")]
+    expected = arguments[1::2]
+    assert arguments[::2] == ["--expected-test"] * len(selectors)
+    assert len(selectors) == len(set(selectors))
+    assert len(expected) == len(set(expected))
+    assert expected == [item.removeprefix("-only-testing:LogYourBodyUITests/") + "()"
+                        for item in selectors]
+    # Explicit acceptance identities are preserved; additional future cases may grow.
+    required = [
+        'LogYourBodyUITests/testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch',
+        'LogYourBodyUITests/testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity',
+        'LogYourBodyUITests/testHomeV2AskSyntheticCancelledTurnRecovers',
+        'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces',
+        'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA',
+        'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA',
+        'LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces',
+        'LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail',
+        'OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal',
+        'ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration',
+        'ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory',
+        'ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote',
+        'ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies',
+        'ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor',
+        'ChaosMonkeyUITests/testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates',
+        'ChaosMonkeyUITests/testSystemAlertsRequireKnownDenyOnlyAction',
+        'ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending',
+        'ChaosMonkeyUITests/testProfilePhotoImportIsExcludedFromMonkeyCandidates',
+        'ChaosMonkeyUITests/testMissingActionTargetsDoNotCompleteMonkeySteps',
+        'ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget',
+        'ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion',
+        'HomeV2LayoutUITests/testLogSheetHasOneHeadingAndKeepsEntryControls',
+        'HomeV2LayoutUITests/testLogSheetEditsUnitsWithKeyboardAndCancelsWithoutChangingHome',
+        'HomeV2LayoutUITests/testLogSheetAtLargestTextKeepsValueAndDetailsReachable',
+        'HomeV2LayoutUITests/testEditorialDataHeroLabelsVisualEstimate',
+        'HomeV2LayoutUITests/testEditorialSingleWeightDoesNotInventAHistory',
+        'HomeV2LayoutUITests/testEditorialSingleReadingDoesNotClaimAWeightTrendBehindPhotoOrBodyFat',
+        'HomeV2LayoutUITests/testCompositionHomeShowsBodyFatFirstAndHonestSupportingMetrics',
+        'HomeV2LayoutUITests/testSupportingMetricTapsOpenTheirOwnProgressWorkspace',
+        'HomeV2LayoutUITests/testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight',
+        'HomeV2LayoutUITests/testCompositionContextAtLargestTextKeepsEachSupportingMetricReachable',
+        'HomeV2LayoutUITests/testBodyFatEditorAtLargestTextPreservesMethodUntilExplicitSelection',
+        'HomeV2TimelineIntegrationUITests/testHorizontalPhotoDragPagesPixelsAndMetricsWithoutOpeningViewer',
+        'HomeV2TimelineIntegrationUITests/testSelectedWeightOnlyDayNeverBorrowsTodaysBodyFat',
+        'HomeV2TimelineIntegrationUITests/testBodyFatCheckInUpdatesSelectedHistoricalPhotoWithoutChangingWeight',
+        'HomeV2TimelineIntegrationUITests/testSelectedDayStepsAtLargestTextFollowThePhotoAndRemainReachable',
+        'LogYourBodyUITests/testHomeV2PhotoFirstKeepsTheNumberBelowThePhoto',
+        'LogYourBodyUITests/testHomeV2ProgressIsOneMetricWorkspace',
+        'LogYourBodyUITests/testHomeV2MetricFirstLogsWeightAndConfirmsInPlace',
+        'LogYourBodyUITests/testHomeV2ProgressRefreshesAfterEditingAnExistingDay',
+        'HomeV2TimelineIntegrationUITests/testVerticalRulerDragDoesNotSelectOrNavigateAndHorizontalScrubStillWorks',
+        'HomeV2LayoutUITests/testEditorialWeightOnlyHeroShowsActualSparseReadings',
+        'LogYourBodyUITests/testHomeV2ChangingLogDateDoesNotCreateATodayUndoReceipt',
+        'ChaosEdgeCaseUITests/testBodyFatEntryRejectsOutOfRangeValues',
+        'LogYourBodyUITests/testHomeV2SwipeMovesPhotoDateAndMetricsTogether',
+        'LogYourBodyUITests/testHomeV2ScrubberJumpsThroughBodyHistory',
+        'LogYourBodyUITests/testHomeV2TimelineCoachMarkDismissesPermanently',
+        'HomeV2TimelineIntegrationUITests/testDiagnosticMountedCurrentPhotoCodeRejectsHistoricalIdentity',
+        'HomeV2TimelineIntegrationUITests/testDiagnosticMountedHistoricalPhotoCodeRejectsCurrentIdentity',
+        'HomeV2TimelineIntegrationUITests/testDiagnosticMountedDefaultGrayAndBlankRejectPhotoIdentity',
+        'HomeV2TimelineIntegrationUITests/testSelectedMomentInfersBracketedBodyFatWithProvenance',
+    ]
+    for identifier in required:
+        assert expected.count(identifier + "()") == 1
+    for identifier in expected:
+        suite, method = identifier.removesuffix("()").split("/")
+        swift = (_REPO_ROOT / "apps/ios/LogYourBodyUITests" / (suite + ".swift")).read_text()
+        assert len(re.findall(r"func " + re.escape(method) + r"\(", swift)) == 1, identifier
+    spec = importlib.util.spec_from_file_location(
+        "home_diagnostic_evidence", _REPO_ROOT / "scripts/ios/launch-quality-evidence.py"
+    )
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    cases = [{"nodeType": "Test Case", "nodeIdentifier": identifier, "result": "Passed"}
+             for identifier in expected]
+    assert len(evidence.validate_cases({"testNodes": cases}, expected)) == len(expected)
+    for identifier in expected:
+        for state in ("missing", "Skipped", "Failed", "duplicate"):
+            invalid = copy.deepcopy(cases)
+            target = next(case for case in invalid if case["nodeIdentifier"] == identifier)
+            if state == "missing":
+                invalid.remove(target)
+            elif state == "duplicate":
+                invalid.append(copy.deepcopy(target))
+            else:
+                target["result"] = state
+            with pytest.raises(ValueError):
+                evidence.validate_cases({"testNodes": invalid}, expected)
