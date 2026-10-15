@@ -234,7 +234,7 @@ struct HomeV2ProgressView: View {
                     .padding(.horizontal, HomeV2Tokens.Space.inset)
                     .padding(.vertical, HomeV2Tokens.Space.margin)
 
-                    if contextualSharePayload != nil {
+                    if contextualSharePayload != nil, !showsProvenance {
                         Button { showsMetricShare = true } label: {
                             Label("Share \(metric.title)", systemImage: "square.and.arrow.up")
                         }

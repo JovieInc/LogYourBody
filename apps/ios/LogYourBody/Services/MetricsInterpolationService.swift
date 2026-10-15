@@ -110,8 +110,9 @@ class MetricsInterpolationService {
             }
 
             while currentDay <= processingEndDay {
-                // Seed the first day at its actual measurement time, not an earlier midnight.
-                let sampleDate = currentDay == firstDay ? firstMetric.date : currentDay
+                // Midnight is before a weigh-in later that day. Sampling it marks
+                // the weigh-in interpolated and drops it from Progress and Share.
+                let sampleDate = trendSampleDate(on: currentDay, query: date)
                 guard let weightResult = estimate(for: sampleDate) else {
                     // A gap larger than the interpolation limit cannot yield a
                     // result on any intervening day. Jump to the next known
@@ -180,6 +181,17 @@ class MetricsInterpolationService {
             }
 
             return trendWeightCache[targetDay]
+        }
+
+        /// Latest weigh-in on `day` that does not look ahead of `query`.
+        /// Days with no eligible weigh-in stay on midnight so gaps still interpolate.
+        private func trendSampleDate(on day: Date, query: Date) -> Date {
+            if let measured = metrics.last(where: {
+                calendar.isDate($0.date, inSameDayAs: day) && $0.date <= query
+            }) {
+                return measured.date
+            }
+            return day
         }
 
         func estimate(for date: Date) -> InterpolatedMetric? {
