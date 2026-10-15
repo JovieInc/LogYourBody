@@ -749,14 +749,18 @@ extension SyncIntegrationRemotePayloadTests {
     func testDailyAndProfileAcceptedPayloadsCompleteOnceAndApplyValues() async throws {
         let dailyID = UUID().uuidString
         let profileID = UUID().uuidString
+        _ = try await seedCompletionDaily(id: dailyID)
+        _ = try await seedCompletionProfile(id: profileID)
+        let updated = ISO8601DateFormatter().string(from: wholeSecondDate(60))
         await assertApplyCompletesOnce { done in
             coreData.updateOrCreateDailyMetric(from: [
-                "id": dailyID, "user_id": "completion-owner", "steps": 123, "notes": "accepted"
+                "id": dailyID, "user_id": "completion-owner", "steps": 123, "notes": "accepted",
+                "updated_at": updated
             ], completion: done)
         }
         await assertApplyCompletesOnce { done in
             coreData.updateOrCreateProfile(from: [
-                "id": profileID, "full_name": "Accepted profile", "height": 180.0
+                "id": profileID, "full_name": "Accepted profile", "height": 180.0, "updated_at": updated
             ], completion: done)
         }
         let daily = try await completionStoredRow(entity: "CachedDailyMetrics", id: dailyID)
@@ -776,6 +780,7 @@ extension SyncIntegrationRemotePayloadTests {
         let store = coreData!
         let stale = ISO8601DateFormatter().string(from: wholeSecondDate(-60))
         let nextID = UUID().uuidString
+        let nextDate = ISO8601DateFormatter().string(from: wholeSecondDate(60))
         Task { @MainActor in
             await store.updateOrCreateDailyMetricAndWait(from: [
                 "id": dailyID, "user_id": "completion-owner", "steps": 7, "updated_at": stale
@@ -785,7 +790,8 @@ extension SyncIntegrationRemotePayloadTests {
             ])
             await store.updateOrCreateProfileAndWait(from: ["id": profileID, "updated_at": stale])
             await store.updateOrCreateDailyMetricAndWait(from: [
-                "id": nextID, "user_id": "completion-owner", "steps": 456
+                "id": nextID, "user_id": "completion-owner", "steps": 456,
+                "date": nextDate, "created_at": nextDate, "updated_at": nextDate
             ])
             finished.fulfill()
         }
@@ -835,6 +841,8 @@ extension SyncIntegrationRemotePayloadTests {
             let row = CachedProfile(context: context)
             row.id = id
             row.fullName = "Keep this profile"
+            row.email = "completion-owner@example.com"
+            row.createdAt = date.addingTimeInterval(-300)
             row.height = 180
             row.updatedAt = date
             row.lastModified = date
