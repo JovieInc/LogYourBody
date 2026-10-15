@@ -242,14 +242,27 @@ struct BodyScoreShareCardView: View {
     private func shareSummary(layout: ShareCardLayout) -> some View {
         VStack(alignment: .leading, spacing: layout.summarySpacing) {
             HStack(alignment: .lastTextBaseline, spacing: layout.scoreSpacing) {
-                Text(payload.snapshot(for: options)?.value ?? payload.scoreText)
-                    .font(.system(size: layout.scoreFontSize, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .allowsTightening(true)
-                    .minimumScaleFactor(0.58)
-                    .accessibilityIdentifier("body_score_share_score")
+                HStack(alignment: .lastTextBaseline, spacing: layout.scoreLabelSpacing) {
+                    Text(payload.snapshot(for: options)?.value ?? payload.scoreText)
+                        .font(.system(size: layout.scoreFontSize, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .allowsTightening(true)
+                        .minimumScaleFactor(0.58)
+                        .accessibilityIdentifier("body_score_share_score")
+
+                    // A tagline-sized "%" is dropped by Vision when the detail line is long.
+                    // Keep the score identifier on the number and draw the percent with it.
+                    if payload.snapshot(for: options)?.unit == "%" {
+                        Text("%")
+                            .font(.system(size: layout.scoreFontSize, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.58)
+                            .accessibilityIdentifier("body_score_share_unit")
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: layout.scoreLabelSpacing) {
                     Text(options.selectedMetric?.title ?? "Body Score")
@@ -260,13 +273,15 @@ struct BodyScoreShareCardView: View {
                         .allowsTightening(true)
                         .minimumScaleFactor(0.7)
 
-                    Text(payload.snapshot(for: options)?.unit ?? payload.tagline)
-                        .font(.system(size: layout.taglineFontSize, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color.white.opacity(0.9))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("body_score_share_tagline")
+                    if payload.snapshot(for: options)?.unit != "%" {
+                        Text(payload.snapshot(for: options)?.unit ?? payload.tagline)
+                            .font(.system(size: layout.taglineFontSize, weight: .semibold, design: .rounded))
+                            .foregroundColor(Color.white.opacity(0.9))
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("body_score_share_tagline")
+                    }
 
                     if let deltaText = payload.snapshot(for: options).map({ $0.detail(options: options) }) ?? payload.deltaText {
                         Text(deltaText)
