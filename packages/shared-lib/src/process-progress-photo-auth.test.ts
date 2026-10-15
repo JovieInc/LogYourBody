@@ -22,9 +22,11 @@ describe('first-party progress photo auth boundary', () => {
 
   it('keeps native photo upload on the first-party bearer API', () => {
     expect(iosPhotoUploadManager).toContain(
-      'private func authenticatedJWT() async throws -> String',
+      'private func authenticatedJWT(for ownership: AuthManager.ProfileSessionOwnership) async throws -> String',
     );
-    expect(iosPhotoUploadManager).toContain('let token = try await authenticatedJWT()');
+    expect(iosPhotoUploadManager).toContain(
+      'let token = try await authenticatedJWT(for: ownership)',
+    );
     expect(iosPhotoUploadManager).toContain('/api/auth/mobile/photos');
     expect(iosPhotoUploadManager).toContain(
       'request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")',
