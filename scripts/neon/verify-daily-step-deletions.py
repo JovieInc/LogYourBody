@@ -78,14 +78,15 @@ def main():
             raise RuntimeError(result.stderr or result.stdout)
         return result
 
-    binaries = {}
+    binaries, versions = {}, {}
     for name in ("initdb", "pg_ctl", "psql"):
         path = (args.postgres_bin / name).resolve()
         version = run([str(path), "--version"]).stdout.strip()
         if not re.search(r"\(PostgreSQL\) 16(?:\.|$)", version):
             raise RuntimeError("PostgreSQL16 required: " + version)
         binaries[name] = str(path)
-    temporary = Path(tempfile.mkdtemp(prefix="lyb-daily-step-deletion-", dir="/private/tmp"))
+        versions[name] = version
+    temporary = Path(tempfile.mkdtemp(prefix="lyb-daily-step-deletion-", dir="/tmp"))
     data, socket = temporary / "data", temporary / "socket"
     socket.mkdir(mode=0o700)
     ctl = [binaries["pg_ctl"], "-D", str(data)]
@@ -262,7 +263,7 @@ def main():
         assert rejected.returncode != 0 and "account_changed" in rejected.stderr and row(rollback_row["id"]) is None
         passed("captured old account incarnation cannot create a deletion marker")
         print(json.dumps({"passed": len(results), "checks": results, "lockObservations": waits,
-                          "sourceSha256": bindings, "liveDatabase": False}), flush=True)
+                          "sourceSha256": bindings, "postgresTools": versions, "liveDatabase": False}), flush=True)
     finally:
         if (data / "postmaster.pid").exists():
             run(ctl + ["-m", "fast", "-w", "stop"])
