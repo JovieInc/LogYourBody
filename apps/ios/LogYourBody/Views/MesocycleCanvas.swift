@@ -470,6 +470,7 @@ struct MesocycleCanvasContainer: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.theme) private var theme
     @State private var draft = ""
+    @FocusState private var isComposerFocused: Bool
 
     private var reduced: Bool { accessibilityReduceMotion || model.reduceMotion }
 
@@ -549,6 +550,10 @@ struct MesocycleCanvasContainer: View {
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            if model.readback?.proposal?.status == "proposed" {
+                proposalActions
+                    .padding(.horizontal, 16)
+            }
             composer
         }
         .background(theme.colors.background.ignoresSafeArea())
@@ -624,33 +629,42 @@ struct MesocycleCanvasContainer: View {
                     }
                 }
             }
-            HStack {
-                Button("Accept") { Task { await model.decide("apply") } }
-                    .frame(minHeight: 44)
-                    .accessibilityIdentifier("canvas_accept")
-                Button("Reject") { Task { await model.decide("reject") } }
-                    .frame(minHeight: 44)
-                    .accessibilityIdentifier("canvas_reject")
-            }
         }
         .padding(12)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("canvas_preview")
     }
 
+    private var proposalActions: some View {
+        HStack {
+            Button("Accept") { Task { await model.decide("apply") } }
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("canvas_accept")
+            Button("Reject") { Task { await model.decide("reject") } }
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("canvas_reject")
+        }
+    }
+
     private var composer: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Prioritize upper chest and triceps", text: $draft)
                 .textFieldStyle(.roundedBorder)
+                .focused($isComposerFocused)
                 .accessibilityIdentifier("canvas_composer")
             HStack {
                 Button("Send") {
                     let text = draft
                     draft = ""
+                    isComposerFocused = false
                     Task { await model.submit(text) }
                 }
                 .accessibilityIdentifier("canvas_send")
-                Button("Voice") { model.stageVoice(draft); draft = "" }
+                Button("Voice") {
+                    model.stageVoice(draft)
+                    draft = ""
+                    isComposerFocused = false
+                }
                     .accessibilityIdentifier("canvas_voice")
                 Button("Reload") { model.reloadFromStore() }
                     .accessibilityIdentifier("canvas_reload")

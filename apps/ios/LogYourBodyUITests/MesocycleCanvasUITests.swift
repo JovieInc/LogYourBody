@@ -66,6 +66,7 @@ final class MesocycleCanvasUITests: XCTestCase {
         composer.tap()
         composer.typeText("Swap incline dumbbell press for the Smith machine incline press")
         tap(app, "canvas_voice")
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
         XCTAssertTrue(app.descendants(matching: .any)["canvas_voice_pending"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["Incline dumbbell press"].exists)
         tap(app, "canvas_voice_confirm")
@@ -106,6 +107,12 @@ final class MesocycleCanvasUITests: XCTestCase {
         composer.tap()
         composer.typeText(text)
         tap(app, "canvas_send")
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
+        let accept = app.buttons["canvas_accept"]
+        XCTAssertTrue(accept.waitForExistence(timeout: 8))
+        // Proposal decisions stay reachable even when its change list fills the scroll view.
+        XCTAssertTrue(accept.isHittable)
+        XCTAssertTrue(app.buttons["canvas_reject"].isHittable)
     }
 
     private func tap(_ app: XCUIApplication, _ identifier: String) {
