@@ -2585,6 +2585,21 @@ final class LogYourBodyUITests: XCTestCase {
 
     private func assertProgressProvenanceCoversShare(in app: XCUIApplication) {
         app.buttons["home_v2_progress_tab_ffmi"].tap()
+        // The first observed FFMI fixture is 35 days old; 1M contains only interpolated FFMI.
+        let range = app.buttons["home_v2_range_3M"]
+        guard range.exists, range.isHittable else {
+            XCTFail("The actual 3M range must be reachable before proving FFMI Share coverage")
+            return
+        }
+        range.tap()
+        let share = app.buttons["home_v2_progress_share"]
+        guard range.isSelected, app.staticTexts["home_v2_progress_value"].label == "22.2",
+              share.exists, share.isHittable else {
+            attachScreenshot(named: "progress-ffmi-share-positive-prerequisite", from: app)
+            XCTFail("Require the real 84.7kg / 17.4% / 178cm fixture's observed FFMI and Share before overlay")
+            return
+        }
+        attachScreenshot(named: "progress-ffmi-observed-share-before-provenance", from: app)
         let chip = app.buttons["home_v2_provenance_chip"].firstMatch
         XCTAssertTrue(chip.waitForExistence(timeout: 5), "The derived FFMI fixture exposes its provenance")
         chip.tap()
