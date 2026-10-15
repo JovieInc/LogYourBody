@@ -889,3 +889,54 @@ private struct PhotoCallerStoredRow {
     let updated: Date?
     let modified: Date?
 }
+
+// Regression candidate for the existing generic Edit callback. This intentionally
+// uses its current date-only service call; it is expected to fail before identity
+// is carried from the captured editor into the admitted store transaction.
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testCapturedOlderEditorDoesNotOverwriteNewerSameDayImport() async throws {
+        let captured = undoFixture(weight: 80, bodyFat: 18, method: "caliper")
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+            captured, userId: captured.userId, markAsSynced: true
+        )
+        let capturedRow = await cachedMetric(id: captured.id)
+        let beforeCaptured = try XCTUnwrap(capturedRow?.toBodyMetrics())
+        let arrivalDate = captured.date.addingTimeInterval(3_600)
+        let arrival = BodyMetrics(
+            id: UUID().uuidString, userId: captured.userId, date: arrivalDate,
+            localDate: captured.localDate, weight: 91, weightUnit: "kg",
+            bodyFatPercentage: 27, bodyFatMethod: "bioelectrical",
+            muscleMass: nil, boneMass: nil, notes: "New import must remain unchanged",
+            photoUrl: nil, dataSource: BodyMetricSource.healthKit.rawValue,
+            sourceMetadata: BodyMetricSourceMetadata(sourceName: "New same-day scale"),
+            createdAt: arrivalDate, updatedAt: arrivalDate
+        )
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(
+            arrival, userId: arrival.userId, markAsSynced: true
+        )
+        let arrivalRow = await cachedMetric(id: arrival.id)
+        let beforeArrival = try XCTUnwrap(arrivalRow?.toBodyMetrics())
+
+        // Exact arguments emitted by homeV2EditEntrySheet after it captured this row.
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: captured.date, weight: 82, bodyFatPercentage: 18.4,
+            bodyFatMethod: BodyFatEntryMethod.bioelectrical.rawValue, userId: captured.userId
+        )
+
+        XCTAssertEqual(result.metrics.id, captured.id, "Edit must retain its original record identity")
+        XCTAssertEqual(result.previousMetric, beforeCaptured, "Undo must describe the edited record")
+        XCTAssertFalse(result.createdNewEntry)
+        let storedCaptured = await cachedMetric(id: captured.id)
+        let storedArrival = await cachedMetric(id: arrival.id)
+        XCTAssertEqual(storedCaptured?.toBodyMetrics()?.weight, 82)
+        XCTAssertEqual(storedCaptured?.toBodyMetrics()?.bodyFatPercentage, 18.4)
+        XCTAssertEqual(storedCaptured?.toBodyMetrics()?.sourceMetadata, beforeCaptured.sourceMetadata)
+        XCTAssertEqual(storedArrival?.toBodyMetrics(), beforeArrival,
+                       "A later same-day import is not the record selected for Edit")
+        let rows = await CoreDataManager.shared.fetchBodyMetrics(
+            for: captured.userId, localDate: captured.localDate
+        )
+        XCTAssertEqual(Set(rows.compactMap(\.id)), Set([captured.id, arrival.id]))
+    }
+}
