@@ -56,8 +56,12 @@ enum ChaosSystemAlertPolicy {
     }
 }
 
-/// Native snapshot ancestry is the evidence for expected scroll clipping.
-/// Missing or ambiguous snapshot matches remain layout findings.
+/// Native snapshot ancestry is the primary evidence for expected scroll
+/// clipping. Snapshot trees can omit descendants that are fully scrolled out
+/// of a viewport even though hit-test queries still vend them, so unmatched
+/// elements fall back to live scroll-container ancestry with the same
+/// viewport-clipping rule. Elements clipped by no scroll container remain
+/// layout findings.
 struct ChaosScrollGeometry {
     private struct Record {
         let type: XCUIElement.ElementType
@@ -67,9 +71,11 @@ struct ChaosScrollGeometry {
         let scrollFrames: [CGRect]
     }
 
+    private let app: XCUIApplication
     private var records: [Record] = []
 
     init(app: XCUIApplication) {
+        self.app = app
         if let snapshot = try? app.snapshot() {
             collect(snapshot, scrollFrames: [])
         }
@@ -115,19 +121,40 @@ struct ChaosScrollGeometry {
             $0.type == type && $0.identifier == identifier
                 && $0.label == label && Self.sameNativeFrame($0.frame, elementFrame)
         }
-        guard matches.count == 1, let record = matches.first else { return false }
-        let frame = record.frame
-        return record.scrollFrames.contains { viewport in
-            guard viewport.width > 0, viewport.height > 0,
-                  viewport.minX >= window.minX - 1, viewport.maxX <= window.maxX + 1,
-                  viewport.minY >= window.minY - 1, viewport.maxY <= window.maxY + 1 else { return false }
-            // Every overflowing edge must be clipped by the native scroll viewport.
-            return (frame.minX >= window.minX - 1 || frame.minX < viewport.minX)
-                && (frame.maxX <= window.maxX + 1 || frame.maxX > viewport.maxX)
-                && (frame.minY >= window.minY - 1 || frame.minY < viewport.minY)
-                && (frame.maxY <= window.maxY + 1 || frame.maxY > viewport.maxY)
-                && !viewport.contains(frame)
+        if matches.count == 1, let record = matches.first,
+           record.scrollFrames.contains(where: {
+               Self.isClippedByViewport(frame: record.frame, viewport: $0, window: window)
+           }) {
+            return true
         }
+        // Snapshot records may not include descendants scrolled fully out of
+        // their viewport; prove the same clipping through live containers.
+        let containers = app.scrollViews.allElementsBoundByIndex
+            + app.collectionViews.allElementsBoundByIndex
+        return containers.contains { container in
+            guard Self.isClippedByViewport(frame: elementFrame, viewport: container.frame, window: window)
+            else { return false }
+            return container.descendants(matching: type)
+                .allElementsBoundByIndex
+                .contains {
+                    $0.identifier == identifier && $0.label == label
+                        && Self.sameNativeFrame($0.frame, elementFrame)
+                }
+        }
+    }
+
+    /// True when every edge of `frame` that leaves `window` is clipped by a
+    /// scroll `viewport` that itself sits inside the window.
+    private static func isClippedByViewport(frame: CGRect, viewport: CGRect, window: CGRect) -> Bool {
+        guard viewport.width > 0, viewport.height > 0,
+              viewport.minX >= window.minX - 1, viewport.maxX <= window.maxX + 1,
+              viewport.minY >= window.minY - 1, viewport.maxY <= window.maxY + 1 else { return false }
+        // Every overflowing edge must be clipped by the native scroll viewport.
+        return (frame.minX >= window.minX - 1 || frame.minX < viewport.minX)
+            && (frame.maxX <= window.maxX + 1 || frame.maxX > viewport.maxX)
+            && (frame.minY >= window.minY - 1 || frame.minY < viewport.minY)
+            && (frame.maxY <= window.maxY + 1 || frame.maxY > viewport.maxY)
+            && !viewport.contains(frame)
     }
 }
 
@@ -395,8 +422,10 @@ final class ChaosMonkeyUITests: XCTestCase {
         composer.tap()
         let draft = "local chaos draft"
         composer.typeText(draft)
-        XCTAssertTrue(app.keyboards.element.exists)
-        XCTAssertEqual(dismissKeyboardForStep(app: app), .executed(.dismiss))
+        XCTAssertEqual(
+            dismissKeyboardForStep(app: app, refocusingIfNeeded: composer),
+            .executed(.dismiss)
+        )
         XCTAssertFalse(app.keyboards.element.exists)
         // Default Home removes the Ask view when collapsed; reopen before inspecting its draft.
         if !composer.exists { openDefaultHomeAsk(in: app) }
@@ -1073,9 +1102,23 @@ final class ChaosMonkeyUITests: XCTestCase {
         return false
     }
 
-    /// Count a dismissal only when a previously visible keyboard disappears.
-    private func dismissKeyboardForStep(app: XCUIApplication) -> ChaosStepOutcome {
-        guard app.keyboards.element.exists else { return .skipped("keyboard was not present") }
+    /// Count a dismissal only when a visible keyboard disappears. A focused
+    /// field may be supplied to recover if an asynchronous view update drops
+    /// focus between typing and the keyboard probe.
+    private func dismissKeyboardForStep(
+        app: XCUIApplication,
+        refocusingIfNeeded field: XCUIElement? = nil
+    ) -> ChaosStepOutcome {
+        let keyboard = app.keyboards.firstMatch
+        if !keyboard.exists {
+            guard let field, field.exists, field.isHittable else {
+                return .skipped("keyboard was not present")
+            }
+            field.tap()
+            guard keyboard.waitForExistence(timeout: 1.5) else {
+                return .skipped("text field did not regain keyboard focus")
+            }
+        }
         let scroll = app.scrollViews.firstMatch
         if scroll.exists && hasFiniteNonZeroFrame(scroll) && scroll.isHittable {
             scroll.swipeDown()
