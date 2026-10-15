@@ -45,7 +45,7 @@ const nextConfig: NextConfig = {
   },
 
   // Server external packages
-  serverExternalPackages: ['pdf-parse'],
+  serverExternalPackages: ['pdf-parse', '@statsig/statsig-node-core'],
 
   // Don't skip TypeScript checks
   typescript: {
