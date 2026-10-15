@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { X, Share, Plus, Smartphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
+import { isMarketingPath } from '@/data/marketingNavigation';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -13,12 +14,14 @@ interface BeforeInstallPromptEvent extends Event {
 
 export function PWAInstallPrompt() {
   const pathname = usePathname();
+  const isMarketing = isMarketingPath(pathname);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
+    if (isMarketing) return;
     // Check if running on iOS
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIOSDevice = /iphone|ipad|ipod/.test(userAgent) && !('MSStream' in window);
@@ -95,7 +98,7 @@ export function PWAInstallPrompt() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
-  }, []);
+  }, [isMarketing]);
 
   const handleDismiss = () => {
     setShowPrompt(false);
@@ -120,19 +123,19 @@ export function PWAInstallPrompt() {
     }
   };
 
-  if (pathname === '/' || !showPrompt || isStandalone) return null;
+  if (isMarketing || !showPrompt || isStandalone) return null;
 
   return (
     <div
       className={cn(
-        'safe-bottom animate-in slide-in-from-bottom-5 fixed bottom-0 left-0 right-0 z-50 p-4',
-        'sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm',
+        'safe-bottom animate-in slide-in-from-bottom-5 fixed right-0 bottom-0 left-0 z-50 p-4',
+        'sm:right-auto sm:bottom-4 sm:left-4 sm:max-w-sm',
       )}
     >
       <div className="bg-linear-card border-linear-border rounded-2xl border p-4 shadow-2xl sm:p-6">
         <button
           onClick={handleDismiss}
-          className="text-linear-text-tertiary hover:text-linear-text hover:bg-linear-border/50 absolute right-2 top-2 rounded-lg p-2 transition-colors"
+          className="text-linear-text-tertiary hover:text-linear-text hover:bg-linear-border/50 absolute top-2 right-2 rounded-lg p-2 transition-colors"
           aria-label="Dismiss"
         >
           <X className="h-5 w-5" />

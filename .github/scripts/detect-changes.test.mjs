@@ -310,6 +310,39 @@ test('CI Summary requires exactly the iOS job each event selected', () => {
   assert.notEqual(runSummaryGate({ ...group, iosResult: 'success', qualityResult: 'success' }), 0);
 });
 
+
+test('isolated reported SQL harness, contract and wrapper changes select the required JS lane', () => {
+  for (const file of ['scripts/neon/test-reported-measurements.py', 'scripts/neon/test_reported_measurements_harness.py', 'packages/shared-lib/src/reported-measurements-sql.test.ts']) {
+    const fx = queueFixture({ [file]: 'changed' });
+    try {
+      assert.deepEqual(detect(fx.workspace, mergeGroup(fx)).outputs, surfaces('true', 'false', 'false', 'false'), file);
+    } finally { fs.rmSync(fx.root, { recursive: true, force: true }); }
+  }
+});
+
+test('required reported SQL qualification fails through tee and records exact source evidence', () => {
+  const js = ciWorkflow.split('  js:\n')[1].split('\n  ios:')[0];
+  assert.match(js, /runs-on: ubuntu-24\.04/);
+  const step = js.split('      - name: Verify reported measurements on disposable PostgreSQL16\n')[1].split('\n      - name:')[0];
+  assert.match(step, /shell: bash/);
+  assert.match(step, /timeout-minutes: 5/);
+  assert.match(step, /--run --postgres-bin \/usr\/lib\/postgresql\/16\/bin/);
+  assert.match(step, /git rev-parse HEAD/);
+  for (const source of ['test-reported-measurements.py', '20260813130000_native_product_records.sql', 'native-product-records-adapter.ts', 'reported-measurements.ts']) assert.ok(step.includes(source));
+  assert.match(js, /Upload reported measurement execution evidence\n        if: always\(\)/);
+  const body = step.split('        run: |\n')[1].split('\n').map((line) => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'reported-sql-ci-'));
+  try {
+    for (const [name, script] of Object.entries({git: 'echo fixture-head', sha256sum: 'echo fixture-hashes', python3: 'if [[ "$1" == "-c" ]]; then echo /usr; exit 0; fi; echo injected-SQL-failure; exit 42'})) {
+      fs.writeFileSync(path.join(root, name), '#!/usr/bin/env bash\n' + script + '\n', {mode: 0o755});
+    }
+    const result = spawnSync('bash', ['-c', body], {cwd: root, encoding: 'utf8', env: {...gitEnv, PATH: `${root}:${process.env.PATH}`}});
+    assert.equal(result.status, 42, result.stderr);
+    assert.match(fs.readFileSync(path.join(root, 'artifacts/reported-measurements/results.log'), 'utf8'), /injected-SQL-failure/);
+    assert.match(fs.readFileSync(path.join(root, 'artifacts/reported-measurements/source-revision.txt'), 'utf8'), /fixture-head/);
+  } finally { fs.rmSync(root, {recursive: true, force: true}); }
+});
+
 for (const file of [
   'apps/web/db/migrations/20261014103000_training_execution_cas.sql',
   'apps/web/db/tests/verify-training-mutations.py',
