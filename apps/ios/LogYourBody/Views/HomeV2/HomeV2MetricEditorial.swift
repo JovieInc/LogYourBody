@@ -604,6 +604,7 @@ struct HomeV2ProvenanceSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(HomeV2Tokens.Colors.canvas.ignoresSafeArea())
         .presentationDetents([.medium])
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_v2_provenance_detail")
     }
 }
