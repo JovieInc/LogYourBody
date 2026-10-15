@@ -228,6 +228,7 @@ class HealthKitManager: ObservableObject {
     let todayStepQuantityQuery: ((Date, Date) async throws -> Double?)?
     let stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])?
     let earliestImportDateQuery: (() async throws -> Date?)?
+    let earliestBodyFatImportDateQuery: (() async throws -> Date?)?
     let importSyncTrigger: (@MainActor () -> Void)?
     let importCompletion: (@MainActor (String) -> Void)?
     let bodyScoreRecalculationTrigger: (@MainActor () -> Void)?
@@ -248,6 +249,7 @@ class HealthKitManager: ObservableObject {
         todayStepQuantityQuery: ((Date, Date) async throws -> Double?)? = nil,
         stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])? = nil,
         earliestImportDateQuery: (() async throws -> Date?)? = nil,
+        earliestBodyFatImportDateQuery: (() async throws -> Date?)? = nil,
         syncTrigger: (@MainActor () -> Void)? = nil,
         importCompletion: (@MainActor (String) -> Void)? = nil,
         bodyScoreRecalculationTrigger: (@MainActor () -> Void)? = nil,
@@ -264,6 +266,7 @@ class HealthKitManager: ObservableObject {
         self.todayStepQuantityQuery = todayStepQuantityQuery
         self.stepHistoryQuery = stepHistoryQuery
         self.earliestImportDateQuery = earliestImportDateQuery
+        self.earliestBodyFatImportDateQuery = earliestBodyFatImportDateQuery
         importSyncTrigger = syncTrigger
         self.importCompletion = importCompletion
         self.bodyScoreRecalculationTrigger = bodyScoreRecalculationTrigger
