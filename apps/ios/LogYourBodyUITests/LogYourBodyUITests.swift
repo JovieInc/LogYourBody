@@ -2585,6 +2585,24 @@ final class LogYourBodyUITests: XCTestCase {
 
     private func assertProgressProvenanceCoversShare(in app: XCUIApplication) {
         app.buttons["home_v2_progress_tab_ffmi"].tap()
+        let range = app.buttons["home_v2_range_1M"]
+        let values = app.staticTexts.matching(identifier: "home_v2_progress_value")
+        let share = app.buttons["home_v2_progress_share"]
+        guard range.exists, range.isSelected, values.count == 1 else {
+            attachScreenshot(named: "progress-ffmi-current-month-prerequisite", from: app)
+            XCTFail("Require the selected1M range and unique typed FFMI value before provenance")
+            return
+        }
+        let value = values.element
+        // Five actual seeded weights, daily0.1kg rounding and alpha0.25 EMA
+        // yield82.4..82.5kg; at15.8% and178cm normalized FFMI displays22.0.
+        guard value.label == "22.0", share.exists, share.isHittable else {
+            attachScreenshot(named: "progress-ffmi-share-positive-prerequisite", from: app)
+            XCTFail("Require the real current1M fixture value22.0 and available Share before overlay")
+            return
+        }
+        let selectedValue = value.label
+        attachScreenshot(named: "progress-ffmi-observed-share-before-provenance", from: app)
         let chip = app.buttons["home_v2_provenance_chip"].firstMatch
         XCTAssertTrue(chip.waitForExistence(timeout: 5), "The derived FFMI fixture exposes its provenance")
         chip.tap()
@@ -2594,6 +2612,10 @@ final class LogYourBodyUITests: XCTestCase {
         app.buttons["home_v2_provenance_done"].tap()
         XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.buttons["home_v2_progress_share"].isHittable)
+        XCTAssertTrue(range.isSelected)
+        XCTAssertEqual(values.count, 1)
+        XCTAssertEqual(value.label, selectedValue)
+        attachScreenshot(named: "progress-ffmi-share-restored-after-provenance", from: app)
     }
 
     func testHomeV2ProgressIsOneMetricWorkspace() throws {
