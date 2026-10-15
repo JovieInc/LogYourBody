@@ -100,7 +100,8 @@ struct DashboardViewLiquid: View {
     @State var isHomeV2ViewerPresented = false
     @State var isHomeV2ContextPresented = false
     @State var isHomeV2MetricProvenancePresented = false
-    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
+    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .bodyFat
+    @StateObject var homeV2StepsReader = HomeV2DailyStepsReader()
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
     @State var homeV2ContextMetricID: String?
@@ -143,6 +144,7 @@ struct DashboardViewLiquid: View {
     @State var addEntryInitialDate = Date()
     @State var addEntryInitialWeight: String?
     @State var addEntryInitialBodyFat: Double?
+    @State var addEntryInitialBodyFatMethod: String?
     @State var isHomeV2LoggingWeight = false
 
     init(
@@ -337,8 +339,10 @@ struct DashboardViewLiquid: View {
                     initialDate: addEntryInitialDate,
                     initialWeight: addEntryInitialWeight,
                     initialBodyFat: addEntryInitialBodyFat,
+                    initialBodyFatMethod: addEntryInitialBodyFatMethod,
                     isHomeV2LogEntry: isHomeV2LoggingWeight,
-                    onWeightSaved: handleHomeV2WeightEntrySaved
+                    onWeightSaved: handleHomeV2WeightEntrySaved,
+                    onBodyFatSaved: handleHomeV2BodyFatEntrySaved
                 )
                     .environmentObject(authManager)
             }
@@ -404,6 +408,7 @@ struct DashboardViewLiquid: View {
                 addEntryInitialDate = Date()
                 addEntryInitialWeight = nil
                 addEntryInitialBodyFat = nil
+                addEntryInitialBodyFatMethod = nil
                 isHomeV2LoggingWeight = false
             }
 

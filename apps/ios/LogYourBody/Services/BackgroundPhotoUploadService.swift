@@ -22,16 +22,25 @@ class BackgroundPhotoUploadService: ObservableObject {
     private let coreDataManager = CoreDataManager.shared
     private var uploadCancellables = Set<AnyCancellable>()
     private var uploadTask: Task<Void, Never>?
+    private var processingGeneration: UUID?
 
     struct PhotoUploadTask: Identifiable {
         let id = UUID()
         let photoItem: PhotosPickerItem
         let date: Date
+        let accountSession: AuthManager.ProfileSessionOwnership?
         var status: UploadStatus = .pending
         var metricsId: String?
         var photoUrl: String?
         var error: String?
         var progress: Double = 0.0
+
+        @MainActor
+        init(photoItem: PhotosPickerItem, date: Date) {
+            self.photoItem = photoItem
+            self.date = date
+            accountSession = AuthManager.shared.captureAccountSession()
+        }
     }
 
     enum UploadStatus {
@@ -51,13 +60,24 @@ class BackgroundPhotoUploadService: ObservableObject {
         guard !isUploading && !uploadQueue.isEmpty else { return }
 
         isUploading = true
+        let generation = UUID()
+        processingGeneration = generation
 
         uploadTask = Task {
+            defer {
+                if processingGeneration == generation {
+                    currentUploadingPhoto = nil
+                    isUploading = false
+                    processingGeneration = nil
+                }
+            }
             while !uploadQueue.isEmpty {
                 if Task.isCancelled { break }
 
                 // Get next task
                 var task = uploadQueue.removeFirst()
+                guard let ownership = task.accountSession,
+                      authManager.ownsAccountSession(ownership) else { continue }
                 currentUploadingPhoto = task
 
                 do {
@@ -71,11 +91,18 @@ class BackgroundPhotoUploadService: ObservableObject {
                         throw PhotoUploadManager.PhotoError.imageConversionFailed
                     }
 
+                    guard processingGeneration == generation else { return }
+                    guard authManager.ownsAccountSession(ownership) else {
+                        throw PhotoUploadManager.PhotoError.notAuthenticated
+                    }
+
                     // Create body metrics entry
                     task.status = .uploading
                     updateTaskInQueue(task)
 
-                    let metrics = await createBodyMetrics(for: task.date)
+                    let metrics = try await createBodyMetrics(for: task.date, ownership: ownership)
+                    guard processingGeneration == generation else { return }
+                    guard authManager.ownsAccountSession(ownership) else { continue }
                     task.metricsId = metrics.id
 
                     // Upload photo using PhotoUploadManager
@@ -84,12 +111,16 @@ class BackgroundPhotoUploadService: ObservableObject {
                         image: image
                     )
 
+                    guard processingGeneration == generation else { return }
+                    guard authManager.ownsAccountSession(ownership) else { continue }
                     task.status = .completed
                     task.photoUrl = photoUrl
                     task.progress = 1.0
 
                     completedUploads.append(task)
                 } catch {
+                    guard processingGeneration == generation else { return }
+                    guard authManager.ownsAccountSession(ownership) else { continue }
                     // print("❌ BackgroundUploadService: Failed to upload photo: \(error)")
                     task.status = .failed
                     task.error = error.localizedDescription
@@ -98,15 +129,12 @@ class BackgroundPhotoUploadService: ObservableObject {
 
                 updateOverallProgress()
             }
-
-            currentUploadingPhoto = nil
-            isUploading = false
-            // print("✅ BackgroundUploadService: Queue processing complete")
         }
     }
 
     func cancelAllUploads() {
         uploadTask?.cancel()
+        processingGeneration = nil
         uploadQueue.removeAll()
         isUploading = false
         currentUploadingPhoto = nil
@@ -115,8 +143,14 @@ class BackgroundPhotoUploadService: ObservableObject {
 
     // MARK: - Private Methods
 
-    private func createBodyMetrics(for date: Date) async -> BodyMetrics {
-        let userId = authManager.currentUser?.id ?? ""
+    private func createBodyMetrics(
+        for date: Date,
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async throws -> BodyMetrics {
+        guard authManager.ownsAccountSession(ownership) else {
+            throw PhotoUploadManager.PhotoError.notAuthenticated
+        }
+        let userId = ownership.subject
         let localDate = BodyMetricLocalDate.key(for: date)
 
         // Check if metrics already exist for this date
@@ -124,6 +158,10 @@ class BackgroundPhotoUploadService: ObservableObject {
             for: userId,
             localDate: localDate
         ).first
+
+        guard authManager.ownsAccountSession(ownership) else {
+            throw PhotoUploadManager.PhotoError.notAuthenticated
+        }
 
         if let existing = existingMetrics {
             // Convert CachedBodyMetrics to BodyMetrics
@@ -220,7 +258,7 @@ class BackgroundPhotoUploadService: ObservableObject {
     }
 
     func reset() {
-        uploadQueue.removeAll()
+        cancelAllUploads()
         completedUploads.removeAll()
         failedUploads.removeAll()
         totalProgress = 0.0

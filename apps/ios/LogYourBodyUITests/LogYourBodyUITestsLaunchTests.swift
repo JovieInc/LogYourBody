@@ -274,6 +274,100 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         XCTAssertFalse(app.navigationBars["Live session"].exists)
     }
 
+    func testFfmiInfoDoneMeetsMinimumHitTarget() throws {
+        assertFfmiInfoDismissal(bottomAction: true)
+    }
+
+    func testFfmiInfoDoneRetainsToolbarWhenGateOff() throws {
+        assertFfmiInfoDismissal(bottomAction: false)
+    }
+
+    private func assertFfmiInfoDismissal(bottomAction: Bool) {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestBodyScoreOnboardingFixture",
+            "-lybUITestSuppressWhatsNew",
+            "-lybUITestDisableBiometricLock",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"
+        ]
+        if bottomAction { app.launchArguments.append("-lybUITestFFMIDismissTarget") }
+        app.launch()
+
+        let start = app.buttons["body_score_onboarding_start_button"]
+        waitForFfmiControl(start, timeout: 15)
+        start.tap()
+        let male = app.buttons["Male"]
+        waitForFfmiControl(male)
+        male.tap()
+        let next = app.buttons["body_score_onboarding_basics_continue_button"]
+        waitForFfmiControl(next)
+        next.tap()
+        XCTAssertTrue(app.staticTexts["How tall are you?"].waitForExistence(timeout: 8))
+        let why = app.buttons["Why we ask"]
+        waitForFfmiControl(why)
+        why.tap()
+        let info = app.buttons["What's FFMI?"]
+        waitForFfmiControl(info)
+        info.tap()
+
+        let bottomDone = app.buttons["ffmi_info_done_button"]
+        let toolbarDone = app.navigationBars.buttons["Done"]
+        let done = bottomAction ? bottomDone : toolbarDone
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        let ready = expectation(for: NSPredicate { _, _ in
+            done.isEnabled && done.isHittable
+        }, evaluatedWith: done)
+        let readiness = XCTWaiter.wait(for: [ready], timeout: 5)
+        let prefix = bottomAction ? "ffmi-dismiss-gate-on" : "ffmi-dismiss-gate-off"
+        captureFfmiDismissal(app, control: done, named: prefix + "-before")
+        XCTAssertEqual(readiness, .completed, "Done must be enabled and hittable before the single tap")
+        XCTAssertEqual(bottomDone.exists, bottomAction)
+        XCTAssertEqual(toolbarDone.exists, !bottomAction)
+        let frame = done.frame
+        XCTAssertFalse(frame.isEmpty)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(frame), "Done must be fully inside the observed window")
+        if bottomAction {
+            XCTAssertGreaterThanOrEqual(frame.width, 44, "FFMI Done \(frame)")
+            XCTAssertGreaterThanOrEqual(frame.height, 44, "FFMI Done \(frame)")
+        }
+
+        done.tap()
+        let dismissed = done.waitForNonExistence(timeout: 5)
+        let returned = expectation(for: NSPredicate { _, _ in
+            info.exists && info.isHittable && app.staticTexts["How tall are you?"].exists
+        }, evaluatedWith: app)
+        let returnResult = XCTWaiter.wait(for: [returned], timeout: 5)
+        captureFfmiDismissal(app, control: info, named: prefix + "-returned")
+        XCTAssertTrue(dismissed, "One Done tap must dismiss the sheet")
+        XCTAssertEqual(returnResult, .completed, "Dismissal must return to the originating height step")
+    }
+
+    private func waitForFfmiControl(_ control: XCUIElement, timeout: TimeInterval = 5) {
+        XCTAssertTrue(control.waitForExistence(timeout: timeout))
+        let ready = expectation(for: NSPredicate { _, _ in
+            control.isEnabled && control.isHittable
+        }, evaluatedWith: control)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: timeout), .completed)
+    }
+
+    private func captureFfmiDismissal(_ app: XCUIApplication, control: XCUIElement, named name: String) {
+        let original = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        original.name = name
+        original.lifetime = .keepAlways
+        add(original)
+        let exists = control.exists
+        let controlState = exists
+            ? "frame=\(control.frame); enabled=\(control.isEnabled); hittable=\(control.isHittable)"
+            : "absent"
+        let geometry = XCTAttachment(string:
+            "controlExists=\(exists); \(controlState); window=\(app.windows.firstMatch.frame)\n"
+                + app.debugDescription
+        )
+        geometry.name = name + "-geometry-accessibility"
+        geometry.lifetime = .keepAlways
+        add(geometry)
+    }
+
     func testExportCancelMeetsMinimumHitTarget() throws {
         let app = XCUIApplication()
         app.launchArguments = [

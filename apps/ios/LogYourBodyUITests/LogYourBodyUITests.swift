@@ -2234,7 +2234,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(
             value.frame.minY,
             stage.frame.maxY - 1,
-            "Nothing is drawn over the person: the number sits below the photo. stage=\(stage.frame) value=\(value.frame)"
+            "Supporting weight sits below the composition-led photo. stage=\(stage.frame) value=\(value.frame)"
         )
         XCTAssertGreaterThanOrEqual(stage.frame.width, app.frame.width - 1, "The photo runs edge to edge")
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_photo_caption"].waitForExistence(timeout: 5))
@@ -2531,6 +2531,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home_v2_view_progress"].isHittable)
         app.buttons["home_v2_provenance_done"].tap()
         XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
+        scrollUntilHittable(app.buttons["home_v2_view_progress"], in: app)
         XCTAssertTrue(app.buttons["home_v2_view_progress"].isHittable)
     }
 
@@ -2559,7 +2560,10 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(value.waitForExistence(timeout: 8), "View progress opens the metric workspace")
         let weightTab = app.buttons["home_v2_progress_tab_weight"]
         XCTAssertTrue(weightTab.waitForExistence(timeout: 5))
-        XCTAssertTrue(weightTab.isSelected, "Weight is selected on arrival")
+        let initialBodyFatTab = app.buttons["home_v2_progress_tab_body_fat"]
+        XCTAssertTrue(initialBodyFatTab.isSelected, "Body fat is selected on arrival")
+        weightTab.tap()
+        XCTAssertTrue(weightTab.isSelected, "Weight remains available in the same workspace")
         XCTAssertTrue(
             app.descendants(matching: .any)["home_v2_trend_chart"].waitForExistence(timeout: 5),
             "Sparse history keeps a compact explanation in the metric workspace"
@@ -2952,7 +2956,24 @@ final class LogYourBodyUITests: XCTestCase {
     private func submitSyntheticChatQuestion(in app: XCUIApplication) {
         let composer = app.textFields["chat_composer"]
         composer.tap()
-        composer.typeText("Synthetic full-turn question")
+        let question = "Synthetic full-turn question"
+        composer.typeText(question)
+        let entered = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", question), object: composer
+        )
+        let complete = XCTWaiter.wait(for: [entered], timeout: 8) == .completed
+        if !complete {
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = "chat-synthetic-incomplete-draft-screen"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "chat-synthetic-incomplete-draft-hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertTrue(complete, "Require the complete synthetic question before Send; never submit partial input")
+        guard complete else { return }
         let send = app.buttons["chat_send_button"]
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
         XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 8), .completed)
@@ -3295,6 +3316,7 @@ final class LogYourBodyUITests: XCTestCase {
             "Log weight opens the sheet"
         )
         let plus = app.buttons["home_v2_log_sheet_plus"]
+        app.segmentedControls.firstMatch.buttons["Weight"].tap()
         XCTAssertTrue(plus.waitForExistence(timeout: 5))
         plus.tap()
         XCTAssertTrue(app.buttons["home_v2_log_sheet_details"].exists, "Optional detail sits behind one disclosure")
@@ -3313,7 +3335,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
     }
 
-    func testHomeV2TodayDoesNotSwipeIntoHistoricalDates() throws {
+    func testHomeV2SwipeMovesPhotoDateAndMetricsTogether() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
 
@@ -3329,37 +3351,76 @@ final class LogYourBodyUITests: XCTestCase {
 
         stage.swipeLeft()
 
-        XCTAssertEqual(caption.label, beforeCaption, "Today must not page into historical dates")
-        XCTAssertEqual(value.label, beforeValue, "Today keeps today’s metric selected")
-        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
-        attachScreenshot(named: "home-v2-today-scoped", from: app)
+        let moved = expectation(
+            for: NSPredicate(format: "label != %@", beforeCaption),
+            evaluatedWith: caption
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [moved], timeout: 5),
+            .completed,
+            "Swiping left moves one day back through body history"
+        )
+        XCTAssertNotEqual(value.label, beforeValue, "The metric follows the selected day")
+        attachScreenshot(named: "home-v2-swipe-back", from: app)
+
+        stage.swipeRight()
+        let returned = expectation(
+            for: NSPredicate(format: "label == %@", beforeCaption),
+            evaluatedWith: caption
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [returned], timeout: 5),
+            .completed,
+            "Swiping right returns to the latest day"
+        )
     }
 
-    func testHomeV2HistoricalDatesLiveInEntriesInsteadOfTodayScrubber() throws {
+    func testHomeV2ScrubberJumpsThroughBodyHistory() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
 
-        XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
-        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
-        app.buttons["photo_timeline_root_menu"].tap()
-        app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["home_v2_entries"].waitForExistence(timeout: 8))
-        XCTAssertGreaterThan(app.buttons.matching(identifier: "home_v2_entries_row").count, 1)
-        attachScreenshot(named: "home-v2-history-in-entries", from: app)
+        let scrubber = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(scrubber.waitForExistence(timeout: 30), "The bottom scrubber travels through time")
+
+        let caption = app.descendants(matching: .any)["home_v2_photo_caption"]
+        XCTAssertTrue(caption.waitForExistence(timeout: 5))
+        let beforeCaption = caption.label
+
+        // Drag from the right edge to the left: fast scrub toward the oldest day.
+        let start = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.7))
+        let end = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.7))
+        start.press(forDuration: 0.05, thenDragTo: end)
+
+        let moved = expectation(
+            for: NSPredicate(format: "label != %@", beforeCaption),
+            evaluatedWith: caption
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [moved], timeout: 5),
+            .completed,
+            "Scrubbing resolves to the same selected day a swipe would reach"
+        )
+        attachScreenshot(named: "home-v2-scrubbed", from: app)
     }
 
-    func testHomeV2TodayDoesNotTeachRemovedTimelineGestures() throws {
+    func testHomeV2TimelineCoachMarkDismissesPermanently() throws {
         let app = XCUIApplication()
         launch(app, with: [
             "-lybUITestPhotoTimelineHUDFixture",
-            "-lybUITestHomeV2PhotoFixture"
+            "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestResetHomeV2TimelineCoach"
         ])
 
+        let coach = app.buttons["home_v2_timeline_coach"]
+        XCTAssertTrue(coach.waitForExistence(timeout: 30), "First use teaches swipe and scrub once")
+        coach.tap()
+        XCTAssertTrue(coach.waitForNonExistence(timeout: 5), "Dismissal is immediate")
+
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
         XCTAssertTrue(
             app.descendants(matching: .any)["home_v2_photo_stage"].waitForExistence(timeout: 30)
         )
-        XCTAssertFalse(app.buttons["home_v2_timeline_coach"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
+        XCTAssertFalse(coach.exists, "The coach mark never occupies product space again")
     }
 
     func testHomeV2ChangingLogDateDoesNotCreateATodayUndoReceipt() throws {
@@ -3368,7 +3429,6 @@ final class LogYourBodyUITests: XCTestCase {
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 30))
         logWeight.tap()
-        app.buttons["home_v2_log_sheet_details"].tap()
         let datePicker = app.datePickers.firstMatch
         XCTAssertTrue(datePicker.waitForExistence(timeout: 8))
         datePicker.tap()
@@ -3470,6 +3530,9 @@ final class LogYourBodyUITests: XCTestCase {
         let viewProgress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 30))
         viewProgress.tap()
+        let weightTab = app.buttons["home_v2_progress_tab_weight"]
+        XCTAssertTrue(weightTab.waitForExistence(timeout: 5))
+        weightTab.tap()
         let value = app.staticTexts["home_v2_progress_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 8))
         let loaded = XCTNSPredicateExpectation(
@@ -3486,6 +3549,9 @@ final class LogYourBodyUITests: XCTestCase {
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 8))
         logWeight.tap()
+        let weightEntry = app.segmentedControls["Entry type selector"].buttons["Weight"]
+        XCTAssertTrue(weightEntry.waitForExistence(timeout: 5))
+        weightEntry.tap()
         let plus = app.buttons["home_v2_log_sheet_plus"]
         XCTAssertTrue(plus.waitForExistence(timeout: 5))
         plus.tap()
@@ -3497,6 +3563,8 @@ final class LogYourBodyUITests: XCTestCase {
         done.tap()
         XCTAssertTrue(viewProgress.waitForExistence(timeout: 8))
         viewProgress.tap()
+        XCTAssertTrue(weightTab.waitForExistence(timeout: 5))
+        weightTab.tap()
         XCTAssertTrue(value.waitForExistence(timeout: 8))
 
         let refreshed = XCTNSPredicateExpectation(
