@@ -2531,8 +2531,27 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home_v2_view_progress"].isHittable)
         app.buttons["home_v2_provenance_done"].tap()
         XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
-        scrollUntilHittable(app.buttons["home_v2_view_progress"], in: app)
-        XCTAssertTrue(app.buttons["home_v2_view_progress"].isHittable)
+        let progress = app.buttons["home_v2_view_progress"]
+        let scroll = app.scrollViews["home_v2_content_scroll"]
+        let ruler = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5))
+        XCTAssertTrue(ruler.waitForExistence(timeout: 5))
+        // XCUI can report content behind the pinned ruler as hittable.
+        let viewport = CGRect(
+            x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
+            height: max(0, min(ruler.frame.minY, scroll.frame.maxY) - scroll.frame.minY)
+        )
+        XCTAssertGreaterThan(viewport.height, 88)
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        for _ in 0..<6 {
+            if progress.isHittable && viewport.contains(progress.frame) { break }
+            let distance = min(viewport.height - 80, max(0, progress.frame.maxY - viewport.maxY) + 12)
+            let start = origin.withOffset(CGVector(dx: viewport.midX, dy: viewport.maxY - 40))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -distance)),
+                        withVelocity: .slow, thenHoldForDuration: 0.15)
+        }
+        XCTAssertTrue(progress.isHittable)
+        XCTAssertTrue(viewport.contains(progress.frame), "View progress must clear the pinned ruler: \(progress.frame)")
     }
 
     private func assertProgressProvenanceCoversShare(in app: XCUIApplication) {
