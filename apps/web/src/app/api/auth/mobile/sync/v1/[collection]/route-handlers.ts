@@ -3,6 +3,7 @@ import {
   nativeAccountFailureStatus,
   requireNativeAccountAdmission,
 } from '@/lib/ports/native-account-admission';
+import { isValidDailyStepDeletion } from '@/lib/ports/daily-step-deletions';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { hasSafeReportedMeasurements } from '@/lib/ports/reported-measurements';
@@ -52,6 +53,7 @@ const PullQuerySchema = z.object({
 type RouteDependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   records: NativeProductRecordsPort;
+  stepsHistoryDeleteEnabled?: () => boolean;
 };
 
 function json(payload: unknown, status = 200) {
@@ -185,7 +187,43 @@ export function createNativeProductRecordHandlers(deps: RouteDependencies) {
       if (!mutations) throw new NativeAccountAdmissionError('account_admission_unavailable');
       const admission = requireNativeAccountAdmission(await mutations.capture(identity.sub));
 
-      const parsed = DeleteBodySchema.safeParse(await request.json().catch(() => null));
+      const body: unknown = await request.json().catch(() => null);
+      if (
+        collection === 'daily_metrics' &&
+        body &&
+        typeof body === 'object' &&
+        Object.hasOwn(body, 'step_deletions')
+      ) {
+        const deletions = (body as { step_deletions?: unknown }).step_deletions;
+        if (
+          Object.keys(body).length !== 1 ||
+          !Array.isArray(deletions) ||
+          !deletions.length ||
+          deletions.length > 100 ||
+          !deletions.every(isValidDailyStepDeletion) ||
+          new Set(deletions.map((item) => item.record.id.toLowerCase())).size !== deletions.length
+        ) {
+          return json(
+            { version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_steps_deletion' },
+            400,
+          );
+        }
+        let enabled = false;
+        try {
+          enabled = deps.stepsHistoryDeleteEnabled?.() === true;
+        } catch {
+          /* Fail closed. */
+        }
+        if (!enabled || !mutations.deleteDailySteps) {
+          return json(
+            { version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'steps_deletion_unavailable' },
+            409,
+          );
+        }
+        const result = await mutations.deleteDailySteps(admission, deletions);
+        return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, ...result });
+      }
+      const parsed = DeleteBodySchema.safeParse(body);
       if (!parsed.success) {
         return json({ version: NATIVE_BODY_METRICS_SYNC_VERSION, error: 'invalid_delete' }, 400);
       }

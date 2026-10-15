@@ -1,3 +1,4 @@
+import type { DailyStepDeletionInput } from './daily-step-deletions';
 import type { TrainingMutationsPort } from './training-mutations';
 import type {
   NativeAccountAdmission,
@@ -89,6 +90,11 @@ export interface NativeProductRecordsPort {
 }
 
 export interface NativeProductAccountMutationsPort extends NativeAccountAdmissionPort {
+  /** Missing capability fails closed. Existing markers remain authoritative. */
+  deleteDailySteps?(
+    admission: NativeAccountAdmission,
+    deletions: DailyStepDeletionInput[],
+  ): Promise<{ records: NativeProductRecord[]; rejected_ids: string[] }>;
   push(
     admission: NativeAccountAdmission,
     collection: NativeProductRecordCollection,
