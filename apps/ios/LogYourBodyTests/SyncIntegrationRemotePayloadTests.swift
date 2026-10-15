@@ -673,6 +673,88 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
 }
 
 extension SyncIntegrationRemotePayloadTests {
+    func testBodyApplyStalePayloadCompletesOnceWithoutChangingStoredRow() async throws {
+        let id = UUID().uuidString
+        let before = try await seedCompletionBody(id: id)
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateBodyMetric(from: [
+                "id": id, "user_id": "completion-owner", "weight": 99.0, "notes": "stale",
+                "updated_at": ISO8601DateFormatter().string(from: wholeSecondDate(-60))
+            ], completion: done)
+        }
+        let after = try await completionStoredRow(entity: "CachedBodyMetrics", id: id)
+        XCTAssertEqual(after, before)
+    }
+
+    func testBodyApplyForeignOwnerAndDeletedRowsCompleteOnceWithoutChangingStorage() async throws {
+        for deleted in [false, true] {
+            let id = UUID().uuidString
+            let before = try await seedCompletionBody(id: id, deleted: deleted)
+            await assertApplyCompletesOnce { done in
+                coreData.updateOrCreateBodyMetric(from: [
+                    "id": id, "user_id": deleted ? "completion-owner" : "different-owner",
+                    "weight": 99.0, "notes": "rejected",
+                    "updated_at": ISO8601DateFormatter().string(from: wholeSecondDate(60))
+                ], completion: done)
+            }
+            let after = try await completionStoredRow(entity: "CachedBodyMetrics", id: id)
+            XCTAssertEqual(after, before)
+        }
+    }
+
+    func testBodyApplyAdmissionRejectionCompletesOnceWithoutInserting() async throws {
+        let id = UUID().uuidString
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateBodyMetric(
+                from: ["id": id, "user_id": "completion-owner", "weight": 80.0],
+                writeAdmission: { throw CancellationError() }, completion: done
+            )
+        }
+        let row = try await completionStoredRow(entity: "CachedBodyMetrics", id: id)
+        XCTAssertNil(row)
+    }
+
+    func testBodyApplyAcceptedPayloadCompletesOnceAndAppliesValues() async throws {
+        let id = UUID().uuidString
+        _ = try await seedCompletionBody(id: id)
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateBodyMetric(from: [
+                "id": id, "user_id": "completion-owner", "weight": 80.0, "weight_unit": "kg",
+                "body_fat_percentage": 18.4, "notes": "accepted",
+                "updated_at": ISO8601DateFormatter().string(from: wholeSecondDate(60))
+            ], completion: done)
+        }
+        let row = try await completionStoredRow(entity: "CachedBodyMetrics", id: id)
+        XCTAssertEqual(row?["weight"] as? Double, 80)
+        XCTAssertEqual(row?["bodyFatPercentage"] as? Double, 18.4)
+        XCTAssertEqual(row?["notes"] as? String, "accepted")
+    }
+
+    func testSkippedBodyAsyncApplyAllowsNextBatchRecord() async throws {
+        let id = UUID().uuidString
+        let before = try await seedCompletionBody(id: id)
+        let nextID = UUID().uuidString
+        let finished = expectation(description: "Stale body apply returns to the batch")
+        let store = coreData!
+        let stale = ISO8601DateFormatter().string(from: wholeSecondDate(-60))
+        let nextDate = ISO8601DateFormatter().string(from: wholeSecondDate(60))
+        Task { @MainActor in
+            await store.updateOrCreateBodyMetricAndWait(from: [
+                "id": id, "user_id": "completion-owner", "weight": 99.0, "updated_at": stale
+            ])
+            await store.updateOrCreateBodyMetricAndWait(from: [
+                "id": nextID, "user_id": "completion-owner", "weight": 80.0, "weight_unit": "kg",
+                "date": nextDate, "created_at": nextDate, "updated_at": nextDate
+            ])
+            finished.fulfill()
+        }
+        await fulfillment(of: [finished], timeout: 3)
+        let after = try await completionStoredRow(entity: "CachedBodyMetrics", id: id)
+        let next = try await completionStoredRow(entity: "CachedBodyMetrics", id: nextID)
+        XCTAssertEqual(after, before)
+        XCTAssertEqual(next?["weight"] as? Double, 80)
+    }
+
     func testDailyApplyStalePayloadCompletesOnceWithoutChangingStoredRow() async throws {
         let id = UUID().uuidString
         let before = try await seedCompletionDaily(id: id)
@@ -831,6 +913,30 @@ extension SyncIntegrationRemotePayloadTests {
             try context.save()
         }
         let saved = try await completionStoredRow(entity: "CachedDailyMetrics", id: id)
+        return try XCTUnwrap(saved)
+    }
+
+    private func seedCompletionBody(id: String, deleted: Bool = false) async throws -> NSDictionary {
+        let context = coreData.viewContext
+        let date = wholeSecondDate()
+        try await context.perform {
+            let row = CachedBodyMetrics(context: context)
+            row.id = id
+            row.userId = "completion-owner"
+            row.date = date
+            row.weight = 81
+            row.weightUnit = "kg"
+            row.bodyFatPercentage = 19.5
+            row.notes = "Keep these notes"
+            row.createdAt = date.addingTimeInterval(-300)
+            row.updatedAt = date
+            row.lastModified = date
+            row.syncStatus = "pending"
+            row.isSynced = false
+            row.isMarkedDeleted = deleted
+            try context.save()
+        }
+        let saved = try await completionStoredRow(entity: "CachedBodyMetrics", id: id)
         return try XCTUnwrap(saved)
     }
 
