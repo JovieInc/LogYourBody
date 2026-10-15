@@ -307,14 +307,20 @@ final class HomeV2LayoutUITests: XCTestCase {
             ("single-weight", "-lybUITestHomeV2Fixture", ["-lybUITestHomeV2SingleWeightHeroFixture"], "—")
         ]
         for item in cases {
+            recordCompositionPhase("\(item.name)-before-launch")
             let app = launchEditorial(fixture: item.fixture, extra: item.extra, largestText: true)
+            recordCompositionPhase("\(item.name)-after-launch")
             XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
             assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "composition-ax5-\(item.name)-primary")
+            // Pinned controls do not move while this fixture's content scrolls.
+            // Capture their viewport once, rather than resolving the same AX trees for every metric.
+            let viewport = homeDetailsViewport(in: app)
             for metric in ["ffmi", "weight", "steps"] {
-                assertReachableByScrolling("home_v2_\(metric)_summary", in: app)
+                assertReachableByScrolling("home_v2_\(metric)_summary", in: app, viewport: viewport)
                 let expected = metric == "ffmi" ? item.ffmi : (metric == "weight" ? "181.0" : "—")
                 XCTAssertEqual(app.staticTexts["home_v2_\(metric)_value"].label, expected)
                 capture(app, named: "composition-ax5-\(item.name)-\(metric)")
+                recordCompositionPhase("\(item.name)-after-\(metric)")
             }
             app.terminate()
         }
@@ -329,7 +335,7 @@ final class HomeV2LayoutUITests: XCTestCase {
             app.buttons["home_v2_log_weight"].tap()
             XCTAssertTrue(app.staticTexts["home_v2_log_sheet"].waitForExistence(timeout: 8))
             if !changesMethod {
-                assertBodyFatDateCanOpenWithoutChangingValue(in: app)
+                guard assertBodyFatDateCanOpenWithoutChangingValue(in: app) else { return }
             }
             let method = app.descendants(matching: .any).matching(identifier: "home_v2_body_fat_method").firstMatch
             assertSheetControlReachable(method, in: app, screenshot: "body-fat-ax5-method-before-\(value)")
@@ -370,16 +376,35 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertEqual(method.value as? String, "DEXA")
     }
 
-    private func assertBodyFatDateCanOpenWithoutChangingValue(in app: XCUIApplication) {
-        let picker = app.datePickers.firstMatch
+    private func assertBodyFatDateCanOpenWithoutChangingValue(in app: XCUIApplication) -> Bool {
+        let picker = app.datePickers.element
         assertSheetControlReachable(picker, in: app, screenshot: "body-fat-ax5-date-before")
         let originalValue = picker.value as? String
         XCTAssertNotNil(originalValue)
         picker.tap()
         capture(app, named: "body-fat-ax5-date-open")
-        app.staticTexts["home_v2_log_sheet"].tap()
+        let popup = app.datePickers.containing(.button, identifier: "DatePicker.Show").element
+        let dismiss = app.buttons["PopoverDismissRegion"]
+        guard popup.waitForExistence(timeout: 5),
+              dismiss.waitForExistence(timeout: 5), dismiss.isHittable else {
+            XCTFail("The observed calendar popup must expose its dismissal region")
+            return false
+        }
+        let region = dismiss.frame
+        let point = CGPoint(x: region.minX + region.width * 0.02, y: region.minY + region.height * 0.98)
+        guard !popup.frame.contains(point), !app.buttons["home_v2_log_sheet_save"].frame.contains(point) else {
+            XCTFail("The dismissal coordinate must be outside both the calendar popup and Save")
+            return false
+        }
+        dismiss.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.98)).tap()
+        guard dismiss.waitForNonExistence(timeout: 5), !popup.exists else {
+            capture(app, named: "body-fat-ax5-popup-not-dismissed")
+            XCTFail("Close the actual calendar popup before querying the compact picker geometry")
+            return false
+        }
         XCTAssertEqual(picker.value as? String, originalValue, "Opening the calendar must preserve the selected day")
         assertSheetControlReachable(picker, in: app, screenshot: "body-fat-ax5-date-dismissed")
+        return true
     }
 
     private func assertSheetControlReachable(_ target: XCUIElement, in app: XCUIApplication, screenshot: String) {
@@ -471,34 +496,54 @@ final class HomeV2LayoutUITests: XCTestCase {
     private func detailControl(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         if identifier.hasSuffix("_summary") {
             // SwiftUI exposes the contained summary as an Other wrapping its real button.
-            return app.otherElements[identifier].buttons.firstMatch
+            return app.otherElements[identifier].buttons.element
         }
         return app.buttons[identifier]
     }
 
-    private func assertReachableByScrolling(_ identifier: String, in app: XCUIApplication) {
+    private func recordCompositionPhase(_ phase: String) {
+        let timing = XCTAttachment(string: "epochSeconds=\(Date().timeIntervalSince1970)")
+        timing.name = "composition-phase-" + phase
+        timing.lifetime = .keepAlways
+        add(timing)
+    }
+
+    private func homeDetailsViewport(in app: XCUIApplication) -> CGRect {
         let scroll = app.scrollViews["home_v2_content_scroll"]
         XCTAssertTrue(scroll.waitForExistence(timeout: 5))
+        let scrollFrame = scroll.frame
+        // XCUI includes the covered safe-area inset in ScrollView.frame.
+        let pinned = [app.otherElements["home_v2_timeline_scrubber"],
+                      app.buttons["home_v2_log_weight"], app.buttons["home_v2_connect_health"]]
+        let pinnedFrames = pinned.filter(\.exists).map(\.frame)
+        let bottom = pinnedFrames.map(\.minY).min() ?? scrollFrame.maxY
+        let viewport = CGRect(x: scrollFrame.minX, y: scrollFrame.minY, width: scrollFrame.width,
+                              height: max(0, min(bottom, scrollFrame.maxY) - scrollFrame.minY))
+        XCTAssertGreaterThan(viewport.height, 88, "Home must leave a usable scrolling viewport")
+        let geometry = XCTAttachment(string: "viewport=\(viewport), pinned=\(pinnedFrames)")
+        geometry.name = "home-details-pinned-viewport"
+        geometry.lifetime = .keepAlways
+        add(geometry)
+        return viewport
+    }
+
+    private func assertReachableByScrolling(
+        _ identifier: String, in app: XCUIApplication, viewport suppliedViewport: CGRect? = nil
+    ) {
+        let viewport = suppliedViewport ?? homeDetailsViewport(in: app)
         let target = detailControl(identifier, in: app)
         XCTAssertTrue(target.waitForExistence(timeout: 5))
-        // XCUI includes the covered safe-area inset in ScrollView.frame. A tappable
-        // point there can hit the ruler/dock instead of the intended content row.
-        let pinned = [app.descendants(matching: .any)["home_v2_timeline_scrubber"],
-                      app.buttons["home_v2_log_weight"], app.buttons["home_v2_connect_health"]]
-        let bottom = pinned.filter(\.exists).map { $0.frame.minY }.min() ?? scroll.frame.maxY
-        let viewport = CGRect(x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
-                              height: max(0, min(bottom, scroll.frame.maxY) - scroll.frame.minY))
-        XCTAssertGreaterThan(viewport.height, 88, "Home must leave a usable scrolling viewport")
         let attempts = scrollToContain(target, in: viewport, app: app)
-        let frames = "target=\(target.frame), viewport=\(viewport), pinned=\(pinned.filter(\.exists).map { $0.frame })" +
-            "\n" + attempts.joined(separator: "\n")
+        let targetFrame = target.frame
+        let hittable = target.isHittable
+        let frames = "target=\(targetFrame), viewport=\(viewport)\n" + attempts.joined(separator: "\n")
         let geometry = XCTAttachment(string: frames)
         geometry.name = "visible-link-geometry-\(identifier)"
         geometry.lifetime = .keepAlways
         add(geometry)
         capture(app, named: "reachable-\(identifier)")
-        XCTAssertTrue(target.isHittable, "Home details must remain reachable with large text: \(frames)")
-        XCTAssertTrue(viewport.contains(target.frame), "The complete target must scroll above the pinned controls: \(frames)")
+        XCTAssertTrue(hittable, "Home details must remain reachable with large text: \(frames)")
+        XCTAssertTrue(viewport.contains(targetFrame), "The complete target must scroll above the pinned controls: \(frames)")
     }
 
     private func scrollToContain(_ target: XCUIElement, in viewport: CGRect, app: XCUIApplication) -> [String] {

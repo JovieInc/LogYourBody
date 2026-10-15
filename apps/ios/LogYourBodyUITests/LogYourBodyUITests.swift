@@ -1638,7 +1638,7 @@ final class LogYourBodyUITests: XCTestCase {
         // Verify the ordinary default before explicitly exercising rollback surfaces.
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture"])
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.descendants(matching: .any)["home_v2_weight_value"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["home_v2_weight_value"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_surface"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["home_chat_composer_dock"].exists)
 
@@ -2226,7 +2226,7 @@ final class LogYourBodyUITests: XCTestCase {
         let stage = app.descendants(matching: .any)["home_v2_photo_stage"]
         XCTAssertTrue(stage.waitForExistence(timeout: 30), "Photo-first Home must show the 4:5 photo stage")
 
-        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        let value = app.staticTexts["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
         XCTContext.runActivity(named: "home-v2-hierarchy") { activity in
             activity.add(XCTAttachment(string: app.debugDescription))
@@ -2751,7 +2751,7 @@ final class LogYourBodyUITests: XCTestCase {
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2OfflineFixture"])
         let banner = app.descendants(matching: .any)["home_v2_offline_banner"]
         XCTAssertTrue(banner.waitForExistence(timeout: 30), "Offline is a banner under the header, never hidden")
-        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        let value = app.staticTexts["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
         XCTAssertLessThanOrEqual(banner.frame.maxY, value.frame.minY + 1, "The banner sits above the number")
         XCTAssertTrue(app.buttons["home_v2_log_weight"].exists, "Home otherwise unchanged")
@@ -3232,7 +3232,7 @@ final class LogYourBodyUITests: XCTestCase {
         let bodyFat = app.descendants(matching: .any)["home_v2_body_fat_graphic"]
         XCTAssertTrue(bodyFat.exists)
         XCTAssertTrue(bodyFat.label.contains("15.8 percent"))
-        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        let value = app.staticTexts["home_v2_weight_value"]
         XCTAssertTrue(value.waitForExistence(timeout: 5))
         XCTAssertGreaterThanOrEqual(value.frame.minY, card.frame.maxY - 1, "Supporting weight sits below the card")
         XCTAssertFalse(app.buttons["home_v2_range_3M"].exists, "Date ranges live in Progress")
@@ -3278,7 +3278,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(stage.waitForExistence(timeout: 30))
 
         let caption = app.descendants(matching: .any)["home_v2_photo_caption"]
-        let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        let value = app.staticTexts["home_v2_weight_value"]
         XCTAssertTrue(caption.waitForExistence(timeout: 5))
         XCTAssertTrue(value.waitForExistence(timeout: 5))
         let beforeCaption = caption.label
@@ -3364,25 +3364,112 @@ final class LogYourBodyUITests: XCTestCase {
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 30))
         logWeight.tap()
-        let datePicker = app.datePickers.firstMatch
+        let weightEntry = app.segmentedControls["Entry type selector"].buttons["Weight"]
+        XCTAssertTrue(weightEntry.waitForExistence(timeout: 8))
+        weightEntry.tap()
+        XCTAssertTrue(weightEntry.isSelected)
+        let datePicker = app.datePickers["home_v2_log_sheet_date"]
+        captureHistoricalCalendarDiagnostic(app, datePicker: datePicker, phase: "before-DatePicker-discovery")
         XCTAssertTrue(datePicker.waitForExistence(timeout: 8))
         datePicker.tap()
+        captureHistoricalCalendarDiagnostic(app, datePicker: datePicker, phase: "before-selection")
 
         let calendar = Calendar.current
         let yesterday = try XCTUnwrap(calendar.date(byAdding: .day, value: -1, to: Date()))
-        if calendar.component(.day, from: Date()) == 1 {
-            app.buttons["Previous Month"].tap()
+        let popup = app.datePickers.containing(.button, identifier: "DatePicker.Show").element
+        guard popup.waitForExistence(timeout: 5) else {
+            XCTFail("The observed calendar popup must be mounted before selecting its day button")
+            return
         }
-        let day = app.staticTexts[String(calendar.component(.day, from: yesterday))].firstMatch
-        XCTAssertTrue(day.waitForExistence(timeout: 5))
+        if calendar.component(.day, from: Date()) == 1 {
+            popup.buttons["DatePicker.PreviousMonth"].tap()
+        }
+        let dayLabel = DateFormatter()
+        dayLabel.locale = .current
+        dayLabel.calendar = calendar
+        dayLabel.dateFormat = "EEEE, MMMM d"
+        let day = popup.buttons[dayLabel.string(from: yesterday)]
+        guard day.waitForExistence(timeout: 5), day.isHittable else {
+            XCTFail("The requested day must be a unique full-date button inside the observed calendar popup")
+            return
+        }
         day.tap()
+        captureHistoricalCalendarDiagnostic(app, datePicker: datePicker, phase: "after-selection")
+        guard historicalPickerValue(historicalCalendarValue(datePicker), matches: yesterday) else {
+            XCTFail("Diagnostic calendar did not prove the requested full day/month/year; no plus or save performed")
+            return
+        }
+        let dismiss = app.buttons["PopoverDismissRegion"]
+        guard dismiss.waitForExistence(timeout: 5), dismiss.isHittable else {
+            XCTFail("The actual calendar popup must expose its dismissal region before save")
+            return
+        }
+        // The owning region spans the screen. This point is outside the observed popup and Save.
+        let region = dismiss.frame
+        let point = CGPoint(x: region.minX + region.width * 0.02, y: region.minY + region.height * 0.98)
+        guard !popup.frame.contains(point), !app.buttons["home_v2_log_sheet_save"].frame.contains(point) else {
+            XCTFail("The dismissal coordinate must be outside both the calendar popup and Save")
+            return
+        }
+        dismiss.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.98)).tap()
+        let closed = expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: dismiss)
+        let closeResult = XCTWaiter.wait(for: [closed], timeout: 5)
+        captureHistoricalCalendarDiagnostic(app, datePicker: datePicker, phase: "before-save-admission")
+        guard closeResult == .completed,
+              !popup.exists,
+              historicalPickerValue(historicalCalendarValue(datePicker), matches: yesterday),
+              app.buttons["home_v2_log_sheet_save"].isHittable else {
+            XCTFail("Diagnostic calendar is not admitted for the requested historical save")
+            return
+        }
         app.buttons["home_v2_log_sheet_plus"].tap()
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].isHittable)
         app.buttons["home_v2_log_sheet_save"].tap()
 
         XCTAssertTrue(logWeight.waitForExistence(timeout: 10), "Saving another day returns without a today receipt")
         XCTAssertFalse(app.buttons["home_v2_undo"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["home_v2_logged_sentence"].exists)
         attachScreenshot(named: "home-v2-log-another-day", from: app)
+    }
+
+    private func captureHistoricalCalendarDiagnostic(
+        _ app: XCUIApplication, datePicker: XCUIElement, phase: String
+    ) {
+        attachScreenshot(named: "historical-calendar-" + phase, from: app)
+        let ax = XCTAttachment(string: app.debugDescription)
+        ax.name = "historical-calendar-" + phase + "-owning-AX"
+        ax.lifetime = .keepAlways
+        add(ax)
+        let wrapperValue = datePicker.exists ? String(describing: datePicker.value) : "<DatePicker TYPE+ID absent>"
+        let childValue = datePicker.exists
+            ? String(describing: historicalCalendarValue(datePicker))
+            : "<DatePicker TYPE+ID absent>"
+        let value = XCTAttachment(string: "locale=\(Locale.current.identifier)\nwrapper=\(wrapperValue)\nchild=\(childValue)")
+        value.name = "historical-calendar-" + phase + "-picker-value"
+        value.lifetime = .keepAlways
+        add(value)
+    }
+
+    private func historicalCalendarValue(_ datePicker: XCUIElement) -> Any? {
+        // Same-run owning AX: compact DatePicker -> Other(label: Date Picker, value: Oct 14, 2026).
+        let child = datePicker.otherElements.matching(NSPredicate(format: "label == %@", "Date Picker")).element
+        return child.exists ? child.value : nil
+    }
+
+    private func historicalPickerValue(_ value: Any?, matches requested: Date) -> Bool {
+        guard let value = value as? String else { return false }
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        for style in [DateFormatter.Style.short, .medium, .long, .full] {
+            let formatter = DateFormatter()
+            formatter.locale = .current
+            formatter.calendar = .current
+            formatter.isLenient = false
+            formatter.dateStyle = style
+            formatter.timeStyle = .none
+            guard let parsed = formatter.date(from: text), formatter.string(from: parsed) == text else { continue }
+            if Calendar.current.isDate(parsed, inSameDayAs: requested) { return true }
+        }
+        return false
     }
 
     func testHomeV2UndoRestoresPhotoOnlyDayAfterRelaunch() throws {
