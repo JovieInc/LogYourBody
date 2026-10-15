@@ -9,6 +9,7 @@ import { LANDING_PRODUCT_PROOF } from '@/lib/marketing/landing-registry';
 import styles from './LaunchLanding.module.css';
 import { launchLandingCopy, launchLandingFeatures } from './launch-landing-copy';
 import { WaitlistForm } from './WaitlistForm';
+import { EditorialLanding } from './EditorialLanding';
 
 const HERO_ACTION_ID = 'early-access';
 
@@ -44,7 +45,11 @@ function PrimaryAction({ id }: { id: string }) {
   );
 }
 
-export function LaunchLanding() {
+export function LaunchLanding({ editorialEnabled = false }: { editorialEnabled?: boolean } = {}) {
+  if (editorialEnabled) {
+    return <EditorialLanding appStoreLive={LANDING_FLAGS.APP_STORE_LIVE} />;
+  }
+
   return (
     <div className={`${styles.page} lyb-marketing lyb-landing min-h-screen`}>
       <a
