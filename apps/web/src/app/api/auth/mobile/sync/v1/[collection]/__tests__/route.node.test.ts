@@ -486,3 +486,159 @@ describe('/api/auth/mobile/sync/v1/[collection]', () => {
     expect(records.pushed[0]?.records).toEqual([record]);
   });
 });
+
+describe('typed daily step deletion', () => {
+  const deletion = {
+    record: { ...morning, notes: 'keep this note', user_id: 'forged-owner' },
+    day_start: '2026-08-13T00:00:00Z',
+    day_end: '2026-08-14T00:00:00Z',
+    time_zone: 'UTC',
+  };
+
+  function typedHarness(enabled?: () => boolean, capability = true) {
+    const records = new MemoryNativeRecords();
+    const deleteDailySteps = jest.fn().mockResolvedValue({
+      records: [{ ...morning, steps: null, steps_present: false }],
+      rejected_ids: [],
+    });
+    if (capability) records.accountMutations.deleteDailySteps = deleteDailySteps;
+    const handlers = createNativeProductRecordHandlers({
+      authenticate: async () => ({ sub: 'owner-a' }) as JovieUserInfo,
+      records,
+      stepsHistoryDeleteEnabled: enabled,
+    });
+    return { records, handlers, deleteDailySteps };
+  }
+
+  it.each([
+    undefined,
+    () => false,
+    () => {
+      throw new Error('provider down');
+    },
+  ])(
+    'fails closed without removing any entity when availability is missing/off/unavailable',
+    async (enabled) => {
+      const { records, handlers, deleteDailySteps } = typedHarness(enabled);
+      const response = await handlers.DELETE(
+        request('DELETE', 'daily-metrics', 'a', { step_deletions: [deletion] }),
+      );
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({ error: 'steps_deletion_unavailable' });
+      expect(deleteDailySteps).not.toHaveBeenCalled();
+      expect(records.removed).toEqual([]);
+    },
+  );
+
+  it('fails closed if an enabled deployment lacks typed persistence', async () => {
+    const { records, handlers } = typedHarness(() => true, false);
+    expect(
+      (
+        await handlers.DELETE(
+          request('DELETE', 'daily-metrics', 'a', { step_deletions: [deletion] }),
+        )
+      ).status,
+    ).toBe(409);
+    expect(records.removed).toEqual([]);
+  });
+
+  it('passes the authenticated admission and retained non-step snapshot to the typed capability', async () => {
+    const { records, handlers, deleteDailySteps } = typedHarness(() => true);
+    const response = await handlers.DELETE(
+      request('DELETE', 'daily-metrics', 'a', { step_deletions: [deletion] }),
+    );
+    expect(response.status).toBe(200);
+    expect(deleteDailySteps).toHaveBeenCalledWith({ subject: 'owner-a', ownerId: morningId }, [
+      deletion,
+    ]);
+    expect(records.removed).toEqual([]);
+    await expect(response.json()).resolves.toMatchObject({
+      records: [{ steps: null, steps_present: false }],
+    });
+  });
+
+  it.each([
+    { step_deletions: [] },
+    { step_deletions: [deletion, deletion] },
+    { step_deletions: [deletion], ids: [morningId] },
+    { step_deletions: [{ ...deletion, day_end: '2026-09-13T00:00:00Z' }] },
+    { step_deletions: [{ ...deletion, time_zone: 'Invalid/Zone' }] },
+    { step_deletions: [{ ...deletion, record: { ...deletion.record, date: deletion.day_end } }] },
+    { step_deletions: Array.from({ length: 101 }, () => deletion) },
+  ])('rejects malformed or broad deletion before any storage action: %p', async (body) => {
+    const { records, handlers, deleteDailySteps } = typedHarness(() => true);
+    expect((await handlers.DELETE(request('DELETE', 'daily-metrics', 'a', body))).status).toBe(400);
+    expect(deleteDailySteps).not.toHaveBeenCalled();
+    expect(records.removed).toEqual([]);
+  });
+
+  it('does not route a typed steps body to another collection', async () => {
+    const { records, handlers, deleteDailySteps } = typedHarness(() => true);
+    expect(
+      (
+        await handlers.DELETE(
+          request('DELETE', 'progress-photos', 'a', { step_deletions: [deletion] }),
+        )
+      ).status,
+    ).toBe(400);
+    expect(deleteDailySteps).not.toHaveBeenCalled();
+    expect(records.removed).toEqual([]);
+  });
+
+  it('keeps legacy whole-record deletion unchanged', async () => {
+    const { records, handlers, deleteDailySteps } = typedHarness(() => false);
+    expect(
+      (await handlers.DELETE(request('DELETE', 'daily-metrics', 'a', { ids: [morningId] }))).status,
+    ).toBe(200);
+    expect(records.removed).toEqual([
+      { subject: 'owner-a', collection: 'daily_metrics', ids: [morningId] },
+    ]);
+    expect(deleteDailySteps).not.toHaveBeenCalled();
+  });
+
+  it('captures admission before awaiting the body and returns account-change failure without fallback', async () => {
+    const { records, handlers, deleteDailySteps } = typedHarness(() => true);
+    const capture = jest.fn().mockResolvedValue({ subject: 'owner-a', ownerId: morningId });
+    records.accountMutations.capture = capture;
+    const req = request('DELETE', 'daily-metrics', 'a', { step_deletions: [deletion] });
+    const originalJson = req.json.bind(req);
+    jest.spyOn(req, 'json').mockImplementation(async () => {
+      expect(capture).toHaveBeenCalledTimes(1);
+      const { NativeAccountAdmissionError } = await import('@/lib/ports/native-account-admission');
+      deleteDailySteps.mockRejectedValue(new NativeAccountAdmissionError('account_changed'));
+      return originalJson();
+    });
+    const response = await handlers.DELETE(req);
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ error: 'account_changed' });
+    expect(records.removed).toEqual([]);
+  });
+
+  it('does not gate ordinary sync or returned retained markers', async () => {
+    const { records, handlers } = typedHarness(() => false);
+    const marker = {
+      schema_version: 1, deleted_at: '2026-08-14T00:00:00Z',
+      day_start: deletion.day_start, day_end: deletion.day_end, time_zone: deletion.time_zone,
+    };
+    jest.spyOn(records, 'pull').mockResolvedValue({
+      records: [
+        {
+          ...morning,
+          steps: null,
+          steps_present: false,
+          steps_deletion: marker,
+          deleted_at: null,
+          server_updated_at: '2026-08-14T00:00:00Z',
+        },
+      ],
+      deleted_ids: [],
+      next_cursor: null,
+    });
+    const response = await handlers.GET(request('GET', 'daily-metrics', 'a'));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ records: [{ steps_deletion: marker }] });
+    expect((await handlers.POST(request('POST', 'daily-metrics', 'a', [morning]))).status).toBe(
+      200,
+    );
+  });
+});

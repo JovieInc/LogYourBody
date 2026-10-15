@@ -732,3 +732,160 @@ private final class UndoFailingSaveContext: NSManagedObjectContext, @unchecked S
         throw UndoTestSaveError.failed
     }
 }
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testPhotoPlaceholderCreationRejectsReplacementAtStoreAdmission() async throws {
+        let auth = AuthManager.shared
+        let previousUser = auth.currentUser
+        let previousSession = auth.authSession
+        defer { auth.currentUser = previousUser; auth.authSession = previousSession }
+        let subject = "photo-create-admission-\(UUID().uuidString)"
+        installPhotoAdmissionSession(subject: subject)
+        let original = try XCTUnwrap(auth.captureAccountSession())
+        let store = makePhotoAdmissionStore()
+        var admissions = 0
+        do {
+            _ = try await store.createOrUpdatePhotoUploadMetricsPlaceholder(
+                for: Date(), userId: subject, writeAdmission: {
+                    admissions += 1
+                    self.installPhotoAdmissionSession(subject: subject)
+                    guard auth.ownsAccountSession(original) else { throw PhotoCallerAdmissionTestError.replacedLifetime }
+                }
+            )
+            XCTFail("A replacement lifetime cannot create a delayed placeholder")
+        } catch {
+            XCTAssertEqual(error as? PhotoCallerAdmissionTestError, .replacedLifetime)
+        }
+        XCTAssertEqual(admissions, 1)
+        XCTAssertFalse(auth.ownsAccountSession(original))
+        XCTAssertEqual(try freshPhotoAdmissionRows(store).count, 0)
+        XCTAssertFalse(store.viewContext.hasChanges)
+    }
+
+    func testPhotoPlaceholderPreparationRejectsReplacementWithoutChangingStoredRow() async throws {
+        let auth = AuthManager.shared
+        let previousUser = auth.currentUser
+        let previousSession = auth.authSession
+        defer { auth.currentUser = previousUser; auth.authSession = previousSession }
+        let subject = "photo-prepare-admission-\(UUID().uuidString)"
+        installPhotoAdmissionSession(subject: subject)
+        let original = try XCTUnwrap(auth.captureAccountSession())
+        let store = makePhotoAdmissionStore()
+        let prepared = try await store.createOrUpdatePhotoUploadMetricsPlaceholder(for: Date(), userId: subject)
+        let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first)
+        let beforeDate = Date(timeIntervalSince1970: 1_750_000_000)
+        row.syncStatus = "pending"
+        row.updatedAt = beforeDate
+        row.lastModified = beforeDate
+        try store.viewContext.save()
+        var admissions = 0
+        do {
+            _ = try await store.prepareExistingPhotoUploadMetrics(
+                id: prepared.metrics.id, userId: subject, writeAdmission: {
+                    admissions += 1
+                    self.installPhotoAdmissionSession(subject: subject)
+                    guard auth.ownsAccountSession(original) else { throw PhotoCallerAdmissionTestError.replacedLifetime }
+                }
+            )
+            XCTFail("A replacement lifetime cannot mutate the existing placeholder")
+        } catch {
+            XCTAssertEqual(error as? PhotoCallerAdmissionTestError, .replacedLifetime)
+        }
+        XCTAssertEqual(admissions, 1)
+        let stored = try XCTUnwrap(try freshPhotoAdmissionRows(store).first)
+        XCTAssertEqual(stored.id, prepared.metrics.id)
+        XCTAssertEqual(stored.owner, subject)
+        XCTAssertEqual(stored.status, "pending")
+        XCTAssertEqual(stored.updated, beforeDate)
+        XCTAssertEqual(stored.modified, beforeDate)
+        XCTAssertFalse(store.viewContext.hasChanges)
+    }
+
+    func testPhotoPlaceholderCleanupRejectsReplacementWithoutRemovingStoredRow() async throws {
+        let auth = AuthManager.shared
+        let previousUser = auth.currentUser
+        let previousSession = auth.authSession
+        defer { auth.currentUser = previousUser; auth.authSession = previousSession }
+        let subject = "photo-cleanup-admission-\(UUID().uuidString)"
+        installPhotoAdmissionSession(subject: subject)
+        let original = try XCTUnwrap(auth.captureAccountSession())
+        let store = makePhotoAdmissionStore()
+        let prepared = try await store.createOrUpdatePhotoUploadMetricsPlaceholder(for: Date(), userId: subject)
+        var admissions = 0
+        let deleted = await store.deleteEmptyPhotoPlaceholder(
+            id: prepared.metrics.id, userId: subject, writeAdmission: {
+                admissions += 1
+                self.installPhotoAdmissionSession(subject: subject)
+                guard auth.ownsAccountSession(original) else { throw PhotoCallerAdmissionTestError.replacedLifetime }
+            }
+        )
+        XCTAssertFalse(deleted)
+        XCTAssertEqual(admissions, 1)
+        let stored = try freshPhotoAdmissionRows(store)
+        XCTAssertEqual(stored.count, 1)
+        XCTAssertEqual(stored.first?.id, prepared.metrics.id)
+        XCTAssertEqual(stored.first?.owner, subject)
+        XCTAssertFalse(store.viewContext.hasChanges)
+    }
+
+    func testPhotoMetadataForwardsCurrentAdmissionThroughPrepareAndCleanup() async throws {
+        let auth = AuthManager.shared
+        let previousUser = auth.currentUser
+        let previousSession = auth.authSession
+        defer { auth.currentUser = previousUser; auth.authSession = previousSession }
+        let subject = "photo-current-admission-\(UUID().uuidString)"
+        installPhotoAdmissionSession(subject: subject)
+        let original = try XCTUnwrap(auth.captureAccountSession())
+        var admissions = 0
+        let admission: CoreDataManager.WriteAdmission = {
+            admissions += 1
+            guard auth.ownsAccountSession(original) else { throw PhotoCallerAdmissionTestError.replacedLifetime }
+        }
+        let created = try await PhotoMetadataService.shared.createOrUpdateMetricsForPhotoUpload(
+            for: Date(), userId: subject, writeAdmission: admission
+        )
+        let prepared = try await PhotoMetadataService.shared.prepareExistingMetricsForPhotoUpload(
+            id: created.metrics.id, userId: subject, writeAdmission: admission
+        )
+        XCTAssertEqual(created.metrics.id, prepared.metrics.id)
+        XCTAssertEqual(try freshPhotoAdmissionRows(CoreDataManager.shared).count, 1)
+        let deleted = await CoreDataManager.shared.deleteEmptyPhotoPlaceholder(
+            id: prepared.metrics.id, userId: subject, writeAdmission: admission
+        )
+        XCTAssertTrue(deleted)
+        XCTAssertEqual(admissions, 3)
+        XCTAssertTrue(try freshPhotoAdmissionRows(CoreDataManager.shared).isEmpty)
+        XCTAssertTrue(auth.ownsAccountSession(original))
+    }
+
+    private func installPhotoAdmissionSession(subject: String) {
+        AuthManager.shared.authSession = .localFixture(subject: subject, email: "photo-admission@example.com")
+        AuthManager.shared.currentUser = LocalUser(id: subject, email: "photo-admission@example.com", name: "Photo")
+    }
+
+    private func makePhotoAdmissionStore() -> CoreDataManager {
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        description.shouldAddStoreAsynchronously = false
+        return CoreDataManager(persistentStoreDescriptions: [description])
+    }
+
+    private func freshPhotoAdmissionRows(_ store: CoreDataManager) throws -> [PhotoCallerStoredRow] {
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = store.viewContext.persistentStoreCoordinator
+        return try context.fetch(CachedBodyMetrics.fetchRequest()).map {
+            PhotoCallerStoredRow(id: $0.id, owner: $0.userId, status: $0.syncStatus,
+                                 updated: $0.updatedAt, modified: $0.lastModified)
+        }
+    }
+}
+
+private enum PhotoCallerAdmissionTestError: Error, Equatable { case replacedLifetime }
+private struct PhotoCallerStoredRow {
+    let id: String?
+    let owner: String?
+    let status: String?
+    let updated: Date?
+    let modified: Date?
+}
