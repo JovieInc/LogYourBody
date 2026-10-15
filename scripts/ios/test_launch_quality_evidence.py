@@ -3,6 +3,7 @@ import copy
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -181,7 +182,39 @@ class EvidenceTests(unittest.TestCase):
         selectors = source[source.index('LAUNCH_QUALITY_UI_TESTS=('):source.index('UI_RESULT_BUNDLE=')]
         command = 'set -euo pipefail\n' + selectors + '\nprintf "%s\\n" "${UI_SELECTORS[@]}" "${UI_EVIDENCE_ARGS[@]}"'
         output = subprocess.check_output(['bash', '-c', command], text=True).splitlines()
-        self.assertEqual(sum(line.startswith('-only-testing:') for line in output), 20)
+        declared = re.findall(r'^\s+"(\w+UITests/test\w+)"', selectors, re.MULTILINE)
+        selected = [line for line in output if line.startswith('-only-testing:')]
+        self.assertEqual(selected, ['-only-testing:LogYourBodyUITests/' + name for name in declared])
+        self.assertEqual(len(selected), len(set(selected)), 'Every selected case must execute exactly once')
+        # Independent case identities retain the existing canvas/main contract as the source list grows.
+        required_cases = (
+            "LogYourBodyUITests/testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch",
+            "LogYourBodyUITests/testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity",
+            "LogYourBodyUITests/testHomeV2AskSyntheticCancelledTurnRecovers",
+            "LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces",
+            "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA",
+            "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA",
+            "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces",
+            "LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail",
+            "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal",
+            "MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards",
+            "MesocycleCanvasUITests/testGoalThroughUndoKeepsTheCanvasAndReadbackTogether",
+            "ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration",
+            "ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory",
+            "ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote",
+            "ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies",
+            "ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor",
+            "ChaosMonkeyUITests/testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates",
+            "ChaosMonkeyUITests/testSystemAlertsRequireKnownDenyOnlyAction",
+            "ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending",
+            "ChaosMonkeyUITests/testProfilePhotoImportIsExcludedFromMonkeyCandidates",
+            "ChaosMonkeyUITests/testMissingActionTargetsDoNotCompleteMonkeySteps",
+            "ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget",
+            "ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion",
+        )
+        self.assertFalse(set(required_cases) - set(declared), 'The combined runner lost an inherited case')
+        evidence_ids = [line for line in output if line.endswith('()')]
+        self.assertEqual(evidence_ids, [name + '()' for name in declared])
         for identifier in evidence.REQUIRED_TESTS:
             self.assertIn('-only-testing:LogYourBodyUITests/' + identifier.removesuffix('()'), output)
             self.assertIn(identifier, output)
