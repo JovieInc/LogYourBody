@@ -148,6 +148,38 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         XCTAssertNil(dayTwoTrend.confidenceLevel)
     }
 
+    func testLaterTimestampedWeighInStaysObservedForTrendAndFFMI() throws {
+        let first = date(daysAfterStart: 0).addingTimeInterval(12 * 60 * 60)
+        let later = date(daysAfterStart: 7).addingTimeInterval(12 * 60 * 60)
+        let metrics = [
+            makeMetric(date: first, weight: 84.7, bodyFatPercentage: 17.4, bodyFatMethod: "manual"),
+            makeMetric(date: later, weight: 82.1, bodyFatPercentage: 15.8, bodyFatMethod: "manual")
+        ]
+        let context = try XCTUnwrap(
+            MetricsInterpolationService.shared.makeWeightInterpolationContext(for: metrics)
+        )
+        let trend = try XCTUnwrap(context.trendWeight(for: later))
+        XCTAssertFalse(trend.isInterpolated, "A weigh-in after midnight is still an observation")
+        XCTAssertFalse(trend.isLastKnown)
+
+        let ffmi = try XCTUnwrap(
+            MetricsInterpolationService.shared.estimateFFMI(
+                for: later, metrics: metrics, heightInches: 178 / 2.54
+            )
+        )
+        XCTAssertFalse(ffmi.isInterpolated)
+        XCTAssertFalse(ffmi.isLastKnown)
+        XCTAssertEqual(
+            fullScreenFFMIPresence(
+                isLastKnown: ffmi.isLastKnown,
+                isInterpolated: ffmi.isInterpolated,
+                hasDirectBodyFat: true,
+                directBodyFatMethod: "manual"
+            ),
+            .present
+        )
+    }
+
     func testTrendWeightConfidenceDegradesWithInterpolationGap() throws {
         let cases: [(gapDays: Int, queryDay: Int, expected: InterpolatedMetric.ConfidenceLevel)] = [
             (7, 3, .high),

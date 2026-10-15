@@ -277,10 +277,13 @@ struct HomeV2TrendChart: View {
 
     @ChartContentBuilder
     private var pointMarks: some ChartContent {
-        ForEach(plotted.marks) { sample in
+        // `plotted` rebuilds the full history; never read it inside the per-point closure.
+        let marks = plotted.marks
+        let lastSampleID = marks.last?.id
+        ForEach(marks) { sample in
             PointMark(x: .value("Day", sample.date), y: .value("Value", sample.value))
-                .symbolSize(sample.id == plotted.marks.last?.id ? 56 : 18)
-                .foregroundStyle(accent.opacity(sample.id == plotted.marks.last?.id ? 1 : 0.45))
+                .symbolSize(sample.id == lastSampleID ? 56 : 18)
+                .foregroundStyle(accent.opacity(sample.id == lastSampleID ? 1 : 0.45))
         }
     }
 

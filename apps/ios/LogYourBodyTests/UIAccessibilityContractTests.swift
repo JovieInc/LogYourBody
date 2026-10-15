@@ -154,3 +154,33 @@ enum UIAccessibilityContract {
         "world_class_screen_dailyReminder"
     ]
 }
+
+extension UIAccessibilityContractTests {
+    func testMetricTrendAccessibilityPreservesEveryDisplayedPeriodWithoutRepeatingNoChange() {
+        for period in ["7d", "1M", "3M", "6M", "1Y", "All"] {
+            let trend = MetricSummaryCard.Trend(direction: .flat, valueText: "No change", caption: period)
+            XCTAssertEqual(trend.accessibilityDescription, "No change, \(period)")
+        }
+    }
+
+    func testMetricTrendAccessibilityPreservesDirectionValueAndPeriod() {
+        let increasing = MetricSummaryCard.Trend(direction: .up, valueText: "1.2 lb", caption: "7d")
+        let decreasing = MetricSummaryCard.Trend(direction: .down, valueText: "0.4%", caption: "1M")
+        XCTAssertEqual(increasing.accessibilityDescription, "Up 1.2 lb, 7d")
+        XCTAssertEqual(decreasing.accessibilityDescription, "Down 0.4%, 1M")
+    }
+
+    func testMetricTrendAccessibilityDoesNotInventAnAbsentPeriod() {
+        let noPeriod = MetricSummaryCard.Trend(direction: .flat, valueText: "No change")
+        let emptyPeriod = MetricSummaryCard.Trend(direction: .up, valueText: "2", caption: "")
+        let customPeriod = MetricSummaryCard.Trend(direction: .down, valueText: "1", caption: "vs last week")
+        XCTAssertEqual(noPeriod.accessibilityDescription, "No change")
+        XCTAssertEqual(emptyPeriod.accessibilityDescription, "Up 2")
+        XCTAssertEqual(customPeriod.accessibilityDescription, "Down 1, vs last week")
+    }
+
+    func testMetricTrendAccessibilityRetainsNumericFlatValueFromLegacyCallers() {
+        let trend = MetricSummaryCard.Trend(direction: .flat, valueText: "0.0")
+        XCTAssertEqual(trend.accessibilityDescription, "No change 0.0")
+    }
+}
