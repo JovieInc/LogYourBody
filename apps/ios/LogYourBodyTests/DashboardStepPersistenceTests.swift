@@ -67,7 +67,7 @@ final class DashboardStepPersistenceTests: XCTestCase {
     }
 
     private func ownedDashboard(
-        todayLoader: (() async throws -> Int)? = nil,
+        todayLoader: (() async throws -> Int?)? = nil,
         loader: (@MainActor (String, Date) async -> DailyMetrics?)? = nil,
         writer: (@MainActor (DailyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil
     ) -> DashboardViewModel {
@@ -244,6 +244,39 @@ final class DashboardStepPersistenceTests: XCTestCase {
         XCTAssertEqual(rows.first?.userId, "dashboard-owner-A")
         XCTAssertEqual(dashboard.dailyMetrics?.steps, 4_321)
         XCTAssertEqual(dashboard.dailyMetrics?.id, rows.first?.id)
+        XCTAssertEqual(syncTriggers, 1)
+    }
+
+    func testMissingHealthKitStepsLeaveExistingDashboardRowUnchanged() async throws {
+        let row = try await seedOwnedRow()
+        let before = snapshot(row)
+        let dashboard = ownedDashboard(todayLoader: { nil })
+        dashboard.dailyMetrics = row.toDailyMetrics()
+        await dashboard.syncStepsFromHealthKit(authManager: ownedAuth, realtimeSyncManager: ownedSync())
+        XCTAssertEqual(snapshot(row), before)
+        XCTAssertEqual(dashboard.dailyMetrics?.steps, 111)
+        XCTAssertEqual(syncTriggers, 0)
+    }
+
+    func testMissingHealthKitStepsDoNotCreateAnEmptyDashboardDay() async {
+        let dashboard = ownedDashboard(todayLoader: { nil })
+        await dashboard.syncStepsFromHealthKit(authManager: ownedAuth, realtimeSyncManager: ownedSync())
+        let rows = await ownedStore.fetchDailyMetrics(for: "dashboard-owner-A")
+        XCTAssertTrue(rows.isEmpty)
+        XCTAssertNil(dashboard.dailyMetrics)
+        XCTAssertEqual(syncTriggers, 0)
+    }
+
+    func testObservedHealthKitZeroStillPersistsThroughDashboard() async throws {
+        let row = try await seedOwnedRow()
+        let dashboard = ownedDashboard(todayLoader: { 0 })
+        await dashboard.syncStepsFromHealthKit(authManager: ownedAuth, realtimeSyncManager: ownedSync())
+        let rows = await ownedStore.fetchDailyMetrics(for: "dashboard-owner-A")
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.id, row.id)
+        XCTAssertEqual(rows.first?.steps, 0)
+        XCTAssertEqual(rows.first?.notes, "keep-note")
+        XCTAssertEqual(dashboard.dailyMetrics?.steps, 0)
         XCTAssertEqual(syncTriggers, 1)
     }
 

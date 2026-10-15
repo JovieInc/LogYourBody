@@ -212,7 +212,9 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertEqual(syncTriggers, 0)
     }
 
-    private func assertHeldTodayQueryIsRejected(replace: () -> Void, cancel: Bool = false) async throws {
+    private func assertHeldTodayQueryIsRejected(
+        replace: () -> Void, cancel: Bool = false, quantity: Double? = 4_321.75
+    ) async throws {
         let query = HeldTodayStepQuantityQuery()
         let manager = manager(todayQuery: query)
         let task = Task { try await manager.fetchTodayStepCount() }
@@ -226,7 +228,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         manager.latestStepCount = 77
         manager.latestStepCountDate = replacementDate
         if cancel { task.cancel() }
-        query.complete(.success(4_321.75))
+        query.complete(.success(quantity))
         do {
             _ = try await task.value
             XCTFail("A stale or cancelled today query must not return a usable count")
@@ -278,19 +280,51 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertLessThanOrEqual(date, Date())
     }
 
-    func testTodayMissingQuantityAndHealthKitNoDataStillPublishZero() async throws {
+    func testTodayMissingQuantityAndHealthKitNoDataDoNotPublishAReading() async throws {
         let noData = NSError(domain: HKErrorDomain, code: HKError.Code.errorNoData.rawValue)
         for result: Result<Double?, Error> in [.success(nil), .failure(noData)] {
             let query = HeldTodayStepQuantityQuery()
             let manager = manager(todayQuery: query)
+            manager.todayStepCount = 123
+            manager.todayStepCountOwner = auth.captureAccountSession()
+            manager.latestStepCount = 123
+            manager.latestStepCountDate = Date()
             query.complete(result)
             let count = try await manager.fetchTodayStepCount()
-            XCTAssertEqual(count, 0)
+            XCTAssertNil(count)
             XCTAssertEqual(manager.todayStepCount, 0)
-            XCTAssertEqual(manager.latestStepCount, 0)
-            XCTAssertNotNil(manager.latestStepCountDate)
-            XCTAssertEqual(manager.todayStepCountOwner, auth.captureAccountSession())
+            XCTAssertNil(manager.latestStepCount)
+            XCTAssertNil(manager.latestStepCountDate)
+            XCTAssertNil(manager.todayStepCountOwner)
+            await manager.syncStepsToProductAPI(userId: "synthetic-health-A")
+            let rows = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
+            XCTAssertTrue(rows.isEmpty)
+            XCTAssertEqual(syncTriggers, 0)
         }
+    }
+
+    func testObservedTodayZeroPublishesAndPersistsAsAnActualReading() async throws {
+        let query = HeldTodayStepQuantityQuery()
+        let manager = manager(todayQuery: query)
+        query.complete(.success(0))
+        let count = try await manager.fetchTodayStepCount()
+        XCTAssertEqual(count, 0)
+        XCTAssertEqual(manager.latestStepCount, 0)
+        XCTAssertNotNil(manager.latestStepCountDate)
+        XCTAssertEqual(manager.todayStepCountOwner, auth.captureAccountSession())
+        await manager.syncStepsToProductAPI(userId: "synthetic-health-A")
+        let rows = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.steps, 0)
+        XCTAssertEqual(syncTriggers, 1)
+    }
+
+    func testLateMissingTodayQueryCannotClearReplacementAccountReading() async throws {
+        try await assertHeldTodayQueryIsRejected(replace: { setAccount("synthetic-health-B") }, quantity: nil)
+    }
+
+    func testCancelledMissingTodayQueryCannotClearCurrentReading() async throws {
+        try await assertHeldTodayQueryIsRejected(replace: {}, cancel: true, quantity: nil)
     }
 
     func testTodaySDKAndQuantityErrorsDoNotPublish() async {
@@ -365,13 +399,14 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         try await task.value
         let records = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
         let record = try XCTUnwrap(records.first)
-        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.count, 2)
+        XCTAssertEqual(records.last?.steps, 0)
         XCTAssertEqual(record.userId, "synthetic-health-A")
         XCTAssertEqual(record.steps, 4_321)
         XCTAssertEqual(record.notes, "Imported from HealthKit")
         let recordsB = await coreData.fetchDailyMetrics(for: "synthetic-health-B")
         XCTAssertTrue(recordsB.isEmpty)
-        XCTAssertEqual(syncTriggers, 1)
+        XCTAssertEqual(syncTriggers, 2)
     }
 
     func testStepImportDoesNotLandWhenAnotherAccountOwnsHealthSync() async {

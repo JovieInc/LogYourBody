@@ -42,7 +42,7 @@ protocol HealthKitSyncManaging: AnyObject {
     func claimAutomaticImportAccount() async
     func syncWeightFromHealthKit() async throws
     func syncStepsFromHealthKit() async throws
-    func fetchTodayStepCount() async throws -> Int
+    func fetchTodayStepCount() async throws -> Int?
     func forceFullHealthKitSync() async -> Bool
 }
 
