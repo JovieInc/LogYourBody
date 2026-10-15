@@ -99,6 +99,10 @@ final class MesocycleCanvasUITests: XCTestCase {
     private func send(_ app: XCUIApplication, _ text: String) {
         let composer = app.textFields["canvas_composer"]
         XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        XCTAssertEqual(app.textFields.matching(identifier: "canvas_composer").count, 1)
+        XCTAssertEqual(app.textFields.matching(identifier: "canvas_root").count, 0)
+        XCTAssertEqual(app.buttons.matching(identifier: "canvas_root").count, 0)
+        XCTAssertTrue(composer.isHittable)
         composer.tap()
         composer.typeText(text)
         tap(app, "canvas_send")
@@ -107,6 +111,7 @@ final class MesocycleCanvasUITests: XCTestCase {
     private func tap(_ app: XCUIApplication, _ identifier: String) {
         let control = app.descendants(matching: .any)[identifier]
         XCTAssertTrue(control.waitForExistence(timeout: 8), identifier)
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: identifier).count, 1, identifier)
         let scroll = app.scrollViews.firstMatch
         // Previews appear above the plan; move/check controls live inside or below it.
         let abovePlan = identifier == "canvas_accept" || identifier == "canvas_reject"

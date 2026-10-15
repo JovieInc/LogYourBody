@@ -514,6 +514,7 @@ struct MesocycleCanvasContainer: View {
                                     .accessibilityIdentifier("canvas_goal_\(goal.id)")
                             }
                         }
+                        .accessibilityElement(children: .contain)
                         .accessibilityIdentifier("canvas_goals")
                     }
                     if let execution = model.readback?.execution, !execution.isEmpty {
@@ -551,6 +552,7 @@ struct MesocycleCanvasContainer: View {
             composer
         }
         .background(theme.colors.background.ignoresSafeArea())
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("canvas_root")
         .task { await model.refresh() }
     }
@@ -632,6 +634,7 @@ struct MesocycleCanvasContainer: View {
             }
         }
         .padding(12)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("canvas_preview")
     }
 
