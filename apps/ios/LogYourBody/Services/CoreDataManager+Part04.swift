@@ -219,6 +219,8 @@ func updateOrCreateDailyMetric(
         let context = viewContext
 
         context.perform {
+            // Skipping a remote record must still release its waiting batch.
+            defer { completion?() }
             if let probe = ServerApplyProbe.beforeWriteAdmission {
                 ServerApplyProbe.beforeWriteAdmission = nil
                 MainActor.assumeIsolated { probe() }
@@ -227,7 +229,6 @@ func updateOrCreateDailyMetric(
                 do {
                     try MainActor.assumeIsolated { try writeAdmission() }
                 } catch {
-                    completion?()
                     return
                 }
             }
@@ -279,7 +280,6 @@ func updateOrCreateDailyMetric(
                 metric.lastModified = Date()
 
                 self.save()
-                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateDailyMetric", underlying: error)
                 let contextInfo = ErrorContext(
@@ -290,7 +290,6 @@ func updateOrCreateDailyMetric(
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating daily metric from server: \(error)")
-                completion?()
             }
         }
     }
@@ -314,6 +313,8 @@ func updateOrCreateProfile(
         let context = viewContext
 
         context.perform {
+            // Skipping a remote record must still release its waiting batch.
+            defer { completion?() }
             if let probe = ServerApplyProbe.beforeWriteAdmission {
                 ServerApplyProbe.beforeWriteAdmission = nil
                 MainActor.assumeIsolated { probe() }
@@ -322,7 +323,6 @@ func updateOrCreateProfile(
                 do {
                     try MainActor.assumeIsolated { try writeAdmission() }
                 } catch {
-                    completion?()
                     return
                 }
             }
@@ -360,7 +360,6 @@ func updateOrCreateProfile(
                 profile.lastModified = Date()
 
                 self.save()
-                completion?()
             } catch {
                 let appError = AppError.coreData(operation: "updateOrCreateProfile", underlying: error)
                 let contextInfo = ErrorContext(
@@ -371,7 +370,6 @@ func updateOrCreateProfile(
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating profile from server: \(error)")
-                completion?()
             }
         }
     }

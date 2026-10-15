@@ -671,3 +671,189 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         XCTAssertEqual(sourceMetadata.quantityType, "HKQuantityTypeIdentifierBodyMass")
     }
 }
+
+extension SyncIntegrationRemotePayloadTests {
+    func testDailyApplyStalePayloadCompletesOnceWithoutChangingStoredRow() async throws {
+        let id = UUID().uuidString
+        let before = try await seedCompletionDaily(id: id)
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateDailyMetric(from: [
+                "id": id, "user_id": "completion-owner", "steps": 7, "notes": "stale",
+                "updated_at": ISO8601DateFormatter().string(from: wholeSecondDate(-60))
+            ], completion: done)
+        }
+        let after = try await completionStoredRow(entity: "CachedDailyMetrics", id: id)
+        XCTAssertEqual(after, before)
+    }
+
+    func testDailyApplyForeignOwnerCompletesOnceWithoutChangingStoredRow() async throws {
+        let id = UUID().uuidString
+        let before = try await seedCompletionDaily(id: id)
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateDailyMetric(from: [
+                "id": id, "user_id": "different-owner", "steps": 7, "notes": "foreign",
+                "updated_at": ISO8601DateFormatter().string(from: wholeSecondDate(60))
+            ], completion: done)
+        }
+        let after = try await completionStoredRow(entity: "CachedDailyMetrics", id: id)
+        XCTAssertEqual(after, before)
+    }
+
+    func testProfileApplyStalePayloadCompletesOnceWithoutChangingStoredRow() async throws {
+        let id = UUID().uuidString
+        let before = try await seedCompletionProfile(id: id)
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateProfile(from: [
+                "id": id, "full_name": "Stale profile", "height": 1,
+                "updated_at": ISO8601DateFormatter().string(from: wholeSecondDate(-60))
+            ], completion: done)
+        }
+        let after = try await completionStoredRow(entity: "CachedProfile", id: id)
+        XCTAssertEqual(after, before)
+    }
+
+    func testDailyAndProfileAdmissionRejectionCompleteOnceWithoutInserting() async throws {
+        let dailyID = UUID().uuidString
+        let profileID = UUID().uuidString
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateDailyMetric(
+                from: ["id": dailyID, "user_id": "completion-owner", "steps": 123],
+                writeAdmission: { throw CancellationError() }, completion: done
+            )
+        }
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateProfile(
+                from: ["id": profileID, "full_name": "Rejected"],
+                writeAdmission: { throw CancellationError() }, completion: done
+            )
+        }
+        let daily = try await completionStoredRow(entity: "CachedDailyMetrics", id: dailyID)
+        let profile = try await completionStoredRow(entity: "CachedProfile", id: profileID)
+        XCTAssertNil(daily)
+        XCTAssertNil(profile)
+    }
+
+    func testDailyApplyInvalidStepsCompletesOnceWithoutChangingStoredRow() async throws {
+        let id = UUID().uuidString
+        let before = try await seedCompletionDaily(id: id)
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateDailyMetric(from: [
+                "id": id, "user_id": "completion-owner", "steps": -1,
+                "updated_at": ISO8601DateFormatter().string(from: wholeSecondDate(60))
+            ], completion: done)
+        }
+        let after = try await completionStoredRow(entity: "CachedDailyMetrics", id: id)
+        XCTAssertEqual(after, before)
+    }
+
+    func testDailyAndProfileAcceptedPayloadsCompleteOnceAndApplyValues() async throws {
+        let dailyID = UUID().uuidString
+        let profileID = UUID().uuidString
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateDailyMetric(from: [
+                "id": dailyID, "user_id": "completion-owner", "steps": 123, "notes": "accepted"
+            ], completion: done)
+        }
+        await assertApplyCompletesOnce { done in
+            coreData.updateOrCreateProfile(from: [
+                "id": profileID, "full_name": "Accepted profile", "height": 180.0
+            ], completion: done)
+        }
+        let daily = try await completionStoredRow(entity: "CachedDailyMetrics", id: dailyID)
+        let profile = try await completionStoredRow(entity: "CachedProfile", id: profileID)
+        XCTAssertEqual(daily?["steps"] as? Int, 123)
+        XCTAssertEqual(daily?["notes"] as? String, "accepted")
+        XCTAssertEqual(profile?["fullName"] as? String, "Accepted profile")
+        XCTAssertEqual(profile?["height"] as? Double, 180)
+    }
+
+    func testSkippedDailyAndProfileAsyncAppliesAllowNextBatchRecord() async throws {
+        let dailyID = UUID().uuidString
+        let profileID = UUID().uuidString
+        _ = try await seedCompletionDaily(id: dailyID)
+        _ = try await seedCompletionProfile(id: profileID)
+        let finished = expectation(description: "All rejected applies returned to the batch")
+        let store = coreData!
+        let stale = ISO8601DateFormatter().string(from: wholeSecondDate(-60))
+        let nextID = UUID().uuidString
+        Task { @MainActor in
+            await store.updateOrCreateDailyMetricAndWait(from: [
+                "id": dailyID, "user_id": "completion-owner", "steps": 7, "updated_at": stale
+            ])
+            await store.updateOrCreateDailyMetricAndWait(from: [
+                "id": dailyID, "user_id": "different-owner", "steps": 7
+            ])
+            await store.updateOrCreateProfileAndWait(from: ["id": profileID, "updated_at": stale])
+            await store.updateOrCreateDailyMetricAndWait(from: [
+                "id": nextID, "user_id": "completion-owner", "steps": 456
+            ])
+            finished.fulfill()
+        }
+        await fulfillment(of: [finished], timeout: 3)
+        let next = try await completionStoredRow(entity: "CachedDailyMetrics", id: nextID)
+        XCTAssertEqual(next?["steps"] as? Int, 456)
+    }
+
+    private func assertApplyCompletesOnce(_ apply: (@escaping () -> Void) -> Void) async {
+        let completed = expectation(description: "Remote apply completion")
+        completed.assertForOverFulfill = true
+        var calls = 0
+        apply {
+            calls += 1
+            completed.fulfill()
+        }
+        await fulfillment(of: [completed], timeout: 2)
+        await coreData.viewContext.perform { }
+        XCTAssertEqual(calls, 1)
+    }
+
+    private func seedCompletionDaily(id: String) async throws -> NSDictionary {
+        let context = coreData.viewContext
+        let date = wholeSecondDate()
+        try await context.perform {
+            let row = CachedDailyMetrics(context: context)
+            row.id = id
+            row.userId = "completion-owner"
+            row.date = date
+            row.steps = 8_765
+            row.notes = "Keep these notes"
+            row.createdAt = date.addingTimeInterval(-300)
+            row.updatedAt = date
+            row.lastModified = date
+            row.syncStatus = "pending"
+            row.isSynced = false
+            try context.save()
+        }
+        let saved = try await completionStoredRow(entity: "CachedDailyMetrics", id: id)
+        return try XCTUnwrap(saved)
+    }
+
+    private func seedCompletionProfile(id: String) async throws -> NSDictionary {
+        let context = coreData.viewContext
+        let date = wholeSecondDate()
+        try await context.perform {
+            let row = CachedProfile(context: context)
+            row.id = id
+            row.fullName = "Keep this profile"
+            row.height = 180
+            row.updatedAt = date
+            row.lastModified = date
+            row.syncStatus = "pending"
+            row.isSynced = false
+            try context.save()
+        }
+        let saved = try await completionStoredRow(entity: "CachedProfile", id: id)
+        return try XCTUnwrap(saved)
+    }
+
+    private func completionStoredRow(entity: String, id: String) async throws -> NSDictionary? {
+        let context = coreData.viewContext
+        return try await context.perform {
+            let request = NSFetchRequest<NSManagedObject>(entityName: entity)
+            request.predicate = NSPredicate(format: "id == %@", id)
+            let rows = try context.fetch(request)
+            XCTAssertLessThanOrEqual(rows.count, 1)
+            return rows.first.map { $0.dictionaryWithValues(forKeys: Array($0.entity.attributesByName.keys)) as NSDictionary }
+        }
+    }
+}
