@@ -337,6 +337,7 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
             await claimAutomaticImportAccount()
         }
         guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else { return false }
+        let importsBodyFatOnly = await bodyFatOnlyImportEnabled()
         let operation = UUID()
         let admitted = await MainActor.run {
             guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return false }
@@ -357,11 +358,20 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
 
         do {
             let defaultHistoricalRange = TimeInterval(10 * 365 * 24 * 60 * 60)
-            let earliestDate = try await getEarliestWeightDate()
-                ?? Date().addingTimeInterval(-defaultHistoricalRange)
+            let earliestWeightDate = try await getEarliestWeightDate()
             try await requireImportOwnership(ownership)
+            let earliestBodyFatDate: Date?
+            if importsBodyFatOnly {
+                earliestBodyFatDate = try await getEarliestBodyFatDate()
+                try await requireImportOwnership(ownership)
+            } else {
+                earliestBodyFatDate = nil
+            }
+            let earliestDate = [earliestWeightDate, earliestBodyFatDate].compactMap { $0 }.min()
+                ?? Date().addingTimeInterval(-defaultHistoricalRange)
             let (totalImported, totalSkipped) = try await processHistoricalHealthKitBatches(
-                earliestDate: earliestDate, endDate: Date(), ownership: ownership, operation: operation
+                earliestDate: earliestDate, endDate: Date(), ownership: ownership, operation: operation,
+                bodyFatOnlyPolicy: importsBodyFatOnly
             )
             try await requireImportOwnership(ownership)
             let completed = await MainActor.run {
@@ -429,10 +439,16 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
 
 func processHistoricalHealthKitBatches(
         earliestDate: Date, endDate: Date, ownership: AuthManager.ProfileSessionOwnership? = nil,
-        operation: UUID? = nil
+        operation: UUID? = nil, bodyFatOnlyPolicy: Bool? = nil
     ) async throws -> (imported: Int, skipped: Int) {
         guard let ownership = await captureImportOwnership(ownership) else { throw HealthKitError.notAuthorized }
         try await requireImportOwnership(ownership)
+        let importsBodyFatOnly: Bool
+        if let bodyFatOnlyPolicy {
+            importsBodyFatOnly = bodyFatOnlyPolicy
+        } else {
+            importsBodyFatOnly = await bodyFatOnlyImportEnabled()
+        }
         let calendar = Calendar.current
         let components = calendar.dateComponents([.month], from: earliestDate, to: endDate)
         let totalMonths = Double(components.month ?? 0)
@@ -474,7 +490,8 @@ func processHistoricalHealthKitBatches(
             // Process this batch
             let (imported, skipped) = await processBatchHealthKitData(
                 weightHistory: weightBatch,
-                bodyFatHistory: bodyFatBatch, ownership: ownership
+                bodyFatHistory: bodyFatBatch, ownership: ownership,
+                bodyFatOnlyPolicy: importsBodyFatOnly
             )
 
             try await requireImportOwnership(ownership)
@@ -538,6 +555,23 @@ func getEarliestWeightDate() async throws -> Date? {
         }
     }
 
+func getEarliestBodyFatDate() async throws -> Date? {
+        if let earliestBodyFatImportDateQuery { return try await earliestBodyFatImportDateQuery() }
+        return try await withCheckedThrowingContinuation { continuation in
+            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
+            let query = HKSampleQuery(
+                sampleType: bodyFatType, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: (samples?.first as? HKQuantitySample)?.startDate)
+                }
+            }
+            healthStore.execute(query)
+        }
+    }
+
 func processBatchHealthKitData(
         weightHistory: [(weight: Double, date: Date)],
         bodyFatHistory: [(percentage: Double, date: Date)]
@@ -555,7 +589,7 @@ func processBatchHealthKitData(
 func processBatchHealthKitData(
         weightHistory: [HealthKitWeightImportSample],
         bodyFatHistory: [HealthKitBodyFatImportSample],
-        ownership: AuthManager.ProfileSessionOwnership? = nil
+        ownership: AuthManager.ProfileSessionOwnership? = nil, bodyFatOnlyPolicy: Bool? = nil
     ) async -> (imported: Int, skipped: Int) {
         guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else {
             return (0, 0)
@@ -603,7 +637,12 @@ func processBatchHealthKitData(
             }
         }
 
-        let importsBodyFatOnly = await bodyFatOnlyImportEnabled()
+        let importsBodyFatOnly: Bool
+        if let bodyFatOnlyPolicy {
+            importsBodyFatOnly = bodyFatOnlyPolicy
+        } else {
+            importsBodyFatOnly = await bodyFatOnlyImportEnabled()
+        }
         var newlyCombinedSampleIDs = Set<String>()
         for sample in weightHistory {
             guard await ownsImport(ownership) else { return (imported, skipped) }
