@@ -310,6 +310,7 @@ struct BodyScoreShareCardView: View {
                 .accessibilityIdentifier("body_score_share_footer")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("body_score_share_summary")
     }
 
@@ -566,6 +567,13 @@ struct BodyScoreShareSheet: View {
     }
 
     var body: some View {
+        ZStack {
+            sheetSurface
+        }
+        .worldClassScreen(.shareBodyScore)
+    }
+
+    private var sheetSurface: some View {
         Group {
             if !payload.isOwned(by: authManager.ownsAccountSession) {
                 Color.clear
@@ -636,7 +644,6 @@ struct BodyScoreShareSheet: View {
         // Keep child identifiers (card/close/actions) discoverable for UI tests.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("body_score_share_sheet")
-        .worldClassScreen(.shareBodyScore)
     }
 
     private var dismissDragOpacity: Double {

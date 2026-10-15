@@ -2389,7 +2389,9 @@ final class LogYourBodyUITests: XCTestCase {
 
     func testProgressShareKeepsSelectedMetricAndVisibleValue() throws {
         let app = XCUIApplication()
-        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture"])
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture", "-lybUITestHomeV2StepsFixture"
+        ])
         let progress = app.buttons["home_v2_view_progress"]
         XCTAssertTrue(progress.waitForExistence(timeout: 30))
         assertTodayProvenancePresentation(in: app)
@@ -2407,10 +2409,37 @@ final class LogYourBodyUITests: XCTestCase {
                 XCTAssertFalse(share.exists, "Missing data must not become Body Score")
                 continue
             }
+            var expectedUnit: String?
+            if identifier == "steps" || identifier == "weight" {
+                // This fixture selects imperial units; HomeV2Copy displays "lb".
+                let progressUnitLabel = identifier == "steps" ? "steps" : "lb"
+                let progressUnits = app.scrollViews["home_v2_progress_scroll"].staticTexts.matching(
+                    NSPredicate(format: "label == %@", progressUnitLabel)
+                )
+                XCTAssertEqual(progressUnits.count, 1)
+                let progressUnit = try XCTUnwrap(progressUnits.count == 1 ? progressUnits.allElementsBoundByIndex.first : nil)
+                let capturedUnit = progressUnit.label
+                XCTAssertFalse(capturedUnit.isEmpty)
+                expectedUnit = capturedUnit
+            } else if identifier == "body_fat" {
+                expectedUnit = "%"
+            }
             XCTAssertTrue(share.waitForExistence(timeout: 5))
             share.tap()
             let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
             XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists)
+            let summary = sheet.descendants(matching: .any)["body_score_share_summary"]
+            XCTAssertTrue(summary.exists)
+            XCTAssertTrue(summary.staticTexts["body_score_share_score"].exists)
+            XCTAssertEqual(summary.staticTexts["body_score_share_score"].label, expectedValue)
+            XCTAssertTrue(summary.staticTexts["body_score_share_footer"].exists)
+            XCTAssertEqual(summary.staticTexts["body_score_share_footer"].label, "Shared from LogYourBody")
+            if identifier != "ffmi" {
+                let unitIdentifier = identifier == "body_fat" ? "body_score_share_unit" : "body_score_share_tagline"
+                XCTAssertTrue(summary.staticTexts[unitIdentifier].exists)
+                XCTAssertEqual(summary.staticTexts[unitIdentifier].label, try XCTUnwrap(expectedUnit))
+            }
             XCTAssertTrue(app.staticTexts["Share \(title)"].exists)
             XCTAssertEqual(app.staticTexts["body_score_share_score"].label, expectedValue)
             XCTAssertFalse(app.staticTexts["Share Body Score"].exists)
