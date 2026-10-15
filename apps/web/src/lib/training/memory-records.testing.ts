@@ -79,6 +79,52 @@ export class MemoryTrainingRecords implements NativeProductRecordsPort {
         const saved = await this.insertTrainingSet(subject, record);
         return saved ? { kind: 'saved', record: saved } : { kind: 'record_conflict' };
       }
+      if (action === 'set_correct') {
+        const expectedRevision = Number(record.expectedRevision);
+        const payload = { ...record };
+        delete payload.expectedRevision;
+        const saved = await this.correctTrainingSet(
+          subject,
+          String(record.id),
+          expectedRevision,
+          payload,
+        );
+        return saved ? { kind: 'saved', record: saved } : { kind: 'record_conflict' };
+      }
+      if (action === 'session_update' && record.status === 'completed') {
+        const prescription = record.prescription as { executionRevision?: number } | undefined;
+        const loggedSetCount = [...this.data.logged_sets.values()].filter(
+          (candidate) =>
+            candidate.user_id === subject &&
+            candidate.deleted_at === null &&
+            candidate.sessionId === record.id,
+        ).length;
+        const saved = await this.updateTrainingSession(
+          subject,
+          String(record.id),
+          Number(prescription?.executionRevision ?? 0),
+          loggedSetCount,
+          record,
+        );
+        return saved ? { kind: 'saved', record: saved } : { kind: 'record_conflict' };
+      }
+      if (
+        action === 'session_update' &&
+        (record.expectedExecutionRevision !== undefined ||
+          record.expectedLoggedSetCount !== undefined)
+      ) {
+        const payload = { ...record };
+        delete payload.expectedExecutionRevision;
+        delete payload.expectedLoggedSetCount;
+        const saved = await this.updateTrainingSession(
+          subject,
+          String(record.id),
+          Number(record.expectedExecutionRevision),
+          Number(record.expectedLoggedSetCount),
+          payload,
+        );
+        return saved ? { kind: 'saved', record: saved } : { kind: 'record_conflict' };
+      }
       if (action === 'swap_insert') {
         if (
           record.record_type !== 'exercise_swap' ||
@@ -121,6 +167,65 @@ export class MemoryTrainingRecords implements NativeProductRecordsPort {
       server_updated_at: '2026-01-10T12:00:00.000Z',
     } as NativeProductRecord;
     this.data.logged_sets.set(id, stored);
+    return stored;
+  }
+
+  async correctTrainingSet(
+    subject: string,
+    id: string,
+    expectedRevision: number,
+    record: Record<string, unknown>,
+  ) {
+    const existing = this.data.logged_sets.get(id);
+    if (
+      !existing ||
+      existing.user_id !== subject ||
+      existing.deleted_at !== null ||
+      Number(existing.revision ?? 0) !== expectedRevision
+    )
+      return null;
+    const stored = {
+      ...record,
+      id,
+      user_id: subject,
+      deleted_at: null,
+      server_updated_at: '2026-01-10T12:00:01.000Z',
+    } as NativeProductRecord;
+    this.data.logged_sets.set(id, stored);
+    return stored;
+  }
+
+  async updateTrainingSession(
+    subject: string,
+    id: string,
+    expectedRevision: number,
+    expectedLoggedSetCount: number,
+    record: Record<string, unknown>,
+  ) {
+    const existing = this.data.training_sessions.get(id);
+    const prescription = existing?.prescription as { executionRevision?: number } | undefined;
+    const loggedSetCount = [...this.data.logged_sets.values()].filter(
+      (candidate) =>
+        candidate.user_id === subject &&
+        candidate.deleted_at === null &&
+        candidate.sessionId === id,
+    ).length;
+    if (
+      !existing ||
+      existing.user_id !== subject ||
+      existing.deleted_at !== null ||
+      Number(prescription?.executionRevision ?? 0) !== expectedRevision ||
+      loggedSetCount !== expectedLoggedSetCount
+    )
+      return null;
+    const stored = {
+      ...record,
+      id,
+      user_id: subject,
+      deleted_at: null,
+      server_updated_at: '2026-01-10T12:00:01.000Z',
+    } as NativeProductRecord;
+    this.data.training_sessions.set(id, stored);
     return stored;
   }
 

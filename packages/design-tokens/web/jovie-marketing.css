@@ -1,0 +1,48 @@
+/* Source-pinned Jovie System B projection. See jovie-marketing-source.json. */
+@source '../../jovie-ui';
+@theme inline {
+  --container-public-content: var(--ds-public-content-max);
+  --container-prose-canonical: var(--ds-prose-max);
+  --color-surface-page: #030407;
+  --color-surface-1: #0f1420;
+  --color-primary-token: #f5f7fb;
+  --color-secondary-token: #d7dce8;
+  --color-tertiary-token: #a8b0c3;
+  --color-subtle: rgba(168, 176, 195, 0.1);
+  --color-default: rgba(168, 176, 195, 0.16);
+  --color-focus: #11afff;
+  --color-success: #3ffa8b;
+  --color-error: #f72a36;
+  --color-btn-primary: #e6e6e6;
+  --color-btn-primary-foreground: #020307;
+  --color-btn-primary-hover: #f0f0f0;
+  --color-btn-secondary: #151b2a;
+  --color-btn-secondary-foreground: #f5f7fb;
+  --color-btn-secondary-hover: #1b2436;
+  --color-interactive-hover: rgba(168, 176, 195, 0.06);
+  --color-interactive-active: rgba(17, 175, 255, 0.1);
+  --color-text-disabled-token: #525d75;
+  --text-app: 0.8125rem;
+  --duration-subtle: 150ms;
+  --ease-subtle: cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-button-inset:
+    rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+}
+.lyb-marketing {
+  --ds-public-content-max: 1298px;
+  --ds-prose-max: 680px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 510;
+  --font-weight-semibold: 590;
+  --font-weight-bold: 680;
+  --state-disabled-opacity: 0.5;
+  color: var(--color-primary-token);
+  background: var(--color-surface-page);
+  font-family: var(--font-body);
+}
+.lyb-marketing h1,
+.lyb-marketing h2 {
+  font-family: var(--font-display);
+}

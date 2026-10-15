@@ -25,11 +25,12 @@ export interface BlogPost {
 type BlogFrontmatter = Partial<
   Pick<BlogPost, 'title' | 'date' | 'author' | 'excerpt'> & {
     tags: string[];
+    draft: boolean;
   }
 >;
 
 // Get the posts directory
-const postsDirectory = path.join(process.cwd(), 'public/blog');
+const postsDirectory = path.join(process.cwd(), 'content/blog');
 
 function parsePost(fileContents: string): { data: BlogFrontmatter; content: string } {
   if (!fileContents.startsWith('---')) {
@@ -80,6 +81,7 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
 
     const fileContents = fs.readFileSync(fullPath, 'utf8');
     const { data, content } = parsePost(fileContents);
+    if (data.draft) return null;
 
     // Calculate read time (assuming 200 words per minute)
     const wordCount = content.split(/\s+/).length;
@@ -137,11 +139,5 @@ export async function getAllTags(): Promise<string[]> {
 }
 
 export async function getAllSlugs(): Promise<string[]> {
-  try {
-    const fileNames = fs.readdirSync(postsDirectory).filter((name) => name.endsWith('.md'));
-    return fileNames.map((fileName) => fileName.replace(/\.md$/, ''));
-  } catch (error) {
-    console.error('Error reading blog directory:', error);
-    return [];
-  }
+  return (await getAllPosts()).map((post) => post.slug);
 }

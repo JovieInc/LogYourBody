@@ -295,6 +295,22 @@ fi
 python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
 build_for_testing_once
 
+CHAT_QUALIFICATION_UNIT_TESTS=(
+  "ChatServiceTests/testSyntheticChatCompletionRestoresThroughExistingHistoryPort"
+  "ChatServiceTests/testSyntheticChatRetryRetainsOriginalIdentity"
+  "ChatServiceTests/testSyntheticChatMissingDoneAndCancelledTurnNeverPersistComplete"
+  "ChatServiceTests/testTurnRejectsDelayedReplacementTokenBeforeOpeningStream"
+  "ChatServiceTests/testTurnDropsHeldMetadataDeltasCompletionAndFailureAfterReplacement"
+  "ChatServiceTests/testTurnSuppressesDelayedProviderErrorButPreservesCurrentErrors"
+  "ChatServiceTests/testHistoryLoadRejectsDelayedSuccessEmptyAndErrorAfterOwnershipOrLoadChanges"
+  "ChatServiceTests/testHistoryLoadRejectsTokenFromReplacementSessionBeforeSending"
+  "ChatServiceTests/testCurrentTurnAcceptsRotatedTokenEventsAndRequiresCompletion"
+)
+CHAT_UNIT_EVIDENCE_ARGS=()
+for test_id in "${CHAT_QUALIFICATION_UNIT_TESTS[@]}"; do
+  CHAT_UNIT_EVIDENCE_ARGS+=(--expected-test "${test_id}()")
+done
+
 # The whole unit target is the gate: every journey test in docs/USER_JOURNEYS.md
 # runs on every PR (all 67 files are registered in the target as of the orphan rescue).
 run_xcodebuild_test \
@@ -303,7 +319,7 @@ run_xcodebuild_test \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
   -only-testing:LogYourBodyTests
 assert_xcresult_evidence \
-  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
 
 # Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
 # test-without-building invocation pays 3-6 min launching the UI test runner
@@ -312,11 +328,15 @@ assert_xcresult_evidence \
 # overran the 40-minute step with every test passing. Same tests, same exact
 # evidence checks, one runner launch.
 LAUNCH_QUALITY_UI_TESTS=(
+  "LogYourBodyUITests/testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch"
+  "LogYourBodyUITests/testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity"
+  "LogYourBodyUITests/testHomeV2AskSyntheticCancelledTurnRecovers"
   "LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
   "LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail"
+  "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal"
 )
 
 # Security-sensitive chaos regressions use the same native execution and
@@ -343,7 +363,7 @@ for test_id in "${LAUNCH_QUALITY_UI_TESTS[@]}" "${CHAOS_REGRESSIONS[@]}"; do
 done
 UI_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui.xcresult"
 UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
-# One runner launch (up to ~9 min hosted) plus all seventeen UI tests (~6 min)
+# One runner launch (up to ~9 min hosted) plus all selected UI tests
 # replaces three separately bounded invocations, so its own bound is the
 # per-invocation limit plus the work the other two used to carry.
 UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1500}"

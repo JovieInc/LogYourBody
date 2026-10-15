@@ -42,6 +42,9 @@ enum HomeV2ProgressMetric: String, CaseIterable, Identifiable {
 
     /// The summary shows a range extreme, not a recommendation or goal.
     var prefersHigh: Bool { self == .steps }
+
+    /// Steps count from zero. Body metrics stay padded so a small change stays visible.
+    var anchorsChartToZero: Bool { self == .steps }
 }
 
 /// What Progress needs for one metric. Values are already in display units.
@@ -51,9 +54,9 @@ struct HomeV2ProgressSeries {
     let unit: String
     let deltaUnit: String
     let target: Double?
-    let sourceLine: String?
-    let insightTitle: String
-    let insightBody: String
+    let provenance: HomeV2ProvenanceDetail?
+    let insightTitle: String?
+    let insightBody: String?
 }
 
 enum HomeV2ProgressCopy {
@@ -74,9 +77,6 @@ enum HomeV2ProgressCopy {
     static let ffmiInsightTitle = "FFMI is derived"
     static let ffmiInsightBody = "Computed from weight, body fat and height, so it moves with the body-fat estimate."
     static let ffmiSource = "Estimated from weight, body fat and height"
-    static let stepsInsightTitle = "Steps come from Apple Health"
-    static let stepsInsightBody = "Daily totals as your iPhone or watch recorded them. Nothing is written back."
-    static let stepsSource = "Apple Health"
     static let noTrendYet = "Your trend appears after 7 days"
 
     static func estimatedBy(_ source: String) -> String {
@@ -105,11 +105,19 @@ enum HomeV2ProgressCopy {
         return "\(direction) \(value)\(unitText) \(rangeLabel(range))"
     }
 
-    static func stepsAverageSentence(average: Double?, range: TimeRange) -> String {
-        guard let average, let text = FormatterCache.formattedSteps(average) else {
+    /// Latest day against the range average, so the hero number has a comparison.
+    static func stepsComparison(latest: Double?, average: Double?, range: TimeRange) -> String {
+        guard let latest, latest.isFinite, let average, average.isFinite,
+              let averageText = FormatterCache.formattedSteps(average),
+              let deltaText = FormatterCache.formattedSteps(abs(latest - average)) else {
             return noTrendYet
         }
-        return "Averaging \(text) a day \(rangeLabel(range))"
+        let delta = (latest - average).rounded()
+        if abs(delta) < 1 {
+            return "At the \(averageText) daily average \(rangeLabel(range))"
+        }
+        let direction = delta > 0 ? "above" : "below"
+        return "\(deltaText) \(direction) the \(averageText) daily average \(rangeLabel(range))"
     }
 
     static func dataDaysSentence(days: Int) -> String {
@@ -122,7 +130,9 @@ enum HomeV2ProgressPolicy {
     struct Stats: Equatable {
         let latest: Double?
         let start: Double?
+        let startDate: Date?
         let extreme: Double?
+        let extremeDate: Date?
         let delta: Double?
         let average: Double?
         let distinctDays: Int
@@ -132,12 +142,17 @@ enum HomeV2ProgressPolicy {
         let sorted = points.sorted { $0.date < $1.date }
         let values = sorted.map(\.value)
         let extreme = prefersHigh ? values.max() : values.min()
+        let extremePoint = extreme.flatMap { target in
+            sorted.filter { $0.value == target }.min { $0.date < $1.date }
+        }
         let average = values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
         let delta: Double? = (values.count > 1) ? (values.last ?? 0) - (values.first ?? 0) : nil
         return Stats(
             latest: values.last,
             start: values.first,
+            startDate: sorted.first?.date,
             extreme: extreme,
+            extremeDate: extremePoint?.date,
             delta: delta,
             average: average,
             distinctDays: Set(sorted.map { calendar.startOfDay(for: $0.date) }).count
@@ -158,18 +173,46 @@ struct HomeV2ProgressView: View {
 
     @State private var showsInsight = false
 
+    private static let contextDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MMMd")
+        return formatter
+    }()
+
     var body: some View {
         let current = series(metric)
-        let visible = HomeV2TrendPolicy.points(current.daily, in: range, now: now)
-        let stats = HomeV2ProgressPolicy.stats(points: visible, prefersHigh: metric.prefersHigh)
+        let visible = HomeV2MetricEditorial.observedPoints(
+            HomeV2TrendPolicy.points(current.daily, in: range, now: now)
+        )
         let hasEnoughData = HomeV2TrendPolicy.hasEnoughData(visible)
+        let presented = HomeV2MetricEditorial.canvas(
+            HomeV2MetricCanvasRequest(
+                metric: metric,
+                points: visible,
+                unit: current.unit,
+                deltaUnit: current.deltaUnit,
+                range: range,
+                provenance: current.provenance,
+                target: current.target,
+                hasEnoughData: hasEnoughData,
+                formatValue: { formatValue(metric, $0) },
+                dateText: { Self.contextDateFormatter.string(from: $0) }
+            )
+        )
 
         VStack(spacing: 0) {
             switcher
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    headline(current, stats: stats, hasEnoughData: hasEnoughData)
+                    HomeV2MetricHero(
+                        value: presented.value,
+                        unit: presented.unit,
+                        comparison: presented.comparison,
+                        provenance: presented.provenance
+                    )
+                    .padding(.horizontal, HomeV2Tokens.Space.inset)
+                    .padding(.vertical, HomeV2Tokens.Space.margin)
 
                     if hasEnoughData {
                         HomeV2TrendChart(
@@ -182,13 +225,18 @@ struct HomeV2ProgressView: View {
                             axis: .months,
                             metricTitle: metric.title,
                             usesSevenDayAverage: !current.trend.isEmpty,
+                            anchorsToZero: metric.anchorsChartToZero,
+                            formatValue: { formatValue(metric, $0) },
                             now: now
                         )
                         .padding(.top, HomeV2Tokens.Space.tight)
-                        insightRow(current)
-                        statsRow(stats, target: current.target)
+                        if let title = current.insightTitle, let body = current.insightBody {
+                            insightRow(title: title, body: body)
+                        }
+                        statsRow(presented.context)
                     } else {
-                        sparseHistory(hasEarlierData: stats.distinctDays == 0 && !current.daily.isEmpty)
+                        let earlier = visible.isEmpty && !current.daily.isEmpty
+                        sparseHistory(hasEarlierData: earlier)
                     }
                 }
             }
@@ -252,80 +300,35 @@ struct HomeV2ProgressView: View {
         }
     }
 
-    private func headline(_ current: HomeV2ProgressSeries, stats: HomeV2ProgressPolicy.Stats, hasEnoughData: Bool) -> some View {
-        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight / 2) {
-            HStack(alignment: .lastTextBaseline, spacing: HomeV2Tokens.Space.tight) {
-                Text(stats.latest.map { formatValue(metric, $0) } ?? "—")
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.progressValue, weight: .bold, relativeTo: .largeTitle)
-                    .kerning(-2)
-                    .foregroundStyle(HomeV2Tokens.Colors.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .accessibilityIdentifier("home_v2_progress_value")
-
-                if !current.unit.isEmpty {
-                    Text(current.unit)
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.lead, relativeTo: .title3)
-                        .foregroundStyle(HomeV2Tokens.Colors.muted)
-                }
-            }
-
-            Text(deltaText(current, stats: stats, hasEnoughData: hasEnoughData))
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
-                .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("home_v2_progress_delta")
-
-            if let sourceLine = current.sourceLine {
-                Text(sourceLine)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .padding(.top, 2)
-            }
-        }
-        .padding(.horizontal, HomeV2Tokens.Space.inset)
-        .padding(.vertical, HomeV2Tokens.Space.margin)
-    }
-
-    private func deltaText(_ current: HomeV2ProgressSeries, stats: HomeV2ProgressPolicy.Stats, hasEnoughData: Bool) -> String {
-        guard hasEnoughData else {
-            return HomeV2ProgressCopy.dataDaysSentence(days: stats.distinctDays)
-        }
-        if metric == .steps {
-            return HomeV2ProgressCopy.stepsAverageSentence(average: stats.average, range: range)
-        }
-        return HomeV2ProgressCopy.deltaSentence(delta: stats.delta, unit: current.deltaUnit, range: range)
-    }
-
-    private func insightRow(_ current: HomeV2ProgressSeries) -> some View {
+    private func insightRow(title: String, body: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
                 withAnimation(.easeInOut(duration: JovieTokens.subtleDuration)) { showsInsight.toggle() }
             } label: {
                 HStack(spacing: HomeV2Tokens.Space.tight) {
                     VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight / 2) {
-                        Text(current.insightTitle)
+                        Text(title)
                             .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                             .foregroundStyle(HomeV2Tokens.Colors.secondary)
                         Text(showsInsight ? HomeV2ProgressCopy.hideInsight : HomeV2ProgressCopy.viewInsight)
                             .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
-                            .foregroundStyle(HomeV2Tokens.Colors.muted)
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
                     }
                     Spacer(minLength: HomeV2Tokens.Space.tight)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(HomeV2Tokens.Colors.quiet)
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
                         .rotationEffect(.degrees(showsInsight ? 90 : 0))
                 }
                 .padding(.horizontal, HomeV2Tokens.Space.inset)
-                .frame(minHeight: 72)
+                .frame(minHeight: JovieTokens.minimumHitTarget)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("home_v2_progress_insight")
 
             if showsInsight {
-                Text(current.insightBody)
+                Text(body)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
                     .foregroundStyle(HomeV2Tokens.Colors.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -336,13 +339,21 @@ struct HomeV2ProgressView: View {
         }
     }
 
-    private func statsRow(_ stats: HomeV2ProgressPolicy.Stats, target: Double?) -> some View {
-        HStack(spacing: 0) {
-            statCell(label: HomeV2ProgressCopy.start, value: stats.start)
-            divider
-            statCell(label: metric.prefersHigh ? HomeV2ProgressCopy.high : HomeV2ProgressCopy.low, value: stats.extreme)
-            divider
-            statCell(label: HomeV2ProgressCopy.target, value: target)
+    private func statsRow(_ context: [HomeV2MetricContext]) -> some View {
+        let cells = ForEach(context) { item in
+            statCell(label: item.label, value: item.value)
+        }
+        return Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) { cells }
+            } else {
+                HStack(spacing: 0) {
+                    ForEach(Array(context.enumerated()), id: \.element.id) { index, item in
+                        if index > 0 { divider }
+                        statCell(label: item.label, value: item.value)
+                    }
+                }
+            }
         }
         .frame(minHeight: 68)
         .overlay(alignment: .top) { HomeV2Hairline() }
@@ -356,18 +367,21 @@ struct HomeV2ProgressView: View {
             .frame(width: HomeV2Tokens.Space.hairline)
     }
 
-    private func statCell(label: String, value: Double?) -> some View {
+    private func statCell(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
-            Text(value.map { formatValue(metric, $0) } ?? HomeV2ProgressCopy.notSet)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+            Text(value)
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.lead, weight: .semibold, relativeTo: .title3)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
         .padding(.horizontal, HomeV2Tokens.Space.inset)
+        .padding(.vertical, HomeV2Tokens.Space.tight)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }

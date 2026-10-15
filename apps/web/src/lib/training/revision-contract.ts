@@ -39,7 +39,7 @@ export const decideProposalInputSchema = z
   })
   .strict();
 
-const exerciseSchema = z.object({
+const exerciseCoreSchema = z.object({
   id: z.string(),
   name: z.string(),
   primaryMuscle: z.enum(MUSCLE_GROUPS),
@@ -52,6 +52,9 @@ const exerciseSchema = z.object({
   loadInstruction: z.string().nullable(),
   progression: z.enum(['hold', 'add_reps', 'increase_load']),
   evidenceIds: z.array(z.string()),
+});
+const exerciseSchema = exerciseCoreSchema.extend({
+  substitutions: z.array(exerciseCoreSchema).default([]),
 });
 export const baselinePlanSchema = z.object({
   week: z.literal(1),

@@ -34,7 +34,7 @@ describe('WaitlistForm', () => {
     fireEvent.change(email, { target: { value: 'person@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
 
-    await screen.findByText(/TestFlight spot opens/i);
+    await screen.findByText(waitlistLandingCopy.successMessage);
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/waitlist',
       expect.objectContaining({
@@ -96,7 +96,10 @@ describe('WaitlistForm', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(waitlistLandingCopy.errorMessage);
+    expect(await screen.findByText(waitlistLandingCopy.errorMessage)).toHaveAttribute(
+      'role',
+      'status',
+    );
     expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
       outcome: 'rate_limited',
     });
@@ -111,7 +114,10 @@ describe('WaitlistForm', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(waitlistLandingCopy.errorMessage);
+    expect(await screen.findByText(waitlistLandingCopy.errorMessage)).toHaveAttribute(
+      'role',
+      'status',
+    );
     expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
       outcome: 'server_error',
     });

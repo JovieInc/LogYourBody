@@ -1,7 +1,7 @@
-'use client'
+import { redirect } from 'next/navigation';
 
-import { LandingPage } from "@/components/LandingPage";
+export const revalidate = false;
 
 export default function LandingRoute() {
-  return <LandingPage />;
+  redirect('/');
 }
