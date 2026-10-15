@@ -13,14 +13,14 @@ jest.mock('../../../auth/mobile/training/v1/dependencies', () => ({
 
 const auth = jest.mocked(getServerAuthSession);
 const nativePost = jest.mocked(canvasHandlers.POST);
-const url = 'https://example.test/api/training/canvas';
+const url = 'https://canvas.example/api/training/canvas';
 const previousEnv = { ...process.env };
 
 function request(headers: Record<string, string> = {}, signal?: AbortSignal) {
   return new NextRequest(url, {
     method: 'POST',
     headers: {
-      origin: 'https://example.test',
+      origin: 'https://canvas.example',
       'content-type': 'application/json',
       'x-lyb-account-subject': 'owner-A',
       ...headers,
@@ -75,7 +75,7 @@ it.each(['LYB_MESOCYCLE_CANVAS_ENABLED', 'LYB_HYPERTROPHY_COACH_API_ENABLED'])(
   },
 );
 
-it.each(['https://foreign.test', 'null', ''])(
+it.each(['https://foreign.example', 'null', ''])(
   'refuses nonmatching origin %s before session work',
   async (origin) => {
     expect((await POST(request({ origin }))).status).toBe(403);
@@ -146,7 +146,7 @@ it('connects the actual browser client to this adapter without exposing a bearer
         ...init,
         headers: {
           ...Object.fromEntries(new Headers(init?.headers)),
-          origin: 'https://example.test',
+          origin: 'https://canvas.example',
         },
       }),
     );
