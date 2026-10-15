@@ -260,6 +260,48 @@ extension DashboardViewLiquid {
         }
     }
 
+    /// Generic Edit targets the captured record, even if another row arrives that day.
+    @MainActor
+    func saveHomeV2Entry(
+        weightKilograms: Double?, bodyFat: Double?, session: HomeV2EditSession,
+        displayValue: Double, displayUnit: String
+    ) async -> Bool {
+        let admission: CoreDataManager.WriteAdmission = {
+            guard authManager.ownsAccountSession(session.owner),
+                  session.metric.userId == session.owner.subject,
+                  homeV2EditingSession?.owner == session.owner,
+                  homeV2EditingSession?.id == session.id, isHomeV2ContextPresented else {
+                throw CancellationError()
+            }
+        }
+        do {
+            try admission()
+            let result = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+                id: session.id, userId: session.owner.subject, weight: weightKilograms,
+                bodyFatPercentage: bodyFat, bodyFatMethod: nil, writeAdmission: admission
+            )
+            try admission()
+            let saved = result.metrics
+            guard saved.id == session.id, saved.userId == session.owner.subject else { return false }
+            RealtimeSyncManager.shared.syncIfNeeded()
+            BodyScoreCache.shared.invalidate(for: session.owner.subject)
+            BodyScoreRecalculationService.shared.scheduleRecalculation()
+            HapticManager.shared.successAction()
+            if Calendar.current.isDateInToday(saved.date) {
+                homeV2Logged = HomeV2LoggedEntry(
+                    metricId: saved.id, userId: session.owner.subject, date: saved.date,
+                    previousMetric: result.previousMetric,
+                    valueText: HomeV2WeightStepPolicy.text(displayValue), unit: displayUnit
+                )
+            }
+            await refreshHomeV2AfterWrite(selecting: saved.id, ownership: session.owner)
+            try admission()
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// C2 Undo: put the day back the way it was. A day that existed keeps its
     /// entry with the previous numbers; a day created by this log is deleted.
     @MainActor
@@ -296,11 +338,14 @@ extension DashboardViewLiquid {
     }
 
     @MainActor
-    func refreshHomeV2AfterWrite(selecting id: String?) async {
+    func refreshHomeV2AfterWrite(
+        selecting id: String?, ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async {
         await viewModel.refreshData(
             authManager: authManager,
             realtimeSyncManager: realtimeSyncManager
         )
+        if let ownership, !authManager.ownsAccountSession(ownership) { return }
         refreshGlobalTimelineStore()
 
         if let id, let index = bodyMetrics.firstIndex(where: { $0.id == id }) {

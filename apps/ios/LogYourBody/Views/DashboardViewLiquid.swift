@@ -102,7 +102,7 @@ struct DashboardViewLiquid: View {
     @StateObject var homeV2StepsReader = HomeV2DailyStepsReader()
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
-    @State var homeV2EditingMetric: BodyMetrics?
+    @State var homeV2EditingSession: HomeV2EditSession?
     @State var homeV2PhotoRoute: HomeV2PhotoRoute?
     @State var isHomeV2SettingsPresented = false
     @State var isHomeV2HelpPresented = false
@@ -263,6 +263,9 @@ struct DashboardViewLiquid: View {
                 reconcileHomeV2Timeline(with: metrics)
                 scheduleDashboardDerivedStateRefresh()
                 scheduleMetricCacheRefresh()
+            }
+            .onChange(of: authManager.captureAccountSession()) { _, _ in
+                homeV2EditingSession = nil
             }
             .onChange(of: authManager.currentUser?.id) { _, _ in
                 homeV2TimelineSelection = nil

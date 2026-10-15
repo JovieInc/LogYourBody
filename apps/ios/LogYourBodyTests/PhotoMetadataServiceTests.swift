@@ -890,9 +890,7 @@ private struct PhotoCallerStoredRow {
     let modified: Date?
 }
 
-// Regression candidate for the existing generic Edit callback. This intentionally
-// uses its current date-only service call; it is expected to fail before identity
-// is carried from the captured editor into the admitted store transaction.
+// The captured editor must retain its record after another same-day import arrives.
 @MainActor
 extension PhotoMetadataServiceTests {
     func testCapturedOlderEditorDoesNotOverwriteNewerSameDayImport() async throws {
@@ -918,10 +916,9 @@ extension PhotoMetadataServiceTests {
         let arrivalRow = await cachedMetric(id: arrival.id)
         let beforeArrival = try XCTUnwrap(arrivalRow?.toBodyMetrics())
 
-        // Exact arguments emitted by homeV2EditEntrySheet after it captured this row.
-        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
-            for: captured.date, weight: 82, bodyFatPercentage: 18.4,
-            bodyFatMethod: BodyFatEntryMethod.bioelectrical.rawValue, userId: captured.userId
+        let result = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+            id: captured.id, userId: captured.userId, weight: 82, bodyFatPercentage: 18.4,
+            bodyFatMethod: nil, writeAdmission: {}
         )
 
         XCTAssertEqual(result.metrics.id, captured.id, "Edit must retain its original record identity")
@@ -938,5 +935,379 @@ extension PhotoMetadataServiceTests {
             for: captured.userId, localDate: captured.localDate
         )
         XCTAssertEqual(Set(rows.compactMap(\.id)), Set([captured.id, arrival.id]))
+    }
+}
+
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testExactMetricEditRejectsMissingDeletedForeignAndAmbiguousTargetsWithoutFallback() async throws {
+        for scenario in ["missing", "deleted", "foreign", "duplicate"] {
+            let store = makePhotoAdmissionStore()
+            let fixture = undoFixture(weight: 80, bodyFat: 18, method: "caliper")
+            try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId, markAsSynced: true)
+            let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first)
+            if scenario == "deleted" { row.isMarkedDeleted = true }
+            if scenario == "duplicate" {
+                let duplicate = CachedBodyMetrics(context: store.viewContext)
+                duplicate.setValuesForKeys(row.dictionaryWithValues(forKeys: Array(row.entity.attributesByName.keys)))
+                duplicate.userId = "another-owner"
+            }
+            try store.viewContext.save()
+            let before = try exactEditStoredRows(store)
+            do {
+                _ = try await store.updateExistingMetricMeasurementsAndWait(
+                    id: scenario == "missing" ? "absent" : fixture.id,
+                    userId: scenario == "foreign" ? "another-owner" : fixture.userId,
+                    weight: 90, bodyFatPercentage: 22, bodyFatMethod: "manual", writeAdmission: {}
+                )
+                XCTFail("An exact edit must reject \(scenario), never create or choose another row")
+            } catch PhotoMetricsEditError.entryNotFound {
+                // Expected fail-closed identity outcome.
+            }
+            XCTAssertEqual(try exactEditStoredRows(store), before)
+            XCTAssertFalse(store.viewContext.hasChanges)
+        }
+    }
+
+    func testExactMetricEditPreservesUntouchedRawFieldsAndUnrelatedSharedDraft() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: nil, bodyFat: 18, method: "caliper")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId, markAsSynced: true)
+        let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first)
+        row.sourceMetadataJSON = "{\"vendor_field\":\"preserve exactly\",\"source_name\":\"Original\"}"
+        row.dataSource = "original-opaque-source"
+        row.originalPhotoUrl = "original-owner/photo.jpg"
+        row.photoProcessedAt = fixture.date
+        row.waistCircumference = 89.123
+        row.hipCircumference = 99.456
+        row.waistUnit = "cm"
+        try store.viewContext.save()
+        let before = try XCTUnwrap(try exactEditStoredRows(store).first)
+        let draft = CachedBodyMetrics(context: store.viewContext)
+        draft.id = "unrelated-incomplete-draft"
+        draft.notes = "Do not save or discard me"
+        let result = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: nil, bodyFatPercentage: 18.4,
+            bodyFatMethod: nil, writeAdmission: {}
+        )
+        let after = try XCTUnwrap(try exactEditStoredRows(store).first)
+        XCTAssertEqual(result.metrics.id, fixture.id)
+        XCTAssertNil(result.metrics.weight)
+        XCTAssertEqual(result.metrics.bodyFatMethod, "caliper")
+        XCTAssertEqual(result.previousMetric?.bodyFatPercentage, 18)
+        let changed = Set(["bodyFatPercentage", "updatedAt", "lastModified", "isSynced", "syncStatus"])
+        for key in row.entity.attributesByName.keys where !changed.contains(key) {
+            XCTAssertEqual(before[key] as? NSObject, after[key] as? NSObject, "Unexpected mutation of \(key)")
+        }
+        XCTAssertEqual(after["bodyFatPercentage"] as? Double, 18.4)
+        XCTAssertEqual(try exactEditStoredRows(store).count, 1)
+        XCTAssertTrue(draft.isInserted)
+        XCTAssertEqual(draft.notes, "Do not save or discard me")
+    }
+
+    func testExactMetricEditRejectsDirtyTargetIncludingItsCommittedIdentity() async throws {
+        for movedIdentity in [false, true] {
+            let store = makePhotoAdmissionStore()
+            let fixture = undoFixture(weight: 80, bodyFat: nil, method: nil)
+            try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+            let before = try exactEditStoredRows(store)
+            let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first)
+            row.notes = "Uncommitted target edit"
+            if movedIdentity { row.id = "different-uncommitted-id" }
+            do {
+                _ = try await store.updateExistingMetricMeasurementsAndWait(
+                    id: fixture.id, userId: fixture.userId, weight: 90, bodyFatPercentage: nil,
+                    bodyFatMethod: nil, writeAdmission: {}
+                )
+                XCTFail("A pending target mutation must not be silently overwritten")
+            } catch PhotoMetricsEditError.pendingEdit { }
+            XCTAssertEqual(try exactEditStoredRows(store), before)
+            XCTAssertEqual(row.notes, "Uncommitted target edit")
+            XCTAssertTrue(row.hasChanges)
+        }
+    }
+
+    func testExactMetricEditRejectsSessionReplacementAtQueuedAdmission() async throws {
+        let auth = AuthManager.shared
+        let previousUser = auth.currentUser
+        let previousSession = auth.authSession
+        defer { auth.currentUser = previousUser; auth.authSession = previousSession }
+        for sameSubject in [true, false] {
+            let store = makePhotoAdmissionStore()
+            let fixture = undoFixture(weight: 80, bodyFat: 18, method: "caliper")
+            installPhotoAdmissionSession(subject: fixture.userId)
+            let owner = try XCTUnwrap(auth.captureAccountSession())
+            let presentation = HomeV2EditSession(metric: fixture, owner: owner)
+            try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+            let before = try exactEditStoredRows(store)
+            var admissions = 0
+            do {
+                _ = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+                    id: presentation.id, userId: presentation.owner.subject,
+                    weight: 90, bodyFatPercentage: 22, bodyFatMethod: "manual",
+                    writeAdmission: {
+                        admissions += 1
+                        if admissions == 2 {
+                            self.installPhotoAdmissionSession(subject: sameSubject ? fixture.userId : "replacement")
+                        }
+                        guard auth.ownsAccountSession(presentation.owner) else {
+                            throw PhotoCallerAdmissionTestError.replacedLifetime
+                        }
+                    }, coreDataManager: store
+                )
+                XCTFail("An admitted UI operation cannot survive an account-lifetime replacement")
+            } catch PhotoCallerAdmissionTestError.replacedLifetime { }
+            XCTAssertEqual(admissions, 2)
+            XCTAssertFalse(auth.ownsAccountSession(owner))
+            XCTAssertEqual(try exactEditStoredRows(store), before)
+            XCTAssertFalse(store.viewContext.hasChanges)
+        }
+    }
+
+    func testExactMetricEditRollsBackFailedCommitWithoutLatentMutation() async throws {
+        for failure in ["throw", "no-save"] {
+            let store = makePhotoAdmissionStore()
+            let fixture = undoFixture(weight: 80, bodyFat: 18, method: "caliper")
+            try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+            let before = try exactEditStoredRows(store)
+            do {
+                _ = try await store.updateExistingMetricMeasurementsAndWait(
+                    id: fixture.id, userId: fixture.userId, weight: 90, bodyFatPercentage: 22,
+                    bodyFatMethod: "manual", writeAdmission: {}, commit: { _ in
+                        if failure == "throw" { throw UndoTestSaveError.failed }
+                    }
+                )
+                XCTFail("A failed or omitted commit cannot report a successful edit")
+            } catch UndoTestSaveError.failed {
+                XCTAssertEqual(failure, "throw")
+            } catch PhotoMetricsEditError.uncommittedWrite {
+                XCTAssertEqual(failure, "no-save")
+            }
+            XCTAssertEqual(try exactEditStoredRows(store), before)
+            XCTAssertFalse(store.viewContext.hasChanges)
+            try store.viewContext.save()
+            XCTAssertEqual(try exactEditStoredRows(store), before, "A later save must not flush the failed edit")
+        }
+    }
+
+    private func exactEditStoredRows(_ store: CoreDataManager) throws -> [NSDictionary] {
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = store.viewContext.persistentStoreCoordinator
+        return try context.performAndWait {
+            let request = CachedBodyMetrics.fetchRequest()
+            request.sortDescriptors = [NSSortDescriptor(key: "id", ascending: true),
+                                       NSSortDescriptor(key: "userId", ascending: true)]
+            return try context.fetch(request).map {
+                NSDictionary(dictionary: $0.dictionaryWithValues(forKeys: Array($0.entity.attributesByName.keys)))
+            }
+        }
+    }
+}
+
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testUnboundDayLogStillChoosesNewestOwnedRecord() async throws {
+        let old = undoFixture(weight: 80, bodyFat: 18, method: "caliper")
+        let later = BodyMetrics(
+            id: UUID().uuidString, userId: old.userId, date: old.date.addingTimeInterval(3_600),
+            localDate: old.localDate, weight: 91, weightUnit: "kg",
+            bodyFatPercentage: nil, bodyFatMethod: nil, muscleMass: nil, boneMass: nil,
+            notes: nil, photoUrl: nil, dataSource: BodyMetricSource.manual.rawValue,
+            createdAt: old.date, updatedAt: old.date
+        )
+        for row in [old, later] {
+            try await CoreDataManager.shared.saveBodyMetricsAndWait(row, userId: old.userId)
+        }
+        let oldBefore = await cachedMetric(id: old.id)
+        let original = try XCTUnwrap(oldBefore?.toBodyMetrics())
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: old.date, weight: 82, userId: old.userId
+        )
+        XCTAssertEqual(result.metrics.id, later.id, "An unbound log still selects its destination day")
+        XCTAssertFalse(result.createdNewEntry)
+        let oldAfter = await cachedMetric(id: old.id)
+        XCTAssertEqual(oldAfter?.toBodyMetrics(), original)
+        XCTAssertEqual(result.previousMetric?.id, later.id)
+    }
+
+    func testExactMetricEditDoesNotPublishAfterSessionReplacementFollowingCommit() async throws {
+        let auth = AuthManager.shared
+        let previousUser = auth.currentUser
+        let previousSession = auth.authSession
+        defer { auth.currentUser = previousUser; auth.authSession = previousSession }
+        for sameSubject in [true, false] {
+            let store = makePhotoAdmissionStore()
+            let fixture = undoFixture(weight: 80, bodyFat: 18, method: "caliper")
+            installPhotoAdmissionSession(subject: fixture.userId)
+            let owner = try XCTUnwrap(auth.captureAccountSession())
+            try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+            var admissions = 0
+            do {
+                _ = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+                    id: fixture.id, userId: owner.subject, weight: nil, bodyFatPercentage: 18.4,
+                    bodyFatMethod: nil, writeAdmission: {
+                        admissions += 1
+                        if admissions == 4 {
+                            self.installPhotoAdmissionSession(subject: sameSubject ? fixture.userId : "replacement")
+                        }
+                        guard auth.ownsAccountSession(owner) else {
+                            throw PhotoCallerAdmissionTestError.replacedLifetime
+                        }
+                    }, coreDataManager: store
+                )
+                XCTFail("The committed old-owner result cannot publish into a replacement lifetime")
+            } catch PhotoCallerAdmissionTestError.replacedLifetime { }
+            XCTAssertEqual(admissions, 4)
+            XCTAssertFalse(auth.ownsAccountSession(owner))
+            let stored = try XCTUnwrap(try exactEditStoredRows(store).first)
+            XCTAssertEqual(stored["id"] as? String, fixture.id)
+            XCTAssertEqual(stored["userId"] as? String, owner.subject)
+            XCTAssertEqual(stored["bodyFatPercentage"] as? Double, 18.4,
+                           "An already admitted original-owner commit must not be undone for a new session")
+            XCTAssertEqual(stored["weight"] as? Double, 80)
+            XCTAssertEqual(stored["bodyFatMethod"] as? String, "caliper")
+            XCTAssertEqual(try exactEditStoredRows(store).count, 1)
+        }
+    }
+}
+
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testCapturedEditorIntentPreservesRawMeasurementsAndMethodsUntilChanged() async throws {
+        for method in [nil, "manual", "caliper"] as [String?] {
+            for weight in [nil, 82.123456] as [Double?] {
+                let store = makePhotoAdmissionStore()
+                let fixture = undoFixture(weight: weight, bodyFat: 18.4567, method: method)
+                try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+                let before = try XCTUnwrap(try exactEditStoredRows(store).first)
+                let session = HomeV2EditSession(
+                    metric: fixture,
+                    owner: AuthManager.ProfileSessionOwnership(subject: fixture.userId, generation: 1)
+                )
+                let initial = weight ?? HomeV2WeightStepPolicy.defaultValue(unit: "kg")
+                let displayed = try XCTUnwrap(HomeV2WeightStepPolicy.parse(HomeV2WeightStepPolicy.text(initial)))
+                let retained = session.measurementReplacements(
+                    value: displayed, bodyFat: 18.5, initialDisplayedWeight: initial
+                )
+                XCTAssertNil(retained.weight)
+                XCTAssertNil(retained.bodyFat)
+                _ = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+                    id: session.id, userId: session.owner.subject, weight: retained.weight,
+                    bodyFatPercentage: retained.bodyFat, bodyFatMethod: nil,
+                    writeAdmission: {}, coreDataManager: store
+                )
+                XCTAssertEqual(try exactEditStoredRows(store), [before], "An unchanged editor is not a new observation")
+
+                let edited = session.measurementReplacements(
+                    value: displayed, bodyFat: 18.4, initialDisplayedWeight: initial
+                )
+                XCTAssertNil(edited.weight)
+                XCTAssertEqual(edited.bodyFat, 18.4)
+                let result = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+                    id: session.id, userId: session.owner.subject, weight: edited.weight,
+                    bodyFatPercentage: edited.bodyFat, bodyFatMethod: nil,
+                    writeAdmission: {}, coreDataManager: store
+                )
+                XCTAssertEqual(result.metrics.weight, weight)
+                XCTAssertEqual(result.metrics.bodyFatPercentage, 18.4)
+                XCTAssertEqual(result.metrics.bodyFatMethod, method,
+                               "Typing a replacement does not select a new measurement method")
+                XCTAssertEqual(result.metrics.sourceMetadata, fixture.sourceMetadata)
+                XCTAssertEqual(result.metrics.date, fixture.date)
+            }
+        }
+    }
+}
+
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testExactMetricEditSQLiteFailureReopenAndOlderIdentityPreservation() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("exact-edit-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("store.sqlite")
+        var managers: [CoreDataManager] = []
+        defer {
+            for manager in managers { try? closeExactEditStore(manager) }
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let store = try makeExactEditSQLiteStore(at: url)
+        managers.append(store)
+        let selected = undoFixture(weight: 80.123456, bodyFat: 18.4567, method: "caliper")
+        let newer = BodyMetrics(
+            id: UUID().uuidString, userId: selected.userId, date: selected.date.addingTimeInterval(3_600),
+            localDate: selected.localDate, weight: 91, weightUnit: "kg",
+            bodyFatPercentage: 27, bodyFatMethod: "bioelectrical", muscleMass: nil, boneMass: nil,
+            notes: "Newer import", photoUrl: nil, dataSource: BodyMetricSource.healthKit.rawValue,
+            sourceMetadata: BodyMetricSourceMetadata(sourceName: "Newer scale"),
+            createdAt: selected.date, updatedAt: selected.date
+        )
+        for metric in [selected, newer] {
+            try await store.saveBodyMetricsAndWait(metric, userId: selected.userId, markAsSynced: true)
+        }
+        let before = try exactEditStoredRows(store)
+        do {
+            _ = try await store.updateExistingMetricMeasurementsAndWait(
+                id: selected.id, userId: selected.userId, weight: nil, bodyFatPercentage: 18.4,
+                bodyFatMethod: nil, writeAdmission: {}, commit: { transaction in
+                    let request = CachedBodyMetrics.fetchRequest()
+                    request.predicate = NSPredicate(format: "id == %@", selected.id)
+                    let row = try XCTUnwrap(try transaction.fetch(request).first)
+                    XCTAssertFalse(try XCTUnwrap(row.entity.attributesByName["createdAt"]).isOptional)
+                    row.createdAt = nil // Exercise a real Core Data validation failure.
+                    try transaction.save()
+                }
+            )
+            XCTFail("An invalid commit must fail without changing either durable row")
+        } catch let error as NSError {
+            XCTAssertEqual(error.domain, NSCocoaErrorDomain)
+            XCTAssertTrue([NSValidationMissingMandatoryPropertyError, NSValidationMultipleErrorsError].contains(error.code))
+        }
+        XCTAssertEqual(try exactEditStoredRows(store), before)
+        XCTAssertFalse(store.viewContext.hasChanges)
+        try closeExactEditStore(store)
+
+        let reopened = try makeExactEditSQLiteStore(at: url)
+        managers.append(reopened)
+        XCTAssertEqual(try exactEditStoredRows(reopened), before, "Failure must survive an actual store reopen")
+        let result = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+            id: selected.id, userId: selected.userId, weight: nil, bodyFatPercentage: 18.4,
+            bodyFatMethod: nil, writeAdmission: {}, coreDataManager: reopened
+        )
+        let after = try exactEditStoredRows(reopened)
+        XCTAssertEqual(result.metrics.id, selected.id)
+        XCTAssertEqual(result.previousMetric?.id, selected.id)
+        XCTAssertEqual(result.metrics.weight, selected.weight)
+        XCTAssertEqual(result.metrics.bodyFatMethod, "caliper")
+        XCTAssertEqual(result.metrics.bodyFatPercentage, 18.4)
+        XCTAssertEqual(result.metrics.sourceMetadata, selected.sourceMetadata)
+        XCTAssertEqual(after.first { $0["id"] as? String == newer.id }, before.first { $0["id"] as? String == newer.id })
+        XCTAssertEqual(after.count, 2)
+        try closeExactEditStore(reopened)
+        let verified = try makeExactEditSQLiteStore(at: url)
+        managers.append(verified)
+        XCTAssertEqual(try exactEditStoredRows(verified), after, "Success must be durable in only the selected row")
+    }
+
+    private func makeExactEditSQLiteStore(at url: URL) throws -> CoreDataManager {
+        let description = NSPersistentStoreDescription(url: url)
+        description.type = NSSQLiteStoreType
+        description.shouldAddStoreAsynchronously = false
+        let manager = CoreDataManager(persistentStoreDescriptions: [description])
+        guard manager.viewContext.persistentStoreCoordinator?.persistentStores.count == 1 else {
+            throw NSError(domain: NSCocoaErrorDomain, code: NSPersistentStoreOpenError)
+        }
+        return manager
+    }
+
+    private func closeExactEditStore(_ manager: CoreDataManager) throws {
+        try manager.viewContext.performAndWait {
+            manager.viewContext.reset()
+            let coordinator = try XCTUnwrap(manager.viewContext.persistentStoreCoordinator)
+            for store in coordinator.persistentStores { try coordinator.remove(store) }
+        }
     }
 }

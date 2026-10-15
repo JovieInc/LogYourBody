@@ -26,6 +26,12 @@ enum PhotoMetricsRestoreError: Error {
     #endif
 }
 
+enum PhotoMetricsEditError: Error {
+    case entryNotFound
+    case pendingEdit
+    case uncommittedWrite
+}
+
 class PhotoMetadataService {
     static let shared = PhotoMetadataService()
 
@@ -230,6 +236,22 @@ class PhotoMetadataService {
             }
             return PhotoMetricsUpdateResult(metrics: new, createdNewEntry: true)
         }
+    }
+
+    /// Only generic Edit uses this path. Day-based log/create keeps its existing API.
+    @MainActor
+    func updateExistingMeasurementsWithResult(
+        id: String, userId: String, weight: Double?, bodyFatPercentage: Double?,
+        bodyFatMethod: String?, writeAdmission: @escaping CoreDataManager.WriteAdmission,
+        coreDataManager: CoreDataManager = .shared
+    ) async throws -> PhotoMetricsUpdateResult {
+        try writeAdmission()
+        let result = try await coreDataManager.updateExistingMetricMeasurementsAndWait(
+            id: id, userId: userId, weight: weight, bodyFatPercentage: bodyFatPercentage,
+            bodyFatMethod: bodyFatMethod, writeAdmission: writeAdmission
+        )
+        try writeAdmission()
+        return result
     }
 
     /// The Add Entry sheet dismisses as soon as this method returns. A fire-and-
