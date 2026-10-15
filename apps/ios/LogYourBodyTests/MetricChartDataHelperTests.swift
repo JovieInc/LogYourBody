@@ -182,3 +182,75 @@ final class MetricChartDataHelperTests: XCTestCase {
         XCTAssertEqual(points.count, 150)
     }
 }
+
+@MainActor
+extension MetricChartDataHelperTests {
+    func testNonBodyHistoryCannotDeleteCollidingBodyRecord() async throws {
+        let description = NSPersistentStoreDescription()
+        description.type = NSInMemoryStoreType
+        description.shouldAddStoreAsynchronously = false
+        let store = CoreDataManager(persistentStoreDescriptions: [description])
+        let id = UUID().uuidString
+        let userId = "history-delete-owner"
+        try await store.saveBodyMetricsAndWait(
+            makeMetric(id: id, userId: userId, daysAgo: 1, weight: 82.123), userId: userId
+        )
+        let request = CachedBodyMetrics.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id)
+        let row = try XCTUnwrap(try store.viewContext.fetch(request).first)
+        let keys = Array(row.entity.attributesByName.keys)
+        let before = row.dictionaryWithValues(forKeys: keys) as NSDictionary
+        var bodyDeleteCalls = 0
+
+        let nonBodyTypes: [DashboardViewLiquid.MetricType?] = [.steps, .glp1, nil]
+        for type in nonBodyTypes {
+            XCTAssertFalse(MetricHistoryDeletion.supportsBodyMetricDeletion(type))
+            let deleted = await MetricHistoryDeletion.deleteBodyEntry(id: id, metricType: type) { requestedID in
+                bodyDeleteCalls += 1
+                XCTAssertEqual(requestedID, id)
+                store.viewContext.delete(row)
+                try? store.viewContext.save()
+                return true
+            }
+            XCTAssertFalse(deleted, "Unsupported history must not report success or hide its row")
+            XCTAssertEqual(bodyDeleteCalls, 0)
+            let retained = try XCTUnwrap(try store.viewContext.fetch(request).first)
+            XCTAssertEqual(retained.dictionaryWithValues(forKeys: keys) as NSDictionary, before)
+        }
+    }
+
+    func testBodyHistoryRoutesExactIDOnceForEveryBodyMetricType() async {
+        for type in [DashboardViewLiquid.MetricType.weight, .bodyFat, .ffmi, .bodyScore] {
+            let id = UUID().uuidString
+            var requests: [String] = []
+            XCTAssertTrue(MetricHistoryDeletion.supportsBodyMetricDeletion(type))
+            let deleted = await MetricHistoryDeletion.deleteBodyEntry(id: id, metricType: type) { requestedID in
+                requests.append(requestedID)
+                return true
+            }
+            XCTAssertTrue(deleted)
+            XCTAssertEqual(requests, [id])
+        }
+    }
+
+    func testBodyHistoryFailedDeleteDoesNotReportSuccess() async {
+        let id = UUID().uuidString
+        var requests: [String] = []
+        let deleted = await MetricHistoryDeletion.deleteBodyEntry(id: id, metricType: .weight) { requestedID in
+            requests.append(requestedID)
+            return false
+        }
+        XCTAssertFalse(deleted)
+        XCTAssertEqual(requests, [id])
+    }
+
+    func testHistoryWithoutRecordIDDoesNotCallDelete() async {
+        var called = false
+        let deleted = await MetricHistoryDeletion.deleteBodyEntry(id: "", metricType: .weight) { _ in
+            called = true
+            return true
+        }
+        XCTAssertFalse(deleted)
+        XCTAssertFalse(called)
+    }
+}

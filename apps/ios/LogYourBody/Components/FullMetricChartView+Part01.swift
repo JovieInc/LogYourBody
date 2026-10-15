@@ -59,20 +59,31 @@ var body: some View {
             HapticManager.shared.selection()
         }
         .alert(
-            "Delete Entry?",
+            MetricHistoryDeletion.supportsBodyMetricDeletion(historyEntryPendingDeletion?.metricType)
+                ? "Delete Entry?" : "Deletion unavailable",
             isPresented: $showingHistoryDeleteConfirmation,
             presenting: historyEntryPendingDeletion
-        ) { entry in
-            Button("Delete", role: .destructive) {
-                Task {
-                    await deleteHistoryEntry(entry)
+        ) { request in
+            if MetricHistoryDeletion.supportsBodyMetricDeletion(request.metricType) {
+                Button("Delete", role: .destructive) {
+                    Task {
+                        await deleteHistoryEntry(request.entry, metricType: request.metricType)
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    historyEntryPendingDeletion = nil
+                }
+            } else {
+                Button("OK", role: .cancel) {
+                    historyEntryPendingDeletion = nil
                 }
             }
-            Button("Cancel", role: .cancel) {
-                historyEntryPendingDeletion = nil
+        } message: { request in
+            if MetricHistoryDeletion.supportsBodyMetricDeletion(request.metricType) {
+                Text("This will remove the entry and update your history.")
+            } else {
+                Text("This entry can’t be deleted from this history yet. Nothing will be removed.")
             }
-        } message: { _ in
-            Text("This will remove the entry and update your history.")
         }
     }
 
