@@ -443,10 +443,19 @@ func markBodyMetricDeleted(id: String, userId: String) async -> Bool {
         }
     }
 
-func deleteEmptyPhotoPlaceholder(id: String, userId: String) async -> Bool {
+func deleteEmptyPhotoPlaceholder(
+        id: String,
+        userId: String,
+        writeAdmission: WriteAdmission? = nil
+    ) async -> Bool {
         let context = viewContext
 
         return await context.perform {
+            do {
+                try MainActor.assumeIsolated { try writeAdmission?() }
+            } catch {
+                return false
+            }
             let fetchRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "id == %@ AND userId == %@", id, userId)
             fetchRequest.fetchLimit = 1

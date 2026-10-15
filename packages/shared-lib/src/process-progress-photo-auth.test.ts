@@ -18,7 +18,7 @@ function expectOwnerScopedPhotoBearer(source: string) {
   )?.[1];
   expect(jwtBody).toBeDefined();
   expect(jwtBody).toMatch(
-    /guard authManager\.ownsAccountSession\(ownership\),\s*let token = await accessTokenProvider\(\),\s*authManager\.ownsAccountSession\(ownership\) else \{\s*throw PhotoError\.notAuthenticated\s*\}/,
+    /^\s*guard authManager\.ownsAccountSession\(ownership\),\s*let token = await accessTokenProvider\(\),\s*authManager\.ownsAccountSession\(ownership\) else \{\s*throw PhotoError\.notAuthenticated\s*\}\s*return token\s*$/,
   );
   expect(jwtBody).toContain('return token');
 
@@ -59,6 +59,14 @@ describe('first-party progress photo auth boundary', () => {
   });
 
   it.each<[string, (source: string) => string]>([
+    [
+      'early return bypasses the ownership guard',
+      (source: string) =>
+        source.replace(
+          'private func authenticatedJWT(for ownership: AuthManager.ProfileSessionOwnership) async throws -> String {',
+          'private func authenticatedJWT(for ownership: AuthManager.ProfileSessionOwnership) async throws -> String {\n        return "synthetic-bypass-token"',
+        ),
+    ],
     [
       'missing owner check before token suspension',
       (source: string) =>
