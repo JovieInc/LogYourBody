@@ -641,9 +641,6 @@ struct BodyScoreShareSheet: View {
         .accessibilityAction(.escape) {
             closeShareSheet()
         }
-        // Keep child identifiers (card/close/actions) discoverable for UI tests.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("body_score_share_sheet")
     }
 
     private var dismissDragOpacity: Double {
@@ -752,31 +749,36 @@ struct BodyScoreShareSheet: View {
         VStack(spacing: JovieTokens.itemGap) {
             sheetHeader
 
-            Picker("Format", selection: $selectedAspect) {
-                ForEach(BodyScoreShareAspect.allCases) { aspect in
-                    Text(aspect.displayName).tag(aspect)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, JovieTokens.screenInset)
-            .accessibilityLabel("Card format")
-
-            if !payload.contextualMetrics.isEmpty {
-                Picker("Metric", selection: $shareOptions.selectedMetric) {
-                    if payload.score > 0 { Text("Body Score").tag(Optional<ContextualMetricKind>.none) }
-                    ForEach(payload.contextualMetrics) { snapshot in
-                        Text(snapshot.kind.title).tag(Optional(snapshot.kind))
+            VStack(spacing: JovieTokens.itemGap) {
+                Picker("Format", selection: $selectedAspect) {
+                    ForEach(BodyScoreShareAspect.allCases) { aspect in
+                        Text(aspect.displayName).tag(aspect)
                     }
                 }
-                .accessibilityIdentifier("contextual_share_metric_picker")
+                .pickerStyle(.segmented)
+                .padding(.horizontal, JovieTokens.screenInset)
+                .accessibilityLabel("Card format")
+
+                if !payload.contextualMetrics.isEmpty {
+                    Picker("Metric", selection: $shareOptions.selectedMetric) {
+                        if payload.score > 0 { Text("Body Score").tag(Optional<ContextualMetricKind>.none) }
+                        ForEach(payload.contextualMetrics) { snapshot in
+                            Text(snapshot.kind.title).tag(Optional(snapshot.kind))
+                        }
+                    }
+                    .accessibilityIdentifier("contextual_share_metric_picker")
+                }
+
+                contentControls
+
+                cardPreview(height: previewHeight)
+
+                shareActions
+                    .disabled(isRendering)
             }
-
-            contentControls
-
-            cardPreview(height: previewHeight)
-
-            shareActions
-                .disabled(isRendering)
+            // The content is a real sibling of Close/title under the world screen root.
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("body_score_share_sheet")
         }
         .padding(.top, JovieTokens.itemGap)
         .padding(.bottom, JovieTokens.compactInset)
