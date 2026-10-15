@@ -107,6 +107,9 @@ def regression_sql():
     statements = [statement for statement in statements if re.search(
         r"on conflict\s*\(collection,\s*id\)\s+do update set", statement,
     )]
+    statements = [statement for statement in statements if re.search(
+        r"values\s*\(\$1,\s*\$2,\s*\$3,", statement,
+    )]
     if len(statements) != 1:
         raise RuntimeError("Expected one actual native-records upsert in the adapter")
     lookup = ("(SELECT payload FROM public.native_records WHERE collection='dexa_results' "

@@ -307,3 +307,110 @@ describe('createNeonNativeProductRecords', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('admitted daily step deletion', () => {
+  const admission = { subject: 'owner-a', ownerId: morningId };
+  const deletion = {
+    record: {
+      ...morning,
+      user_id: 'forged-owner',
+      steps_deletion: { schema_version: 1, deleted_at: 'forged' },
+    },
+    day_start: '2026-08-13T00:00:00Z',
+    day_end: '2026-08-14T00:00:00Z',
+    time_zone: 'UTC',
+  };
+  function transactionStore(results: unknown[][]) {
+    // Neon queries are lazy; record descriptors, then execute one transaction.
+    const query = jest.fn((sql, values) => ({ sql, values }));
+    const transaction = jest.fn().mockResolvedValue([[], ...results]);
+    const database = { query, transaction } as unknown as NeonQueryFunction<false, false>;
+    return { store: createNeonNativeProductRecords(database), query, transaction };
+  }
+
+  it('places account admission before both marker statements and preserves the original non-step snapshot', async () => {
+    const persisted = {
+      ...morning,
+      steps: null,
+      steps_present: false,
+      steps_deletion: { schema_version: 1, day_start: deletion.day_start },
+    };
+    const { store, query, transaction } = transactionStore([[row(persisted)], []]);
+    const result = await store.accountMutations!.deleteDailySteps!(admission, [deletion]);
+    expect(transaction).toHaveBeenCalledTimes(1);
+    const statements = transaction.mock.calls[0][0];
+    expect(statements).toHaveLength(3);
+    expect(normalized(statements[0].sql)).toBe(
+      'select public.lyb_native_account_admit($1, $2::uuid)',
+    );
+    expect(statements[0].values).toEqual(['owner-a', morningId]);
+    expect(normalized(statements[1].sql)).toContain("values ('daily_metrics'");
+    expect(normalized(statements[2].sql)).toContain('update public.native_records target');
+    const submitted = JSON.parse(statements[1].values[2]);
+    expect(submitted).toEqual(morning);
+    expect(statements[1].values[1]).toBe('owner-a');
+    expect(result.records).toEqual([
+      {
+        ...persisted,
+        user_id: 'owner-a',
+        deleted_at: null,
+        server_updated_at: '2026-08-13T12:16:00.000Z',
+      },
+    ]);
+    expect(result.rejected_ids).toEqual([]);
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it('reports rejected anchors and returns other saved same-day rows without fabricated success', async () => {
+    const { store } = transactionStore([
+      [],
+      [],
+      [row({ ...morning, id: eveningId, steps: null })],
+      [row({ ...morning, steps: null })],
+    ]);
+    const result = await store.accountMutations!.deleteDailySteps!(admission, [
+      deletion,
+      { ...deletion, record: { ...deletion.record, id: eveningId } },
+    ]);
+    expect(result.rejected_ids).toEqual([morningId]);
+    expect(result.records.map((record) => record.id)).toEqual([eveningId, morningId]);
+  });
+
+  it.each([
+    { deletions: [] },
+    { deletions: [deletion, deletion] },
+    { deletions: [{ ...deletion, day_end: '2027-08-13T00:00:00Z' }] },
+    { deletions: [{ ...deletion, time_zone: 'Invalid/Zone' }] },
+  ])(
+    'rejects invalid internal typed calls before constructing mutations: %p',
+    async ({ deletions }) => {
+      const { store, query, transaction } = transactionStore([]);
+      await expect(store.accountMutations!.deleteDailySteps!(admission, deletions)).rejects.toThrow(
+        'invalid_steps_deletion',
+      );
+      expect(query).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('propagates an owner replacement rejection and never retries an unadmitted write', async () => {
+    const { store, transaction, query } = transactionStore([]);
+    transaction.mockRejectedValue({ code: 'LYB01' });
+    await expect(
+      store.accountMutations!.deleteDailySteps!(admission, [deletion]),
+    ).rejects.toMatchObject({ code: 'account_changed' });
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it('strips forged marker metadata before daily POST while retaining notes and unrelated fields', async () => {
+    const { store, transaction } = transactionStore([[row(morning)]]);
+    await store.accountMutations!.push(admission, 'daily_metrics', [deletion.record]);
+    const statements = transaction.mock.calls[0][0];
+    expect(normalized(statements[0].sql)).toBe(
+      'select public.lyb_native_account_admit($1, $2::uuid)',
+    );
+    expect(JSON.parse(statements[1].values[3])).toEqual(morning);
+    expect(statements).toHaveLength(2);
+  });
+});
