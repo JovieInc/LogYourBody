@@ -37,6 +37,11 @@ enum ServerApplyProbe {
     nonisolated(unsafe) static var beforeWriteAdmission: (@MainActor () -> Void)?
 }
 
+private enum ProfileSyncPayloadError: Error {
+    case missingOwner
+    case missingEmail
+}
+
 extension CoreDataManager {
 // MARK: - Update from Server Data
 
@@ -329,7 +334,16 @@ func updateOrCreateProfile(
             request.fetchLimit = 1
 
             do {
+                guard !userId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw ProfileSyncPayloadError.missingOwner
+                }
                 let results = try context.fetch(request)
+                let incomingEmail = (data["email"] as? String).flatMap { value in
+                    value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : value
+                }
+                guard results.first != nil || incomingEmail != nil else {
+                    throw ProfileSyncPayloadError.missingEmail
+                }
                 let profile = results.first ?? CachedProfile(context: context)
                 if results.first != nil,
                    BodyMetricSyncDateParser.storedVersionIsNewer(profile.updatedAt, than: data) {
@@ -338,7 +352,17 @@ func updateOrCreateProfile(
 
                 // Update fields
                 // profile.userId = userId // Using id field instead
+                let appliedAt = Date()
                 profile.id = userId
+                if let incomingEmail { profile.email = incomingEmail }
+                // The mobile API omits these timestamps. Initialize local cache
+                // metadata once, preserving existing values on later pulls.
+                profile.createdAt = profile.createdAt
+                    ?? (data["created_at"] as? String).flatMap(BodyMetricSyncDateParser.date)
+                    ?? appliedAt
+                profile.updatedAt = (data["updated_at"] as? String).flatMap(BodyMetricSyncDateParser.date)
+                    ?? profile.updatedAt
+                    ?? appliedAt
                 profile.fullName = data["full_name"] as? String
                 profile.username = data["username"] as? String
                 // profile.avatarUrl = data["avatar_url"] as? String // avatarUrl field not in Core Data model
@@ -353,7 +377,7 @@ func updateOrCreateProfile(
 
                 profile.syncStatus = "synced"
                 profile.isSynced = true
-                profile.lastModified = Date()
+                profile.lastModified = appliedAt
 
                 self.save()
             } catch {

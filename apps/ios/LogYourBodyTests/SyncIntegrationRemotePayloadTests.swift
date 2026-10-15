@@ -155,6 +155,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         let userId = "sync_test_user_profile_\(UUID().uuidString)"
         let firstPayload: [String: Any] = [
             "id": userId,
+            "email": "profile-sync@example.com",
             "full_name": "First Name",
             "username": "first_name",
             "height": 178.0,
@@ -165,6 +166,7 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         ]
         let secondPayload: [String: Any] = [
             "id": userId,
+            "email": "profile-sync@example.com",
             "full_name": "Updated Name",
             "username": "updated_name",
             "height": 181.0,
@@ -669,6 +671,119 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         XCTAssertEqual(sourceMetadata.sampleId, "weight-sample-123")
         XCTAssertEqual(sourceMetadata.bodyFatSampleId, "body-fat-sample-456")
         XCTAssertEqual(sourceMetadata.quantityType, "HKQuantityTypeIdentifierBodyMass")
+    }
+
+    func testMobileProfilePullPersistsRequiredFieldsIntoIndependentContext() async throws {
+        let before = Date()
+        await applyRequiredProfileThroughSave(from: [
+            "id": "fresh-mobile-profile", "email": "fresh@example.com", "full_name": "Fresh profile"
+        ])
+        let storedValue = try await durableRemoteProfile(id: "fresh-mobile-profile")
+        let stored = try XCTUnwrap(storedValue)
+        XCTAssertEqual(stored.email, "fresh@example.com")
+        XCTAssertEqual(stored.name, "Fresh profile")
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(stored.createdAt), before)
+        XCTAssertLessThanOrEqual(try XCTUnwrap(stored.updatedAt), Date())
+        XCTAssertEqual(stored.createdAt, stored.updatedAt)
+        XCTAssertTrue(stored.synced)
+        XCTAssertFalse(coreData.viewContext.hasChanges)
+    }
+
+    func testProfilePullPreservesKnownMetadataWhenMobilePayloadOmitsIt() async throws {
+        await applyRequiredProfileThroughSave(from: [
+            "id": "existing-mobile-profile", "email": "known@example.com", "full_name": "Before",
+            "created_at": "2024-01-01T00:00:00Z", "updated_at": "2025-01-01T00:00:00.123Z"
+        ])
+        let first = try await durableRemoteProfile(id: "existing-mobile-profile")
+        let initial = try XCTUnwrap(first)
+        for missingEmail: Any in [NSNull(), "", "   "] {
+            await applyRequiredProfileThroughSave(from: [
+                "id": "existing-mobile-profile", "email": missingEmail, "full_name": "Updated",
+                "created_at": "invalid", "updated_at": "invalid"
+            ])
+        }
+        await applyRequiredProfileThroughSave(from: ["id": "existing-mobile-profile", "full_name": "Final"])
+        let final = try await durableRemoteProfile(id: "existing-mobile-profile")
+        let stored = try XCTUnwrap(final)
+        XCTAssertEqual(stored.email, "known@example.com")
+        XCTAssertEqual(stored.name, "Final")
+        XCTAssertEqual(stored.createdAt, initial.createdAt)
+        XCTAssertEqual(stored.updatedAt, initial.updatedAt)
+        XCTAssertEqual(stored.createdAt, BodyMetricSyncDateParser.date(from: "2024-01-01T00:00:00Z"))
+        XCTAssertEqual(stored.updatedAt, BodyMetricSyncDateParser.date(from: "2025-01-01T00:00:00.123Z"))
+    }
+
+    func testMalformedProfilePullDoesNotInsertOrPoisonFollowingValidSave() async throws {
+        let invalid: [[String: Any]] = [
+            ["id": "", "email": "valid@example.com"],
+            ["id": "   ", "email": "valid@example.com"],
+            ["email": "valid@example.com"],
+            ["id": "missing-email"],
+            ["id": "null-email", "email": NSNull()],
+            ["id": "blank-email", "email": "   "]
+        ]
+        for payload in invalid {
+            await coreData.updateOrCreateProfileAndWait(from: payload)
+        }
+        await coreData.viewContext.perform { }
+        XCTAssertFalse(coreData.viewContext.hasChanges)
+        XCTAssertEqual(try coreData.viewContext.count(for: CachedProfile.fetchRequest()), 0)
+        await applyRequiredProfileThroughSave(from: [
+            "id": "valid-after-invalid", "email": "valid@example.com", "full_name": "Valid"
+        ])
+        let storedValue = try await durableRemoteProfile(id: "valid-after-invalid")
+        let stored = try XCTUnwrap(storedValue)
+        XCTAssertEqual(stored.email, "valid@example.com")
+        XCTAssertEqual(try coreData.viewContext.count(for: CachedProfile.fetchRequest()), 1)
+    }
+
+    func testProfilePullUpdatesEmailAndVersionWithoutReplacingCreationDate() async throws {
+        await applyRequiredProfileThroughSave(from: [
+            "id": "versioned-profile", "email": "before@example.com",
+            "created_at": "2024-01-01T00:00:00Z", "updated_at": "2025-01-01T00:00:00Z"
+        ])
+        await applyRequiredProfileThroughSave(from: [
+            "id": "versioned-profile", "email": "after@example.com",
+            "created_at": "2024-06-01T00:00:00Z", "updated_at": "2025-02-01T00:00:00Z"
+        ])
+        let storedValue = try await durableRemoteProfile(id: "versioned-profile")
+        let stored = try XCTUnwrap(storedValue)
+        XCTAssertEqual(stored.email, "after@example.com")
+        XCTAssertEqual(stored.createdAt, BodyMetricSyncDateParser.date(from: "2024-01-01T00:00:00Z"))
+        XCTAssertEqual(stored.updatedAt, BodyMetricSyncDateParser.date(from: "2025-02-01T00:00:00Z"))
+    }
+
+    private func applyRequiredProfileThroughSave(from payload: [String: Any]) async {
+        // Wait for production persistence before reading through an independent context.
+        // Calling save from this test would mask a missing production save.
+        let saved = expectation(forNotification: .NSManagedObjectContextDidSave, object: coreData.viewContext)
+        await coreData.updateOrCreateProfileAndWait(from: payload)
+        await fulfillment(of: [saved], timeout: 5)
+    }
+
+    private struct DurableRemoteProfile {
+        let email: String?
+        let name: String?
+        let createdAt: Date?
+        let updatedAt: Date?
+        let synced: Bool
+    }
+
+    private func durableRemoteProfile(id: String) async throws -> DurableRemoteProfile? {
+        await coreData.viewContext.perform { }
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = coreData.viewContext.persistentStoreCoordinator
+        return try await context.perform {
+            let request = CachedProfile.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            let rows = try context.fetch(request)
+            XCTAssertLessThanOrEqual(rows.count, 1)
+            guard let row = rows.first else { return nil }
+            return DurableRemoteProfile(
+                email: row.email, name: row.fullName, createdAt: row.createdAt,
+                updatedAt: row.updatedAt, synced: row.isSynced
+            )
+        }
     }
 }
 
