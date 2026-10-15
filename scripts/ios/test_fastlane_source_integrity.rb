@@ -77,7 +77,7 @@ Dir.mktmpdir('lyb-fastlane-version-') do |dir|
   [nil, false, 'true'].each do |preserve|
     reset.call
     options = { clean_artifacts: false }
-    options[:preserve_build_number] = preserve unless preserve.nil?
+    options[:skip_build_number_increment] = preserve unless preserve.nil?
     build(options)
     check(File.read(STATE[:version_file]).match?(/\A\d{14}\z/), 'normal build lost timestamp versioning')
     check(STATE[:actions].include?(:increment_build_number), 'normal build skipped version action')
@@ -199,12 +199,12 @@ required = 'RiskTests/testWriteAdmission()'
 end
 measured = Coverage.result.fetch(FASTFILE)
 lines = File.readlines(FASTFILE)
-guard = lines.index { |line| line.include?('unless options[:preserve_build_number] == true') }
+guard = lines.index { |line| line.include?('if options[:skip_build_number_increment] != true') }
 check(guard && measured.fetch(:lines).fetch(guard).to_i > 0, 'production version guard did not execute')
 branches = measured.fetch(:branches).select { |location, _| location[2] == guard + 1 }
 check(branches.length == 1 && branches.values.first.values.all? { |count| count > 0 },
       'both actual version guard branches must execute')
-opt = lines.index { |line| line.include?('preserve_build_number: true') }
+opt = lines.index { |line| line.include?('skip_build_number_increment: true') }
 call_line = opt && lines[0..opt].rindex { |line| line.strip == 'build(' }
 check(call_line && measured.fetch(:lines).fetch(call_line).to_i > 0, 'actual build_check call did not execute')
 puts JSON.generate({ cases: checks, actualFastfileVersionGuardLine: guard + 1,

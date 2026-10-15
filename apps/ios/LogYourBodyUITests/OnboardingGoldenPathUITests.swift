@@ -17,7 +17,12 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     /// fresh progress store (unique userId per launch).
     func testBodyScoreOnboardingGoldenPathReachesReveal() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture"]
+        app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture", "-lybUITestRevealTransitionDiagnostic"]
+        app.forwardActualXCTestContext()
+        let session = try XCTUnwrap(app.launchEnvironment["XCTestSessionIdentifier"])
+        XCTAssertNotNil(UUID(uuidString: session))
+        let bundle = try XCTUnwrap(app.launchEnvironment["XCTestBundlePath"])
+        XCTAssertTrue(bundle.hasSuffix("/LogYourBodyUITests.xctest"))
         app.launch()
 
         assertHookStep(in: app)
@@ -387,7 +392,19 @@ final class OnboardingGoldenPathUITests: XCTestCase {
             app.staticTexts["What should Home answer first?"].waitForExistence(timeout: 2),
             "The Home-mode question is gone"
         )
-        XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_completeProfile"].waitForExistence(timeout: 8))
+        let profileAppeared = app.descendants(matching: .any)["world_class_screen_completeProfile"]
+            .waitForExistence(timeout: 8)
+        if app.launchArguments.contains("-lybUITestRevealTransitionDiagnostic") {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "reveal-transition-after-existing-profile-wait"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+            let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screen.name = "reveal-transition-after-existing-profile-wait"
+            screen.lifetime = .keepAlways
+            add(screen)
+        }
+        XCTAssertTrue(profileAppeared)
         XCTAssertFalse(app.textFields["Last name"].exists)
     }
 
