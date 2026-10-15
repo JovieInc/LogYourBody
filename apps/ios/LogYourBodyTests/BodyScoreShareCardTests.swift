@@ -365,8 +365,22 @@ final class BodyScoreShareCardTests: XCTestCase {
     }
 
     func testContextualPNGExportRetainsEveryAspectAndVisibleSelection() throws {
-        for kind in [ContextualMetricKind.steps, .weight, .bodyFat, .ffmi] {
-            let payload = try XCTUnwrap(BodyScoreSharePayload.contextual([contextualSnapshot(kind: kind)], selected: kind))
+        let selectedDate = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-14T12:00:00Z"))
+        let expectedDate = selectedDate.formatted(date: .abbreviated, time: .omitted)
+        let expectations = [
+            SharePNGTruth(kind: .steps, value: "7,544", unit: "steps", date: expectedDate, evidence: nil),
+            SharePNGTruth(kind: .weight, value: "83.2", unit: "kg", date: expectedDate, evidence: nil),
+            SharePNGTruth(kind: .bodyFat, value: "17.4", unit: "%", date: expectedDate, evidence: "Estimated"),
+            SharePNGTruth(kind: .ffmi, value: "19.8", unit: "", date: expectedDate, evidence: "Derived estimate")
+        ]
+        for expectation in expectations {
+            let kind = expectation.kind
+            let snapshot = try renderingSnapshot(kind: kind)
+            XCTAssertEqual(snapshot.value, expectation.value)
+            XCTAssertEqual(snapshot.unit, expectation.unit)
+            XCTAssertEqual(snapshot.evidence, expectation.evidence)
+            XCTAssertTrue(snapshot.observation.contains(try XCTUnwrap(expectation.date)))
+            let payload = try XCTUnwrap(BodyScoreSharePayload.contextual([snapshot], selected: kind))
             let options = BodyScoreShareOptions(selectedMetric: kind)
             for aspect in BodyScoreShareAspect.allCases {
                 let size = aspect.pixelSize
@@ -383,14 +397,36 @@ final class BodyScoreShareCardTests: XCTestCase {
                 XCTAssertEqual(decoded.size, size)
                 XCTAssertGreaterThan(png.count, 1_000)
                 let text = try recognizedShareText(decoded)
-                let expected = contextualSnapshot(kind: kind).value.filter(\.isNumber)
+                let expected = expectation.value.filter(\.isNumber)
                 XCTAssertTrue(text.filter(\.isNumber).contains(expected), "Export must contain selected value for \(kind)")
                 XCTAssertFalse(text.lowercased().contains("body score"))
+                XCTAssertEqual(pngTruthMismatches(text, expected: expectation), [])
+            }
+            if kind == .bodyFat || kind == .ffmi {
+                // Real bad-input output calibrates the same OCR validator; not a production mutation.
+                let badText = try renderPNGText(
+                    contextualSnapshot(kind: kind), aspect: .portrait,
+                    options: options, name: "calibration-wrong-\(kind.rawValue).png")
+                let rejected = pngTruthMismatches(badText, expected: expectation)
+                XCTAssertTrue(rejected.contains("value"))
+                XCTAssertTrue(rejected.contains("unit"))
             }
         }
+        let expected = expectations[2]
+        let correct = try renderingSnapshot(kind: .bodyFat)
+        let differentDate = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-17T12:00:00Z"))
+        let wrongDate = ContextualMetricSnapshot(
+            kind: correct.kind, value: correct.value, unit: correct.unit,
+            observation: differentDate.formatted(date: .abbreviated, time: .omitted),
+            range: correct.range, trend: correct.trend,
+            provenance: correct.provenance, evidence: correct.evidence)
+        let text = try renderPNGText(
+            wrongDate, aspect: .portrait, options: BodyScoreShareOptions(selectedMetric: .bodyFat),
+            name: "calibration-wrong-selected-date.png")
+        XCTAssertTrue(pngTruthMismatches(text, expected: expected).contains("date"))
     }
 
-    func testEvidenceMeaningCannotBeHiddenBySourcePrivacy() {
+    func testEvidenceMeaningCannotBeHiddenBySourcePrivacy() throws {
         XCTAssertEqual(ContextualMetricEvidencePolicy.label(for: .ffmi), "Derived estimate")
         XCTAssertEqual(ContextualMetricEvidencePolicy.label(for: .bodyScore), "Derived estimate")
         XCTAssertEqual(ContextualMetricEvidencePolicy.label(for: .bodyFat, bodyFatMethod: "visual_estimate"), "Estimated")
@@ -404,6 +440,46 @@ final class BodyScoreShareCardTests: XCTestCase {
         options.includeTrend = false
         options.includeProvenance = false
         XCTAssertEqual(snapshot.detail(options: options), "Derived estimate")
+
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-14T12:00:00Z"))
+        let average = try XCTUnwrap(ContextualMetricProgressPolicy.selection(
+            points: [MetricChartDataPoint(date: date, value: 82, presence: .present)],
+            averages: [MetricChartDataPoint(date: date, value: 81, presence: .present)],
+            focus: .init(date: date, value: 81, kind: .sevenDayAverage)))
+        let smoothed = ContextualMetricSnapshot(
+            kind: .weight, value: String(format: "%.1f", average.point.value), unit: "kg",
+            observation: date.formatted(date: .abbreviated, time: .shortened), range: "30 days",
+            trend: nil, provenance: average.source(entries: []),
+            evidence: ContextualMetricEvidencePolicy.label(for: .weight, isSmoothed: average.isSmoothed))
+        let privateValue = ContextualMetricSnapshot(
+            kind: .bodyScore, value: "991.7", unit: "", observation: "PRIVATE RECORD",
+            range: "PRIVATE RANGE", trend: "PRIVATE TREND", provenance: "PRIVATE SOURCE")
+        let snapshots = [try renderingSnapshot(kind: .bodyFat), try renderingSnapshot(kind: .ffmi), smoothed]
+        let expectations = [
+            SharePNGTruth(kind: .bodyFat, value: "17.4", unit: "%", date: nil, evidence: "Estimated",
+                          hiddenDate: date.formatted(date: .abbreviated, time: .omitted)),
+            SharePNGTruth(kind: .ffmi, value: "19.8", unit: "", date: nil, evidence: "Derived estimate",
+                          hiddenDate: date.formatted(date: .abbreviated, time: .omitted)),
+            SharePNGTruth(kind: .weight, value: "81.0", unit: "kg", date: nil, evidence: "Smoothed",
+                          hiddenDate: date.formatted(date: .abbreviated, time: .omitted))
+        ]
+        for (selected, expected) in zip(snapshots, expectations) {
+            var privateOptions = BodyScoreShareOptions(selectedMetric: selected.kind)
+            privateOptions.includeObservation = false
+            privateOptions.includeRange = false
+            privateOptions.includeTrend = false
+            privateOptions.includeProvenance = false
+            let text = try renderPNGText(
+                selected, aspect: .portrait, options: privateOptions,
+                name: "contextual-privacy-\(selected.kind.rawValue).png", privateSnapshots: [privateValue])
+            XCTAssertEqual(pngTruthMismatches(text, expected: expected), [])
+            var stripped = selected
+            stripped.evidence = nil
+            let badText = try renderPNGText(
+                stripped, aspect: .portrait, options: privateOptions,
+                name: "calibration-hidden-evidence-\(selected.kind.rawValue).png")
+            XCTAssertTrue(pngTruthMismatches(badText, expected: expected).contains("evidence"))
+        }
     }
 
     func testStepsObservationKeepsSampleDayWhenSyncUpdatesLater() {
@@ -515,6 +591,7 @@ final class BodyScoreShareCardTests: XCTestCase {
 
     func testProgressAverageFocusKeepsActualAverageAndRejectsStaleRange() throws {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let expectedDate = date.formatted(date: .abbreviated, time: .omitted)
         let raw = MetricChartDataPoint(date: date, value: 82, presence: .present)
         let average = MetricChartDataPoint(date: date, value: 81, presence: .present)
         let focus = HomeV2ChartIntegrity.Sample(date: date, value: 81, kind: .sevenDayAverage)
@@ -530,6 +607,42 @@ final class BodyScoreShareCardTests: XCTestCase {
         let latest = try XCTUnwrap(ContextualMetricProgressPolicy.selection(points: [raw], focus: nil))
         XCTAssertEqual(latest.point.value, 82)
         XCTAssertFalse(latest.isSmoothed)
+
+        let rawEntry = MetricHistoryEntry(
+            id: "raw", date: date, primaryValue: 82, secondaryValue: nil, source: .healthKit)
+        for (name, selection, expectation) in [
+            ("raw", latest, SharePNGTruth(
+                kind: .weight, value: "82.0", unit: "kg", date: expectedDate, evidence: nil, source: "Apple Health")),
+            ("average", selected, SharePNGTruth(
+                kind: .weight, value: "81.0", unit: "kg", date: expectedDate, evidence: "Smoothed"))
+        ] {
+            let snapshot = ContextualMetricSnapshot(
+                kind: .weight, value: String(format: "%.1f", selection.point.value), unit: "kg",
+                observation: selection.point.date.formatted(date: .abbreviated, time: .shortened),
+                range: "30 days", trend: nil, provenance: selection.source(entries: [rawEntry, misleadingSource]),
+                evidence: ContextualMetricEvidencePolicy.label(for: .weight, isSmoothed: selection.isSmoothed))
+            var options = BodyScoreShareOptions(selectedMetric: .weight)
+            options.includeProvenance = true
+            for aspect in BodyScoreShareAspect.allCases {
+                let text = try renderPNGText(
+                    snapshot, aspect: aspect, options: options,
+                    name: "contextual-weight-\(name)-\(aspect.rawValue).png")
+                XCTAssertEqual(pngTruthMismatches(text, expected: expectation), [])
+            }
+        }
+        let substituted = ContextualMetricSnapshot(
+            kind: .weight, value: "82.0", unit: "kg",
+            observation: date.formatted(date: .abbreviated, time: .shortened),
+            range: "30 days", trend: nil, provenance: "Apple Health", evidence: "Smoothed")
+        var sourceVisible = BodyScoreShareOptions(selectedMetric: .weight)
+        sourceVisible.includeProvenance = true
+        let text = try renderPNGText(
+            substituted, aspect: .portrait, options: sourceVisible,
+            name: "calibration-average-borrowed-raw-source.png")
+        let rejected = pngTruthMismatches(text, expected: SharePNGTruth(
+            kind: .weight, value: "81.0", unit: "kg", date: expectedDate, evidence: "Smoothed"))
+        XCTAssertTrue(rejected.contains("value"))
+        XCTAssertTrue(rejected.contains("source"))
     }
 
     func testProgressPresentationRejectsDeletedRefreshedAndSparseFocus() throws {
@@ -757,6 +870,151 @@ final class BodyScoreShareCardTests: XCTestCase {
         request.usesLanguageCorrection = false
         try VNImageRequestHandler(cgImage: XCTUnwrap(image.cgImage), options: [:]).perform([request])
         return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+    }
+
+
+    private struct SharePNGTruth {
+        let kind: ContextualMetricKind
+        let value: String
+        let unit: String
+        let date: String?
+        let evidence: String?
+        var source: String?
+        var hiddenDate: String?
+    }
+
+    private func renderingSnapshot(kind: ContextualMetricKind) throws -> ContextualMetricSnapshot {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-10-14T12:00:00Z"))
+        if kind == .steps {
+            let daily = DailyMetrics(
+                id: "png-day", userId: "synthetic", date: date, steps: 7_544,
+                notes: nil, createdAt: date, updatedAt: date.addingTimeInterval(864_000))
+            return .steps(daily, value: "7,544", range: "30 days")
+        }
+        if kind == .weight {
+            let selected = shareWeightMetric(weight: 83.2, date: date, source: "healthkit")
+            let history = [
+                shareWeightMetric(weight: 81, date: date.addingTimeInterval(-86_400)),
+                selected,
+                shareWeightMetric(weight: 84, date: date.addingTimeInterval(86_400))
+            ]
+            return .weight(selected, metrics: history, prefersTrend: true,
+                           context: ("kg", date.formatted(date: .abbreviated, time: .omitted), "30 days"),
+                           formatValue: { String(format: "%.1f", $0) })
+        }
+        let ffmi = try XCTUnwrap(UnitConversion.calculateFFMI(weightKg: 80, bodyFatPercentage: 20, heightCm: 180))
+        let value = kind == .bodyFat ? 17.4 : ffmi
+        let points = (0..<7).map { index in
+            MetricChartDataPoint(
+                date: date.addingTimeInterval(Double(index - 3) * 86_400),
+                value: index == 3 ? value : value + Double(index - 3) * 0.2,
+                presence: kind == .bodyFat ? .estimated : .present)
+        }
+        let selected = try XCTUnwrap(ContextualMetricProgressPolicy.presentationSelection(
+            points: points, averages: [],
+            focus: .init(date: date, value: value, kind: .daily)))
+        XCTAssertTrue(selected.isFocused)
+        XCTAssertEqual(selected.point.date, date)
+        XCTAssertEqual(selected.point.value, value, accuracy: 0.0001)
+        let entry = MetricHistoryEntry(
+            id: "png-selected", date: date, primaryValue: value, secondaryValue: nil, source: .manual)
+        // BF/FFMI use the real Progress policies and initializer; no private view factory is claimed.
+        return ContextualMetricSnapshot(
+            kind: kind, value: String(format: "%.1f", selected.point.value),
+            unit: kind == .bodyFat ? "%" : "",
+            observation: selected.point.date.formatted(date: .abbreviated, time: .shortened),
+            range: "30 days", trend: nil, provenance: selected.source(entries: [entry]),
+            evidence: ContextualMetricEvidencePolicy.label(
+                for: kind, isEstimated: selected.point.isEstimated || selected.isSmoothed,
+                isSmoothed: kind == .weight && selected.isSmoothed))
+    }
+
+    private func renderPNGText(
+        _ snapshot: ContextualMetricSnapshot, aspect: BodyScoreShareAspect,
+        options: BodyScoreShareOptions, name: String, privateSnapshots: [ContextualMetricSnapshot] = []
+    ) throws -> String {
+        let payload = try XCTUnwrap(BodyScoreSharePayload.contextual(
+            [snapshot] + privateSnapshots, selected: snapshot.kind))
+        let size = aspect.pixelSize
+        let renderer = ImageRenderer(content: BodyScoreShareCardView(payload: payload, aspect: aspect, options: options)
+            .frame(width: size.width, height: size.height).environment(\.colorScheme, .dark))
+        renderer.scale = 1
+        let image = try XCTUnwrap(renderer.uiImage)
+        let png = try XCTUnwrap(image.pngData())
+        let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        let decoded = try XCTUnwrap(UIImage(data: png))
+        XCTAssertEqual(decoded.size, size)
+        XCTAssertGreaterThan(png.count, 1_000)
+        return try recognizedShareText(decoded)
+    }
+
+    private func pngTruthMismatches(_ text: String, expected: SharePNGTruth) -> Set<String> {
+        let lower = text.lowercased()
+        let compact = lower.filter { $0.isLetter || $0.isNumber }
+        let normalized = lower.replacingOccurrences(of: ",", with: "")
+        let numeric = NSRegularExpression.escapedPattern(for: expected.value.replacingOccurrences(of: ",", with: ""))
+        var mismatches = Set<String>()
+        if !compact.contains(expected.kind.title.lowercased().filter { $0.isLetter || $0.isNumber }) {
+            mismatches.insert("metric")
+        }
+        if normalized.range(of: "(?<![0-9.])" + numeric + "(?![0-9.])", options: .regularExpression) == nil {
+            mismatches.insert("value")
+        }
+        let hasKilograms = lower.range(of: #"\bkg\b"#, options: .regularExpression) != nil
+        let stepWords = lower.components(separatedBy: .whitespacesAndNewlines)
+            .filter { $0.trimmingCharacters(in: .punctuationCharacters) == "steps" }
+        let hasSteps = !stepWords.isEmpty
+        if expected.unit == "kg" && !hasKilograms { mismatches.insert("unit") }
+        // The uppercase metric title cannot substitute for the separate steps unit label.
+        if expected.unit == "steps" && stepWords.count < 2 { mismatches.insert("unit") }
+        if expected.unit == "%" && !lower.contains("%") { mismatches.insert("unit") }
+        if expected.unit != "kg" && hasKilograms { mismatches.insert("unit") }
+        if expected.unit != "steps" && hasSteps { mismatches.insert("unit") }
+        if expected.unit != "%" && lower.contains("%") { mismatches.insert("unit") }
+        if let date = expected.date {
+            if !compact.contains(date.lowercased().filter { $0.isLetter || $0.isNumber }) {
+                mismatches.insert("date")
+            }
+            if !compact.contains("30days") { mismatches.insert("range") }
+        } else if compact.contains("30days") || compact.contains("privatetrend") {
+            mismatches.insert("privacy")
+        }
+        if let hiddenDate = expected.hiddenDate,
+           compact.contains(hiddenDate.lowercased().filter { $0.isLetter || $0.isNumber }) {
+            mismatches.insert("privacy")
+        }
+        if let evidence = expected.evidence {
+            if !compact.contains(evidence.lowercased().filter { $0.isLetter || $0.isNumber }) {
+                mismatches.insert("evidence")
+            }
+        } else if lower.contains("smoothed") || lower.contains("estimated") || compact.contains("derivedestimate") {
+            mismatches.insert("evidence")
+        }
+        if let source = expected.source {
+            if !compact.contains(source.lowercased().filter { $0.isLetter || $0.isNumber }) {
+                mismatches.insert("source")
+            }
+        } else if compact.contains("applehealth") || compact.contains("manual") || compact.contains("weightbodyfatandheight") {
+            mismatches.insert("source")
+        }
+        if compact.contains("6210") || compact.contains("bodyscore") || compact.contains("privatesource") {
+            mismatches.insert("unrelated")
+        }
+        if normalized.range(of: #"(?<![0-9.])991\.7(?![0-9.])"#, options: .regularExpression) != nil {
+            mismatches.insert("privacy")
+        }
+        if expected.kind != .weight && normalized.range(
+            of: #"(?<![0-9.])83\.2(?![0-9.])"#, options: .regularExpression) != nil {
+            mismatches.insert("value")
+        }
+        // Token boundaries do not mistake legitimate "Inferred" text for Infinity.
+        if lower.range(of: #"(?<![a-z])(?:nan|[+-]?inf(?:inity)?)(?![a-z])"#, options: .regularExpression) != nil {
+            mismatches.insert("nonfinite")
+        }
+        return mismatches
     }
 
     private func contextualSnapshot(kind: ContextualMetricKind) -> ContextualMetricSnapshot {
