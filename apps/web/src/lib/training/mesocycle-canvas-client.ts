@@ -118,17 +118,31 @@ export function createCanvasClient(port: CanvasLedgerPort, subject = 'local'): C
   };
 }
 
-export function httpCanvasClient(fetchImpl: typeof fetch = fetch): CanvasClient {
+export function httpCanvasClient(
+  fetchImpl: typeof fetch = fetch,
+  account?: { subject: string; signal?: AbortSignal },
+): CanvasClient {
   let write: number | null = null;
   async function send(body: Record<string, unknown>): Promise<CanvasCommandResult> {
     const empty = readCanvasLedger(null, 'The plan could not be loaded.');
+    if (!account?.subject.trim() || account.signal?.aborted) {
+      return { kind: 'missed_update', readback: empty };
+    }
     try {
-      const response = await fetchImpl('/api/auth/mobile/training/v1/canvas', {
+      const response = await fetchImpl('/api/training/canvas', {
         method: 'POST',
-        headers: { accept: 'application/json', 'content-type': 'application/json' },
+        headers: {
+          accept: 'application/json',
+          'content-type': 'application/json',
+          'x-lyb-account-subject': account.subject,
+        },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        signal: account.signal,
         body: JSON.stringify({ ...body, expectedWrite: write }),
       });
       const payload = (await response.json()) as Partial<CanvasCommandResult> & { error?: string };
+      if (account.signal?.aborted) return { kind: 'missed_update', readback: empty };
       if (payload.readback && typeof payload.kind === 'string') {
         const result = payload as CanvasCommandResult;
         write = result.readback.write;

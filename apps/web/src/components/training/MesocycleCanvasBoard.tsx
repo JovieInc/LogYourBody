@@ -19,11 +19,13 @@ type Viewport = 'ultrawide' | 'phone';
 
 export function MesocycleCanvasBoard({
   mode = 'account',
+  accountSubject,
   client,
   viewport,
   reduceMotion,
 }: {
   mode?: 'fixture' | 'account';
+  accountSubject?: string;
   client?: CanvasClient;
   viewport?: Viewport;
   reduceMotion?: boolean;
@@ -35,19 +37,30 @@ export function MesocycleCanvasBoard({
   const [wide, setWide] = useState(viewport === 'ultrawide');
   const [motion, setMotion] = useState(reduceMotion === true ? 'reduced' : 'fluid');
   const focusId = useRef<string | null>(null);
+  const activeRef = useRef<CanvasClient | null>(client ?? null);
   const composerId = useId();
 
   useEffect(() => {
-    if (client) {
-      setActive(client);
-      return;
-    }
-    setActive(
-      mode === 'fixture'
+    const controller = new AbortController();
+    const next =
+      client ??
+      (mode === 'fixture'
         ? createCanvasClient(sessionCanvasPort(window.sessionStorage))
-        : httpCanvasClient(),
-    );
-  }, [client, mode]);
+        : httpCanvasClient(
+            fetch,
+            accountSubject ? { subject: accountSubject, signal: controller.signal } : undefined,
+          ));
+    activeRef.current = next;
+    setReadback(null);
+    setDraft('');
+    focusId.current = null;
+    setBusy(false);
+    setActive(next);
+    return () => {
+      controller.abort();
+      if (activeRef.current === next) activeRef.current = null;
+    };
+  }, [client, mode, accountSubject]);
 
   useEffect(() => {
     if (viewport) {
@@ -93,13 +106,14 @@ export function MesocycleCanvasBoard({
   }, [readback]);
 
   async function run(work: () => Promise<CanvasCommandResult>) {
-    if (!active) return;
+    const owner = active;
+    if (!owner || activeRef.current !== owner) return;
     setBusy(true);
     try {
       const result = await work();
-      setReadback(result.readback);
+      if (activeRef.current === owner) setReadback(result.readback);
     } finally {
-      setBusy(false);
+      if (activeRef.current === owner) setBusy(false);
     }
   }
 

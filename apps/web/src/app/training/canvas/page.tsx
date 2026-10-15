@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { getServerAuthSession } from '@/lib/ports/server-auth-runtime';
 import { MesocycleCanvasBoard } from '@/components/training/MesocycleCanvasBoard';
 import {
   mesocycleCanvasEnabled,
@@ -13,7 +14,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function MesocycleCanvasPage() {
+export default async function MesocycleCanvasPage() {
   if (!mesocycleCanvasEnabled()) notFound();
-  return <MesocycleCanvasBoard mode={mesocycleCanvasFixtureEnabled() ? 'fixture' : 'account'} />;
+  if (mesocycleCanvasFixtureEnabled()) return <MesocycleCanvasBoard mode="fixture" />;
+  const { userId } = await getServerAuthSession();
+  if (!userId) notFound();
+  return <MesocycleCanvasBoard key={userId} mode="account" accountSubject={userId} />;
 }

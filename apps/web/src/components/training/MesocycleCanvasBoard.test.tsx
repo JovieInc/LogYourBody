@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MesocycleCanvasBoard } from './MesocycleCanvasBoard';
 import {
   createCanvasClient,
@@ -61,6 +61,35 @@ function clientFor(port: CanvasLedgerPort): CanvasClient {
 }
 
 describe('mesocycle canvas board', () => {
+  it('drops an old account response when the client changes', async () => {
+    const a = createCanvasClient(memoryCanvasPort());
+    const b = createCanvasClient(memoryCanvasPort());
+    let finish!: (result: Awaited<ReturnType<CanvasClient['submit']>>) => void;
+    const oldResult = await a.read();
+    oldResult.readback.narration = 'Old account response';
+    const newResult = await b.read();
+    newResult.readback.narration = 'New account response';
+    a.submit = () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      });
+    b.read = async () => newResult;
+    const view = render(<MesocycleCanvasBoard client={a} viewport="phone" reduceMotion />);
+    fireEvent.change(screen.getByTestId('canvas-composer'), {
+      target: { value: 'old account draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(finish).toBeDefined());
+    view.rerender(<MesocycleCanvasBoard client={b} viewport="phone" reduceMotion />);
+    await screen.findByText('New account response');
+    expect(screen.getByTestId('canvas-composer')).toHaveValue('');
+    await act(async () => {
+      finish(oldResult);
+    });
+    expect(screen.getByTestId('canvas-narration')).toHaveTextContent('New account response');
+    expect(screen.queryByText('Old account response')).not.toBeInTheDocument();
+  });
+
   it('does not invent a plan when the account client has not loaded one', async () => {
     const fetchImpl = jest.fn(
       async () =>
@@ -85,7 +114,7 @@ describe('mesocycle canvas board', () => {
     render(
       <MesocycleCanvasBoard
         mode="account"
-        client={httpCanvasClient(fetchImpl as typeof fetch)}
+        client={httpCanvasClient(fetchImpl as typeof fetch, { subject: 'signed-in-subject' })}
         viewport="ultrawide"
       />,
     );
