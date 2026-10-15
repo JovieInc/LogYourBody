@@ -170,12 +170,12 @@ final class HomeV2TimelinePolicyTests: XCTestCase {
         }
     }
 
-    func testUnsupportedWeightsUseMissingTrendCopy() {
+    func testOverflowingDisplayConversionUsesMissingTrendCopy() throws {
         let first = entry("first", day: 0, weight: 1)
         let latest = entry("latest", day: 1, weight: Double.greatestFiniteMagnitude)
         let snapshot = HomeV2TimelinePolicy.Snapshot(metrics: [latest, first], owner: "owner")
         let id = HomeV2TimelinePolicy.EntryID(latest)
-        XCTAssertNil(snapshot.weightDeltaKilograms30d(for: id))
+        XCTAssertTrue(try XCTUnwrap(snapshot.weightDeltaKilograms30d(for: id)).isFinite)
         XCTAssertEqual(snapshot.weightChangeSentence(for: id, system: .imperial), "No 30-day trend yet")
     }
 

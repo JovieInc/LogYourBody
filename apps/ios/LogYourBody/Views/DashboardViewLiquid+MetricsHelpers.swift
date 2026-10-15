@@ -99,7 +99,10 @@ extension DashboardViewLiquid {
     /// Headline formatter for the weight metric card using trend-weight when enabled.
     func formatTrendWeightHeadline(_ metric: BodyMetrics, usesTrend: Bool) -> String {
         let system = currentMeasurementSystem
-        let trendKg = HomeV2WeightQuality.trendWeight(for: metric, in: bodyMetrics)
+        let trendKg = MetricsInterpolationService.shared.estimateTrendWeight(
+            for: metric.date,
+            metrics: bodyMetrics
+        )?.value
         guard let kilograms = TimelineWeightHeadlinePolicy.kilograms(
             measuredWeight: metric.weight,
             trendWeight: trendKg,

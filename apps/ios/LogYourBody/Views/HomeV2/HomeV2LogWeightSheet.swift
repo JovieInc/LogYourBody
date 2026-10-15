@@ -187,8 +187,6 @@ struct HomeV2LogWeightSheet: View {
                     .multilineTextAlignment(.center)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetValue, weight: .semibold, relativeTo: .largeTitle)
                     .kerning(-1.5)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
                     .foregroundStyle(HomeV2Tokens.Colors.ink)
                     .focused($focusedField, equals: .weight)
                     .accessibilityLabel("Weight")
@@ -331,10 +329,7 @@ struct HomeV2LogWeightSheet: View {
 
     private func commitTypedWeight() {
         guard let typed = HomeV2WeightStepPolicy.parse(valueText) else { return }
-        valueText = HomeV2WeightStepPolicy.text(typed)
-        errorText = HomeV2WeightStepPolicy.range(unit: unit).contains(typed)
-            ? nil
-            : HomeV2Copy.weightRangeError(unit: unit)
+        valueText = HomeV2WeightStepPolicy.text(HomeV2WeightStepPolicy.clamped(typed, unit: unit))
     }
 
     private func performDelete() {

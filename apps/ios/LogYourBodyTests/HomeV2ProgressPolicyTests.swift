@@ -134,6 +134,7 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
     }
 
     func testEveryMetricHasAnAccentAndATitle() {
+        XCTAssertEqual(HomeV2ProgressMetric.allCases, [.bodyFat, .ffmi, .weight, .steps])
         for metric in HomeV2ProgressMetric.allCases {
             XCTAssertFalse(metric.title.isEmpty)
             XCTAssertFalse(metric.identifier.isEmpty)
@@ -157,17 +158,6 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
             XCTAssertEqual(stats.distinctDays, days, "Multiple entries on one day do not advance the trend threshold")
             XCTAssertEqual(HomeV2TrendPolicy.hasEnoughData(selected), days >= HomeV2TrendPolicy.minimumDistinctDays)
         }
-    }
-
-    func testWeightProgressOmitsFlaggedValuesWithoutMutatingThem() {
-        let flagged = point(daysAgo: 1, value: 18)
-        let supported = point(daysAgo: 0, value: 80)
-
-        XCTAssertEqual(
-            HomeV2ProgressPolicy.supportedWeightPoints([flagged, supported], system: .metric).map(\.value),
-            [supported.value]
-        )
-        XCTAssertEqual(flagged.value, 18)
     }
 
     @MainActor

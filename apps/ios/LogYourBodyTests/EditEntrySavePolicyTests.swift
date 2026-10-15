@@ -87,4 +87,59 @@ final class EditEntrySavePolicyTests: XCTestCase {
         XCTAssertTrue(NativeSheetPresentationPolicy.usesNativeNavigationChrome(.bugReportForm))
         XCTAssertFalse(NativeSheetPresentationPolicy.usesCustomGrabber(.bugReportPrompt))
     }
+    @MainActor
+    func testPrefilledBodyFatKeepsEverySupportedMethod() {
+        for method in BodyFatEntryMethod.allCases {
+            let sheet = AddEntrySheet(
+                isPresented: .constant(true), initialTab: 1,
+                initialBodyFat: 18, initialBodyFatMethod: method.rawValue
+            )
+            XCTAssertEqual(sheet.bodyFat, "18.0")
+            XCTAssertEqual(sheet.bodyFatMethod, method.rawValue)
+            XCTAssertFalse(BodyFatEntryMethod.needsPreservedOption(sheet.bodyFatMethod))
+        }
+    }
+
+    @MainActor
+    func testPrefilledBodyFatPreservesMissingAndUnsupportedMethodsWithoutGuessing() {
+        let methods: [String?] = [nil, "", "healthkit", "apple_health", "future_method", "not dexa"]
+        for method in methods {
+            let sheet = AddEntrySheet(
+                isPresented: .constant(true), initialTab: 1,
+                initialBodyFat: 18, initialBodyFatMethod: method
+            )
+            XCTAssertEqual(sheet.bodyFatMethod, method, "Opaque provenance must remain byte-for-byte unchanged")
+            XCTAssertTrue(BodyFatEntryMethod.needsPreservedOption(sheet.bodyFatMethod))
+            XCTAssertEqual(BodyFatEntryMethod.selectionTitle(sheet.bodyFatMethod), "Method not specified")
+        }
+    }
+
+    @MainActor
+    func testPrefilledBodyFatRetainsTypedAndKnownLegacyMethodBytes() {
+        let methods = [
+            ("manual", "Entered by you"), ("typed", "Entered by you"), ("DEXA", "DEXA"),
+            (" dexa (BodySpec) ", "DEXA"), ("inbody", "InBody"),
+            ("bioelectrical", "Bioelectrical"), ("calipers", "Calipers")
+        ]
+        for (method, title) in methods {
+            let sheet = AddEntrySheet(
+                isPresented: .constant(true), initialTab: 1,
+                initialBodyFat: 18, initialBodyFatMethod: method
+            )
+            XCTAssertEqual(sheet.bodyFatMethod, method)
+            XCTAssertEqual(BodyFatEntryMethod.selectionTitle(sheet.bodyFatMethod), title)
+            XCTAssertTrue(BodyFatEntryMethod.needsPreservedOption(sheet.bodyFatMethod))
+        }
+    }
+
+    @MainActor
+    func testBlankBodyFatEntryKeepsTheExistingVisualEstimateDefault() {
+        let sheet = AddEntrySheet(
+            isPresented: .constant(true), initialTab: 1,
+            initialBodyFat: nil, initialBodyFatMethod: "dexa"
+        )
+        XCTAssertEqual(sheet.bodyFat, "")
+        XCTAssertEqual(sheet.bodyFatMethod, BodyFatEntryMethod.visualEstimate.rawValue)
+        XCTAssertEqual(BodyFatEntryMethod.selectionTitle(sheet.bodyFatMethod), "Visual Estimate")
+    }
 }

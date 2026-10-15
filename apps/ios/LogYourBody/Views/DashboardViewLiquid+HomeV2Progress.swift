@@ -16,7 +16,7 @@ extension DashboardViewLiquid {
         )
     }
 
-    func openHomeV2Progress(metric: HomeV2ProgressMetric = .weight) {
+    func openHomeV2Progress(metric: HomeV2ProgressMetric = .bodyFat) {
         homeV2ProgressMetric = metric
         if !HomeV2TrendPolicy.visibleRanges.contains(selectedRange) {
             selectedRange = .month3
@@ -32,19 +32,11 @@ extension DashboardViewLiquid {
         switch metric {
         case .weight:
             // ponytail: PhaseInsightPolicy sorts the metrics on every read; cache it if Progress ever feels slow.
-            let insight = PhaseInsightPolicy.insight(for: homeV2InsightMetrics)
+            let insight = PhaseInsightPolicy.insight(for: bodyMetrics)
             let title = homeV2PhaseSentence.map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 } ?? insight.title
-            let daily = HomeV2ProgressPolicy.supportedWeightPoints(
-                fullChartCache[.weight] ?? [],
-                system: system
-            )
-            let trend = HomeV2ProgressPolicy.supportedWeightPoints(
-                fullTrendChartCache[.weight] ?? [],
-                system: system
-            )
             return HomeV2ProgressSeries(
-                daily: daily,
-                trend: trend,
+                daily: fullChartCache[.weight] ?? [],
+                trend: fullTrendChartCache[.weight] ?? [],
                 unit: homeV2DisplayUnit,
                 deltaUnit: homeV2DisplayUnit,
                 target: weightGoal.map { convertWeight($0, to: system) ?? $0 },

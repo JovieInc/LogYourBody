@@ -238,7 +238,26 @@ struct FFMIInfoContent: View {
     }
 }
 
+enum FFMIInfoDismissTargetPolicy {
+    static let gateKey = "ffmi_info_dismiss_target_v1"
+
+    @MainActor
+    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-lybUITestBodyScoreOnboardingFixture") {
+            return arguments.contains("-lybUITestFFMIDismissTarget")
+        }
+        #endif
+        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return check(gateKey)
+    }
+}
+
+@MainActor
 struct FFMIInfoLink: View {
+    private let usesBottomDismiss = FFMIInfoDismissTargetPolicy.isEnabled()
+
     @Environment(\.theme)
     private var theme
 
@@ -270,11 +289,28 @@ struct FFMIInfoLink: View {
                 }
                 .background(Color.jovieCanvas.ignoresSafeArea())
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") {
-                            isPresenting = false
+                    if !usesBottomDismiss {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") {
+                                isPresenting = false
+                            }
+                            .foregroundStyle(Color.jovieAction)
                         }
-                        .foregroundStyle(Color.jovieAction)
+                    }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if usesBottomDismiss {
+                        Button {
+                            isPresenting = false
+                        } label: {
+                            Text("Done")
+                                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .accessibilityIdentifier("ffmi_info_done_button")
+                        .padding(.horizontal, JovieTokens.screenInset)
+                        .padding(.vertical, JovieTokens.itemGap)
                     }
                 }
             }

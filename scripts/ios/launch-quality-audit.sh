@@ -321,6 +321,15 @@ run_xcodebuild_test \
 assert_xcresult_evidence \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
 
+python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
+  --coverage "$ARTIFACT_DIR/launch-quality-unit-tests.coverage.json" \
+  --evidence "$ARTIFACT_DIR/launch-quality-unit-tests.evidence.json" \
+  --baseline "$ROOT_DIR/scripts/ios/native-coverage-baseline.json" \
+  --profile quality-unit --source-sha "$(git -C "$ROOT_DIR" rev-parse HEAD)" \
+  --base-revision "${BASE_SHA:-}" --source-root "$ROOT_DIR" \
+  --scheme "$SCHEME" --only-testing LogYourBodyTests \
+  > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
+
 # Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
 # test-without-building invocation pays 3-6 min launching the UI test runner
 # before its first test (xcresult action log, run 38320479871: runner launch
@@ -337,25 +346,6 @@ LAUNCH_QUALITY_UI_TESTS=(
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
   "LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail"
   "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal"
-)
-
-# Weight logger and historical-entry regressions changed by LYB-169 run in the
-# same bounded UI invocation and are required by the exact-test evidence gate.
-WEIGHT_LOGGER_REGRESSIONS=(
-  "HomeV2TimelineIntegrationUITests/testSelectedMomentBaselineHistoricalSwipeUpdatesDateAndMetrics"
-  "HomeV2LayoutUITests/testLogSheetHasOneHeadingAndKeepsEntryControls"
-  "HomeV2LayoutUITests/testLogSheetEditsUnitsWithKeyboardAndCancelsWithoutChangingHome"
-  "HomeV2LayoutUITests/testLogSheetAtLargestTextKeepsValueAndDetailsReachable"
-  "HomeV2LayoutUITests/testEditorialWeightOnlyHeroShowsActualSparseReadings"
-  "HomeV2LayoutUITests/testHistoricalOnlyDataLeavesTodayEmptyAndReachableAtLargestText"
-  "HomeV2TimelineIntegrationUITests/testHorizontalPhotoDragKeepsTodaySelectedWithoutOpeningViewer"
-  "HomeV2TimelineIntegrationUITests/testHistoricalWeightOnlyDayInEntriesNeverBorrowsTodaysBodyFat"
-  "HomeV2TimelineIntegrationUITests/testLargestTextHasNoTimelineRulerAndKeepsLoggingReachable"
-  "LogYourBodyUITests/testHomeV2TodayDoesNotSwipeIntoHistoricalDates"
-  "LogYourBodyUITests/testHomeV2HistoricalDatesLiveInEntriesInsteadOfTodayScrubber"
-  "LogYourBodyUITests/testHomeV2TodayDoesNotTeachRemovedTimelineGestures"
-  "LogYourBodyUITests/testHomeV2ChangingLogDateDoesNotCreateATodayUndoReceipt"
-  "ChaosEdgeCaseUITests/testBodyFatEntryRejectsOutOfRangeValues"
 )
 
 # Security-sensitive chaos regressions use the same native execution and
@@ -376,10 +366,7 @@ CHAOS_REGRESSIONS=(
 )
 UI_SELECTORS=()
 UI_EVIDENCE_ARGS=()
-for test_id in \
-  "${LAUNCH_QUALITY_UI_TESTS[@]}" \
-  "${WEIGHT_LOGGER_REGRESSIONS[@]}" \
-  "${CHAOS_REGRESSIONS[@]}"; do
+for test_id in "${LAUNCH_QUALITY_UI_TESTS[@]}" "${CHAOS_REGRESSIONS[@]}"; do
   UI_SELECTORS+=("-only-testing:LogYourBodyUITests/$test_id")
   UI_EVIDENCE_ARGS+=(--expected-test "$test_id()")
 done
@@ -418,7 +405,7 @@ fi
   printf -- '- Required passing test IDs and seven screenshot hashes: `launch-quality-ui.evidence.json`. First failed attempt bundles are retained.\n'
   printf -- '- Source: `source-revision.txt` plus `source-working-tree.patch`; this is not exact deployed-build certification.\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
-  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, then one UI invocation covering four screenshot selectors, logout hierarchy, thirteen weight logger/history regressions, and twelve bounded chaos regressions with simulator parallelism disabled\n'
+  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, then one UI invocation covering four screenshot selectors, logout hierarchy, and twelve bounded chaos regressions with simulator parallelism disabled\n'
   printf -- '- Required native function coverage: biometric policy in unit execution and SettingsRow body, leading content, and value inset and action accounting in the chaos UI regressions\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"

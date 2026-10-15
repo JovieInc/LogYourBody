@@ -196,14 +196,12 @@ extension DashboardViewLiquid {
                     )
                     if isHomeV2CheckIn, homeV2SystemState == .loading {
                         HomeV2LoadingHome()
-                    } else if isHomeV2CheckIn {
-                        if let today = homeV2SelectedTodayMetric {
-                            homeV2Surface(for: today)
-                        } else {
-                            homeV2DayZero
-                        }
                     } else if bodyMetrics.isEmpty {
-                        photoTimelineHUDEmptyState
+                        if isHomeV2CheckIn {
+                            homeV2DayZero
+                        } else {
+                            photoTimelineHUDEmptyState
+                        }
                     } else {
                         photoTimelineHUD
                     }

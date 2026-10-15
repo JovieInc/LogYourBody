@@ -10,16 +10,6 @@ func stepWeight(by direction: Int) {
         HapticManager.shared.selection()
 }
 
-func updateWeightUnit(from previous: String, to current: String) {
-        if !previous.isEmpty, previous != current,
-           let value = HomeV2WeightStepPolicy.parse(weight) {
-            weight = HomeV2WeightStepPolicy.text(
-                HomeV2WeightStepPolicy.converted(value, from: previous, to: current)
-            )
-        }
-        validateWeight(weight)
-    }
-
 // MARK: - Photo Entry View
     var photoEntryView: some View {
         VStack(spacing: 16) {
@@ -222,7 +212,7 @@ func saveBodyFat(userId: String) {
                 defer { isSavingEntry = false }
 
                 do {
-                    _ = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                    let savedMetric = try await PhotoMetadataService.shared.createOrUpdateMetrics(
                         for: selectedDate,
                         bodyFatPercentage: validatedBodyFat,
                         bodyFatMethod: bodyFatMethod,
@@ -235,6 +225,7 @@ func saveBodyFat(userId: String) {
 
                     trackEntrySaved(type: "body_fat")
                     HapticManager.shared.successAction()
+                    onBodyFatSaved?(savedMetric)
                     dismiss()
                 } catch {
                     handleValidationError(

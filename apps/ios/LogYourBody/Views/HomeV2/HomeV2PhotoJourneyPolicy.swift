@@ -172,12 +172,13 @@ enum HomeV2PhotoTool: String, CaseIterable, Identifiable {
 enum HomeV2PhotoRulerPolicy {
     static let minimumSpanDays = 56
 
-    static func span(for dates: [Date], calendar: Calendar = .current) -> DateInterval {
+    static func span(for dates: [Date], calendar: Calendar = .current, now: Date = Date()) -> DateInterval {
         let sorted = dates.sorted()
-        let start = calendar.startOfDay(for: sorted.first ?? Date())
-        let last = calendar.startOfDay(for: sorted.last ?? start)
-        let minimumEnd = calendar.date(byAdding: .day, value: minimumSpanDays, to: start) ?? last
-        let end = max(last, minimumEnd)
+        let end = sorted.last ?? now
+        let first = sorted.first ?? end
+        // Pad short histories backward; the latest timestamp is never future axis space.
+        let minimumStart = calendar.date(byAdding: .day, value: -minimumSpanDays, to: end) ?? first
+        let start = calendar.startOfDay(for: min(first, minimumStart))
         return DateInterval(start: start, end: max(end, start.addingTimeInterval(1)))
     }
 

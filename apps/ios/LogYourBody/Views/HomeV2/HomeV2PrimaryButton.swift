@@ -83,7 +83,9 @@ struct HomeV2DisclosureLink: View {
 
 /// H0: the first check-in. One sentence, one quiet alternative, one action.
 struct HomeV2DayZero: View {
-    var hasHistory = false
+    let stepsValue: String
+    let stepsDetail: String
+    let onViewSteps: () -> Void
     let onConnectHealth: () -> Void
     let onLogWeight: () -> Void
 
@@ -91,30 +93,22 @@ struct HomeV2DayZero: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    HomeV2DataHero(
-                        metric: nil,
-                        metrics: [],
-                        unit: "",
-                        emptyTitle: hasHistory ? HomeV2Copy.nothingLoggedToday : nil
-                    )
+                    HomeV2DataHero(metric: nil, metrics: [], unit: "")
                         .frame(width: geometry.size.width,
                                height: geometry.size.width / HomeV2Tokens.photoAspectRatio)
                         .accessibilityIdentifier("home_v2_editorial_card")
 
                     VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
-                        Text(hasHistory ? HomeV2Copy.nothingLoggedToday : "Start with what you have.")
+                        Text("Start with what you have.")
                             .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle,
                                               weight: .semibold, relativeTo: .title2)
                             .foregroundStyle(HomeV2Tokens.Colors.ink)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text(
-                            hasHistory
-                                ? HomeV2Copy.earlierEntriesBody
-                                : "Log your weight or connect Apple Health. No body fat or photo required."
-                        )
+                        Text("Log body fat or weight, or connect Apple Health for daily steps. Start with any reading.")
                             .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
                             .foregroundStyle(HomeV2Tokens.Colors.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        HomeV2StepsSummary(value: stepsValue, detail: stepsDetail, dateText: "Today", onTap: onViewSteps)
                         HomeV2DisclosureLink(
                             title: HomeV2Copy.connectHealthInstead,
                             identifier: "home_v2_connect_health",
@@ -128,7 +122,7 @@ struct HomeV2DayZero: View {
             .accessibilityIdentifier("home_v2_content_scroll")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            HomeV2Dock(title: HomeV2Copy.logWeight, identifier: "home_v2_log_weight", action: onLogWeight)
+            HomeV2Dock(title: HomeV2Copy.logCheckIn, identifier: "home_v2_log_weight", action: onLogWeight)
                 .background(HomeV2Tokens.Colors.shell)
         }
     }

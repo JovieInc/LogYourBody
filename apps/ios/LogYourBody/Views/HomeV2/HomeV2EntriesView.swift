@@ -7,10 +7,8 @@ import SwiftUI
 /// Entries (Pencil E0): every logged day, one month per section, newest
 /// first. A row opens that day in Context. Viewing needs no action.
 struct HomeV2EntriesView: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
     let sections: [HomeV2EntriesSection]
-    let onSelect: (HomeV2EntriesRow) -> Void
+    let onSelect: (Date) -> Void
     let onBack: () -> Void
 
     var body: some View {
@@ -81,61 +79,41 @@ struct HomeV2EntriesView: View {
 
     private func entryRow(_ row: HomeV2EntriesRow) -> some View {
         Button {
-            onSelect(row)
+            onSelect(row.date)
         } label: {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-                        entryIdentity(row)
-                        entryValue(row)
-                    }
+            HStack(spacing: HomeV2Tokens.Space.row) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.dayText)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+                        .foregroundStyle(HomeV2Tokens.Colors.ink)
+                    Text(row.source)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                }
+
+                Spacer(minLength: HomeV2Tokens.Space.tight)
+
+                Text(row.valueText)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                    .lineLimit(1)
+
+                if let photoURL = row.photoURL {
+                    SubjectPlateView(urlString: photoURL, size: CGSize(width: 28, height: 36))
+                        .clipShape(RoundedRectangle(cornerRadius: HomeV2Tokens.thumbRadius, style: .continuous))
+                        .accessibilityHidden(true)
                 } else {
-                    HStack(spacing: HomeV2Tokens.Space.row) {
-                        entryIdentity(row)
-                        Spacer(minLength: HomeV2Tokens.Space.tight)
-                        entryValue(row)
-                    }
+                    Color.clear.frame(width: 28, height: 36)
                 }
             }
             .padding(.horizontal, HomeV2Tokens.Space.inset)
-            .padding(.vertical, dynamicTypeSize.isAccessibilitySize ? HomeV2Tokens.Space.tight : 0)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 72)
+            .frame(minHeight: 64)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .overlay(alignment: .bottom) { HomeV2Hairline() }
         .accessibilityLabel("\(row.dayText), \(row.valueText), \(row.source)")
-        .accessibilityHint("Opens this day for details and corrections")
+        .accessibilityHint("Opens this day")
         .accessibilityIdentifier("home_v2_entries_row")
-    }
-
-    private func entryIdentity(_ row: HomeV2EntriesRow) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(row.dayText)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
-                .foregroundStyle(HomeV2Tokens.Colors.ink)
-            Text(row.source)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func entryValue(_ row: HomeV2EntriesRow) -> some View {
-        HStack(spacing: HomeV2Tokens.Space.tight) {
-            Text(row.valueText)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .medium, relativeTo: .body)
-                .foregroundStyle(HomeV2Tokens.Colors.ink)
-                .lineLimit(1)
-
-            if let photoURL = row.photoURL {
-                SubjectPlateView(urlString: photoURL, size: CGSize(width: 28, height: 36))
-                    .clipShape(RoundedRectangle(cornerRadius: HomeV2Tokens.thumbRadius, style: .continuous))
-                    .accessibilityHidden(true)
-            } else if !dynamicTypeSize.isAccessibilitySize {
-                Color.clear.frame(width: 28, height: 36)
-            }
-        }
     }
 }
