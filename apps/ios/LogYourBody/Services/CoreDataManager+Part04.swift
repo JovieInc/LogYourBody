@@ -17,6 +17,21 @@ enum BodyMetricSyncDateParser {
         return wholeSeconds.date(from: string)
     }
 
+    /// The native profile API sends birthdays as calendar dates, while older
+    /// payloads can contain ISO timestamps. Match the API client's UTC calendar.
+    static func profileBirthDate(from string: String) -> Date? {
+        if let timestamp = date(from: string) { return timestamp }
+        guard string.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        guard let parsed = formatter.date(from: string), formatter.string(from: parsed) == string else { return nil }
+        return parsed
+    }
+
     /// True when a stored row is strictly newer than a parseable payload
     /// `updated_at`. A missing or unparseable timestamp is not newer, so those
     /// payloads still apply.
@@ -351,8 +366,9 @@ func updateOrCreateProfile(
                 profile.gender = data["gender"] as? String
                 profile.activityLevel = data["activity_level"] as? String
 
-                if let dateString = data["date_of_birth"] as? String {
-                    profile.dateOfBirth = ISO8601DateFormatter().date(from: dateString)
+                if let dateString = data["date_of_birth"] as? String,
+                   let birthDate = BodyMetricSyncDateParser.profileBirthDate(from: dateString) {
+                    profile.dateOfBirth = birthDate
                 }
 
                 profile.syncStatus = "synced"
