@@ -19,8 +19,10 @@ extension DashboardViewLiquid {
         HomeV2Copy.displayUnit(currentMeasurementSystem)
     }
 
-    var homeV2TodayMetric: BodyMetrics? {
-        bodyMetrics.first { Calendar.current.isDateInToday($0.date) }
+    var homeV2InsightMetrics: [BodyMetrics] {
+        bodyMetrics.filter {
+            $0.weight == nil || HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight)
+        }
     }
 
     /// Photo-first Home behind `HomeV2Policy`; the legacy `LaunchTimelineSurface`
@@ -32,6 +34,7 @@ extension DashboardViewLiquid {
             metric: metric,
             bodyMetrics: homeV2Timeline.metrics,
             timeline: homeV2Timeline,
+            hasAnyPhotoInHistory: bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) },
             selectedID: Binding(get: { HomeV2TimelinePolicy.EntryID(metric) }, set: selectHomeV2TimelineEntry),
             weightValue: HomeV2EditorialPolicy.displayWeight(in: metric, system: currentMeasurementSystem)
                 .map { String(format: "%.1f", $0) } ?? "—",
@@ -55,7 +58,8 @@ extension DashboardViewLiquid {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
             onDone: { homeV2Logged = nil },
-            onUndo: { Task { await undoHomeV2Logged() } }
+            onUndo: { Task { await undoHomeV2Logged() } },
+            onProvenancePresentationChange: { isHomeV2MetricProvenancePresented = $0 }
         )
         .task(id: homeV2StepsRequest(on: metric.date)) {
             guard let ownership = authManager.captureAccountSession() else { return }
@@ -66,10 +70,10 @@ extension DashboardViewLiquid {
         // Chart caches refresh centrally when measurements change. Phase copy
         // must also follow edits to an existing day, not just added rows.
         .task(id: bodyMetrics) {
-            let insight = PhaseInsightPolicy.insight(for: bodyMetrics)
+            let insight = PhaseInsightPolicy.insight(for: homeV2InsightMetrics)
             homeV2PhaseSentence = HomeV2Copy.phaseSentence(
                 kind: insight.kind,
-                weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: bodyMetrics)
+                weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: homeV2InsightMetrics)
             )
         }
     }
@@ -175,8 +179,11 @@ extension DashboardViewLiquid {
 
     func presentHomeV2LogSheet(for date: Date = Date(), initialTab: Int = 0) {
         let existing = homeV2Metric(on: date)
-        let latestKilograms = existing?.weight
-            ?? bodyMetrics.filter { $0.weight != nil && $0.date <= date }.max { $0.date < $1.date }?.weight
+        let latestKilograms = existing?.weight.flatMap {
+            HomeV2WeightQuality.isWithinSupportedLoggingRange($0) ? $0 : nil
+        } ?? bodyMetrics.filter {
+            $0.date <= date && HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight)
+        }.max { $0.date < $1.date }?.weight
         let initial = latestKilograms.map { convertWeight($0, to: currentMeasurementSystem) ?? $0 }
             ?? HomeV2WeightStepPolicy.defaultValue(unit: homeV2DisplayUnit)
         HapticManager.shared.selection()
@@ -222,49 +229,17 @@ extension DashboardViewLiquid {
         }
     }
 
-    /// Saves a weight (and optional body fat) for a day. Today gets the C2
-    /// logged state with Undo; other days just save and refresh.
-    @MainActor
-    func saveHomeV2Weight(value: Double, bodyFat: Double?, on date: Date = Date()) async -> Bool {
-        guard let userId = authManager.currentUser?.id else { return false }
-        let kilograms = currentMeasurementSystem == .imperial ? value.lbsToKg : value
-
-        do {
-            let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
-                for: date,
-                weight: kilograms,
-                bodyFatPercentage: bodyFat,
-                bodyFatMethod: bodyFat == nil ? nil : BodyFatEntryMethod.bioelectrical.rawValue,
-                userId: userId
-            )
-            let saved = result.metrics
-            RealtimeSyncManager.shared.syncIfNeeded()
-            BodyScoreCache.shared.invalidate(for: userId)
-            BodyScoreRecalculationService.shared.scheduleRecalculation()
-            HapticManager.shared.successAction()
-
-            if Calendar.current.isDateInToday(saved.date) {
-                homeV2Logged = HomeV2LoggedEntry(
-                    metricId: saved.id,
-                    userId: userId,
-                    date: saved.date,
-                    previousMetric: result.previousMetric,
-                    valueText: HomeV2WeightStepPolicy.text(value),
-                    unit: homeV2DisplayUnit
-                )
-            }
-            await refreshHomeV2AfterWrite(selecting: saved.id)
-            return true
-        } catch {
-            return false
-        }
-    }
-
     /// Generic Edit targets the captured record, even if another row arrives that day.
     @MainActor
     func saveHomeV2Entry(
-        weightKilograms: Double?, bodyFat: Double?, session: HomeV2EditSession,
-        displayValue: Double, displayUnit: String
+        weightKilograms: Double?,
+        bodyFat: Double?,
+        clearBodyFat: Bool = false,
+        bodyFatMethod: String? = nil,
+        markManualCorrection: Bool = false,
+        session: HomeV2EditSession,
+        displayValue: Double,
+        displayUnit: String
     ) async -> Bool {
         let admission: CoreDataManager.WriteAdmission = {
             guard authManager.ownsAccountSession(session.owner),
@@ -278,7 +253,9 @@ extension DashboardViewLiquid {
             try admission()
             let result = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
                 id: session.id, userId: session.owner.subject, weight: weightKilograms,
-                bodyFatPercentage: bodyFat, bodyFatMethod: nil, writeAdmission: admission
+                bodyFatPercentage: bodyFat, bodyFatMethod: bodyFatMethod,
+                clearBodyFat: clearBodyFat, markManualCorrection: markManualCorrection,
+                writeAdmission: admission
             )
             try admission()
             let saved = result.metrics

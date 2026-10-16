@@ -174,6 +174,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             throw XCTSkip("Body fat and more tab is not reachable from this fixture.")
         }
         detailsButton.tap()
+        app.segmentedControls.firstMatch.buttons["Body Fat"].tap()
 
         let bodyFatField = app.textFields.matching(
             NSPredicate(format: "placeholderValue == '0.0'")

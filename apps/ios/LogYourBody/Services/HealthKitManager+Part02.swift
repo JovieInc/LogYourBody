@@ -87,7 +87,7 @@ extension HealthKitManager {
         guard await ownsImport(ownership) else { throw HealthKitError.notAuthorized }
     }
 
-func fetchTodayStepCount() async throws -> Int {
+func fetchTodayStepCount() async throws -> Int? {
         guard isAuthorized, let ownership = await captureImportOwnership() else {
             throw HealthKitError.notAuthorized
         }
@@ -97,7 +97,7 @@ func fetchTodayStepCount() async throws -> Int {
         let now = Date()
         let startOfDay = calendar.startOfDay(for: now)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? now
-        let stepCount: Int
+        let stepCount: Int?
         do {
             let quantity: Double?
             if let todayStepQuantityQuery {
@@ -107,8 +107,8 @@ func fetchTodayStepCount() async throws -> Int {
             }
             stepCount = try HealthKitStepCountPolicy.stepCount(from: quantity)
         } catch {
-            guard let noData = HealthKitStepCountPolicy.stepCount(forNoData: error) else { throw error }
-            stepCount = noData
+            guard HealthKitStepCountPolicy.isNoData(error) else { throw error }
+            stepCount = nil
         }
 
         try Task.checkCancellation()
@@ -119,10 +119,10 @@ func fetchTodayStepCount() async throws -> Int {
                   self.admitsAutomaticImportForCurrentAccount() else {
                 throw HealthKitError.notAuthorized
             }
-            self.todayStepCountOwner = ownership
-            self.todayStepCount = stepCount
+            self.todayStepCountOwner = stepCount == nil ? nil : ownership
+            self.todayStepCount = stepCount ?? 0
             self.latestStepCount = stepCount
-            self.latestStepCountDate = now
+            self.latestStepCountDate = stepCount == nil ? nil : now
             return stepCount
         }
     }
@@ -147,7 +147,7 @@ func fetchTodayStepCount() async throws -> Int {
         }
     }
 
-func fetchStepCount(for date: Date) async throws -> Int {
+func fetchStepCount(for date: Date) async throws -> Int? {
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }
@@ -169,7 +169,11 @@ func fetchStepCount(for date: Date) async throws -> Int {
                 options: .cumulativeSum
             ) { _, statistics, error in
                 if let error = error {
-                    continuation.resume(throwing: error)
+                    if HealthKitStepCountPolicy.isNoData(error) {
+                        continuation.resume(returning: nil)
+                    } else {
+                        continuation.resume(throwing: error)
+                    }
                     return
                 }
 
@@ -867,7 +871,7 @@ func syncSingleStepFromHistory(
         date: Date,
         ownership: AuthManager.ProfileSessionOwnership? = nil
     ) async throws {
-        guard stepCount > 0 else { return }
+        guard stepCount >= 0 else { return }
         guard let ownership = await captureImportOwnership(ownership) else {
             throw HealthKitError.notAuthorized
         }
@@ -963,9 +967,9 @@ func scheduleObservedBodyMetricSync() {
     }
 }
 
-/// HealthKit answers a cumulative-sum query with `HKError.errorNoData` when
-/// nothing has been recorded for the predicate yet. For today's steps that is
-/// zero, not a failure, so it must not reach Sentry as a non-fatal error.
+/// Empty HealthKit results can also mean read access was not granted. Keep
+/// missing readings distinct from a recorded zero without reporting no-data as
+/// an operational failure.
 enum HealthKitStepCountPolicy {
     enum QuantityError: Error, LocalizedError {
         case invalidStepCount
@@ -974,9 +978,9 @@ enum HealthKitStepCountPolicy {
     }
 
     /// Preserve HealthKit's existing truncation to a stored Int32 count, with
-    /// validation before conversion or publication. Missing data still means zero.
-    static func stepCount(from quantity: Double?) throws -> Int {
-        guard let quantity else { return 0 }
+    /// validation before conversion or publication. Missing data remains absent.
+    static func stepCount(from quantity: Double?) throws -> Int? {
+        guard let quantity else { return nil }
         guard quantity.isFinite, quantity >= 0 else { throw QuantityError.invalidStepCount }
         let wholeCount = quantity.rounded(.towardZero)
         guard wholeCount <= Double(Int32.max), let count = Int(exactly: wholeCount) else {
@@ -985,11 +989,8 @@ enum HealthKitStepCountPolicy {
         return count
     }
 
-    static func stepCount(forNoData error: Error) -> Int? {
+    static func isNoData(_ error: Error) -> Bool {
         let nsError = error as NSError
-        guard nsError.domain == HKErrorDomain, nsError.code == HKError.Code.errorNoData.rawValue else {
-            return nil
-        }
-        return 0
+        return nsError.domain == HKErrorDomain && nsError.code == HKError.Code.errorNoData.rawValue
     }
 }

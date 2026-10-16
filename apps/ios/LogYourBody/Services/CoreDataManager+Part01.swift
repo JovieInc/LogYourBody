@@ -718,7 +718,8 @@ extension CoreDataManager {
     /// lookup and commit share the main context queue without a suspension.
     func updateExistingMetricMeasurementsAndWait(
         id: String, userId: String, weight: Double?, bodyFatPercentage: Double?,
-        bodyFatMethod: String?, writeAdmission: @escaping WriteAdmission,
+        bodyFatMethod: String?, clearBodyFat: Bool = false, markManualCorrection: Bool = false,
+        writeAdmission: @escaping WriteAdmission,
         commit: @escaping (NSManagedObjectContext) throws -> Void = { try $0.save() }
     ) async throws -> PhotoMetricsUpdateResult {
         let shared = viewContext
@@ -746,9 +747,17 @@ extension CoreDataManager {
                         row.weight = weight
                         row.weightUnit = "kg"
                     }
-                    if let bodyFatPercentage {
+                    // A nil body-fat argument retains the stored value. Clearing the
+                    // field is explicit, as is marking a real change manual.
+                    if clearBodyFat {
+                        row.bodyFatPercentage = 0
+                        row.bodyFatMethod = nil
+                    } else if let bodyFatPercentage {
                         row.bodyFatPercentage = bodyFatPercentage
                         if let bodyFatMethod { row.bodyFatMethod = bodyFatMethod }
+                    }
+                    if markManualCorrection, row.dataSource != BodyMetricSource.manual.rawValue {
+                        row.dataSource = BodyMetricSource.manual.rawValue
                     }
                     if transaction.hasChanges {
                         let now = Date()

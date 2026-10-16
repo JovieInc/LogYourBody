@@ -35,9 +35,6 @@ enum PhotoMetricsEditError: Error {
 class PhotoMetadataService {
     static let shared = PhotoMetadataService()
 
-    // Cache for body fat estimations to avoid repeated calculations
-    private var estimationCache: [String: (value: Double, isEstimated: Bool)] = [:]
-
     private init() {}
 
     /// Extract EXIF orientation from photo metadata
@@ -191,6 +188,9 @@ class PhotoMetadataService {
                 bodyFatMethod: updatedBodyFatMethod,
                 muscleMass: existing.muscleMass,
                 boneMass: existing.boneMass,
+                waistCm: existing.waistCm,
+                hipCm: existing.hipCm,
+                waistUnit: existing.waistUnit,
                 notes: existing.notes,
                 photoUrl: photoUrl ?? existing.photoUrl,
                 dataSource: existing.dataSource,
@@ -242,13 +242,15 @@ class PhotoMetadataService {
     @MainActor
     func updateExistingMeasurementsWithResult(
         id: String, userId: String, weight: Double?, bodyFatPercentage: Double?,
-        bodyFatMethod: String?, writeAdmission: @escaping CoreDataManager.WriteAdmission,
+        bodyFatMethod: String?, clearBodyFat: Bool = false, markManualCorrection: Bool = false,
+        writeAdmission: @escaping CoreDataManager.WriteAdmission,
         coreDataManager: CoreDataManager = .shared
     ) async throws -> PhotoMetricsUpdateResult {
         try writeAdmission()
         let result = try await coreDataManager.updateExistingMetricMeasurementsAndWait(
             id: id, userId: userId, weight: weight, bodyFatPercentage: bodyFatPercentage,
-            bodyFatMethod: bodyFatMethod, writeAdmission: writeAdmission
+            bodyFatMethod: bodyFatMethod, clearBodyFat: clearBodyFat,
+            markManualCorrection: markManualCorrection, writeAdmission: writeAdmission
         )
         try writeAdmission()
         return result
@@ -384,49 +386,28 @@ class PhotoMetadataService {
         return BodyMetricSource.photo.rawValue
     }
 
-    /// Estimate body fat percentage based on nearby entries (with caching for performance)
+    /// Estimate from the current measurements without retaining results across edits or accounts.
     func estimateBodyFat(for date: Date, metrics: [BodyMetrics]) -> (value: Double, isEstimated: Bool)? {
-        // Create cache key from date and metrics IDs
-        let cacheKey = "\(date.timeIntervalSince1970)-\(metrics.map { $0.id }.joined(separator: ","))"
-
-        // Check cache first
-        if let cached = estimationCache[cacheKey] {
-            return cached
+        var before: BodyMetrics?
+        var after: BodyMetrics?
+        for metric in metrics where metric.bodyFatPercentage != nil {
+            if metric.date <= date {
+                // Match stable chronological sorting: the last equal-date entry wins before.
+                if let previous = before, previous.date > metric.date { continue }
+                before = metric
+            } else {
+                if let following = after, following.date <= metric.date { continue }
+                after = metric
+            }
         }
 
-        let sortedMetrics = metrics.filter { $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
-        guard !sortedMetrics.isEmpty else { return nil }
-
-        // Find metrics before and after the date
-        let before = sortedMetrics.last { $0.date <= date }
-        let after = sortedMetrics.first { $0.date > date }
-
-        var result: (value: Double, isEstimated: Bool)?
-
-        if let beforeMetric = before, let afterMetric = after,
-           let beforeBF = beforeMetric.bodyFatPercentage, let afterBF = afterMetric.bodyFatPercentage {
-            // Linear interpolation between two points
-            let totalInterval = afterMetric.date.timeIntervalSince(beforeMetric.date)
-            let progressInterval = date.timeIntervalSince(beforeMetric.date)
-            let progress = progressInterval / totalInterval
-
-            let estimatedBF = beforeBF + (afterBF - beforeBF) * progress
-            result = (round(estimatedBF * 10) / 10, true)
-        } else if let closestMetric = before ?? after {
-            // Use the closest available metric
-            result = (closestMetric.bodyFatPercentage ?? 0, true)
+        if let before, let after,
+           let beforeValue = before.bodyFatPercentage, let afterValue = after.bodyFatPercentage {
+            let interval = after.date.timeIntervalSince(before.date)
+            let progress = date.timeIntervalSince(before.date) / interval
+            return (round((beforeValue + (afterValue - beforeValue) * progress) * 10) / 10, true)
         }
-
-        // Cache the result
-        if let result = result {
-            estimationCache[cacheKey] = result
-        }
-
-        return result
-    }
-
-    /// Clear estimation cache (call when metrics data changes)
-    func clearEstimationCache() {
-        estimationCache.removeAll()
+        guard let value = (before ?? after)?.bodyFatPercentage else { return nil }
+        return (value, true)
     }
 }

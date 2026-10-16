@@ -55,6 +55,8 @@ struct HomeV2TrendChart: View {
     var showsDots = true
     var chartHeight: CGFloat = HomeV2Tokens.chartHeight
     var axis: Axis = .trend
+    var axisDates: [Date]?
+    var formatAxisDate: ((Date) -> String)?
     var metricTitle = "Weight"
     var usesSevenDayAverage = true
     var anchorsToZero = false
@@ -63,6 +65,7 @@ struct HomeV2TrendChart: View {
     /// Progress can scrub a day. The home pager keeps the drag for changing days.
     var allowsSelection = true
     var formatValue: (Double) -> String = { String(format: "%.1f", $0) }
+    var onSelection: (HomeV2ChartIntegrity.Sample?) -> Void = { _ in }
     var now = Date()
 
     @State private var selectedX: Date?
@@ -155,6 +158,7 @@ struct HomeV2TrendChart: View {
             }
         }
         .onChange(of: range) { _, _ in selectedX = nil }
+        .onChange(of: selectedSample) { _, sample in onSelection(sample) }
     }
 
     private var tooltipRow: some View {
@@ -229,11 +233,11 @@ struct HomeV2TrendChart: View {
     private var chartWithXAxis: some View {
         scaledChart
             .chartXAxis {
-                AxisMarks(values: plotted.xAxisDates) { value in
+                AxisMarks(values: axisDates ?? plotted.xAxisDates) { value in
                     AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
                     if axis == .months, let date = value.as(Date.self) {
                         AxisValueLabel {
-                            Text(HomeV2ChartIntegrity.axisLabel(date: date, range: range, locale: .current))
+                            Text(xAxisLabel(for: date))
                                 .font(.caption)
                                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                                 .lineLimit(1)
@@ -242,6 +246,10 @@ struct HomeV2TrendChart: View {
                     }
                 }
             }
+    }
+
+    private func xAxisLabel(for date: Date) -> String {
+        formatAxisDate?(date) ?? HomeV2ChartIntegrity.axisLabel(date: date, range: range, locale: .current)
     }
 
     private var scaledChart: some View {

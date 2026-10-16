@@ -23,6 +23,85 @@ final class PhotoMetadataServiceTests: XCTestCase {
         try await super.tearDown()
     }
 
+    func testBodyFatEstimateReflectsChangedValuesWithStableRecordIDs() {
+        let id = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = estimateFixture(id: id, date: date, bodyFat: 28.123)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [first])?.value, 28.123)
+        let edited = estimateFixture(id: id, date: date, bodyFat: 18.456)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [edited])?.value, 18.456)
+    }
+
+    func testBodyFatEstimateBecomesAbsentWhenTheLastValueIsRemoved() {
+        let id = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let original = estimateFixture(id: id, date: date, bodyFat: 20)
+        XCTAssertNotNil(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [original]))
+        let cleared = estimateFixture(id: id, date: date, bodyFat: nil)
+        XCTAssertNil(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [cleared]))
+    }
+
+    func testBodyFatEstimateReflectsChangedDatesWithStableRecordIDs() {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let ids = [UUID().uuidString, UUID().uuidString]
+        let first = estimateFixture(id: ids[0], date: date.addingTimeInterval(-100), bodyFat: 10)
+        let last = estimateFixture(id: ids[1], date: date.addingTimeInterval(100), bodyFat: 30)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [first, last])?.value, 20)
+        let moved = estimateFixture(id: ids[1], date: date.addingTimeInterval(300), bodyFat: 30)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [first, moved])?.value, 15)
+    }
+
+    func testBodyFatEstimateDoesNotReuseAnotherOwnersSameRecordID() {
+        let id = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = estimateFixture(id: id, date: date, bodyFat: 30, owner: "first")
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [first])?.value, 30)
+        let nextOwner = estimateFixture(id: id, date: date, bodyFat: 15, owner: "next")
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [nextOwner])?.value, 15)
+    }
+
+    func testBodyFatEstimateDoesNotCollideOnCommaSeparatedIDs() {
+        let token = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = [
+            estimateFixture(id: "\(token),left", date: date, bodyFat: 30),
+            estimateFixture(id: "right", date: date, bodyFat: nil)
+        ]
+        let second = [
+            estimateFixture(id: token, date: date, bodyFat: 15),
+            estimateFixture(id: "left,right", date: date, bodyFat: nil)
+        ]
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: first)?.value, 30)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: second)?.value, 15)
+    }
+
+    func testBodyFatEstimatePreservesUnsortedInterpolationAndEqualDateSelection() {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let rows = [
+            estimateFixture(date: date.addingTimeInterval(100), bodyFat: 30),
+            estimateFixture(date: date.addingTimeInterval(-100), bodyFat: 10),
+            estimateFixture(date: date.addingTimeInterval(100), bodyFat: 40),
+            estimateFixture(date: date.addingTimeInterval(-100), bodyFat: 20),
+            estimateFixture(date: date, bodyFat: nil)
+        ]
+        let estimate = PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: rows)
+        XCTAssertEqual(estimate?.value, 25)
+        XCTAssertEqual(estimate?.isEstimated, true)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(
+            for: date.addingTimeInterval(-100), metrics: rows
+        )?.value, 20)
+    }
+
+    private func estimateFixture(
+        id: String = UUID().uuidString, date: Date, bodyFat: Double?, owner: String = "estimate-owner"
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id, userId: owner, date: date, weight: nil, weightUnit: nil,
+            bodyFatPercentage: bodyFat, bodyFatMethod: nil, muscleMass: nil, boneMass: nil,
+            notes: nil, photoUrl: nil, dataSource: "manual", createdAt: date, updatedAt: date
+        )
+    }
+
     @MainActor
     func testRestoredScanOnboardingDoesNotTurnHistoricalMeasurementsIntoTodaysPhotoBaseline() async throws {
         let previousUser = AuthManager.shared.currentUser
@@ -1309,5 +1388,114 @@ extension PhotoMetadataServiceTests {
             let coordinator = try XCTUnwrap(manager.viewContext.persistentStoreCoordinator)
             for store in coordinator.persistentStores { try coordinator.remove(store) }
         }
+    }
+}
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testWeightUpdatePreservesCircumferencesAcrossIndependentRead() async throws {
+        try await verifyUnrelatedCircumferencesSurvive(weight: 82.4, expected: (82.4, 18.2))
+    }
+
+    func testBodyFatUpdatePreservesCircumferencesAcrossIndependentRead() async throws {
+        try await verifyUnrelatedCircumferencesSurvive(bodyFat: 19.3, expected: (80.123, 19.3))
+    }
+
+    func testPhotoAttachPreservesCircumferencesAcrossIndependentRead() async throws {
+        try await verifyUnrelatedCircumferencesSurvive(
+            weight: 77, bodyFat: 14, photo: "file:///replacement-photo.jpg", preserve: true,
+            expected: (80.123, 18.2)
+        )
+    }
+
+    func testPhotoAttachKeepsMissingCircumferencesAbsent() async throws {
+        try await verifyUnrelatedCircumferencesSurvive(
+            photo: "file:///replacement-photo.jpg", preserve: true, circumferences: (nil, nil, nil),
+            expected: (80.123, 18.2)
+        )
+    }
+
+    private func verifyUnrelatedCircumferencesSurvive(
+        weight: Double? = nil, bodyFat: Double? = nil, photo: String? = nil, preserve: Bool = false,
+        circumferences: (waist: Double?, hip: Double?, unit: String?) = (85.123, 101.987, "in"),
+        expected: (weight: Double, bodyFat: Double)
+    ) async throws {
+        let (waist, hip, unit) = circumferences
+        let owner = "circumference-preservation-\(UUID().uuidString)"
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let original = BodyMetrics(
+            id: UUID().uuidString, userId: owner, date: date,
+            weight: 80.123, weightUnit: "kg", bodyFatPercentage: 18.2, bodyFatMethod: "caliper",
+            muscleMass: 56.789, boneMass: 3.123, waistCm: waist, hipCm: hip, waistUnit: unit,
+            notes: "Keep the original measurements", photoUrl: "file:///original-photo.jpg",
+            dataSource: BodyMetricSource.healthKit.rawValue,
+            sourceMetadata: BodyMetricSourceMetadata(sourceName: "Original scale", sampleId: "original-sample"),
+            createdAt: date.addingTimeInterval(-60), updatedAt: date
+        )
+        let manager = CoreDataManager.shared
+        try await manager.saveBodyMetricsAndWait(original, userId: owner, markAsSynced: true)
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: date, photoUrl: photo, weight: weight, bodyFatPercentage: bodyFat,
+            userId: owner, preserveExistingMeasurements: preserve
+        )
+        XCTAssertFalse(result.createdNewEntry)
+        XCTAssertEqual(result.previousMetric?.waistCm, waist)
+        XCTAssertEqual(result.previousMetric?.hipCm, hip)
+        let reader = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        reader.persistentStoreCoordinator = manager.viewContext.persistentStoreCoordinator
+        let stored = try await reader.perform {
+            let request = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@ AND userId == %@", original.id, owner)
+            let rows = try reader.fetch(request)
+            XCTAssertEqual(rows.count, 1)
+            return try XCTUnwrap(rows.first?.toBodyMetrics())
+        }
+        for metric in [result.metrics, stored] {
+            XCTAssertEqual(metric.id, original.id)
+            XCTAssertEqual(metric.userId, owner)
+            XCTAssertEqual(metric.date, original.date)
+            XCTAssertEqual(metric.localDate, original.localDate)
+            XCTAssertEqual(metric.createdAt, original.createdAt)
+            XCTAssertEqual(metric.weight, expected.weight)
+            XCTAssertEqual(metric.bodyFatPercentage, expected.bodyFat)
+            XCTAssertEqual(metric.bodyFatMethod, original.bodyFatMethod)
+            XCTAssertEqual(metric.waistCm, waist)
+            XCTAssertEqual(metric.hipCm, hip)
+            XCTAssertEqual(metric.waistUnit, unit)
+            XCTAssertEqual(metric.muscleMass, original.muscleMass)
+            XCTAssertEqual(metric.boneMass, original.boneMass)
+            XCTAssertEqual(metric.notes, original.notes)
+            XCTAssertEqual(metric.photoUrl, photo ?? original.photoUrl)
+            XCTAssertEqual(metric.dataSource, original.dataSource)
+            XCTAssertEqual(metric.sourceMetadata, original.sourceMetadata)
+        }
+    }
+}
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testExactMetricEditClearsBodyFatAndMarksManualWithoutRewritingOtherFields() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80.123456, bodyFat: 18.4567, method: "caliper")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId, markAsSynced: true)
+        let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first)
+        row.waistCircumference = 85.5
+        try store.viewContext.save()
+
+        let result = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: nil, bodyFatPercentage: nil,
+            bodyFatMethod: nil, clearBodyFat: true, markManualCorrection: true, writeAdmission: {}
+        )
+
+        XCTAssertEqual(result.metrics.id, fixture.id)
+        XCTAssertEqual(result.metrics.weight, 80.123456)
+        XCTAssertNil(result.metrics.bodyFatPercentage)
+        XCTAssertNil(result.metrics.bodyFatMethod)
+        XCTAssertEqual(result.metrics.metricSource, .manual)
+        XCTAssertEqual(result.metrics.waistCm, 85.5)
+        XCTAssertEqual(result.metrics.sourceMetadata, result.previousMetric?.sourceMetadata)
+        XCTAssertEqual(result.previousMetric?.bodyFatPercentage, 18.4567)
+        XCTAssertEqual(result.previousMetric?.bodyFatMethod, "caliper")
+        XCTAssertEqual(result.previousMetric?.metricSource, .healthKit)
     }
 }

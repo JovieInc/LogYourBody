@@ -337,6 +337,7 @@ python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
 # overran the 40-minute step with every test passing. Same tests, same exact
 # evidence checks, one runner launch.
 LAUNCH_QUALITY_UI_TESTS=(
+  "LogYourBodyUITests/testProgressShareKeepsSelectedMetricAndVisibleValue"
   "LogYourBodyUITests/testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch"
   "LogYourBodyUITests/testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity"
   "LogYourBodyUITests/testHomeV2AskSyntheticCancelledTurnRecovers"

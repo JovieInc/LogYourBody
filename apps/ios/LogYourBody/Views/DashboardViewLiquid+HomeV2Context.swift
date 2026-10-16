@@ -13,26 +13,33 @@ struct HomeV2EditSession: Identifiable {
     let owner: AuthManager.ProfileSessionOwnership
     var id: String { metric.id }
 
+    /// The body-fat figure the sheet shows. Equality with that figure is "unchanged".
+    var displayedBodyFat: Double? {
+        metric.bodyFatPercentage.flatMap {
+            HomeV2WeightStepPolicy.parse(String(format: "%.1f", $0))
+        }
+    }
+
     /// Compare with the sheet's displayed values, not its higher-precision source.
     /// A retained field is a nil patch; the stored raw value stays authoritative.
     func measurementReplacements(
         value: Double, bodyFat: Double?, initialDisplayedWeight: Double
     ) -> (weight: Double?, bodyFat: Double?) {
         let displayedWeight = HomeV2WeightStepPolicy.parse(HomeV2WeightStepPolicy.text(initialDisplayedWeight))
-        let displayedBodyFat = metric.bodyFatPercentage.flatMap {
-            HomeV2WeightStepPolicy.parse(String(format: "%.1f", $0))
-        }
         return (value == displayedWeight ? nil : value, bodyFat == displayedBodyFat ? nil : bodyFat)
     }
 }
 
 extension DashboardViewLiquid {
     func homeV2Metric(on date: Date) -> BodyMetrics? {
-        bodyMetrics.first { Calendar.current.isDate($0.date, inSameDayAs: date) }
+        let localDate = BodyMetricLocalDate.key(for: date)
+        return bodyMetrics.filter { $0.localDate == localDate }
+            .max { $0.date < $1.date }
     }
 
-    func openHomeV2Context(on date: Date = Date()) {
+    func openHomeV2Context(on date: Date = Date(), metricID: String? = nil) {
         homeV2ContextDay = date
+        homeV2ContextMetricID = metricID
         HapticManager.shared.selection()
         isHomeV2ContextPresented = true
     }
@@ -52,7 +59,7 @@ extension DashboardViewLiquid {
         HomeV2ContextView(
             bodyMetrics: bodyMetrics,
             selectedDay: $homeV2ContextDay,
-            detail: { homeV2DayDetail(for: $0) },
+            detail: { homeV2DayDetail(for: $0, preferredMetricID: homeV2ContextMetricID) },
             onClose: { isHomeV2ContextPresented = false },
             onEditEntry: { metric in
                 guard let owner = authManager.captureAccountSession(), owner.subject == metric.userId else { return }
@@ -85,17 +92,20 @@ extension DashboardViewLiquid {
                 weightValue: { metric in metric.weight.map { convertWeight($0, to: system) ?? $0 } },
                 hasPhoto: { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
             ),
-            onSelect: { date in openHomeV2Context(on: date) },
+            onSelect: { row in openHomeV2Context(on: row.date, metricID: row.id) },
             onBack: { isHomeV2EntriesPresented = false }
         )
     }
 
     /// Everything Context shows for a day. Derived values say so.
-    func homeV2DayDetail(for date: Date) -> HomeV2DayDetail {
+    func homeV2DayDetail(for date: Date, preferredMetricID: String? = nil) -> HomeV2DayDetail {
         let calendar = Calendar.current
         let system = currentMeasurementSystem
         let unit = homeV2DisplayUnit
-        let metric = homeV2Metric(on: date)
+        let localDate = BodyMetricLocalDate.key(for: date, calendar: calendar)
+        let metric = preferredMetricID.flatMap { id in
+            bodyMetrics.first { $0.id == id && $0.localDate == localDate }
+        } ?? homeV2Metric(on: date)
         var rows: [HomeV2DayEntryRow] = []
 
         if let metric, let weight = metric.weight {
@@ -103,8 +113,8 @@ extension DashboardViewLiquid {
             rows.append(HomeV2DayEntryRow(
                 id: "weight",
                 label: HomeV2ContextCopy.weight,
-                subline: HomeV2Provenance.subline(for: metric),
-                value: "\(HomeV2WeightStepPolicy.text(value)) \(unit)"
+                subline: HomeV2Provenance.weightSubline(for: metric),
+                value: HomeV2Provenance.weightText(displayValue: value, metric: metric, unit: unit)
             ))
         }
 
@@ -192,9 +202,20 @@ extension DashboardViewLiquid {
                     value: value, bodyFat: bodyFat, initialDisplayedWeight: initial
                 )
                 let kilograms = replacement.weight.map { system == .imperial ? $0.lbsToKg : $0 }
+                let bodyFatUnchanged = bodyFat == session.displayedBodyFat
+                let method = bodyFatUnchanged || bodyFat == nil || metric.bodyFatPercentage != nil
+                    ? nil
+                    : BodyFatEntryMethod.bioelectrical.rawValue
+                let changed = kilograms != nil || !bodyFatUnchanged
                 return await saveHomeV2Entry(
-                    weightKilograms: kilograms, bodyFat: replacement.bodyFat, session: session,
-                    displayValue: value, displayUnit: unit
+                    weightKilograms: kilograms,
+                    bodyFat: bodyFatUnchanged ? nil : bodyFat,
+                    clearBodyFat: !bodyFatUnchanged && bodyFat == nil,
+                    bodyFatMethod: method,
+                    markManualCorrection: changed && metric.metricSource != .manual,
+                    session: session,
+                    displayValue: value,
+                    displayUnit: unit
                 )
             },
             onDelete: {
