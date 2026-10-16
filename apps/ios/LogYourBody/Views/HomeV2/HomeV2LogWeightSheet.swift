@@ -16,16 +16,19 @@ struct HomeV2LogWeightSheet: View {
     let mode: Mode
     let unit: String
     let initialValue: Double
+    let initialBodyFat: Double?
+    let initialWeightIsMissing: Bool
     let dateText: String
     let deleteScope: String?
     /// The day's existing photo, shown in the Front slot instead of a camera.
     let existingPhotoURL: String?
-    let onSave: (_ value: Double, _ bodyFat: Double?) async -> Bool
+    let onSave: (_ value: Double?, _ bodyFat: Double?) async -> Bool
     let onDelete: (() async -> Bool)?
     let onAddPhoto: (_ pose: String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var valueText: String
+    @State private var preservesRecordedValues: Bool
     @State private var bodyFatText: String
     @State private var showsDetails: Bool
     @State private var isSaving = false
@@ -44,23 +47,30 @@ struct HomeV2LogWeightSheet: View {
         unit: String,
         initialValue: Double,
         initialBodyFat: Double?,
+        initialWeightIsMissing: Bool = false,
         dateText: String,
         deleteScope: String? = nil,
         existingPhotoURL: String? = nil,
-        onSave: @escaping (_ value: Double, _ bodyFat: Double?) async -> Bool,
+        onSave: @escaping (_ value: Double?, _ bodyFat: Double?) async -> Bool,
         onDelete: (() async -> Bool)? = nil,
         onAddPhoto: @escaping (_ pose: String) -> Void
     ) {
         self.mode = mode
         self.unit = unit
         self.initialValue = initialValue
+        self.initialBodyFat = initialBodyFat
+        self.initialWeightIsMissing = initialWeightIsMissing
         self.dateText = dateText
         self.deleteScope = deleteScope
         self.existingPhotoURL = existingPhotoURL
         self.onSave = onSave
         self.onDelete = onDelete
         self.onAddPhoto = onAddPhoto
-        _valueText = State(initialValue: HomeV2WeightStepPolicy.text(initialValue))
+        // Hold the policy for this presentation; a flag refresh must not replace a focused draft.
+        let preservesRecordedValues = mode == .edit && HomeV2EntryEditPolicy.isEnabled()
+        _preservesRecordedValues = State(initialValue: preservesRecordedValues)
+        _valueText = State(initialValue: preservesRecordedValues && initialWeightIsMissing
+            ? "" : HomeV2WeightStepPolicy.text(initialValue))
         _bodyFatText = State(initialValue: initialBodyFat.map { String(format: "%.1f", $0) } ?? "")
         _showsDetails = State(initialValue: mode == .edit)
         _detent = State(initialValue: mode == .edit ? .large : .medium)
@@ -182,7 +192,8 @@ struct HomeV2LogWeightSheet: View {
             Spacer(minLength: HomeV2Tokens.Space.tight)
 
             VStack(spacing: 0) {
-                TextField("", text: $valueText)
+                TextField("", text: $valueText, prompt: preservesRecordedValues && initialWeightIsMissing
+                    ? Text("Add").foregroundColor(HomeV2Tokens.Colors.secondary) : nil)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetValue, weight: .semibold, relativeTo: .largeTitle)
@@ -330,6 +341,16 @@ struct HomeV2LogWeightSheet: View {
     }
 
     private func commitTypedWeight() {
+        if preservesRecordedValues {
+            do {
+                _ = try HomeV2EntryEditPolicy.weight(
+                    text: valueText, initialValue: initialWeightIsMissing ? nil : initialValue,
+                    unit: unit, preserving: true
+                )
+                errorText = nil
+            } catch { errorText = error.localizedDescription }
+            return
+        }
         guard let typed = HomeV2WeightStepPolicy.parse(valueText) else { return }
         valueText = HomeV2WeightStepPolicy.text(typed)
         errorText = HomeV2WeightStepPolicy.range(unit: unit).contains(typed)
@@ -354,20 +375,19 @@ struct HomeV2LogWeightSheet: View {
 
     private func save() {
         focusedField = nil
-        guard let value = HomeV2WeightStepPolicy.parse(valueText),
-              HomeV2WeightStepPolicy.range(unit: unit).contains(value) else {
-            errorText = HomeV2Copy.weightRangeError(unit: unit)
+        let value: Double?
+        let bodyFat: Double?
+        do {
+            value = try HomeV2EntryEditPolicy.weight(
+                text: valueText, initialValue: initialWeightIsMissing ? nil : initialValue,
+                unit: unit, preserving: preservesRecordedValues
+            )
+            bodyFat = try HomeV2EntryEditPolicy.bodyFat(
+                text: bodyFatText, initialValue: initialBodyFat, preserving: preservesRecordedValues
+            )
+        } catch {
+            errorText = error.localizedDescription
             return
-        }
-
-        var bodyFat: Double?
-        if !bodyFatText.trimmingCharacters(in: .whitespaces).isEmpty {
-            guard let parsed = HomeV2WeightStepPolicy.parse(bodyFatText),
-                  HomeV2WeightStepPolicy.bodyFatRange.contains(parsed) else {
-                errorText = HomeV2Copy.bodyFatRangeError
-                return
-            }
-            bodyFat = parsed
         }
 
         errorText = nil
@@ -376,7 +396,7 @@ struct HomeV2LogWeightSheet: View {
             let saved = await onSave(value, bodyFat)
             isSaving = false
             if saved {
-                NotificationManager.shared.recordWeighInLogged()
+                if value != nil { NotificationManager.shared.recordWeighInLogged() }
                 dismiss()
             } else {
                 errorText = HomeV2Copy.saveFailed

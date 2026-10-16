@@ -443,6 +443,10 @@ struct HomeV2LoggedEntry: Equatable {
     let valueText: String
     let unit: String
     var savedMetric: BodyMetrics?
+
+    var confirmationText: String {
+        valueText.isEmpty ? "Entry saved." : HomeV2Copy.loggedSentence(value: valueText, unit: unit)
+    }
 }
 
 /// Geometry that must hold on every iPhone: the photo stays full width at 4:5

@@ -23,7 +23,7 @@ struct HomeV2EditSession: Identifiable {
     /// Compare with the sheet's displayed values, not its higher-precision source.
     /// A retained field is a nil patch; the stored raw value stays authoritative.
     func measurementReplacements(
-        value: Double, bodyFat: Double?, initialDisplayedWeight: Double
+        value: Double?, bodyFat: Double?, initialDisplayedWeight: Double
     ) -> (weight: Double?, bodyFat: Double?) {
         let displayedWeight = HomeV2WeightStepPolicy.parse(HomeV2WeightStepPolicy.text(initialDisplayedWeight))
         return (value == displayedWeight ? nil : value, bodyFat == displayedBodyFat ? nil : bodyFat)
@@ -191,6 +191,7 @@ extension DashboardViewLiquid {
             unit: unit,
             initialValue: initial,
             initialBodyFat: metric.bodyFatPercentage,
+            initialWeightIsMissing: metric.weight == nil,
             dateText: HomeV2ContextCopy.entryDateText(metric.date),
             deleteScope: HomeV2ContextCopy.deleteBody(
                 date: formatHUDDate(metric.date),

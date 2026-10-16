@@ -7,6 +7,84 @@ import XCTest
 @testable import LogYourBody
 
 final class HomeV2ContextPolicyTests: XCTestCase {
+    @MainActor
+    func testEntryEditPreservationRequiresItsOwnGateOrAuthenticatedTestFixture() {
+        let arguments = ["-lybUITestPhotoTimelineHUDFixture", HomeV2Policy.photoFixtureArgument,
+                         HomeV2EntryEditPolicy.fixtureArgument]
+        let context = ["XCTestSessionIdentifier": UUID().uuidString,
+                       "XCTestBundlePath": "/Fixtures/LogYourBodyUITests.xctest"]
+        for environment in [[:], context.merging(["XCTestSessionIdentifier": "invalid"]) { _, new in new }] {
+            XCTAssertFalse(HomeV2EntryEditPolicy.isEnabled(
+                arguments: arguments, environment: environment, isGateEnabled: { key in
+                    XCTAssertEqual(key, HomeV2EntryEditPolicy.gateKey)
+                    return false
+                }
+            ))
+        }
+        XCTAssertTrue(HomeV2EntryEditPolicy.isEnabled(
+            arguments: [], environment: [:], isGateEnabled: { $0 == HomeV2EntryEditPolicy.gateKey }
+        ))
+        #if DEBUG
+        XCTAssertTrue(HomeV2EntryEditPolicy.isEnabled(
+            arguments: arguments, environment: context, isGateEnabled: { _ in
+                XCTFail("The isolated UI fixture must not depend on remote flags")
+                return false
+            }
+        ))
+        for invalid in [arguments + [HomeV2EntryEditPolicy.fixtureArgument],
+                        arguments + [HomeV2Policy.rollbackFixtureArgument],
+                        [HomeV2EntryEditPolicy.fixtureArgument]] {
+            XCTAssertFalse(HomeV2EntryEditPolicy.isEnabled(
+                arguments: invalid, environment: context, isGateEnabled: { _ in false }
+            ))
+        }
+        #endif
+    }
+
+    func testEntryEditMissingWeightStaysMissingAndExistingWeightCannotBeCleared() throws {
+        XCTAssertNil(try HomeV2EntryEditPolicy.weight(text: " \n", initialValue: nil, unit: "kg", preserving: true))
+        XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: "", initialValue: 80, unit: "kg", preserving: true))
+        XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: "", initialValue: nil, unit: "kg", preserving: false))
+        XCTAssertEqual(try HomeV2EntryEditPolicy.weight(text: "80,5", initialValue: nil, unit: "kg", preserving: true), 80.5)
+    }
+
+    func testEntryEditHistoricalReadingsSurviveButReplacementValuesAreValidated() throws {
+        for (raw, unit) in [(31.2345, "kg"), (700.1234, "lb")] {
+            let text = HomeV2WeightStepPolicy.text(raw)
+            XCTAssertNotNil(try HomeV2EntryEditPolicy.weight(text: text, initialValue: raw, unit: unit, preserving: true))
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: text, initialValue: raw, unit: unit, preserving: false))
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: text, initialValue: nil, unit: unit, preserving: true))
+        }
+        for raw in [2.4567, 61.2345, 71.2345] {
+            let text = String(format: "%.1f", raw)
+            XCTAssertNotNil(try HomeV2EntryEditPolicy.bodyFat(text: text, initialValue: raw, preserving: true))
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.bodyFat(text: text, initialValue: nil, preserving: true))
+        }
+        XCTAssertEqual(try HomeV2EntryEditPolicy.bodyFat(text: "21,25", initialValue: nil, preserving: true), 21.3)
+        XCTAssertNil(try HomeV2EntryEditPolicy.bodyFat(text: "", initialValue: 21.3, preserving: true),
+                     "Clearing body fat remains an explicit removal, unlike an untouched historical value")
+        XCTAssertEqual(try HomeV2EntryEditPolicy.bodyFat(text: "65", initialValue: nil, preserving: false), 65,
+                       "The disabled gate retains the existing editor range")
+    }
+
+    func testEntryEditRejectsInvalidNumbersWithoutSubstitutingDefaults() {
+        for text in ["0", "-1", "NaN", "infinity", "1.2.3", "no reading"] {
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: text, initialValue: nil, unit: "kg", preserving: true))
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.bodyFat(text: text, initialValue: nil, preserving: true))
+        }
+    }
+
+    func testEntrySavedConfirmationDoesNotInventWeight() {
+        let entry = HomeV2LoggedEntry(
+            metricId: "photo", userId: "owner", date: Date(), previousMetric: nil, valueText: "", unit: "kg"
+        )
+        XCTAssertEqual(entry.confirmationText, "Entry saved.")
+        let weight = HomeV2LoggedEntry(
+            metricId: "weight", userId: "owner", date: Date(), previousMetric: nil, valueText: "80.1", unit: "kg"
+        )
+        XCTAssertEqual(weight.confirmationText, HomeV2Copy.loggedSentence(value: "80.1", unit: "kg"))
+    }
+
     private func metric(
         id: String? = nil,
         daysAgo: Int,
