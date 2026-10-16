@@ -224,6 +224,7 @@ enum HomeV2ChartIntegrity {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         if let days = range.days, days <= 31 {
             formatter.setLocalizedDateFormatFromTemplate("MMMd")
         } else if range == .all {
@@ -257,6 +258,7 @@ enum HomeV2ChartIntegrity {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         formatter.setLocalizedDateFormatFromTemplate("MMMd")
         return "\(formatter.string(from: date)) · \(valueText) · \(kind == .sevenDayAverage ? "7-day average" : "Daily value")"
     }

@@ -858,7 +858,7 @@ final class OnboardingFlowViewModelTests: XCTestCase {
         XCTAssertNotNil(dateOfBirth)
 
         if let dateOfBirth {
-            let components = Calendar.current.dateComponents([.year, .month, .day], from: dateOfBirth)
+            let components = ProfileBirthDatePolicy.calendar.dateComponents([.year, .month, .day], from: dateOfBirth)
             XCTAssertEqual(components.year, 1_990)
             XCTAssertEqual(components.month, 1)
             XCTAssertEqual(components.day, 1)
@@ -931,7 +931,7 @@ final class OnboardingFlowViewModelTests: XCTestCase {
 
         // Everything is known, so the step is one confirmation screen with no last-name ask.
         XCTAssertEqual(viewModel.profileDetailsSubsteps, [.height])
-        XCTAssertEqual(Calendar.current.component(.year, from: viewModel.profileDateOfBirth), 1_988)
+        XCTAssertEqual(ProfileBirthDatePolicy.year(from: viewModel.profileDateOfBirth), 1_988)
     }
 
     func testProfileDetailsPlanNavigation() {
