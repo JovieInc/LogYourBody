@@ -1,11 +1,18 @@
-name: iOS App Store Readiness (Read Only)
+name: App Store Connect Readiness (Read Only)
 
+# Manual readback for App Store 1.2.0. GET requests only. Red table rows are a
+# completed readback with a named Tim-only follow-up; they do not submit,
+# attach a build, or write metadata.
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
   actions: read
+
+concurrency:
+  group: app-store-connect-readiness
+  cancel-in-progress: false
 
 jobs:
   readiness:

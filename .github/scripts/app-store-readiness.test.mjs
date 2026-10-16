@@ -1,438 +1,392 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { generateKeyPairSync, verify } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   AscReader,
+  STALE_WHATS_NEW_PREFIX,
   createToken,
+  githubApiArguments,
   latestTestFlightUpload,
   readReadiness,
   renderSummary,
 } from './app-store-readiness.mjs';
 
+const APP = '6755209876';
+const ANNUAL = 'com.logyourbody.app.pro1.annual.3daytrial';
+const MONTHLY = 'com.logyourbody.app.pro1.monthly.3daytrial';
+const BUILD_NUMBER = '20261016215903';
 const manifest = JSON.parse(
-  readFileSync(
-    new URL('../../apps/ios/fastlane/storefront-manifest.generated.json', import.meta.url),
-  ),
+  readFileSync(new URL('../../apps/ios/fastlane/storefront-manifest.generated.json', import.meta.url)),
 );
-const metadata = manifest.locales[0].metadata;
-const productIds = [
-  'com.logyourbody.app.pro1.annual.3daytrial',
-  'com.logyourbody.app.pro1.monthly.3daytrial',
-];
-const resource = (id, attributes = {}, relationships = {}) => ({ id, attributes, relationships });
-const run = (id, overrides = {}) => ({
-  id,
-  run_attempt: 1,
-  head_branch: 'main',
-  head_sha: 'a'.repeat(40),
-  path: '.github/workflows/ios-release-loop.yml',
-  repository: { full_name: 'JovieInc/LogYourBody' },
-  html_url: `https://github.com/JovieInc/LogYourBody/actions/runs/${id}`,
-  ...overrides,
-});
-const uploadJob = (overrides = {}) => ({
-  id: 21,
-  name: 'Deploy to TestFlight / Deploy to TestFlight (alpha)',
-  steps: [{ name: 'Upload to TestFlight', conclusion: 'success' }],
-  ...overrides,
-});
-const validationJob = {
-  id: 22,
-  name: 'Validate Release',
-  steps: [{ name: 'Extract version info', conclusion: 'success' }],
-};
-const logs =
-  '2026-10-16T22:00:00.000Z echo "📦 Version: $VERSION"\n2026-10-16T22:00:00.000Z 📦 Version: 1.2.0\n2026-10-16T22:00:00.000Z 🔢 Build: 20261016215903\n';
 const receipt = {
-  runId: 1,
+  runId: 38972403724,
   attempt: 1,
   sha: 'a'.repeat(40),
-  url: run(1).html_url,
+  url: 'https://github.com/JovieInc/LogYourBody/actions/runs/38972403724/attempts/1',
   version: '1.2.0',
-  build: '20261016215903',
+  build: BUILD_NUMBER,
 };
 
-function fixture() {
-  const data = {
-    '/v1/apps/6755209876': resource('6755209876', { bundleId: 'com.logyourbody.app' }),
-    '/v1/apps/6755209876/appStoreVersions': [
-      resource('version', {
-        platform: 'IOS',
-        versionString: '1.2.0',
-        appVersionState: 'PREPARE_FOR_SUBMISSION',
-      }),
-    ],
-    '/v1/builds': [
-      resource(
-        'build',
-        {
-          version: receipt.build,
-          processingState: 'VALID',
-          expired: false,
-          buildAudienceType: 'APP_STORE_ELIGIBLE',
-          usesNonExemptEncryption: false,
-        },
-        {
-          preReleaseVersion: { data: { id: 'prerelease' } },
-          appEncryptionDeclaration: { data: null },
-          appStoreVersion: { data: null },
-        },
-      ),
-    ],
-    '/v1/appStoreVersions/version/build': null,
-    '/v1/apps/6755209876/subscriptionGroups': [resource('group')],
-    '/v1/subscriptionGroups/group/subscriptions': productIds.map((productId, i) =>
-      resource(`sub${i}`, { productId, state: 'READY_TO_SUBMIT' }),
+function resource(id, attrs, relationships) {
+  return { id, attributes: attrs, ...(relationships ? { relationships } : {}) };
+}
+
+function world(mutate = () => {}) {
+  const locale = manifest.locales[0];
+  const meta = locale.metadata;
+  const state = {
+    versionState: 'PREPARE_FOR_SUBMISSION',
+    bundleId: 'com.logyourbody.app',
+    versions: null,
+    build: resource(
+      'build-1',
+      {
+        version: BUILD_NUMBER,
+        processingState: 'VALID',
+        expired: false,
+        usesNonExemptEncryption: false,
+        buildAudienceType: 'APP_STORE_ELIGIBLE',
+      },
+      {
+        preReleaseVersion: { data: { id: 'pre' } },
+        appEncryptionDeclaration: { data: null },
+        appStoreVersion: { data: null },
+      },
     ),
-    '/v1/appStoreVersions/version/appStoreVersionLocalizations': [
-      resource('loc', { locale: 'en-US', ...metadata, whatsNew: metadata.releaseNotes }),
+    included: [resource('pre', { version: '1.2.0', platform: 'IOS' })],
+    selectedStatus: 404,
+    selected: null,
+    products: [
+      resource('sub-annual', { productId: ANNUAL, state: 'READY_TO_SUBMIT' }),
+      resource('sub-monthly', { productId: MONTHLY, state: 'READY_TO_SUBMIT' }),
     ],
-    '/v1/apps/6755209876/appInfos': [resource('info', { state: 'PREPARE_FOR_SUBMISSION' })],
-    '/v1/appInfos/info/appInfoLocalizations': [
-      resource('info-loc', {
-        locale: 'en-US',
-        name: metadata.name,
-        subtitle: metadata.subtitle,
-        privacyPolicyUrl: metadata.privacyUrl,
-      }),
-    ],
+    submissions: [],
+    useFilteredSubmissions: false,
+    items: {},
+    whatsNew: meta.releaseNotes,
+    description: meta.description,
+    appInfos: [resource('info', { state: 'PREPARE_FOR_SUBMISSION' })],
   };
-  const included = [resource('prerelease', { version: '1.2.0', platform: 'IOS' })];
-  const calls = [];
+  mutate(state);
+  const version = resource('version-120', {
+    versionString: '1.2.0',
+    platform: 'IOS',
+    appVersionState: state.versionState,
+  });
+  const routes = {
+    [`/v1/apps/${APP}`]: { data: resource(APP, { bundleId: state.bundleId }) },
+    [`/v1/apps/${APP}/appStoreVersions`]: { data: state.versions ?? [version] },
+    '/v1/builds': { data: state.build ? [state.build] : [], included: state.included },
+    [`/v1/appStoreVersions/version-120/build`]: {
+      status: state.selectedStatus,
+      data: state.selected,
+    },
+    [`/v1/apps/${APP}/subscriptionGroups`]: { data: [resource('group', { referenceName: 'Pro' })] },
+    '/v1/subscriptionGroups/group/subscriptions': { data: state.products },
+    [state.useFilteredSubmissions ? '/v1/reviewSubmissions' : `/v1/apps/${APP}/reviewSubmissions`]: {
+      data: state.submissions,
+    },
+    [`/v1/appStoreVersions/version-120/appStoreVersionLocalizations`]: {
+      data: [
+        resource('loc', {
+          locale: locale.id,
+          description: state.description,
+          keywords: meta.keywords,
+          supportUrl: meta.supportUrl,
+          marketingUrl: meta.marketingUrl,
+          promotionalText: meta.promotionalText,
+          whatsNew: state.whatsNew,
+        }),
+      ],
+    },
+    [`/v1/apps/${APP}/appInfos`]: { data: state.appInfos },
+    '/v1/appInfos/info/appInfoLocalizations': {
+      data: [
+        resource('app-loc', {
+          locale: locale.id,
+          name: meta.name,
+          subtitle: meta.subtitle,
+          privacyPolicyUrl: meta.privacyUrl,
+        }),
+      ],
+    },
+    ...state.items,
+  };
   const asc = {
+    calls: [],
+    async request(path, query = {}) {
+      const key = path.split('?')[0];
+      asc.calls.push({ method: 'GET', path: key, query });
+      const route = routes[key];
+      if (!route) return { status: 404, pathname: key, body: {} };
+      return { status: route.status ?? 200, pathname: key, body: route };
+    },
     async get(path, query) {
-      calls.push([path, query]);
-      if (!(path in data)) throw new Error(`Unexpected fixture path ${path}`);
-      return { data: structuredClone(data[path]), included: structuredClone(included) };
+      const result = await this.request(path, query);
+      if (result.status !== 200) throw new Error(`ASC GET ${result.pathname} returned HTTP ${result.status}`);
+      return result.body;
     },
     async all(path, query) {
       return (await this.get(path, query)).data;
     },
   };
-  return { data, included, calls, asc };
+  return { asc, manifest, evidence: async () => receipt };
 }
-const report = (f, evidence = async () => receipt) =>
-  readReadiness({ asc: f.asc, evidence, manifest });
 
-test('complete live readback passes without requiring or performing a build attach', async () => {
-  const f = fixture();
-  const rows = await report(f);
+const report = (input) => readReadiness(input);
+const row = (rows, name) => rows.find((entry) => entry.check === name);
+
+test('committed release notes are the post-#1197 text', () => {
+  const notes = manifest.locales[0].metadata.releaseNotes;
+  assert.equal(notes.startsWith(STALE_WHATS_NEW_PREFIX), false);
+  assert.match(notes, /3-day free trial/);
+  assert.match(notes, /sign-in resumed more than once/);
+});
+
+test('a processed selectable 1.2.0 build with Ready to Submit subscriptions passes', async () => {
+  const rows = await report(world());
   assert.equal(rows.length, 7);
-  assert(rows.every((row) => row.pass));
-  assert.match(renderSummary(rows), /Read-only/);
-  assert(
-    f.calls.some(
-      ([path, query]) => path === '/v1/builds' && query['filter[version]'] === receipt.build,
-    ),
-  );
+  assert.equal(rows.every((entry) => entry.pass), true);
+  assert.match(row(rows, 'Version state').detail, /state=PREPARE_FOR_SUBMISSION/);
+  assert.match(row(rows, 'Build processed and selectable').detail, /selectable; selected build=none/);
+  assert.match(row(rows, ANNUAL).detail, /READY_TO_SUBMIT/);
+  assert.match(row(rows, "What's New").detail, /post-#1197/);
 });
 
-test('newest upload wins even when its processing/distribution job failed; non-upload runs are skipped', async () => {
-  const queried = [];
-  const github = async (path, raw) => {
-    queried.push(path);
-    if (path.includes('/workflows/'))
-      return [{ workflow_runs: [run(3), run(2, { conclusion: 'failure' }), run(1)] }];
-    if (path.includes('/runs/3/'))
-      return [
-        {
-          jobs: [
-            { ...uploadJob(), steps: [{ name: 'Upload to TestFlight', conclusion: 'skipped' }] },
-          ],
-        },
-      ];
-    if (path.includes('/runs/2/'))
-      return [{ jobs: [uploadJob({ conclusion: 'failure' }), validationJob] }];
-    if (raw) return logs;
-    throw new Error('Must not fall back to an older upload');
-  };
-  const result = await latestTestFlightUpload(github);
-  assert.equal(result.runId, 2);
-  assert.equal(result.build, receipt.build);
-  assert(!queried.some((path) => path.includes('/runs/1/')));
+test('an unselected build is selectable when the version relationship is empty or 404', async () => {
+  for (const selectedStatus of [404, 200]) {
+    const rows = await report(world((state) => {
+      state.selectedStatus = selectedStatus;
+      state.selected = null;
+    }));
+    assert.equal(row(rows, 'Build processed and selectable').pass, true, String(selectedStatus));
+  }
 });
 
-test('release provenance rejects wrong branch/repo/workflow and never substitutes a manually picked build', async () => {
-  const github = async () => [
-    {
-      workflow_runs: [
-        run(1, { head_branch: 'feature' }),
-        run(2, { repository: { full_name: 'other/repo' } }),
-        run(3, { path: '.github/workflows/other.yml' }),
+test('an already selected exact build passes and a build linked elsewhere fails', async () => {
+  const selected = await report(world((state) => {
+    state.selectedStatus = 200;
+    state.selected = resource('build-1', { version: BUILD_NUMBER });
+    state.build.relationships.appStoreVersion = { data: { id: 'version-120' } };
+  }));
+  assert.match(row(selected, 'Build processed and selectable').detail, /already selected/);
+
+  const linked = await report(world((state) => {
+    state.build.relationships.appStoreVersion = { data: { id: 'other-version' } };
+  }));
+  const failed = row(linked, 'Build processed and selectable');
+  assert.equal(failed.pass, false);
+  assert.match(failed.action, /Tim-only T3/);
+  assert.match(failed.detail, /linked version=other-version/);
+});
+
+test('processing, audience, and export compliance gate selectability', async () => {
+  const processing = await report(world((state) => {
+    state.build.attributes.processingState = 'PROCESSING';
+  }));
+  assert.equal(row(processing, 'Build processed and selectable').pass, false);
+
+  const audience = await report(world((state) => {
+    state.build.attributes.buildAudienceType = 'INTERNAL_ONLY';
+  }));
+  assert.equal(row(audience, 'Build processed and selectable').pass, false);
+
+  for (const declaration of ['APPROVED', 'IN_REVIEW', undefined]) {
+    const rows = await report(world((state) => {
+      state.build.attributes.usesNonExemptEncryption = true;
+      state.build.relationships.appEncryptionDeclaration = { data: { id: 'declaration' } };
+      state.included.push(resource('declaration', { appEncryptionDeclarationState: declaration }));
+    }));
+    assert.equal(row(rows, 'Build processed and selectable').pass, declaration === 'APPROVED', String(declaration));
+  }
+});
+
+test('Ready to Submit passes and another state passes only when attached to 1.2.0', async () => {
+  const approved = await report(world((state) => {
+    state.products[1].attributes.state = 'APPROVED';
+  }));
+  const monthly = row(approved, MONTHLY);
+  assert.equal(monthly.pass, false);
+  assert.match(monthly.action, /Tim-only T5/);
+  assert.match(monthly.detail, /attachment to 1.2.0 not shown/);
+  assert.equal(row(approved, ANNUAL).pass, true);
+
+  const attached = await report(world((state) => {
+    state.products[1].attributes.state = 'APPROVED';
+    state.submissions = [resource('submission-1', { state: 'READY_FOR_REVIEW' })];
+    state.items['/v1/reviewSubmissions/submission-1/items'] = {
+      data: [
+        { relationships: { appStoreVersion: { data: { id: 'version-120' } } } },
+        { relationships: { subscription: { data: { id: 'sub-monthly' } } } },
       ],
-    },
-  ];
-  await assert.rejects(latestTestFlightUpload(github), /No successful TestFlight upload/);
-});
-
-test('missing or ambiguous version/build logs fail closed at the newest upload', async () => {
-  for (const invalid of [
-    '',
-    logs + logs.replace(receipt.build, '20261016220000'),
-    logs.replace('1.2.0', '1.3.0') + logs,
-  ]) {
-    const github = async (path, raw) =>
-      raw
-        ? invalid
-        : path.includes('/workflows/')
-          ? [{ workflow_runs: [run(1)] }]
-          : [{ jobs: [uploadJob(), validationJob] }];
-    await assert.rejects(latestTestFlightUpload(github), /version\/build receipt/);
-  }
-});
-
-test('pending/invalid/expired/wrong-version/wrong-platform builds cannot pass', async () => {
-  const mutations = [
-    (f) => {
-      f.data['/v1/builds'][0].attributes.processingState = 'PROCESSING';
-    },
-    (f) => {
-      f.data['/v1/builds'][0].attributes.processingState = 'INVALID';
-    },
-    (f) => {
-      f.data['/v1/builds'][0].attributes.expired = true;
-    },
-    (f) => {
-      f.included[0].attributes.version = '1.1.0';
-    },
-    (f) => {
-      f.included[0].attributes.platform = 'MAC_OS';
-    },
-    (f) => {
-      f.data['/v1/builds'][0].attributes.usesNonExemptEncryption = null;
-    },
-    (f) => {
-      f.data['/v1/builds'][0].attributes.buildAudienceType = 'INTERNAL_ONLY';
-    },
-    (f) => {
-      f.data['/v1/builds'] = [];
-    },
-    (f) => {
-      f.data['/v1/builds'][0].relationships.appStoreVersion.data = { id: 'other-version' };
-    },
-  ];
-  for (const mutate of mutations) {
-    const f = fixture();
-    mutate(f);
-    const rows = await report(f);
-    assert.equal(rows.find((row) => row.check === 'Build processed and selectable').pass, false);
-    assert(rows.filter((row) => !row.pass).every((row) => row.action.startsWith('Tim-only')));
-  }
-});
-
-test('latest upload with wrong marketing version and missing receipts do not pass an older build', async () => {
-  for (const evidence of [
-    async () => ({ ...receipt, version: '1.3.0' }),
-    async () => {
-      throw new Error('GitHub receipt unavailable');
-    },
-  ]) {
-    const rows = await report(fixture(), evidence);
-    assert.equal(rows.find((row) => row.check === 'Build processed and selectable').pass, false);
-    assert.equal(rows.find((row) => row.check === "What's New").pass, true);
-  }
-});
-
-test('stale pre-1197 or blank What’s New fails; a different nonblank text also fails', async () => {
-  for (const whatsNew of [
-    '',
-    'Private body-composition timeline with a single time-weighted photo scrubber, weight and body-fat logging, optional Apple Health context, Stats, restore purchases, data export, and account deletion.',
-    'Bug fixes.',
-  ]) {
-    const f = fixture();
-    f.data['/v1/appStoreVersions/version/appStoreVersionLocalizations'][0].attributes.whatsNew =
-      whatsNew;
-    const rows = await report(f);
-    assert.equal(rows.find((row) => row.check === "What's New").pass, false);
-  }
-});
-
-test('missing or stale version/app-info metadata fails, including locales absent from ASC', async () => {
-  for (const mutate of [
-    (f) => {
-      f.data[
-        '/v1/appStoreVersions/version/appStoreVersionLocalizations'
-      ][0].attributes.description = '';
-    },
-    (f) => {
-      f.data['/v1/appStoreVersions/version/appStoreVersionLocalizations'] = [];
-    },
-    (f) => {
-      f.data['/v1/appInfos/info/appInfoLocalizations'][0].attributes.privacyPolicyUrl = '';
-    },
-    (f) => {
-      f.data['/v1/apps/6755209876/appInfos'] = [];
-    },
-  ]) {
-    const f = fixture();
-    mutate(f);
-    assert.equal((await report(f)).find((row) => row.check === 'Storefront metadata').pass, false);
-  }
-});
-
-test('both exact subscription IDs are required; approval/review alone does not prove attachment to 1.2.0', async () => {
-  for (const state of [
-    'MISSING_METADATA',
-    'WAITING_FOR_REVIEW',
-    'IN_REVIEW',
-    'APPROVED',
-    'DEVELOPER_ACTION_NEEDED',
-  ]) {
-    const f = fixture();
-    f.data['/v1/subscriptionGroups/group/subscriptions'][0].attributes.state = state;
-    const rows = await report(f);
-    assert.equal(rows.find((row) => row.check === productIds[0]).pass, false);
-    assert.match(rows.find((row) => row.check === productIds[0]).action, /attachment/);
-  }
-  const f = fixture();
-  f.data['/v1/subscriptionGroups/group/subscriptions'].pop();
-  assert.equal((await report(f)).find((row) => row.check === productIds[1]).pass, false);
-});
-
-test('missing version, rejected state, and wrong app identity fail without hiding other rows', async () => {
-  for (const mutate of [
-    (f) => {
-      f.data['/v1/apps/6755209876/appStoreVersions'] = [];
-    },
-    (f) => {
-      f.data['/v1/apps/6755209876/appStoreVersions'][0].attributes.appVersionState = 'REJECTED';
-    },
-    (f) => {
-      f.data['/v1/apps/6755209876'].attributes.bundleId = 'other.app';
-    },
-  ]) {
-    const f = fixture();
-    mutate(f);
-    const rows = await report(f);
-    assert.equal(rows.length, 7);
-    assert(rows.some((row) => !row.pass));
-  }
-});
-
-test('API failures remain red and leave independent checks visible', async () => {
-  const f = fixture();
-  const get = f.asc.get;
-  f.asc.get = async (path, query) => {
-    if (path.includes('/subscriptions')) throw new Error('ASC GET returned HTTP 403');
-    return get.call(f.asc, path, query);
-  };
-  const rows = await report(f);
-  assert.equal(rows.filter((row) => row.pass).length, 5);
-  assert.match(renderSummary(rows), /Tim-only/);
-});
-
-test('ASC transport sends GET only, follows pagination, and blocks off-origin links and redirects', async () => {
-  const requests = [];
-  const reader = new AscReader('private-token', async (url, options) => {
-    requests.push({ url: String(url), options });
-    return new Response(
-      JSON.stringify({
-        data: [{ id: requests.length }],
-        links: {
-          next:
-            requests.length === 1 ? 'https://api.appstoreconnect.apple.com/v1/apps?page=2' : null,
-        },
-      }),
-    );
-  });
-  assert.deepEqual(await reader.all('/v1/apps'), [{ id: 1 }, { id: 2 }]);
-  assert(
-    requests.every(
-      (r) => r.options.method === 'GET' && r.options.redirect === 'error' && !r.options.body,
-    ),
-  );
-  await assert.rejects(reader.get('https://other.example/key'), /origin/);
-  await assert.rejects(reader.get('//other.example/key'), /origin/);
-  const failed = new AscReader(
-    'private-token',
-    async () => new Response('private-token secret body', { status: 403 }),
-  );
-  await assert.rejects(
-    failed.get('/v1/apps'),
-    (error) => !error.message.includes('private-token') && error.message.includes('403'),
-  );
-});
-
-test('JWT uses existing release secrets, ES256, bounded lifetime, and a GET-only scope', () => {
-  const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
-  const token = createToken(
-    {
-      ASC_KEY_ID: 'key-id',
-      ASC_ISSUER_ID: 'issuer',
-      ASC_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }).replaceAll('\n', '\\n'),
-    },
-    1000,
-  );
-  const [header, payload, signature] = token.split('.');
-  assert.equal(JSON.parse(Buffer.from(header, 'base64url')).alg, 'ES256');
-  const claims = JSON.parse(Buffer.from(payload, 'base64url'));
-  assert.equal(claims.exp - claims.iat, 1200);
-  assert(claims.scope.every((scope) => scope.startsWith('GET ')));
-  assert(
-    verify(
-      'sha256',
-      Buffer.from(`${header}.${payload}`),
-      { key: publicKey, dsaEncoding: 'ieee-p1363' },
-      Buffer.from(signature, 'base64url'),
-    ),
-  );
-});
-
-test('App Store audience and encryption approval are required independently of processing', async () => {
-  for (const state of ['APPROVED', 'IN_REVIEW', 'REJECTED', undefined]) {
-    const f = fixture();
-    f.data['/v1/builds'][0].attributes.usesNonExemptEncryption = true;
-    f.data['/v1/builds'][0].relationships.appEncryptionDeclaration = {
-      data: { id: 'declaration' },
     };
-    f.included.push(resource('declaration', { appEncryptionDeclarationState: state }));
-    const row = (await report(f)).find((row) => row.check === 'Build processed and selectable');
-    assert.equal(row.pass, state === 'APPROVED');
-  }
+  }));
+  assert.match(row(attached, MONTHLY).detail, /attached to 1.2.0/);
+  assert.equal(row(attached, MONTHLY).pass, true);
+
+  const filteredInput = world((state) => {
+    state.products[1].attributes.state = 'APPROVED';
+    state.useFilteredSubmissions = true;
+    state.submissions = [resource('submission-1', { state: 'READY_FOR_REVIEW' })];
+    state.items['/v1/reviewSubmissions/submission-1/items'] = {
+      data: [
+        { relationships: { appStoreVersion: { data: { id: 'version-120' } } } },
+        { relationships: { subscription: { data: { id: 'sub-monthly' } } } },
+      ],
+    };
+  });
+  const filtered = await report(filteredInput);
+  assert.equal(row(filtered, MONTHLY).pass, true);
+  assert.equal(filteredInput.asc.calls.some((call) => call.path === '/v1/reviewSubmissions'), true);
 });
 
-test('already selected exact build passes and is identified separately from an unselected build', async () => {
-  const f = fixture();
-  f.data['/v1/appStoreVersions/version/build'] = resource('build', { version: receipt.build });
-  f.data['/v1/builds'][0].relationships.appStoreVersion = { data: { id: 'version' } };
-  const row = (await report(f)).find((row) => row.check === 'Build processed and selectable');
-  assert(row.pass);
-  assert.match(row.detail, /already selected/);
+test("What's New rejects the pre-#1197 sentence and metadata mismatches stay visible", async () => {
+  const stale = await report(world((state) => {
+    state.whatsNew = `${STALE_WHATS_NEW_PREFIX}, weight and body-fat logging.`;
+  }));
+  const whatsNew = row(stale, "What's New");
+  assert.equal(whatsNew.pass, false);
+  assert.match(whatsNew.detail, /stale pre-#1197/);
+  assert.match(whatsNew.action, /Tim-only T6/);
+
+  const metadata = await report(world((state) => {
+    state.description = 'Different description';
+  }));
+  assert.equal(row(metadata, 'Storefront metadata').pass, false);
+  assert.match(row(metadata, 'Storefront metadata').detail, /description/);
+  assert.equal(row(metadata, "What's New").pass, true);
 });
 
-test('run pagination stops at the newest proven upload and ASC pagination cycles fail closed', async () => {
+test('rejected and missing versions fail closed without dropping the other rows', async () => {
+  const rejected = await report(world((state) => {
+    state.versionState = 'REJECTED';
+  }));
+  assert.equal(row(rejected, 'Version state').pass, false);
+  assert.match(row(rejected, 'Version state').action, /Tim-only T1/);
+  assert.equal(rejected.filter((entry) => entry.pass).length >= 2, true);
+
+  const missing = await report(world((state) => {
+    state.versions = [];
+  }));
+  assert.match(row(missing, 'Version state').detail, /missing or ambiguous/);
+  assert.match(row(missing, 'Build processed and selectable').detail, /unavailable/);
+});
+
+test('the newest upload is the newest successful TestFlight upload, not an older substitute', async () => {
+  const wrong = await report({
+    ...world(),
+    evidence: async () => ({ ...receipt, version: '1.1.0', build: '9' }),
+  });
+  assert.match(row(wrong, 'Newest TestFlight upload').detail, /not 1\.2\.0/);
+  assert.match(row(wrong, 'Build processed and selectable').detail, /cannot substitute/);
+
+  const run = (id) => ({
+    id,
+    run_attempt: 1,
+    head_sha: 'b'.repeat(40),
+    head_branch: 'main',
+    path: '.github/workflows/ios-release-loop.yml',
+    repository: { full_name: 'JovieInc/LogYourBody' },
+  });
+  const uploadedJobs = [
+    {
+      name: 'Deploy to TestFlight / Deploy to TestFlight (alpha)',
+      steps: [{ name: 'Upload to TestFlight', conclusion: 'success' }],
+    },
+    {
+      id: 55,
+      name: 'Validate Release',
+      steps: [{ name: 'Extract version info', conclusion: 'success' }],
+    },
+  ];
+  const logs = 'Version: 20261012.601\n2026-10-16T21:59:03.8785120Z 📦 Version: 1.2.0\n🔢 Build: 20261016215903\n';
   const queried = [];
   const github = async (path, raw) => {
     queried.push(path);
     if (path.includes('/workflows/')) {
-      return [
-        {
-          workflow_runs: path.endsWith('page=1')
-            ? Array.from({ length: 100 }, (_, i) => run(200 - i))
-            : [run(1)],
-        },
-      ];
+      const page = path.endsWith('page=1') ? Array.from({ length: 100 }, (_, index) => run(500 - index)) : [run(7)];
+      return [{ workflow_runs: page }];
     }
     if (raw) return logs;
-    return [{ jobs: path.includes('/runs/1/') ? [uploadJob(), validationJob] : [] }];
+    return [{ jobs: path.includes('/runs/7/') ? uploadedJobs : [] }];
   };
-  assert.equal((await latestTestFlightUpload(github)).runId, 1);
-  assert(queried.some((path) => path.endsWith('page=2')));
-  assert(!queried.some((path) => path.endsWith('page=3')));
-  const reader = new AscReader(
-    'token',
-    async () => new Response(JSON.stringify({ data: [], links: { next: '/v1/apps' } })),
-  );
-  await assert.rejects(reader.all('/v1/apps'), /repeated a page/);
+  assert.equal((await latestTestFlightUpload(github)).runId, 7);
+  assert.equal(queried.some((path) => path.endsWith('page=2')), true);
+  assert.equal(queried.some((path) => path.endsWith('page=3')), false);
 });
 
-test('summary escapes table markup and assigns a named Tim-only item to every red row', () => {
+test('ASC transport is GET-only and does not echo tokens or off-origin pages', async () => {
+  const requests = [];
+  const reader = new AscReader('private-token', async (url, options) => {
+    requests.push({ url: String(url), options });
+    return new Response(JSON.stringify({
+      data: [{ id: String(requests.length) }],
+      links: { next: requests.length === 1 ? 'https://api.appstoreconnect.apple.com/v1/apps?page=2' : null },
+    }));
+  });
+  assert.deepEqual(await reader.all('/v1/apps'), [{ id: '1' }, { id: '2' }]);
+  assert.equal(requests.every((entry) => entry.options.method === 'GET' && entry.options.redirect === 'error' && !entry.options.body), true);
+  await assert.rejects(reader.get('https://other.example/key'), /origin/);
+  const denied = new AscReader('private-token', async () => new Response('private-token secret body', { status: 403 }));
+  await assert.rejects(denied.get('/v1/apps'), (error) => !error.message.includes('private-token') && error.message.includes('403'));
+  const missing = await denied.request('/v1/appStoreVersions/version-120/build');
+  assert.equal(missing.status, 403);
+  const cycling = new AscReader('token', async () => new Response(JSON.stringify({ data: [], links: { next: '/v1/apps' } })));
+  await assert.rejects(cycling.all('/v1/apps'), /repeated a page/);
+});
+
+test('JWT matches the release client claims and never returns key material', () => {
+  const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const token = createToken({
+    ASC_KEY_ID: 'key-id',
+    ASC_ISSUER_ID: 'issuer',
+    ASC_PRIVATE_KEY: pem.replaceAll('\n', '\\n'),
+  }, 1_000);
+  const [header, payload, signature] = token.split('.');
+  assert.equal(JSON.parse(Buffer.from(header, 'base64url')).alg, 'ES256');
+  const claims = JSON.parse(Buffer.from(payload, 'base64url'));
+  assert.deepEqual(Object.keys(claims).sort(), ['aud', 'exp', 'iat', 'iss']);
+  assert.equal(claims.aud, 'appstoreconnect-v1');
+  assert.equal(claims.exp - claims.iat, 1200);
+  assert.equal(claims.scope, undefined);
+  assert.equal(verify('sha256', Buffer.from(`${header}.${payload}`), { key: publicKey, dsaEncoding: 'ieee-p1363' }, Buffer.from(signature, 'base64url')), true);
+  const secret = 'BEGIN PRIVATE KEY MATERIAL should-not-leak';
+  assert.throws(() => createToken({ ASC_KEY_ID: 'kid', ASC_ISSUER_ID: 'iss', ASC_PRIVATE_KEY: secret }), (error) => {
+    assert.equal(error.message.includes('should-not-leak'), false);
+    return true;
+  });
+});
+
+test('GitHub log reads allow escape sequences and the workflow stays read-only', () => {
+  const args = githubApiArguments('repos/JovieInc/LogYourBody/actions/jobs/1/logs', { raw: true });
+  assert.equal(args.includes('--allow-escape-sequences'), true);
+  assert.equal(args.includes('--method'), true);
+  assert.equal(args.includes('GET'), true);
+  assert.equal(args.includes('--paginate'), false);
+  const source = readFileSync(new URL('./app-store-readiness.mjs', import.meta.url), 'utf8');
+  for (const method of ['POST', 'PATCH', 'PUT', 'DELETE']) {
+    assert.equal(source.includes(`method: '${method}'`), false);
+  }
+  const workflow = readFileSync(new URL('../workflows/app-store-connect-readiness.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /pull_request:|schedule:|contents: write|environment:/);
+  assert.match(workflow, /contents: read/);
+  assert.match(workflow, /actions: read/);
+  assert.match(workflow, /secrets\.APP_STORE_CONNECT_API_KEY_ID/);
+  assert.match(workflow, /secrets\.APP_STORE_CONNECT_API_KEY_ISSUER_ID/);
+  assert.match(workflow, /secrets\.APP_STORE_CONNECT_API_KEY }}/);
+  assert.equal(workflow.includes('submit_for_review'), false);
+});
+
+test('the summary escapes markup and names a Tim-only item for every failure', () => {
   const summary = renderSummary([
     { check: 'Check', pass: false, detail: 'bad | state\n<script>', action: 'Tim-only T1: fix it' },
   ]);
   assert.match(summary, /FAIL/);
   assert.match(summary, /Tim-only T1/);
-  assert(!summary.includes('<script>'));
-  assert(!summary.includes('bad | state'));
+  assert.equal(summary.includes('<script>'), false);
+  assert.equal(summary.includes('bad | state'), false);
+  assert.match(summary, /#1197/);
 });

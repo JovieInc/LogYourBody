@@ -88,6 +88,10 @@ Reusable/manual web release loop. This is no longer the automatic main-branch re
 
 Reusable/manual iOS release loop for TestFlight/App Store release paths.
 
+### `app-store-connect-readiness.yml`
+
+Manual read-only App Store Connect check for version 1.2.0. It reports version state, whether the newest TestFlight upload is processed and selectable, whether both pro1 subscriptions are Ready to Submit or already attached, and whether What's New and storefront metadata match the committed manifest. It does not submit, attach a build, or write metadata.
+
 ### `ios-testflight-deploy.yml`
 
 Reusable TestFlight deployment workflow.

@@ -9,58 +9,16 @@ The engineering pipeline is fully automated. **One human step** stands between t
 - TestFlight upload waits for Apple to finish processing the build before assigning tester groups. The deploy job allows up to 60 minutes for that provider-controlled step.
 - App Store submission is gated behind `paywall_testflight_verified: true` — a deliberate manual gate so no build ships without a proven purchase/restore.
 
-## Read-only ASC readiness readback (LYB-200)
+## Read-only readiness check
 
-After the readiness PR merges, dispatch on `main`:
-
-```bash
-gh workflow run ios-app-store-readiness.yml --ref main
-gh run list --workflow ios-app-store-readiness.yml --branch main --event workflow_dispatch --limit 5
-# Use the run ID returned above:
-gh run watch RUN_ID
-```
-
-Link that successful run in LYB-200/LYB-138 and inspect its job-summary table.
-A successful job means the readback completed; every **FAIL** row has a named
-**Tim-only T1–T7** item to resolve before Submit. Retain those names and the run
-link in the release handoff, or replace each with a dedicated fix issue. A red
-row never triggers an ASC mutation. The workflow has only GitHub read
-permissions, uses the existing release ASC secrets, scopes each ES256 token to
-a single GET, and never invokes a submit, attach, or metadata-upload lane.
-
-The report identifies the newest main Release Loop whose **Upload to
-TestFlight** step succeeded, even if later processing/distribution failed. It
-reads that attempt's version/build log receipt and checks the exact ASC build
-for `VALID`, unexpired, iOS 1.2.0, `APP_STORE_ELIGIBLE`, resolved export compliance,
-and no association with
-another App Store version. It reports whether the build is already selected;
-selecting it remains outside this workflow. Missing logs or API access produce
-red rows rather than a fallback to an older build.
-
-Both exact `pro1` subscription product IDs must be `READY_TO_SUBMIT` to pass
-automatically. The public API does not expose their attachment to an App Store
-version, so other states (including `APPROVED`) receive a named Tim-only
-attachment/state verification item. Product IDs alone do not verify a live
-introductory offer's duration or price.
-
-Live What's New must match the committed storefront manifest, and the report
-compares the version's localized description, keywords, promotional text and
-support/marketing URLs plus editable app-info name, subtitle and privacy URL.
-This is bounded metadata/build evidence; screenshots, app privacy declarations,
-agreements, and the real-device purchase/restore proof below still require the
-release checklist.
-
-**#1197 resolution:** [the What's New PR](https://github.com/JovieInc/LogYourBody/pull/1197)
-already merged on **2026-10-11 at 12:53:51 UTC**, commit
-`fe054800d6c4db490e780a8a8620571ebdcacdd2`, and is an ancestor of this change.
-No superseding close or additional merge is needed. Its Pro/free-trial/sign-in
-notes are committed; only the live readback can confirm ASC has them.
-
-Local regression command (Node 22, no credentials or dependencies):
+Dispatch `app-store-connect-readiness.yml` on `main` before Submit. It writes a pass/fail table to the job summary for version state, the newest TestFlight-uploaded build, both pro1 3-day-trial subscriptions, and What's New plus the rest of the committed storefront metadata. A green job means the readback finished. A FAIL row names a Tim-only follow-up and does not submit, attach a build, or write metadata.
 
 ```bash
-node --test .github/scripts/app-store-readiness.test.mjs
+gh workflow run app-store-connect-readiness.yml --ref main
+gh run list --workflow app-store-connect-readiness.yml --branch main --event workflow_dispatch --limit 5
 ```
+
+[#1197](https://github.com/JovieInc/LogYourBody/pull/1197) already merged on 2026-10-11 (`fe054800d6c4db490e780a8a8620571ebdcacdd2`). The check compares live What's New with that committed text.
 
 ## Preconditions (machine-verified, no action needed)
 

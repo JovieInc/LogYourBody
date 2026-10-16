@@ -5,16 +5,51 @@ import { pathToFileURL } from 'node:url';
 
 const REPOSITORY = 'JovieInc/LogYourBody';
 const APP_ID = '6755209876';
+const BUNDLE_ID = 'com.logyourbody.app';
 const VERSION = '1.2.0';
 const API = 'https://api.appstoreconnect.apple.com';
 const PRODUCTS = [
   'com.logyourbody.app.pro1.annual.3daytrial',
   'com.logyourbody.app.pro1.monthly.3daytrial',
 ];
+// release_notes.txt before #1197 (fe054800). Live or committed text that still
+// starts with this sentence is the stale pre-submit What's New.
+export const STALE_WHATS_NEW_PREFIX =
+  'Private body-composition timeline with a single time-weighted photo scrubber';
 
-// Same issuer/key secrets and ES256 claims as the Ruby release monitor, with
-// a fresh token scoped to exactly one GET. No key file or Fastlane lane needed.
-export function createToken(env, now = Math.floor(Date.now() / 1000), path = '/v1/apps') {
+const PASS_VERSION_STATES = new Set([
+  'PREPARE_FOR_SUBMISSION',
+  'READY_FOR_REVIEW',
+  'WAITING_FOR_REVIEW',
+  'IN_REVIEW',
+  'PENDING_APPLE_RELEASE',
+  'PENDING_DEVELOPER_RELEASE',
+  'PROCESSING_FOR_DISTRIBUTION',
+  'PROCESSING_FOR_APP_STORE',
+  'READY_FOR_SALE',
+  'PREORDER_READY_FOR_SALE',
+]);
+
+const METADATA_FIELDS = [
+  ['description', 'version', 'description'],
+  ['keywords', 'version', 'keywords'],
+  ['supportUrl', 'version', 'supportUrl'],
+  ['marketingUrl', 'version', 'marketingUrl'],
+  ['promotionalText', 'version', 'promotionalText'],
+  ['name', 'app', 'name'],
+  ['subtitle', 'app', 'subtitle'],
+  ['privacyUrl', 'app', 'privacyPolicyUrl'],
+];
+
+const attributes = (record) => record?.attributes ?? {};
+const normalize = (value) => String(value ?? '').replaceAll('\r\n', '\n').trim();
+const requireTrue = (condition, message) => {
+  if (!condition) throw new Error(message);
+};
+
+// Same iss/exp/aud claims as verify-app-store-subscriptions.rb, plus iat.
+// Apple's JWT has no per-request scope claim; this client only sends GET.
+export function createToken(env, now = Math.floor(Date.now() / 1000)) {
   try {
     for (const name of ['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY']) {
       if (!env[name]) throw new Error('Missing credential');
@@ -25,7 +60,6 @@ export function createToken(env, now = Math.floor(Date.now() / 1000), path = '/v
       iat: now,
       exp: now + 1200,
       aud: 'appstoreconnect-v1',
-      scope: [`GET ${path}`],
     })}`;
     const signature = sign('sha256', Buffer.from(message), {
       key: env.ASC_PRIVATE_KEY.replaceAll('\\n', '\n'),
@@ -43,86 +77,110 @@ export class AscReader {
     this.fetcher = fetcher;
   }
 
-  async get(path, query = {}) {
+  async request(path, query = {}) {
     const url = new URL(path, API);
-    if (url.origin !== API || url.username || url.password)
+    if (url.origin !== API || url.username || url.password) {
       throw new Error('ASC pagination origin rejected');
-    for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
-    const token =
-      typeof this.token === 'function' ? this.token(url.pathname + url.search) : this.token;
+    }
+    for (const [key, value] of Object.entries(query)) url.searchParams.set(key, String(value));
     let response;
     try {
       response = await this.fetcher(url, {
         method: 'GET',
         redirect: 'error',
         signal: AbortSignal.timeout(30_000),
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        headers: { Authorization: `Bearer ${this.token}`, Accept: 'application/json' },
       });
     } catch {
       throw new Error(`ASC GET ${url.pathname} failed (network, timeout, or redirect)`);
     }
-    if (!response.ok) throw new Error(`ASC GET ${url.pathname} returned HTTP ${response.status}`);
-    try {
-      return await response.json();
-    } catch {
-      throw new Error(`ASC GET ${url.pathname} returned invalid JSON`);
+    const text = await response.text();
+    let body = {};
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        if (response.ok) throw new Error(`ASC GET ${url.pathname} returned invalid JSON`);
+      }
     }
+    return { status: response.status, pathname: url.pathname, body };
+  }
+
+  async get(path, query = {}) {
+    const result = await this.request(path, query);
+    if (result.status !== 200) {
+      throw new Error(`ASC GET ${result.pathname} returned HTTP ${result.status}`);
+    }
+    return result.body;
   }
 
   async all(path, query = {}) {
     const records = [];
-    const visited = new Set();
-    while (path) {
-      if (visited.has(path)) throw new Error('ASC pagination repeated a page');
-      visited.add(path);
-      const page = await this.get(path, query);
-      if (!Array.isArray(page.data)) throw new Error('ASC list response missing data');
-      records.push(...page.data);
-      path = page.links?.next;
-      query = {};
+    const seen = new Set();
+    let next = path;
+    let nextQuery = query;
+    for (let page = 0; next; page += 1) {
+      if (page > 20) throw new Error('ASC pagination exceeded 20 pages');
+      if (seen.has(next)) throw new Error('ASC pagination repeated a page');
+      seen.add(next);
+      const body = await this.get(next, nextQuery);
+      if (!Array.isArray(body.data)) throw new Error('ASC list response missing data');
+      records.push(...body.data);
+      next = body.links?.next || '';
+      nextQuery = {};
     }
     return records;
   }
 }
 
+export function githubApiArguments(path, { raw = false, paginate = true } = {}) {
+  return [
+    'api',
+    '--method',
+    'GET',
+    '--allow-escape-sequences',
+    path,
+    ...(raw || !paginate ? [] : ['--paginate', '--slurp']),
+  ];
+}
+
 export function githubGet(path, raw = false, paginate = true) {
   try {
-    const output = execFileSync(
-      'gh',
-      ['api', '--method', 'GET', path, ...(raw || !paginate ? [] : ['--paginate', '--slurp'])],
-      {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        timeout: 120_000,
-        maxBuffer: 20 * 1024 * 1024,
-      },
-    );
-    return raw ? output : paginate ? JSON.parse(output) : [JSON.parse(output)];
+    const output = execFileSync('gh', githubApiArguments(path, { raw, paginate }), {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 120_000,
+      maxBuffer: 20 * 1024 * 1024,
+    });
+    if (raw) return output;
+    const parsed = JSON.parse(output);
+    return Array.isArray(parsed) ? parsed : [parsed];
   } catch {
-    throw new Error(
-      'GitHub readback unavailable (check actions:read, token, and retained job logs)',
-    );
+    throw new Error('GitHub readback unavailable (check actions:read, token, and retained job logs)');
   }
+}
+
+function stripAnsi(value) {
+  return String(value).replace(/\u001b\[[0-9;]*[A-Za-z]/g, '');
 }
 
 export async function latestTestFlightUpload(github = githubGet) {
   const base = `repos/${REPOSITORY}/actions`;
-  // Do not filter conclusion=success: an upload may succeed before processing
-  // or distribution fails. Skip only runs without a successful upload step.
-  for (let page = 1; ; page++) {
+  for (let page = 1; ; page += 1) {
     const pages = await github(
       `${base}/workflows/ios-release-loop.yml/runs?branch=main&per_page=100&page=${page}`,
       false,
       false,
     );
-    const runs = pages.flatMap((page) => page.workflow_runs).sort((a, b) => b.id - a.id);
+    const runs = pages.flatMap((entry) => entry.workflow_runs ?? []).sort((a, b) => b.id - a.id);
     for (const run of runs) {
       if (
         run.head_branch !== 'main' ||
         run.repository?.full_name !== REPOSITORY ||
         run.path !== '.github/workflows/ios-release-loop.yml'
-      )
+      ) {
         continue;
+      }
       if (
         !Number.isSafeInteger(run.id) ||
         !Number.isSafeInteger(run.run_attempt) ||
@@ -130,38 +188,30 @@ export async function latestTestFlightUpload(github = githubGet) {
       ) {
         throw new Error('Release Loop provenance incomplete');
       }
-      const jobPages = await github(
-        `${base}/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
-      );
-      const jobs = jobPages.flatMap((page) => page.jobs);
+      const jobPages = await github(`${base}/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`);
+      const jobs = jobPages.flatMap((entry) => entry.jobs ?? []);
       const uploaded = jobs.some(
         (job) =>
-          job.name.startsWith('Deploy to TestFlight /') &&
-          job.steps?.some(
-            (step) => step.name === 'Upload to TestFlight' && step.conclusion === 'success',
-          ),
+          job.name?.startsWith('Deploy to TestFlight /') &&
+          job.steps?.some((step) => step.name === 'Upload to TestFlight' && step.conclusion === 'success'),
       );
       if (!uploaded) continue;
       const validation = jobs.filter(
         (job) =>
           job.name === 'Validate Release' &&
-          job.steps?.some(
-            (step) => step.name === 'Extract version info' && step.conclusion === 'success',
-          ),
+          job.steps?.some((step) => step.name === 'Extract version info' && step.conclusion === 'success'),
       );
-      if (validation.length !== 1 || !Number.isSafeInteger(validation[0].id))
+      if (validation.length !== 1 || !Number.isSafeInteger(validation[0].id)) {
         throw new Error('Release Loop version/build receipt missing');
-      const logs = await github(`${base}/jobs/${validation[0].id}/logs`, true);
+      }
+      const logs = stripAnsi(await github(`${base}/jobs/${validation[0].id}/logs`, true));
       const versions = [
-        ...new Set(
-          [...logs.matchAll(/📦 Version: (\d+\.\d+(?:\.\d+)?)\s*$/gm)].map((match) => match[1]),
-        ),
+        ...new Set([...logs.matchAll(/📦 Version: (\d+\.\d+(?:\.\d+)?)\s*$/gm)].map((match) => match[1])),
       ];
-      const builds = [
-        ...new Set([...logs.matchAll(/🔢 Build: (\d+)\s*$/gm)].map((match) => match[1])),
-      ];
-      if (versions.length !== 1 || builds.length !== 1)
+      const builds = [...new Set([...logs.matchAll(/🔢 Build: (\d+)\s*$/gm)].map((match) => match[1]))];
+      if (versions.length !== 1 || builds.length !== 1) {
         throw new Error('Release Loop version/build receipt missing or ambiguous');
+      }
       return {
         runId: run.id,
         attempt: run.run_attempt,
@@ -176,14 +226,77 @@ export async function latestTestFlightUpload(github = githubGet) {
   throw new Error('No successful TestFlight upload found in retained main Release Loops');
 }
 
-const attributes = (record) => record?.attributes ?? {};
-const requireTrue = (condition, message) => {
-  if (!condition) throw new Error(message);
-};
-const normalize = (value) =>
-  String(value ?? '')
-    .replaceAll('\r\n', '\n')
-    .trim();
+function relatedIds(item) {
+  const ids = [];
+  for (const relationship of Object.values(item?.relationships ?? {})) {
+    const data = relationship?.data;
+    const resources = Array.isArray(data) ? data : data ? [data] : [];
+    for (const resource of resources) {
+      if (resource?.id) ids.push(String(resource.id));
+    }
+  }
+  return ids;
+}
+
+async function listReviewSubmissions(asc) {
+  const attempts = [
+    [`/v1/apps/${APP_ID}/reviewSubmissions`, { limit: 20 }],
+    ['/v1/reviewSubmissions', { 'filter[app]': APP_ID, limit: 20 }],
+  ];
+  const notes = [];
+  for (const [path, query] of attempts) {
+    const listed = await asc.request(path, query);
+    if (listed.status === 200 && Array.isArray(listed.body?.data)) {
+      return { submissions: listed.body.data, note: '' };
+    }
+    notes.push(`${listed.pathname} HTTP ${listed.status}`);
+  }
+  return { submissions: [], note: notes.join('; ') };
+}
+
+async function subscriptionsAttachedToVersion(asc, versionId) {
+  if (!versionId) return { ids: new Set(), note: 'version unavailable' };
+  const listed = await listReviewSubmissions(asc);
+  if (listed.note) return { ids: new Set(), note: listed.note };
+  const ids = new Set();
+  const failures = [];
+  for (const submission of listed.submissions) {
+    try {
+      const items = await asc.all(`/v1/reviewSubmissions/${submission.id}/items`, { limit: 200 });
+      const related = new Set(items.flatMap((item) => relatedIds(item)));
+      if (related.has(versionId)) {
+        for (const id of related) ids.add(id);
+      }
+    } catch (error) {
+      failures.push(error.message);
+    }
+  }
+  return {
+    ids,
+    note: failures.length ? failures[0] : 'review submission items read',
+  };
+}
+
+function expectedLocales(manifest) {
+  requireTrue(Array.isArray(manifest?.locales) && manifest.locales.length > 0, 'Committed storefront locales missing');
+  return manifest.locales;
+}
+
+async function readVersion(asc) {
+  const app = await asc.get(`/v1/apps/${APP_ID}`, { 'fields[apps]': 'bundleId' });
+  requireTrue(attributes(app.data).bundleId === BUNDLE_ID, 'ASC app bundle identity mismatch');
+  const versions = await asc.all(`/v1/apps/${APP_ID}/appStoreVersions`, {
+    'filter[platform]': 'IOS',
+    'filter[versionString]': VERSION,
+    'fields[appStoreVersions]': 'versionString,appVersionState,platform',
+    limit: 200,
+  });
+  const matches = versions.filter(
+    (item) => attributes(item).versionString === VERSION && attributes(item).platform === 'IOS',
+  );
+  requireTrue(matches.length === 1, `App Store ${VERSION} missing or ambiguous`);
+  return matches[0];
+}
 
 export async function readReadiness({ asc, evidence = latestTestFlightUpload, manifest }) {
   const rows = [];
@@ -194,248 +307,232 @@ export async function readReadiness({ asc, evidence = latestTestFlightUpload, ma
       rows.push({ check: name, pass: false, detail: error.message, action });
     }
   };
-  let version, receipt;
-  const versionId = () => {
-    requireTrue(version, `App Store ${VERSION} unavailable; see Version state`);
-    return version.id;
-  };
-  await check(
-    'Version state',
-    'Tim-only T1: resolve the version state in ASC before Submit.',
-    async () => {
-      const app = await asc.get(`/v1/apps/${APP_ID}`);
-      requireTrue(
-        attributes(app.data).bundleId === 'com.logyourbody.app',
-        'ASC app bundle identity mismatch',
-      );
-      const versions = await asc.all(`/v1/apps/${APP_ID}/appStoreVersions`, {
-        'filter[platform]': 'IOS',
-        'filter[versionString]': VERSION,
-        limit: 200,
-      });
-      const matches = versions.filter(
-        (item) => attributes(item).versionString === VERSION && attributes(item).platform === 'IOS',
-      );
-      requireTrue(matches.length === 1, `App Store ${VERSION} missing or ambiguous`);
-      version = matches[0];
-      const state = attributes(version).appVersionState;
-      requireTrue(
-        ['PREPARE_FOR_SUBMISSION', 'READY_FOR_REVIEW'].includes(state),
-        `${VERSION} state=${state || 'UNKNOWN'}; not awaiting a Submit click`,
-      );
-      return `${VERSION} state=${state}; version ID=${version.id}`;
-    },
-  );
+
+  let version;
+  await check('Version state', 'Tim-only T1: resolve the 1.2.0 version state in App Store Connect before Submit.', async () => {
+    version = await readVersion(asc);
+    const state = attributes(version).appVersionState || 'UNKNOWN';
+    requireTrue(
+      PASS_VERSION_STATES.has(state),
+      `${VERSION} state=${state}; not a submittable or already-submitted state`,
+    );
+    return `${VERSION} state=${state}; version ID=${version.id}`;
+  });
+
+  let receipt;
   await check(
     'Newest TestFlight upload',
-    'Tim-only T2: restore Release Loop log access or complete a TestFlight upload, then rerun.',
+    'Tim-only T2: restore Release Loop log access or complete a 1.2.0 TestFlight upload, then rerun.',
     async () => {
       receipt = await evidence();
       requireTrue(
         receipt.version === VERSION,
         `Newest upload is ${receipt.version} (${receipt.build}), not ${VERSION}; run ${receipt.url}`,
       );
-      return `Run ${receipt.runId}, attempt ${receipt.attempt}; ${receipt.version} (${receipt.build}); commit ${receipt.sha}; ${receipt.url}`;
+      return `Run ${receipt.runId} attempt ${receipt.attempt}; ${receipt.version} (${receipt.build}); commit ${receipt.sha}; ${receipt.url}`;
     },
   );
+
   await check(
     'Build processed and selectable',
-    'Tim-only T3: inspect this exact build in ASC; resolve processing/export compliance or version availability, then select it if appropriate.',
+    'Tim-only T3: inspect this exact build in App Store Connect and resolve processing, export compliance, or version linkage. This workflow does not select it.',
     async () => {
-      requireTrue(
-        receipt?.version === VERSION,
-        'No matching newest TestFlight receipt; cannot substitute an older build',
-      );
-      const id = versionId();
+      requireTrue(receipt?.version === VERSION, 'No matching newest TestFlight receipt; cannot substitute an older build');
+      requireTrue(version?.id, `App Store ${VERSION} unavailable; see Version state`);
       const result = await asc.get('/v1/builds', {
         'filter[app]': APP_ID,
         'filter[version]': receipt.build,
         include: 'preReleaseVersion,appEncryptionDeclaration,appStoreVersion',
+        'fields[builds]':
+          'version,processingState,expired,usesNonExemptEncryption,buildAudienceType,preReleaseVersion,appEncryptionDeclaration,appStoreVersion',
+        'fields[preReleaseVersions]': 'version,platform',
+        'fields[appEncryptionDeclarations]': 'appEncryptionDeclarationState',
         limit: 200,
       });
-      requireTrue(
-        result.data?.length === 1,
-        `Exact uploaded build ${receipt.build} missing or ambiguous in ASC`,
-      );
+      requireTrue(result.data?.length === 1, `Exact uploaded build ${receipt.build} missing or ambiguous in ASC`);
       const build = result.data[0];
       const included = result.included ?? [];
-      const related = (name) =>
-        included.find((item) => item.id === build.relationships?.[name]?.data?.id);
-      const a = attributes(build),
-        pre = attributes(related('preReleaseVersion')),
-        encryption = attributes(related('appEncryptionDeclaration'));
-      const attached = await asc.get(`/v1/appStoreVersions/${id}/build`);
+      const related = (name) => included.find((item) => item.id === build.relationships?.[name]?.data?.id);
+      const buildAttributes = attributes(build);
+      const pre = attributes(related('preReleaseVersion'));
+      const encryption = attributes(related('appEncryptionDeclaration'));
       const linkage = build.relationships?.appStoreVersion;
-      requireTrue(
-        linkage && Object.hasOwn(linkage, 'data'),
-        'Build App Store version association unavailable',
-      );
+      requireTrue(linkage && Object.hasOwn(linkage, 'data'), 'Build App Store version association unavailable');
       const otherVersion = linkage.data?.id;
+      const compliance =
+        buildAttributes.usesNonExemptEncryption === false ||
+        (buildAttributes.usesNonExemptEncryption === true && encryption.appEncryptionDeclarationState === 'APPROVED');
       requireTrue(
-        a.version === receipt.build &&
-          a.processingState === 'VALID' &&
-          a.expired === false &&
+        buildAttributes.version === receipt.build &&
+          buildAttributes.processingState === 'VALID' &&
+          buildAttributes.expired === false &&
           pre.version === VERSION &&
           pre.platform === 'IOS' &&
-          a.buildAudienceType === 'APP_STORE_ELIGIBLE' &&
-          (a.usesNonExemptEncryption === false ||
-            (a.usesNonExemptEncryption === true &&
-              encryption.appEncryptionDeclarationState === 'APPROVED')) &&
-          (!otherVersion || otherVersion === id),
-        `${receipt.build}: processing=${a.processingState || 'UNKNOWN'}, expired=${a.expired}, version=${pre.version || 'UNKNOWN'}, platform=${pre.platform || 'UNKNOWN'}, audience=${a.buildAudienceType || 'UNKNOWN'}, non-exempt encryption=${a.usesNonExemptEncryption}, declaration=${encryption.appEncryptionDeclarationState || 'none'}, linked version=${otherVersion || 'none'}`,
+          buildAttributes.buildAudienceType === 'APP_STORE_ELIGIBLE' &&
+          compliance &&
+          (!otherVersion || otherVersion === version.id),
+        `${receipt.build}: processing=${buildAttributes.processingState || 'UNKNOWN'}, expired=${buildAttributes.expired}, version=${pre.version || 'UNKNOWN'}, platform=${pre.platform || 'UNKNOWN'}, audience=${buildAttributes.buildAudienceType || 'UNKNOWN'}, non-exempt encryption=${buildAttributes.usesNonExemptEncryption}, declaration=${encryption.appEncryptionDeclarationState || 'none'}, linked version=${otherVersion || 'none'}`,
       );
-      return `${receipt.build}: VALID, unexpired, IOS ${VERSION}, APP_STORE_ELIGIBLE, export compliance resolved; ${attached.data?.id === build.id ? 'already selected' : `selectable; selected build=${attributes(attached.data).version || 'none'}`}`;
+      const selected = await asc.request(`/v1/appStoreVersions/${version.id}/build`);
+      if (![200, 404].includes(selected.status)) {
+        throw new Error(`ASC GET /v1/appStoreVersions/${version.id}/build returned HTTP ${selected.status}`);
+      }
+      const selectedId = selected.status === 200 ? selected.body?.data?.id ?? null : null;
+      const selectedBuild = selected.status === 200 ? attributes(selected.body?.data).version || 'none' : 'none';
+      const selection = selectedId === build.id ? 'already selected' : `selectable; selected build=${selectedBuild}`;
+      return `${receipt.build}: VALID, unexpired, IOS ${VERSION}, APP_STORE_ELIGIBLE, export compliance resolved; ${selection}`;
     },
   );
-  let products, productError;
+
+  let products = [];
+  let productError;
   try {
     const groups = await asc.all(`/v1/apps/${APP_ID}/subscriptionGroups`, { limit: 200 });
     products = (
-      await Promise.all(
-        groups.map((group) =>
-          asc.all(`/v1/subscriptionGroups/${group.id}/subscriptions`, { limit: 200 }),
-        ),
-      )
+      await Promise.all(groups.map((group) => asc.all(`/v1/subscriptionGroups/${group.id}/subscriptions`, { limit: 200 })))
     ).flat();
   } catch (error) {
     productError = error;
   }
+
+  let attachment = { ids: new Set(), note: 'not checked' };
+  if (!productError) {
+    try {
+      attachment = await subscriptionsAttachedToVersion(asc, version?.id);
+    } catch (error) {
+      attachment = { ids: new Set(), note: error.message };
+    }
+  }
+
   for (const [index, productId] of PRODUCTS.entries()) {
     await check(
       productId,
-      `Tim-only T${index + 4}: resolve this product in ASC or verify its attachment to ${VERSION}; the public API does not expose that attachment.`,
+      `Tim-only T${index + 4}: put this product in Ready to Submit, or confirm it is attached to ${VERSION}. This workflow cannot attach it.`,
       async () => {
         if (productError) throw productError;
-        const product = products.filter((item) => attributes(item).productId === productId);
-        requireTrue(product.length === 1, 'Required subscription missing or ambiguous');
-        const state = attributes(product[0]).state;
-        // APPROVED/IN_REVIEW alone cannot prove attachment to this version.
+        const matches = products.filter((item) => attributes(item).productId === productId);
+        requireTrue(matches.length === 1, 'Required subscription missing or ambiguous');
+        const product = matches[0];
+        const state = attributes(product).state || 'UNKNOWN';
+        const attached = attachment.ids.has(String(product.id));
         requireTrue(
-          state === 'READY_TO_SUBMIT',
-          `state=${state || 'UNKNOWN'}; attachment to ${VERSION} unverified`,
+          state === 'READY_TO_SUBMIT' || attached,
+          `state=${state}; attachment to ${VERSION} not shown (${attachment.note})`,
         );
-        return `state=${state}; product ID=${product[0].id}; attachment not required for this row to pass`;
+        if (attached) return `state=${state}; attached to ${VERSION}; product ID=${product.id}`;
+        return `state=${state}; product ID=${product.id}; Ready to Submit before attachment`;
       },
     );
   }
+
   let localizations;
-  const versionLocales = () =>
-    (localizations ??= asc.all(`/v1/appStoreVersions/${versionId()}/appStoreVersionLocalizations`, {
-      limit: 200,
-    }));
+  const versionLocales = () => {
+    requireTrue(version?.id, `App Store ${VERSION} unavailable; see Version state`);
+    localizations ??= asc.all(`/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`, { limit: 200 });
+    return localizations;
+  };
+
   await check(
     "What's New",
-    'Tim-only T6: update ASC What’s New from the committed storefront manifest; this workflow cannot write metadata.',
+    "Tim-only T6: replace ASC What's New with the committed storefront release notes. This workflow cannot write metadata.",
     async () => {
       const live = await versionLocales();
-      requireTrue(manifest.locales?.length > 0, 'Committed storefront locales missing');
       const notes = [];
-      for (const locale of manifest.locales) {
-        const expected = normalize(locale.metadata.releaseNotes);
-        requireTrue(
-          expected &&
-            !expected.startsWith(
-              'Private body-composition timeline with a single time-weighted photo scrubber',
-            ),
-          'Committed release notes are blank or pre-#1197',
-        );
+      for (const locale of expectedLocales(manifest)) {
+        const expected = normalize(locale.metadata?.releaseNotes);
+        requireTrue(expected && !expected.startsWith(STALE_WHATS_NEW_PREFIX), `${locale.id} committed release notes are blank or pre-#1197`);
         const actual = live.find((item) => attributes(item).locale === locale.id);
+        const whatsNew = normalize(attributes(actual).whatsNew);
         requireTrue(
-          normalize(attributes(actual).whatsNew) === expected,
-          `${locale.id} What’s New missing or differs from post-#1197 committed text`,
+          whatsNew === expected,
+          whatsNew.startsWith(STALE_WHATS_NEW_PREFIX)
+            ? `${locale.id} What's New is the stale pre-#1197 text`
+            : `${locale.id} What's New missing or differs from the committed post-#1197 text`,
         );
         notes.push(`${locale.id}: ${expected}`);
       }
-      return `Matches post-#1197 committed text. ${notes.join('; ')}`;
+      return `Matches committed post-#1197 text. ${notes.join('; ')}`;
     },
   );
+
   await check(
     'Storefront metadata',
-    'Tim-only T7: reconcile the named ASC metadata fields with the committed manifest before Submit.',
+    'Tim-only T7: reconcile the named ASC metadata fields with the committed storefront manifest before Submit.',
     async () => {
       const live = await versionLocales();
       const infos = await asc.all(`/v1/apps/${APP_ID}/appInfos`, { limit: 200 });
-      const editable = infos.filter((info) =>
-        ['PREPARE_FOR_SUBMISSION', 'READY_FOR_REVIEW'].includes(
-          attributes(info).state ?? attributes(info).appStoreState,
-        ),
-      );
-      requireTrue(editable.length === 1, 'Editable app information missing or ambiguous');
-      const appLocales = await asc.all(`/v1/appInfos/${editable[0].id}/appInfoLocalizations`, {
-        limit: 200,
+      const versionState = attributes(version).appVersionState;
+      const editable = infos.filter((info) => {
+        const state = attributes(info).state ?? attributes(info).appStoreState;
+        return state === versionState || state === 'PREPARE_FOR_SUBMISSION' || state === 'READY_FOR_REVIEW';
       });
+      const chosen = editable.length === 1 ? editable : infos.length === 1 ? infos : [];
+      requireTrue(chosen.length === 1, 'Editable app information missing or ambiguous');
+      const appLocales = await asc.all(`/v1/appInfos/${chosen[0].id}/appInfoLocalizations`, { limit: 200 });
       const missing = [];
-      for (const locale of manifest.locales) {
-        const expected = locale.metadata;
-        const v = attributes(live.find((item) => attributes(item).locale === locale.id));
-        const app = attributes(appLocales.find((item) => attributes(item).locale === locale.id));
-        for (const field of [
-          'description',
-          'keywords',
-          'supportUrl',
-          'marketingUrl',
-          'promotionalText',
-        ]) {
-          if (!normalize(expected[field]) || normalize(v[field]) !== normalize(expected[field]))
-            missing.push(`${locale.id}.${field}`);
-        }
-        for (const [field, source] of [
-          ['name', 'name'],
-          ['subtitle', 'subtitle'],
-          ['privacyPolicyUrl', 'privacyUrl'],
-        ]) {
-          if (!normalize(expected[source]) || normalize(app[field]) !== normalize(expected[source]))
-            missing.push(`${locale.id}.${field}`);
+      for (const locale of expectedLocales(manifest)) {
+        const versionLocale = attributes(live.find((item) => attributes(item).locale === locale.id));
+        const appLocale = attributes(appLocales.find((item) => attributes(item).locale === locale.id));
+        for (const [source, target, field] of METADATA_FIELDS) {
+          const expected = normalize(locale.metadata?.[source]);
+          const actual = normalize((target === 'version' ? versionLocale : appLocale)[field]);
+          if (!expected || actual !== expected) missing.push(`${locale.id}.${field}`);
         }
       }
       requireTrue(missing.length === 0, `Missing or stale metadata: ${missing.join(', ')}`);
-      return 'Name, subtitle, privacy URL, description, keywords, support/marketing URLs, promotional text match the committed manifest';
+      return 'Name, subtitle, privacy URL, description, keywords, promotional text, and support/marketing URLs match the committed manifest';
     },
   );
+
   return rows;
 }
 
 const cell = (value) =>
-  String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('|', '&#124;')
-    .replace(/[\r\n]+/g, ' ');
+  String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '&#124;').replace(/[\r\n]+/g, ' ');
+
 export function renderSummary(rows) {
   return (
-    `## App Store ${VERSION} readiness\n\nRead-only ASC snapshot. No submit, build attach, release, or metadata writes.\n\n` +
+    `## App Store ${VERSION} readiness\n\nRead-only App Store Connect snapshot. No submit, build attach, release, or metadata write.\n\n` +
     '| Check | Result | Evidence | Follow-up |\n| --- | --- | --- | --- |\n' +
     rows
-      .map(
-        (row) =>
-          `| ${cell(row.check)} | ${row.pass ? 'PASS' : 'FAIL'} | ${cell(row.detail)} | ${cell(row.action)} |`,
-      )
+      .map((row) => `| ${cell(row.check)} | ${row.pass ? 'PASS' : 'FAIL'} | ${cell(row.detail)} | ${cell(row.action)} |`)
       .join('\n') +
-    `\n\nReadback complete. ${rows.every((row) => row.pass) ? 'All reported checks pass.' : 'Resolve every red row using its named Tim-only item before Submit.'}\n\n` +
-    '[#1197](https://github.com/JovieInc/LogYourBody/pull/1197) merged 2026-10-11 (fe054800d6c4db490e780a8a8620571ebdcacdd2). Live text is checked separately above.\n\n' +
-    'Scope: API metadata and build eligibility only. Screenshots, privacy declarations, agreements, and real-device paywall purchase/restore evidence still need the release checklist. A green job means the readback ran; readiness is determined by the table.\n'
+    `\n\nReadback complete. ${rows.every((row) => row.pass) ? 'All reported checks pass.' : 'Resolve every FAIL row using its named Tim-only item before Submit.'}\n\n` +
+    '[#1197](https://github.com/JovieInc/LogYourBody/pull/1197) merged 2026-10-11 (fe054800d6c4db490e780a8a8620571ebdcacdd2). Live What\'s New is checked above against that committed text.\n\n' +
+    'Scope: version state, the newest uploaded build, the two pro1 subscriptions, and storefront metadata. Screenshots, privacy declarations, agreements, and a real-device purchase/restore remain on the release checklist. A green job means the readback ran; the table is the result.\n'
   );
 }
 
 async function main() {
   const manifest = JSON.parse(
-    readFileSync(
-      new URL('../../apps/ios/fastlane/storefront-manifest.generated.json', import.meta.url),
-    ),
+    readFileSync(new URL('../../apps/ios/fastlane/storefront-manifest.generated.json', import.meta.url)),
   );
-  const asc = new AscReader((path) => createToken(process.env, undefined, path));
+  let asc;
+  try {
+    asc = new AscReader(createToken(process.env));
+  } catch (error) {
+    const message = error.message;
+    asc = {
+      async request() {
+        throw new Error(message);
+      },
+      async get() {
+        throw new Error(message);
+      },
+      async all() {
+        throw new Error(message);
+      },
+    };
+  }
   const rows = await readReadiness({ asc, manifest });
   const summary = renderSummary(rows);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
   console.log(summary);
-  // Red rows are a completed readback with named follow-ups, not a failed job.
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(() => {
-    const message =
-      'Readiness report could not be generated. Tim-only T0: inspect workflow setup and rerun.\n';
+    const message = 'Readiness report could not be generated. Tim-only T0: inspect workflow setup and rerun.\n';
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, message);
     console.error(message);
     process.exitCode = 1;
