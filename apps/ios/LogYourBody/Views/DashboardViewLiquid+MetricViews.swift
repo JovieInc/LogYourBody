@@ -234,7 +234,7 @@ extension DashboardViewLiquid {
 
     var dashboardMetricShareSnapshots: [ContextualMetricSnapshot] {
         let date = currentMetric.map { formatDate($0.date) } ?? ""
-        let source = currentMetric.map { HomeV2Provenance.label(for: $0) }
+        let source = currentMetric.map { HomeV2Provenance.label(for: $0, field: .bodyFat) }
         let range = selectedRange.accessibilityLabel
         var snapshots = [
             ContextualMetricSnapshot.steps(dailyMetrics, value: formatSteps(dailyMetrics?.steps), range: range),
@@ -252,7 +252,7 @@ extension DashboardViewLiquid {
                 provenance: currentMetric?.bodyFatPercentage == nil ? nil : source,
                 evidence: ContextualMetricEvidencePolicy.label(
                     for: .bodyFat, isEstimated: currentMetric?.bodyFatPercentage == nil,
-                    bodyFatMethod: currentMetric?.bodyFatMethod)),
+                    bodyFatMethod: currentMetric?.attributedBodyFatMethod)),
             ContextualMetricSnapshot(
                 kind: .ffmi, value: currentMetric.map { formatFFMIValue($0) } ?? "—",
                 unit: "", observation: date, range: range, trend: nil,

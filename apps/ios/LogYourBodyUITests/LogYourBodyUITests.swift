@@ -2291,6 +2291,50 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-day-zero", from: app)
     }
 
+    func testHomeV2ManualCorrectionKeepsImportedSiblingAndUndoSource() throws {
+        let app = XCUIApplication()
+        app.forwardActualXCTestContext()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2ImportedCorrectionFixture"
+        ])
+        let context = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(context.waitForExistence(timeout: 30))
+        context.tap()
+        let weight = app.descendants(matching: .any)["home_v2_context_row_weight"]
+        let fat = app.descendants(matching: .any)["home_v2_context_row_body_fat"]
+        XCTAssertTrue(weight.waitForExistence(timeout: 8))
+        XCTAssertTrue(fat.waitForExistence(timeout: 8))
+        XCTAssertTrue(weight.label.contains("Apple Health"), weight.label)
+        XCTAssertTrue(fat.label.contains("Apple Health"), fat.label)
+        let originalWeight = weight.label
+        let originalFat = fat.label
+        attachScreenshot(named: "field-provenance-imported", from: app)
+        app.buttons["home_v2_edit_entry"].tap()
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 8))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+        let typed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "Typed"), object: weight
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [typed], timeout: 8), .completed)
+        XCTAssertFalse(weight.label.contains("Apple Health"), weight.label)
+        XCTAssertEqual(fat.label, originalFat, "Untouched body fat retains its imported source and raw display")
+        attachScreenshot(named: "field-provenance-mixed-after-edit", from: app)
+        app.buttons["home_v2_context_close"].tap()
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 8))
+        undo.tap()
+        XCTAssertTrue(context.waitForExistence(timeout: 8))
+        context.tap()
+        XCTAssertTrue(weight.waitForExistence(timeout: 8))
+        XCTAssertEqual(weight.label, originalWeight)
+        XCTAssertEqual(fat.label, originalFat)
+        attachScreenshot(named: "field-provenance-restored-after-undo", from: app)
+    }
+
+
     func testHomeV2ContextShowsTheDayAndEditsTheEntry() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])

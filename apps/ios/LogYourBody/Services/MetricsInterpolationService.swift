@@ -420,8 +420,8 @@ class MetricsInterpolationService {
         }
 
         private func isDexaMeasurement(_ metric: BodyMetrics) -> Bool {
-            let method = metric.bodyFatMethod?.lowercased() ?? ""
-            let source = metric.dataSource?.lowercased() ?? ""
+            let method = metric.attributedBodyFatMethod?.lowercased() ?? ""
+            let source = metric.measurementSource(for: .bodyFat).rawValue
             return method.contains("dexa") || source.contains("bodyspec_dexa")
         }
 

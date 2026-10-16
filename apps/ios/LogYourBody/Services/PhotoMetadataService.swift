@@ -21,6 +21,7 @@ struct PhotoMetricsUpdateResult {
 
 enum PhotoMetricsRestoreError: Error {
     case entryNotFound
+    case entryChanged
     #if DEBUG
     case simulatedSaveFailure
     #endif
@@ -176,6 +177,16 @@ class PhotoMetadataService {
                 existing.bodyFatMethod
             }
 
+            var changedFields: Set<BodyMetricField> = []
+            if updatedWeight != existing.weight { changedFields.insert(.weight) }
+            if updatedBodyFat != existing.bodyFatPercentage || updatedBodyFatMethod != existing.bodyFatMethod {
+                changedFields.insert(.bodyFat)
+            }
+            let metadata = changedFields.isEmpty ? existing.sourceMetadata :
+                (existing.sourceMetadata ?? BodyMetricSourceMetadata()).settingEntrySource(
+                    BodyMetricSource(dataSource), fields: changedFields, bodyFatMethod: bodyFatMethod
+                )
+
             // Update existing metrics
             let updated = BodyMetrics(
                 id: existing.id,
@@ -194,7 +205,7 @@ class PhotoMetadataService {
                 notes: existing.notes,
                 photoUrl: photoUrl ?? existing.photoUrl,
                 dataSource: existing.dataSource,
-                sourceMetadata: existing.sourceMetadata,
+                sourceMetadata: metadata,
                 createdAt: existing.createdAt,
                 updatedAt: Date()
             )
@@ -269,6 +280,7 @@ class PhotoMetadataService {
         id: String,
         userId: String,
         previous: BodyMetrics,
+        replacing saved: BodyMetrics? = nil,
         context: NSManagedObjectContext? = nil
     ) async throws {
         guard previous.id == id, previous.userId == userId else {
@@ -290,14 +302,42 @@ class PhotoMetadataService {
                 throw PhotoMetricsRestoreError.entryNotFound
             }
 
+            var fields = Set(BodyMetricField.allCases)
+            if let saved {
+                guard saved.id == id, saved.userId == userId,
+                      let current = cached.toBodyMetrics() else { throw PhotoMetricsRestoreError.entryNotFound }
+                fields = []
+                if saved.weight != previous.weight || saved.weightUnit != previous.weightUnit {
+                    guard current.weight == saved.weight, current.weightUnit == saved.weightUnit,
+                          current.sourceMetadata?.entrySource(for: .weight) ==
+                            saved.sourceMetadata?.entrySource(for: .weight),
+                          current.dataSource == saved.dataSource else { throw PhotoMetricsRestoreError.entryChanged }
+                    fields.insert(.weight)
+                }
+                if saved.bodyFatPercentage != previous.bodyFatPercentage || saved.bodyFatMethod != previous.bodyFatMethod {
+                    guard current.bodyFatPercentage == saved.bodyFatPercentage, current.bodyFatMethod == saved.bodyFatMethod,
+                          current.sourceMetadata?.entrySource(for: .bodyFat) ==
+                            saved.sourceMetadata?.entrySource(for: .bodyFat),
+                          current.sourceMetadata?.enteredBodyFatMethod == saved.sourceMetadata?.enteredBodyFatMethod,
+                          current.dataSource == saved.dataSource else { throw PhotoMetricsRestoreError.entryChanged }
+                    fields.insert(.bodyFat)
+                }
+            }
+            guard !fields.isEmpty else { return }
             let previousValues = cached.dictionaryWithValues(forKeys: [
-                "weight", "weightUnit", "bodyFatPercentage", "bodyFatMethod", "updatedAt",
+                "weight", "weightUnit", "bodyFatPercentage", "bodyFatMethod", "sourceMetadataJSON", "updatedAt",
                 "lastModified", "isSynced", "syncStatus"
             ])
-            cached.weight = previous.weight ?? 0
-            cached.weightUnit = previous.weightUnit
-            cached.bodyFatPercentage = previous.bodyFatPercentage ?? 0
-            cached.bodyFatMethod = previous.bodyFatMethod
+            if fields.contains(.weight) {
+                cached.weight = previous.weight ?? 0
+                cached.weightUnit = previous.weightUnit
+            }
+            if fields.contains(.bodyFat) {
+                cached.bodyFatPercentage = previous.bodyFatPercentage ?? 0
+                cached.bodyFatMethod = previous.bodyFatMethod
+            }
+            cached.sourceMetadataJSON = (BodyMetricSourceMetadata(jsonString: cached.sourceMetadataJSON) ??
+                BodyMetricSourceMetadata()).restoringEntrySources(from: previous.sourceMetadata, fields: fields).jsonString
             let now = Date()
             cached.updatedAt = now
             cached.lastModified = now

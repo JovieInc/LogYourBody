@@ -231,11 +231,11 @@ enum HomeV2CompositionPolicy {
             return HomeV2Copy.compositionTrackingPrompt
         }
 
-        let method = methodKey(latest.bodyFatMethod)
+        let method = methodKey(latest.attributedBodyFatMethod)
         let label = measurementLabel(for: method)
         let latestText = String(format: "%.1f", latestValue)
         let earlier = readings
-            .filter { $0.localDate != latest.localDate && methodKey($0.bodyFatMethod) == method }
+            .filter { $0.localDate != latest.localDate && methodKey($0.attributedBodyFatMethod) == method }
             .max(by: { $0.date < $1.date })
 
         guard let earlier, let earlierValue = earlier.bodyFatPercentage else {
@@ -442,6 +442,7 @@ struct HomeV2LoggedEntry: Equatable {
     let previousMetric: BodyMetrics?
     let valueText: String
     let unit: String
+    var savedMetric: BodyMetrics?
 }
 
 /// Geometry that must hold on every iPhone: the photo stays full width at 4:5
@@ -499,7 +500,7 @@ enum HomeV2EditorialPolicy {
     static func bodyFat(in metric: BodyMetrics?) -> BodyFatReading? {
         guard let metric, let value = metric.bodyFatPercentage,
               value.isFinite, value > 0, value < 100 else { return nil }
-        let method = metric.bodyFatMethod?.lowercased()
+        let method = metric.attributedBodyFatMethod?.lowercased()
             .split(whereSeparator: \.isWhitespace).joined(separator: " ") ?? ""
         // Synthetic estimates must not be presented as recorded body fat.
         guard !method.contains("interpolat"), !method.contains("derived") else { return nil }
