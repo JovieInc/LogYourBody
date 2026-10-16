@@ -152,7 +152,7 @@ struct DatePickerSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text(date.formatted(date: .long, time: .omitted))
+                    Text(ProfileBirthDatePolicy.formatted(date, style: .long))
                         .font(.title.weight(.semibold))
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, JovieTokens.tightGap)
@@ -162,11 +162,13 @@ struct DatePickerSheet: View {
                     DatePicker(
                         "Date of Birth",
                         selection: $date,
-                        in: ...Date(),
+                        in: ...ProfileBirthDatePolicy.today(),
                         displayedComponents: .date
                     )
                     .datePickerStyle(.wheel)
                     .labelsHidden()
+                    .environment(\.calendar, ProfileBirthDatePolicy.calendar)
+                    .environment(\.timeZone, ProfileBirthDatePolicy.calendar.timeZone)
                 }
             }
             .navigationTitle("Date of Birth")

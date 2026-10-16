@@ -20,8 +20,9 @@ enum ProfileDetailsValidationPolicy {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> Bool {
-        let components = calendar.dateComponents([.year], from: dateOfBirth, to: now)
-        guard let age = components.year else { return false }
+        guard let age = ProfileBirthDatePolicy.age(
+            from: dateOfBirth, now: now, localCalendar: calendar
+        ) else { return false }
         return age >= 16 && age <= 80
     }
 
@@ -374,6 +375,8 @@ struct BodyScoreProfileDetailsView: View {
             )
             .datePickerStyle(.wheel)
             .labelsHidden()
+            .environment(\.calendar, ProfileBirthDatePolicy.calendar)
+            .environment(\.timeZone, ProfileBirthDatePolicy.calendar.timeZone)
 
             OnboardingCaptionText(
                 text: "You must be 16–80 years old to continue.",
