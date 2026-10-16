@@ -15,7 +15,7 @@ final class DashboardViewModel: ObservableObject {
     private let healthKitManager: HealthKitManager
     private let healthSyncCoordinator: HealthSyncCoordinating
     private let latestMetricLoader: @MainActor (String) async -> BodyMetrics?
-    private let todayStepCountLoader: (() async throws -> Int)?
+    private let todayStepCountLoader: (() async throws -> Int?)?
     private let dailyStepLoader: @MainActor (String, Date) async -> DailyMetrics?
     private let dailyStepWriter: @MainActor (DailyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void
     private let stepSyncTrigger: (@MainActor () -> Void)?
@@ -28,7 +28,7 @@ final class DashboardViewModel: ObservableObject {
             let cached = await CoreDataManager.shared.fetchLatestBodyMetric(for: userId)
             return cached?.toBodyMetrics()
         },
-        todayStepCountLoader: (() async throws -> Int)? = nil,
+        todayStepCountLoader: (() async throws -> Int?)? = nil,
         dailyStepLoader: @escaping @MainActor (String, Date) async -> DailyMetrics? = { userId, date in
             await CoreDataManager.shared.fetchDailyMetrics(for: userId, date: date)?.toDailyMetrics()
         },
@@ -201,12 +201,13 @@ final class DashboardViewModel: ObservableObject {
     ) async {
         guard let ownership = authManager.captureAccountSession() else { return }
         do {
-            let stepCount: Int
+            let stepCount: Int?
             if let todayStepCountLoader {
                 stepCount = try await todayStepCountLoader()
             } else {
                 stepCount = try await healthKitManager.fetchTodayStepCount()
             }
+            guard let stepCount else { return }
             try await updateStepCount(
                 steps: stepCount,
                 authManager: authManager,
