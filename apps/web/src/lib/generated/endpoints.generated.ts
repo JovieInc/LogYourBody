@@ -432,6 +432,15 @@ export const endpoints = {
         'Inter SIL Open Font License FAQ reference bundled with the shared typography assets.',
     },
     {
+      value: 'https://github.com/rsms/inter-tight',
+      reason:
+        'Bundled Inter Tight copyright attribution, preserved from the upstream SIL Open Font License.',
+    },
+    {
+      value: 'https://scripts.sil.org/OFL',
+      reason: 'HTTPS SIL Open Font License FAQ included in the bundled Inter Tight license.',
+    },
+    {
       value: 'https://www.fontshare.com/fonts/satoshi',
       reason: 'Satoshi font provenance reference for the shared typography projection.',
     },

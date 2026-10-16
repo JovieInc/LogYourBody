@@ -4,9 +4,53 @@
 //
 import CoreData
 import XCTest
+import UIKit
 @testable import LogYourBody
 
 final class HomeV2ContextPolicyTests: XCTestCase {
+    @MainActor
+    func testBodyFatEditorGateRequiresExplicitRolloutOrAuthenticatedExclusiveFixture() {
+        let context = ["XCTestSessionIdentifier": UUID().uuidString,
+                       "XCTestBundlePath": "/Fixtures/LogYourBodyUITests.xctest"]
+        let base = ["-lybUITestPhotoTimelineHUDFixture", HomeV2Policy.photoFixtureArgument]
+        let enabled = base + [HomeV2EntryBodyFatPrimaryPolicy.fixtureArgument]
+        let disabled = base + [HomeV2EntryBodyFatPrimaryPolicy.disabledFixtureArgument]
+        XCTAssertFalse(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(arguments: [], environment: [:], isGateEnabled: { _ in false }))
+        XCTAssertTrue(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(arguments: [], environment: [:], isGateEnabled: { key in
+            XCTAssertEqual(key, HomeV2EntryBodyFatPrimaryPolicy.gateKey)
+            return true
+        }))
+        #if DEBUG
+        XCTAssertTrue(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(
+                arguments: enabled, environment: context, isGateEnabled: { _ in false }
+            ))
+        XCTAssertFalse(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(
+                arguments: disabled, environment: context, isGateEnabled: { _ in true }
+            ))
+        for arguments in [enabled + [HomeV2EntryBodyFatPrimaryPolicy.fixtureArgument], enabled + disabled,
+                          enabled + [HomeV2Policy.rollbackFixtureArgument], [HomeV2EntryBodyFatPrimaryPolicy.fixtureArgument]] {
+            XCTAssertFalse(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(
+                arguments: arguments, environment: context, isGateEnabled: { _ in false }
+            ))
+        }
+        for environment in [[:], context.merging(["XCTestSessionIdentifier": "invalid"]) { _, new in new },
+                            context.merging(["XCTestBundlePath": "/Fixtures/Other.xctest"]) { _, new in new }] {
+            XCTAssertFalse(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(
+                arguments: enabled, environment: environment, isGateEnabled: { _ in false }
+            ))
+        }
+        #endif
+    }
+
+    func testEditorDisplayFontIsBundledAndRegistered() throws {
+        let bundle = Bundle(for: AuthManager.self)
+        XCTAssertNotNil(bundle.url(forResource: "InterTight", withExtension: "ttf"))
+        XCTAssertNotNil(bundle.url(forResource: "InterTight-OFL", withExtension: "txt"))
+        XCTAssertTrue((bundle.object(forInfoDictionaryKey: "UIAppFonts") as? [String])?.contains("InterTight.ttf") == true)
+        XCTAssertNotNil(UIFont(name: "InterTight-Regular", size: 84), "Editorial display must use its actual bundled font")
+    }
+
+
     @MainActor
     func testEntryEditPreservationRequiresItsOwnGateOrAuthenticatedTestFixture() {
         let arguments = ["-lybUITestPhotoTimelineHUDFixture", HomeV2Policy.photoFixtureArgument,

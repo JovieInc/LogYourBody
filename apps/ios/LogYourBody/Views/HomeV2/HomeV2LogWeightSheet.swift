@@ -29,18 +29,17 @@ struct HomeV2LogWeightSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var valueText: String
     @State private var preservesRecordedValues: Bool
+    @State private var bodyFatPrimary: Bool
     @State private var bodyFatText: String
     @State private var showsDetails: Bool
     @State private var isSaving = false
     @State private var isConfirmingDelete = false
     @State private var errorText: String?
+    @State private var validationErrorField: Field?
     @State private var detent: PresentationDetent
     @FocusState private var focusedField: Field?
 
-    private enum Field: Hashable {
-        case weight
-        case bodyFat
-    }
+    private typealias Field = HomeV2EntryEditorField
 
     init(
         mode: Mode = .log,
@@ -67,7 +66,9 @@ struct HomeV2LogWeightSheet: View {
         self.onDelete = onDelete
         self.onAddPhoto = onAddPhoto
         // Hold the policy for this presentation; a flag refresh must not replace a focused draft.
-        let preservesRecordedValues = mode == .edit && HomeV2EntryEditPolicy.isEnabled()
+        let primary = mode == .edit && HomeV2EntryBodyFatPrimaryPolicy.isEnabled()
+        _bodyFatPrimary = State(initialValue: primary)
+        let preservesRecordedValues = primary || (mode == .edit && HomeV2EntryEditPolicy.isEnabled())
         _preservesRecordedValues = State(initialValue: preservesRecordedValues)
         _valueText = State(initialValue: preservesRecordedValues && initialWeightIsMissing
             ? "" : HomeV2WeightStepPolicy.text(initialValue))
@@ -85,6 +86,36 @@ struct HomeV2LogWeightSheet: View {
     }
 
     var body: some View {
+        if bodyFatPrimary {
+            HomeV2EntryEditorLayout(
+                unit: unit, dateText: dateText, initialWeightIsMissing: initialWeightIsMissing,
+                existingPhotoURL: existingPhotoURL, isSaving: isSaving, errorText: errorText,
+                valueText: $valueText, bodyFatText: $bodyFatText, focusedField: $focusedField,
+                onSave: save, onDelete: onDelete == nil ? nil : { isConfirmingDelete = true },
+                onAddPhoto: { onAddPhoto("Front") }, onClose: { dismiss() }, onStep: step
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(HomeV2Tokens.Colors.canvas)
+            .onChange(of: focusedField) { previous, current in
+                if previous == .weight, current != .weight { commitTypedWeight() }
+            }
+            .onChange(of: bodyFatText) { _, _ in clearSubmittedValidation(for: .bodyFat) }
+            .onChange(of: valueText) { _, _ in clearSubmittedValidation(for: .weight) }
+            .alert(HomeV2ContextCopy.deleteTitle, isPresented: $isConfirmingDelete) {
+                Button(HomeV2ContextCopy.deleteEntry, role: .destructive, action: performDelete)
+                    .accessibilityIdentifier("home_v2_log_sheet_delete_confirm")
+                Button(HomeV2ContextCopy.cancel, role: .cancel) {}
+                    .accessibilityIdentifier("home_v2_log_sheet_delete_cancel")
+            } message: {
+                Text(deleteScope ?? "")
+            }
+        } else {
+            legacyContent
+        }
+    }
+
+    private var legacyContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
@@ -333,7 +364,14 @@ struct HomeV2LogWeightSheet: View {
         .accessibilityIdentifier("home_v2_log_sheet_photo_\(pose.lowercased())")
     }
 
+    private func clearSubmittedValidation(for field: Field) {
+        guard validationErrorField == field else { return }
+        validationErrorField = nil
+        errorText = nil
+    }
+
     private func step(_ direction: Int) {
+        validationErrorField = nil
         let current = HomeV2WeightStepPolicy.parse(valueText) ?? initialValue
         valueText = HomeV2WeightStepPolicy.text(HomeV2WeightStepPolicy.stepped(current, by: direction, unit: unit))
         errorText = nil
@@ -347,8 +385,14 @@ struct HomeV2LogWeightSheet: View {
                     text: valueText, initialValue: initialWeightIsMissing ? nil : initialValue,
                     unit: unit, preserving: true
                 )
-                errorText = nil
-            } catch { errorText = error.localizedDescription }
+                if !bodyFatPrimary || validationErrorField != .bodyFat {
+                    validationErrorField = nil
+                    errorText = nil
+                }
+            } catch {
+                validationErrorField = .weight
+                errorText = error.localizedDescription
+            }
             return
         }
         guard let typed = HomeV2WeightStepPolicy.parse(valueText) else { return }
@@ -378,10 +422,12 @@ struct HomeV2LogWeightSheet: View {
         let value: Double?
         let bodyFat: Double?
         do {
+            validationErrorField = .weight
             value = try HomeV2EntryEditPolicy.weight(
                 text: valueText, initialValue: initialWeightIsMissing ? nil : initialValue,
                 unit: unit, preserving: preservesRecordedValues
             )
+            validationErrorField = .bodyFat
             bodyFat = try HomeV2EntryEditPolicy.bodyFat(
                 text: bodyFatText, initialValue: initialBodyFat, preserving: preservesRecordedValues
             )
@@ -390,6 +436,7 @@ struct HomeV2LogWeightSheet: View {
             return
         }
 
+        validationErrorField = nil
         errorText = nil
         isSaving = true
         Task { @MainActor in

@@ -486,6 +486,9 @@
 		7585611558F46F5B8916E402 /* DexaReportedMeasurementsCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 812F1687F7FE1C0FB873CD40 /* DexaReportedMeasurementsCompatibilityTests.swift */; };
 		1DFC02C32EE4A1927B9611F2 /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = 268B06CA55F3059A974968FA /* JovieKit */; };
 		CC51F90AD41E20451A31775A /* JovieKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5975412524D066E7DFBA4A90 /* JovieKit */; };
+		3C8D01B01A2EBFA3C3EB73CD /* InterTight.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E0666550EE3D136A64FEB833 /* InterTight.ttf */; };
+		AB92EB88BB101CE4C08FF99D /* InterTight-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = C804289887C0B000A09DC147 /* InterTight-OFL.txt */; };
+		BFED20261016000100000001 /* HomeV2EntryEditorLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1062,6 +1065,9 @@
 		C4240D5F0129EC16E29C2259 /* DexaReportedMeasurementsPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaReportedMeasurementsPersistenceTests.swift; sourceTree = "<group>"; };
 		006434E8EF977B41ED40B4EA /* ReportedMeasurementsMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportedMeasurementsMigrationTests.swift; sourceTree = "<group>"; };
 		812F1687F7FE1C0FB873CD40 /* DexaReportedMeasurementsCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DexaReportedMeasurementsCompatibilityTests.swift; sourceTree = "<group>"; };
+		E0666550EE3D136A64FEB833 /* InterTight.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "InterTight.ttf"; sourceTree = "<group>"; };
+		C804289887C0B000A09DC147 /* InterTight-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "InterTight-OFL.txt"; sourceTree = "<group>"; };
+		BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2EntryEditorLayout.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1212,6 +1218,7 @@
 				BA9844F348C4675E22E4592F /* HomeV2TrendChart.swift */,
 				ACBA870282ED5F613A82213D /* HomeV2PrimaryButton.swift */,
 				55EE79E338D0E34DCB4E3FDF /* HomeV2LogWeightSheet.swift */,
+				BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */,
 				2B950B0AD205E333255C5FEE /* HomeV2ContextPolicy.swift */,
 				8BA8A68A080FCFF9487C1DF3 /* HomeV2ContextView.swift */,
 				699DEE22068AAD22FE7270FA /* HomeV2EntriesView.swift */,
@@ -1465,6 +1472,7 @@
 		AD723AE32E15FA5C002376C6 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				92214BD7648D98322296C4CA /* Fonts */,
 				E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */,
 				E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */,
 				AD723AE12E15FA5C002376C6 /* app-icon-180.png */,
@@ -1986,6 +1994,15 @@
 			path = Atoms;
 			sourceTree = "<group>";
 		};
+		92214BD7648D98322296C4CA /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				E0666550EE3D136A64FEB833 /* InterTight.ttf */,
+				C804289887C0B000A09DC147 /* InterTight-OFL.txt */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -2111,6 +2128,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3C8D01B01A2EBFA3C3EB73CD /* InterTight.ttf in Resources */,
+				AB92EB88BB101CE4C08FF99D /* InterTight-OFL.txt in Resources */,
 				E9A811932F40800000C0A701 /* PrivacyInfo.xcprivacy in Resources */,
 				E4C0A5110000000000000008 /* MesocycleCanvasSequence.json in Resources */,
 				AD72432A2F01234500ABCDEF /* Assets.xcassets in Resources */,
@@ -2599,6 +2618,7 @@
 				C7B9E48E55256B991FBCDEF0 /* HomeV2TrendChart.swift in Sources */,
 				7F81E0D294C9EBD959FA20B8 /* HomeV2PrimaryButton.swift in Sources */,
 				994AA8612F8DEA8D4BFFC133 /* HomeV2LogWeightSheet.swift in Sources */,
+				BFED20261016000100000001 /* HomeV2EntryEditorLayout.swift in Sources */,
 				07E0F159F526A8319DA5D5FC /* HomeV2ContextPolicy.swift in Sources */,
 				0B0F8A35DFED490D0711EAC1 /* HomeV2ContextView.swift in Sources */,
 				EC28049AC685F317C126EEAF /* HomeV2EntriesView.swift in Sources */,
