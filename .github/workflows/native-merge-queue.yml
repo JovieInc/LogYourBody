@@ -6,6 +6,9 @@ name: Native Merge Queue Enrollment
 # green and the cause was transient (check timeout) or a first failed merge group. A second
 # failed merge group at one head is a poison: it stays out and the lanes repair owner takes it.
 # Manual and merge-conflict removals are never undone here.
+# enqueuePullRequest refusals that are only a review block (changes requested, or
+# missing required approving reviews) are NOT_ELIGIBLE: a notice and a green job.
+# Draft, conflict, permission, and every other enqueue error still fail the job.
 on:
   workflow_run:
     workflows: [CI]
@@ -157,12 +160,20 @@ jobs:
               });
             } catch (error) {
               const errors = Array.isArray(error?.errors) ? error.errors : [];
-              // GitHub's review gate is an eligibility result, not an enrollment outage.
-              const reviewBlocked = errors.length > 0 && errors.every((failure) => failure.type === 'UNPROCESSABLE'
-                && /^Pull request [1-9]\d* reviews? requesting changes by reviewers with write access\.$/.test(failure.message ?? ''));
-              if (reviewBlocked) {
-                await recordOutcome('NOT_ELIGIBLE', 'Pull request is blocked by requested changes',
-                  errors.map((failure) => failure.message).join('; '));
+              // Review-policy refusals are ineligibility. Drafts, conflicts, permissions,
+              // and every other enqueue error still throw.
+              const reviewClause = /^(?:Pull request \d+ reviews? requesting changes by reviewers with write access|At least \d+ approving reviews? (?:(?:is|are) )?required by reviewers with write access)\.?$/;
+              const reviewBlocking = errors.length > 0 && errors.every((failure) => {
+                if (failure?.type !== 'UNPROCESSABLE') return false;
+                const clauses = String(failure.message ?? '').split(/ and (?=(?:Pull request|At least)\b)/);
+                return clauses.length > 0 && clauses.every((clause) => reviewClause.test(clause.trim()));
+              });
+              if (reviewBlocking) {
+                await recordOutcome(
+                  'NOT_ELIGIBLE',
+                  'Pull request is blocked by review',
+                  errors.map((failure) => failure.message).filter(Boolean).join('; '),
+                );
                 return;
               }
               const alreadyQueued = errors.some((failure) => failure.type === 'UNPROCESSABLE'
