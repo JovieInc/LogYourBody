@@ -208,6 +208,7 @@ final class OnboardingFlowViewModel: ObservableObject {
     let calculator: BodyScoreCalculating
     let profileUpdateHandler: @MainActor ([String: Any]) async throws -> Void
     var hasMarkedOnboardingComplete = false
+    var firstInsightImpression = FirstInsightImpression()
     var isOnboardingCompletionInFlight = false
     let progressStore = OnboardingProgressStore.shared
     var isRestoringProgress = false

@@ -165,6 +165,27 @@ export const endpoints = {
       reason: 'Apple developer documentation links in docs/research.',
     },
     {
+      value: 'https://support.apple.com/en-in/guide/iphone/iphe3d379c32/ios',
+      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
+    },
+    {
+      value: 'https://happyscale.com',
+      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
+    },
+    {
+      value: 'https://help.macrofactorapp.com/dashboard/weight_trend',
+      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
+    },
+    {
+      value:
+        'https://help.hevyapp.com/hc/en-us/articles/35385479603479-Body-Composition-Tracking-Measurements-and-Progress-Photos',
+      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
+    },
+    {
+      value: 'https://help.bevel.health/en/articles/10437057',
+      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
+    },
+    {
       value: 'https://edpb.europa.eu',
       reason: 'Legal-doc link (EDPB) referenced by privacy copy.',
     },
@@ -340,6 +361,10 @@ export const endpoints = {
     {
       value: 'https://linear.app/jovie/issue/LYB-95',
       reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-173',
+      reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-97',
