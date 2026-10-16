@@ -6,6 +6,8 @@
 // Found by the iOS UI refactor self-verification loop.
 //
 import XCTest
+import SwiftUI
+import Vision
 @testable import LogYourBody
 
 final class UIAccessibilityContractTests: XCTestCase {
@@ -182,5 +184,85 @@ extension UIAccessibilityContractTests {
     func testMetricTrendAccessibilityRetainsNumericFlatValueFromLegacyCallers() {
         let trend = MetricSummaryCard.Trend(direction: .flat, valueText: "0.0")
         XCTAssertEqual(trend.accessibilityDescription, "No change 0.0")
+    }
+}
+
+extension UIAccessibilityContractTests {
+    @MainActor
+    func testMetricIdentitySurvivesLoadingEmptyAndErrorStates() {
+        for title in ["Steps", "Weight", "Body fat", "FFMI"] {
+            let states: [(MetricSummaryCard.State, String)] = [
+                (.loading(title: title), "Loading \(title)"),
+                (.empty(title: title, message: "No data", action: nil), "\(title), No data"),
+                (.error(title: title, message: "Unable to load", action: nil), "\(title), Unable to load")
+            ]
+            for (state, expected) in states {
+                let card = MetricSummaryCard(icon: "circle", accentColor: .blue, state: state)
+                XCTAssertEqual(card.titleText(identityEnabled: true), title)
+                XCTAssertEqual(card.accessibilityLabel(identityEnabled: true), expected)
+                XCTAssertEqual(card.titleText(identityEnabled: false), "Metric")
+            }
+        }
+    }
+
+    @MainActor
+    func testMetricAccessibleSummaryRetainsHiddenChartAndSourceContext() {
+        let content = MetricSummaryCard.Content(
+            title: "Weight", value: "80.0", unit: "kg", timestamp: "Today",
+            dataPoints: [], chartAccessibilityLabel: "Recorded weight, last 30 days",
+            chartAccessibilityValue: "12 recorded entries",
+            trend: .init(direction: .flat, valueText: "No change", caption: "1M"),
+            footnote: "Apple Health"
+        )
+        let card = MetricSummaryCard(icon: "circle", accentColor: .blue, state: .data(content))
+        XCTAssertEqual(card.accessibilityLabel(identityEnabled: true),
+                       "Weight, 80.0 kg, No change, 1M, Updated Today, " +
+                        "Recorded weight, last 30 days, 12 recorded entries, Apple Health")
+        XCTAssertEqual(card.accessibilityLabel(identityEnabled: false),
+                       "Weight, 80.0 kg, No change, 1M, Updated Today")
+    }
+
+    @MainActor
+    func testMetricIdentityRolloutRequiresItsSpecificGate() {
+        XCTAssertFalse(MetricCardIdentityPolicy.isEnabled { _ in false })
+        XCTAssertTrue(MetricCardIdentityPolicy.isEnabled { $0 == "metric_card_identity_v1" })
+        XCTAssertFalse(MetricCardIdentityPolicy.isEnabled { $0 == "some_other_gate" })
+    }
+
+    @MainActor
+    func testRenderedMetricStatesKeepTheirVisibleName() throws {
+        let states: [(String, MetricSummaryCard.State)] = [
+            ("loading", .loading(title: "Body fat")),
+            ("empty", .empty(title: "Body fat", message: "No measurements yet", action: nil)),
+            ("error", .error(title: "Body fat", message: "Unable to load measurements", action: nil))
+        ]
+        for enabled in [false, true] {
+            for size: DynamicTypeSize in [.large, .accessibility3] {
+                for (name, state) in states {
+                    let card = MetricSummaryCard(icon: "percent", accentColor: .blue, state: state)
+                        .environment(\.metricCardIdentity, enabled)
+                        .environment(\.dynamicTypeSize, size)
+                        .transaction { $0.animation = nil; $0.disablesAnimations = true }
+                        .padding(20)
+                        .background(Color.appBackground)
+                        .preferredColorScheme(.dark)
+                    let renderer = ImageRenderer(content: card)
+                    renderer.proposedSize = ProposedViewSize(width: 320, height: nil)
+                    renderer.scale = 2
+                    let image = try XCTUnwrap(renderer.uiImage)
+                    let attachment = XCTAttachment(image: image)
+                    attachment.name = "metric-identity-\(enabled)-\(name)-\(size)"
+                    attachment.lifetime = .keepAlways
+                    add(attachment)
+                    let request = VNRecognizeTextRequest()
+                    request.recognitionLevel = .accurate
+                    request.recognitionLanguages = ["en-US"]
+                    try VNImageRequestHandler(cgImage: XCTUnwrap(image.cgImage), options: [:]).perform([request])
+                    let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+                        .joined(separator: " ")
+                    XCTAssertTrue(text.contains(enabled ? "Body fat" : "Metric"), text)
+                }
+            }
+        }
     }
 }

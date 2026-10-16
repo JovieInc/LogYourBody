@@ -91,7 +91,7 @@ struct AllMetricsRow: View {
                 MetricSummaryCard(
                     icon: "figure.walk",
                     accentColor: Color.metricAccentSteps,
-                    state: .empty(message: "No steps data", action: nil)
+                    state: .empty(title: "Steps", message: "No steps data", action: nil)
                 )
             }
         }
@@ -138,7 +138,7 @@ struct AllMetricsRow: View {
                 MetricSummaryCard(
                     icon: "figure.stand",
                     accentColor: Color.metricAccentWeight,
-                    state: .empty(message: "No weight data", action: nil)
+                    state: .empty(title: "Weight", message: "No weight data", action: nil)
                 )
             }
         }
@@ -174,7 +174,7 @@ struct AllMetricsRow: View {
                 MetricSummaryCard(
                     icon: "percent",
                     accentColor: Color.metricAccentBodyFat,
-                    state: .empty(message: "No body fat data", action: nil)
+                    state: .empty(title: "Body fat", message: "No body fat data", action: nil)
                 )
             }
         }
@@ -210,7 +210,7 @@ struct AllMetricsRow: View {
                 MetricSummaryCard(
                     icon: "figure.arms.open",
                     accentColor: Color.metricAccentFFMI,
-                    state: .empty(message: "No FFMI data", action: nil)
+                    state: .empty(title: "FFMI", message: "No FFMI data", action: nil)
                 )
             }
         }
@@ -249,7 +249,7 @@ struct AllMetricsRow: View {
                 MetricSummaryCard(
                     icon: "ruler",
                     accentColor: Color.metricAccentWaist,
-                    state: .empty(message: "No waist data", action: nil)
+                    state: .empty(title: "Waist", message: "No waist data", action: nil)
                 )
             }
         }
