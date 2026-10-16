@@ -475,91 +475,118 @@ struct MesocycleCanvasContainer: View {
     private var reduced: Bool { accessibilityReduceMotion || model.reduceMotion }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("TRAINING PLAN")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(theme.colors.textSecondary)
-                    Text("This week")
-                        .font(.system(size: 28, weight: .semibold))
-                        .foregroundStyle(theme.colors.text)
-                    Text(model.narration)
-                        .font(.system(size: 15))
-                        .foregroundStyle(theme.colors.textSecondary)
-                        .accessibilityIdentifier("canvas_narration")
-                        .accessibilityAddTraits(.updatesFrequently)
-                    if let voice = model.stagedVoice {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Voice heard a plan edit. Nothing is saved yet.")
-                                .accessibilityIdentifier("canvas_voice_pending")
-                            Text(voice).font(.system(size: 14))
-                            HStack {
-                                Button("Confirm voice edit") { Task { await model.confirmVoice() } }
-                                    .accessibilityIdentifier("canvas_voice_confirm")
-                                Button("Cancel voice edit") { model.cancelVoice() }
-                                    .accessibilityIdentifier("canvas_voice_cancel")
-                            }
-                        }
-                    }
-                    if let proposal = model.readback?.proposal, proposal.status == "proposed" {
-                        preview(proposal.proposal.changes)
-                    }
-                    days
-                    if let goals = model.readback?.goals, !goals.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Muscle goals and weekly totals")
-                                .font(.system(size: 13, weight: .semibold))
-                            ForEach(goals) { goal in
-                                Text("\(goal.label): \(goal.role), \(setsText(goal.weeklySets)) sets")
-                                    .accessibilityIdentifier("canvas_goal_\(goal.id)")
-                            }
-                        }
-                        .accessibilityElement(children: .contain)
-                        .accessibilityIdentifier("canvas_goals")
-                    }
-                    if let execution = model.readback?.execution, !execution.isEmpty {
-                        Text(executionReadback(execution))
-                            .font(.system(size: 13))
+        // Voice decisions and fixture controls stay outside the week scroll.
+        // The launch journey otherwise spends its time paging a 19-exercise plan
+        // to reach a button that was rendered at the top.
+        ScrollViewReader { proxy in
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("TRAINING PLAN")
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(theme.colors.textSecondary)
-                            .accessibilityIdentifier("canvas_execution")
-                            .accessibilityLabel(executionReadback(execution))
-                    }
-                    Color.clear
-                        .frame(width: 1, height: 1)
-                        .accessibilityElement()
-                        .accessibilityIdentifier(reduced ? "canvas_motion_reduced" : "canvas_motion_fluid")
-                        .accessibilityLabel(reduced ? "Reduced motion" : "Fluid motion")
-                    if showsFixtureControls {
-                        Button("Check Smith machine without declaring it") {
-                            Task {
-                                await model.proposeSwap(
-                                    exerciseName: "Incline dumbbell press",
-                                    toVariantId: "smith_incline_press",
-                                    declareEquipment: []
-                                )
+                        Text("This week")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundStyle(theme.colors.text)
+                        Text(model.narration)
+                            .font(.system(size: 15))
+                            .foregroundStyle(theme.colors.textSecondary)
+                            .accessibilityIdentifier("canvas_narration")
+                            .accessibilityAddTraits(.updatesFrequently)
+                        if let proposal = model.readback?.proposal, proposal.status == "proposed" {
+                            preview(proposal.proposal.changes)
+                        }
+                        days
+                        if let goals = model.readback?.goals, !goals.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Muscle goals and weekly totals")
+                                    .font(.system(size: 13, weight: .semibold))
+                                ForEach(goals) { goal in
+                                    Text("\(goal.label): \(goal.role), \(setsText(goal.weeklySets)) sets")
+                                        .accessibilityIdentifier("canvas_goal_\(goal.id)")
+                                }
                             }
+                            .accessibilityElement(children: .contain)
+                            .accessibilityIdentifier("canvas_goals")
                         }
-                        .accessibilityIdentifier("canvas_inject_unsupported")
-                        Button("Retry a missed save") {
-                            Task { await model.proposeSets(instanceId: "standing_calf_raise:tuesday:single:3", sets: 8) }
+                        if let execution = model.readback?.execution, !execution.isEmpty {
+                            Text(executionReadback(execution))
+                                .font(.system(size: 13))
+                                .foregroundStyle(theme.colors.textSecondary)
+                                .accessibilityIdentifier("canvas_execution")
+                                .accessibilityLabel(executionReadback(execution))
+                                .id("canvas_execution_block")
                         }
-                        .accessibilityIdentifier("canvas_inject_missed")
+                        Color.clear
+                            .frame(width: 1, height: 1)
+                            .accessibilityElement()
+                            .accessibilityIdentifier(reduced ? "canvas_motion_reduced" : "canvas_motion_fluid")
+                            .accessibilityLabel(reduced ? "Reduced motion" : "Fluid motion")
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                voiceConfirmation
+                fixtureControls(proxy)
+                if model.readback?.proposal?.status == "proposed" {
+                    proposalActions
+                        .padding(.horizontal, 16)
+                }
+                composer
+            }
+            .background(theme.colors.background.ignoresSafeArea())
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("canvas_root")
+        }
+        .task { await model.refresh() }
+    }
+
+    @ViewBuilder
+    private var voiceConfirmation: some View {
+        if let voice = model.stagedVoice {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Voice heard a plan edit. Nothing is saved yet.")
+                    .accessibilityIdentifier("canvas_voice_pending")
+                Text(voice)
+                    .font(.system(size: 14))
+                HStack {
+                    Button("Confirm voice edit") { Task { await model.confirmVoice() } }
+                        .accessibilityIdentifier("canvas_voice_confirm")
+                    Button("Cancel voice edit") { model.cancelVoice() }
+                        .accessibilityIdentifier("canvas_voice_cancel")
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+        }
+    }
+
+    @ViewBuilder
+    private func fixtureControls(_ proxy: ScrollViewProxy) -> some View {
+        if showsFixtureControls {
+            VStack(alignment: .leading, spacing: 8) {
+                Button("Show saved readback") {
+                    proxy.scrollTo("canvas_execution_block", anchor: .bottom)
+                }
+                .accessibilityIdentifier("canvas_reveal_readback")
+                Button("Check Smith machine without declaring it") {
+                    Task {
+                        await model.proposeSwap(
+                            exerciseName: "Incline dumbbell press",
+                            toVariantId: "smith_incline_press",
+                            declareEquipment: []
+                        )
                     }
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("canvas_inject_unsupported")
+                Button("Retry a missed save") {
+                    Task { await model.proposeSets(instanceId: "standing_calf_raise:tuesday:single:3", sets: 8) }
+                }
+                .accessibilityIdentifier("canvas_inject_missed")
             }
-            if model.readback?.proposal?.status == "proposed" {
-                proposalActions
-                    .padding(.horizontal, 16)
-            }
-            composer
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
         }
-        .background(theme.colors.background.ignoresSafeArea())
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("canvas_root")
-        .task { await model.refresh() }
     }
 
     private var days: some View {

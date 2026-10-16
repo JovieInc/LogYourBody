@@ -18,6 +18,9 @@ final class MesocycleCanvasUITests: XCTestCase {
     }
 
     func testGoalThroughUndoKeepsTheCanvasAndReadbackTogether() {
+        // The runner's maximum allowance. Pinned decisions keep this under it;
+        // the default 90s budget cannot type and accept the whole week.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestCanvasFixture"]
         app.launch()
@@ -120,11 +123,15 @@ final class MesocycleCanvasUITests: XCTestCase {
         XCTAssertTrue(control.waitForExistence(timeout: 8), identifier)
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: identifier).count, 1, identifier)
         let scroll = app.scrollViews.firstMatch
-        // Previews appear above the plan; move/check controls live inside or below it.
+        // Previews sit above the plan. Voice decisions and fixture checks are pinned.
         let abovePlan = identifier == "canvas_accept" || identifier == "canvas_reject"
-            || identifier.hasPrefix("canvas_sets_") || identifier == "canvas_voice_confirm"
-        for _ in 0..<12 where !control.isHittable {
-            if abovePlan { scroll.swipeDown() } else { scroll.swipeUp() }
+            || identifier.hasPrefix("canvas_sets_")
+        for _ in 0..<4 where !control.isHittable {
+            if abovePlan {
+                scroll.swipeDown(velocity: .fast)
+            } else {
+                scroll.swipeUp(velocity: .fast)
+            }
         }
         XCTAssertTrue(control.isHittable, identifier)
         control.tap()
@@ -136,8 +143,14 @@ final class MesocycleCanvasUITests: XCTestCase {
 
     private func revealReadback(_ app: XCUIApplication) {
         let readback = app.descendants(matching: .any)["canvas_execution"]
-        for _ in 0..<12 where !readback.isHittable {
-            app.scrollViews.firstMatch.swipeUp()
+        XCTAssertTrue(readback.waitForExistence(timeout: 4))
+        let reveal = app.buttons["canvas_reveal_readback"]
+        if !readback.isHittable, reveal.exists, reveal.isHittable {
+            reveal.tap()
+        }
+        let scroll = app.scrollViews.firstMatch
+        for _ in 0..<4 where !readback.isHittable {
+            scroll.swipeUp(velocity: .fast)
         }
         XCTAssertTrue(readback.isHittable)
     }
