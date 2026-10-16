@@ -242,6 +242,46 @@ test('unrelated GraphQL failures are retained', async () => {
   );
 });
 
+test('GitHub review blockers leave the PR ineligible without failing enrollment', async () => {
+  for (const message of [
+    'Pull request 1 review requesting changes by reviewers with write access.',
+    'Pull request 2 reviews requesting changes by reviewers with write access.',
+  ]) {
+    const enqueueError = Object.assign(new Error('GraphQL enrollment failed'), {
+      errors: [{ type: 'UNPROCESSABLE', message }],
+    });
+    const { calls, core } = await nativeScenario({ enqueueError });
+    assert.equal(calls.length, 1, 'Do not retry or bypass the review blocker');
+    assert.equal(calls[0].variables.expectedHeadOid, head);
+    assert.ok(core.messages.some((notice) => notice.startsWith('NOT_ELIGIBLE:')
+      && notice.includes(message)));
+    assert.ok(!core.messages.some((notice) => notice.startsWith('ENQUEUED:')));
+    assert.equal(core.tables.length, 1);
+    assert.equal(core.tables[0][0][1], 'NOT_ELIGIBLE');
+    assert.equal(core.tables[0][2][1], head);
+    assert.equal(core.tables[0][3][1], message);
+  }
+});
+
+test('review blocker handling preserves permission, unexpected and mixed GraphQL failures', async () => {
+  const reviewBlocker = {
+    type: 'UNPROCESSABLE',
+    message: 'Pull request 1 review requesting changes by reviewers with write access.',
+  };
+  for (const errors of [
+    [],
+    undefined,
+    [{ ...reviewBlocker, type: 'FORBIDDEN' }],
+    [{ type: 'UNPROCESSABLE', message: 'Resource not accessible by integration' }],
+    [{ type: 'UNPROCESSABLE', message: 'Unexpected review service failure' }],
+    [reviewBlocker, { type: 'FORBIDDEN', message: 'Resource not accessible by integration' }],
+    [reviewBlocker, { type: 'UNPROCESSABLE', message: 'Unexpected review service failure' }],
+  ]) {
+    const enqueueError = Object.assign(new Error('GraphQL enrollment failed'), { errors });
+    await assert.rejects(nativeScenario({ enqueueError }), (error) => error === enqueueError);
+  }
+});
+
 for (const [name, mutate] of [
   [
     'failed CI',

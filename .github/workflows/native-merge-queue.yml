@@ -157,6 +157,14 @@ jobs:
               });
             } catch (error) {
               const errors = Array.isArray(error?.errors) ? error.errors : [];
+              // GitHub's review gate is an eligibility result, not an enrollment outage.
+              const reviewBlocked = errors.length > 0 && errors.every((failure) => failure.type === 'UNPROCESSABLE'
+                && /^Pull request [1-9]\d* reviews? requesting changes by reviewers with write access\.$/.test(failure.message ?? ''));
+              if (reviewBlocked) {
+                await recordOutcome('NOT_ELIGIBLE', 'Pull request is blocked by requested changes',
+                  errors.map((failure) => failure.message).join('; '));
+                return;
+              }
               const alreadyQueued = errors.some((failure) => failure.type === 'UNPROCESSABLE'
                 && /^Pull request is already in the queue\.?$/.test(failure.message ?? ''));
               if (!alreadyQueued) throw error;
