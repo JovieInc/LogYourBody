@@ -221,6 +221,18 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         return viewport
     }
 
+    func testHistoricalWeightOnlyDayInEntriesNeverBorrowsTodaysBodyFat() {
+        let app = launch()
+        app.buttons["photo_timeline_root_menu"].tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
+        let rows = app.buttons.matching(identifier: "home_v2_entries_row")
+        XCTAssertGreaterThan(rows.count, 2)
+        rows.element(boundBy: 2).tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context_row_body_fat"].exists)
+        capture(app, "entries-selected-missing-body-fat")
+    }
+
     private func launch(largestText: Bool = false, withSteps: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [

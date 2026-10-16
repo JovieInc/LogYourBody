@@ -51,7 +51,8 @@ enum HomeV2TimelinePolicy {
         /// one pass after the history sort. Future weights can never enter its window.
         private static func weightChanges(in metrics: [BodyMetrics], calendar: Calendar) -> [EntryID: Double] {
             let weights = metrics.reversed().compactMap { metric -> HomeV2EditorialPolicy.WeightReading? in
-                guard let weight = metric.weight, weight.isFinite, weight > 0 else { return nil }
+                guard let weight = metric.weight,
+                      HomeV2WeightQuality.isWithinSupportedLoggingRange(weight) else { return nil }
                 return .init(id: metric.id, date: metric.date, kilograms: weight)
             }
             var changes: [EntryID: Double] = [:]

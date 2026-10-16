@@ -968,3 +968,84 @@ private struct PhotoCallerStoredRow {
     let updated: Date?
     let modified: Date?
 }
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testWeightUpdatePreservesCircumferencesAcrossIndependentRead() async throws {
+        try await verifyUnrelatedCircumferencesSurvive(weight: 82.4, expected: (82.4, 18.2))
+    }
+
+    func testBodyFatUpdatePreservesCircumferencesAcrossIndependentRead() async throws {
+        try await verifyUnrelatedCircumferencesSurvive(bodyFat: 19.3, expected: (80.123, 19.3))
+    }
+
+    func testPhotoAttachPreservesCircumferencesAcrossIndependentRead() async throws {
+        try await verifyUnrelatedCircumferencesSurvive(
+            weight: 77, bodyFat: 14, photo: "file:///replacement-photo.jpg", preserve: true,
+            expected: (80.123, 18.2)
+        )
+    }
+
+    func testPhotoAttachKeepsMissingCircumferencesAbsent() async throws {
+        try await verifyUnrelatedCircumferencesSurvive(
+            photo: "file:///replacement-photo.jpg", preserve: true, circumferences: (nil, nil, nil),
+            expected: (80.123, 18.2)
+        )
+    }
+
+    private func verifyUnrelatedCircumferencesSurvive(
+        weight: Double? = nil, bodyFat: Double? = nil, photo: String? = nil, preserve: Bool = false,
+        circumferences: (waist: Double?, hip: Double?, unit: String?) = (85.123, 101.987, "in"),
+        expected: (weight: Double, bodyFat: Double)
+    ) async throws {
+        let (waist, hip, unit) = circumferences
+        let owner = "circumference-preservation-\(UUID().uuidString)"
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let original = BodyMetrics(
+            id: UUID().uuidString, userId: owner, date: date,
+            weight: 80.123, weightUnit: "kg", bodyFatPercentage: 18.2, bodyFatMethod: "caliper",
+            muscleMass: 56.789, boneMass: 3.123, waistCm: waist, hipCm: hip, waistUnit: unit,
+            notes: "Keep the original measurements", photoUrl: "file:///original-photo.jpg",
+            dataSource: BodyMetricSource.healthKit.rawValue,
+            sourceMetadata: BodyMetricSourceMetadata(sourceName: "Original scale", sampleId: "original-sample"),
+            createdAt: date.addingTimeInterval(-60), updatedAt: date
+        )
+        let manager = CoreDataManager.shared
+        try await manager.saveBodyMetricsAndWait(original, userId: owner, markAsSynced: true)
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: date, photoUrl: photo, weight: weight, bodyFatPercentage: bodyFat,
+            userId: owner, preserveExistingMeasurements: preserve
+        )
+        XCTAssertFalse(result.createdNewEntry)
+        XCTAssertEqual(result.previousMetric?.waistCm, waist)
+        XCTAssertEqual(result.previousMetric?.hipCm, hip)
+        let reader = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        reader.persistentStoreCoordinator = manager.viewContext.persistentStoreCoordinator
+        let stored = try await reader.perform {
+            let request = CachedBodyMetrics.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@ AND userId == %@", original.id, owner)
+            let rows = try reader.fetch(request)
+            XCTAssertEqual(rows.count, 1)
+            return try XCTUnwrap(rows.first?.toBodyMetrics())
+        }
+        for metric in [result.metrics, stored] {
+            XCTAssertEqual(metric.id, original.id)
+            XCTAssertEqual(metric.userId, owner)
+            XCTAssertEqual(metric.date, original.date)
+            XCTAssertEqual(metric.localDate, original.localDate)
+            XCTAssertEqual(metric.createdAt, original.createdAt)
+            XCTAssertEqual(metric.weight, expected.weight)
+            XCTAssertEqual(metric.bodyFatPercentage, expected.bodyFat)
+            XCTAssertEqual(metric.bodyFatMethod, original.bodyFatMethod)
+            XCTAssertEqual(metric.waistCm, waist)
+            XCTAssertEqual(metric.hipCm, hip)
+            XCTAssertEqual(metric.waistUnit, unit)
+            XCTAssertEqual(metric.muscleMass, original.muscleMass)
+            XCTAssertEqual(metric.boneMass, original.boneMass)
+            XCTAssertEqual(metric.notes, original.notes)
+            XCTAssertEqual(metric.photoUrl, photo ?? original.photoUrl)
+            XCTAssertEqual(metric.dataSource, original.dataSource)
+            XCTAssertEqual(metric.sourceMetadata, original.sourceMetadata)
+        }
+    }
+}
