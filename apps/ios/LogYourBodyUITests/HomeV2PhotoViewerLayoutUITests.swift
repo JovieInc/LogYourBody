@@ -18,8 +18,10 @@ final class HomeV2PhotoViewerLayoutUITests: XCTestCase {
         let start = stage.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: stage.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)))
         XCTAssertNotEqual(heading.label, selectedDate)
+        let scrubbedDate = heading.label
         stage.press(forDuration: 1.3)
         XCTAssertFalse(mode.exists)
+        XCTAssertEqual(heading.label, scrubbedDate, "Exiting scrub mode must retain the selected photo")
         stage.press(forDuration: 1.3)
         XCTAssertTrue(mode.waitForExistence(timeout: 5))
         app.buttons["home_v2_viewer_tools"].tap()
