@@ -1061,7 +1061,9 @@ final class ChaosMonkeyUITests: XCTestCase {
         let edge = Self.edgeStrings.randomElement(using: &rng) ?? ""
         guard !edge.isEmpty else { return .skipped("seeded text was empty") }
         field.typeText(String(edge.prefix(24)))
-        guard dismissKeyboardForStep(app: app) == .executed(.dismiss) else {
+        // A view update can drop the keyboard after typing. Refocus so dismissal
+        // is still verified instead of skipping a step that already entered text.
+        guard dismissKeyboardForStep(app: app, refocusingIfNeeded: field) == .executed(.dismiss) else {
             return .skipped("typing finished but keyboard dismissal was not verified")
         }
         return .executed(.type)

@@ -23,6 +23,85 @@ final class PhotoMetadataServiceTests: XCTestCase {
         try await super.tearDown()
     }
 
+    func testBodyFatEstimateReflectsChangedValuesWithStableRecordIDs() {
+        let id = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = estimateFixture(id: id, date: date, bodyFat: 28.123)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [first])?.value, 28.123)
+        let edited = estimateFixture(id: id, date: date, bodyFat: 18.456)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [edited])?.value, 18.456)
+    }
+
+    func testBodyFatEstimateBecomesAbsentWhenTheLastValueIsRemoved() {
+        let id = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let original = estimateFixture(id: id, date: date, bodyFat: 20)
+        XCTAssertNotNil(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [original]))
+        let cleared = estimateFixture(id: id, date: date, bodyFat: nil)
+        XCTAssertNil(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [cleared]))
+    }
+
+    func testBodyFatEstimateReflectsChangedDatesWithStableRecordIDs() {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let ids = [UUID().uuidString, UUID().uuidString]
+        let first = estimateFixture(id: ids[0], date: date.addingTimeInterval(-100), bodyFat: 10)
+        let last = estimateFixture(id: ids[1], date: date.addingTimeInterval(100), bodyFat: 30)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [first, last])?.value, 20)
+        let moved = estimateFixture(id: ids[1], date: date.addingTimeInterval(300), bodyFat: 30)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [first, moved])?.value, 15)
+    }
+
+    func testBodyFatEstimateDoesNotReuseAnotherOwnersSameRecordID() {
+        let id = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = estimateFixture(id: id, date: date, bodyFat: 30, owner: "first")
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [first])?.value, 30)
+        let nextOwner = estimateFixture(id: id, date: date, bodyFat: 15, owner: "next")
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: [nextOwner])?.value, 15)
+    }
+
+    func testBodyFatEstimateDoesNotCollideOnCommaSeparatedIDs() {
+        let token = UUID().uuidString
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = [
+            estimateFixture(id: "\(token),left", date: date, bodyFat: 30),
+            estimateFixture(id: "right", date: date, bodyFat: nil)
+        ]
+        let second = [
+            estimateFixture(id: token, date: date, bodyFat: 15),
+            estimateFixture(id: "left,right", date: date, bodyFat: nil)
+        ]
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: first)?.value, 30)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: second)?.value, 15)
+    }
+
+    func testBodyFatEstimatePreservesUnsortedInterpolationAndEqualDateSelection() {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let rows = [
+            estimateFixture(date: date.addingTimeInterval(100), bodyFat: 30),
+            estimateFixture(date: date.addingTimeInterval(-100), bodyFat: 10),
+            estimateFixture(date: date.addingTimeInterval(100), bodyFat: 40),
+            estimateFixture(date: date.addingTimeInterval(-100), bodyFat: 20),
+            estimateFixture(date: date, bodyFat: nil)
+        ]
+        let estimate = PhotoMetadataService.shared.estimateBodyFat(for: date, metrics: rows)
+        XCTAssertEqual(estimate?.value, 25)
+        XCTAssertEqual(estimate?.isEstimated, true)
+        XCTAssertEqual(PhotoMetadataService.shared.estimateBodyFat(
+            for: date.addingTimeInterval(-100), metrics: rows
+        )?.value, 20)
+    }
+
+    private func estimateFixture(
+        id: String = UUID().uuidString, date: Date, bodyFat: Double?, owner: String = "estimate-owner"
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id, userId: owner, date: date, weight: nil, weightUnit: nil,
+            bodyFatPercentage: bodyFat, bodyFatMethod: nil, muscleMass: nil, boneMass: nil,
+            notes: nil, photoUrl: nil, dataSource: "manual", createdAt: date, updatedAt: date
+        )
+    }
+
     @MainActor
     func testRestoredScanOnboardingDoesNotTurnHistoricalMeasurementsIntoTodaysPhotoBaseline() async throws {
         let previousUser = AuthManager.shared.currentUser
