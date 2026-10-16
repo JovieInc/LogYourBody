@@ -61,7 +61,7 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
         return Self(
             kind: .weight, value: kilograms.map(formatValue) ?? "—", unit: context.unit,
             observation: context.observation, range: context.range, trend: nil,
-            provenance: usesDerivedValue ? nil : metric.map { HomeV2Provenance.label(for: $0) },
+            provenance: usesDerivedValue ? nil : metric.map { HomeV2Provenance.label(for: $0, field: .weight) },
             evidence: needsReview ? HomeV2WeightQuality.reviewMessage
                 : ContextualMetricEvidencePolicy.label(for: .weight, isEstimated: usesDerivedValue, isSmoothed: usesDerivedValue)
         )

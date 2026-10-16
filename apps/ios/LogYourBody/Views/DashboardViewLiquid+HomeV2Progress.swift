@@ -64,7 +64,7 @@ extension DashboardViewLiquid {
             let latestSource = bodyMetrics
                 .filter { $0.bodyFatPercentage != nil }
                 .max { $0.date < $1.date }
-                .map { HomeV2Provenance.label(for: $0) }
+                .map { HomeV2Provenance.label(for: $0, field: .bodyFat) }
             return HomeV2ProgressSeries(
                 daily: fullChartCache[.bodyFat] ?? [],
                 trend: [],

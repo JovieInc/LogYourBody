@@ -66,7 +66,7 @@ extension DashboardViewLiquid {
         bodyMetrics
             .filter { $0.bodyFatPercentage != nil }
             .max { $0.date < $1.date }
-            .map { HomeV2Provenance.label(for: $0) }
+            .map { HomeV2Provenance.label(for: $0, field: .bodyFat) }
     }
 
     /// The pair a tool starts from: the first photo against the selected one.

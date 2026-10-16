@@ -212,7 +212,7 @@ extension DashboardViewLiquid {
                     bodyFat: bodyFatUnchanged ? nil : bodyFat,
                     clearBodyFat: !bodyFatUnchanged && bodyFat == nil,
                     bodyFatMethod: method,
-                    markManualCorrection: changed && metric.metricSource != .manual,
+                    markManualCorrection: changed,
                     session: session,
                     displayValue: value,
                     displayUnit: unit

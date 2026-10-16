@@ -535,6 +535,11 @@ func saveAndWait() {
                 cached.dataSource = BodyMetricSource.normalizedRawValue(metrics.dataSource)
                 if let sourceMetadataJSON = metrics.sourceMetadata?.jsonString {
                     cached.sourceMetadataJSON = sourceMetadataJSON
+                } else if metrics.metricSource != .manual, metrics.metricSource != .photo,
+                          let prior = BodyMetricSourceMetadata(jsonString: cached.sourceMetadataJSON) {
+                    cached.sourceMetadataJSON = prior.settingEntrySource(
+                        nil, fields: Set(BodyMetricField.allCases)
+                    ).jsonString
                 } else if cached.sourceMetadataJSON == nil,
                           let legacyDataSource = metrics.dataSource,
                           BodyMetricSource.normalizedRawValue(legacyDataSource) != legacyDataSource {
@@ -743,7 +748,7 @@ extension CoreDataManager {
                       row.userId == userId, !row.isMarkedDeleted,
                       let previous = row.toBodyMetrics() else { throw PhotoMetricsEditError.entryNotFound }
                 do {
-                    if let weight {
+                    if let weight, weight != previous.weight {
                         row.weight = weight
                         row.weightUnit = "kg"
                     }
@@ -752,12 +757,24 @@ extension CoreDataManager {
                     if clearBodyFat {
                         row.bodyFatPercentage = 0
                         row.bodyFatMethod = nil
-                    } else if let bodyFatPercentage {
+                    } else if let bodyFatPercentage,
+                              bodyFatPercentage != previous.bodyFatPercentage ||
+                                bodyFatMethod.map({ $0 != previous.bodyFatMethod }) == true {
                         row.bodyFatPercentage = bodyFatPercentage
                         if let bodyFatMethod { row.bodyFatMethod = bodyFatMethod }
                     }
-                    if markManualCorrection, row.dataSource != BodyMetricSource.manual.rawValue {
-                        row.dataSource = BodyMetricSource.manual.rawValue
+                    if markManualCorrection {
+                        var fields: Set<BodyMetricField> = []
+                        if let weight, weight != previous.weight { fields.insert(.weight) }
+                        if clearBodyFat && previous.bodyFatPercentage != nil ||
+                            bodyFatPercentage.map({ $0 != previous.bodyFatPercentage }) == true ||
+                            bodyFatPercentage != nil && bodyFatMethod.map({ $0 != previous.bodyFatMethod }) == true {
+                            fields.insert(.bodyFat)
+                        }
+                        if !fields.isEmpty {
+                            row.sourceMetadataJSON = (previous.sourceMetadata ?? BodyMetricSourceMetadata())
+                                .settingEntrySource(.manual, fields: fields, bodyFatMethod: bodyFatMethod).jsonString
+                        }
                     }
                     if transaction.hasChanges {
                         let now = Date()

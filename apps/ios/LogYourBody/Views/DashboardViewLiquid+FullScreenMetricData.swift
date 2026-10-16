@@ -439,7 +439,7 @@ private func buildFullScreenBodyFatChartData(
                 return MetricChartDataPoint(
                     date: metric.date,
                     value: bf,
-                    isEstimated: metric.bodyFatMethod == "visual_estimate"
+                    isEstimated: metric.attributedBodyFatMethod == "visual_estimate"
                 )
             }
 
@@ -475,7 +475,7 @@ private func buildFullScreenFFMIChartData(
                 isLastKnown: ffmiResult.isLastKnown,
                 isInterpolated: ffmiResult.isInterpolated,
                 hasDirectBodyFat: metric.bodyFatPercentage != nil,
-                directBodyFatMethod: metric.bodyFatMethod
+                directBodyFatMethod: metric.attributedBodyFatMethod
             )
 
             return MetricChartDataPoint(

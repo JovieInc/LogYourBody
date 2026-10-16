@@ -89,9 +89,9 @@ enum HomeV2Provenance {
         return formatter
     }()
 
-    static func label(for metric: BodyMetrics) -> String {
+    static func label(for metric: BodyMetrics, field: BodyMetricField? = nil) -> String {
         let named = metric.sourceMetadata?.sourceName?.trimmingCharacters(in: .whitespaces)
-        switch metric.metricSource {
+        switch field.map({ metric.measurementSource(for: $0) }) ?? metric.metricSource {
         case .healthKit:
             return (named?.isEmpty == false ? named : nil) ?? HomeV2ContextCopy.appleHealth
         case .smartScale:
@@ -107,7 +107,10 @@ enum HomeV2Provenance {
         }
     }
 
-    static func detailedLabel(for metric: BodyMetrics) -> String {
+    static func detailedLabel(for metric: BodyMetrics, field: BodyMetricField? = nil) -> String {
+        if let field, metric.sourceMetadata?.entrySource(for: field) == .manual {
+            return HomeV2ContextCopy.typed
+        }
         let named = metric.sourceMetadata?.sourceName?.trimmingCharacters(in: .whitespaces)
         if metric.metricSource == .manual, let named, !named.isEmpty {
             let cameThroughHealth = metric.sourceMetadata?.sourceBundleId != nil ||
@@ -117,7 +120,7 @@ enum HomeV2Provenance {
             return "\(original) · corrected in LogYourBody"
         }
 
-        let label = label(for: metric)
+        let label = label(for: metric, field: field)
         guard metric.metricSource == .healthKit,
               label != HomeV2ContextCopy.appleHealth else { return label }
         return "\(label) via \(HomeV2ContextCopy.appleHealth)"
@@ -131,14 +134,16 @@ enum HomeV2Provenance {
     }
 
     /// "Apple Health, 7:02 AM" or just "Apple Health".
-    static func subline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
-        let source = detailedLabel(for: metric)
+    static func subline(
+        for metric: BodyMetrics, field: BodyMetricField? = nil, calendar: Calendar = .current
+    ) -> String {
+        let source = detailedLabel(for: metric, field: field)
         guard let time = timeText(for: metric.date, calendar: calendar) else { return source }
         return "\(source), \(time)"
     }
 
     static func weightSubline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
-        let provenance = subline(for: metric, calendar: calendar)
+        let provenance = subline(for: metric, field: .weight, calendar: calendar)
         guard !HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight) else { return provenance }
         return "\(provenance). \(HomeV2WeightQuality.reviewMessage)"
     }
@@ -152,10 +157,10 @@ enum HomeV2Provenance {
 
     /// Body fat names its method when that is more specific than the source.
     static func bodyFatSubline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
-        switch metric.bodyFatMethod {
+        switch metric.attributedBodyFatMethod {
         case "dexa": return "DEXA"
         case "caliper": return "Calipers"
-        default: return subline(for: metric, calendar: calendar)
+        default: return subline(for: metric, field: .bodyFat, calendar: calendar)
         }
     }
 }
@@ -177,6 +182,11 @@ enum HomeV2CorrectionPolicy {
             BodyFatEntryMethod.bioelectrical.rawValue
         }
 
+        var changedFields: Set<BodyMetricField> = []
+        if kilograms != metric.weight { changedFields.insert(.weight) }
+        if bodyFatPercentage != metric.bodyFatPercentage { changedFields.insert(.bodyFat) }
+        let metadata = changedFields.isEmpty ? metric.sourceMetadata :
+            (metric.sourceMetadata ?? BodyMetricSourceMetadata()).settingEntrySource(.manual, fields: changedFields)
         return BodyMetrics(
             id: metric.id,
             userId: metric.userId,
@@ -193,8 +203,8 @@ enum HomeV2CorrectionPolicy {
             waistUnit: metric.waistUnit,
             notes: metric.notes,
             photoUrl: metric.photoUrl,
-            dataSource: metric.metricSource == .manual ? metric.dataSource : BodyMetricSource.manual.rawValue,
-            sourceMetadata: metric.sourceMetadata,
+            dataSource: metric.dataSource,
+            sourceMetadata: metadata,
             createdAt: metric.createdAt,
             updatedAt: updatedAt
         )

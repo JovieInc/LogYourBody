@@ -427,7 +427,7 @@ enum HomeV2MetricEditorial {
         let fat = HomeV2EditorialPolicy.bodyFat(in: metric)
         let hasWeight = metric.weight != nil
         guard hasWeight || fat != nil else { return nil }
-        let weightSource = HomeV2Provenance.label(for: metric)
+        let weightSource = HomeV2Provenance.label(for: metric, field: .weight)
         let weightChip = chip(for: weightSource)
         let fatChip = fat.map { chip(for: $0.caption) }
         let resolved: String

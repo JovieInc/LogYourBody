@@ -241,16 +241,17 @@ final class HomeV2ContextPolicyTests: XCTestCase {
         XCTAssertEqual(corrected.id, original.id)
         XCTAssertEqual(corrected.date, original.date)
         XCTAssertEqual(corrected.localDate, original.localDate)
-        XCTAssertEqual(corrected.metricSource, .manual)
-        XCTAssertEqual(corrected.sourceMetadata, original.sourceMetadata)
+        XCTAssertEqual(corrected.metricSource, .healthKit)
+        XCTAssertEqual(corrected.measurementSource(for: .weight), .manual)
+        XCTAssertEqual(corrected.sourceMetadata?.sourceName, original.sourceMetadata?.sourceName)
         XCTAssertEqual(corrected.createdAt, original.createdAt)
         XCTAssertEqual(corrected.updatedAt, updateTime)
         XCTAssertEqual(corrected.weight, 79.5)
         XCTAssertNil(corrected.bodyFatPercentage)
         XCTAssertNil(corrected.bodyFatMethod)
         XCTAssertEqual(
-            HomeV2Provenance.detailedLabel(for: corrected),
-            "Withings via Apple Health · corrected in LogYourBody"
+            HomeV2Provenance.detailedLabel(for: corrected, field: .weight),
+            "Typed"
         )
     }
 }

@@ -70,7 +70,7 @@ final class BodyMetricSourceContractTests: XCTestCase {
         XCTAssertNil(decoded.sourceName)
         XCTAssertEqual(decoded.deviceModel, "Scanner X")
         XCTAssertEqual(decoded.externalResultId, "result-123")
-        XCTAssertEqual(decoded.jsonObject["vendor"], "BodySpec")
+        XCTAssertEqual(decoded.jsonObject["vendor"] as? String, "BodySpec")
     }
 
     func testUnconfiguredBuildCannotClaimAnExistingConnectionIsAvailable() {
@@ -125,5 +125,46 @@ final class BodyMetricSourceContractTests: XCTestCase {
             vatMassKg: nil, vatVolumeCm3: nil, resultPdfUrl: nil, resultPdfName: nil,
             createdAt: Date(timeIntervalSince1970: updated), updatedAt: Date(timeIntervalSince1970: updated)
         )
+    }
+}
+
+extension BodyMetricSourceContractTests {
+    func testFieldAttributionRoundTripsWithoutDiscardingImportOrUnknownMetadata() throws {
+        let raw = #"{"vendor":"apple_health","sample_id":"original-weight","body_fat_sample_id":"original-fat","# +
+            #""future":{"enabled":true,"values":[null,9223372036854775807]}}"#
+        let original = try XCTUnwrap(BodyMetricSourceMetadata(jsonString: raw))
+        let corrected = original.settingEntrySource(.manual, fields: [.weight])
+        let encoded = try JSONEncoder().encode(corrected)
+        let decoded = try JSONDecoder().decode(BodyMetricSourceMetadata.self, from: encoded)
+        XCTAssertEqual(decoded, corrected)
+        XCTAssertEqual(decoded.entrySource(for: .weight), .manual)
+        XCTAssertNil(decoded.entrySource(for: .bodyFat))
+        XCTAssertEqual(decoded.sampleId, "original-weight")
+        XCTAssertEqual(decoded.bodyFatSampleId, "original-fat")
+        let future = try XCTUnwrap(decoded.jsonObject["future"] as? [String: Any])
+        XCTAssertEqual(future["enabled"] as? Bool, true)
+        let values = try XCTUnwrap(future["values"] as? [Any])
+        XCTAssertTrue(values[0] is NSNull)
+        XCTAssertEqual((values[1] as? NSNumber)?.int64Value, Int64.max)
+        XCTAssertEqual(try XCTUnwrap(BodyMetricSourceMetadata(jsonString: decoded.jsonString)), decoded)
+    }
+
+    func testUnknownFieldSourceNeverInventsAManualAttribution() throws {
+        let metadata = try XCTUnwrap(BodyMetricSourceMetadata(jsonString: #"{"weight_entry_source":"future-device"}"#))
+        XCTAssertNil(metadata.entrySource(for: .weight))
+        XCTAssertEqual(metadata.jsonObject["weight_entry_source"] as? String, "future-device")
+    }
+
+    func testUndoMetadataRestoresOnlySelectedFieldAttribution() throws {
+        let previous = BodyMetricSourceMetadata(vendor: "apple_health")
+        let current = try XCTUnwrap(BodyMetricSourceMetadata(
+            jsonString: #"{"vendor":"apple_health","weight_entry_source":"manual","body_fat_entry_source":"manual","# +
+                #""future":{"keep":true}}"#
+        ))
+        let restored = current.restoringEntrySources(from: previous, fields: [.weight])
+        XCTAssertNil(restored.entrySource(for: .weight))
+        XCTAssertEqual(restored.entrySource(for: .bodyFat), .manual)
+        XCTAssertNotNil(restored.jsonObject["future"])
+        XCTAssertEqual(restored.vendor, "apple_health")
     }
 }

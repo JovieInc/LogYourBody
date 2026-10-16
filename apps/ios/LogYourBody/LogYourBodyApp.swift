@@ -876,6 +876,8 @@ enum UITestFixtureIsolation {
             } else {
                 fixturePhotoURL = timelinePhotoURL
             }
+            let fixtureSource = arguments.contains("-lybUITestHomeV2ImportedCorrectionFixture") && entry.daysAgo == 0
+                ? BodyMetricSource.healthKit.rawValue : entry.source
             let metric = BodyMetrics(
                 id: "\(metricIdPrefix)_\(entry.daysAgo)",
                 userId: userId,
@@ -885,7 +887,7 @@ enum UITestFixtureIsolation {
                 bodyFatPercentage: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly
                     ? nil : entry.bodyFat,
                 bodyFatMethod: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly || entry.bodyFat == nil
-                    ? nil : (usesVisualEstimateHero ? "visual_estimate" : entry.source),
+                    ? nil : (usesVisualEstimateHero ? "visual_estimate" : fixtureSource),
                 muscleMass: isPhotoOnly ? nil : entry.muscle,
                 boneMass: nil,
                 waistCm: nil,
@@ -893,7 +895,7 @@ enum UITestFixtureIsolation {
                 waistUnit: nil,
                 notes: entry.notes,
                 photoUrl: fixturePhotoURL,
-                dataSource: entry.source,
+                dataSource: fixtureSource,
                 createdAt: date,
                 updatedAt: now
             )

@@ -1394,11 +1394,15 @@ extension PhotoMetadataServiceTests {
 @MainActor
 extension PhotoMetadataServiceTests {
     func testWeightUpdatePreservesCircumferencesAcrossIndependentRead() async throws {
-        try await verifyUnrelatedCircumferencesSurvive(weight: 82.4, expected: (82.4, 18.2))
+        try await verifyUnrelatedCircumferencesSurvive(
+            weight: 82.4, expected: (82.4, 18.2), manuallyEnteredFields: [.weight]
+        )
     }
 
     func testBodyFatUpdatePreservesCircumferencesAcrossIndependentRead() async throws {
-        try await verifyUnrelatedCircumferencesSurvive(bodyFat: 19.3, expected: (80.123, 19.3))
+        try await verifyUnrelatedCircumferencesSurvive(
+            bodyFat: 19.3, expected: (80.123, 19.3), manuallyEnteredFields: [.bodyFat]
+        )
     }
 
     func testPhotoAttachPreservesCircumferencesAcrossIndependentRead() async throws {
@@ -1418,7 +1422,7 @@ extension PhotoMetadataServiceTests {
     private func verifyUnrelatedCircumferencesSurvive(
         weight: Double? = nil, bodyFat: Double? = nil, photo: String? = nil, preserve: Bool = false,
         circumferences: (waist: Double?, hip: Double?, unit: String?) = (85.123, 101.987, "in"),
-        expected: (weight: Double, bodyFat: Double)
+        expected: (weight: Double, bodyFat: Double), manuallyEnteredFields: Set<BodyMetricField> = []
     ) async throws {
         let (waist, hip, unit) = circumferences
         let owner = "circumference-preservation-\(UUID().uuidString)"
@@ -1467,7 +1471,9 @@ extension PhotoMetadataServiceTests {
             XCTAssertEqual(metric.notes, original.notes)
             XCTAssertEqual(metric.photoUrl, photo ?? original.photoUrl)
             XCTAssertEqual(metric.dataSource, original.dataSource)
-            XCTAssertEqual(metric.sourceMetadata, original.sourceMetadata)
+            XCTAssertEqual(metric.sourceMetadata, original.sourceMetadata?.settingEntrySource(
+                .manual, fields: manuallyEnteredFields
+            ))
         }
     }
 }
@@ -1491,11 +1497,275 @@ extension PhotoMetadataServiceTests {
         XCTAssertEqual(result.metrics.weight, 80.123456)
         XCTAssertNil(result.metrics.bodyFatPercentage)
         XCTAssertNil(result.metrics.bodyFatMethod)
-        XCTAssertEqual(result.metrics.metricSource, .manual)
+        XCTAssertEqual(result.metrics.metricSource, .healthKit)
+        XCTAssertEqual(result.metrics.measurementSource(for: .weight), .healthKit)
+        XCTAssertEqual(result.metrics.sourceMetadata?.entrySource(for: .bodyFat), .manual)
         XCTAssertEqual(result.metrics.waistCm, 85.5)
-        XCTAssertEqual(result.metrics.sourceMetadata, result.previousMetric?.sourceMetadata)
+        XCTAssertEqual(result.metrics.sourceMetadata?.sourceName, result.previousMetric?.sourceMetadata?.sourceName)
         XCTAssertEqual(result.previousMetric?.bodyFatPercentage, 18.4567)
         XCTAssertEqual(result.previousMetric?.bodyFatMethod, "caliper")
         XCTAssertEqual(result.previousMetric?.metricSource, .healthKit)
+    }
+}
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testExactWeightCorrectionKeepsUntouchedBodyFatImportedAfterIndependentRead() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80.123456, bodyFat: 18.4567, method: "dexa")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId, markAsSynced: true)
+        let result = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: 82, bodyFatPercentage: nil,
+            bodyFatMethod: nil, markManualCorrection: true, writeAdmission: {}
+        )
+        let reader = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        reader.persistentStoreCoordinator = store.viewContext.persistentStoreCoordinator
+        let read = try XCTUnwrap(try reader.fetch(CachedBodyMetrics.fetchRequest()).first?.toBodyMetrics())
+        for metric in [result.metrics, read] {
+            XCTAssertEqual(metric.metricSource, .healthKit)
+            XCTAssertEqual(metric.measurementSource(for: .weight), .manual)
+            XCTAssertEqual(metric.measurementSource(for: .bodyFat), .healthKit)
+            XCTAssertEqual(metric.bodyFatPercentage, 18.4567)
+            XCTAssertEqual(metric.bodyFatMethod, "dexa")
+            XCTAssertTrue(HomeV2Provenance.weightSubline(for: metric).hasPrefix("Typed"))
+            XCTAssertEqual(HomeV2Provenance.bodyFatSubline(for: metric), "DEXA")
+            XCTAssertEqual(metric.date, fixture.date)
+            XCTAssertEqual(metric.createdAt, fixture.createdAt)
+        }
+    }
+
+    func testExactBodyFatCorrectionCannotClaimTheUntouchedImportsMethod() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80.123456, bodyFat: 18.4567, method: "dexa")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId, markAsSynced: true)
+        let result = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: nil, bodyFatPercentage: 20,
+            bodyFatMethod: nil, markManualCorrection: true, writeAdmission: {}
+        )
+        let metric = result.metrics
+        XCTAssertEqual(metric.weight, fixture.weight)
+        XCTAssertEqual(metric.measurementSource(for: .weight), .healthKit)
+        XCTAssertEqual(metric.measurementSource(for: .bodyFat), .manual)
+        XCTAssertEqual(metric.bodyFatMethod, "dexa", "Original import method remains in the record")
+        XCTAssertEqual(metric.attributedBodyFatMethod, "manual")
+        XCTAssertTrue(HomeV2Provenance.bodyFatSubline(for: metric).hasPrefix("Typed"))
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: metric)?.caption, "Entered by you")
+    }
+
+    func testUnchangedExactSaveDoesNotMarkAnyFieldManual() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80.123456, bodyFat: 18.4567, method: "dexa")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId, markAsSynced: true)
+        let before = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first?.toBodyMetrics())
+        let result = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: before.weight,
+            bodyFatPercentage: before.bodyFatPercentage, bodyFatMethod: nil,
+            markManualCorrection: true, writeAdmission: {}
+        )
+        XCTAssertEqual(result.metrics, before)
+    }
+
+    func testManualDayLogOverBodyFatOnlyImportKeepsBothSources() async throws {
+        let fixture = undoFixture(weight: nil, bodyFat: 18.4567, method: "dexa")
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: fixture.date, weight: 82, userId: fixture.userId
+        )
+        XCTAssertEqual(result.metrics.measurementSource(for: .weight), .manual)
+        XCTAssertEqual(result.metrics.measurementSource(for: .bodyFat), .healthKit)
+        XCTAssertEqual(result.metrics.bodyFatPercentage, 18.4567)
+        XCTAssertEqual(result.metrics.bodyFatMethod, "dexa")
+        XCTAssertTrue(HomeV2Provenance.weightSubline(for: result.metrics).hasPrefix("Typed"))
+    }
+
+    func testFreshImportReplacesManualAttributionRatherThanInheritingIt() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80, bodyFat: 18, method: "dexa")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+        _ = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: 82, bodyFatPercentage: nil,
+            bodyFatMethod: nil, markManualCorrection: true, writeAdmission: {}
+        )
+        // An import with explicit source metadata replaces the prior measurement source.
+        let imported = BodyMetrics(
+            id: fixture.id, userId: fixture.userId, date: fixture.date,
+            weight: 82, weightUnit: "kg", bodyFatPercentage: 18, bodyFatMethod: "dexa",
+            muscleMass: nil, boneMass: nil, notes: fixture.notes, photoUrl: fixture.photoUrl,
+            dataSource: "healthkit", sourceMetadata: BodyMetricSourceMetadata(vendor: "apple_health", sampleId: "new-import"),
+            createdAt: fixture.createdAt, updatedAt: Date()
+        )
+        try await store.saveBodyMetricsAndWait(imported, userId: fixture.userId, markAsSynced: true)
+        let read = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first?.toBodyMetrics())
+        XCTAssertEqual(read.measurementSource(for: .weight), .healthKit)
+        XCTAssertNil(read.sourceMetadata?.entrySource(for: .weight))
+        XCTAssertEqual(read.sourceMetadata?.sampleId, "new-import")
+    }
+
+    func testUndoWeightKeepsNewerBodyFatPhotoNoteAndUnknownMetadata() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80, bodyFat: 18, method: "dexa")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+        let result = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: 82, bodyFatPercentage: nil,
+            bodyFatMethod: nil, markManualCorrection: true, writeAdmission: {}
+        )
+        let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first)
+        row.bodyFatPercentage = 19
+        row.photoUrl = "local://newer-photo"
+        row.notes = "newer note"
+        var metadata = try XCTUnwrap(result.metrics.sourceMetadata).jsonObject
+        metadata["future"] = ["keep": true]
+        metadata["body_fat_entry_source"] = "manual"
+        row.sourceMetadataJSON = try XCTUnwrap(BodyMetricSourceMetadata(jsonObject: metadata)?.jsonString)
+        try store.viewContext.save()
+        try await PhotoMetadataService.shared.restoreMeasurements(
+            id: fixture.id, userId: fixture.userId, previous: try XCTUnwrap(result.previousMetric),
+            replacing: result.metrics, context: store.viewContext
+        )
+        let restored = try XCTUnwrap(row.toBodyMetrics())
+        XCTAssertEqual(restored.weight, 80)
+        XCTAssertEqual(restored.measurementSource(for: .weight), .healthKit)
+        XCTAssertEqual(restored.bodyFatPercentage, 19)
+        XCTAssertEqual(restored.measurementSource(for: .bodyFat), .manual)
+        XCTAssertEqual(restored.photoUrl, "local://newer-photo")
+        XCTAssertEqual(restored.notes, "newer note")
+        XCTAssertNotNil(restored.sourceMetadata?.jsonObject["future"])
+    }
+
+    func testUndoRejectsAChangedMeasurementWithoutTouchingIt() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80, bodyFat: 18, method: "dexa")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+        let result = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: 82, bodyFatPercentage: nil,
+            bodyFatMethod: nil, markManualCorrection: true, writeAdmission: {}
+        )
+        let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first)
+        row.weight = 83
+        try store.viewContext.save()
+        let before = row.toBodyMetrics()
+        do {
+            try await PhotoMetadataService.shared.restoreMeasurements(
+                id: fixture.id, userId: fixture.userId, previous: try XCTUnwrap(result.previousMetric),
+                replacing: result.metrics, context: store.viewContext
+            )
+            XCTFail("A later measurement must not be overwritten by an old Undo")
+        } catch PhotoMetricsRestoreError.entryChanged {}
+        XCTAssertEqual(row.toBodyMetrics(), before)
+    }
+}
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testFieldSourcesSurviveActualSyncPullStorageAndPendingUploadMapping() async throws {
+        let store = makePhotoAdmissionStore()
+        let owner = "synthetic-provenance-sync"
+        let date = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: 1_800_000_000))
+        let metadata: [String: Any] = [
+            "vendor": "apple_health", "sample_id": "original-sample", "weight_entry_source": "manual",
+            "future": ["retained": true]
+        ]
+        let payload: [String: Any] = [
+            "id": "synthetic-provenance-record", "user_id": owner, "date": date,
+            "weight": 82.0, "weight_unit": "kg", "body_fat_percentage": 18.4567,
+            "body_fat_method": "dexa", "data_source": "healthkit", "source_metadata": metadata,
+            "created_at": date, "updated_at": date
+        ]
+        await store.updateOrCreateBodyMetricAndWait(from: payload)
+        let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first)
+        let metric = try XCTUnwrap(row.toBodyMetrics())
+        XCTAssertEqual(metric.measurementSource(for: .weight), .manual)
+        XCTAssertEqual(metric.measurementSource(for: .bodyFat), .healthKit)
+        XCTAssertEqual(metric.bodyFatMethod, "dexa")
+        let pending = row.pendingSyncItem()
+        let uploadMetadata = try XCTUnwrap(BodyMetricSourceMetadata(jsonString: pending.sourceMetadataJSON))
+        XCTAssertEqual(uploadMetadata.entrySource(for: .weight), .manual)
+        XCTAssertNil(uploadMetadata.entrySource(for: .bodyFat))
+        XCTAssertEqual(uploadMetadata.sampleId, "original-sample")
+        XCTAssertEqual((uploadMetadata.jsonObject["future"] as? [String: Bool])?["retained"], true)
+        let exported = try JSONDecoder().decode(BodyMetrics.self, from: JSONEncoder().encode(metric))
+        XCTAssertEqual(exported.sourceMetadata, metric.sourceMetadata)
+        XCTAssertEqual(exported.bodyFatPercentage, 18.4567)
+    }
+}
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testExplicitCaliperEntryKeepsTheChosenMethodWhileChangingOnlyBodyFatSource() async throws {
+        let fixture = undoFixture(weight: 80, bodyFat: 18, method: "dexa")
+        try await CoreDataManager.shared.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+        let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: fixture.date, bodyFatPercentage: 18, bodyFatMethod: "caliper", userId: fixture.userId
+        )
+        XCTAssertEqual(result.metrics.measurementSource(for: .weight), .healthKit)
+        XCTAssertEqual(result.metrics.measurementSource(for: .bodyFat), .manual)
+        XCTAssertEqual(result.metrics.attributedBodyFatMethod, "caliper")
+        XCTAssertEqual(HomeV2Provenance.bodyFatSubline(for: result.metrics), "Calipers")
+        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: result.metrics)?.caption, "Caliper estimate")
+        let decoded = try JSONDecoder().decode(BodyMetrics.self, from: JSONEncoder().encode(result.metrics))
+        XCTAssertEqual(decoded.attributedBodyFatMethod, "caliper")
+    }
+
+    func testMetadataFreeImportCannotRetainAStaleManualFieldOverride() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80, bodyFat: 18, method: "dexa")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+        _ = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: 82, bodyFatPercentage: nil,
+            bodyFatMethod: nil, markManualCorrection: true, writeAdmission: {}
+        )
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId, markAsSynced: true)
+        let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first?.toBodyMetrics())
+        XCTAssertEqual(row.weight, 80)
+        XCTAssertEqual(row.measurementSource(for: .weight), .healthKit)
+        XCTAssertNil(row.sourceMetadata?.entrySource(for: .weight))
+    }
+}
+
+@MainActor
+extension PhotoMetadataServiceTests {
+    func testExactMethodOnlyCorrectionKeepsChosenMethodAndImportedWeight() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80, bodyFat: 18, method: "dexa")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+        let result = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: nil, bodyFatPercentage: 18,
+            bodyFatMethod: "caliper", markManualCorrection: true, writeAdmission: {}
+        )
+        let reader = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        reader.persistentStoreCoordinator = store.viewContext.persistentStoreCoordinator
+        let read = try XCTUnwrap(try reader.fetch(CachedBodyMetrics.fetchRequest()).first?.toBodyMetrics())
+        for metric in [result.metrics, read] {
+            XCTAssertEqual(metric.measurementSource(for: .weight), .healthKit)
+            XCTAssertEqual(metric.measurementSource(for: .bodyFat), .manual)
+            XCTAssertEqual(metric.attributedBodyFatMethod, "caliper")
+            XCTAssertEqual(HomeV2Provenance.bodyFatSubline(for: metric), "Calipers")
+            XCTAssertEqual(metric.weight, fixture.weight)
+            XCTAssertEqual(metric.bodyFatPercentage, fixture.bodyFatPercentage)
+        }
+    }
+
+    func testUndoCannotOverwriteANewerEnteredBodyFatMethod() async throws {
+        let store = makePhotoAdmissionStore()
+        let fixture = undoFixture(weight: 80, bodyFat: 18, method: "dexa")
+        try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+        let result = try await store.updateExistingMetricMeasurementsAndWait(
+            id: fixture.id, userId: fixture.userId, weight: nil, bodyFatPercentage: 20,
+            bodyFatMethod: nil, markManualCorrection: true, writeAdmission: {}
+        )
+        let row = try XCTUnwrap(try store.viewContext.fetch(CachedBodyMetrics.fetchRequest()).first)
+        row.sourceMetadataJSON = result.metrics.sourceMetadata?.settingEntrySource(
+            .manual, fields: [.bodyFat], bodyFatMethod: "caliper"
+        ).jsonString
+        try store.viewContext.save()
+        let before = row.toBodyMetrics()
+        do {
+            try await PhotoMetadataService.shared.restoreMeasurements(
+                id: fixture.id, userId: fixture.userId, previous: try XCTUnwrap(result.previousMetric),
+                replacing: result.metrics, context: store.viewContext
+            )
+            XCTFail("A newer explicit method must not be overwritten by an old Undo")
+        } catch PhotoMetricsRestoreError.entryChanged {}
+        XCTAssertEqual(row.toBodyMetrics(), before)
     }
 }

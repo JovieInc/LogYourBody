@@ -219,7 +219,8 @@ extension DashboardViewLiquid {
                 date: saved.date,
                 previousMetric: result.previousMetric,
                 valueText: HomeV2WeightStepPolicy.text(value),
-                unit: homeV2DisplayUnit
+                unit: homeV2DisplayUnit,
+                savedMetric: saved
             )
             BodyScoreCache.shared.invalidate(for: userId)
         }
@@ -268,7 +269,8 @@ extension DashboardViewLiquid {
                 homeV2Logged = HomeV2LoggedEntry(
                     metricId: saved.id, userId: session.owner.subject, date: saved.date,
                     previousMetric: result.previousMetric,
-                    valueText: HomeV2WeightStepPolicy.text(displayValue), unit: displayUnit
+                    valueText: HomeV2WeightStepPolicy.text(displayValue), unit: displayUnit,
+                    savedMetric: saved
                 )
             }
             await refreshHomeV2AfterWrite(selecting: saved.id, ownership: session.owner)
@@ -293,7 +295,8 @@ extension DashboardViewLiquid {
                 try await PhotoMetadataService.shared.restoreMeasurements(
                     id: logged.metricId,
                     userId: userId,
-                    previous: previous
+                    previous: previous,
+                    replacing: logged.savedMetric
                 )
             } else {
                 guard await RealtimeSyncManager.shared.deleteBodyMetric(id: logged.metricId) else {
