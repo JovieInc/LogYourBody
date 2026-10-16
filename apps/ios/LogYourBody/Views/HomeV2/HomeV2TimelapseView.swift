@@ -7,13 +7,13 @@ import SwiftUI
 /// Timelapse (Pencil P7): the photos in order, with pause, progress, the
 /// ruler, and playback settings behind one disclosure.
 struct HomeV2TimelapseView: View {
-    let bodyMetrics: [BodyMetrics]
+    private let photos: [BodyMetrics]
+    private let dates: [Date]
+    private let usesBoundedPrefetch: Bool
     let formatters: HomeV2Formatters
     let onClose: () -> Void
 
-    @State private var frame = 0
-    @State private var isPlaying = false
-    @State private var isReady = false
+    @State private var playback = HomeV2TimelapsePlaybackState()
     @State private var speed: Double = 1
     @State private var loops = false
     @State private var showsSettings = false
@@ -21,10 +21,18 @@ struct HomeV2TimelapseView: View {
     /// Top bar, transport, ruler and the settings row below the stage.
     private static let chromeHeight: CGFloat = 52 + 60 + 72 + 60
 
-    private var chronological: [Int] { HomeV2PhotoIndex.chronologicalPhotoIndices(in: bodyMetrics) }
-    private var dates: [Date] { chronological.map { bodyMetrics[$0].date } }
+    @MainActor
+    init(bodyMetrics: [BodyMetrics], formatters: HomeV2Formatters, onClose: @escaping () -> Void) {
+        let photos = HomeV2PhotoIndex.chronologicalPhotoIndices(in: bodyMetrics).map { bodyMetrics[$0] }
+        self.photos = photos
+        self.dates = photos.map(\.date)
+        self.formatters = formatters
+        self.onClose = onClose
+        self.usesBoundedPrefetch = HomeV2TimelapsePolicy.usesBoundedPrefetch()
+    }
+
     private var current: BodyMetrics? {
-        chronological.indices.contains(frame) ? bodyMetrics[chronological[frame]] : nil
+        photos.indices.contains(playback.frame) ? photos[playback.frame] : nil
     }
 
     var body: some View {
@@ -47,9 +55,8 @@ struct HomeV2TimelapseView: View {
                 }
 
                 transport
-                HomeV2PhotoTimelineRuler(dates: dates, selected: frame) { selected in
-                    frame = selected
-                    isPlaying = false
+                HomeV2PhotoTimelineRuler(dates: dates, selected: playback.frame) { selected in
+                    playback.select(selected, needsPreparation: usesBoundedPrefetch)
                 }
                     .padding(.top, HomeV2Tokens.Space.tight)
 
@@ -60,8 +67,8 @@ struct HomeV2TimelapseView: View {
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
         }
         .background(Color.black.ignoresSafeArea())
-        .task { await prepare() }
-        .task(id: "\(isPlaying)-\(speed)-\(loops)") { await play() }
+        .task(id: usesBoundedPrefetch ? "\(playback.frame)-\(loops)" : "legacy") { await prepare() }
+        .task(id: "\(playback.isPlaying)-\(speed)-\(loops)") { await play() }
     }
 
     private var topBar: some View {
@@ -107,18 +114,18 @@ struct HomeV2TimelapseView: View {
     private var transport: some View {
         HStack(spacing: HomeV2Tokens.Space.compact) {
             Button {
-                isPlaying.toggle()
+                playback.togglePlayback()
                 HapticManager.shared.selection()
             } label: {
-                Image(systemName: isPlaying ? "pause" : "play.fill")
+                Image(systemName: playback.isPlaying ? "pause" : "play.fill")
                     .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(HomeV2Tokens.Colors.ink)
                     .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .disabled(!isReady)
-            .accessibilityLabel(isPlaying ? "Pause" : "Play")
+            .disabled(!playback.isReady)
+            .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
             .accessibilityIdentifier("home_v2_timelapse_play")
 
             GeometryReader { geometry in
@@ -143,7 +150,7 @@ struct HomeV2TimelapseView: View {
 
     private var progress: CGFloat {
         guard dates.count > 1 else { return 1 }
-        return CGFloat(frame) / CGFloat(dates.count - 1)
+        return CGFloat(playback.frame) / CGFloat(dates.count - 1)
     }
 
     private var settings: some View {
@@ -218,29 +225,49 @@ struct HomeV2TimelapseView: View {
         .padding(.bottom, HomeV2Tokens.Space.tight)
     }
 
-    /// Plates render lazily; warm every frame once so playback never waits.
     private func prepare() async {
-        for index in chronological {
-            guard let urlString = bodyMetrics[index].photoUrl, !Task.isCancelled else { continue }
-            if SubjectPlateStore.shared.cachedPlate(for: urlString) != nil { continue }
-            if let image = await ImageCacheService.shared.loadImage(from: urlString) {
-                _ = await SubjectPlateStore.shared.plate(for: urlString, image: image)
+        if usesBoundedPrefetch {
+            let selected = playback.frame
+            await HomeV2TimelapsePolicy.prepareWindow(
+                from: selected, count: photos.count, loops: loops,
+                load: prepareFrame,
+                currentReady: { playback.prepared(frame: selected, count: photos.count) }
+            )
+        } else {
+            for index in photos.indices {
+                guard !Task.isCancelled else { return }
+                await prepareFrame(index)
             }
+            guard !Task.isCancelled else { return }
+            playback.prepared(frame: playback.frame, count: photos.count)
         }
-        isReady = true
-        isPlaying = dates.count > 1
+    }
+
+    private func prepareFrame(_ index: Int) async {
+        guard !Task.isCancelled, photos.indices.contains(index),
+              let urlString = photos[index].photoUrl else { return }
+        if SubjectPlateStore.shared.cachedPlate(for: urlString) != nil { return }
+        guard let image = await ImageCacheService.shared.loadImage(from: urlString),
+              !Task.isCancelled else { return }
+        _ = await SubjectPlateStore.shared.plate(for: urlString, image: image)
     }
 
     private func play() async {
-        guard isPlaying else { return }
-        while isPlaying, !Task.isCancelled {
+        guard playback.isPlaying else { return }
+        while playback.isPlaying, !Task.isCancelled {
             try? await Task.sleep(for: .seconds(HomeV2TimelapsePolicy.frameInterval(speed: speed)))
-            guard isPlaying, !Task.isCancelled else { return }
-            if let next = HomeV2TimelapsePolicy.next(after: frame, count: dates.count, loops: loops) {
-                frame = next
-            } else {
-                isPlaying = false
+            guard playback.isPlaying, !Task.isCancelled else { return }
+            let previous = playback.frame
+            guard let next = HomeV2TimelapsePolicy.next(after: previous, count: photos.count, loops: loops) else {
+                playback.isPlaying = false
+                return
             }
+            if usesBoundedPrefetch {
+                // Keep the current photo visible while an uncached successor loads.
+                await prepareFrame(next)
+            }
+            guard playback.isPlaying, !Task.isCancelled, playback.frame == previous else { return }
+            playback.frame = next
         }
     }
 }
