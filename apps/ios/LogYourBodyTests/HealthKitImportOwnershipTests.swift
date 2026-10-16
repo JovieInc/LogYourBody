@@ -1293,4 +1293,160 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertEqual(queries, 0)
         XCTAssertFalse(manager.isImporting)
     }
+
+    func testSmartScaleRefreshDeniesWithoutReadingWhenUnauthorized() async {
+        let probe = SmartScaleQueryProbe()
+        let manager = smartScaleManager(probe)
+        manager.isAuthorized = false
+        let result = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(result, .denied)
+        XCTAssertEqual(probe.calls, 0)
+        let rows = try? await durableImportedMetrics()
+        XCTAssertEqual(rows?.isEmpty, true)
+    }
+
+    func testSmartScaleRefreshSkipsDuplicateSampleUpdates() async throws {
+        let probe = SmartScaleQueryProbe()
+        let manager = smartScaleManager(probe)
+        let date = Date()
+        let sample = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "scale-weight-1", kind: .weight, value: 81.4, date: date, sourceName: "Withings"
+        ))
+        try await coreData.saveBodyMetricsAndWait(storedSmartScaleMetric(sample), userId: "synthetic-health-A")
+        probe.result.samples = [sample]
+        let result = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(result.outcome, .refreshed)
+        XCTAssertEqual(result.imported, 0)
+        XCTAssertEqual(result.skippedDuplicates, 1)
+        XCTAssertEqual(probe.calls, 1)
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, 1)
+    }
+
+    func testSmartScaleRefreshKeepsBackdatedSampleDateAndSource() async throws {
+        let probe = SmartScaleQueryProbe()
+        let manager = smartScaleManager(probe)
+        var parts = DateComponents()
+        parts.year = 2018
+        parts.month = 3
+        parts.day = 4
+        parts.hour = 7
+        parts.minute = 15
+        let backdated = try XCTUnwrap(Calendar.current.date(from: parts))
+        let sample = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "scale-backdated", kind: .weight, value: 79.2, date: backdated, sourceName: "Withings"
+        ))
+        probe.result.samples = [sample]
+        probe.result.anchors = HealthKitSmartScaleAnchors(weight: Data([1, 2, 3]), bodyFat: nil)
+        let result = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(result.imported, 1)
+        let row = try XCTUnwrap(try await durableImportedMetrics().first)
+        XCTAssertEqual(row.date.timeIntervalSince1970, backdated.timeIntervalSince1970, accuracy: 1)
+        XCTAssertFalse(Calendar.current.isDateInToday(row.date))
+        XCTAssertEqual(row.dataSource, BodyMetricSource.healthKit.rawValue)
+        XCTAssertEqual(HomeV2Provenance.detailedLabel(for: row, field: .weight), "Withings via Apple Health")
+        XCTAssertEqual(
+            defaults.data(forKey: HealthKitDefaultsKey.smartScaleWeightAnchor.scoped(with: "synthetic-health-A")),
+            Data([1, 2, 3])
+        )
+        probe.result.samples = [sample]
+        let repeatResult = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(repeatResult.skippedDuplicates, 1)
+        XCTAssertEqual(repeatResult.imported, 0)
+        XCTAssertEqual(try await durableImportedMetrics().count, 1)
+    }
+
+    func testSmartScaleRefreshSkipsManualAndDexaMatches() async throws {
+        let probe = SmartScaleQueryProbe()
+        let manager = smartScaleManager(probe)
+        let day = try XCTUnwrap(
+            Calendar.current.date(from: DateComponents(year: 2024, month: 6, day: 2, hour: 8))
+        )
+        try await coreData.saveBodyMetricsAndWait(
+            reading(source: .manual, date: day, weight: 80, bodyFat: nil), userId: "synthetic-health-A"
+        )
+        try await coreData.saveBodyMetricsAndWait(
+            reading(source: .bodySpecDexa, date: day, weight: nil, bodyFat: 18.4), userId: "synthetic-health-A"
+        )
+        let weight = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "scale-same-day-weight", kind: .weight, value: 80.05, date: day.addingTimeInterval(3600),
+            sourceName: "Withings"
+        ))
+        let fat = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "scale-same-day-fat", kind: .bodyFat, value: 18.5, date: day.addingTimeInterval(3600),
+            sourceName: "Withings"
+        ))
+        probe.result.samples = [weight, fat]
+        let result = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(result.imported, 0)
+        XCTAssertEqual(result.skippedCovered, 2)
+        XCTAssertEqual(try await durableImportedMetrics().count, 2)
+    }
+
+    func testSmartScalePolicyKeepsADistinctSameDayReading() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let morning = Date(timeIntervalSince1970: 1_700_000_000)
+        let existing = HealthKitSmartScaleSyncPolicy.Existing(
+            source: .manual, date: morning, weightKg: 80, bodyFatPercent: nil,
+            weightSampleId: nil, bodyFatSampleId: nil
+        )
+        let different = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "later-weigh-in", kind: .weight, value: 82.4,
+            date: morning.addingTimeInterval(3_600), sourceName: "Renpho"
+        ))
+        let admissions = HealthKitSmartScaleSyncPolicy.reconcile(
+            authorized: true, samples: [different], existing: [existing], calendar: calendar
+        )
+        XCTAssertEqual(admissions, [.imported(different)])
+        XCTAssertEqual(HealthKitSmartScaleSyncPolicy.attribution(sourceName: "Renpho"), "Renpho via Apple Health")
+        XCTAssertFalse(HealthKitSmartScaleSyncPolicy.isEnabled { _ in false })
+        XCTAssertEqual(HealthKitSmartScaleSyncPolicy.gateKey, "healthkit_smart_scale_sync_v1")
+    }
+
+    private func smartScaleManager(_ probe: SmartScaleQueryProbe) -> HealthKitManager {
+        let manager = manager()
+        manager.smartScaleSyncEnabled = { true }
+        manager.smartScaleSampleQuery = { anchors in try await probe.fetch(anchors) }
+        return manager
+    }
+
+    private func storedSmartScaleMetric(_ sample: HealthKitSmartScaleSyncPolicy.Sample) -> BodyMetrics {
+        BodyMetrics(
+            id: UUID().uuidString, userId: "synthetic-health-A", date: sample.date,
+            weight: sample.value, weightUnit: "kg", bodyFatPercentage: nil, bodyFatMethod: nil,
+            muscleMass: nil, boneMass: nil, notes: nil, photoUrl: nil,
+            dataSource: BodyMetricSource.healthKit.rawValue,
+            sourceMetadata: BodyMetricSourceMetadata(
+                vendor: "apple_health", sourceName: sample.sourceName, sampleId: sample.sampleId,
+                quantityType: HKQuantityTypeIdentifier.bodyMass.rawValue
+            ),
+            createdAt: sample.date, updatedAt: sample.date
+        )
+    }
+
+    private func reading(
+        source: BodyMetricSource, date: Date, weight: Double?, bodyFat: Double?
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: UUID().uuidString, userId: "synthetic-health-A", date: date,
+            weight: weight, weightUnit: "kg", bodyFatPercentage: bodyFat,
+            bodyFatMethod: bodyFat == nil ? nil : "DEXA", muscleMass: nil, boneMass: nil,
+            notes: nil, photoUrl: nil, dataSource: source.rawValue,
+            createdAt: date, updatedAt: date
+        )
+    }
+}
+
+private final class SmartScaleQueryProbe: @unchecked Sendable {
+    var calls = 0
+    var result = HealthKitSmartScaleQueryResult(samples: [], anchors: HealthKitSmartScaleAnchors())
+    var error: Error?
+
+    func fetch(_ anchors: HealthKitSmartScaleAnchors) async throws -> HealthKitSmartScaleQueryResult {
+        calls += 1
+        _ = anchors
+        if let error { throw error }
+        return result
+    }
 }
