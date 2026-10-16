@@ -105,7 +105,7 @@ struct DashboardViewLiquid: View {
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
     @State var homeV2ContextMetricID: String?
-    @State var homeV2EditingMetric: BodyMetrics?
+    @State var homeV2EditingSession: HomeV2EditSession?
     @State var homeV2PhotoRoute: HomeV2PhotoRoute?
     @State var isHomeV2SettingsPresented = false
     @State var isHomeV2HelpPresented = false
@@ -284,6 +284,7 @@ struct DashboardViewLiquid: View {
             }
             .onChange(of: authManager.captureAccountSession()) { _, owner in
                 invalidateDashboardShareContext(currentOwner: owner)
+                homeV2EditingSession = nil
                 homeV2TimelineSelection = nil
                 isMetricDetailActive = false
                 isStatsDestinationActive = false
