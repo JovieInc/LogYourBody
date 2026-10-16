@@ -4,6 +4,7 @@ import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
 import type { VoiceCoachAccess } from '@/lib/voice/access';
 import type { VoiceProvider } from '@/lib/voice/provider';
+import { planUtteranceProposal } from '@/lib/training/mesocycle-canvas';
 import { parseVoiceIntent, type VoiceWeightUnit } from '@/lib/voice/intent-parser';
 
 const VoiceSetContextSchema = z
@@ -136,8 +137,10 @@ export function createVoiceRouteHandlers(dependencies: VoiceRouteDependencies) {
         lastCompletedSet: input.session?.lastCompletedSet,
         weightUnit,
       });
+      // Plan sentences stay proposals. This route does not write the ledger.
+      const response = result.kind === 'message' ? planUtteranceProposal(input.transcript) : result;
       return NextResponse.json(
-        { version: VOICE_API_VERSION, ...result },
+        { version: VOICE_API_VERSION, ...response },
         { headers: { 'Cache-Control': 'no-store' } },
       );
     },

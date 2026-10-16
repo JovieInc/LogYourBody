@@ -343,6 +343,37 @@ final class URLSessionTrainingService: TrainingServicing {
         try await send(path: "enroll", method: "DELETE", accessToken: accessToken)
     }
 
+    func perform(_ request: CanvasClientRequest, accessToken: String) async throws -> CanvasCommandResponse {
+        guard let url = URL(string: "\(TrainingAPIContract.rootPath)/canvas", relativeTo: baseURL)?.absoluteURL else {
+            throw TrainingServiceError.invalidResponse
+        }
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        urlRequest.httpBody = try JSONSerialization.data(withJSONObject: request.jsonObject())
+
+        let (data, response) = try await urlSession.data(for: urlRequest)
+        guard let http = response as? HTTPURLResponse else { throw TrainingServiceError.invalidResponse }
+        if http.statusCode == 401 { throw TrainingServiceError.authenticationExpired }
+        if http.statusCode == 429 {
+            throw TrainingServiceError.rateLimited(
+                retryAfterSeconds: Int(http.value(forHTTPHeaderField: "Retry-After") ?? "60") ?? 60
+            )
+        }
+        guard http.statusCode == 200 || http.statusCode == 409 else {
+            let payload = try? JSONDecoder().decode(TrainingErrorResponse.self, from: data)
+            throw TrainingServiceError.server(code: payload?.error ?? "training_unavailable")
+        }
+        let decoded = try JSONDecoder().decode(CanvasCommandResponse.self, from: data)
+        guard (decoded.version ?? 1) == TrainingAPIContract.version, decoded.readback.version == 1 else {
+            throw TrainingServiceError.invalidResponse
+        }
+        return decoded
+    }
+
     private func send<Response: Decodable>(
         path: String,
         method: String,

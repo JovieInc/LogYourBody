@@ -150,6 +150,32 @@ describe('mobile voice routes', () => {
     });
   });
 
+  it('returns a plan edit proposal and does not apply it', async () => {
+    const { handlers } = createHandlers();
+    const request = new NextRequest('http://localhost/api/auth/mobile/voice/v1/intent', {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        transcript: 'Swap incline dumbbell press for the Smith machine incline press',
+      }),
+    });
+
+    const response = await handlers.intent(request);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      version: 1,
+      kind: 'plan_edit',
+      requiresConfirmation: true,
+      applied: false,
+      operation: {
+        kind: 'swap',
+        exerciseName: 'incline dumbbell press',
+        toVariantId: 'smith_incline_press',
+        declareEquipment: ['smith'],
+      },
+    });
+  });
+
   it('binds terse in-session speech to the supplied canonical current set', async () => {
     const { handlers } = createHandlers();
     const response = await handlers.intent(
@@ -184,6 +210,20 @@ describe('mobile voice routes', () => {
         loadKg: 80,
         rir: 1,
       },
+    });
+  });
+
+  it('leaves an ordinary message as a message', async () => {
+    const { handlers } = createHandlers();
+    const request = new NextRequest('http://localhost/api/auth/mobile/voice/v1/intent', {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ transcript: 'How is my week looking?' }),
+    });
+
+    await expect((await handlers.intent(request)).json()).resolves.toEqual({
+      version: 1,
+      kind: 'message',
     });
   });
 

@@ -617,8 +617,11 @@ describe('typed daily step deletion', () => {
   it('does not gate ordinary sync or returned retained markers', async () => {
     const { records, handlers } = typedHarness(() => false);
     const marker = {
-      schema_version: 1, deleted_at: '2026-08-14T00:00:00Z',
-      day_start: deletion.day_start, day_end: deletion.day_end, time_zone: deletion.time_zone,
+      schema_version: 1,
+      deleted_at: '2026-08-14T00:00:00Z',
+      day_start: deletion.day_start,
+      day_end: deletion.day_end,
+      time_zone: deletion.time_zone,
     };
     jest.spyOn(records, 'pull').mockResolvedValue({
       records: [

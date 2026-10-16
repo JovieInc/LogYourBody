@@ -428,6 +428,10 @@
 		F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000003 /* TrainingSessionDraft.swift */; };
 		F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000005 /* TrainingSessionDraftTests.swift */; };
 		E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C003 /* TrainingViews.swift */; };
+		E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000001 /* MesocycleCanvas.swift */; };
+		E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */; };
+		E4C0A5110000000000000006 /* MesocycleCanvasUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */; };
+		E4C0A5110000000000000008 /* MesocycleCanvasSequence.json in Resources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */; };
 		E6CBDEE0211741843DCF52AA /* CoreDataManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF02BFDD936CBA59B3704AA3 /* CoreDataManager+Part01.swift */; };
 		E740BE7171B6D98EEC5796B5 /* ErrorStateViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95E35CCA2D3778DD47C8E104 /* ErrorStateViewTests.swift */; };
 		E7C7A871B2C96214AF2D825F /* DashboardViewLiquid+HomeV2Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80B6FA49C262D1B19B195720 /* DashboardViewLiquid+HomeV2Settings.swift */; };
@@ -994,6 +998,10 @@
 		F00720261007000100000003 /* TrainingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraft.swift; sourceTree = "<group>"; };
 		F00720261007000100000005 /* TrainingSessionDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraftTests.swift; sourceTree = "<group>"; };
 		E4172D019C9F4A30A881C003 /* TrainingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingViews.swift; sourceTree = "<group>"; };
+		E4C0A5110000000000000001 /* MesocycleCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvas.swift; sourceTree = "<group>"; };
+		E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasTests.swift; sourceTree = "<group>"; };
+		E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasUITests.swift; sourceTree = "<group>"; };
+		E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MesocycleCanvasSequence.json; sourceTree = "<group>"; };
 		E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2Policy.swift; sourceTree = "<group>"; };
 		E47A7741CF9BBCD0F5DC0D5C /* LaunchSurfacePolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchSurfacePolicyTests.swift; sourceTree = "<group>"; };
 		E47CB009DE7EAE53EC20AE72 /* DSAvatar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSAvatar.swift; path = DesignSystem/Atoms/DSAvatar.swift; sourceTree = "<group>"; };
@@ -1458,6 +1466,7 @@
 			isa = PBXGroup;
 			children = (
 				E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */,
+				E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */,
 				AD723AE12E15FA5C002376C6 /* app-icon-180.png */,
 				AD0054EA2E2197600029E0FF /* Legal */,
 			);
@@ -1610,6 +1619,7 @@
 				AD723B032E15FA5C002376C6 /* LoginView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
 				E4172D019C9F4A30A881C003 /* TrainingViews.swift */,
+				E4C0A5110000000000000001 /* MesocycleCanvas.swift */,
 				8E3A26E632164AACAA5D77FD /* MainTabViewPolicies.swift */,
 				AD723B062E15FA5C002376C6 /* PreferencesView.swift */,
 				AD3147A12F0B000100ABCDEF /* PreferenceGoalEditing.swift */,
@@ -1713,6 +1723,7 @@
 			isa = PBXGroup;
 			children = (
 				C7A700032F20000000C0A703 /* ChatServiceTests.swift */,
+				E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */,
 				F00720261007000100000005 /* TrainingSessionDraftTests.swift */,
 				FE06A6A600000000000000F6 /* Glp1CardAndCatalogTests.swift */,
 				FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */,
@@ -1736,6 +1747,7 @@
 			isa = PBXGroup;
 			children = (
 				AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */,
+				E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */,
 				B39A732AA4894B1DB77C9902 /* HomeV2PhotoViewerLayoutUITests.swift */,
 				AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */,
 				E4BD849D58744A00A126F802 /* HomeV2LayoutUITests.swift */,
@@ -2100,6 +2112,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E9A811932F40800000C0A701 /* PrivacyInfo.xcprivacy in Resources */,
+				E4C0A5110000000000000008 /* MesocycleCanvasSequence.json in Resources */,
 				AD72432A2F01234500ABCDEF /* Assets.xcassets in Resources */,
 				AD72435C2E15FA5E002376C6 /* LaunchScreen.storyboard in Resources */,
 				AD7243322E15FA5D002376C6 /* Preview Assets.xcassets in Resources */,
@@ -2139,6 +2152,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
+				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
 				F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */,
 				FE06A6A600000000000000B6 /* Glp1CardAndCatalogTests.swift in Sources */,
 				FE04A4A400000000000000B4 /* SyncIntervalAndChunkingTests.swift in Sources */,
@@ -2300,6 +2314,7 @@
 				F1179AAA0000000000000001 /* HomeV2TimelineIntegrationUITests.swift in Sources */,
 				DB6F742008744039AA49CA01 /* HomeV2ShareRecoveryUITests.swift in Sources */,
 				AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */,
+				E4C0A5110000000000000006 /* MesocycleCanvasUITests.swift in Sources */,
 				B39A732AA4894B1DB77C9901 /* HomeV2PhotoViewerLayoutUITests.swift in Sources */,
 				401055DB589E0EF494FCBB1E /* OnboardingGoldenPathUITests.swift in Sources */,
 				542F8AAE22D916390F4ACA2D /* ChaosMonkeyUITests.swift in Sources */,
@@ -2338,6 +2353,7 @@
 				F00720261007000100000002 /* TrainingDraftStore.swift in Sources */,
 				F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */,
 				E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */,
+				E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
 				AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */,
 				AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */,
