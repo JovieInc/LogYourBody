@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A19900000000000000000001 /* StoreKitPurchaseRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */; };
 		A16800000000000000000001 /* ContextualMetricShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16800000000000000000002 /* ContextualMetricShare.swift */; };
 		5AAEA63151156B8F114A0B83 /* BodyRecordReviewConsumerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */; };
 		84230C7F619A7210787206E8 /* AppReviewNativeAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832C6BD896D896CCBEBAF565 /* AppReviewNativeAdapter.swift */; };
@@ -509,6 +510,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitPurchaseRestoreTests.swift; sourceTree = "<group>"; };
 		A16800000000000000000002 /* ContextualMetricShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContextualMetricShare.swift; path = Components/ContextualMetricShare.swift; sourceTree = "<group>"; };
 		533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyRecordReviewConsumerTests.swift; sourceTree = "<group>"; };
 		832C6BD896D896CCBEBAF565 /* AppReviewNativeAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewNativeAdapter.swift; sourceTree = "<group>"; };
@@ -1730,6 +1732,7 @@
 		AD7D30A52E1490810072AA5B /* LogYourBodyTests */ = {
 			isa = PBXGroup;
 			children = (
+				A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */,
 				C7A700032F20000000C0A703 /* ChatServiceTests.swift */,
 				E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */,
 				F00720261007000100000005 /* TrainingSessionDraftTests.swift */,
@@ -2245,6 +2248,7 @@
 				A4856A2B9E1FC174F9F1739F /* RevenueCatFlowTests.swift in Sources */,
 				E2E530F646B04158935304E2 /* AuthBillingLifecycleTests.swift in Sources */,
 				D47F9BD18CBEE2413DF244FC /* RevenueCatProductConfigurationTests.swift in Sources */,
+				A19900000000000000000001 /* StoreKitPurchaseRestoreTests.swift in Sources */,
 				FFC041175CAD1871B45B8FE6 /* RevenueCatPurchaseRestoreFlowTests.swift in Sources */,
 				E251E204A77F2161E880A19E /* RevenueCatSubscriptionAnalyticsTransitionTests.swift in Sources */,
 				0922CA98E79021C4CB2595A5 /* ProductAPIProfilePayloadTests.swift in Sources */,

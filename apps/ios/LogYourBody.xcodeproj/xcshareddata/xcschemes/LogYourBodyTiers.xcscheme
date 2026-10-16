@@ -39,6 +39,9 @@
             reference = "container:TestPlans/Integration.xctestplan">
          </TestPlanReference>
          <TestPlanReference
+            reference = "container:TestPlans/StoreKit.xctestplan">
+         </TestPlanReference>
+         <TestPlanReference
             reference = "container:TestPlans/UITests.xctestplan">
          </TestPlanReference>
       </TestPlans>
