@@ -3,6 +3,8 @@
 // LogYourBodyTests
 //
 import XCTest
+import SwiftUI
+import UIKit
 @testable import LogYourBody
 
 final class AnalyticsServiceTests: XCTestCase {
@@ -11,7 +13,7 @@ final class AnalyticsServiceTests: XCTestCase {
         "add_entry_view", "app_open", "bug_report_form_opened", "bug_report_submitted",
         "chat_first_answer_cancelled", "chat_first_answer_completed", "chat_first_answer_failed",
         "chat_first_conversation_deleted", "chat_first_message_sent", "dashboard_view", "entry_saved",
-        "login_attempt", "login_completed", "login_failed", "login_view", "mvp_weight_logged",
+        "first_insight_rendered", "login_attempt", "login_completed", "login_failed", "login_view", "mvp_weight_logged",
         "notification_permission_granted", "onboarding_account_created", "onboarding_account_creation_failed",
         "onboarding_body_score_calculation_attempt", "onboarding_body_score_calculation_failed",
         "onboarding_body_score_calculation_succeeded", "onboarding_completed", "onboarding_email_captured",
@@ -45,6 +47,7 @@ final class AnalyticsServiceTests: XCTestCase {
         private(set) var trackedProperties: [[String: String]?] = []
         private(set) var queriedFlags: [String] = []
         var gateResult = true
+        var onTrack: (() -> Void)?
 
         func start() {
             startCallCount += 1
@@ -58,6 +61,7 @@ final class AnalyticsServiceTests: XCTestCase {
         func track(event: String, properties: [String: String]?) {
             trackedEvents.append(event)
             trackedProperties.append(properties)
+            onTrack?()
         }
 
         func reset() {
@@ -309,5 +313,95 @@ final class AnalyticsServiceTests: XCTestCase {
 
         client.gateResult = false
         XCTAssertFalse(service.isFeatureEnabled(flagKey: "strict_reminders"))
+    }
+
+    func testFirstInsightEligibilityAndDeduplicationThroughSanitizingPort() {
+        let (service, client) = makeService()
+        service.start()
+        var impression = FirstInsightImpression()
+        impression.recordIfEligible(summaryIsVisible: false, sceneIsActive: true, tracker: service)
+        impression.recordIfEligible(summaryIsVisible: true, sceneIsActive: false, tracker: service)
+        client.gateResult = false
+        impression.recordIfEligible(summaryIsVisible: true, sceneIsActive: true, tracker: service)
+        XCTAssertFalse(impression.hasRecorded)
+        XCTAssertTrue(client.trackedEvents.isEmpty)
+        client.gateResult = true
+        impression.recordIfEligible(summaryIsVisible: true, sceneIsActive: true, tracker: service)
+        impression.recordIfEligible(summaryIsVisible: true, sceneIsActive: true, tracker: service)
+        XCTAssertEqual(client.trackedEvents, ["first_insight_rendered"])
+        XCTAssertTrue(client.trackedProperties.allSatisfy { $0 == nil })
+        XCTAssertTrue(impression.hasRecorded)
+        XCTAssertEqual(client.queriedFlags, [FirstInsightImpression.gateKey, FirstInsightImpression.gateKey])
+    }
+
+    func testFirstInsightDropsEvenApprovedCrossEventMetadataAndSensitiveValues() {
+        let (service, client) = makeService()
+        var properties = sensitiveProperties
+        properties["entry_context"] = "authenticated"
+        properties["from_step"] = "loading"
+        properties["to_step"] = "bodyScore"
+        service.track(event: "first_insight_rendered", properties: properties)
+        XCTAssertEqual(client.trackedEvents, ["first_insight_rendered"])
+        XCTAssertTrue(client.trackedProperties.allSatisfy { $0 == nil })
+    }
+
+    @MainActor
+    func testVisibleRevealEmitsGenericImpressionThroughSanitizingPort() async {
+        let (service, client) = makeService()
+        service.start()
+        let rendered = expectation(description: "Visible insight marker")
+        client.onTrack = { rendered.fulfill() }
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.bodyScoreInput.weight = WeightValue(value: 80, unit: .kilograms)
+        viewModel.bodyScoreInput.bodyFat = BodyFatValue(percentage: 20, source: .manualValue)
+        viewModel.currentStep = .bodyScore
+        let controller = UIHostingController(rootView: BodyScoreRevealView(
+            viewModel: viewModel, analyticsTracker: service
+        ).environment(\.scenePhase, .active).environment(\.accessibilityReduceMotion, true))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        await fulfillment(of: [rendered], timeout: 5)
+        XCTAssertEqual(client.trackedEvents, ["first_insight_rendered"])
+        XCTAssertTrue(client.trackedProperties.allSatisfy { $0 == nil })
+    }
+
+    @MainActor
+    func testCalculationAndTransitionDoNotConsumeRenderQualification() async {
+        let (service, client) = makeService()
+        service.start()
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        viewModel.bodyScoreInput.weight = WeightValue(value: 80, unit: .kilograms)
+        viewModel.bodyScoreInput.bodyFat = BodyFatValue(percentage: 20, source: .manualValue)
+        await viewModel.calculateScore()
+        XCTAssertEqual(viewModel.currentStep, .bodyScore)
+        viewModel.trackStepTransition(from: .loading, to: .bodyScore)
+        service.track(event: "onboarding_body_score_calculation_succeeded")
+        service.track(event: "onboarding_step_advanced", properties: ["to_step": "bodyScore"])
+        XCTAssertFalse(viewModel.firstInsightImpression.hasRecorded)
+        XCTAssertEqual(client.trackedEvents, [
+            "onboarding_body_score_calculation_succeeded", "onboarding_step_advanced"
+        ])
+    }
+
+    @MainActor
+    func testMountedLoadingFallbackNeverEmitsImpression() async {
+        let (service, client) = makeService()
+        service.start()
+        let rendered = expectation(description: "No insight without valid content")
+        rendered.isInverted = true
+        client.onTrack = { rendered.fulfill() }
+        let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
+        let controller = UIHostingController(rootView: BodyScoreRevealView(
+            viewModel: viewModel, analyticsTracker: service
+        ).environment(\.scenePhase, .active).environment(\.accessibilityReduceMotion, true))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        await fulfillment(of: [rendered], timeout: 0.5)
+        XCTAssertTrue(client.trackedEvents.isEmpty)
+        XCTAssertFalse(viewModel.firstInsightImpression.hasRecorded)
     }
 }

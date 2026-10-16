@@ -7,6 +7,17 @@ status: research, not policy
 
 # Nikita Bier's Growth Playbook — Applied to LogYourBody
 
+**October 16, 2026 supersession (LYB-179):** Preserve this September research as
+v1 history, not implementation, monetization or spending authority. LYB-173 now
+sets automatic-first, one-decision, steerable coaching; the timeline is historical
+detail. The [current funnel contract](../marketing/funnel-evidence-contract.md)
+owns evidence qualification. Pro's registry references are $9.99/month or
+$69.99/year USD, with a three-day trial; premium/coaching bundles, share-gated
+trials and creator budgets suggested by older research are not configured offers
+or approved spend. No contact upload, automatic sharing, outreach, campaign,
+price/trial change or new vendor follows from this note. See the dated
+[reference teardowns and demo drafts](../marketing/growth-reference-demos-2026-10-16.md).
+
 _Sources: his own threads (@nikitabier), the Lenny's Podcast interview and transcript, iOS 18 coverage, and his documented advisory work (Death Clock, Dupe, Protector, Explode). Compiled 2026-09-27._
 
 ---

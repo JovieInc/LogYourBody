@@ -15,6 +15,7 @@
     "test": "turbo run test",
     "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
     "lint:knowledge": "node scripts/lint-no-specifics.mjs && node scripts/lint-claims.mjs",
+    "growth:report": "node packages/shared-lib/scripts/growth-report.mjs",
     "test:knowledge-lint": "node --test scripts/lint-no-specifics.test.mjs scripts/lint-claims.test.mjs",
     "web": "pnpm --filter logyourbody dev",
     "db:migrate": "scripts/web/create-migration.sh",
