@@ -59,7 +59,8 @@ extension DashboardViewLiquid {
             },
             onDone: { homeV2Logged = nil },
             onUndo: { Task { await undoHomeV2Logged() } },
-            onProvenancePresentationChange: { isHomeV2MetricProvenancePresented = $0 }
+            onProvenancePresentationChange: { isHomeV2MetricProvenancePresented = $0 },
+            isPhotoScrubNavigating: isHomeV2PhotoScrubNavigating
         )
         .task(id: homeV2StepsRequest(on: metric.date)) {
             guard let ownership = authManager.captureAccountSession() else { return }
@@ -76,6 +77,13 @@ extension DashboardViewLiquid {
                 weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: homeV2InsightMetrics)
             )
         }
+    }
+
+    private var isHomeV2PhotoScrubNavigating: Bool {
+        selectedPhotoTimelineRootPage != .timeline || isHomeChatExpanded ||
+            isShowingPhotoTimelineMenu || isHomeV2ViewerPresented || isHomeV2ContextPresented ||
+            isHomeV2EntriesPresented || isHomeV2AllPhotosPresented || isHomeV2SettingsPresented ||
+            isHomeV2HelpPresented || showAddEntrySheet || isMetricDetailActive || isStatsDestinationActive
     }
 
     /// The ID remains authoritative when a background refresh inserts, reorders or deletes rows.

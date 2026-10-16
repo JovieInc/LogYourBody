@@ -7,6 +7,49 @@ import XCTest
 @testable import LogYourBody
 
 final class HomeV2PhotoJourneyPolicyTests: XCTestCase {
+    func testPhotoScrubRequiresMoreThanASecondAndMapsBothDirectionsWithoutAnInitialJump() {
+        XCTAssertGreaterThan(HomeV2PhotoScrubPolicy.holdDuration, 1)
+        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 4, translation: 0, width: 400, count: 5), 4)
+        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 4, translation: -200, width: 400, count: 5), 2)
+        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 0, translation: 200, width: 400, count: 5), 2)
+        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 2, translation: -400, width: 400, count: 5), 0)
+        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 2, translation: 400, width: 400, count: 5), 4)
+        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(
+            start: 2, translation: .greatestFiniteMagnitude, width: 1, count: 5
+        ), 4)
+    }
+
+    func testPhotoScrubRejectsEmptySingleOrInvalidSelectionsAndGeometry() {
+        for count in [0, 1] {
+            XCTAssertNil(HomeV2PhotoScrubPolicy.position(start: 0, translation: 100, width: 400, count: count))
+        }
+        for start in [-1, 3] {
+            XCTAssertNil(HomeV2PhotoScrubPolicy.position(start: start, translation: 100, width: 400, count: 3))
+        }
+        for width: CGFloat in [0, -1, .nan, .infinity] {
+            XCTAssertNil(HomeV2PhotoScrubPolicy.position(start: 0, translation: 100, width: width, count: 3))
+        }
+        for translation: CGFloat in [.nan, .infinity, -.infinity] {
+            XCTAssertNil(HomeV2PhotoScrubPolicy.position(start: 0, translation: translation, width: 400, count: 3))
+        }
+    }
+
+    @MainActor
+    func testPhotoScrubGateDefaultsOffAndUsesThePlatformPort() {
+        XCTAssertFalse(HomeV2PhotoScrubPolicy.isEnabled(arguments: [], checkGate: { _ in false }))
+        var checked: [String] = []
+        XCTAssertTrue(HomeV2PhotoScrubPolicy.isEnabled(arguments: [], checkGate: {
+            checked.append($0)
+            return true
+        }))
+        XCTAssertEqual(checked, [HomeV2PhotoScrubPolicy.gateKey])
+        #if DEBUG
+        XCTAssertTrue(HomeV2PhotoScrubPolicy.isEnabled(
+            arguments: [HomeV2PhotoScrubPolicy.fixtureArgument], checkGate: { _ in false }
+        ))
+        #endif
+    }
+
     private func rulerCalendar(timeZoneID: String = "UTC") throws -> Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: timeZoneID))

@@ -4,6 +4,55 @@ import XCTest
 final class HomeV2TimelineIntegrationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
+    func testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap() {
+        let app = launch(holdScrub: true)
+        let stage = app.buttons["home_v2_photo_stage"]
+        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
+        let loaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 8), .completed)
+        let caption = app.staticTexts["home_v2_photo_caption"]
+        let weight = app.staticTexts["home_v2_weight_value"]
+        let date = caption.label, initialWeight = weight.label
+        let mode = app.staticTexts["home_v2_photo_scrub_mode"]
+        stage.press(forDuration: 0.7)
+        XCTAssertFalse(mode.exists, "A short hold must not activate scrubbing")
+        // A short hold may be a normal photo tap. Return if the viewer opened.
+        let close = app.buttons["home_v2_viewer_close"]
+        if close.exists { close.tap() }
+        let start = stage.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+        start.press(forDuration: 1.3, thenDragTo: start.withOffset(CGVector(dx: -stage.frame.width * 0.75, dy: 0)))
+        XCTAssertTrue(mode.waitForExistence(timeout: 5))
+        XCTAssertNotEqual(caption.label, date)
+        XCTAssertNotEqual(weight.label, initialWeight)
+        XCTAssertFalse(close.exists, "Holding and scrubbing must not open the photo viewer")
+        let surface = pager.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
+        surface.press(forDuration: 0.05, thenDragTo: surface.withOffset(CGVector(dx: pager.frame.width * 0.85, dy: 0)))
+        XCTAssertEqual(caption.label, date)
+        XCTAssertEqual(weight.label, initialWeight)
+        stage.press(forDuration: 1.3)
+        XCTAssertFalse(mode.exists)
+        stage.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+    }
+
+    func testPhotoScrubResetsWhenNavigatingToTheMenuAndBack() {
+        let app = launch(holdScrub: true)
+        let stage = app.buttons["home_v2_photo_stage"]
+        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
+        let loaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 8), .completed)
+        stage.press(forDuration: 1.3)
+        let mode = app.staticTexts["home_v2_photo_scrub_mode"]
+        XCTAssertTrue(mode.waitForExistence(timeout: 5))
+        app.buttons["photo_timeline_root_menu"].tap()
+        let scrim = app.buttons["home_v2_sidebar_scrim"]
+        XCTAssertTrue(scrim.waitForExistence(timeout: 5))
+        scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        XCTAssertFalse(mode.exists)
+        stage.tap()
+        XCTAssertTrue(app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5))
+    }
+
     func testHorizontalPhotoDragPagesPixelsAndMetricsWithoutOpeningViewer() throws {
         let app = launch(withSteps: true)
         let stage = app.buttons["home_v2_photo_stage"]
@@ -233,13 +282,14 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         capture(app, "entries-selected-missing-body-fat")
     }
 
-    private func launch(largestText: Bool = false, withSteps: Bool = false) -> XCUIApplication {
+    private func launch(largestText: Bool = false, withSteps: Bool = false, holdScrub: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
             "-lybUITestHomeV2TimelineFixture", "-lybUITestHomeV2OfflineFixture", "-lybUITestSuppressWhatsNew"
         ]
         if withSteps { app.launchArguments.append("-lybUITestHomeV2StepsFixture") }
+        if holdScrub { app.launchArguments.append("-lybUITestPhotoHoldScrub") }
         if largestText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         }

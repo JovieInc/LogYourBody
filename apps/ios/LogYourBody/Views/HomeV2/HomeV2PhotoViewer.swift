@@ -107,18 +107,31 @@ struct HomeV2PhotoViewer: View {
     private func photoStage(size: CGSize) -> some View {
         let height = min(size.height, size.width / HomeV2Tokens.photoAspectRatio)
         let photoSize = CGSize(width: height * HomeV2Tokens.photoAspectRatio, height: height)
-        return TabView(selection: $selectedIndex) {
-            ForEach(photoIndices, id: \.self) { index in
-                SubjectPlateView(urlString: bodyMetrics[index].photoUrl ?? "", size: photoSize)
-                    .frame(width: size.width, height: size.height)
-                    .tag(index)
+        return HomeV2PhotoScrubber(
+            values: chronological, selection: $selectedIndex, width: size.width,
+            canActivate: photoIndices.contains(selectedIndex),
+            isNavigating: showsTools || pendingTool != nil, identifier: "home_v2_viewer"
+        ) { isScrubbing in
+            Group {
+                if isScrubbing, let current {
+                    SubjectPlateView(urlString: current.photoUrl ?? "", size: photoSize)
+                        .frame(width: size.width, height: size.height)
+                } else {
+                    TabView(selection: $selectedIndex) {
+                        ForEach(photoIndices, id: \.self) { index in
+                            SubjectPlateView(urlString: bodyMetrics[index].photoUrl ?? "", size: photoSize)
+                                .frame(width: size.width, height: size.height)
+                                .tag(index)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(current.map { "Progress photo, \(formatters.dateText($0))" } ?? "Progress photo")
+            .accessibilityIdentifier("home_v2_viewer_stage")
         }
-        .tabViewStyle(.page(indexDisplayMode: .never))
         .frame(width: size.width, height: size.height)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(current.map { "Progress photo, \(formatters.dateText($0))" } ?? "Progress photo")
-        .accessibilityIdentifier("home_v2_viewer_stage")
     }
 
     private var topBar: some View {

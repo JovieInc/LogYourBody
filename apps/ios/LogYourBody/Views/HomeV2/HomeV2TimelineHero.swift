@@ -124,17 +124,30 @@ struct HomeV2TimelinePager: View {
     let unit: String
     let dateText: (BodyMetrics) -> String
     let onOpenPhoto: () -> Void
+    var isNavigating = false
 
     var body: some View {
-        TabView(selection: $selectedID) {
-            ForEach(snapshot.metrics) { metric in
+        HomeV2PhotoScrubber(
+            values: snapshot.metrics.reversed().map(HomeV2TimelinePolicy.EntryID.init),
+            selection: $selectedID, width: size.width,
+            canActivate: snapshot.metric(for: selectedID).map(PhotoTimelineHUDPolicy.hasUsablePhoto) ?? false,
+            isNavigating: isNavigating, identifier: "home_v2_photo"
+        ) { isScrubbing in
+            if isScrubbing, let metric = snapshot.metric(for: selectedID) {
                 HomeV2TimelinePage(metric: metric, metrics: snapshot.metrics, size: size, unit: unit,
-                                   dateText: dateText(metric), onOpenPhoto: onOpenPhoto)
-                    .tag(HomeV2TimelinePolicy.EntryID(metric))
-                    .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
+                                   dateText: dateText(metric), onOpenPhoto: {})
+            } else {
+                TabView(selection: $selectedID) {
+                    ForEach(snapshot.metrics) { metric in
+                        HomeV2TimelinePage(metric: metric, metrics: snapshot.metrics, size: size, unit: unit,
+                                           dateText: dateText(metric), onOpenPhoto: onOpenPhoto)
+                            .tag(HomeV2TimelinePolicy.EntryID(metric))
+                            .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
             }
         }
-        .tabViewStyle(.page(indexDisplayMode: .never))
         .frame(width: size.width, height: size.height)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Body timeline")
