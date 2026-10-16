@@ -5,6 +5,35 @@
 import Combine
 import Foundation
 
+/// Present the editorial editor only after explicit rollout or an authenticated test override.
+enum HomeV2EntryBodyFatPrimaryPolicy {
+    static let gateKey = "home_v2_entry_body_fat_primary_v1"
+    static let fixtureArgument = "-lybUITestEntryBodyFatPrimary"
+    static let disabledFixtureArgument = "-lybUITestEntryBodyFatPrimaryDisabled"
+
+    @MainActor
+    static func isEnabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isGateEnabled: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        let enabled = arguments.filter { $0 == fixtureArgument }.count
+        let disabled = arguments.filter { $0 == disabledFixtureArgument }.count
+        if enabled + disabled == 1,
+           arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
+           arguments.contains(HomeV2Policy.photoFixtureArgument),
+           !arguments.contains(HomeV2Policy.rollbackFixtureArgument),
+           UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil,
+           environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") == true {
+            return enabled == 1
+        }
+        #endif
+        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return check(gateKey)
+    }
+}
+
 /// Editing an imported record must not turn a missing or untouched reading into a new measurement.
 enum HomeV2EntryEditPolicy {
     static let gateKey = "home_v2_entry_edit_preservation_v1"
