@@ -902,8 +902,12 @@ struct ChatTabView: View {
                 VoiceSetReviewView(session: session, heard: heard) { proposal in
                     commitVoiceSet(proposal)
                 }
-            case .canvas:
-                MesocycleCanvasScreen { await chatAccessToken() }
+            case .canvas(let ownership):
+                MesocycleCanvasScreen(
+                    ownership: ownership,
+                    isCurrentAccount: { authManager.ownsAccountSession(ownership) },
+                    accessToken: { await chatAccessToken() }
+                )
             }
         }
     }
@@ -1218,7 +1222,10 @@ struct ChatTabView: View {
                 .accessibilityIdentifier("training_error_card")
         }
         if canvasEnabled {
-            Button("Open week plan") { trainingPresentation = .canvas }
+            Button("Open week plan") {
+                guard let ownership = authManager.captureAccountSession() else { return }
+                trainingPresentation = .canvas(ownership)
+            }
                 .buttonStyle(.plain)
                 .font(.system(size: 15, weight: .semibold))
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

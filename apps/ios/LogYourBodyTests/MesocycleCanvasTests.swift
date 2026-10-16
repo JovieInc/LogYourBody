@@ -162,3 +162,117 @@ private func exercise(_ plan: CanvasPlan, _ name: String) -> CanvasExercise? {
 private func session(_ plan: CanvasPlan, _ instanceId: String) -> CanvasSession? {
     plan.sessions.first { $0.exercises.contains { $0.instanceId == instanceId } }
 }
+
+extension MesocycleCanvasTests {
+    func testSessionReplacementDuringTokenLookupNeverSends() async {
+        var current = true
+        let service = OwnershipCanvasService()
+        let store = MemoryCanvasStore()
+        let model = MesocycleCanvasModel(
+            service: service, store: store,
+            accessToken: { current = false; return "replacement-token" },
+            reduceMotion: false, isCurrentAccount: { current }
+        )
+        await model.submit("undo")
+        XCTAssertTrue(service.tokens.isEmpty)
+        XCTAssertNil(model.readback)
+        XCTAssertNil(store.load())
+        XCTAssertFalse(model.busy)
+    }
+
+    func testSessionReplacementDuringResponseNeverAdoptsOrCaches() async {
+        var current = true
+        let service = OwnershipCanvasService()
+        service.beforeResponse = { current = false }
+        let store = MemoryCanvasStore()
+        let model = MesocycleCanvasModel(
+            service: service, store: store, accessToken: { "original-token" },
+            reduceMotion: false, isCurrentAccount: { current }
+        )
+        model.stageVoice("undo")
+        await model.refresh()
+        XCTAssertEqual(service.tokens, ["original-token"])
+        XCTAssertNil(model.readback)
+        XCTAssertNil(model.stagedVoice)
+        XCTAssertNil(store.load())
+        XCTAssertFalse(model.busy)
+    }
+
+    func testRevokedModelCannotReloadCachedPlanOrStageVoice() async throws {
+        var current = true
+        let service = OwnershipCanvasService()
+        let store = MemoryCanvasStore()
+        let model = MesocycleCanvasModel(
+            service: service, store: store, accessToken: { "original-token" },
+            reduceMotion: false, isCurrentAccount: { current }
+        )
+        await model.refresh()
+        XCTAssertNotNil(model.readback)
+        let saved = try XCTUnwrap(store.load())
+        current = false
+        model.reloadFromStore()
+        model.stageVoice("undo")
+        await model.resendLast()
+        XCTAssertNil(model.readback)
+        XCTAssertNil(model.stagedVoice)
+        XCTAssertEqual(store.load(), saved)
+        XCTAssertEqual(service.tokens, ["original-token"])
+    }
+
+    func testQueuedWorkCannotSendAfterAccountReplacement() async {
+        var current = true
+        let service = OwnershipCanvasService()
+        service.beforeResponse = { current = false }
+        let store = MemoryCanvasStore()
+        let model = MesocycleCanvasModel(
+            service: service, store: store, accessToken: { "original-token" },
+            reduceMotion: false, isCurrentAccount: { current }
+        )
+        async let first: Void = model.refresh()
+        async let second: Void = model.submit("undo")
+        _ = await (first, second)
+        XCTAssertEqual(service.tokens, ["original-token"])
+        XCTAssertNil(model.readback)
+        XCTAssertNil(store.load())
+    }
+
+    func testAccountStoresAndDeletionStayIsolated() throws {
+        let suite = "canvas-ownership-" + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let original = try JSONEncoder().encode(CanvasReadback.empty)
+        defaults.set(original, forKey: "lyb.mesocycle-canvas.v1.account")
+        let first = UserDefaultsCanvasStore(subject: "first-owner", defaults: defaults)
+        let second = UserDefaultsCanvasStore(subject: "second-owner", defaults: defaults)
+        XCTAssertNil(first.load(), "An unattributed legacy cache must never be adopted")
+        XCTAssertNil(defaults.object(forKey: "lyb.mesocycle-canvas.v1.account"))
+        first.save(original)
+        XCTAssertNil(second.load())
+        let secondData = Data("second-owner-snapshot".utf8)
+        second.save(secondData)
+        XCTAssertEqual(UserDefaultsCanvasStore(subject: "first-owner", defaults: defaults).load(), original)
+        UserDefaultsCanvasStore.clear(subject: "first-owner", defaults: defaults)
+        XCTAssertNil(first.load())
+        XCTAssertEqual(second.load(), secondData)
+    }
+
+    func testCanvasPresentationUsesTheCapturedAccountLifetime() {
+        let first = AuthManager.ProfileSessionOwnership(subject: "owner", generation: 1)
+        let replacement = AuthManager.ProfileSessionOwnership(subject: "owner", generation: 2)
+        let other = AuthManager.ProfileSessionOwnership(subject: "other", generation: 1)
+        XCTAssertNotEqual(TrainingPresentation.canvas(first).id, TrainingPresentation.canvas(replacement).id)
+        XCTAssertNotEqual(TrainingPresentation.canvas(first).id, TrainingPresentation.canvas(other).id)
+    }
+}
+
+@MainActor
+private final class OwnershipCanvasService: MesocycleCanvasServicing {
+    var beforeResponse: (() -> Void)?
+    private(set) var tokens: [String] = []
+
+    func perform(_ request: CanvasClientRequest, accessToken: String) async throws -> CanvasCommandResponse {
+        tokens.append(accessToken)
+        beforeResponse?()
+        return CanvasCommandResponse(version: 1, kind: "read", readback: .empty, missing: nil)
+    }
+}

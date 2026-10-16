@@ -188,8 +188,17 @@ final class UserDefaultsCanvasStore: CanvasSnapshotStoring {
 
     init(subject: String, defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        self.key = "lyb.mesocycle-canvas.v1.\(subject)"
+        self.key = Self.key(subject: subject)
+        // The original unscoped cache cannot be attributed to an account.
+        defaults.removeObject(forKey: "lyb.mesocycle-canvas.v1.account")
     }
+
+    static func clear(subject: String, defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key(subject: subject))
+        defaults.removeObject(forKey: "lyb.mesocycle-canvas.v1.account")
+    }
+
+    private static func key(subject: String) -> String { "lyb.mesocycle-canvas.v2.\(subject)" }
 
     func load() -> Data? { defaults.data(forKey: key) }
     func save(_ data: Data) { defaults.set(data, forKey: key) }
@@ -290,6 +299,7 @@ final class MesocycleCanvasModel: ObservableObject {
     private let service: MesocycleCanvasServicing
     private let store: CanvasSnapshotStoring
     private let accessToken: () async -> String?
+    private let isCurrentAccount: () -> Bool
     private var expectedWrite: Int?
     private var tail: Task<Void, Never> = Task {}
     private var lastRequest: CanvasClientRequest?
@@ -298,12 +308,14 @@ final class MesocycleCanvasModel: ObservableObject {
         service: MesocycleCanvasServicing,
         store: CanvasSnapshotStoring,
         accessToken: @escaping () async -> String?,
-        reduceMotion: Bool
+        reduceMotion: Bool,
+        isCurrentAccount: @escaping () -> Bool = { true }
     ) {
         self.service = service
         self.store = store
         self.accessToken = accessToken
         self.reduceMotion = reduceMotion
+        self.isCurrentAccount = isCurrentAccount
     }
 
     func refresh() async { await send(CanvasClientRequest(action: "read", expectedWrite: expectedWrite)) }
@@ -313,6 +325,7 @@ final class MesocycleCanvasModel: ObservableObject {
         await send(CanvasClientRequest(action: "submit", transcript: text, expectedWrite: expectedWrite))
     }
     func stageVoice(_ transcript: String) {
+        guard requireCurrentAccount() else { return }
         let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         stagedVoice = text
@@ -369,6 +382,7 @@ final class MesocycleCanvasModel: ObservableObject {
         await send(lastRequest)
     }
     func reloadFromStore() {
+        guard requireCurrentAccount() else { return }
         guard let data = store.load(),
               let decoded = try? JSONDecoder().decode(CanvasReadback.self, from: data),
               decoded.version == 1,
@@ -395,17 +409,36 @@ final class MesocycleCanvasModel: ObservableObject {
         await next.value
     }
 
-    private func deliver(_ request: CanvasClientRequest) async {
-        guard let token = await accessToken(), !token.isEmpty else {
+    private func requireCurrentAccount() -> Bool {
+        guard isCurrentAccount() else {
+            readback = nil
+            stagedVoice = nil
+            expectedWrite = nil
+            lastRequest = nil
             narration = "Your session expired. Sign in again to continue."
-            return
+            return false
         }
+        return true
+    }
+
+    private func deliver(_ request: CanvasClientRequest) async {
+        guard requireCurrentAccount() else { return }
         busy = true
         defer { busy = false }
         lastRequest = request
         do {
-            adopt(try await service.perform(request, accessToken: token))
+            var response: CanvasCommandResponse?
+            try await TrainingOwnedRequest.perform(
+                isCurrent: isCurrentAccount,
+                getToken: accessToken,
+                send: { token in
+                    guard !token.isEmpty else { throw TrainingServiceError.authenticationExpired }
+                    response = try await self.service.perform(request, accessToken: token)
+                }
+            )
+            if let response { adopt(response) }
         } catch let error as TrainingServiceError {
+            guard requireCurrentAccount() else { return }
             switch error {
             case .authenticationExpired:
                 narration = "Your session expired. Sign in again to continue."
@@ -415,6 +448,7 @@ final class MesocycleCanvasModel: ObservableObject {
                 narration = "The plan could not be updated."
             }
         } catch {
+            guard requireCurrentAccount() else { return }
             narration = "The plan could not be updated."
         }
     }
@@ -450,12 +484,17 @@ final class MesocycleCanvasModel: ObservableObject {
 struct MesocycleCanvasScreen: View {
     @StateObject private var model: MesocycleCanvasModel
 
-    init(accessToken: @escaping () async -> String?) {
+    init(
+        ownership: AuthManager.ProfileSessionOwnership,
+        isCurrentAccount: @escaping () -> Bool,
+        accessToken: @escaping () async -> String?
+    ) {
         _model = StateObject(wrappedValue: MesocycleCanvasModel(
             service: URLSessionTrainingService(),
-            store: UserDefaultsCanvasStore(subject: "account"),
+            store: UserDefaultsCanvasStore(subject: ownership.subject),
             accessToken: accessToken,
-            reduceMotion: false
+            reduceMotion: false,
+            isCurrentAccount: isCurrentAccount
         ))
     }
 
@@ -534,10 +573,12 @@ struct MesocycleCanvasContainer: View {
                 }
                 composer
             }
+            .foregroundStyle(theme.colors.text)
             .background(theme.colors.background.ignoresSafeArea())
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("canvas_root")
         }
+        .preferredColorScheme(.dark)
         .task { await model.refresh() }
     }
 
