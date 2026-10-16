@@ -80,6 +80,7 @@ export const endpoints = {
     },
     statsig: {
       apiHost: 'statsigapi.net',
+      gateEvaluationUrl: 'https://api.statsig.com/v1/check_gate',
     },
     sentry: {
       ingestHost: '*.ingest.sentry.io',
