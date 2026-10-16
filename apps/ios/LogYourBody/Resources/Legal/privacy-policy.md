@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated: July 14, 2026**
+**Last Updated: October 14, 2026**
 
 ## Introduction
 
@@ -12,7 +12,7 @@ LogYourBody ("we," "our," or "us") is committed to protecting your privacy. This
 
 We collect personal information that you voluntarily provide when registering for an account or using our Service:
 
-- **Account Information**: Name, email address, password (encrypted)
+- **Account Information**: Name, email address, and sign-in identifiers
 - **Profile Information**: Date of birth, gender, height, weight
 - **Health Information**: Body measurements, weight logs, body fat percentage, progress photos
 - **Health Data**: Step count, activity data (when you grant permission to access Apple Health or similar services)
@@ -62,22 +62,18 @@ We use the information we collect to:
 ### Where We Store Data
 
 - Product data (profile, body metrics, chat, waitlist) is stored in Neon (PostgreSQL)
-- Progress photos are stored in encrypted cloud object storage
-- We use industry-standard encryption for data in transit and at rest
+- Progress photos are stored in cloud object storage for sync
 
 ### Security Measures
 
 - Sign in with Apple through Jovie Better Auth; we do not store user passwords
-- HTTPS/TLS encryption for all data transmission
-- Regular security audits and updates
-- Limited access to personal data (need-to-know basis)
-- Secure authentication via Jovie Better Auth
+- Production service APIs use HTTPS
+- Service APIs authenticate account requests through Jovie Better Auth
 
 ### Data Retention
 
 - We retain your data as long as your account is active
-- Deleted accounts have data removed within 30 days
-- You can request immediate deletion via Settings > Delete Account
+- You can request deletion via Settings > Delete Account
 
 ## Data Sharing and Disclosure
 

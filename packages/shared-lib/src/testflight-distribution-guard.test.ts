@@ -50,7 +50,7 @@ describe('TestFlight distribution guard', () => {
         def upload_to_testflight(**options); $uploads << options; end
         Coverage.start
         load ARGV.fetch(0)
-        results = JSON.parse(STDIN.read, symbolize_names: true).map do |options|
+        results = JSON.parse(ARGV.fetch(1), symbolize_names: true).map do |options|
           $auth_calls = 0
           $uploads = []
           error = nil
@@ -65,10 +65,7 @@ describe('TestFlight distribution guard', () => {
         puts JSON.generate(results: results, covered: coverage.count { |count| count > 0 }, total: coverage.length)
       `,
             sourcePath,
-          ],
-          {
-            encoding: 'utf8',
-            input: JSON.stringify([
+            JSON.stringify([
               {
                 version_name: ' 1.2.0 ',
                 build_number: ' 20260904212136 ',
@@ -81,6 +78,9 @@ describe('TestFlight distribution guard', () => {
               { version_name: '1.2.0', build_number: '' },
               { build_number: '20260904212136' },
             ]),
+          ],
+          {
+            encoding: 'utf8',
             timeout: 10_000,
           },
         ),

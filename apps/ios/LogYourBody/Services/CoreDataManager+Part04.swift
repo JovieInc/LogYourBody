@@ -17,6 +17,21 @@ enum BodyMetricSyncDateParser {
         return wholeSeconds.date(from: string)
     }
 
+    /// The native profile API sends birthdays as calendar dates, while older
+    /// payloads can contain ISO timestamps. Match the API client's UTC calendar.
+    static func profileBirthDate(from string: String) -> Date? {
+        if let timestamp = date(from: string) { return timestamp }
+        guard string.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        guard let parsed = formatter.date(from: string), formatter.string(from: parsed) == string else { return nil }
+        return parsed
+    }
+
     /// True when a stored row is strictly newer than a parseable payload
     /// `updated_at`. A missing or unparseable timestamp is not newer, so those
     /// payloads still apply.
@@ -30,13 +45,43 @@ enum BodyMetricSyncDateParser {
     }
 }
 
+/// Test seam that runs inside the context queue immediately before each
+/// `writeAdmission` check. A regression can land an account switch in the gap
+/// between a pull-side guard and the queued write deterministically.
+enum ServerApplyProbe {
+    nonisolated(unsafe) static var beforeWriteAdmission: (@MainActor () -> Void)?
+}
+
+private enum ProfileSyncPayloadError: Error {
+    case missingOwner
+    case missingEmail
+}
+
 extension CoreDataManager {
 // MARK: - Update from Server Data
 
-    func updateOrCreateBodyMetric(from data: [String: Any]) {
+    func updateOrCreateBodyMetric(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
+            defer { completion?() }
+            // viewContext is the container's main-queue context. Admission and
+            // this synchronous write share the executor with auth replacement.
+            if let probe = ServerApplyProbe.beforeWriteAdmission {
+                ServerApplyProbe.beforeWriteAdmission = nil
+                MainActor.assumeIsolated { probe() }
+            }
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    return
+                }
+            }
             let id = data["id"] as? String ?? UUID().uuidString
 
             let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
@@ -45,8 +90,14 @@ extension CoreDataManager {
 
             do {
                 let results = try context.fetch(request)
-                if results.first?.isMarkedDeleted == true {
-                    return
+                let payloadUserId = data["user_id"] as? String
+                if let existing = results.first {
+                    if existing.isMarkedDeleted {
+                        return
+                    }
+                    if let owner = existing.userId, !owner.isEmpty, payloadUserId != owner {
+                        return
+                    }
                 }
 
                 let metric = results.first ?? CachedBodyMetrics(context: context)
@@ -165,10 +216,38 @@ extension CoreDataManager {
         }
     }
 
-func updateOrCreateDailyMetric(from data: [String: Any]) {
+    func updateOrCreateBodyMetricAndWait(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            updateOrCreateBodyMetric(from: data, writeAdmission: writeAdmission) {
+                continuation.resume()
+            }
+        }
+    }
+
+func updateOrCreateDailyMetric(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
+            // Skipping a remote record must still release its waiting batch.
+            defer { completion?() }
+            if let probe = ServerApplyProbe.beforeWriteAdmission {
+                ServerApplyProbe.beforeWriteAdmission = nil
+                MainActor.assumeIsolated { probe() }
+            }
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    return
+                }
+            }
             let id = data["id"] as? String ?? UUID().uuidString
 
             let request: NSFetchRequest<CachedDailyMetrics> = CachedDailyMetrics.fetchRequest()
@@ -231,10 +310,38 @@ func updateOrCreateDailyMetric(from data: [String: Any]) {
         }
     }
 
-func updateOrCreateProfile(from data: [String: Any]) {
+    func updateOrCreateDailyMetricAndWait(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            updateOrCreateDailyMetric(from: data, writeAdmission: writeAdmission) {
+                continuation.resume()
+            }
+        }
+    }
+
+func updateOrCreateProfile(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil,
+        completion: (() -> Void)? = nil
+    ) {
         let context = viewContext
 
         context.perform {
+            // Skipping a remote record must still release its waiting batch.
+            defer { completion?() }
+            if let probe = ServerApplyProbe.beforeWriteAdmission {
+                ServerApplyProbe.beforeWriteAdmission = nil
+                MainActor.assumeIsolated { probe() }
+            }
+            if let writeAdmission {
+                do {
+                    try MainActor.assumeIsolated { try writeAdmission() }
+                } catch {
+                    return
+                }
+            }
             let userId = data["id"] as? String ?? ""
 
             let request: NSFetchRequest<CachedProfile> = CachedProfile.fetchRequest()
@@ -242,7 +349,16 @@ func updateOrCreateProfile(from data: [String: Any]) {
             request.fetchLimit = 1
 
             do {
+                guard !userId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw ProfileSyncPayloadError.missingOwner
+                }
                 let results = try context.fetch(request)
+                let incomingEmail = (data["email"] as? String).flatMap { value in
+                    value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : value
+                }
+                guard results.first != nil || incomingEmail != nil else {
+                    throw ProfileSyncPayloadError.missingEmail
+                }
                 let profile = results.first ?? CachedProfile(context: context)
                 if results.first != nil,
                    BodyMetricSyncDateParser.storedVersionIsNewer(profile.updatedAt, than: data) {
@@ -251,7 +367,17 @@ func updateOrCreateProfile(from data: [String: Any]) {
 
                 // Update fields
                 // profile.userId = userId // Using id field instead
+                let appliedAt = Date()
                 profile.id = userId
+                if let incomingEmail { profile.email = incomingEmail }
+                // The mobile API omits these timestamps. Initialize local cache
+                // metadata once, preserving existing values on later pulls.
+                profile.createdAt = profile.createdAt
+                    ?? (data["created_at"] as? String).flatMap(BodyMetricSyncDateParser.date)
+                    ?? appliedAt
+                profile.updatedAt = (data["updated_at"] as? String).flatMap(BodyMetricSyncDateParser.date)
+                    ?? profile.updatedAt
+                    ?? appliedAt
                 profile.fullName = data["full_name"] as? String
                 profile.username = data["username"] as? String
                 // profile.avatarUrl = data["avatar_url"] as? String // avatarUrl field not in Core Data model
@@ -260,13 +386,14 @@ func updateOrCreateProfile(from data: [String: Any]) {
                 profile.gender = data["gender"] as? String
                 profile.activityLevel = data["activity_level"] as? String
 
-                if let dateString = data["date_of_birth"] as? String {
-                    profile.dateOfBirth = ISO8601DateFormatter().date(from: dateString)
+                if let dateString = data["date_of_birth"] as? String,
+                   let birthDate = BodyMetricSyncDateParser.profileBirthDate(from: dateString) {
+                    profile.dateOfBirth = birthDate
                 }
 
                 profile.syncStatus = "synced"
                 profile.isSynced = true
-                profile.lastModified = Date()
+                profile.lastModified = appliedAt
 
                 self.save()
             } catch {
@@ -279,6 +406,17 @@ func updateOrCreateProfile(from data: [String: Any]) {
                 )
                 ErrorReporter.shared.capture(appError, context: contextInfo)
                 // print("Error updating profile from server: \(error)")
+            }
+        }
+    }
+
+    func updateOrCreateProfileAndWait(
+        from data: [String: Any],
+        writeAdmission: WriteAdmission? = nil
+    ) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            updateOrCreateProfile(from: data, writeAdmission: writeAdmission) {
+                continuation.resume()
             }
         }
     }

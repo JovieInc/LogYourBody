@@ -149,4 +149,137 @@ describe('mobile voice routes', () => {
       heard: { reps: 8, loadValue: 185, weightUnit: 'lbs', loadKg: 83.91, rir: 2 },
     });
   });
+
+  it('returns a plan edit proposal and does not apply it', async () => {
+    const { handlers } = createHandlers();
+    const request = new NextRequest('http://localhost/api/auth/mobile/voice/v1/intent', {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        transcript: 'Swap incline dumbbell press for the Smith machine incline press',
+      }),
+    });
+
+    const response = await handlers.intent(request);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      version: 1,
+      kind: 'plan_edit',
+      requiresConfirmation: true,
+      applied: false,
+      operation: {
+        kind: 'swap',
+        exerciseName: 'incline dumbbell press',
+        toVariantId: 'smith_incline_press',
+        declareEquipment: ['smith'],
+      },
+    });
+  });
+
+  it('binds terse in-session speech to the supplied canonical current set', async () => {
+    const { handlers } = createHandlers();
+    const response = await handlers.intent(
+      new NextRequest('http://localhost/api/auth/mobile/voice/v1/intent', {
+        method: 'POST',
+        headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          transcript: 'nine reps, probably one left',
+          weightUnit: 'kg',
+          session: {
+            id: '11111111-1111-4111-8111-111111111111',
+            exercises: [{ id: 'bench_press', name: 'Bench Press' }],
+            currentSet: {
+              exerciseId: 'bench_press',
+              exerciseName: 'Bench Press',
+              setNumber: 2,
+              reps: 10,
+              loadKg: 80,
+              rir: 2,
+            },
+          },
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      kind: 'log_set',
+      proposal: {
+        exerciseId: 'bench_press',
+        setNumber: 2,
+        reps: 9,
+        loadKg: 80,
+        rir: 1,
+      },
+    });
+  });
+
+  it('leaves an ordinary message as a message', async () => {
+    const { handlers } = createHandlers();
+    const request = new NextRequest('http://localhost/api/auth/mobile/voice/v1/intent', {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ transcript: 'How is my week looking?' }),
+    });
+
+    await expect((await handlers.intent(request)).json()).resolves.toEqual({
+      version: 1,
+      kind: 'message',
+    });
+  });
+
+  it('routes correction and interruption phrases without mutating state', async () => {
+    const { handlers } = createHandlers();
+    const session = {
+      id: '11111111-1111-4111-8111-111111111111',
+      exercises: [{ id: 'incline_press', name: 'Incline press' }],
+      currentSet: {
+        exerciseId: 'incline_press',
+        exerciseName: 'Incline press',
+        setNumber: 2,
+        reps: 10,
+        loadKg: 30,
+        rir: 2,
+      },
+      lastCompletedSet: {
+        exerciseId: 'incline_press',
+        exerciseName: 'Incline press',
+        setNumber: 1,
+        reps: 10,
+        loadKg: 30,
+        rir: 2,
+      },
+    };
+    const intent = async (transcript: string) =>
+      (
+        await handlers.intent(
+          new NextRequest('http://localhost/api/auth/mobile/voice/v1/intent', {
+            method: 'POST',
+            headers: { authorization: 'Bearer test-token', 'content-type': 'application/json' },
+            body: JSON.stringify({ transcript, weightUnit: 'kg', session }),
+          }),
+        )
+      ).json();
+
+    await expect(intent('actually nine, not ten')).resolves.toMatchObject({
+      kind: 'correct_set',
+      proposal: { setNumber: 1, reps: 9, loadKg: 30, rir: 2 },
+    });
+    await expect(intent('bench is taken')).resolves.toMatchObject({
+      kind: 'workout_action',
+      action: { kind: 'equipment_unavailable', exerciseId: 'incline_press' },
+    });
+    await expect(intent('I only have 30 minutes')).resolves.toMatchObject({
+      kind: 'workout_action',
+      action: { kind: 'shorten', minutes: 30 },
+    });
+    await expect(intent('skip this today')).resolves.toMatchObject({
+      kind: 'workout_action',
+      action: { kind: 'skip', exerciseId: 'incline_press' },
+    });
+    await expect(intent('my shoulder hurts on this')).resolves.toMatchObject({
+      kind: 'workout_action',
+      requiresConfirmation: false,
+      action: { kind: 'pain', exerciseId: 'incline_press' },
+    });
+  });
 });

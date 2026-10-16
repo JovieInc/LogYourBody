@@ -26,7 +26,10 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
         )
         XCTAssertEqual(HomeV2ProgressCopy.estimatedBy("Withings"), "Estimated by your Withings")
         XCTAssertEqual(HomeV2ProgressCopy.estimatedBy("Typed"), "Estimated, typed by you")
-        XCTAssertTrue(HomeV2ProgressCopy.stepsAverageSentence(average: 8_412, range: .month3).hasPrefix("Averaging "))
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsComparison(latest: nil, average: 8_412, range: .month3),
+            HomeV2ProgressCopy.noTrendYet
+        )
     }
 
     func testStepFormatterPreservesOrdinaryRoundingAndLocale() {
@@ -62,29 +65,45 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
         }
     }
 
-    func testStepAverageFormatsFractionalAndLargeValuesWithoutIntegerConversion() {
+    func testStepComparisonFormatsLatestAgainstTheRangeAverage() {
         let formatter = FormatterCache.stepsFormatter
         let originalLocale = formatter.locale
         defer { formatter.locale = originalLocale }
         formatter.locale = Locale(identifier: "en_US")
         XCTAssertEqual(
-            HomeV2ProgressCopy.stepsAverageSentence(average: 8_421.5, range: .month3),
-            "Averaging 8,422 a day in 3 months"
+            HomeV2ProgressCopy.stepsComparison(latest: 9_000, average: 6_210, range: .month1),
+            "2,790 above the 6,210 daily average in 30 days"
         )
         XCTAssertEqual(
-            HomeV2ProgressCopy.stepsAverageSentence(average: 1e20, range: .all),
-            "Averaging 100,000,000,000,000,000,000 a day overall"
+            HomeV2ProgressCopy.stepsComparison(latest: 5_000, average: 6_210, range: .month1),
+            "1,210 below the 6,210 daily average in 30 days"
         )
         XCTAssertEqual(
-            HomeV2ProgressCopy.stepsAverageSentence(average: 0, range: .week1),
-            "Averaging 0 a day in 7 days"
+            HomeV2ProgressCopy.stepsComparison(latest: 6_210, average: 6_210, range: .month1),
+            "At the 6,210 daily average in 30 days"
+        )
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsComparison(latest: 8_421.5, average: 8_421.5, range: .month3),
+            "At the 8,422 daily average in 3 months"
+        )
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsComparison(latest: 1e20, average: 1e20, range: .all),
+            "At the 100,000,000,000,000,000,000 daily average overall"
+        )
+        XCTAssertEqual(
+            HomeV2ProgressCopy.stepsComparison(latest: 0, average: 0, range: .week1),
+            "At the 0 daily average in 7 days"
         )
     }
 
-    func testStepAverageTreatsMissingAndNonfiniteValuesAsNoTrend() {
+    func testStepComparisonTreatsMissingAndNonfiniteValuesAsNoTrend() {
         for value: Double? in [nil, .nan, .infinity, -.infinity] {
             XCTAssertEqual(
-                HomeV2ProgressCopy.stepsAverageSentence(average: value, range: .month1),
+                HomeV2ProgressCopy.stepsComparison(latest: value, average: 6_210, range: .month1),
+                HomeV2ProgressCopy.noTrendYet
+            )
+            XCTAssertEqual(
+                HomeV2ProgressCopy.stepsComparison(latest: 6_210, average: value, range: .month1),
                 HomeV2ProgressCopy.noTrendYet
             )
         }
@@ -95,6 +114,8 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
         let stats = HomeV2ProgressPolicy.stats(points: points, prefersHigh: false)
         XCTAssertEqual(stats.latest ?? 0, 173.4, accuracy: 0.001)
         XCTAssertEqual(stats.start ?? 0, 186.2, accuracy: 0.001)
+        XCTAssertEqual(stats.startDate, points[2].date)
+        XCTAssertEqual(stats.extremeDate, points[1].date)
         XCTAssertEqual(stats.extreme ?? 0, 172.9, accuracy: 0.001)
         XCTAssertEqual(stats.delta ?? 0, -12.8, accuracy: 0.001)
         XCTAssertEqual(stats.distinctDays, 3)
@@ -113,12 +134,17 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
     }
 
     func testEveryMetricHasAnAccentAndATitle() {
+        XCTAssertEqual(HomeV2ProgressMetric.allCases, [.bodyFat, .ffmi, .weight, .steps])
         for metric in HomeV2ProgressMetric.allCases {
             XCTAssertFalse(metric.title.isEmpty)
             XCTAssertFalse(metric.identifier.isEmpty)
         }
         XCTAssertTrue(HomeV2ProgressMetric.steps.prefersHigh)
         XCTAssertFalse(HomeV2ProgressMetric.weight.prefersHigh)
+        XCTAssertTrue(HomeV2ProgressMetric.steps.anchorsChartToZero)
+        XCTAssertFalse(HomeV2ProgressMetric.weight.anchorsChartToZero)
+        XCTAssertFalse(HomeV2ProgressMetric.bodyFat.anchorsChartToZero)
+        XCTAssertFalse(HomeV2ProgressMetric.ffmi.anchorsChartToZero)
     }
 
     func testSparseClassificationUsesDistinctDaysInTheSelectedRange() {
@@ -132,6 +158,17 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
             XCTAssertEqual(stats.distinctDays, days, "Multiple entries on one day do not advance the trend threshold")
             XCTAssertEqual(HomeV2TrendPolicy.hasEnoughData(selected), days >= HomeV2TrendPolicy.minimumDistinctDays)
         }
+    }
+
+    func testWeightProgressOmitsFlaggedValuesWithoutMutatingThem() {
+        let flagged = point(daysAgo: 1, value: 18)
+        let supported = point(daysAgo: 0, value: 80)
+
+        XCTAssertEqual(
+            HomeV2ProgressPolicy.supportedWeightPoints([flagged, supported], system: .metric).map(\.value),
+            [supported.value]
+        )
+        XCTAssertEqual(flagged.value, 18)
     }
 
     @MainActor

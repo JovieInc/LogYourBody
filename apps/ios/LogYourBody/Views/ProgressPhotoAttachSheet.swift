@@ -136,22 +136,29 @@ struct ProgressPhotoAttachSheet: View {
                     .padding(.top, JovieTokens.itemGap)
                     .padding(.bottom, JovieTokens.itemGap)
                 }
+                // The navigation-bar Cancel accessibility frame stays 36 points tall.
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    attachButton
-                        .padding(.horizontal, JovieTokens.screenInset)
-                        .padding(.vertical, JovieTokens.itemGap)
+                    HStack(spacing: 12) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("Cancel")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                        .disabled(isBusy)
+                        .accessibilityIdentifier("progress_photo_attach_cancel_button")
+
+                        attachButton
+                    }
+                    .padding(.horizontal, JovieTokens.screenInset)
+                    .padding(.vertical, JovieTokens.itemGap)
                 }
             }
             .navigationTitle("Progress Photo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .disabled(isBusy)
-                }
-
                 ToolbarItemGroup(placement: .primaryAction) {
                     photoSourceMenu
                 }
@@ -420,13 +427,13 @@ struct ProgressPhotoAttachSheet: View {
         } label: {
             if isBusy {
                 ProgressView()
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             } else if isSuccess {
                 Label("Close", systemImage: "checkmark")
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             } else {
                 Label("Attach Photo", systemImage: "paperclip")
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
         }
         .buttonStyle(.glassProminent)
@@ -521,9 +528,16 @@ struct ProgressPhotoAttachSheet: View {
             return
         }
 
-        guard let userId = authManager.currentUser?.id else {
+        guard let ownership = authManager.captureAccountSession(),
+              authManager.ownsAccountSession(ownership) else {
             attachStatus = .failed("Sign in again to upload photos.")
             return
+        }
+        let userId = ownership.subject
+        let writeAdmission: CoreDataManager.WriteAdmission = {
+            guard authManager.ownsAccountSession(ownership) else {
+                throw PhotoUploadManager.PhotoError.notAuthenticated
+            }
         }
 
         attachStatus = .processing
@@ -532,7 +546,9 @@ struct ProgressPhotoAttachSheet: View {
             var placeholderMetricId: String?
 
             do {
-                let metricsResult = try await targetMetrics(userId: userId)
+                try writeAdmission()
+                let metricsResult = try await targetMetrics(userId: userId, writeAdmission: writeAdmission)
+                try writeAdmission()
                 let metrics = metricsResult.metrics
                 placeholderMetricId = metrics.id
 
@@ -543,8 +559,11 @@ struct ProgressPhotoAttachSheet: View {
                         to: metrics,
                         userId: userId
                     )
+                    try writeAdmission()
                     await onComplete()
+                    try writeAdmission()
                     await MainActor.run {
+                        guard authManager.ownsAccountSession(ownership) else { return }
                         attachStatus = .success
                         HapticManager.shared.successAction()
                     }
@@ -557,19 +576,27 @@ struct ProgressPhotoAttachSheet: View {
                     image: selectedImage
                 )
 
+                try writeAdmission()
                 await onComplete()
+                try writeAdmission()
                 await MainActor.run {
+                    guard authManager.ownsAccountSession(ownership) else { return }
                     attachStatus = .success
                     HapticManager.shared.successAction()
                 }
             } catch {
+                // Preserve any already-admitted original-owner upload; stale callers
+                // cannot clean up its row or update replacement-session presentation.
+                guard authManager.ownsAccountSession(ownership) else { return }
                 await MainActor.run {
+                    guard authManager.ownsAccountSession(ownership) else { return }
                     attachStatus = .failed(error.localizedDescription)
                 }
                 if let placeholderMetricId {
                     _ = await CoreDataManager.shared.deleteEmptyPhotoPlaceholder(
                         id: placeholderMetricId,
-                        userId: userId
+                        userId: userId,
+                        writeAdmission: writeAdmission
                     )
                 }
             }
@@ -638,17 +665,22 @@ struct ProgressPhotoAttachSheet: View {
     }
     #endif
 
-    private func targetMetrics(userId: String) async throws -> PhotoMetricsUpdateResult {
+    private func targetMetrics(
+        userId: String,
+        writeAdmission: @escaping CoreDataManager.WriteAdmission
+    ) async throws -> PhotoMetricsUpdateResult {
         if let targetMetric {
             return try await PhotoMetadataService.shared.prepareExistingMetricsForPhotoUpload(
                 id: targetMetric.id,
-                userId: userId
+                userId: userId,
+                writeAdmission: writeAdmission
             )
         }
 
         return try await PhotoMetadataService.shared.createOrUpdateMetricsForPhotoUpload(
             for: selectedImageDate ?? fallbackDate,
-            userId: userId
+            userId: userId,
+            writeAdmission: writeAdmission
         )
     }
 }

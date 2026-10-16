@@ -242,6 +242,113 @@ test('unrelated GraphQL failures are retained', async () => {
   );
 });
 
+const changesRequested =
+  'Pull request 1 review requesting changes by reviewers with write access.';
+
+function graphqlFailure(errors) {
+  return Object.assign(new Error('GraphQL enrollment failed'), { errors });
+}
+
+test('GitHub review blockers leave the PR ineligible without failing enrollment', async () => {
+  for (const message of [
+    changesRequested,
+    'Pull request 2 reviews requesting changes by reviewers with write access.',
+  ]) {
+    const enqueueError = graphqlFailure([{ type: 'UNPROCESSABLE', message }]);
+    const { calls, core } = await nativeScenario({ enqueueError });
+    assert.equal(calls.length, 1, 'Do not retry or bypass the review blocker');
+    assert.equal(calls[0].variables.expectedHeadOid, head);
+    assert.ok(core.messages.some((notice) => notice.startsWith('NOT_ELIGIBLE:')
+      && notice.includes(message)));
+    assert.ok(!core.messages.some((notice) => notice.startsWith('ENQUEUED:')));
+    assert.equal(core.tables.length, 1);
+    assert.equal(core.tables[0][0][1], 'NOT_ELIGIBLE');
+    assert.equal(core.tables[0][2][1], head);
+    assert.equal(core.tables[0][3][1], message);
+  }
+});
+
+test('review blocker handling preserves permission, unexpected and mixed GraphQL failures', async () => {
+  const reviewBlocker = {
+    type: 'UNPROCESSABLE',
+    message: changesRequested,
+  };
+  for (const errors of [
+    [],
+    undefined,
+    [{ ...reviewBlocker, type: 'FORBIDDEN' }],
+    [{ type: 'UNPROCESSABLE', message: 'Resource not accessible by integration' }],
+    [{ type: 'UNPROCESSABLE', message: 'Unexpected review service failure' }],
+    [reviewBlocker, { type: 'FORBIDDEN', message: 'Resource not accessible by integration' }],
+    [reviewBlocker, { type: 'UNPROCESSABLE', message: 'Unexpected review service failure' }],
+  ]) {
+    const enqueueError = graphqlFailure(errors);
+    await assert.rejects(nativeScenario({ enqueueError }), (error) => error === enqueueError);
+  }
+});
+
+test('changes-requested and other review blocks are not eligible', async () => {
+  for (const message of [
+    changesRequested,
+    'Pull request 2 reviews requesting changes by reviewers with write access.',
+    'At least 1 approving review is required by reviewers with write access.',
+    'At least 2 approving reviews are required by reviewers with write access.',
+    'At least 1 approving review required by reviewers with write access.',
+    `${changesRequested.slice(0, -1)} and At least 1 approving review is required by reviewers with write access.`,
+  ]) {
+    const { calls, core } = await nativeScenario({
+      enqueueError: graphqlFailure([{ type: 'UNPROCESSABLE', message }]),
+    });
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].query, /mutation Enqueue/);
+    assert.ok(
+      core.messages.some(
+        (entry) => entry.startsWith('NOT_ELIGIBLE:') && entry.includes('blocked by review'),
+      ),
+    );
+  }
+});
+
+test('a review block beside another refusal still fails', async () => {
+  for (const errors of [
+    [
+      { type: 'UNPROCESSABLE', message: changesRequested },
+      {
+        type: 'UNPROCESSABLE',
+        message: 'Pull request has merge conflicts and Pull request not in mergeable state',
+      },
+    ],
+    [
+      {
+        type: 'UNPROCESSABLE',
+        message: `${changesRequested.slice(0, -1)} and Pull request has merge conflicts and Pull request not in mergeable state`,
+      },
+    ],
+    [{ type: 'FORBIDDEN', message: changesRequested }],
+    [],
+  ]) {
+    await assert.rejects(
+      nativeScenario({ enqueueError: graphqlFailure(errors) }),
+      /GraphQL enrollment failed/,
+    );
+  }
+});
+
+test('draft, conflict, and permission refusals still fail', async () => {
+  for (const message of [
+    'Pull request is a draft.',
+    'Pull request has merge conflicts and Pull request not in mergeable state',
+    'Pull request refusing to allow a GitHub App to create or update workflow `.github/workflows/ci.yml` without `workflows` permission',
+  ]) {
+    await assert.rejects(
+      nativeScenario({
+        enqueueError: graphqlFailure([{ type: 'UNPROCESSABLE', message }]),
+      }),
+      /GraphQL enrollment failed/,
+    );
+  }
+});
+
 for (const [name, mutate] of [
   [
     'failed CI',

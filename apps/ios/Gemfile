@@ -2,3 +2,6 @@ source "https://rubygems.org"
 
 gem "fastlane"
 gem "cocoapods"
+# ActiveSupport 7.2 permits connection_pool 3.x, which requires Ruby >= 3.2.
+# The iOS toolchain uses Ruby 3.1, so retain the compatible 2.x line.
+gem "connection_pool", "< 3.0"

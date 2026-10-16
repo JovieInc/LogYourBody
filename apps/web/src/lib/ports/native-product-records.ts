@@ -1,3 +1,4 @@
+import type { DailyStepDeletionInput } from './daily-step-deletions';
 import type { TrainingMutationsPort } from './training-mutations';
 import type {
   NativeAccountAdmission,
@@ -48,6 +49,22 @@ export interface NativeProductRecordsPort {
     subject: string,
     record: Record<string, unknown>,
   ): Promise<NativeProductRecord | null>;
+  /** Revision-guarded correction that replaces one owned set and its embedded
+   * audit trail atomically. Missing capability must fail closed. */
+  correctTrainingSet?(
+    subject: string,
+    id: string,
+    expectedRevision: number,
+    record: Record<string, unknown>,
+  ): Promise<NativeProductRecord | null>;
+  /** Compare-and-swap for revisioned active-session actions. */
+  updateTrainingSession?(
+    subject: string,
+    id: string,
+    expectedRevision: number,
+    expectedLoggedSetCount: number,
+    record: Record<string, unknown>,
+  ): Promise<NativeProductRecord | null>;
   push(
     subject: string,
     collection: NativeProductRecordCollection,
@@ -73,6 +90,11 @@ export interface NativeProductRecordsPort {
 }
 
 export interface NativeProductAccountMutationsPort extends NativeAccountAdmissionPort {
+  /** Missing capability fails closed. Existing markers remain authoritative. */
+  deleteDailySteps?(
+    admission: NativeAccountAdmission,
+    deletions: DailyStepDeletionInput[],
+  ): Promise<{ records: NativeProductRecord[]; rejected_ids: string[] }>;
   push(
     admission: NativeAccountAdmission,
     collection: NativeProductRecordCollection,

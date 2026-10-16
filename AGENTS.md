@@ -81,7 +81,11 @@ gbrain query "what is the timeline scrubber convention?"   # hybrid
 - **Setup (one-time per machine):** `pnpm setup:gbrain` (or `bash scripts/setup-gbrain.sh`). It resolves the brain's Supabase URL from `GBRAIN_DATABASE_URL` or Doppler (`jovie-web/dev`) and writes `~/.gbrain/config.json`. The connection string is a secret and is never committed.
 - **Code-aware search (optional):** run `/sync-gbrain --full` in Claude Code to index this repo, enabling `gbrain code-def` / `code-refs` / `code-callers`. It pins the worktree with `.gbrain-source` (gitignored).
 - **Graceful degradation:** if gbrain is unreachable, fall back to normal repo exploration — never block on it.
-- **Writes are automatic** via the memory→gbrain sync hook; you do not push manually.
+- **Writeback:** after non-trivial work, write durable findings to GBrain and read the same slug back. A configured memory-sync hook or successful write request alone is not persistence proof. If unavailable, report the exact write/readback gap.
+
+Local worktrees and Codex Cloud use the dependency-only bootstrap in
+`scripts/codex-setup.sh`. See [`CODEX.md`](CODEX.md) for lifecycle setup,
+runtime pins, hook trust, cleanup, and cloud verification boundaries.
 
 ---
 
@@ -535,7 +539,17 @@ pnpm --filter apps/web build
 
 ### Test Coverage Requirements
 
-- iOS: Minimum 70% code coverage
+- iOS: 70% whole-app line coverage is a long-term target. Enforce nonregression
+  against the committed [native coverage baselines](scripts/ios/native-coverage-baseline.json)
+  for the same real CI selector; do not mix Unit-tier and launch-quality results.
+- Native shipping requires meaningful regression and failure-path tests for changed
+  behavior, named passing cases for changed risky paths, and current exact-head
+  execution and coverage from the repository's real native runner.
+- Missing, skipped, stale or unavailable relevant native evidence remains unverified.
+  A global percentage or module-import test does not replace behavior proof.
+- Preserve the existing required function-coverage, UI, Golden Path and eval gates.
+  Baselines may only rise with verified same-selector native receipts; removing
+  retained app source from a report or lowering a floor is not an allowed update.
 - Web: 80% code coverage is aspirational; CI runs the test suite but does not enforce this threshold
 - All new features must include tests
 

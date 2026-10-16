@@ -225,8 +225,10 @@ class HealthKitManager: ObservableObject {
     let importCoreDataManager: CoreDataManager?
     let weightImportQuery: ((Date, Date) async throws -> [HealthKitWeightImportSample])?
     let bodyFatImportQuery: ((Date) async throws -> [HealthKitBodyFatImportSample])?
+    let todayStepQuantityQuery: ((Date, Date) async throws -> Double?)?
     let stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])?
     let earliestImportDateQuery: (() async throws -> Date?)?
+    let earliestBodyFatImportDateQuery: (() async throws -> Date?)?
     let importSyncTrigger: (@MainActor () -> Void)?
     let importCompletion: (@MainActor (String) -> Void)?
     let bodyScoreRecalculationTrigger: (@MainActor () -> Void)?
@@ -236,6 +238,7 @@ class HealthKitManager: ObservableObject {
     /// tests pass a foreground priority because a background-QoS detached task
     /// can stay unscheduled for 30s+ on a loaded CI simulator.
     let historicalImportPriority: TaskPriority
+    let bodyFatOnlyImportEnabled: @MainActor () -> Bool
 
     init(
         userDefaults: UserDefaults = .standard,
@@ -243,28 +246,34 @@ class HealthKitManager: ObservableObject {
         coreDataManager: CoreDataManager? = nil,
         weightImportQuery: ((Date, Date) async throws -> [HealthKitWeightImportSample])? = nil,
         bodyFatImportQuery: ((Date) async throws -> [HealthKitBodyFatImportSample])? = nil,
+        todayStepQuantityQuery: ((Date, Date) async throws -> Double?)? = nil,
         stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])? = nil,
         earliestImportDateQuery: (() async throws -> Date?)? = nil,
+        earliestBodyFatImportDateQuery: (() async throws -> Date?)? = nil,
         syncTrigger: (@MainActor () -> Void)? = nil,
         importCompletion: (@MainActor (String) -> Void)? = nil,
         bodyScoreRecalculationTrigger: (@MainActor () -> Void)? = nil,
         metricImportStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil,
         rawImportStore: (([HKRawSample]) async -> Void)? = nil,
-        historicalImportPriority: TaskPriority = .background
+        historicalImportPriority: TaskPriority = .background,
+        bodyFatOnlyImportEnabled: @escaping @MainActor () -> Bool = { HealthKitBodyFatOnlyImportPolicy.isEnabled() }
     ) {
         self.userDefaults = userDefaults
         importAuthManager = authManager
         importCoreDataManager = coreDataManager
         self.weightImportQuery = weightImportQuery
         self.bodyFatImportQuery = bodyFatImportQuery
+        self.todayStepQuantityQuery = todayStepQuantityQuery
         self.stepHistoryQuery = stepHistoryQuery
         self.earliestImportDateQuery = earliestImportDateQuery
+        self.earliestBodyFatImportDateQuery = earliestBodyFatImportDateQuery
         importSyncTrigger = syncTrigger
         self.importCompletion = importCompletion
         self.bodyScoreRecalculationTrigger = bodyScoreRecalculationTrigger
         self.metricImportStore = metricImportStore
         self.rawImportStore = rawImportStore
         self.historicalImportPriority = historicalImportPriority
+        self.bodyFatOnlyImportEnabled = bodyFatOnlyImportEnabled
     }
 
     @Published var isAuthorized = false
@@ -275,6 +284,7 @@ class HealthKitManager: ObservableObject {
     @Published var latestWeightDate: Date?
     @Published var latestBodyFatPercentage: Double?
     @Published var latestBodyFatDate: Date?
+    @MainActor var todayStepCountOwner: AuthManager.ProfileSessionOwnership?
     @Published var todayStepCount: Int = 0
     @Published var latestStepCount: Int?
     @Published var latestStepCountDate: Date?
@@ -417,5 +427,16 @@ enum HealthKitError: Error, LocalizedError {
         case .syncFailed:
             return "Failed to sync weight data"
         }
+    }
+}
+
+/// BF-only canonical ingestion is opt-in; unset Statsig gates remain off.
+enum HealthKitBodyFatOnlyImportPolicy {
+    static let gateKey = "healthkit_body_fat_only_import_v1"
+
+    @MainActor
+    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
+        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return checkGate(gateKey)
     }
 }

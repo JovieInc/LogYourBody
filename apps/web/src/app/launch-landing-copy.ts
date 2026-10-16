@@ -8,9 +8,9 @@ function formatPrice(amount: number) {
 }
 
 /**
- * Every line here is a product truth from the registry, a customer outcome, or
- * an action. Feature descriptions come straight from the registry so the page
- * can never claim more than the app ships.
+ * Feature descriptions and reference prices use the canonical registry.
+ * Implemented behavior and public release availability still need their own
+ * runtime/provider evidence; a registry entry is not proof of shipment.
  */
 export const launchLandingCopy = {
   headline: logYourBody.messages.landing.headline,
@@ -36,8 +36,11 @@ export const launchLandingCopy = {
   ],
   featuresHeading: 'What it keeps',
   pricingHeading: proPlan.name,
-  pricingLine: `${proPlan.trialDays}-day free trial, then ${formatPrice(proPlan.pricing.monthly.amount)} a month or ${formatPrice(proPlan.pricing.annual.amount)} a year.`,
-  pricingNote: 'Billed through the App Store. Cancel there any time.',
+  monthlyReferencePrice: formatPrice(proPlan.pricing.monthly.amount),
+  annualReferencePrice: formatPrice(proPlan.pricing.annual.amount),
+  pricingLine: `Reference pricing: ${formatPrice(proPlan.pricing.monthly.amount)} a month or ${formatPrice(proPlan.pricing.annual.amount)} a year (USD).`,
+  pricingNote:
+    'The App Store confirms your local price, any trial eligibility, and subscription terms before you subscribe. Manage or cancel your subscription there.',
 } as const;
 
 export const launchLandingFeatures = logYourBody.features

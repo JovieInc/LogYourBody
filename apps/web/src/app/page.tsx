@@ -1,5 +1,7 @@
 import { LaunchLanding } from './LaunchLanding';
 import { endpoints } from '@/lib/generated/endpoints.generated';
+import { LANDING_FLAGS } from '@/lib/flags/landing';
+import { readEditorialHomepageRollout } from '@/lib/flags/publicLanding.server';
 
 const marketingUrl = endpoints.hosts.marketing.url;
 
@@ -34,7 +36,12 @@ const landingStructuredData = {
   ],
 };
 
-export default function HomePage() {
+// A public launch switch can update without a client-side page swap or visitor tracking.
+export const revalidate = 30;
+
+export default async function HomePage() {
+  const editorialEnabled =
+    LANDING_FLAGS.ART_DIRECTION_V2_ENABLED && (await readEditorialHomepageRollout());
   return (
     <>
       <script
@@ -43,7 +50,7 @@ export default function HomePage() {
           __html: JSON.stringify(landingStructuredData).replace(/</g, '\\u003c'),
         }}
       />
-      <LaunchLanding />
+      <LaunchLanding editorialEnabled={editorialEnabled} />
     </>
   );
 }

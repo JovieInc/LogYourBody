@@ -46,13 +46,15 @@ extension DashboardViewLiquid {
     /// Calculate age from date of birth
     func calculateAge(from dateOfBirth: Date?) -> Int? {
         guard let dob = dateOfBirth else { return nil }
-        let calendar = Calendar.current
-        let now = Date()
-        let ageComponents = calendar.dateComponents([.year], from: dob, to: now)
-        return ageComponents.year
+        return ProfileBirthDatePolicy.age(from: dob)
     }
 
     var currentMetric: BodyMetrics? {
+        if layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled() {
+            guard let selection = homeV2TimelineSelection,
+                  selection.id.owner == authManager.currentUser?.id else { return nil }
+            return homeV2Timeline.metric(for: selection.id)
+        }
         let metrics = viewModel.bodyMetrics
         guard !metrics.isEmpty, selectedIndex >= 0, selectedIndex < metrics.count else { return nil }
         return metrics[selectedIndex]

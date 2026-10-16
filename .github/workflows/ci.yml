@@ -52,9 +52,8 @@ jobs:
   cancel-superseded-merge-groups:
     name: Cancel Superseded Merge Groups
     # When the queue drops or rebuilds a group it deletes the gh-readonly-queue ref, but
-    # the old CI run keeps queueing and holding macOS runners. Each new group cancels
-    # merge-group CI runs whose ref no longer exists. GitHub deletes the old refs a few
-    # seconds after starting the new group, so a second pass runs 90s later.
+    # the old CI run keeps queueing and holding macOS runners. Sweep again at the end of
+    # each group, after GitHub has deleted any replaced refs.
     # Advisory: never fails CI.
     if: github.event_name == 'merge_group'
     runs-on: ubuntu-latest
@@ -64,30 +63,14 @@ jobs:
       actions: write
       contents: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
       - name: Cancel CI runs for deleted merge-group refs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -uo pipefail
-          sweep() {
-            for status in queued in_progress waiting pending; do
-              gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=merge_group&status=$status&per_page=100" \
-                --jq '.workflow_runs[] | "\(.id) \(.head_branch)"'
-            done | sort -u | while read -r run_id branch; do
-              [[ "$run_id" == "$GITHUB_RUN_ID" || "$branch" != gh-readonly-queue/* ]] && continue
-              # Only a definitive 404 proves the group is gone; any other error leaves the run.
-              # Capture first: under pipefail, `gh ... | grep -q` returns gh's 404 exit status
-              # even when grep matches, so the sweep never cancelled anything.
-              # Actions runs this under bash -e, so a 404 (gh exits 1) must not end the step.
-              ref_lookup=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --silent 2>&1) || true
-              if grep -q 'HTTP 404' <<<"$ref_lookup"; then
-                gh run cancel "$run_id" -R "$GITHUB_REPOSITORY" && echo "Cancelled superseded run $run_id ($branch)"
-              fi
-            done
-          }
-          sweep
-          sleep 90
-          sweep
+        run: bash .github/scripts/cancel-superseded-merge-groups.sh
 
   merge-group-fail-fast:
     name: Merge Group Fail Fast
@@ -130,8 +113,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node --test .github/scripts/verify-ruleset-targets.test.mjs && node .github/scripts/verify-ruleset-targets.mjs
 
+      # Whole-repo invariant: a docs-only change can add an unregistered URL, so this runs
+      # on every change instead of only inside the js job.
+      - name: Verify URL registry covers the whole repo
+        run: node packages/product-registry/scripts/url-drift.test.mjs
+
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
+
+      - name: Test agent environment lifecycle with coverage
+        run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-include=scripts/codex-setup.mjs
+          --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=100
+          scripts/codex-setup.test.mjs
 
       - name: Test post-merge Launch Quality
         run: node --test .github/scripts/post-merge-quality.test.mjs
@@ -147,7 +142,8 @@ jobs:
 
   js:
     name: JavaScript/TypeScript
-    runs-on: ubuntu-latest
+    # Disposable SQL qualification requires this image's PostgreSQL16 binaries.
+    runs-on: ubuntu-24.04
     needs: detect-changes
     if: needs.detect-changes.outputs.web == 'true'
     steps:
@@ -177,6 +173,109 @@ jobs:
 
       - name: Neon migration layout checks
         run: pnpm db:schema:check
+
+      - name: Verify training mutations on disposable PostgreSQL16
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          mkdir -p artifacts/training-mutations/coverage
+          git rev-parse HEAD > artifacts/training-mutations/source-revision.txt
+          sha256sum apps/web/db/tests/verify-training-mutations.py apps/web/db/migrations/*.sql apps/web/src/lib/neon/user-directory-adapter.ts apps/web/src/lib/neon/native-account-admission.ts > artifacts/training-mutations/source-sha256.txt
+          python3 -m trace --count --summary --missing \
+            --ignore-dir "$(python3 -c 'import sys; print(sys.prefix)')" \
+            --coverdir artifacts/training-mutations/coverage \
+            apps/web/db/tests/verify-training-mutations.py --postgres-bin /usr/lib/postgresql/16/bin \
+            | tee artifacts/training-mutations/results.log
+
+      - name: Upload training mutation execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-mutations-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/training-mutations
+          if-no-files-found: warn
+
+      - name: Verify reported measurements on disposable PostgreSQL16
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/reported-measurements/coverage
+          git rev-parse HEAD > artifacts/reported-measurements/source-revision.txt
+          sha256sum scripts/neon/test-reported-measurements.py apps/web/db/migrations/20260813130000_native_product_records.sql apps/web/src/lib/neon/native-product-records-adapter.ts apps/web/src/lib/ports/reported-measurements.ts > artifacts/reported-measurements/source-sha256.txt
+          python3 -m trace --count --summary --missing \
+            --ignore-dir "$(python3 -c 'import sys; print(sys.prefix)')" \
+            --coverdir artifacts/reported-measurements/coverage \
+            scripts/neon/test-reported-measurements.py --run --postgres-bin /usr/lib/postgresql/16/bin \
+            | tee artifacts/reported-measurements/results.log
+
+      - name: Verify daily step deletions on disposable PostgreSQL16
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          evidence=artifacts/reported-measurements/daily-step-deletions
+          mkdir -p "$evidence/coverage"
+          git rev-parse HEAD > "$evidence/source-revision.txt"
+          sha256sum scripts/neon/verify-daily-step-deletions.py apps/web/src/lib/neon/native-product-records-adapter.ts apps/web/src/lib/neon/native-account-admission.ts apps/web/db/migrations/20260714183000_create_app_users.sql apps/web/db/migrations/20260813130000_native_product_records.sql apps/web/db/migrations/20261010120000_native_account_admission.sql > "$evidence/source-sha256.txt"
+          python3 -m trace --count --summary --missing \
+            --ignore-dir "$(python3 -c 'import sys; print(sys.prefix)')" \
+            --coverdir "$evidence/coverage" \
+            scripts/neon/verify-daily-step-deletions.py --run --postgres-bin /usr/lib/postgresql/16/bin \
+            | tee "$evidence/results.log"
+          python3 - <<'PY'
+          import hashlib, json, pathlib, re
+          root = pathlib.Path.cwd()
+          evidence = root / "artifacts/reported-measurements/daily-step-deletions"
+          reports = [json.loads(line) for line in (evidence / "results.log").read_text().splitlines() if line.startswith("{")]
+          assert len(reports) == 1, "Expected one completed deletion report"
+          report = reports[0]
+          expected = [
+              'DELETE then different-ID POST waits on actual account lock and retains unrelated fields',
+              'POST then different-ID DELETE waits on actual account lock and retains unrelated fields',
+              'same-ID stale replay cannot move or erase marker/date/notes/unknown JSON',
+              'different-ID recorded zero and positive imports inherit the owner/day marker',
+              'repeat deletion accepts equivalent offset instants and retains original marker',
+              'half-open end leaves the following day unchanged',
+              "foreign-ID collision cannot change anchor or authorize another owner's day deletion",
+              "different owner completes while first owner's lock remains held",
+              'later transaction failure rolls back marker and every daily write',
+              'captured old account incarnation cannot create a deletion marker',
+          ]
+          assert report["passed"] == 10 and report["checks"] == expected, "Incomplete or changed deletion contracts"
+          assert report["liveDatabase"] is False
+          schedules = [name.split(" waits on")[0] for name in expected[:2]]
+          assert report["lockObservations"] == [
+              {"schedule": name, "waitEventType": "Lock", "actualHolderInBlockingPids": True} for name in schedules
+          ], "Missing actual owner-lock observations"
+          assert set(report["postgresTools"]) == {"initdb", "pg_ctl", "psql"}
+          assert all(re.search(r"\(PostgreSQL\) 16(?:\.|$)", version) for version in report["postgresTools"].values())
+          recorded = {}
+          for line in (evidence / "source-sha256.txt").read_text().splitlines():
+              digest, name = line.split(maxsplit=1)
+              recorded[name] = digest
+          sources = [
+              'scripts/neon/verify-daily-step-deletions.py',
+              'apps/web/src/lib/neon/native-product-records-adapter.ts',
+              'apps/web/src/lib/neon/native-account-admission.ts',
+              'apps/web/db/migrations/20260714183000_create_app_users.sql',
+              'apps/web/db/migrations/20260813130000_native_product_records.sql',
+              'apps/web/db/migrations/20261010120000_native_account_admission.sql',
+          ]
+          assert set(recorded) == set(sources), "Incomplete source inventory"
+          assert re.fullmatch(r"[0-9a-f]{40}", (evidence / "source-revision.txt").read_text().strip())
+          assert all(hashlib.sha256((root / name).read_bytes()).hexdigest() == recorded[name] for name in sources)
+          assert report["sourceSha256"] == {str(root / name): recorded[name] for name in sources[1:]}, "Report source mismatch"
+          print("Verified 10 deletion contracts, 2 owner-lock observations, PostgreSQL16 tools and exact source")
+          PY
+
+      - name: Upload reported measurement execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reported-measurements-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/reported-measurements
+          if-no-files-found: warn
 
       - name: Type check
         run: pnpm typecheck
@@ -267,3 +366,23 @@ jobs:
           fi
 
           echo "✅ All CI checks passed!" >> "$GITHUB_STEP_SUMMARY"
+
+  cancel-superseded-merge-groups-final:
+    name: Cancel Superseded Merge Groups (group end)
+    if: always() && github.event_name == 'merge_group'
+    needs: [ci-summary]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Cancel CI runs for deleted merge-group refs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/cancel-superseded-merge-groups.sh

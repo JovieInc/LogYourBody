@@ -15,6 +15,7 @@
     "test": "turbo run test",
     "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
     "lint:knowledge": "node scripts/lint-no-specifics.mjs && node scripts/lint-claims.mjs",
+    "growth:report": "node packages/shared-lib/scripts/growth-report.mjs",
     "test:knowledge-lint": "node --test scripts/lint-no-specifics.test.mjs scripts/lint-claims.test.mjs",
     "web": "pnpm --filter logyourbody dev",
     "db:migrate": "scripts/web/create-migration.sh",
@@ -67,7 +68,7 @@
   },
   "pnpm": {
     "overrides": {
-      "js-yaml": "4.3.2",
+      "js-yaml": "5.4.3",
       "prismjs": "1.30.0",
       "@xmldom/xmldom": ">=0.8.15",
       "fflate": ">=0.8.3",
@@ -90,11 +91,11 @@
     "*.{json,md,css,scss}": [
       "prettier --write"
     ],
-    "apps/ios/**/*.{swift}": [
-      "swiftlint lint --strict --config apps/ios/.swiftlint.yml"
-    ],
     "*.{ts,tsx,js,jsx,mjs,cjs,swift,sh,yml,yaml,json,md,html,css,scss,rb,py,toml,xml,plist,template,xcconfig}": [
       "node packages/product-registry/scripts/url-drift.test.mjs --staged"
+    ],
+    "apps/ios/{LogYourBody,LogYourBodyWidget,LogYourBodyTests,LogYourBodyUITests}/**/*.swift": [
+      "swiftlint lint --strict --config apps/ios/.swiftlint.yml"
     ]
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 # Health & Medical Disclosure
 
-**Last Updated: July 11, 2025**
+**Last Updated: October 14, 2026**
 
 ## Important Health Information Disclaimer
 
@@ -62,7 +62,7 @@ Before using fitness tracking features:
 
 ### 4.1 Limitations of Measurements
 
-- Body weight and composition measurements are estimates only
+- Measured weight and body-composition estimates are different kinds of information
 - Different measurement methods may yield different results
 - Daily fluctuations are normal and expected
 - These measurements should not be your only health indicators
@@ -113,15 +113,15 @@ While tracking progress can be motivating, it may also impact mental health:
 
 If you're struggling with body image or eating concerns:
 
-- National Eating Disorders Association Helpline: 1-800-931-2237
-- Crisis Text Line: Text "HELLO" to 741741
+- [National Alliance for Eating Disorders helpline (U.S.)](https://www.allianceforeatingdisorders.com/find-treatment/): 1-866-662-1235
+- [Crisis Text Line (U.S.)](https://www.crisistextline.org/): Text "HOME" to 741741
 - Consult with mental health professionals
 
 ## 7. Data Accuracy and Limitations
 
 ### 7.1 No Guarantee of Accuracy
 
-- All measurements and calculations are estimates
+- Measurements can contain error; derived metrics depend on the accuracy of their inputs
 - Results may vary based on input accuracy
 - Technical errors or bugs may affect data
 - We do not guarantee the accuracy of any health metrics

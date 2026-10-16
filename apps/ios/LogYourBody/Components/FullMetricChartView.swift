@@ -320,6 +320,8 @@ struct FullMetricChartView: View {
     let currentValue: String
     let unit: String
     let currentDate: String
+    let shareSnapshots: [ContextualMetricSnapshot]
+    let isShareContextVisible: Bool
     let chartData: [MetricChartDataPoint]
     /// Optional canonical trend series. Raw data remains the source for the
     /// Raw mode while the default Smoothed mode can use the same series as the
@@ -344,8 +346,10 @@ struct FullMetricChartView: View {
     @State var isHistoryScrubbing = false
 
     @State var localHistorySections: [HistorySection]?
-    @State var historyEntryPendingDeletion: MetricHistoryEntry?
+    @State var historyEntryPendingDeletion: MetricHistoryDeletionRequest?
     @State var showingHistoryDeleteConfirmation = false
+
+    @State var showsMetricShare = false
 
     @ScaledMetric(relativeTo: .largeTitle) var headlineValueFontSize: CGFloat = 56
 
@@ -368,6 +372,8 @@ struct FullMetricChartView: View {
         goalValue: Double?,
         selectedTimeRange: Binding<TimeRange>,
         selectedTimelineDate: Binding<Date?> = .constant(nil),
+        shareSnapshots: [ContextualMetricSnapshot] = [],
+        isShareContextVisible: Bool = true,
         initialChartMode: ChartMode = .trend
     ) {
         self.title = title
@@ -376,6 +382,8 @@ struct FullMetricChartView: View {
         self.currentValue = currentValue
         self.unit = unit
         self.currentDate = currentDate
+        self.shareSnapshots = shareSnapshots
+        self.isShareContextVisible = isShareContextVisible
         self.chartData = chartData
         self.trendChartData = trendChartData
         self.onAdd = onAdd
@@ -443,4 +451,33 @@ func makeHistorySections(from entries: [MetricHistoryEntry]) -> [HistorySection]
     }
 
     return sections
+}
+
+/// Capture the row and its entity kind together before confirmation or an async wait.
+struct MetricHistoryDeletionRequest: Identifiable {
+    let entry: MetricHistoryEntry
+    let metricType: DashboardViewLiquid.MetricType
+    var id: String { entry.id }
+}
+
+/// Only body-measurement history IDs may reach the body-measurement delete API.
+enum MetricHistoryDeletion {
+    static func supportsBodyMetricDeletion(_ type: DashboardViewLiquid.MetricType?) -> Bool {
+        switch type {
+        case .weight, .bodyFat, .ffmi, .bodyScore:
+            return true
+        case .steps, .glp1, nil:
+            return false
+        }
+    }
+
+    @MainActor
+    static func deleteBodyEntry(
+        id: String,
+        metricType: DashboardViewLiquid.MetricType?,
+        using deleteBodyMetric: (String) async -> Bool
+    ) async -> Bool {
+        guard !id.isEmpty, supportsBodyMetricDeletion(metricType) else { return false }
+        return await deleteBodyMetric(id)
+    }
 }

@@ -35,7 +35,8 @@ else
   echo "::warning::Could not diff '${BASE_SHA:-}'..'${HEAD_SHA:-}'; selecting every surface."
 fi
 
-matches() { [[ "$diff_known" == 'false' ]] || printf '%s\n' "$changed_files" | grep -Eq "$1"; }
+# Drain the input: grep -q can SIGPIPE printf under pipefail and hide a match.
+matches() { [[ "$diff_known" == 'false' ]] || printf '%s\n' "$changed_files" | grep -E "$1" > /dev/null; }
 
 web=false
 matches "$web_pattern" && web=true

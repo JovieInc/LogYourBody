@@ -29,21 +29,20 @@ var entryScreen: WorldClassScreen {
         }
     }
 
+var isHomeV2WeightEntry: Bool {
+        isHomeV2LogEntry && selectedTab == 0
+    }
+
+var usesAccessibleBodyFatLayout: Bool {
+        isHomeV2LogEntry && selectedTab == 1 && dynamicTypeSize.isAccessibilitySize
+    }
+
 var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                if isHomeV2LogEntry {
-                    Text(selectedTab == 0 ? "Log weight" : entryTitle)
-                        .accessibilityIdentifier("home_v2_log_sheet")
-                        .accessibilityAddTraits(.isHeader)
+                if !isHomeV2WeightEntry && !usesAccessibleBodyFatLayout {
+                    entryDateDescription
                 }
-                Text(selectedDate.formatted(date: .complete, time: .shortened))
-                    .font(.subheadline)
-                    .foregroundStyle(Color.jovieTextSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, JovieTokens.screenInset)
-                    .padding(.top, 8)
-                    .accessibilityIdentifier(isHomeV2LogEntry ? "home_v2_log_sheet_date" : "add_entry_date")
 
                 Picker("Entry Type", selection: $selectedTab) {
                     Label("Weight", systemImage: "scalemass").tag(0)
@@ -59,58 +58,50 @@ var body: some View {
                 .accessibilityLabel("Entry type selector")
                 .accessibilityHint("Select the type of entry you want to add")
 
-                // Date picker (common for all tabs)
-                HStack {
-                    Text("Date")
-                        .font(.appBodySmall)
-                        .foregroundColor(.appTextSecondary)
-
-                    Spacer()
-
-                    DatePicker("", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
-                        .labelsHidden()
+                if !usesAccessibleBodyFatLayout {
+                    entryDatePicker
                 }
-                .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.vertical, 8)
 
                 Divider()
 
                 // Tab content
-                ScrollView {
-                    switch selectedTab {
-                    case 0:
-                        weightEntryView
-                    case 1:
-                        bodyFatEntryView
-                    case 2:
-                        photoEntryView
-                    case 3:
-                        glp1EntryView
-                    default:
-                        EmptyView()
+                if usesAccessibleBodyFatLayout {
+                    accessibleBodyFatScrollView
+                } else {
+                    ScrollView {
+                        switch selectedTab {
+                        case 0:
+                            weightEntryView
+                        case 1:
+                            bodyFatEntryView
+                        case 2:
+                            photoEntryView
+                        case 3:
+                            glp1EntryView
+                        default:
+                            EmptyView()
+                        }
                     }
+                    .accessibilityIdentifier(isHomeV2WeightEntry ? "home_v2_log_sheet_content" : "add_entry_content")
                 }
 
-                BaseButton(
-                    saveButtonText,
-                    configuration: ButtonConfiguration(
-                        style: .custom(background: .jovieAction, foreground: .jovieActionText),
-                        size: .large,
-                        isLoading: isProcessingPhotos || isSavingEntry,
-                        isEnabled: canSave && !isProcessingPhotos && !isSavingEntry,
-                        fullWidth: true,
-                        cornerRadius: 9_999
-                    ),
-                    action: saveEntry
-                )
+                entrySaveButton
                 .accessibilityIdentifier(isHomeV2LogEntry ? "home_v2_log_sheet_save" : "add_entry_save_button")
                 .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.vertical, 12)
             }
             .worldClassScreen(entryScreen)
-            .navigationTitle(isHomeV2LogEntry && selectedTab == 0 ? "Log weight" : entryTitle)
+            .navigationTitle(isHomeV2LogEntry ? "" : entryTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if isHomeV2LogEntry {
+                    ToolbarItem(placement: .principal) {
+                        Text(selectedTab == 0 ? "Log weight" : entryTitle)
+                            .font(.headline)
+                            .accessibilityIdentifier("home_v2_log_sheet")
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                }
                 ToolbarItemGroup(placement: .cancellationAction) {
                     Button("Cancel") {
                         guard NativeSheetPresentationPolicy.canDismissAddEntry(
@@ -159,6 +150,99 @@ var body: some View {
             }
         }
         .nativeSheetChrome(for: .addEntry, detent: $sheetDetent)
+    }
+
+    private var bodyFatValueScrollID: String { "body-fat-value-control" }
+
+    private var accessibleBodyFatScrollView: some View {
+        GeometryReader { viewport in
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        entryDateDescription
+                        entryDatePicker
+                        bodyFatEntryView
+                    }
+                }
+                .accessibilityIdentifier("add_entry_content")
+                .onChange(of: isBodyFatFieldEditing) { _, _ in
+                    revealBodyFatField(using: proxy, viewportHeight: viewport.size.height)
+                }
+                .onChange(of: viewport.size.height) { _, height in
+                    revealBodyFatField(using: proxy, viewportHeight: height)
+                }
+            }
+        }
+    }
+
+    private func revealBodyFatField(using proxy: ScrollViewProxy, viewportHeight: CGFloat) {
+        guard isBodyFatFieldEditing, viewportHeight.isFinite, viewportHeight > 0 else { return }
+        proxy.scrollTo(bodyFatValueScrollID, anchor: .center)
+    }
+
+    private var entryDateDescription: some View {
+        Text(selectedDate.formatted(date: .complete, time: .shortened))
+            .font(.subheadline)
+            .foregroundStyle(Color.jovieTextSecondary)
+            .fixedSize(horizontal: false, vertical: usesAccessibleBodyFatLayout)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.top, 8)
+            .accessibilityIdentifier(isHomeV2LogEntry ? "home_v2_log_sheet_date" : "add_entry_date")
+    }
+
+    private var entryDatePicker: some View {
+        Group {
+            if isHomeV2WeightEntry {
+                DatePicker("Date", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+                    .font(.appBodySmall)
+                    .foregroundStyle(Color.jovieTextSecondary)
+                    .tint(.jovieText)
+                    .accessibilityIdentifier("home_v2_log_sheet_date")
+            } else if usesAccessibleBodyFatLayout {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Date")
+                        .font(.appBodySmall)
+                        .foregroundColor(.appTextSecondary)
+                    DatePicker("Date", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+                        .labelsHidden()
+                }
+            } else {
+                HStack {
+                    Text("Date")
+                        .font(.appBodySmall)
+                        .foregroundColor(.appTextSecondary)
+
+                    Spacer()
+
+                    DatePicker("", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+                        .labelsHidden()
+                }
+            }
+        }
+        .padding(.horizontal, JovieTokens.screenInset)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private var entrySaveButton: some View {
+        let configuration = ButtonConfiguration(
+            style: .custom(background: .jovieAction, foreground: .jovieActionText),
+            size: .large,
+            isLoading: isProcessingPhotos || isSavingEntry,
+            isEnabled: canSave && !isProcessingPhotos && !isSavingEntry,
+            fullWidth: true,
+            cornerRadius: 9_999
+        )
+        if usesAccessibleBodyFatLayout {
+            BaseButton(configuration: configuration, action: saveEntry) {
+                Text(saveButtonText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        } else {
+            BaseButton(saveButtonText, configuration: configuration, action: saveEntry)
+        }
     }
 
 // MARK: - GLP-1 Entry View
@@ -507,7 +591,113 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
     }
 
 // MARK: - Weight Entry View
+    @ViewBuilder
     var weightEntryView: some View {
+        if isHomeV2LogEntry {
+            homeV2WeightEntryView
+        } else {
+            standardWeightEntryView
+        }
+    }
+
+    private var homeV2WeightEntryView: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 8) {
+                TextField("0.0", text: $weight)
+                    .keyboardType(.decimalPad)
+                    .scaledSystemFont(size: 64, weight: .semibold, relativeTo: .largeTitle)
+                    .monospacedDigit()
+                    .multilineTextAlignment(.center)
+                    .textFieldStyle(.plain)
+                    .foregroundStyle(Color.jovieText)
+                    .tint(.jovieText)
+                    .frame(maxWidth: .infinity)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .accessibilityLabel("Weight value")
+                    .accessibilityHint("Enter your weight")
+                    .accessibilityIdentifier("home_v2_log_sheet_value")
+                    .submitLabel(.done)
+                    .onChange(of: weight) { _, newValue in
+                        validateWeight(newValue)
+                    }
+
+                Picker("Weight unit", selection: $weightUnit) {
+                    Text("kg").tag("kg")
+                    Text("lbs").tag("lbs")
+                }
+                .pickerStyle(.menu)
+                .tint(.jovieTextSecondary)
+                .frame(minWidth: 64, minHeight: JovieTokens.minimumHitTarget)
+                .accessibilityValue(weightUnit)
+                .accessibilityIdentifier("home_v2_log_sheet_unit")
+                .onChange(of: weightUnit) { previous, current in
+                    updateWeightUnit(from: previous, to: current)
+                }
+            }
+
+            HStack(spacing: 24) {
+                homeV2WeightStepButton(direction: -1, symbol: "minus", label: "Decrease weight")
+                homeV2WeightStepButton(direction: 1, symbol: "plus", label: "Increase weight")
+            }
+
+            Group {
+                if let error = weightError {
+                    Text(error)
+                        .foregroundStyle(Color.error)
+                        .accessibilityLabel("Weight validation error: \(error)")
+                } else {
+                    Text("Use your scale reading for this date.")
+                        .foregroundStyle(Color.jovieTextSecondary)
+                }
+            }
+            .font(.appBodySmall)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                selectedTab = 1
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Add body fat")
+                            .font(.body)
+                            .foregroundStyle(Color.jovieText)
+                        Text("Optional estimate or measurement")
+                            .font(.caption)
+                            .foregroundStyle(Color.jovieTextSecondary)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.body)
+                        .foregroundStyle(Color.jovieTextSecondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("home_v2_log_sheet_details")
+        }
+        .padding(.horizontal, JovieTokens.screenInset)
+        .padding(.vertical, 24)
+    }
+
+    private func homeV2WeightStepButton(direction: Int, symbol: String, label: String) -> some View {
+        Button { stepWeight(by: direction) } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(Color.jovieText)
+                .frame(width: 48, height: 48)
+                .background(Color.jovieText.opacity(0.08), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(direction < 0 ? "home_v2_log_sheet_minus" : "home_v2_log_sheet_plus")
+    }
+
+    private var standardWeightEntryView: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Enter your weight")
                 .font(.appHeadline)
@@ -515,16 +705,6 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
-                    if isHomeV2LogEntry {
-                        Button { stepWeight(by: -1) } label: {
-                            Image(systemName: "minus")
-                                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-                                .contentShape(Rectangle())
-                        }
-                        .accessibilityLabel("Decrease weight")
-                        .accessibilityIdentifier("home_v2_log_sheet_minus")
-                    }
-
                     TextField("0.0", text: $weight)
                         .keyboardType(.decimalPad)
                         .font(.system(size: 48, weight: .bold, design: .rounded))
@@ -538,16 +718,6 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                             validateWeight(newValue)
                         }
 
-                    if isHomeV2LogEntry {
-                        Button { stepWeight(by: 1) } label: {
-                            Image(systemName: "plus")
-                                .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-                                .contentShape(Rectangle())
-                        }
-                        .accessibilityLabel("Increase weight")
-                        .accessibilityIdentifier("home_v2_log_sheet_plus")
-                    }
-
                     Picker("Unit", selection: $weightUnit) {
                         Text("kg").tag("kg")
                         Text("lbs").tag("lbs")
@@ -555,8 +725,8 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 80)
                     .accessibilityLabel("Weight unit")
-                    .onChange(of: weightUnit) { _, _ in
-                        validateWeight(weight)
+                    .onChange(of: weightUnit) { previous, current in
+                        updateWeightUnit(from: previous, to: current)
                     }
                 }
 
@@ -570,13 +740,6 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                     Text("Use today's scale weight.")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextTertiary)
-                }
-
-                if isHomeV2LogEntry {
-                    Button("Body fat and more") {
-                        selectedTab = 1
-                    }
-                    .accessibilityIdentifier("home_v2_log_sheet_details")
                 }
             }
 
@@ -594,7 +757,7 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    TextField("0.0", text: $bodyFat)
+                    TextField("0.0", text: $bodyFat, onEditingChanged: { isBodyFatFieldEditing = $0 })
                         .keyboardType(.decimalPad)
                         .font(.system(size: 48, weight: .bold, design: .rounded))
                         .multilineTextAlignment(.center)
@@ -611,6 +774,7 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                         .font(.system(size: 24, weight: .medium))
                         .foregroundColor(.appTextSecondary)
                 }
+                .id(bodyFatValueScrollID)
 
                 // Helper text
                 if let error = bodyFatError {
@@ -630,18 +794,47 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                     .font(.appBodySmall)
                     .foregroundColor(.appTextSecondary)
 
-                Picker("Method", selection: $bodyFatMethod) {
-                    ForEach(BodyFatEntryMethod.allCases, id: \.rawValue) { method in
-                        Text(method.title).tag(method.rawValue)
+                Group {
+                    if usesAccessibleBodyFatLayout {
+                        Menu {
+                            bodyFatMethodPicker
+                        } label: {
+                            HStack(spacing: 16) {
+                                Text(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .accessibilityHidden(true)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        bodyFatMethodPicker
+                            .pickerStyle(MenuPickerStyle())
                     }
                 }
-                .pickerStyle(MenuPickerStyle())
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityLabel("Body fat measurement method")
+                .accessibilityValue(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
+                .accessibilityIdentifier("home_v2_body_fat_method")
             }
 
             Spacer()
         }
         .padding(.horizontal)
+    }
+
+    private var bodyFatMethodPicker: some View {
+        Picker("Method", selection: $bodyFatMethod) {
+            if BodyFatEntryMethod.needsPreservedOption(bodyFatMethod) {
+                Text(BodyFatEntryMethod.selectionTitle(bodyFatMethod)).tag(bodyFatMethod)
+            }
+            ForEach(BodyFatEntryMethod.allCases, id: \.rawValue) { method in
+                Text(method.title).tag(Optional(method.rawValue))
+            }
+        }
     }
 }

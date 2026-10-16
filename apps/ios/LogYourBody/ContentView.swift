@@ -159,6 +159,15 @@ struct ContentView: View {
         )
     }
 
+    private var isProductReadyForReviewRequest: Bool {
+        authManager.isAuthenticated && isLoadingComplete &&
+            !shouldShowOnboarding && !shouldShowProfileCompletion && subscriptionManager.isSubscribed &&
+            (!isBiometricLockArmed || isUnlocked) && !finishedOnboardingThisLaunch &&
+            !authManager.needsLegalConsent && !showLegalConsent && !showWhatsNew &&
+            !showDailyReminderOffer && !shouldShowDailyReminderPrompt && pendingDexaPDF == nil &&
+            !bugReportManager.isPromptPresented && !bugReportManager.isFormPresented
+    }
+
     private func completeLaunchOverlayIfReady() {
         guard !isLoadingComplete,
               loadingManager.progress >= 1.0 else {
@@ -180,6 +189,11 @@ struct ContentView: View {
             loadingOverlay
         }
         .preferredColorScheme(.dark)
+        .modifier(BodyRecordReviewPresentation(
+            currentOwnerID: authManager.currentUser?.id,
+            isProductReady: isProductReadyForReviewRequest,
+            isOnline: realtimeSyncManager.isOnline
+        ))
         .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         // Toast presenter removed - handle notifications at view level
         .fullScreenCover(isPresented: $showLegalConsent) {
@@ -358,17 +372,19 @@ struct ContentView: View {
                             showDailyReminderOffer = shouldShowDailyReminderPrompt
                         }
                     }
-                    // Offered over Today once a first weigh-in is logged; a swipe-away
-                    // counts as "Not now" so it is asked once.
-                    .sheet(isPresented: $showDailyReminderOffer, onDismiss: {
-                        if !notificationManager.hasCompletedDailyWeighInPrompt {
-                            notificationManager.skipDailyWeighInPrompt()
-                        }
-                    }, content: {
-                        DailyWeighInReminderPromptView(notificationManager: notificationManager) {
-                            showDailyReminderOffer = false
-                        }
-                    })
+                    // Sibling of Today, not a modifier on it. An ancestor sheet drops
+                    // the edit-entry sheet while Context is pushed.
+                    .background {
+                        DailyReminderOfferSheetHost(
+                            isPresented: $showDailyReminderOffer,
+                            notificationManager: notificationManager,
+                            onDismiss: {
+                                if !notificationManager.hasCompletedDailyWeighInPrompt {
+                                    notificationManager.skipDailyWeighInPrompt()
+                                }
+                            }
+                        )
+                    }
             }
         }
     }
@@ -417,6 +433,25 @@ struct ContentView: View {
                 .transition(.opacity)
             }
         }
+    }
+}
+
+/// Offered over Today once a first weigh-in is logged. A swipe-away counts as
+/// "Not now" so it is asked once. The sheet stays on this sibling so it is not
+/// an ancestor of Today's log sheet.
+private struct DailyReminderOfferSheetHost: View {
+    @Binding var isPresented: Bool
+    var notificationManager: NotificationManager
+    var onDismiss: () -> Void
+
+    var body: some View {
+        Color.clear
+            .accessibilityHidden(true)
+            .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
+                DailyWeighInReminderPromptView(notificationManager: notificationManager) {
+                    isPresented = false
+                }
+            }
     }
 }
 

@@ -27,11 +27,36 @@ struct TrainingExercisePrescription: Decodable, Equatable, Identifiable, Sendabl
     let loadInstruction: String?
     let progression: String
     let evidenceIds: [String]
+    var substitutions: [TrainingExerciseSubstitution]?
 
     struct RepRange: Decodable, Equatable, Sendable {
         let min: Int
         let max: Int
     }
+}
+
+struct TrainingExerciseSubstitution: Decodable, Equatable, Identifiable, Sendable {
+    let id: String
+    let name: String
+    let primaryMuscle: String
+    let muscleContribution: [String: Double]
+    let sets: Int
+    let repRange: TrainingExercisePrescription.RepRange
+    let targetReps: Int
+    let targetRir: Int
+    let targetLoadKg: Double?
+    let loadInstruction: String?
+    let progression: String
+    let evidenceIds: [String]
+}
+
+struct TrainingWorkoutEvent: Decodable, Equatable, Identifiable, Sendable {
+    let id: String
+    let kind: String
+    let createdAt: String
+    let exerciseId: String?
+    let replacementExerciseId: String?
+    let minutes: Int?
 }
 
 struct TrainingSession: Decodable, Equatable, Identifiable, Sendable {
@@ -45,6 +70,9 @@ struct TrainingSession: Decodable, Equatable, Identifiable, Sendable {
     let explanation: String?
     let evidenceIds: [String]
     let loggedSets: [TrainingSavedSet]?
+    var executionRevision: Int?
+    var executionPaused: Bool?
+    var executionEvents: [TrainingWorkoutEvent]?
 }
 
 struct TrainingSavedSet: Codable, Equatable, Sendable {
@@ -54,6 +82,21 @@ struct TrainingSavedSet: Codable, Equatable, Sendable {
     let reps: Int
     let loadKg: Double?
     let rir: Int
+    var completedAt: String?
+    var revision: Int?
+    var corrections: [TrainingSetCorrectionAudit]?
+}
+
+struct TrainingSetCorrectionAudit: Codable, Equatable, Sendable {
+    struct Previous: Codable, Equatable, Sendable {
+        let reps: Int
+        let loadKg: Double?
+        let rir: Int
+    }
+
+    let id: String
+    let correctedAt: String
+    let previous: Previous
 }
 
 struct TrainingNextResponse: Decodable, Equatable, Sendable {
@@ -92,12 +135,84 @@ struct TrainingSetLogRequest: Codable, Equatable, Sendable {
     let rir: Int
 }
 
+struct TrainingMuscleFeedbackRequest: Encodable, Equatable, Sendable {
+    let soreness: Int?
+    let recovery: String?
+    let pump: Int?
+    let workload: String?
+    let performance: String?
+}
+
+struct TrainingSetCorrectionRequest: Codable, Equatable, Sendable {
+    let sessionId: String
+    let exerciseId: String
+    let setNumber: Int
+    let reps: Int
+    let loadKg: Double?
+    let rir: Int
+    let correctionId: String
+    let expectedRevision: Int
+}
+
+struct TrainingWorkoutAction: Encodable, Equatable, Sendable {
+    let kind: String
+    let exerciseId: String?
+    let minutes: Int?
+
+    static func equipmentUnavailable(_ exerciseId: String) -> Self {
+        Self(kind: "equipment_unavailable", exerciseId: exerciseId, minutes: nil)
+    }
+
+    static func skip(_ exerciseId: String) -> Self {
+        Self(kind: "skip", exerciseId: exerciseId, minutes: nil)
+    }
+
+    static func pain(_ exerciseId: String) -> Self {
+        Self(kind: "pain", exerciseId: exerciseId, minutes: nil)
+    }
+
+    static func shorten(_ minutes: Int) -> Self {
+        Self(kind: "shorten", exerciseId: nil, minutes: minutes)
+    }
+
+    static let pause = Self(kind: "pause", exerciseId: nil, minutes: nil)
+    static let resume = Self(kind: "resume", exerciseId: nil, minutes: nil)
+    static let end = Self(kind: "end", exerciseId: nil, minutes: nil)
+}
+
+struct TrainingWorkoutActionRequest: Encodable, Equatable, Sendable {
+    let sessionId: String
+    let eventId: String
+    let expectedRevision: Int
+    let action: TrainingWorkoutAction
+}
+
 struct TrainingFeedbackRequest: Encodable, Equatable, Sendable {
     let sessionId: String
-    let soreness: Int
-    let pump: Int
-    let performance: String
-    let jointPain: Int
+    let soreness: Int?
+    let pump: Int?
+    let performance: String?
+    let jointPain: Int?
+    let muscles: [String: TrainingMuscleFeedbackRequest]?
+    let source: String
+
+    init(
+        sessionId: String,
+        soreness: Int? = nil,
+        pump: Int? = nil,
+        performance: String? = nil,
+        jointPain: Int? = nil,
+        muscles: [String: TrainingMuscleFeedbackRequest]? = nil,
+        source: String = "touch"
+    ) {
+        self.sessionId = sessionId
+        self.soreness = soreness
+        self.pump = pump
+        self.performance = performance
+        self.jointPain = jointPain
+        self.muscles = muscles
+        self.source = source
+    }
 }
 
 enum TrainingServiceError: LocalizedError, Equatable {
@@ -126,6 +241,8 @@ protocol TrainingServicing {
     func loadNext(accessToken: String) async throws -> TrainingNextResponse
     func enroll(accessToken: String, sessionsPerWeek: Int, equipment: String) async throws -> TrainingProgramResponse
     func logSet(accessToken: String, request: TrainingSetLogRequest) async throws
+    func correctSet(accessToken: String, request: TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
+    func applyAction(accessToken: String, request: TrainingWorkoutActionRequest) async throws -> TrainingSession
     func recordFeedback(accessToken: String, request: TrainingFeedbackRequest) async throws
     func revoke(accessToken: String) async throws -> TrainingRevokeResponse
 }
@@ -164,10 +281,53 @@ final class URLSessionTrainingService: TrainingServicing {
             body: request
         )
         guard response.sessionComplete != nil,
-              response.log == TrainingSavedSet(
-                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
-                reps: request.reps, loadKg: request.loadKg, rir: request.rir
-              ) else { throw TrainingServiceError.invalidResponse }
+              let log = response.log,
+              log.sessionId == request.sessionId,
+              log.exerciseId == request.exerciseId,
+              log.setNumber == request.setNumber,
+              log.reps == request.reps,
+              log.loadKg == request.loadKg,
+              log.rir == request.rir
+        else { throw TrainingServiceError.invalidResponse }
+    }
+
+    func correctSet(
+        accessToken: String,
+        request: TrainingSetCorrectionRequest
+    ) async throws -> TrainingSavedSet {
+        let response: TrainingSetCorrectionResponse = try await send(
+            path: "correct-set",
+            method: "POST",
+            accessToken: accessToken,
+            body: request
+        )
+        guard response.log.sessionId == request.sessionId,
+              response.log.exerciseId == request.exerciseId,
+              response.log.setNumber == request.setNumber,
+              response.log.reps == request.reps,
+              response.log.loadKg == request.loadKg,
+              response.log.rir == request.rir,
+              response.log.revision == request.expectedRevision + 1,
+              response.log.corrections?.contains(where: { $0.id == request.correctionId }) == true
+        else { throw TrainingServiceError.invalidResponse }
+        return response.log
+    }
+
+    func applyAction(
+        accessToken: String,
+        request: TrainingWorkoutActionRequest
+    ) async throws -> TrainingSession {
+        let response: TrainingWorkoutActionResponse = try await send(
+            path: "action",
+            method: "POST",
+            accessToken: accessToken,
+            body: request
+        )
+        guard response.session.id == request.sessionId,
+              response.session.executionRevision == request.expectedRevision + 1,
+              response.session.executionEvents?.contains(where: { $0.id == request.eventId }) == true
+        else { throw TrainingServiceError.invalidResponse }
+        return response.session
     }
 
     func recordFeedback(accessToken: String, request: TrainingFeedbackRequest) async throws {
@@ -181,6 +341,37 @@ final class URLSessionTrainingService: TrainingServicing {
 
     func revoke(accessToken: String) async throws -> TrainingRevokeResponse {
         try await send(path: "enroll", method: "DELETE", accessToken: accessToken)
+    }
+
+    func perform(_ request: CanvasClientRequest, accessToken: String) async throws -> CanvasCommandResponse {
+        guard let url = URL(string: "\(TrainingAPIContract.rootPath)/canvas", relativeTo: baseURL)?.absoluteURL else {
+            throw TrainingServiceError.invalidResponse
+        }
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        urlRequest.httpBody = try JSONSerialization.data(withJSONObject: request.jsonObject())
+
+        let (data, response) = try await urlSession.data(for: urlRequest)
+        guard let http = response as? HTTPURLResponse else { throw TrainingServiceError.invalidResponse }
+        if http.statusCode == 401 { throw TrainingServiceError.authenticationExpired }
+        if http.statusCode == 429 {
+            throw TrainingServiceError.rateLimited(
+                retryAfterSeconds: Int(http.value(forHTTPHeaderField: "Retry-After") ?? "60") ?? 60
+            )
+        }
+        guard http.statusCode == 200 || http.statusCode == 409 else {
+            let payload = try? JSONDecoder().decode(TrainingErrorResponse.self, from: data)
+            throw TrainingServiceError.server(code: payload?.error ?? "training_unavailable")
+        }
+        let decoded = try JSONDecoder().decode(CanvasCommandResponse.self, from: data)
+        guard (decoded.version ?? 1) == TrainingAPIContract.version, decoded.readback.version == 1 else {
+            throw TrainingServiceError.invalidResponse
+        }
+        return decoded
     }
 
     private func send<Response: Decodable>(
@@ -256,5 +447,14 @@ private struct TrainingSetLogResponse: Decodable, VersionedTrainingResponse {
     let version: Int
     let log: TrainingSavedSet?
     let sessionComplete: Bool?
+}
+private struct TrainingSetCorrectionResponse: Decodable, VersionedTrainingResponse {
+    let version: Int
+    let log: TrainingSavedSet
+}
+private struct TrainingWorkoutActionResponse: Decodable, VersionedTrainingResponse {
+    let version: Int
+    let decision: String
+    let session: TrainingSession
 }
 private struct TrainingErrorResponse: Decodable { let error: String }

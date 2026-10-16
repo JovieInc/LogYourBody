@@ -5,24 +5,28 @@
 import CoreGraphics
 import Foundation
 
-/// Gate for the photo-first Home (Pencil H2, picked 2026-09-26). Evaluated
-/// through `FeatureReleaseEvaluator` (shared lifecycle contract, JOV-8056):
-/// dogfood-stage, so verified staff/agent principals see it automatically and
-/// ordinary customers need the Statsig enable gate. Debug fixtures force it
-/// on so XCUITest can cover both states without a network.
+/// Photo-first Home (Pencil H2, picked 2026-09-26). Graduated: ordinary users
+/// open it by default. Evaluated through `FeatureReleaseEvaluator` (shared
+/// lifecycle contract, JOV-8056). Statsig is an emergency kill switch only;
+/// an unavailable or unset gate must not fall back to the legacy Home.
+/// Debug fixtures explicitly choose Home V2 or rollback.
 enum HomeV2Policy {
     static let gateKey = "home_v2_photo_first"
-    /// Inverse-meaning emergency stop (shared lifecycle contract, JOV-8056).
-    /// Never a blanket default: only a fresh `true` stops the surface.
+    /// Inverse-meaning emergency stop. Only a fresh `true` stops the surface.
     static let killSwitchKey = "home_v2_kill_switch"
-    /// Dogfood stage: verified staff/agent principals are exposed
-    /// automatically; ordinary customers still need the enable gate.
+    /// Public baseline. The positive enable gate is recorded on the descriptor
+    /// and is not consulted: a missing or false gate must not hide Home.
     static let releaseDescriptor = FeatureReleaseDescriptor(
         flagKey: gateKey,
         killSwitchKey: killSwitchKey,
-        stage: .dogfood,
+        stage: .graduated,
         minimumBuild: nil
     )
+    #if DEBUG
+    /// Explicit legacy captures exercise rollback without changing remote gates.
+    /// Rollback wins if a test accidentally supplies both fixture modes.
+    static let rollbackFixtureArgument = "-lybUITestHomeRollbackFixture"
+    #endif
     static let fixtureArgument = "-lybUITestHomeV2Fixture"
     static let photoFixtureArgument = "-lybUITestHomeV2PhotoFixture"
     /// Signed in, nothing logged yet: the H0 day-zero state.
@@ -42,6 +46,7 @@ enum HomeV2Policy {
         isGateEnabled: ((String) -> Bool)? = nil
     ) -> Bool {
         #if DEBUG
+        if arguments.contains(rollbackFixtureArgument) { return false }
         if arguments.contains(fixtureArgument) || arguments.contains(photoFixtureArgument) ||
             arguments.contains(emptyFixtureArgument) ||
             arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument) ||
@@ -51,17 +56,16 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        // Query the kill switch first so `flagKey` remains the last gate
-        // consulted, matching the enable-gate call contract.
+        // Graduated Home does not consult the positive enable gate. Doing so
+        // would record an exposure for a flag that no longer decides the surface.
         let killSwitchEnabled = checkGate(killSwitchKey)
-        let enableGateEnabled = checkGate(gateKey)
         return FeatureReleaseEvaluator.evaluate(
             releaseDescriptor,
             context: FeatureReleaseContext(
                 actor: actor,
                 installedBuild: installedBuild,
                 configState: .fresh,
-                enableGate: enableGateEnabled,
+                enableGate: false,
                 killSwitch: killSwitchEnabled
             )
         ).isEnabled
@@ -89,6 +93,7 @@ enum HomeV2Policy {
 enum HomeV2Copy {
     static let title = "Today"
     static let logWeight = "Log weight"
+    static let logCheckIn = "Log check-in"
     static let done = "Done"
     static let undo = "Undo"
     static let lastThirtyDays = "Last 30 days"
@@ -96,6 +101,8 @@ enum HomeV2Copy {
     static let viewProgress = "View progress"
     static let firstCheckInTitle = "Your first check-in"
     static let firstCheckInBody = "Track weight and body fat to follow changes in your shape over time."
+    static let nothingLoggedToday = "Nothing logged today"
+    static let earlierEntriesBody = "Your earlier entries are still in Entries. Log today’s weight when you’re ready."
     static let connectHealthInstead = "Connect Apple Health instead"
     static let logSheetTitle = "Log weight"
     static let addDetails = "Add details or photos"
@@ -158,6 +165,23 @@ enum HomeV2Copy {
         "Latest photo · \(date)"
     }
 
+    /// Timeline caption above the number: "Sep 25 · Apple Health".
+    static func dayCaption(date: String, source: String) -> String {
+        "\(date) · \(source)"
+    }
+
+    /// Selected-day body fat with provenance: "Body fat 15.8% · DEXA".
+    static func dayBodyFatLine(value: String, source: String) -> String {
+        "Body fat \(value)% · \(source)"
+    }
+
+    /// The editorial plate on a day without a photo.
+    static let noPhotoThisDay = "No photo this day"
+
+    /// Shown once, then gone for good.
+    static let timelineCoachHint = "Swipe through your history. Drag the timeline to jump in time."
+    static let coachDismissedDefaultsKey = "home_v2_timeline_coach_dismissed"
+
     /// H1 status line: "Cutting for 9 weeks." Nothing is claimed about pace
     /// without a target, and nothing at all before there is a trend.
     static func phaseSentence(kind: PhaseInsightKind, weeks: Int) -> String? {
@@ -207,11 +231,11 @@ enum HomeV2CompositionPolicy {
             return HomeV2Copy.compositionTrackingPrompt
         }
 
-        let method = methodKey(latest.bodyFatMethod)
+        let method = methodKey(latest.attributedBodyFatMethod)
         let label = measurementLabel(for: method)
         let latestText = String(format: "%.1f", latestValue)
         let earlier = readings
-            .filter { $0.localDate != latest.localDate && methodKey($0.bodyFatMethod) == method }
+            .filter { $0.localDate != latest.localDate && methodKey($0.attributedBodyFatMethod) == method }
             .max(by: { $0.date < $1.date })
 
         guard let earlier, let earlierValue = earlier.bodyFatPercentage else {
@@ -297,7 +321,7 @@ enum HomeV2WeightStepPolicy {
     static let bodyFatRange: ClosedRange<Double> = 2...70
 
     static func range(unit: String) -> ClosedRange<Double> {
-        unit == "kg" ? 20...500 : 44...1_100
+        unit == "kg" ? 32...300 : 70...660
     }
 
     static func defaultValue(unit: String) -> Double {
@@ -317,12 +341,96 @@ enum HomeV2WeightStepPolicy {
         clamped(value + Double(direction) * step, unit: unit)
     }
 
+    static func converted(_ value: Double, from sourceUnit: String, to destinationUnit: String) -> Double {
+        let source = sourceUnit.lowercased()
+        let destination = destinationUnit.lowercased()
+        guard source != destination else { return rounded(value) }
+        if source == "kg", destination == "lbs" || destination == "lb" {
+            return rounded(value.kgToLbs)
+        }
+        if source == "lbs" || source == "lb", destination == "kg" {
+            return rounded(value.lbsToKg)
+        }
+        return rounded(value)
+    }
+
     static func rounded(_ value: Double) -> Double {
         (value * 10).rounded() / 10
     }
 
     static func text(_ value: Double) -> String {
         String(format: "%.1f", rounded(value))
+    }
+}
+
+/// Manual entry and trend presentation share one adult logging range. Imported
+/// samples outside it remain stored and visible with provenance for correction.
+enum HomeV2WeightQuality {
+    static let supportedKilograms: ClosedRange<Double> = 32...300
+    static let reviewMessage = "Outside the supported logging range. Source value kept unchanged."
+
+    static func isWithinSupportedLoggingRange(_ kilograms: Double?) -> Bool {
+        guard let kilograms, kilograms.isFinite else { return false }
+        return supportedKilograms.contains(kilograms)
+    }
+
+    /// Exclude flagged source measurements before interpolation and smoothing:
+    /// an average containing an unsupported reading can itself look supported.
+    static func trendContext(
+        for metrics: [BodyMetrics]
+    ) -> MetricsInterpolationService.WeightInterpolationContext? {
+        MetricsInterpolationService.shared.makeWeightInterpolationContext(
+            for: metrics.filter { isWithinSupportedLoggingRange($0.weight) }
+        )
+    }
+
+    static func trendWeight(for metric: BodyMetrics, in metrics: [BodyMetrics]) -> Double? {
+        // Keep the original flagged measurement visible for correction; do not
+        // replace it with a trend from otherwise supported surrounding records.
+        guard metric.weight == nil || isWithinSupportedLoggingRange(metric.weight) else { return nil }
+        return trendContext(for: metrics)?.trendWeight(for: metric.date)?.value
+    }
+}
+
+/// Today never falls back to the latest historical row. Earlier imports stay in
+/// Entries and the selected-day Context surface.
+enum HomeV2TodayPolicy {
+    static func metrics(
+        in metrics: [BodyMetrics],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [BodyMetrics] {
+        let today = BodyMetricLocalDate.key(for: now, calendar: calendar)
+        return metrics.filter { $0.localDate == today }
+            .sorted { $0.date == $1.date ? $0.id > $1.id : $0.date > $1.date }
+    }
+}
+
+/// Sparse recorded-weight charts label every unique sample for 0/1/2 points,
+/// then only their bounds. Repeated samples on one day use times, not duplicate
+/// day labels.
+enum HomeV2RecordedWeightChartPolicy {
+    enum LabelGranularity: Equatable {
+        case day
+        case time
+    }
+
+    static func axisDates(for readings: [HomeV2EditorialPolicy.WeightReading]) -> [Date] {
+        let unique = readings.map(\.date).sorted().reduce(into: [Date]()) { dates, date in
+            if dates.last != date { dates.append(date) }
+        }
+        guard unique.count > 2 else { return unique }
+        return [unique[0], unique[unique.count - 1]]
+    }
+
+    static func labelGranularity(
+        for readings: [HomeV2EditorialPolicy.WeightReading],
+        calendar: Calendar = .current
+    ) -> LabelGranularity {
+        let dates = axisDates(for: readings)
+        guard dates.count > 1,
+              dates.allSatisfy({ calendar.isDate($0, inSameDayAs: dates[0]) }) else { return .day }
+        return .time
     }
 }
 
@@ -334,6 +442,7 @@ struct HomeV2LoggedEntry: Equatable {
     let previousMetric: BodyMetrics?
     let valueText: String
     let unit: String
+    var savedMetric: BodyMetrics?
 }
 
 /// Geometry that must hold on every iPhone: the photo stays full width at 4:5
@@ -348,5 +457,87 @@ enum HomeV2Layout {
         let fourByFive = width / HomeV2Tokens.photoAspectRatio
         let available = max(minimumStageHeight, height - belowPhotoHeight)
         return min(fourByFive, available)
+    }
+}
+
+/// Values for the editorial fallback come from stored readings, never photo
+/// appearance, a target, or interpolated chart caches.
+enum HomeV2EditorialPolicy {
+    /// Recorded values only. Current profile height is canonical centimeters;
+    /// another account's profile or an interpolated BF value cannot supply FFMI.
+    static func ffmi(in metric: BodyMetrics, owner: String?, heightCm: Double?) -> Double? {
+        guard metric.userId == owner, let weight = weight(in: metric),
+              let bodyFat = bodyFat(in: metric), let heightCm,
+              heightCm.isFinite, heightCm > 0,
+              let value = UnitConversion.calculateFFMI(
+                weightKg: weight, bodyFatPercentage: bodyFat.percentage, heightCm: heightCm
+              ), value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    static func weight(in metric: BodyMetrics) -> Double? {
+        guard let value = metric.weight, value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    static func displayWeight(in metric: BodyMetrics, system: MeasurementSystem) -> Double? {
+        guard let weight = weight(in: metric) else { return nil }
+        let value = system == .imperial ? weight.kgToLbs : weight
+        return value.isFinite ? value : nil
+    }
+
+    struct BodyFatReading: Equatable {
+        let percentage: Double
+        let caption: String
+    }
+
+    struct WeightReading: Identifiable, Equatable {
+        let id: String
+        let date: Date
+        let kilograms: Double
+    }
+
+    static func bodyFat(in metric: BodyMetrics?) -> BodyFatReading? {
+        guard let metric, let value = metric.bodyFatPercentage,
+              value.isFinite, value > 0, value < 100 else { return nil }
+        let method = metric.attributedBodyFatMethod?.lowercased()
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ") ?? ""
+        // Synthetic estimates must not be presented as recorded body fat.
+        guard !method.contains("interpolat"), !method.contains("derived") else { return nil }
+        let caption: String
+        // Only known stored methods establish provenance. Free-form or negated
+        // labels must not become scan claims merely because they mention one.
+        switch method {
+        case "visual_estimate": caption = "Visual estimate"
+        case "inbody": caption = "From your InBody scan"
+        case "dexa", "dexa (bodyspec)", "bodyspec_dexa": caption = "From your DEXA scan"
+        case "manual", "typed": caption = "Entered by you"
+        case "healthkit", "apple_health": caption = "From Apple Health"
+        case "body_scan": caption = "Body scan estimate"
+        case "bia_scale", "bioelectrical": caption = "Bioelectrical estimate"
+        case "caliper", "calipers": caption = "Caliper estimate"
+        default: caption = "Source not recorded"
+        }
+        return BodyFatReading(percentage: value, caption: caption)
+    }
+
+    static func supportsWeightComparison(in metrics: [BodyMetrics], selected: BodyMetrics?) -> Bool {
+        weights(in: metrics, selected: selected).count >= 2
+    }
+
+    static func weights(
+        in metrics: [BodyMetrics],
+        selected: BodyMetrics?,
+        calendar: Calendar = .current
+    ) -> [WeightReading] {
+        guard let selected,
+              let start = calendar.date(byAdding: .day, value: -30, to: selected.date) else { return [] }
+        return metrics.compactMap { metric in
+            guard metric.userId == selected.userId,
+                  metric.date >= start, metric.date <= selected.date,
+                  let weight = metric.weight,
+                  HomeV2WeightQuality.isWithinSupportedLoggingRange(weight) else { return nil }
+            return WeightReading(id: metric.id, date: metric.date, kilograms: weight)
+        }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date < $1.date }
     }
 }

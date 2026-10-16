@@ -63,6 +63,70 @@ final class LaunchSurfacePolicyTests: XCTestCase {
     func testChatComposerGeometryDisablesTransitionAnimationForReducedMotion() {
         XCTAssertNil(ChatComposerGeometry.transitionAnimation(reduceMotion: true))
         XCTAssertNotNil(ChatComposerGeometry.transitionAnimation(reduceMotion: false))
+        XCTAssertNil(ChatComposerGeometry.morphAnimation(reduceMotion: true))
+        XCTAssertNotNil(ChatComposerGeometry.morphAnimation(reduceMotion: false))
+    }
+
+    @MainActor
+    func testComposerLoggingPrototypeIsDefaultOffAndKeepsStableModeOrder() {
+        XCTAssertFalse(
+            ComposerLoggingPrototypePolicy.isEnabled(arguments: [], isGateEnabled: { _ in false })
+        )
+        XCTAssertTrue(
+            ComposerLoggingPrototypePolicy.isEnabled(arguments: [], isGateEnabled: { key in
+                key == ComposerLoggingPrototypePolicy.gateKey
+            })
+        )
+        XCTAssertEqual(ComposerLoggingMode.allCases, [.weight, .bodyFat, .photo])
+        XCTAssertEqual(ComposerLoggingMode.allCases.map(\.title), ["Weight", "Body fat", "Photo"])
+        XCTAssertTrue(ComposerLoggingPrototypePolicy.allowsHoldDrag(isAccessibilitySize: false))
+        XCTAssertFalse(
+            ComposerLoggingPrototypePolicy.allowsHoldDrag(isAccessibilitySize: true),
+            "The expanded accessibility fallback remains tap-first so options cannot move under a held finger"
+        )
+    }
+
+    func testComposerLoggingTapSelectionRequiresOneOptionActivation() {
+        var selector = ComposerLoggingSelectorState()
+
+        selector.toggleTapSelection()
+        selector.toggleTapSelection()
+        XCTAssertEqual(selector.phase, .composer, "Fast repeated plus taps may close but never select or send")
+
+        selector.toggleTapSelection()
+        XCTAssertTrue(selector.isPresented)
+        XCTAssertEqual(selector.phase, .tapSelection)
+        XCTAssertEqual(selector.selectFromTap(.bodyFat), .bodyFat)
+        XCTAssertFalse(selector.isPresented)
+        XCTAssertNil(selector.highlightedMode)
+        XCTAssertNil(selector.selectFromTap(.weight), "A repeated callback cannot route a second mode")
+    }
+
+    func testComposerLoggingDragSelectionTracksTargetsAndReleaseOnlyReturnsInputType() {
+        var selector = ComposerLoggingSelectorState()
+
+        selector.beginDragSelection()
+        XCTAssertTrue(selector.updateDragSelection(over: .weight))
+        XCTAssertFalse(selector.updateDragSelection(over: .weight), "A stationary finger must not repeat haptics")
+        XCTAssertTrue(selector.updateDragSelection(over: .photo))
+        XCTAssertEqual(selector.highlightedMode, .photo)
+        XCTAssertEqual(selector.finishDragSelection(over: .photo), .photo)
+        XCTAssertFalse(selector.isPresented)
+        XCTAssertNil(selector.highlightedMode)
+    }
+
+    func testComposerLoggingDragCancellationAndInterruptionRestoreComposer() {
+        var selector = ComposerLoggingSelectorState()
+
+        selector.beginDragSelection()
+        XCTAssertTrue(selector.updateDragSelection(over: .bodyFat))
+        XCTAssertNil(selector.finishDragSelection(over: nil), "Releasing outside a target must cancel")
+        XCTAssertEqual(selector.phase, .composer)
+
+        selector.beginDragSelection()
+        selector.cancel()
+        XCTAssertEqual(selector.phase, .composer)
+        XCTAssertNil(selector.highlightedMode)
     }
 
     func testHomeChatChromePinsComposerAndDropsPeerChatTab() {
@@ -90,7 +154,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
         )
     }
 
-    func testHomeSwipeMatchesJovieEdgeAndPageRules() {
+    func testHomeSwipeMatchesFounderIAContract() {
         XCTAssertEqual(
             HomeChatChromePolicy.swipeDestination(
                 translationX: 80,
@@ -99,7 +163,7 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isOnStats: false,
                 isChatExpanded: false
             ),
-            .menu
+            .stats
         )
         XCTAssertEqual(
             HomeChatChromePolicy.swipeDestination(
@@ -109,11 +173,11 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isOnStats: false,
                 isChatExpanded: false
             ),
-            .stats
+            .menu
         )
         XCTAssertEqual(
             HomeChatChromePolicy.swipeDestination(
-                translationX: 90,
+                translationX: -90,
                 translationY: 8,
                 startX: 180,
                 isOnStats: true,
@@ -172,8 +236,8 @@ final class LaunchSurfacePolicyTests: XCTestCase {
                 isOnStats: true,
                 isChatExpanded: true
             ),
-            .menu,
-            "The edge swipe still opens navigation while Ask is expanded"
+            .collapseChat,
+            "Ask must collapse to its owning workspace before navigation changes"
         )
     }
 

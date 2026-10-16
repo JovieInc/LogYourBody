@@ -56,23 +56,51 @@ enum ChaosSystemAlertPolicy {
     }
 }
 
-/// Native snapshot ancestry is the evidence for expected scroll clipping.
-/// Missing or ambiguous snapshot matches remain layout findings.
+/// Native snapshot ancestry is the primary evidence for expected scroll
+/// clipping. Snapshot trees can omit descendants that are fully scrolled out
+/// of a viewport even though hit-test queries still vend them, so unmatched
+/// elements fall back to live scroll-container ancestry with the same
+/// viewport-clipping rule. Elements clipped by no scroll container remain
+/// layout findings.
 struct ChaosScrollGeometry {
-    private struct Record {
+    struct Record {
         let type: XCUIElement.ElementType
         let identifier: String
         let label: String
         let frame: CGRect
         let scrollFrames: [CGRect]
+
+        var description: String {
+            let identifier = self.identifier.isEmpty ? "(no identifier)" : self.identifier
+            let label = self.label.isEmpty ? "(no label)" : self.label
+            return "\(String(describing: type)) id=\(identifier) label=\"\(label)\" frame=\(frame)"
+        }
     }
 
+    private let app: XCUIApplication
     private var records: [Record] = []
+    private(set) var captureFailure: String?
 
     init(app: XCUIApplication) {
-        if let snapshot = try? app.snapshot() {
-            collect(snapshot, scrollFrames: [])
+        self.app = app
+        do {
+            collect(try app.snapshot(), scrollFrames: [])
+        } catch {
+            captureFailure = String(describing: error)
         }
+    }
+
+    // Dedicated checkpoints use these values from the same immutable tree.
+    // Do not combine earlier live element frames with later scroll ancestry.
+    var layoutRecords: [Record] {
+        records.filter { $0.type == .button || $0.type == .staticText }
+    }
+
+    var capturedWindow: CGRect? { records.first { $0.type == .window }?.frame }
+    var capturedSystemOverlay: Bool { records.contains { $0.type == .keyboard || $0.type == .alert } }
+
+    func isExpectedScrollClipping(_ record: Record, window: CGRect) -> Bool {
+        record.scrollFrames.contains { Self.isClippedByViewport(frame: record.frame, viewport: $0, window: window) }
     }
 
     private mutating func collect(_ snapshot: XCUIElementSnapshot, scrollFrames: [CGRect]) {
@@ -94,34 +122,61 @@ struct ChaosScrollGeometry {
     /// CGRect snapshots can derive widths by subtraction, changing their last
     /// floating-point bits. Compare edges within four ULPs for record identity;
     /// the one-point layout overflow threshold remains unchanged.
-    private static func sameNativeFrame(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
+    static func sameNativeFrame(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
         let edges = [(lhs.minX, rhs.minX), (lhs.minY, rhs.minY),
                      (lhs.maxX, rhs.maxX), (lhs.maxY, rhs.maxY)]
         return edges.allSatisfy { abs($0.0 - $0.1) <= max($0.0.ulp, $0.1.ulp) * 4 }
     }
 
     func isExpectedScrollClipping(_ element: XCUIElement, window: CGRect) -> Bool {
-        let type = element.elementType
-        let identifier = element.identifier
-        let label = element.label
-        let elementFrame = element.frame
+        isExpectedScrollClipping(
+            type: element.elementType, identifier: element.identifier,
+            label: element.label, frame: element.frame, window: window
+        )
+    }
+
+    func isExpectedScrollClipping(
+        type: XCUIElement.ElementType, identifier: String, label: String,
+        frame elementFrame: CGRect, window: CGRect
+    ) -> Bool {
         let matches = records.filter {
             $0.type == type && $0.identifier == identifier
                 && $0.label == label && Self.sameNativeFrame($0.frame, elementFrame)
         }
-        guard matches.count == 1, let record = matches.first else { return false }
-        let frame = record.frame
-        return record.scrollFrames.contains { viewport in
-            guard viewport.width > 0, viewport.height > 0,
-                  viewport.minX >= window.minX - 1, viewport.maxX <= window.maxX + 1,
-                  viewport.minY >= window.minY - 1, viewport.maxY <= window.maxY + 1 else { return false }
-            // Every overflowing edge must be clipped by the native scroll viewport.
-            return (frame.minX >= window.minX - 1 || frame.minX < viewport.minX)
-                && (frame.maxX <= window.maxX + 1 || frame.maxX > viewport.maxX)
-                && (frame.minY >= window.minY - 1 || frame.minY < viewport.minY)
-                && (frame.maxY <= window.maxY + 1 || frame.maxY > viewport.maxY)
-                && !viewport.contains(frame)
+        if matches.count == 1, let record = matches.first,
+           record.scrollFrames.contains(where: {
+               Self.isClippedByViewport(frame: record.frame, viewport: $0, window: window)
+           }) {
+            return true
         }
+        // Snapshot records may not include descendants scrolled fully out of
+        // their viewport; prove the same clipping through live containers.
+        let containers = app.scrollViews.allElementsBoundByIndex
+            + app.collectionViews.allElementsBoundByIndex
+        return containers.contains { container in
+            guard Self.isClippedByViewport(frame: elementFrame, viewport: container.frame, window: window)
+            else { return false }
+            return container.descendants(matching: type)
+                .allElementsBoundByIndex
+                .contains {
+                    $0.identifier == identifier && $0.label == label
+                        && Self.sameNativeFrame($0.frame, elementFrame)
+                }
+        }
+    }
+
+    /// True when every edge of `frame` that leaves `window` is clipped by a
+    /// scroll `viewport` that itself sits inside the window.
+    private static func isClippedByViewport(frame: CGRect, viewport: CGRect, window: CGRect) -> Bool {
+        guard viewport.width > 0, viewport.height > 0,
+              viewport.minX >= window.minX - 1, viewport.maxX <= window.maxX + 1,
+              viewport.minY >= window.minY - 1, viewport.maxY <= window.maxY + 1 else { return false }
+        // Every overflowing edge must be clipped by the native scroll viewport.
+        return (frame.minX >= window.minX - 1 || frame.minX < viewport.minX)
+            && (frame.maxX <= window.maxX + 1 || frame.maxX > viewport.maxX)
+            && (frame.minY >= window.minY - 1 || frame.minY < viewport.minY)
+            && (frame.maxY <= window.maxY + 1 || frame.maxY > viewport.maxY)
+            && !viewport.contains(frame)
     }
 }
 
@@ -309,6 +364,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
+        openDefaultHomeAsk(in: app)
         let composer = app.textFields["chat_composer"]
         XCTAssertTrue(composer.waitForExistence(timeout: 12))
         var rng = ChaosRNG(seed: 42)
@@ -316,7 +372,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         let menu = app.buttons["photo_timeline_root_menu"]
         XCTAssertTrue(menu.exists)
         accounting.record(performTap(app: app, candidates: [menu], rng: &rng))
-        let closeMenu = app.buttons["Close Menu"]
+        let closeMenu = app.buttons["home_v2_sidebar_scrim"]
         XCTAssertTrue(closeMenu.waitForExistence(timeout: 5))
         accounting.record(performDismiss(app: app, buttons: [closeMenu]))
         XCTAssertTrue(closeMenu.waitForNonExistence(timeout: 5))
@@ -327,6 +383,7 @@ final class ChaosMonkeyUITests: XCTestCase {
         XCTAssertEqual(accounting.skipped, 0)
         XCTAssertFalse(accounting.shouldAttempt)
         XCTAssertFalse(app.keyboards.element.exists)
+        if !composer.exists { openDefaultHomeAsk(in: app) }
         XCTAssertNotEqual(composer.value as? String, "", "Actual typing must leave a local draft without sending it.")
     }
 
@@ -381,19 +438,25 @@ final class ChaosMonkeyUITests: XCTestCase {
         ]
         app.forwardActualXCTestContext()
         app.launch()
+        openDefaultHomeAsk(in: app)
         let composer = app.textFields["chat_composer"]
         XCTAssertTrue(composer.waitForExistence(timeout: 12))
         composer.tap()
         let draft = "local chaos draft"
         composer.typeText(draft)
-        XCTAssertTrue(app.keyboards.element.exists)
-        XCTAssertEqual(dismissKeyboardForStep(app: app), .executed(.dismiss))
+        XCTAssertEqual(
+            dismissKeyboardForStep(app: app, refocusingIfNeeded: composer),
+            .executed(.dismiss)
+        )
+        XCTAssertFalse(app.keyboards.element.exists)
+        // Default Home removes the Ask view when collapsed; reopen before inspecting its draft.
+        if !composer.exists { openDefaultHomeAsk(in: app) }
         let tree = XCTAttachment(string: app.debugDescription)
         tree.name = "Keyboard dismissal draft preservation"
         tree.lifetime = .keepAlways
         add(tree)
         XCTAssertEqual(composer.value as? String, draft, "Keyboard dismissal must not submit or clear a draft.")
-        XCTAssertFalse(app.keyboards.element.exists)
+        XCTAssertFalse(app.staticTexts[draft].exists, "Keyboard dismissal must not submit the local draft.")
     }
 
     func testSystemAlertsRequireKnownDenyOnlyAction() {
@@ -410,9 +473,14 @@ final class ChaosMonkeyUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
-            "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"
+            "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock",
+            "-lybUITestHomeEditPresentationDiagnostic"
         ]
         app.forwardActualXCTestContext()
+        let session = try XCTUnwrap(app.launchEnvironment["XCTestSessionIdentifier"])
+        XCTAssertNotNil(UUID(uuidString: session))
+        let bundle = try XCTUnwrap(app.launchEnvironment["XCTestBundlePath"])
+        XCTAssertTrue(bundle.hasSuffix("/LogYourBodyUITests.xctest"))
         app.launch()
         popToRootIfNeeded(in: app)
         let contextButton = app.buttons["home_v2_context_button"]
@@ -426,9 +494,19 @@ final class ChaosMonkeyUITests: XCTestCase {
                        "Monkey must not open the personal photo picker from Context.")
         let edit = app.buttons["home_v2_edit_entry"]
         XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons.matching(identifier: "home_v2_edit_entry").count, 1)
+        XCTAssertEqual(edit.label, "Edit entry")
+        XCTAssertTrue(edit.isEnabled)
+        XCTAssertTrue(edit.isHittable)
+        XCTAssertTrue(app.frame.contains(edit.frame))
+        XCTAssertGreaterThanOrEqual(edit.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(edit.frame.height, 44)
+        captureHomeEditTransition(app, phase: "before-tap")
         edit.tap()
         let sheet = app.descendants(matching: .any)["home_v2_log_sheet"]
-        XCTAssertTrue(sheet.waitForExistence(timeout: 8))
+        let sheetAppeared = sheet.waitForExistence(timeout: 8)
+        captureHomeEditTransition(app, phase: "after-existing-wait")
+        XCTAssertTrue(sheetAppeared)
         XCTAssertEqual(sheet.label, "Edit entry")
         let tree = XCTAttachment(string: app.debugDescription)
         tree.name = "Photo import control scanner tree"
@@ -451,16 +529,35 @@ final class ChaosMonkeyUITests: XCTestCase {
         }
     }
 
+    private func captureHomeEditTransition(_ app: XCUIApplication, phase: String) {
+        let edit = app.buttons["home_v2_edit_entry"]
+        let exists = edit.exists
+        let frame = exists ? edit.frame : CGRect.zero
+        let enabled = exists && edit.isEnabled
+        let hittable = exists && edit.isHittable
+        let geometry = "phase=\(phase) window=\(app.frame) edit=\(frame) " +
+            "exists=\(exists) enabled=\(enabled) hittable=\(hittable)"
+        let details = XCTAttachment(string: geometry + "\n" + app.debugDescription)
+        details.name = "home-edit-transition-\(phase)"
+        details.lifetime = .keepAlways
+        add(details)
+        let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screen.name = "home-edit-transition-\(phase)"
+        screen.lifetime = .keepAlways
+        add(screen)
+    }
+
     func testNativeScrollClippingRequiresActualScrollAncestor() throws {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = [
-            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestSuppressWhatsNew",
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestChatFirstFixture", "-lybUITestSuppressWhatsNew",
             "-lybUITestDisableBiometricLock", "-UIPreferredContentSizeCategoryName",
             "UICTContentSizeCategoryAccessibilityXXXL"
         ]
         app.forwardActualXCTestContext()
         app.launch()
+        openDefaultHomeAsk(in: app)
         let prompt = app.buttons["Summarize my trend"]
         XCTAssertTrue(prompt.waitForExistence(timeout: 30))
         let window = app.windows.firstMatch.frame
@@ -489,6 +586,34 @@ final class ChaosMonkeyUITests: XCTestCase {
                                    width: send.frame.width / 2, height: send.frame.height)
         XCTAssertGreaterThan(send.frame.maxX, croppedWindow.maxX)
         XCTAssertFalse(geometry.isExpectedScrollClipping(send, window: croppedWindow))
+
+        // Earlier element frames must retain their own native ancestors when
+        // a later layout moves. A matching label alone never proves scrolling.
+        let capturedWindow = try XCTUnwrap(geometry.capturedWindow)
+        let capturedPrompt = try XCTUnwrap(geometry.layoutRecords.first {
+            $0.type == .button && $0.label == "Summarize my trend"
+        })
+        XCTAssertTrue(geometry.isExpectedScrollClipping(capturedPrompt, window: capturedWindow))
+        let noAncestor = ChaosScrollGeometry.Record(
+            type: capturedPrompt.type, identifier: capturedPrompt.identifier,
+            label: capturedPrompt.label, frame: capturedPrompt.frame, scrollFrames: []
+        )
+        XCTAssertFalse(geometry.isExpectedScrollClipping(noAncestor, window: capturedWindow))
+        XCTAssertFalse(ChaosScrollGeometry.sameNativeFrame(
+            capturedPrompt.frame, capturedPrompt.frame.offsetBy(dx: 0, dy: -145.66666666666666)
+        ))
+    }
+
+    private func openDefaultHomeAsk(in app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_surface"].exists)
+        let menu = app.buttons["photo_timeline_root_menu"]
+        XCTAssertTrue(menu.isHittable)
+        menu.tap()
+        let ask = app.buttons["home_v2_sidebar_ask"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 5))
+        ask.tap()
+        XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 8))
     }
 
     private static let edgeStrings: [String] = [
@@ -936,7 +1061,9 @@ final class ChaosMonkeyUITests: XCTestCase {
         let edge = Self.edgeStrings.randomElement(using: &rng) ?? ""
         guard !edge.isEmpty else { return .skipped("seeded text was empty") }
         field.typeText(String(edge.prefix(24)))
-        guard dismissKeyboardForStep(app: app) == .executed(.dismiss) else {
+        // A view update can drop the keyboard after typing. Refocus so dismissal
+        // is still verified instead of skipping a step that already entered text.
+        guard dismissKeyboardForStep(app: app, refocusingIfNeeded: field) == .executed(.dismiss) else {
             return .skipped("typing finished but keyboard dismissal was not verified")
         }
         return .executed(.type)
@@ -946,7 +1073,13 @@ final class ChaosMonkeyUITests: XCTestCase {
         let candidates = buttons ?? ["Back", "Close", "Cancel", "Done"].map { app.buttons[$0] }
             + [app.navigationBars.buttons.element(boundBy: 0)]
         for button in candidates where button.exists && button.isHittable && !isDenylisted(button) {
-            button.tap()
+            if button.identifier == "home_v2_sidebar_scrim" {
+                // The drawer covers the scrim's center; dismiss through its exposed right edge.
+                button.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+                    .withOffset(CGVector(dx: -8, dy: 0)).tap()
+            } else {
+                button.tap()
+            }
             return .executed(.dismiss)
         }
         return .skipped("no safe dismissal control")
@@ -1042,9 +1175,23 @@ final class ChaosMonkeyUITests: XCTestCase {
         return false
     }
 
-    /// Count a dismissal only when a previously visible keyboard disappears.
-    private func dismissKeyboardForStep(app: XCUIApplication) -> ChaosStepOutcome {
-        guard app.keyboards.element.exists else { return .skipped("keyboard was not present") }
+    /// Count a dismissal only when a visible keyboard disappears. A focused
+    /// field may be supplied to recover if an asynchronous view update drops
+    /// focus between typing and the keyboard probe.
+    private func dismissKeyboardForStep(
+        app: XCUIApplication,
+        refocusingIfNeeded field: XCUIElement? = nil
+    ) -> ChaosStepOutcome {
+        let keyboard = app.keyboards.firstMatch
+        if !keyboard.exists {
+            guard let field, field.exists, field.isHittable else {
+                return .skipped("keyboard was not present")
+            }
+            field.tap()
+            guard keyboard.waitForExistence(timeout: 1.5) else {
+                return .skipped("text field did not regain keyboard focus")
+            }
+        }
         let scroll = app.scrollViews.firstMatch
         if scroll.exists && hasFiniteNonZeroFrame(scroll) && scroll.isHittable {
             scroll.swipeDown()

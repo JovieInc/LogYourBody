@@ -287,6 +287,7 @@ struct AccountDeletionCleanupService {
                 deleteTrainingDrafts: {
                     guard let ownership else { throw AuthError.invalidToken }
                     try await MainActor.run {
+                        UserDefaultsCanvasStore.clear(subject: ownership.subject)
                         try TrainingDraftStore.shared.purge(ownerId: ownership.subject)
                     }
                 }

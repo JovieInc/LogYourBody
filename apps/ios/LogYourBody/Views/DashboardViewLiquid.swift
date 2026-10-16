@@ -22,6 +22,7 @@ struct DashboardViewLiquid: View {
 
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.theme) var theme
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @StateObject var viewModel = DashboardViewModel()
@@ -29,6 +30,8 @@ struct DashboardViewLiquid: View {
 
     // Core data / selection
     @State var selectedIndex: Int = 0
+    @State var homeV2Timeline = HomeV2TimelinePolicy.Snapshot()
+    @State var homeV2TimelineSelection: HomeV2TimelinePolicy.Selection?
 
     // Metrics reordering state
     @AppStorage("metricsOrder") private var metricsOrderData = Data()
@@ -96,10 +99,13 @@ struct DashboardViewLiquid: View {
     @State var isPhotoTimelineSettingsPresented = false
     @State var isHomeV2ViewerPresented = false
     @State var isHomeV2ContextPresented = false
-    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .weight
+    @State var isHomeV2MetricProvenancePresented = false
+    @State var homeV2ProgressMetric: HomeV2ProgressMetric = .bodyFat
+    @StateObject var homeV2StepsReader = HomeV2DailyStepsReader()
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
-    @State var homeV2EditingMetric: BodyMetrics?
+    @State var homeV2ContextMetricID: String?
+    @State var homeV2EditingSession: HomeV2EditSession?
     @State var homeV2PhotoRoute: HomeV2PhotoRoute?
     @State var isHomeV2SettingsPresented = false
     @State var isHomeV2HelpPresented = false
@@ -110,12 +116,26 @@ struct DashboardViewLiquid: View {
     @State var homeV2PhaseSentence: String?
     @State var isMetricDetailActive = false
     @State var selectedMetricType: MetricType = .weight
-    @State private var isStatsDestinationActive = false
+    @State var isStatsDestinationActive = false
     @State var isProgressPhotoAttachPresented = false
     @State var progressPhotoAttachTarget: BodyMetrics?
     @State private var chartMode: ChartMode = .trend
     @State var bodyScoreRefreshToken = UUID()
-    @State var bodyScoreSharePayload: BodyScoreSharePayload?
+    @State var bodyScoreShareCapture = AccountBoundShareCapture()
+    var bodyScoreSharePayload: BodyScoreSharePayload? {
+        get { bodyScoreShareCapture.authorizedPayload(owns: authManager.ownsAccountSession) }
+        nonmutating set {
+            guard let newValue, let owner = newValue.accountSession,
+                  authManager.ownsAccountSession(owner) else {
+                bodyScoreShareCapture.clear()
+                return
+            }
+            bodyScoreShareCapture.freeze(newValue, owner: owner)
+        }
+    }
+    @State private var screenshotShareSnapshots: [ContextualMetricSnapshot] = []
+    @State private var screenshotShareOwner: AuthManager.ProfileSessionOwnership?
+    @State private var showsScreenshotShareChoice = false
     @State var bodyScoreSharePresentationID: UUID?
     @State private var hasPerformedInitialRefresh = false
     @State var featureGateRefreshToken = UUID()
@@ -124,6 +144,7 @@ struct DashboardViewLiquid: View {
     @State var addEntryInitialDate = Date()
     @State var addEntryInitialWeight: String?
     @State var addEntryInitialBodyFat: Double?
+    @State var addEntryInitialBodyFatMethod: String?
     @State var isHomeV2LoggingWeight = false
 
     init(
@@ -238,6 +259,7 @@ struct DashboardViewLiquid: View {
                 }
             }
             .onDisappear {
+                invalidateDashboardShareContext()
                 syncBannerDismissTask?.cancel()
                 metricCacheRefreshTask?.cancel()
                 metricCacheBuildID = UUID()
@@ -255,9 +277,25 @@ struct DashboardViewLiquid: View {
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
                 scheduleMetricCacheRefresh()
             }
-            .onReceive(viewModel.$bodyMetrics) { _ in
+            .onReceive(viewModel.$bodyMetrics) { metrics in
+                reconcileHomeV2Timeline(with: metrics)
                 scheduleDashboardDerivedStateRefresh()
                 scheduleMetricCacheRefresh()
+            }
+            .onChange(of: authManager.captureAccountSession()) { _, owner in
+                invalidateDashboardShareContext(currentOwner: owner)
+                homeV2EditingSession = nil
+                homeV2TimelineSelection = nil
+                isMetricDetailActive = false
+                isStatsDestinationActive = false
+                selectedPhotoTimelineRootPage = .timeline
+                isHomeV2MetricProvenancePresented = false
+                metricCacheRefreshTask?.cancel()
+                metricCacheBuildID = UUID()
+                fullChartCache = [:]
+                fullTrendChartCache = [:]
+                metricEntriesCache = [:]
+                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
@@ -273,6 +311,7 @@ struct DashboardViewLiquid: View {
                 scheduleMetricCacheRefresh()
             }
             .onChange(of: selectedIndex) { _, newIndex in
+                recordHomeV2TimelineSelection(at: newIndex)
                 scheduleDashboardDerivedStateRefresh(animatedIndex: newIndex)
             }
             .onChange(of: selectedTab) { _, newTab in
@@ -288,6 +327,7 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
                 featureGateRefreshToken = UUID()
+                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
@@ -300,8 +340,10 @@ struct DashboardViewLiquid: View {
                     initialDate: addEntryInitialDate,
                     initialWeight: addEntryInitialWeight,
                     initialBodyFat: addEntryInitialBodyFat,
+                    initialBodyFatMethod: addEntryInitialBodyFatMethod,
                     isHomeV2LogEntry: isHomeV2LoggingWeight,
-                    onWeightSaved: handleHomeV2WeightEntrySaved
+                    onWeightSaved: handleHomeV2WeightEntrySaved,
+                    onBodyFatSaved: handleHomeV2BodyFatEntrySaved
                 )
                     .environmentObject(authManager)
             }
@@ -328,14 +370,37 @@ struct DashboardViewLiquid: View {
                 photoTimelineStatsDestination
             }
             .onScreenshot {
-                guard selectedTab == .home else { return }
-                guard !isMetricDetailActive else { return }
-                guard let payload = makeBodyScoreSharePayload() else { return }
-                let presentationID = UUID()
-                DispatchQueue.main.async {
-                    bodyScoreSharePresentationID = presentationID
-                    bodyScoreSharePayload = payload
+                guard scenePhase == .active, selectedTab == .home,
+                      selectedPhotoTimelineRootPage == .timeline,
+                      !isMetricDetailActive, !isStatsDestinationActive,
+                      isMetricShareContextVisible, !showsScreenshotShareChoice,
+                      let ownership = authManager.captureAccountSession(),
+                      dashboardMetricsBelong(to: ownership) else { return }
+                screenshotShareOwner = ownership
+                screenshotShareSnapshots = dashboardMetricShareSnapshots
+                showsScreenshotShareChoice = !screenshotShareSnapshots.isEmpty
+            }
+            .confirmationDialog("Choose a metric to share", isPresented: $showsScreenshotShareChoice, titleVisibility: .visible) {
+                ForEach(screenshotShareSnapshots) { snapshot in
+                    Button(snapshot.kind.title) {
+                        guard let ownership = screenshotShareOwner,
+                              authManager.ownsAccountSession(ownership) else {
+                            invalidateDashboardShareContext()
+                            return
+                        }
+                        bodyScoreSharePresentationID = UUID()
+                        bodyScoreSharePayload = BodyScoreSharePayload.contextual(
+                            screenshotShareSnapshots, selected: snapshot.kind)?.owned(by: ownership)
+                        screenshotShareSnapshots = []
+                        screenshotShareOwner = nil
+                    }
                 }
+                Button("Not now", role: .cancel) {
+                    screenshotShareSnapshots = []
+                    screenshotShareOwner = nil
+                }
+            } message: {
+                Text("Your screenshot stays unchanged. Only the metric you choose is included.")
             }
             .onChange(of: showAddEntrySheet) { _, isPresented in
                 guard !isPresented else { return }
@@ -344,6 +409,7 @@ struct DashboardViewLiquid: View {
                 addEntryInitialDate = Date()
                 addEntryInitialWeight = nil
                 addEntryInitialBodyFat = nil
+                addEntryInitialBodyFatMethod = nil
                 isHomeV2LoggingWeight = false
             }
 
@@ -364,9 +430,23 @@ struct DashboardViewLiquid: View {
         releaseReviewDestination = nil
     }
 
+    func dashboardMetricsBelong(to ownership: AuthManager.ProfileSessionOwnership) -> Bool {
+        authManager.ownsAccountSession(ownership)
+            && bodyMetrics.allSatisfy { $0.userId == ownership.subject }
+            && (dailyMetrics == nil || dailyMetrics?.userId == ownership.subject)
+    }
+
+    func invalidateDashboardShareContext(currentOwner: AuthManager.ProfileSessionOwnership? = nil) {
+        bodyScoreShareCapture.reconcile(currentOwner: currentOwner)
+        bodyScoreSharePresentationID = nil
+        screenshotShareSnapshots = []
+        screenshotShareOwner = nil
+        showsScreenshotShareChoice = false
+    }
+
     @ViewBuilder
     private var bodyScoreShareOverlay: some View {
-        if let payload = bodyScoreSharePayload {
+        if let payload = bodyScoreSharePayload, payload.isOwned(by: authManager.ownsAccountSession) {
             BodyScoreShareSheet(payload: payload) {
                 bodyScoreSharePayload = nil
                 bodyScoreSharePresentationID = nil

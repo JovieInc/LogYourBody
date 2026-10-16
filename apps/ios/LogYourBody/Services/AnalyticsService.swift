@@ -113,6 +113,7 @@ private enum AnalyticsEventPolicy {
         "chat_first_message_sent": [:],
         "dashboard_view": [:],
         "entry_saved": [:],
+        "first_insight_rendered": [:],
         "login_attempt": accountMethod,
         "login_completed": accountMethod,
         "login_failed": accountMethod,

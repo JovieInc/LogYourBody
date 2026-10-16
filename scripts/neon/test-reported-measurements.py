@@ -107,6 +107,9 @@ def regression_sql():
     statements = [statement for statement in statements if re.search(
         r"on conflict\s*\(collection,\s*id\)\s+do update set", statement,
     )]
+    statements = [statement for statement in statements if re.search(
+        r"values\s*\(\$1,\s*\$2,\s*\$3,", statement,
+    )]
     if len(statements) != 1:
         raise RuntimeError("Expected one actual native-records upsert in the adapter")
     lookup = ("(SELECT payload FROM public.native_records WHERE collection='dexa_results' "
@@ -149,22 +152,35 @@ def regression_sql():
     return "\n".join(sql + daily_presence_sql()) + "\n"
 
 
+def verify_postgres_tools(directory, environment):
+    binaries = {}
+    versions = {}
+    for name in ("initdb", "pg_ctl", "psql"):
+        candidate = directory / name if directory else shutil.which(name)
+        if not candidate or not Path(candidate).is_file() or not os.access(candidate, os.X_OK):
+            raise RuntimeError("Missing executable PostgreSQL16 tool: " + name)
+        binaries[name] = str(Path(candidate).resolve())
+        version = subprocess.run([binaries[name], "--version"], env=environment, text=True,
+                                 check=True, timeout=10, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT).stdout.strip()
+        if not re.search(r"\(PostgreSQL\) 16(?:\.|$)", version):
+            raise RuntimeError("PostgreSQL16 required for " + name + ": " + version)
+        versions[name] = version
+    return binaries, versions
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", action="store_true", help="create a disposable local PostgreSQL cluster")
-    parser.add_argument("--postgres-bin", type=Path, help="directory containing PostgreSQL 16+ binaries")
+    parser.add_argument("--postgres-bin", type=Path, help="directory containing PostgreSQL16 binaries")
     args = parser.parse_args()
     if not args.run:
         parser.error("Pass --run to opt in; no database is contacted by default")
-    binaries = {}
-    for name in ("initdb", "pg_ctl", "psql"):
-        candidate = args.postgres_bin / name if args.postgres_bin else shutil.which(name)
-        if not candidate or not Path(candidate).is_file():
-            parser.error("PostgreSQL binaries not found; pass --postgres-bin")
-        binaries[name] = str(Path(candidate).resolve())
     sql = regression_sql()
     # No DATABASE_URL, PG*, .env, or user connection configuration is inherited.
     environment = {"PATH": os.defpath, "LC_ALL": "C"}
+    binaries, versions = verify_postgres_tools(args.postgres_bin, environment)
+    print(json.dumps({"postgresTools": versions}), flush=True)
     temporary = Path(tempfile.mkdtemp(prefix="lyb-measurements-", dir="/tmp"))
     cluster = temporary / "data"
     socket = temporary / "socket"
@@ -185,11 +201,18 @@ def main():
                 "-p", "55484", "-U", "measurement_test", "-d", "postgres"]
         run([*psql, "-c", "CREATE TABLE public.schema_migrations(version text PRIMARY KEY);"])
         run([*psql, "-f", str(MIGRATION)])
-        run(psql, sql)
+        output = run(psql, sql)
+        checks = sql.count("DO $$ BEGIN IF (")
+        executed = output.splitlines().count("DO")
+        if executed != checks or checks != 22:
+            raise RuntimeError(f"Expected 22 SQL checks, generated {checks}, executed {executed}")
+        print(json.dumps({"sqlChecks": executed, "writes": sql.count("EXECUTE write_record("),
+                          "meaning": "actual adapter generic upsert; synthetic disposable PostgreSQL16"}), flush=True)
         print("PASS: actual adapter SQL preserves DEXA measurements, daily step presence, ownership and legacy compatibility")
     except subprocess.CalledProcessError as error:
         print(error.stdout or "PostgreSQL command failed")
-        raise SystemExit(1) from error
+        # trace's CLI suppresses SystemExit; preserve a real nonzero CI failure.
+        raise RuntimeError("PostgreSQL regression command failed") from error
     finally:
         # Only this newly created cluster is stopped; retain it if stopping fails.
         if (cluster / "postmaster.pid").exists():

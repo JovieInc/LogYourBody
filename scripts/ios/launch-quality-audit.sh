@@ -295,6 +295,22 @@ fi
 python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
 build_for_testing_once
 
+CHAT_QUALIFICATION_UNIT_TESTS=(
+  "ChatServiceTests/testSyntheticChatCompletionRestoresThroughExistingHistoryPort"
+  "ChatServiceTests/testSyntheticChatRetryRetainsOriginalIdentity"
+  "ChatServiceTests/testSyntheticChatMissingDoneAndCancelledTurnNeverPersistComplete"
+  "ChatServiceTests/testTurnRejectsDelayedReplacementTokenBeforeOpeningStream"
+  "ChatServiceTests/testTurnDropsHeldMetadataDeltasCompletionAndFailureAfterReplacement"
+  "ChatServiceTests/testTurnSuppressesDelayedProviderErrorButPreservesCurrentErrors"
+  "ChatServiceTests/testHistoryLoadRejectsDelayedSuccessEmptyAndErrorAfterOwnershipOrLoadChanges"
+  "ChatServiceTests/testHistoryLoadRejectsTokenFromReplacementSessionBeforeSending"
+  "ChatServiceTests/testCurrentTurnAcceptsRotatedTokenEventsAndRequiresCompletion"
+)
+CHAT_UNIT_EVIDENCE_ARGS=()
+for test_id in "${CHAT_QUALIFICATION_UNIT_TESTS[@]}"; do
+  CHAT_UNIT_EVIDENCE_ARGS+=(--expected-test "${test_id}()")
+done
+
 # The whole unit target is the gate: every journey test in docs/USER_JOURNEYS.md
 # runs on every PR (all 67 files are registered in the target as of the orphan rescue).
 run_xcodebuild_test \
@@ -303,7 +319,16 @@ run_xcodebuild_test \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
   -only-testing:LogYourBodyTests
 assert_xcresult_evidence \
-  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
+
+python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
+  --coverage "$ARTIFACT_DIR/launch-quality-unit-tests.coverage.json" \
+  --evidence "$ARTIFACT_DIR/launch-quality-unit-tests.evidence.json" \
+  --baseline "$ROOT_DIR/scripts/ios/native-coverage-baseline.json" \
+  --profile quality-unit --source-sha "$(git -C "$ROOT_DIR" rev-parse HEAD)" \
+  --base-revision "${BASE_SHA:-}" --source-root "$ROOT_DIR" \
+  --scheme "$SCHEME" --only-testing LogYourBodyTests \
+  > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
 
 # Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
 # test-without-building invocation pays 3-6 min launching the UI test runner
@@ -312,11 +337,18 @@ assert_xcresult_evidence \
 # overran the 40-minute step with every test passing. Same tests, same exact
 # evidence checks, one runner launch.
 LAUNCH_QUALITY_UI_TESTS=(
+  "LogYourBodyUITests/testProgressShareKeepsSelectedMetricAndVisibleValue"
+  "LogYourBodyUITests/testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch"
+  "LogYourBodyUITests/testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity"
+  "LogYourBodyUITests/testHomeV2AskSyntheticCancelledTurnRecovers"
   "LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA"
   "LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces"
   "LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail"
+  "OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal"
+  "MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards"
+  "MesocycleCanvasUITests/testGoalThroughUndoKeepsTheCanvasAndReadbackTogether"
 )
 
 # Security-sensitive chaos regressions use the same native execution and
@@ -343,7 +375,7 @@ for test_id in "${LAUNCH_QUALITY_UI_TESTS[@]}" "${CHAOS_REGRESSIONS[@]}"; do
 done
 UI_RESULT_BUNDLE="$ARTIFACT_DIR/launch-quality-ui.xcresult"
 UI_RESULT_BUNDLES=("$UI_RESULT_BUNDLE")
-# One runner launch (up to ~9 min hosted) plus all seventeen UI tests (~6 min)
+# One runner launch (up to ~9 min hosted) plus all selected UI tests
 # replaces three separately bounded invocations, so its own bound is the
 # per-invocation limit plus the work the other two used to carry.
 UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1500}"
@@ -353,7 +385,7 @@ XCODEBUILD_COMMAND_TIMEOUT_SECONDS="$UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS" run_
   "$ARTIFACT_DIR/launch-quality-ui.log" \
   "${UI_SELECTORS[@]}"
 assert_xcresult_evidence "$UI_RESULT_BUNDLE" "${UI_EVIDENCE_ARGS[@]}" \
-  --critical-captures --require-settings-row-coverage --require-chaos-accounting-coverage
+  --critical-captures --require-settings-row-coverage --require-chaos-accounting-coverage --require-canvas-coverage
 
 if [[ "$RUN_RUNTIME_WARNING_AUDIT" == "true" ]]; then
   FAIL_ON_RUNTIME_WARNINGS="$FAIL_ON_RUNTIME_WARNINGS" \
@@ -373,11 +405,11 @@ fi
   printf -- '- Unit coverage: photo timeline HUD launch policy, Body Score share card layout\n'
   printf -- '- Fixture UI coverage: home hero + chat composer, Jovie swipe/menu Timeline/Stats, one timeline scrubber, home/analytics/onboarding/share screenshot attachments\n'
   printf -- '- Evidence scope: `fixture_ui`; injected auth and entitlement state. Real Sign in with Apple, purchase, and restore remain `not_verified`.\n'
-  printf -- '- Required passing test IDs and seven screenshot hashes: `launch-quality-ui.evidence.json`. First failed attempt bundles are retained.\n'
+  printf -- '- Required passing test IDs and ten screenshot hashes: `launch-quality-ui.evidence.json`. First failed attempt bundles are retained.\n'
   printf -- '- Source: `source-revision.txt` plus `source-working-tree.patch`; this is not exact deployed-build certification.\n'
   printf -- '- Runtime warning audit: `runtime-warnings.log`, fail-on-warning=`%s`\n' "$FAIL_ON_RUNTIME_WARNINGS"
-  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, then one UI invocation covering four screenshot selectors, logout hierarchy, and twelve bounded chaos regressions with simulator parallelism disabled\n'
-  printf -- '- Required native function coverage: biometric policy in unit execution and SettingsRow body, leading content, and value inset and action accounting in the chaos UI regressions\n'
+  printf -- '- Build strategy: one `build-for-testing`, the complete unit target, then one UI invocation covering inherited surface cases, two canvas cases, and twelve bounded chaos regressions with simulator parallelism disabled\n'
+  printf -- '- Required native coverage: biometric policy, SettingsRow, chaos action accounting, and executed MesocycleCanvas app/view lines. Canvas captures cover reduced motion, replay/readback, and undo.\n'
   printf -- '- Build timeout: `%ss`; test command timeout: `%ss` per xcodebuild invocation\n' "$BUILD_FOR_TESTING_TIMEOUT_SECONDS" "$XCODEBUILD_COMMAND_TIMEOUT_SECONDS"
   printf -- '- Logs and result bundles: `%s`\n' "$ARTIFACT_DIR"
 } > "$ARTIFACT_DIR/summary.md"

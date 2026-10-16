@@ -39,6 +39,11 @@ class MetricsInterpolationService {
     // Maximum gap in days for interpolation (matching web implementation)
     private let maxInterpolationGapDays = 30
 
+    // Maximum gap in days for DEXA-anchored body-fat estimates. DEXA scans are
+    // typically months apart, so a wider window is allowed when both anchors
+    // are measured DEXA results and the estimate is derived from scale weight.
+    private let maxDexaInterpolationGapDays = 365
+
     final class WeightInterpolationContext {
         private let metrics: [BodyMetrics]
         private let maxGapDays: Int
@@ -47,8 +52,6 @@ class MetricsInterpolationService {
         // Cached trend-weight series for efficiency when querying multiple dates
         private var trendWeightCache: [Date: InterpolatedMetric] = [:]
         private var trendRawValues: [Date: Double] = [:]
-        private var trendLastDay: Date?
-        private var trendLastValue: Double?
         // Smoothing factor for exponential moving average (EMA).
         // Higher values react more quickly to new weigh-ins.
         private let trendAlpha: Double = 0.25
@@ -70,10 +73,6 @@ class MetricsInterpolationService {
                 return nil
             }
 
-            if let cached = trendWeightCache[targetDay] {
-                return cached
-            }
-
             // There is no new measurement after the final metric. Walking the
             // EMA one day at a time all the way to a far-future query date can
             // block the main thread for seconds (for example, when the last
@@ -88,25 +87,21 @@ class MetricsInterpolationService {
                 processingEndDay = targetDay
             }
 
+            // Only completed earlier days are reusable EMA checkpoints. The
+            // target day's eligible weigh-in depends on the query timestamp.
             let cachedAnchor = trendRawValues
-                .filter { $0.key <= targetDay }
+                .filter { $0.key < targetDay }
                 .max { $0.key < $1.key }
-            var ema = cachedAnchor?.value ?? trendLastValue
-            var currentDay: Date
-
-            if let cachedAnchor {
-                currentDay = calendar.date(byAdding: .day, value: 1, to: cachedAnchor.key) ?? cachedAnchor.key
-            } else if let lastDay = trendLastDay, let lastValue = ema, lastDay >= firstDay, targetDay >= lastDay {
-                currentDay = calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay
-                ema = lastValue
-            } else {
-                currentDay = firstDay
-                ema = nil
+            var ema = cachedAnchor?.value
+            let nextDay = cachedAnchor.flatMap {
+                calendar.date(byAdding: .day, value: 1, to: $0.key)
             }
+            var currentDay = nextDay ?? firstDay
 
             while currentDay <= processingEndDay {
-                // Seed the first day at its actual measurement time, not an earlier midnight.
-                let sampleDate = currentDay == firstDay ? firstMetric.date : currentDay
+                // Midnight is before a weigh-in later that day. Sampling it marks
+                // the weigh-in interpolated and drops it from Progress and Share.
+                let sampleDate = trendSampleDate(on: currentDay, query: date)
                 guard let weightResult = estimate(for: sampleDate) else {
                     // A gap larger than the interpolation limit cannot yield a
                     // result on any intervening day. Jump to the next known
@@ -140,14 +135,14 @@ class MetricsInterpolationService {
                     confidenceLevel: weightResult.confidenceLevel
                 )
 
-                trendWeightCache[currentDay] = trendMetric
-                trendRawValues[currentDay] = emaValue
-                trendLastDay = currentDay
-                trendLastValue = emaValue
-
+                // A partial target day must neither replace an earlier
+                // query's result nor seed the EMA for a later day.
                 if currentDay == targetDay {
                     return trendMetric
                 }
+
+                trendWeightCache[currentDay] = trendMetric
+                trendRawValues[currentDay] = emaValue
 
                 guard let nextDay = calendar.date(byAdding: .day, value: 1, to: currentDay) else {
                     break
@@ -174,7 +169,20 @@ class MetricsInterpolationService {
                 )
             }
 
-            return trendWeightCache[targetDay]
+            // No eligible sample was produced for this query. A completed
+            // checkpoint from a later query cannot fill this unresolved day.
+            return nil
+        }
+
+        /// Latest weigh-in on `day` that does not look ahead of `query`.
+        /// Days with no eligible weigh-in stay on midnight so gaps still interpolate.
+        private func trendSampleDate(on day: Date, query: Date) -> Date {
+            if let measured = metrics.last(where: {
+                calendar.isDate($0.date, inSameDayAs: day) && $0.date <= query
+            }) {
+                return measured.date
+            }
+            return day
         }
 
         func estimate(for date: Date) -> InterpolatedMetric? {
@@ -271,11 +279,20 @@ class MetricsInterpolationService {
     final class BodyFatInterpolationContext {
         private let metrics: [BodyMetrics]
         private let maxGapDays: Int
+        private let maxDexaGapDays: Int
+        private let weightContext: WeightInterpolationContext?
         private let calendar = Calendar.current
 
-        init(metrics: [BodyMetrics], maxGapDays: Int) {
+        init(
+            metrics: [BodyMetrics],
+            maxGapDays: Int,
+            maxDexaGapDays: Int,
+            weightContext: WeightInterpolationContext?
+        ) {
             self.metrics = metrics
             self.maxGapDays = maxGapDays
+            self.maxDexaGapDays = maxDexaGapDays
+            self.weightContext = weightContext
         }
 
         func estimate(for date: Date) -> InterpolatedMetric? {
@@ -332,8 +349,13 @@ class MetricsInterpolationService {
                 to: afterMetric.date
             ).day ?? 0
 
-            guard gapDays <= maxGapDays else {
-                return nil
+            if gapDays > maxGapDays {
+                return dexaAnchoredEstimate(
+                    for: date,
+                    before: beforeMetric,
+                    after: afterMetric,
+                    gapDays: gapDays
+                )
             }
 
             let totalInterval = afterMetric.date.timeIntervalSince(beforeMetric.date)
@@ -349,6 +371,65 @@ class MetricsInterpolationService {
                 isLastKnown: false,
                 confidenceLevel: confidence
             )
+        }
+
+        /// Estimates body fat between two measured DEXA scans using the scale
+        /// weight trend. Lean mass is interpolated linearly between the scans
+        /// and fat mass is taken as the remainder of the trend weight, so the
+        /// estimate tracks weigh-ins instead of a straight line between scans.
+        private func dexaAnchoredEstimate(
+            for date: Date,
+            before: BodyMetrics,
+            after: BodyMetrics,
+            gapDays: Int
+        ) -> InterpolatedMetric? {
+            guard gapDays <= maxDexaGapDays,
+                  isDexaMeasurement(before),
+                  isDexaMeasurement(after),
+                  let beforeBF = before.bodyFatPercentage,
+                  let afterBF = after.bodyFatPercentage,
+                  let weightContext else {
+                return nil
+            }
+
+            guard let beforeWeight = weight(at: before),
+                  let afterWeight = weight(at: after),
+                  beforeWeight > 0,
+                  afterWeight > 0,
+                  let trend = weightContext.trendWeight(for: date),
+                  trend.value > 0 else {
+                return nil
+            }
+
+            let beforeLean = beforeWeight * (1 - beforeBF / 100)
+            let afterLean = afterWeight * (1 - afterBF / 100)
+
+            let totalInterval = after.date.timeIntervalSince(before.date)
+            let progressInterval = date.timeIntervalSince(before.date)
+            let progress = totalInterval != 0 ? progressInterval / totalInterval : 0
+
+            let leanMass = beforeLean + (afterLean - beforeLean) * progress
+            let estimatedBF = min(100, max(0, (trend.value - leanMass) / trend.value * 100))
+
+            return InterpolatedMetric(
+                value: round(estimatedBF * 10) / 10,
+                isInterpolated: true,
+                isLastKnown: false,
+                confidenceLevel: .low
+            )
+        }
+
+        private func isDexaMeasurement(_ metric: BodyMetrics) -> Bool {
+            let method = metric.attributedBodyFatMethod?.lowercased() ?? ""
+            let source = metric.measurementSource(for: .bodyFat).rawValue
+            return method.contains("dexa") || source.contains("bodyspec_dexa")
+        }
+
+        private func weight(at metric: BodyMetrics) -> Double? {
+            if let weight = metric.weight {
+                return weight
+            }
+            return weightContext?.trendWeight(for: metric.date)?.value
         }
 
         private func indexOfLastMetric(onOrBefore date: Date) -> Int? {
@@ -461,7 +542,12 @@ class MetricsInterpolationService {
     func makeBodyFatInterpolationContext(for metrics: [BodyMetrics]) -> BodyFatInterpolationContext? {
         let filtered = metrics.filter { $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
         guard !filtered.isEmpty else { return nil }
-        return BodyFatInterpolationContext(metrics: filtered, maxGapDays: maxInterpolationGapDays)
+        return BodyFatInterpolationContext(
+            metrics: filtered,
+            maxGapDays: maxInterpolationGapDays,
+            maxDexaGapDays: maxDexaInterpolationGapDays,
+            weightContext: makeWeightInterpolationContext(for: metrics)
+        )
     }
 
     func makeFFMIInterpolationContext(for metrics: [BodyMetrics], heightInches: Double) -> FFMIInterpolationContext? {
@@ -544,68 +630,11 @@ class MetricsInterpolationService {
 
     // MARK: - Body Fat Interpolation
 
-    /// Estimate body fat percentage for a given date based on nearby entries
-    /// Returns nil if gap is >30 days or no data available
+    /// Estimate body fat percentage for a given date based on nearby entries.
+    /// Returns nil if gap is >30 days unless both anchors are measured DEXA
+    /// scans, in which case scale weight carries the estimate between them.
     func estimateBodyFat(for date: Date, metrics: [BodyMetrics]) -> InterpolatedMetric? {
-        let sortedMetrics = metrics.filter { $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
-        guard !sortedMetrics.isEmpty else { return nil }
-        guard let lastMetric = sortedMetrics.last else { return nil }
-
-        // Check if date is before first entry
-        if date < sortedMetrics[0].date {
-            return nil
-        }
-
-        // Check if date is after last entry - return last known value
-        if date > lastMetric.date {
-            guard let lastBF = lastMetric.bodyFatPercentage else { return nil }
-            return InterpolatedMetric(
-                value: round(lastBF * 10) / 10,
-                isInterpolated: false,
-                isLastKnown: true,
-                confidenceLevel: nil
-            )
-        }
-
-        // Find metrics before and after the date
-        let before = sortedMetrics.last { $0.date <= date }
-        let after = sortedMetrics.first { $0.date > date }
-
-        // Exact match - return actual value
-        if let exactMatch = before, Calendar.current.isDate(exactMatch.date, inSameDayAs: date) {
-            guard let bf = exactMatch.bodyFatPercentage else { return nil }
-            return InterpolatedMetric(
-                value: round(bf * 10) / 10,
-                isInterpolated: false,
-                isLastKnown: false,
-                confidenceLevel: nil
-            )
-        }
-
-        // Interpolate between two points
-        if let beforeMetric = before, let afterMetric = after,
-           let beforeBF = beforeMetric.bodyFatPercentage, let afterBF = afterMetric.bodyFatPercentage {
-            // Check gap size
-            let gapDays = Calendar.current.dateComponents([.day], from: beforeMetric.date, to: afterMetric.date).day ?? 0
-            guard gapDays <= maxInterpolationGapDays else { return nil }
-
-            // Linear interpolation
-            let totalInterval = afterMetric.date.timeIntervalSince(beforeMetric.date)
-            let progressInterval = date.timeIntervalSince(beforeMetric.date)
-            let progress = progressInterval / totalInterval
-
-            let estimatedBF = beforeBF + (afterBF - beforeBF) * progress
-            let confidence = InterpolatedMetric.confidence(forDaysGap: gapDays)
-
-            return InterpolatedMetric(
-                value: round(estimatedBF * 10) / 10,
-                isInterpolated: true,
-                isLastKnown: false,
-                confidenceLevel: confidence
-            )
-        }
-
-        return nil
+        makeBodyFatInterpolationContext(for: metrics)?.estimate(for: date)
     }
 
     // MARK: - Lean Mass Calculation
