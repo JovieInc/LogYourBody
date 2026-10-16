@@ -148,6 +148,80 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         XCTAssertNil(dayTwoTrend.confidenceLevel)
     }
 
+    func testColdTrendForLongHistoryStaysBelowHangThreshold() throws {
+        let metrics = (0..<3_000).map { day in
+            makeMetric(date: date(daysAfterStart: day).addingTimeInterval(12 * 60 * 60), weight: 80)
+        }
+        let started = ProcessInfo.processInfo.systemUptime
+        let context = try XCTUnwrap(
+            MetricsInterpolationService.shared.makeWeightInterpolationContext(for: metrics)
+        )
+        let result = try XCTUnwrap(context.trendWeight(for: metrics[metrics.count - 1].date))
+        let elapsed = ProcessInfo.processInfo.systemUptime - started
+        let timing = XCTAttachment(string: "Cold trend, 3000 daily observations: \(elapsed) seconds")
+        timing.lifetime = .keepAlways
+        add(timing)
+        XCTAssertEqual(result.value, 80, accuracy: 0.001)
+        XCTAssertFalse(result.isInterpolated)
+        XCTAssertFalse(result.isLastKnown)
+        XCTAssertLessThan(elapsed, 2, "A cold chart trend must not cross the two-second app-hang threshold")
+    }
+
+
+    func testTrendSamplingKeepsDSTMidnightExclusiveAndQueryInclusive() throws {
+        for (zone, month, day, hours) in [
+            ("America/Los_Angeles", 3, 8, 23.0),
+            ("America/Los_Angeles", 11, 1, 25.0),
+            ("Europe/Berlin", 3, 29, 23.0),
+            ("Europe/Berlin", 10, 25, 25.0),
+            ("Australia/Lord_Howe", 4, 5, 24.5),
+            ("Australia/Lord_Howe", 10, 4, 23.5)
+        ] {
+            var localCalendar = Calendar(identifier: .gregorian)
+            localCalendar.timeZone = try XCTUnwrap(TimeZone(identifier: zone))
+            let start = try XCTUnwrap(localCalendar.date(from: DateComponents(year: 2_026, month: month, day: day)))
+            let end = try XCTUnwrap(localCalendar.date(byAdding: .day, value: 1, to: start))
+            XCTAssertEqual(end.timeIntervalSince(start), hours * 3_600)
+            try assertTrendDayBoundary(start: start, end: end, calendar: localCalendar)
+        }
+    }
+
+    func testTrendSamplingRetainsLastDuplicateAtExactTimestamp() throws {
+        let first = date(daysAfterStart: 0).addingTimeInterval(12 * 60 * 60)
+        let next = date(daysAfterStart: 1).addingTimeInterval(12 * 60 * 60)
+        let context = MetricsInterpolationService.WeightInterpolationContext(metrics: [
+            makeMetric(date: first, weight: 80),
+            makeMetric(date: first, weight: 100),
+            makeMetric(date: next, weight: 120)
+        ], maxGapDays: 30)
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: first)).value, 100)
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: next)).value, 105)
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: first)).value, 100)
+    }
+
+    private func assertTrendDayBoundary(start: Date, end: Date, calendar: Calendar) throws {
+        let metrics = [
+            makeMetric(date: start.addingTimeInterval(3_600), weight: 80),
+            makeMetric(date: end.addingTimeInterval(-0.25), weight: 100),
+            makeMetric(date: end, weight: 120),
+            makeMetric(date: end.addingTimeInterval(3_600), weight: 140)
+        ]
+        let context = MetricsInterpolationService.WeightInterpolationContext(
+            metrics: metrics, maxGapDays: 30, calendar: calendar
+        )
+        let queries = [end.addingTimeInterval(-0.5), metrics[1].date, end, metrics[3].date]
+        // Completed day ends at 100; next-day EMA is 105 at midnight and 110 after its later reading.
+        let expected = [80.0, 100.0, 105.0, 110.0]
+        for index in [3, 0, 2, 1, 3] {
+            let value = try XCTUnwrap(context.trendWeight(for: queries[index]))
+            XCTAssertEqual(value.value, expected[index], accuracy: 0.001)
+            XCTAssertFalse(value.isInterpolated)
+            XCTAssertFalse(value.isLastKnown)
+            XCTAssertNil(value.confidenceLevel)
+        }
+        XCTAssertNil(context.trendWeight(for: metrics[0].date.addingTimeInterval(-0.001)))
+    }
+
     func testLaterTimestampedWeighInStaysObservedForTrendAndFFMI() throws {
         let first = date(daysAfterStart: 0).addingTimeInterval(12 * 60 * 60)
         let later = date(daysAfterStart: 7).addingTimeInterval(12 * 60 * 60)
