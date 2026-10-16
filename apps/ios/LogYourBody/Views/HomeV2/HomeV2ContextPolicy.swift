@@ -207,6 +207,17 @@ struct HomeV2DayEntryRow: Identifiable, Equatable {
     let label: String
     let subline: String
     let value: String
+
+    /// A recorded zero is a value; absent and invalid counts do not create a row.
+    static func steps(_ value: Int?) -> HomeV2DayEntryRow? {
+        guard let value, value >= 0 else { return nil }
+        return HomeV2DayEntryRow(
+            id: "steps",
+            label: HomeV2ContextCopy.steps,
+            subline: HomeV2ContextCopy.appleHealth,
+            value: FormatterCache.stepsFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
+        )
+    }
 }
 
 /// Everything Context shows for one day.
