@@ -108,16 +108,6 @@ extension DashboardViewLiquid {
         } ?? homeV2Metric(on: date)
         var rows: [HomeV2DayEntryRow] = []
 
-        if let metric, let weight = metric.weight {
-            let value = convertWeight(weight, to: system) ?? weight
-            rows.append(HomeV2DayEntryRow(
-                id: "weight",
-                label: HomeV2ContextCopy.weight,
-                subline: HomeV2Provenance.weightSubline(for: metric),
-                value: HomeV2Provenance.weightText(displayValue: value, metric: metric, unit: unit)
-            ))
-        }
-
         if let metric, let bodyFat = metric.bodyFatPercentage {
             rows.append(HomeV2DayEntryRow(
                 id: "body_fat",
@@ -145,6 +135,25 @@ extension DashboardViewLiquid {
                     value: String(format: "%.1f", ffmi)
                 ))
             }
+        }
+
+        if let metric, let weight = metric.weight {
+            let value = convertWeight(weight, to: system) ?? weight
+            rows.append(HomeV2DayEntryRow(
+                id: "weight",
+                label: HomeV2ContextCopy.weight,
+                subline: HomeV2Provenance.weightSubline(for: metric),
+                value: HomeV2Provenance.weightText(displayValue: value, metric: metric, unit: unit)
+            ))
+        }
+
+        if let row = HomeV2DayEntryRow.steps(
+            dailyMetricsLookup()[calendar.startOfDay(for: date)]?.steps
+        ) {
+            rows.append(row)
+        }
+
+        if let metric, let weight = metric.weight, let bodyFat = metric.bodyFatPercentage {
             if let lean = UnitConversion.calculateLeanMass(
                 weightKg: weight,
                 bodyFatPercentage: bodyFat,
@@ -157,12 +166,6 @@ extension DashboardViewLiquid {
                     value: "\(HomeV2WeightStepPolicy.text(lean)) \(unit)"
                 ))
             }
-        }
-
-        if let row = HomeV2DayEntryRow.steps(
-            dailyMetricsLookup()[calendar.startOfDay(for: date)]?.steps
-        ) {
-            rows.append(row)
         }
 
         let note = metric?.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
