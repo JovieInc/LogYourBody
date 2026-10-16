@@ -22,6 +22,27 @@ finally:
 sys.exit(status)
 `;
 
+function coveragePercent(output: string, production: string) {
+  const measured = output
+    .split('\n')
+    .map((line) => line.match(/^\s*\d+\s+(\d+(?:\.\d+)?)%\s+\S+\s+\((.+)\)$/))
+    .find((row) => row?.[2] === production);
+  return measured ? Number(measured[1]) : undefined;
+}
+
+it('reads integer and fractional Python trace percentages for the exact production path', () => {
+  for (const percentage of ['95', '95.0', '94.9']) {
+    const output =
+      'lines   cov%   module   (path)\n  400  100%  unrelated  (/other.py)\n' +
+      '  200  ' +
+      percentage +
+      '%  production  (/production.py)\n';
+    expect(coveragePercent(output, '/production.py')).toBe(Number(percentage));
+    expect(coveragePercent(output, '/missing.py')).toBeUndefined();
+  }
+  expect(coveragePercent('200 NaN% production (/production.py)', '/production.py')).toBeUndefined();
+});
+
 function checkedTrace(
   test: string,
   directory: string,
@@ -33,12 +54,9 @@ function checkedTrace(
     timeout: 30_000,
   });
   expect(output).toContain('Native coverage ratchet behavior tests executed: 16');
-  const measured = output
-    .split('\n')
-    .map((line) => line.match(/^\s*\d+\s+(\d+)%\s+\S+\s+\((.+)\)$/))
-    .find((row) => row?.[2] === production);
+  const measured = coveragePercent(output, production);
   expect(measured, 'The production checker must execute under trace').toBeDefined();
-  expect(Number(measured?.[1])).toBeGreaterThanOrEqual(95);
+  expect(measured).toBeGreaterThanOrEqual(95);
   return output;
 }
 
