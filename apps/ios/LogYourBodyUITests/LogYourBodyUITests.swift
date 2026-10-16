@@ -2321,8 +2321,13 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(edit.waitForExistence(timeout: 8), "Saving returns to the day")
         app.buttons["home_v2_context_close"].tap()
-        let home = app.descendants(matching: .any)["home_v2_change_sentence"]
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_context"].waitForNonExistence(timeout: 8),
+            "Closing removes Context"
+        )
+        let home = app.scrollViews["home_v2_content_scroll"]
         XCTAssertTrue(home.waitForExistence(timeout: 8), "Closing returns Home")
+        XCTAssertTrue(contextButton.isHittable, "The returned Home header can reopen the day's details")
         XCTAssertTrue(
             app.buttons["home_v2_done"].exists || app.buttons["home_v2_log_weight"].exists,
             "Home shows the logged state for today's edit, or the check-in"
