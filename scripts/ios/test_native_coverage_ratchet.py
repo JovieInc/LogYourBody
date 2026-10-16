@@ -176,6 +176,8 @@ class NativeCoverageRatchetTests(unittest.TestCase):
             git("init", "-q", "-b", "main")
             git("config", "user.name", "Coverage Fixture")
             git("config", "user.email", "coverage-fixture@example.invalid")
+            # Synthetic history must not invoke the developer's hardware or password-manager signer.
+            git("config", "commit.gpgSign", "false")
             (root / "base").write_text("base")
             git("add", "."); git("commit", "-qm", "common baseline")
             common = git("rev-parse", "HEAD")
