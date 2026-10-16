@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A16800000000000000000001 /* ContextualMetricShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16800000000000000000002 /* ContextualMetricShare.swift */; };
 		5AAEA63151156B8F114A0B83 /* BodyRecordReviewConsumerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */; };
 		84230C7F619A7210787206E8 /* AppReviewNativeAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832C6BD896D896CCBEBAF565 /* AppReviewNativeAdapter.swift */; };
 		80341C4DDED4231D4589ED47 /* BodyRecordReviewConsumer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E6CF428B39B066C378F12CD /* BodyRecordReviewConsumer.swift */; };
@@ -505,6 +506,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A16800000000000000000002 /* ContextualMetricShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContextualMetricShare.swift; path = Components/ContextualMetricShare.swift; sourceTree = "<group>"; };
 		533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyRecordReviewConsumerTests.swift; sourceTree = "<group>"; };
 		832C6BD896D896CCBEBAF565 /* AppReviewNativeAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewNativeAdapter.swift; sourceTree = "<group>"; };
 		2E6CF428B39B066C378F12CD /* BodyRecordReviewConsumer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyRecordReviewConsumer.swift; sourceTree = "<group>"; };
@@ -1140,6 +1142,7 @@
 			children = (
 				ADF1F6B72ED4C63900745F33 /* GlobalTimelineHeader.swift */,
 				ADA600252ED259A700088042 /* BodyScoreShareCard.swift */,
+				A16800000000000000000002 /* ContextualMetricShare.swift */,
 				AD3145D12F0A020100ABCDEF /* AvatarBodyRenderer.swift */,
 				ADA4B7562ED0E7D700F4262A /* DashboardFFMITile.swift */,
 				ADA4B7572ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift */,
@@ -2453,6 +2456,7 @@
 				ADDC47F62E2D89F3003C97E7 /* LogYourBodyApp.swift in Sources */,
 				ADDC47F72E2D89F3003C97E7 /* AnimatedTabView.swift in Sources */,
 				ADA600262ED259A700088042 /* BodyScoreShareCard.swift in Sources */,
+				A16800000000000000000001 /* ContextualMetricShare.swift in Sources */,
 				ADDC47F82E2D89F3003C97E7 /* DashboardComponents.swift in Sources */,
 				ADA4B7452ECFE0F300F4262A /* FullMetricChartView.swift in Sources */,
 				ADDC47FA2E2D89F3003C97E7 /* DietPhaseCard.swift in Sources */,

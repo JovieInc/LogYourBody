@@ -52,8 +52,6 @@ class MetricsInterpolationService {
         // Cached trend-weight series for efficiency when querying multiple dates
         private var trendWeightCache: [Date: InterpolatedMetric] = [:]
         private var trendRawValues: [Date: Double] = [:]
-        private var trendLastDay: Date?
-        private var trendLastValue: Double?
         // Smoothing factor for exponential moving average (EMA).
         // Higher values react more quickly to new weigh-ins.
         private let trendAlpha: Double = 0.25
@@ -75,10 +73,6 @@ class MetricsInterpolationService {
                 return nil
             }
 
-            if let cached = trendWeightCache[targetDay] {
-                return cached
-            }
-
             // There is no new measurement after the final metric. Walking the
             // EMA one day at a time all the way to a far-future query date can
             // block the main thread for seconds (for example, when the last
@@ -93,25 +87,21 @@ class MetricsInterpolationService {
                 processingEndDay = targetDay
             }
 
+            // Only completed earlier days are reusable EMA checkpoints. The
+            // target day's eligible weigh-in depends on the query timestamp.
             let cachedAnchor = trendRawValues
-                .filter { $0.key <= targetDay }
+                .filter { $0.key < targetDay }
                 .max { $0.key < $1.key }
-            var ema = cachedAnchor?.value ?? trendLastValue
-            var currentDay: Date
-
-            if let cachedAnchor {
-                currentDay = calendar.date(byAdding: .day, value: 1, to: cachedAnchor.key) ?? cachedAnchor.key
-            } else if let lastDay = trendLastDay, let lastValue = ema, lastDay >= firstDay, targetDay >= lastDay {
-                currentDay = calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay
-                ema = lastValue
-            } else {
-                currentDay = firstDay
-                ema = nil
+            var ema = cachedAnchor?.value
+            let nextDay = cachedAnchor.flatMap {
+                calendar.date(byAdding: .day, value: 1, to: $0.key)
             }
+            var currentDay = nextDay ?? firstDay
 
             while currentDay <= processingEndDay {
-                // Seed the first day at its actual measurement time, not an earlier midnight.
-                let sampleDate = currentDay == firstDay ? firstMetric.date : currentDay
+                // Midnight is before a weigh-in later that day. Sampling it marks
+                // the weigh-in interpolated and drops it from Progress and Share.
+                let sampleDate = trendSampleDate(on: currentDay, query: date)
                 guard let weightResult = estimate(for: sampleDate) else {
                     // A gap larger than the interpolation limit cannot yield a
                     // result on any intervening day. Jump to the next known
@@ -145,14 +135,14 @@ class MetricsInterpolationService {
                     confidenceLevel: weightResult.confidenceLevel
                 )
 
-                trendWeightCache[currentDay] = trendMetric
-                trendRawValues[currentDay] = emaValue
-                trendLastDay = currentDay
-                trendLastValue = emaValue
-
+                // A partial target day must neither replace an earlier
+                // query's result nor seed the EMA for a later day.
                 if currentDay == targetDay {
                     return trendMetric
                 }
+
+                trendWeightCache[currentDay] = trendMetric
+                trendRawValues[currentDay] = emaValue
 
                 guard let nextDay = calendar.date(byAdding: .day, value: 1, to: currentDay) else {
                     break
@@ -179,7 +169,20 @@ class MetricsInterpolationService {
                 )
             }
 
-            return trendWeightCache[targetDay]
+            // No eligible sample was produced for this query. A completed
+            // checkpoint from a later query cannot fill this unresolved day.
+            return nil
+        }
+
+        /// Latest weigh-in on `day` that does not look ahead of `query`.
+        /// Days with no eligible weigh-in stay on midnight so gaps still interpolate.
+        private func trendSampleDate(on day: Date, query: Date) -> Date {
+            if let measured = metrics.last(where: {
+                calendar.isDate($0.date, inSameDayAs: day) && $0.date <= query
+            }) {
+                return measured.date
+            }
+            return day
         }
 
         func estimate(for date: Date) -> InterpolatedMetric? {

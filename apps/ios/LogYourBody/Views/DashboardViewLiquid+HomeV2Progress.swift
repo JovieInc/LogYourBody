@@ -12,8 +12,10 @@ extension DashboardViewLiquid {
             range: $selectedRange,
             series: { homeV2ProgressSeries(for: $0) },
             formatValue: { homeV2ProgressValueText($0, $1) },
-            onLogWeight: { presentHomeV2LogSheet() }
+            onLogWeight: { presentHomeV2LogSheet() },
+            isShareContextVisible: isMetricShareContextVisible && !isMetricDetailActive && !isStatsDestinationActive
         )
+        .id(authManager.captureAccountSession())
     }
 
     func openHomeV2Progress(metric: HomeV2ProgressMetric = .bodyFat) {
@@ -28,21 +30,35 @@ extension DashboardViewLiquid {
 
     /// Series come from the prewarmed whole-history caches (display units).
     func homeV2ProgressSeries(for metric: HomeV2ProgressMetric) -> HomeV2ProgressSeries {
+        guard let ownership = authManager.captureAccountSession(), dashboardMetricsBelong(to: ownership) else {
+            return HomeV2ProgressSeries(
+                daily: [], trend: [], unit: "", deltaUnit: "", target: nil,
+                provenance: nil, insightTitle: nil, insightBody: nil)
+        }
         let system = currentMeasurementSystem
         switch metric {
         case .weight:
             // ponytail: PhaseInsightPolicy sorts the metrics on every read; cache it if Progress ever feels slow.
-            let insight = PhaseInsightPolicy.insight(for: bodyMetrics)
+            let insight = PhaseInsightPolicy.insight(for: homeV2InsightMetrics)
             let title = homeV2PhaseSentence.map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 } ?? insight.title
+            let daily = HomeV2ProgressPolicy.supportedWeightPoints(
+                fullChartCache[.weight] ?? [],
+                system: system
+            )
+            let trend = HomeV2ProgressPolicy.supportedWeightPoints(
+                fullTrendChartCache[.weight] ?? [],
+                system: system
+            )
             return HomeV2ProgressSeries(
-                daily: fullChartCache[.weight] ?? [],
-                trend: fullTrendChartCache[.weight] ?? [],
+                daily: daily,
+                trend: trend,
                 unit: homeV2DisplayUnit,
                 deltaUnit: homeV2DisplayUnit,
                 target: weightGoal.map { convertWeight($0, to: system) ?? $0 },
                 provenance: HomeV2MetricEditorial.progressProvenance(metric: .weight, bodyFatSource: nil),
                 insightTitle: title,
-                insightBody: [insight.message, insight.detail].compactMap { $0 }.joined(separator: " ")
+                insightBody: [insight.message, insight.detail].compactMap { $0 }.joined(separator: " "),
+                shareEntries: cachedMetricEntries(for: .weight)?.entries ?? []
             )
         case .bodyFat:
             let latestSource = bodyMetrics
@@ -57,7 +73,8 @@ extension DashboardViewLiquid {
                 target: bodyFatGoal,
                 provenance: HomeV2MetricEditorial.progressProvenance(metric: .bodyFat, bodyFatSource: latestSource),
                 insightTitle: nil,
-                insightBody: nil
+                insightBody: nil,
+                shareEntries: cachedMetricEntries(for: .bodyFat)?.entries ?? []
             )
         case .ffmi:
             return HomeV2ProgressSeries(
@@ -79,7 +96,8 @@ extension DashboardViewLiquid {
                 target: Double(stepGoal),
                 provenance: HomeV2MetricEditorial.progressProvenance(metric: .steps, bodyFatSource: nil),
                 insightTitle: nil,
-                insightBody: nil
+                insightBody: nil,
+                shareEntries: cachedMetricEntries(for: .steps)?.entries ?? []
             )
         }
     }

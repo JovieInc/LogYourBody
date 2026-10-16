@@ -174,6 +174,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             throw XCTSkip("Body fat and more tab is not reachable from this fixture.")
         }
         detailsButton.tap()
+        app.segmentedControls.firstMatch.buttons["Body Fat"].tap()
 
         let bodyFatField = app.textFields.matching(
             NSPredicate(format: "placeholderValue == '0.0'")
@@ -1103,30 +1104,6 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
     // MARK: - Layout defect detection
 
-    /// Values belong to one stationary checkpoint, never to a later tap or scroll.
-    private struct LayoutSample {
-        let element: XCUIElement
-        let type: XCUIElement.ElementType
-        let identifier: String
-        let label: String
-        let frame: CGRect
-
-        init?(_ element: XCUIElement) {
-            guard element.exists else { return nil }
-            self.element = element
-            type = element.elementType
-            identifier = element.identifier
-            label = element.label
-            frame = element.frame
-        }
-
-        var description: String {
-            let identifier = self.identifier.isEmpty ? "(no identifier)" : self.identifier
-            let label = self.label.isEmpty ? "(no label)" : self.label
-            return "\(String(describing: type)) id=\(identifier) label=\"\(label)\" frame=\(frame)"
-        }
-    }
-
     /// Fails with a screenshot if `layoutAnomalies` finds anything at this
     /// checkpoint. Unlike the chaos monkey's soft per-step recording, these
     /// are dedicated, deterministic checkpoints under an extreme text size,
@@ -1137,19 +1114,17 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        attachDiagnosticTree(from: app, named: "layout-scan-\(context)-tree")
-        attachScreenshot(named: "layout-scan-\(context)", from: app)
-        let window = app.windows.firstMatch.frame
-        let elements = app.buttons.allElementsBoundByIndex + app.staticTexts.allElementsBoundByIndex
-        let samples = elements.compactMap { LayoutSample($0) }
-        let geometry = samples.map { "\($0.identifier) \($0.label): \($0.frame)" }
-        let attachment = XCTAttachment(string: "window=\(window)\n" + geometry.joined(separator: "\n"))
-        attachment.name = "layout-scan-\(context)-geometry"
+        let geometry = ChaosScrollGeometry(app: app)
+        let attachment = XCTAttachment(string: "window=\(String(describing: geometry.capturedWindow))\n"
+            + "captureFailure=\(geometry.captureFailure ?? "none")\n" + geometry.diagnosticDescription)
+        attachment.name = "layout-scan-\(context)-immutable-geometry-and-ancestry"
         attachment.lifetime = .keepAlways
         add(attachment)
+        // This later image is visual evidence, not the geometry snapshot's timestamp.
+        attachScreenshot(named: "layout-scan-\(context)-after-snapshot", from: app)
         var observations: [String] = []
         let findings = layoutAnomalies(
-            candidates: samples, windowFrame: window, in: app, observations: &observations
+            geometry: geometry, in: app, observations: &observations
         )
         let clipping = XCTAttachment(string: observations.joined(separator: "\n"))
         clipping.name = "layout-scan-\(context)-expected-native-scroll-clipping"
@@ -1166,13 +1141,18 @@ final class ChaosEdgeCaseUITests: XCTestCase {
     /// label clipped down to a single ellipsis. The keyboard and system
     /// alerts are excluded -- neither is the app's layout to fix.
     private func layoutAnomalies(
-        candidates: [LayoutSample], windowFrame: CGRect,
-        in app: XCUIApplication, observations: inout [String]
+        geometry: ChaosScrollGeometry, in app: XCUIApplication, observations: inout [String]
     ) -> [String] {
-        guard !app.keyboards.element.exists, !app.alerts.firstMatch.exists else { return [] }
-        guard windowFrame.width > 0, windowFrame.height > 0 else { return [] }
-
-        let scrollGeometry = ChaosScrollGeometry(app: app)
+        if let failure = geometry.captureFailure { return ["layout snapshot failed: \(failure)"] }
+        guard let windowFrame = geometry.capturedWindow,
+              windowFrame.origin.x.isFinite, windowFrame.origin.y.isFinite,
+              windowFrame.width.isFinite, windowFrame.height.isFinite,
+              windowFrame.width > 0, windowFrame.height > 0 else {
+            return ["layout snapshot has no finite positive window"]
+        }
+        guard !geometry.capturedSystemOverlay else { return [] }
+        let candidates = geometry.layoutRecords
+        guard !candidates.isEmpty else { return ["layout snapshot contains no button or static text"] }
         var findings: [String] = []
         for element in candidates {
             let frame = element.frame
@@ -1197,10 +1177,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
 
             let overflowsWindow = frame.minX < windowFrame.minX - 1 || frame.maxX > windowFrame.maxX + 1
                 || frame.minY < windowFrame.minY - 1 || frame.maxY > windowFrame.maxY + 1
-            if overflowsWindow && scrollGeometry.isExpectedScrollClipping(
-                type: element.type, identifier: element.identifier, label: element.label,
-                frame: frame, window: windowFrame
-            ) {
+            if overflowsWindow && geometry.isExpectedScrollClipping(element, window: windowFrame) {
                 observations.append("native scroll clipping: \(element.description)")
                 continue
             }
@@ -1209,7 +1186,25 @@ final class ChaosEdgeCaseUITests: XCTestCase {
                 findings.append("non-scroll frame outside window bounds \(windowFrame): \(element.description)")
                 continue
             }
-            guard element.element.isHittable else { continue }
+            guard overflowsWindow || element.label == "\u{2026}" else { continue }
+            // Hittability is necessarily live. Fail closed if this finding no
+            // longer identifies exactly one unchanged element and window.
+            let matches = app.descendants(matching: element.type).allElementsBoundByIndex.filter {
+                $0.identifier == element.identifier && $0.label == element.label
+                    && ChaosScrollGeometry.sameNativeFrame($0.frame, frame)
+            }
+            guard matches.count == 1, let live = matches.first,
+                  ChaosScrollGeometry.sameNativeFrame(app.windows.firstMatch.frame, windowFrame) else {
+                findings.append("layout changed or ambiguous before hittability: \(element.description)")
+                continue
+            }
+            let hittable = live.isHittable
+            guard ChaosScrollGeometry.sameNativeFrame(live.frame, frame),
+                  ChaosScrollGeometry.sameNativeFrame(app.windows.firstMatch.frame, windowFrame) else {
+                findings.append("layout changed during hittability: \(element.description)")
+                continue
+            }
+            guard hittable else { continue }
             if overflowsWindow {
                 findings.append("frame outside window bounds \(windowFrame): \(element.description)")
                 continue

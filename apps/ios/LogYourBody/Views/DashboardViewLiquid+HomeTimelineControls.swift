@@ -87,21 +87,26 @@ extension DashboardViewLiquid {
 
     func makeBodyScoreShareAction(metric: BodyMetrics? = nil, score: Int? = nil) -> (() -> Void)? {
         if let score, score <= 0 { return nil }
-        guard let initialPayload = makeBodyScoreSharePayload(metric: metric) else { return nil }
+        guard let ownership = authManager.captureAccountSession(),
+              dashboardMetricsBelong(to: ownership),
+              (metric ?? currentMetric)?.userId == ownership.subject,
+              let initialPayload = makeBodyScoreSharePayload(metric: metric) else { return nil }
 
         return {
+            guard authManager.ownsAccountSession(ownership) else { return }
             let presentationID = UUID()
             bodyScoreSharePresentationID = presentationID
-            bodyScoreSharePayload = initialPayload
+            bodyScoreSharePayload = initialPayload.owned(by: ownership)
 
             Task { @MainActor in
                 guard let resolvedPayload = await makeBodyScoreSharePayloadResolvingPhoto(metric: metric),
                       resolvedPayload.photoImage != nil,
-                      bodyScoreSharePresentationID == presentationID else {
+                      bodyScoreSharePresentationID == presentationID,
+                      authManager.ownsAccountSession(ownership) else {
                     return
                 }
 
-                bodyScoreSharePayload = resolvedPayload
+                bodyScoreSharePayload = resolvedPayload.owned(by: ownership)
             }
         }
     }

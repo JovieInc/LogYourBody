@@ -294,6 +294,29 @@ struct LivePhotoLibraryAdapter: PhotoLibraryManaging {
         }
     }
 
+    /// Recheck the captured account after an authorization prompt, before writing private pixels.
+    @MainActor
+    func saveImage(_ image: UIImage, whileOwned isCurrent: @escaping @MainActor () -> Bool) async -> Bool {
+        await Self.saveAuthorizedImage(image, whileOwned: isCurrent, authorize: {
+            let status = PHPhotoLibrary.authorizationStatus()
+            if status == .authorized || status == .limited { return true }
+            guard status == .notDetermined else { return false }
+            let granted = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            return granted == .authorized || granted == .limited
+        }, write: { UIImageWriteToSavedPhotosAlbum($0, nil, nil, nil) })
+    }
+
+    @MainActor
+    static func saveAuthorizedImage(
+        _ image: UIImage, whileOwned isCurrent: () -> Bool,
+        authorize: () async -> Bool, write: (UIImage) -> Void
+    ) async -> Bool {
+        guard isCurrent() else { return false }
+        guard await authorize(), isCurrent() else { return false }
+        write(image)
+        return true
+    }
+
     func saveImage(_ image: UIImage) async -> Bool {
         let status = PHPhotoLibrary.authorizationStatus()
 

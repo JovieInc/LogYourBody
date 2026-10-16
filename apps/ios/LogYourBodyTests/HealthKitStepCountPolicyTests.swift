@@ -7,8 +7,8 @@ import XCTest
 @testable import LogYourBody
 
 final class HealthKitStepCountPolicyTests: XCTestCase {
-    func testMissingQuantityAndZeroRemainZero() throws {
-        XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: nil), 0)
+    func testMissingQuantityRemainsAbsentWhileMeasuredZeroIsPreserved() throws {
+        XCTAssertNil(try HealthKitStepCountPolicy.stepCount(from: nil))
         XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: 0), 0)
         XCTAssertEqual(try HealthKitStepCountPolicy.stepCount(from: -0.0), 0)
     }
@@ -42,26 +42,26 @@ final class HealthKitStepCountPolicyTests: XCTestCase {
         }
     }
 
-    func testNoDataForTodayReadsAsZeroSteps() {
+    func testNoDataIsRecognizedWithoutInventingAStepCount() {
         let noData = NSError(
             domain: HKErrorDomain,
             code: HKError.Code.errorNoData.rawValue,
             userInfo: [NSLocalizedDescriptionKey: "No data available for the specified predicate."]
         )
 
-        XCTAssertEqual(HealthKitStepCountPolicy.stepCount(forNoData: noData), 0)
+        XCTAssertTrue(HealthKitStepCountPolicy.isNoData(noData))
     }
 
     func testOtherHealthKitErrorsStillPropagate() {
         let denied = NSError(domain: HKErrorDomain, code: HKError.Code.errorAuthorizationDenied.rawValue)
 
-        XCTAssertNil(HealthKitStepCountPolicy.stepCount(forNoData: denied))
+        XCTAssertFalse(HealthKitStepCountPolicy.isNoData(denied))
     }
 
     func testNonHealthKitErrorsStillPropagate() {
         let sameCodeDifferentDomain = NSError(domain: "com.logyourbody.test", code: HKError.Code.errorNoData.rawValue)
 
-        XCTAssertNil(HealthKitStepCountPolicy.stepCount(forNoData: sameCodeDifferentDomain))
-        XCTAssertNil(HealthKitStepCountPolicy.stepCount(forNoData: HealthKitError.notAuthorized))
+        XCTAssertFalse(HealthKitStepCountPolicy.isNoData(sameCodeDifferentDomain))
+        XCTAssertFalse(HealthKitStepCountPolicy.isNoData(HealthKitError.notAuthorized))
     }
 }

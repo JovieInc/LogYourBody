@@ -392,7 +392,7 @@ final class HomeV2PolicyTests: XCTestCase {
         XCTAssertNil(HomeV2Copy.phaseSentence(kind: .insufficientData, weeks: 3), "No phase line before there is a trend")
         XCTAssertEqual(HomeV2Copy.displayUnit(.imperial), "lb")
         XCTAssertEqual(HomeV2Copy.displayUnit(.metric), "kg")
-        XCTAssertEqual(HomeV2Copy.weightRangeError(unit: "lb"), "Enter a weight between 44 and 1100 lb.")
+        XCTAssertEqual(HomeV2Copy.weightRangeError(unit: "lb"), "Enter a weight between 70 and 660 lb.")
 
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -410,13 +410,73 @@ final class HomeV2PolicyTests: XCTestCase {
     func testWeightStepsByATenthAndStaysInRange() {
         XCTAssertEqual(HomeV2WeightStepPolicy.stepped(173.4, by: 1, unit: "lb"), 173.5, accuracy: 0.001)
         XCTAssertEqual(HomeV2WeightStepPolicy.stepped(173.4, by: -1, unit: "lb"), 173.3, accuracy: 0.001)
-        XCTAssertEqual(HomeV2WeightStepPolicy.stepped(44.0, by: -1, unit: "lb"), 44.0, accuracy: 0.001)
-        XCTAssertEqual(HomeV2WeightStepPolicy.stepped(500.0, by: 1, unit: "kg"), 500.0, accuracy: 0.001)
+        XCTAssertEqual(HomeV2WeightStepPolicy.stepped(70.0, by: -1, unit: "lb"), 70.0, accuracy: 0.001)
+        XCTAssertEqual(HomeV2WeightStepPolicy.stepped(300.0, by: 1, unit: "kg"), 300.0, accuracy: 0.001)
         XCTAssertEqual(HomeV2WeightStepPolicy.text(173.44), "173.4")
         XCTAssertEqual(HomeV2WeightStepPolicy.parse("173,4"), 173.4)
         XCTAssertNil(HomeV2WeightStepPolicy.parse("heavy"))
-        XCTAssertEqual(HomeV2WeightStepPolicy.clamped(9_999, unit: "lb"), 1_100, accuracy: 0.001)
+        XCTAssertEqual(HomeV2WeightStepPolicy.clamped(9_999, unit: "lb"), 660, accuracy: 0.001)
         XCTAssertEqual(HomeV2WeightStepPolicy.defaultValue(unit: "kg"), 70, accuracy: 0.001)
+        XCTAssertEqual(HomeV2WeightStepPolicy.converted(80, from: "kg", to: "lbs"), 176.4, accuracy: 0.001)
+        XCTAssertEqual(HomeV2WeightStepPolicy.converted(176.4, from: "lbs", to: "kg"), 80, accuracy: 0.001)
+    }
+
+    func testTodayPolicyNeverFallsBackToHistoricalEntries() {
+        let calendar = Calendar.current
+        let now = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: Date()) ?? Date()
+        let today = editorialMetric(id: "today", user: "A", date: now, weight: 80)
+        let earlierToday = editorialMetric(
+            id: "today-earlier",
+            user: "A",
+            date: now.addingTimeInterval(-3_600),
+            weight: 80.2
+        )
+        let historical = editorialMetric(
+            id: "historical",
+            user: "A",
+            date: calendar.date(byAdding: .day, value: -1, to: now) ?? now,
+            weight: 81
+        )
+
+        XCTAssertTrue(HomeV2TodayPolicy.metrics(in: [historical], now: now, calendar: calendar).isEmpty)
+        XCTAssertEqual(
+            HomeV2TodayPolicy.metrics(in: [historical, earlierToday, today], now: now, calendar: calendar).map(\.id),
+            ["today", "today-earlier"]
+        )
+    }
+
+    func testImplausibleImportedWeightStaysOutOfChartsWithoutChangingTheRecord() {
+        let date = Date()
+        let imported = editorialMetric(id: "imported", user: "A", date: date, weight: 18)
+
+        XCTAssertFalse(HomeV2WeightQuality.isWithinSupportedLoggingRange(imported.weight))
+        XCTAssertEqual(imported.weight, 18, "Validation must not rewrite source data")
+        XCTAssertTrue(HomeV2EditorialPolicy.weights(in: [imported], selected: imported).isEmpty)
+        XCTAssertTrue(HomeV2WeightQuality.isWithinSupportedLoggingRange(32))
+        XCTAssertTrue(HomeV2WeightQuality.isWithinSupportedLoggingRange(300))
+    }
+
+    func testSparseWeightChartLabelsZeroOneTwoAndRepeatedDaySamples() {
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: Date())
+        let first = HomeV2EditorialPolicy.WeightReading(
+            id: "first",
+            date: calendar.date(byAdding: .hour, value: 7, to: day) ?? day,
+            kilograms: 80
+        )
+        let second = HomeV2EditorialPolicy.WeightReading(
+            id: "second",
+            date: calendar.date(byAdding: .hour, value: 19, to: day) ?? day,
+            kilograms: 79.8
+        )
+
+        XCTAssertEqual(HomeV2RecordedWeightChartPolicy.axisDates(for: []).count, 0)
+        XCTAssertEqual(HomeV2RecordedWeightChartPolicy.axisDates(for: [first]), [first.date])
+        XCTAssertEqual(HomeV2RecordedWeightChartPolicy.axisDates(for: [first, second]), [first.date, second.date])
+        XCTAssertEqual(
+            HomeV2RecordedWeightChartPolicy.labelGranularity(for: [first, second], calendar: calendar),
+            .time
+        )
     }
 
     func testPhaseWeeksCountConsecutiveWeeksMovingThePhasesWay() {

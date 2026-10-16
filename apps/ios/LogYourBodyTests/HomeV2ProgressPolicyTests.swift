@@ -160,6 +160,17 @@ final class HomeV2ProgressPolicyTests: XCTestCase {
         }
     }
 
+    func testWeightProgressOmitsFlaggedValuesWithoutMutatingThem() {
+        let flagged = point(daysAgo: 1, value: 18)
+        let supported = point(daysAgo: 0, value: 80)
+
+        XCTAssertEqual(
+            HomeV2ProgressPolicy.supportedWeightPoints([flagged, supported], system: .metric).map(\.value),
+            [supported.value]
+        )
+        XCTAssertEqual(flagged.value, 18)
+    }
+
     @MainActor
     func testRawProgressChartsIdentifyTheirMetricWithoutClaimingAnAverage() {
         let points = (0..<7).map { point(daysAgo: $0, value: 20) }

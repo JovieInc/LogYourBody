@@ -10,6 +10,16 @@ func stepWeight(by direction: Int) {
         HapticManager.shared.selection()
 }
 
+func updateWeightUnit(from previous: String, to current: String) {
+        if !previous.isEmpty, previous != current,
+           let value = HomeV2WeightStepPolicy.parse(weight) {
+            weight = HomeV2WeightStepPolicy.text(
+                HomeV2WeightStepPolicy.converted(value, from: previous, to: current)
+            )
+        }
+        validateWeight(weight)
+    }
+
 // MARK: - Photo Entry View
     var photoEntryView: some View {
         VStack(spacing: 16) {
@@ -132,6 +142,8 @@ var saveButtonText: String {
         case 1:
             saveBodyFat(userId: userId)
         case 2:
+            guard let ownership = authManager.captureAccountSession(),
+                  ownership.subject == userId, authManager.ownsAccountSession(ownership) else { return }
             let photosToSave = selectedPhotos
             guard PhotoUploadBatchPolicy.canStartUpload(
                 selectedCount: photosToSave.count,
@@ -146,7 +158,7 @@ var saveButtonText: String {
             photoIdentifiers.removeAll()
 
             Task {
-                await savePhotos(userId: userId, selectedPhotos: photosToSave)
+                await savePhotos(userId: userId, selectedPhotos: photosToSave, ownership: ownership)
             }
         case 3:
             saveGlp1Dose(userId: userId)
@@ -308,8 +320,18 @@ func saveGlp1Dose(userId: String) {
         }
     }
 
-func savePhotos(userId: String, selectedPhotos photosToUpload: [AppPhotoAsset]) async {
-        guard !photosToUpload.isEmpty else { return }
+func savePhotos(
+        userId: String,
+        selectedPhotos photosToUpload: [AppPhotoAsset],
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async {
+        guard !photosToUpload.isEmpty, ownership.subject == userId,
+              authManager.ownsAccountSession(ownership) else { return }
+        let writeAdmission: CoreDataManager.WriteAdmission = {
+            guard authManager.ownsAccountSession(ownership) else {
+                throw PhotoUploadManager.PhotoError.notAuthenticated
+            }
+        }
 
         isProcessingPhotos = true
         photoProgress = 0
@@ -321,20 +343,25 @@ func savePhotos(userId: String, selectedPhotos photosToUpload: [AppPhotoAsset]) 
         var failedPhotos: [AppPhotoAsset] = []
 
         defer {
-            isProcessingPhotos = false
-            processingPhotoCount = 0
+            if authManager.ownsAccountSession(ownership) {
+                isProcessingPhotos = false
+                processingPhotoCount = 0
+            }
         }
 
         for (index, item) in photosToUpload.enumerated() {
+            guard authManager.ownsAccountSession(ownership) else { return }
             var placeholderMetricId: String?
 
             do {
                 defer {
-                    processedCount = index + 1
-                    photoProgress = PhotoUploadBatchPolicy.progress(
-                        completedCount: processedCount,
-                        totalCount: photosToUpload.count
-                    )
+                    if authManager.ownsAccountSession(ownership) {
+                        processedCount = index + 1
+                        photoProgress = PhotoUploadBatchPolicy.progress(
+                            completedCount: processedCount,
+                            totalCount: photosToUpload.count
+                        )
+                    }
                 }
 
                 let itemIdentifier = item.localIdentifier
@@ -347,8 +374,10 @@ func savePhotos(userId: String, selectedPhotos photosToUpload: [AppPhotoAsset]) 
                 // Create or get metrics for this date
                 let metricsResult = try await PhotoMetadataService.shared.createOrUpdateMetricsForPhotoUpload(
                     for: photoDate,
-                    userId: userId
+                    userId: userId,
+                    writeAdmission: writeAdmission
                 )
+                try writeAdmission()
                 let metrics = metricsResult.metrics
                 placeholderMetricId = metrics.id
 
@@ -357,12 +386,16 @@ func savePhotos(userId: String, selectedPhotos photosToUpload: [AppPhotoAsset]) 
                     for: metrics,
                     image: image
                 )
+                try writeAdmission()
 
                 successfulUploadCount += 1
                 if let itemIdentifier {
                     successfulPhotoIdentifiers.append(itemIdentifier)
                 }
             } catch {
+                // A late result may belong to an admitted original-owner PUT. Do not
+                // delete its placeholder or publish its UI result into another lifetime.
+                guard authManager.ownsAccountSession(ownership) else { return }
                 let context = ErrorContext(
                     feature: "photos",
                     operation: "savePhotos",
@@ -373,18 +406,22 @@ func savePhotos(userId: String, selectedPhotos photosToUpload: [AppPhotoAsset]) 
                 if let placeholderMetricId {
                     _ = await CoreDataManager.shared.deleteEmptyPhotoPlaceholder(
                         id: placeholderMetricId,
-                        userId: userId
+                        userId: userId,
+                        writeAdmission: writeAdmission
                     )
                 }
+                guard authManager.ownsAccountSession(ownership) else { return }
                 failedPhotos.append(item)
             }
         }
 
+        guard authManager.ownsAccountSession(ownership) else { return }
         photoIdentifiers = successfulPhotoIdentifiers
 
         // Delete successfully imported originals even if a later item failed.
         if deletePhotosAfterImport && !photoIdentifiers.isEmpty {
-            await deletePhotosFromLibrary()
+            await deletePhotosFromLibrary(ownership: ownership)
+            guard authManager.ownsAccountSession(ownership) else { return }
         }
 
         RealtimeSyncManager.shared.syncIfNeeded()
@@ -423,12 +460,13 @@ func trackEntrySaved(type: String, properties: [String: String] = [:]) {
         )
     }
 
-func deletePhotosFromLibrary() async {
-        guard !photoIdentifiers.isEmpty else { return }
+func deletePhotosFromLibrary(ownership: AuthManager.ProfileSessionOwnership) async {
+        guard !photoIdentifiers.isEmpty, authManager.ownsAccountSession(ownership) else { return }
 
         do {
             try await LivePhotoLibraryAdapter.shared.deleteAssets(localIdentifiers: photoIdentifiers)
         } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
             let context = ErrorContext(
                 feature: "photos",
                 operation: "deleteImportedPhotos",

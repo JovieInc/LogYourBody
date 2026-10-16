@@ -494,6 +494,7 @@ struct HomeV2MetricHero: View {
     let unit: String
     let comparison: String
     var provenance: HomeV2ProvenanceDetail?
+    var onProvenancePresentationChange: (Bool) -> Void = { _ in }
     var valueIdentifier = "home_v2_progress_value"
     var comparisonIdentifier = "home_v2_progress_delta"
     var valueSize: CGFloat = HomeV2Tokens.TypeSize.progressValue
@@ -521,6 +522,8 @@ struct HomeV2MetricHero: View {
             }
         }
         .onChange(of: provenance) { _, _ in showsProvenance = false }
+        .onChange(of: showsProvenance) { _, presented in onProvenancePresentationChange(presented) }
+        .onDisappear { onProvenancePresentationChange(false) }
     }
 
     @ViewBuilder
@@ -601,6 +604,7 @@ struct HomeV2ProvenanceSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(HomeV2Tokens.Colors.canvas.ignoresSafeArea())
         .presentationDetents([.medium])
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_v2_provenance_detail")
     }
 }

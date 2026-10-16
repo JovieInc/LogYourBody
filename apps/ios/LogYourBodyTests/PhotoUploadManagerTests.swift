@@ -13,12 +13,14 @@ final class PhotoUploadManagerTests: XCTestCase {
         try await super.setUp()
         try await CoreDataManager.shared.deleteAllDataAndWait()
         AuthManager.shared.currentUser = nil
+        AuthManager.shared.authSession = nil
         PhotoUploadStubURLProtocol.reset()
     }
 
     override func tearDown() async throws {
         PhotoUploadStubURLProtocol.reset()
         AuthManager.shared.currentUser = nil
+        AuthManager.shared.authSession = nil
         try await CoreDataManager.shared.deleteAllDataAndWait()
         try await super.tearDown()
     }
@@ -75,6 +77,76 @@ final class PhotoUploadManagerTests: XCTestCase {
 
         XCTAssertFalse(manager.isUploading)
         XCTAssertTrue(PhotoUploadStubURLProtocol.requests.isEmpty)
+    }
+
+    func testForeignMetricIsRejectedBeforeEitherUploadEntryPointDoesWork() async throws {
+        authenticate(userId: "current-photo-owner")
+        let metrics = try await seedPhotoPlaceholder(id: UUID().uuidString, userId: "foreign-photo-owner")
+        var tokenRequests = 0
+        let manager = makeManager(accessTokenProvider: {
+            tokenRequests += 1
+            return "stub-jwt"
+        })
+        PhotoUploadStubURLProtocol.install { _ in .http(503, body: Data()) }
+
+        await assertThrowsPhotoError(.notAuthenticated) {
+            _ = try await manager.uploadProgressPhoto(for: metrics, imageData: try makePNGData())
+        }
+        await assertThrowsPhotoError(.notAuthenticated) {
+            _ = try await manager.uploadProgressPhoto(for: metrics, image: makeSolidImage())
+        }
+
+        XCTAssertEqual(tokenRequests, 0)
+        XCTAssertTrue(PhotoUploadStubURLProtocol.requests.isEmpty)
+        XCTAssertNil(manager.currentUploadTask)
+        XCTAssertNil(manager.uploadError)
+        let cached = try await cachedPhotoState(metricId: metrics.id)
+        XCTAssertNil(cached.photoUrl)
+        XCTAssertNil(cached.originalPhotoUrl)
+        let owner = try await cachedMetricOwner(metricId: metrics.id)
+        XCTAssertEqual(owner, "foreign-photo-owner")
+    }
+
+    func testNewAccountDuringTokenLoadIsRejectedBeforePhotoStoreRequest() async throws {
+        try await assertTokenReplacementRejected(sameSubject: false)
+    }
+
+    func testSameSubjectReplacementDuringTokenLoadIsRejectedBeforePhotoStoreRequest() async throws {
+        try await assertTokenReplacementRejected(sameSubject: true)
+    }
+
+    func testAccountReplacementDuringTicketRequestIsRejectedBeforePut() async throws {
+        let originalUserId = "ticket_owner_\(UUID().uuidString)"
+        let replacementUserId = "ticket_replacement_\(UUID().uuidString)"
+        let metrics = try await seedPhotoPlaceholder(id: UUID().uuidString, userId: originalUserId)
+        authenticate(userId: originalUserId)
+        PhotoUploadStubURLProtocol.install { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            switchPhotoUploadSignedInAccount(to: replacementUserId)
+            return .http(200, body: Data("""
+            {
+              "uploadUrl": "https://\(PhotoUploadStubURLProtocol.stubHost)/r2/old-owner.jpg",
+              "uploadMethod": "PUT",
+              "uploadHeaders": {},
+              "objectKey": "progress-photos/\(originalUserId)/old-owner.jpg",
+              "photoUrl": "https://photos.logyourbody.com/old-owner.jpg"
+            }
+            """.utf8))
+        }
+
+        let manager = makeManager(token: "stub-jwt")
+        await assertThrowsPhotoError(.notAuthenticated) {
+            _ = try await manager.uploadProgressPhoto(for: metrics, imageData: try makePNGData())
+        }
+
+        XCTAssertEqual(PhotoUploadStubURLProtocol.requests.map(\.httpMethod), ["POST"])
+        let cached = try await cachedPhotoState(metricId: metrics.id)
+        XCTAssertNil(cached.photoUrl)
+        XCTAssertNil(cached.originalPhotoUrl)
+        let owner = try await cachedMetricOwner(metricId: metrics.id)
+        XCTAssertEqual(owner, originalUserId)
+        let replacementCount = try await bodyMetricCount(userId: replacementUserId)
+        XCTAssertEqual(replacementCount, 0)
     }
 
     // MARK: - First-party photo store fail-closed
@@ -356,14 +428,65 @@ final class PhotoUploadManagerTests: XCTestCase {
         }
     }
 
+    private func assertTokenReplacementRejected(sameSubject: Bool) async throws {
+        let originalUserId = "delayed_photo_owner_\(UUID().uuidString)"
+        let replacementUserId = sameSubject ? originalUserId : "delayed_photo_replacement_\(UUID().uuidString)"
+        let metrics = try await seedPhotoPlaceholder(id: UUID().uuidString, userId: originalUserId)
+        authenticate(userId: originalUserId)
+        let ownership = try XCTUnwrap(AuthManager.shared.captureAccountSession())
+        let tokenEntered = expectation(description: "Actual upload awaits token provider")
+        var continuation: CheckedContinuation<String?, Never>?
+        let manager = makeManager(accessTokenProvider: {
+            await withCheckedContinuation { pending in
+                continuation = pending
+                tokenEntered.fulfill()
+            }
+        })
+        PhotoUploadStubURLProtocol.install { _ in .http(503, body: Data()) }
+        let upload = Task { @MainActor in
+            await assertThrowsPhotoError(.notAuthenticated) {
+                _ = try await manager.uploadProgressPhoto(for: metrics, imageData: try makePNGData())
+            }
+        }
+        defer {
+            upload.cancel()
+            continuation?.resume(returning: nil)
+        }
+        await fulfillment(of: [tokenEntered], timeout: 2)
+        authenticate(userId: replacementUserId)
+        XCTAssertFalse(AuthManager.shared.ownsAccountSession(ownership))
+        let pendingToken = try XCTUnwrap(continuation)
+        continuation = nil
+        pendingToken.resume(returning: "replacement-session-token")
+        await upload.value
+
+        XCTAssertTrue(PhotoUploadStubURLProtocol.requests.isEmpty)
+        XCTAssertFalse(manager.isUploading)
+        let cached = try await cachedPhotoState(metricId: metrics.id)
+        XCTAssertNil(cached.photoUrl)
+        XCTAssertNil(cached.originalPhotoUrl)
+        let owner = try await cachedMetricOwner(metricId: metrics.id)
+        XCTAssertEqual(owner, originalUserId)
+        let metricCount = try await bodyMetricCount(id: metrics.id)
+        XCTAssertEqual(metricCount, 1)
+        if !sameSubject {
+            let replacementCount = try await bodyMetricCount(userId: replacementUserId)
+            XCTAssertEqual(replacementCount, 0)
+        }
+    }
+
     private func makeManager(token: String?) -> PhotoUploadManager {
+        makeManager(accessTokenProvider: { token })
+    }
+
+    private func makeManager(accessTokenProvider: @escaping () async -> String?) -> PhotoUploadManager {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [PhotoUploadStubURLProtocol.self]
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         let session = URLSession(configuration: configuration)
         return PhotoUploadManager(
-            accessTokenProvider: { token },
+            accessTokenProvider: accessTokenProvider,
             apiBaseURL: "https://\(PhotoUploadStubURLProtocol.stubHost)",
             storageSession: session,
             functionSession: session
@@ -371,6 +494,7 @@ final class PhotoUploadManagerTests: XCTestCase {
     }
 
     private func authenticate(userId: String) {
+        AuthManager.shared.authSession = .localFixture(subject: userId, email: "photo-upload-tests@example.com")
         AuthManager.shared.currentUser = LocalUser(
             id: userId,
             email: "photo-upload-tests@example.com",
@@ -477,6 +601,7 @@ final class PhotoUploadManagerTests: XCTestCase {
 private func switchPhotoUploadSignedInAccount(to userId: String) {
     let apply = {
         MainActor.assumeIsolated {
+            AuthManager.shared.authSession = .localFixture(subject: userId, email: "photo-replacement@example.com")
             AuthManager.shared.currentUser = LocalUser(
                 id: userId,
                 email: "photo-replacement@example.com",

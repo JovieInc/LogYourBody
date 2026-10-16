@@ -142,7 +142,7 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
         syncStepsFromHealthKitCallCount += 1
     }
 
-    func fetchTodayStepCount() async throws -> Int {
+    func fetchTodayStepCount() async throws -> Int? {
         fetchTodayStepCountCallCount += 1
         return 123
     }

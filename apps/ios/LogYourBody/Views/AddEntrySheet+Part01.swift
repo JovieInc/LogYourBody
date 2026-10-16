@@ -612,6 +612,8 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                     .foregroundStyle(Color.jovieText)
                     .tint(.jovieText)
                     .frame(maxWidth: .infinity)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .accessibilityLabel("Weight value")
                     .accessibilityHint("Enter your weight")
                     .accessibilityIdentifier("home_v2_log_sheet_value")
@@ -629,8 +631,8 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                 .frame(minWidth: 64, minHeight: JovieTokens.minimumHitTarget)
                 .accessibilityValue(weightUnit)
                 .accessibilityIdentifier("home_v2_log_sheet_unit")
-                .onChange(of: weightUnit) { _, _ in
-                    validateWeight(weight)
+                .onChange(of: weightUnit) { previous, current in
+                    updateWeightUnit(from: previous, to: current)
                 }
             }
 
@@ -723,8 +725,8 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 80)
                     .accessibilityLabel("Weight unit")
-                    .onChange(of: weightUnit) { _, _ in
-                        validateWeight(weight)
+                    .onChange(of: weightUnit) { previous, current in
+                        updateWeightUnit(from: previous, to: current)
                     }
                 }
 

@@ -2387,6 +2387,74 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 5))
     }
 
+    func testProgressShareKeepsSelectedMetricAndVisibleValue() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture", "-lybUITestHomeV2StepsFixture"
+        ])
+        let progress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 30))
+        assertTodayProvenancePresentation(in: app)
+        progress.tap()
+        let value = app.staticTexts["home_v2_progress_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", "—"), object: value)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+        var sharedMetrics = Set<String>()
+        for (identifier, title) in [("steps", "Steps"), ("weight", "Weight"), ("body_fat", "Body fat"), ("ffmi", "FFMI")] {
+            app.buttons["home_v2_progress_tab_\(identifier)"].tap()
+            let expectedValue = value.label
+            let share = app.buttons["home_v2_progress_share"]
+            if ["—", "–"].contains(expectedValue) {
+                XCTAssertFalse(share.exists, "Missing data must not become Body Score")
+                continue
+            }
+            var expectedUnit: String?
+            if identifier == "steps" || identifier == "weight" {
+                // This fixture selects imperial units; HomeV2Copy displays "lb".
+                let progressUnitLabel = identifier == "steps" ? "steps" : "lb"
+                let progressUnits = app.scrollViews["home_v2_progress_scroll"].staticTexts.matching(
+                    NSPredicate(format: "label == %@", progressUnitLabel)
+                )
+                XCTAssertEqual(progressUnits.count, 1)
+                let progressUnit = try XCTUnwrap(progressUnits.count == 1 ? progressUnits.allElementsBoundByIndex.first : nil)
+                let capturedUnit = progressUnit.label
+                XCTAssertFalse(capturedUnit.isEmpty)
+                expectedUnit = capturedUnit
+            } else if identifier == "body_fat" {
+                expectedUnit = "%"
+            }
+            XCTAssertTrue(share.waitForExistence(timeout: 5))
+            share.tap()
+            let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
+            XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists)
+            let summary = sheet.descendants(matching: .any)["body_score_share_summary"]
+            XCTAssertTrue(summary.exists)
+            XCTAssertTrue(summary.staticTexts["body_score_share_score"].exists)
+            XCTAssertEqual(summary.staticTexts["body_score_share_score"].label, expectedValue)
+            XCTAssertTrue(summary.staticTexts["body_score_share_footer"].exists)
+            XCTAssertEqual(summary.staticTexts["body_score_share_footer"].label, "Shared from LogYourBody")
+            if identifier != "ffmi" {
+                let unitIdentifier = identifier == "body_fat" ? "body_score_share_unit" : "body_score_share_tagline"
+                XCTAssertTrue(summary.staticTexts[unitIdentifier].exists)
+                XCTAssertEqual(summary.staticTexts[unitIdentifier].label, try XCTUnwrap(expectedUnit))
+            }
+            XCTAssertTrue(app.staticTexts["Share \(title)"].exists)
+            XCTAssertEqual(app.staticTexts["body_score_share_score"].label, expectedValue)
+            XCTAssertFalse(app.staticTexts["Share Body Score"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["body_score_share_photo_visual"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["body_score_share_avatar_visual"].exists)
+            XCTAssertTrue(app.buttons["body_score_share_system_button"].exists)
+            attachScreenshot(named: "contextual-share-\(identifier)", from: app)
+            app.buttons["body_score_share_close_button"].tap()
+            XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))
+            sharedMetrics.insert(identifier)
+        }
+        XCTAssertTrue(Set(["steps", "weight"]).isSubset(of: sharedMetrics), "Fixture must exercise Steps and Weight")
+        assertProgressProvenanceCoversShare(in: app)
+    }
+
     func testDefaultHomeHeaderSwipesOpenProgressReturnHomeAndOpenSidebar() throws {
         let app = XCUIApplication()
         launchDefaultHome(app, extra: ["-lybUITestChatFirstFixture"])
@@ -2481,6 +2549,73 @@ final class LogYourBodyUITests: XCTestCase {
             XCTAssertTrue(log.waitForExistence(timeout: 8))
             app.terminate()
         }
+    }
+
+    private func assertTodayProvenancePresentation(in app: XCUIApplication) {
+        let chip = app.buttons["home_v2_provenance_chip"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5))
+        chip.tap()
+        let detail = app.descendants(matching: .any)["home_v2_provenance_detail"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 5), "Today has one working provenance presenter")
+        XCTAssertFalse(app.buttons["home_v2_view_progress"].isHittable)
+        app.buttons["home_v2_provenance_done"].tap()
+        XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
+        let progress = app.buttons["home_v2_view_progress"]
+        let scroll = app.scrollViews["home_v2_content_scroll"]
+        let ruler = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5))
+        XCTAssertTrue(ruler.waitForExistence(timeout: 5))
+        // XCUI can report content behind the pinned ruler as hittable.
+        let viewport = CGRect(
+            x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
+            height: max(0, min(ruler.frame.minY, scroll.frame.maxY) - scroll.frame.minY)
+        )
+        XCTAssertGreaterThan(viewport.height, 88)
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        for _ in 0..<6 {
+            if progress.isHittable && viewport.contains(progress.frame) { break }
+            let distance = min(viewport.height - 80, max(0, progress.frame.maxY - viewport.maxY) + 12)
+            let start = origin.withOffset(CGVector(dx: viewport.midX, dy: viewport.maxY - 40))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -distance)),
+                        withVelocity: .slow, thenHoldForDuration: 0.15)
+        }
+        XCTAssertTrue(progress.isHittable)
+        XCTAssertTrue(viewport.contains(progress.frame), "View progress must clear the pinned ruler: \(progress.frame)")
+    }
+
+    private func assertProgressProvenanceCoversShare(in app: XCUIApplication) {
+        app.buttons["home_v2_progress_tab_ffmi"].tap()
+        let range = app.buttons["home_v2_range_1M"]
+        let values = app.staticTexts.matching(identifier: "home_v2_progress_value")
+        let share = app.buttons["home_v2_progress_share"]
+        guard range.exists, range.isSelected, values.count == 1 else {
+            attachScreenshot(named: "progress-ffmi-current-month-prerequisite", from: app)
+            XCTFail("Require the selected1M range and unique typed FFMI value before provenance")
+            return
+        }
+        let value = values.element
+        // Five actual seeded weights, daily0.1kg rounding and alpha0.25 EMA
+        // yield82.4..82.5kg; at15.8% and178cm normalized FFMI displays22.0.
+        guard value.label == "22.0", share.exists, share.isHittable else {
+            attachScreenshot(named: "progress-ffmi-share-positive-prerequisite", from: app)
+            XCTFail("Require the real current1M fixture value22.0 and available Share before overlay")
+            return
+        }
+        let selectedValue = value.label
+        attachScreenshot(named: "progress-ffmi-observed-share-before-provenance", from: app)
+        let chip = app.buttons["home_v2_provenance_chip"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "The derived FFMI fixture exposes its provenance")
+        chip.tap()
+        let detail = app.descendants(matching: .any)["home_v2_provenance_detail"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["home_v2_progress_share"].isHittable, "The underlying Share action is covered")
+        app.buttons["home_v2_provenance_done"].tap()
+        XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["home_v2_progress_share"].isHittable)
+        XCTAssertTrue(range.isSelected)
+        XCTAssertEqual(values.count, 1)
+        XCTAssertEqual(value.label, selectedValue)
+        attachScreenshot(named: "progress-ffmi-share-restored-after-provenance", from: app)
     }
 
     func testHomeV2ProgressIsOneMetricWorkspace() throws {
@@ -2891,7 +3026,24 @@ final class LogYourBodyUITests: XCTestCase {
     private func submitSyntheticChatQuestion(in app: XCUIApplication) {
         let composer = app.textFields["chat_composer"]
         composer.tap()
-        composer.typeText("Synthetic full-turn question")
+        let question = "Synthetic full-turn question"
+        composer.typeText(question)
+        let entered = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == %@", question), object: composer
+        )
+        let complete = XCTWaiter.wait(for: [entered], timeout: 8) == .completed
+        if !complete {
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = "chat-synthetic-incomplete-draft-screen"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "chat-synthetic-incomplete-draft-hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+        }
+        XCTAssertTrue(complete, "Require the complete synthetic question before Send; never submit partial input")
+        guard complete else { return }
         let send = app.buttons["chat_send_button"]
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
         XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 8), .completed)

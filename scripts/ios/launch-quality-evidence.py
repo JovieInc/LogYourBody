@@ -149,6 +149,7 @@ def main():
     parser.add_argument('--critical-captures', action='store_true')
     parser.add_argument('--require-settings-row-coverage', action='store_true')
     parser.add_argument('--require-biometric-coverage', action='store_true')
+    parser.add_argument('--export-coverage', action='store_true')
     parser.add_argument('--require-chaos-accounting-coverage', action='store_true')
     parser.add_argument('--require-canvas-coverage', action='store_true')
     parser.add_argument('--started-at', type=float, required=True)
@@ -214,7 +215,7 @@ def main():
         if args.require_biometric_coverage:
             requirements['Views/BiometricLockView.swift'] = [
                 'static BiometricLockPolicy.shouldDisableForUITests(arguments:environment:userId:)']
-        if requirements or args.require_chaos_accounting_coverage or args.require_canvas_coverage:
+        if requirements or args.require_chaos_accounting_coverage or args.require_canvas_coverage or args.export_coverage:
             coverage = json.loads(subprocess.check_output(
                 ['xcrun', 'xccov', 'view', '--report', '--json', str(args.bundle)], text=True))
             receipt['requiredFunctionCoverage'] = validate_function_coverage(coverage, requirements)
