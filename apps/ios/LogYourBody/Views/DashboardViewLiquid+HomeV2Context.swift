@@ -159,13 +159,10 @@ extension DashboardViewLiquid {
             }
         }
 
-        if let steps = dailyMetricsLookup()[calendar.startOfDay(for: date)]?.steps, steps > 0 {
-            rows.append(HomeV2DayEntryRow(
-                id: "steps",
-                label: HomeV2ContextCopy.steps,
-                subline: HomeV2ContextCopy.appleHealth,
-                value: FormatterCache.stepsFormatter.string(from: NSNumber(value: steps)) ?? "\(steps)"
-            ))
+        if let row = HomeV2DayEntryRow.steps(
+            dailyMetricsLookup()[calendar.startOfDay(for: date)]?.steps
+        ) {
+            rows.append(row)
         }
 
         let note = metric?.notes?.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -544,3 +544,30 @@ private final class HeldDailyStepsRead {
         continuation.resume(returning: rows)
     }
 }
+
+extension HomeV2ContextPolicyTests {
+    func testContextStepsRetainsAnExplicitZero() throws {
+        let row = try XCTUnwrap(HomeV2DayEntryRow.steps(0))
+        XCTAssertEqual(row.id, "steps")
+        XCTAssertEqual(row.label, "Steps")
+        XCTAssertEqual(row.subline, "Apple Health")
+        XCTAssertEqual(row.value, "0")
+    }
+
+    func testContextStepsDoesNotInventAValueForMissingData() {
+        XCTAssertNil(HomeV2DayEntryRow.steps(nil))
+    }
+
+    func testContextStepsRejectsNegativeCounts() {
+        XCTAssertNil(HomeV2DayEntryRow.steps(-1))
+        XCTAssertNil(HomeV2DayEntryRow.steps(Int.min))
+    }
+
+    func testContextStepsPreservesPositiveCountFormatting() throws {
+        let row = try XCTUnwrap(HomeV2DayEntryRow.steps(5_432))
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        XCTAssertEqual(row.value, formatter.string(from: 5_432))
+    }
+}
