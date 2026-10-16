@@ -321,11 +321,44 @@ jobs:
       mac-first: false
       supersede-key: ${{ github.head_ref || '' }}
 
+  ios_storekit:
+    name: iOS StoreKit Purchase and Restore
+    needs: detect-changes
+    # Main still needs a fresh receipt when Unit was already verified by the merge group.
+    if: github.event_name == 'push' || needs.detect-changes.outputs.ios_changed == 'true'
+    runs-on: macos-15
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup simulator build environment
+        uses: ./.github/actions/setup-ios-build
+        with:
+          xcode-version: 'latest-stable'
+          working-directory: apps/ios
+          setup-ruby: 'false'
+          create-config-files: 'true'
+
+      - name: StoreKit purchase and restore evidence
+        run: bash scripts/ios/storekit-purchase-restore.sh
+
+      - name: Upload StoreKit execution and coverage receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-storekit-${{ github.sha }}-${{ github.run_attempt }}
+          path: apps/ios/test_results/storekit/${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
     if: always()
-    needs: [detect-changes, mac-runner-routing-tests, js, ios, ios_quality]
+    needs: [detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_storekit]
     steps:
       - name: Check results
         run: |
@@ -345,6 +378,11 @@ jobs:
             fi
           }
 
+          storekit_expected=false
+          if [[ "${{ github.event_name }}" == "push" || "${{ needs.detect-changes.outputs.ios_changed }}" == "true" ]]; then
+            storekit_expected=true
+          fi
+
           {
             echo "## CI Summary"
             echo ""
@@ -353,6 +391,7 @@ jobs:
             echo "- iOS Unit runs here: ${{ needs.detect-changes.outputs.ios_unit }}"
             echo "- iOS Launch Quality runs here: ${{ needs.detect-changes.outputs.ios_quality }} (deferred for draft: ${{ needs.detect-changes.outputs.ios_quality_deferred }})"
             echo "- iOS quality gate: ${{ needs.ios_quality.result }}"
+            echo "- iOS StoreKit purchase and restore: ${{ needs.ios_storekit.result }}"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -360,6 +399,7 @@ jobs:
              [[ "${{ needs.mac-runner-routing-tests.result }}" != "success" ]] || \
              ! assert_expected_result "JavaScript/TypeScript" "${{ needs.detect-changes.outputs.web }}" "${{ needs.js.result }}" || \
              ! assert_expected_result "iOS" "${{ needs.detect-changes.outputs.ios_unit }}" "${{ needs.ios.result }}" || \
+             ! assert_expected_result "iOS StoreKit" "$storekit_expected" "${{ needs.ios_storekit.result }}" || \
              ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios_quality }}" "${{ needs.ios_quality.result }}"; then
             echo "❌ One or more CI jobs failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1

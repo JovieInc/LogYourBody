@@ -255,27 +255,51 @@ test('ci.yml wires detection, the iOS jobs and the CI Summary dependencies', () 
   }
   assert.match(jobBlock('ios'), /if: needs\.detect-changes\.outputs\.ios_unit == 'true'/);
   assert.match(jobBlock('ios_quality'), /if: needs\.detect-changes\.outputs\.ios_quality == 'true'/);
-  assert.match(jobBlock('ci-summary'), /if: always\(\)[\s\S]*needs: \[detect-changes, mac-runner-routing-tests, js, ios, ios_quality\]/);
+  assert.match(jobBlock('ci-summary'), /if: always\(\)[\s\S]*needs: \[detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_storekit\]/);
 });
 
-function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult }) {
+test('StoreKit evidence runs on every main push and gates native changes', () => {
+  const storekit = jobBlock('ios_storekit');
+  assert.match(storekit, /if: github\.event_name == 'push' \|\| needs\.detect-changes\.outputs\.ios_changed == 'true'/);
+  assert.match(storekit, /runs-on: macos-15/);
+  assert.match(storekit, /run: bash scripts\/ios\/storekit-purchase-restore\.sh/);
+  assert.doesNotMatch(storekit, /secrets\./);
+  assert.match(storekit, /if: always\(\)[\s\S]*actions\/upload-artifact/);
+  assert.match(jobBlock('ci-summary'), /needs: \[.*ios_storekit\]/);
+  const script = fs.readFileSync(path.join(scriptDir, '../../scripts/ios/storekit-purchase-restore.sh'), 'utf8');
+  for (const name of [
+    'testAnnualTrialPurchaseRestoreExpiration',
+    'testMonthlyTrialPurchaseRestoreExpiration',
+    'testAnnualTrialPurchaseRestoreRefund',
+    'testMonthlyTrialPurchaseRestoreRefund',
+  ]) {
+    assert.match(script, new RegExp(name));
+  }
+  assert.match(script, /CODE_SIGNING_ALLOWED=NO/);
+  assert.doesNotMatch(script, /APP_STORE_CONNECT|ASC_KEY|api[_-]?key/i);
+});
+
+function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult, event = 'pull_request', storekitResult }) {
   const block = jobBlock('ci-summary');
   const script = block
     .slice(block.indexOf('run: |') + 'run: |'.length)
     .split('\n')
     .map((line) => line.replace(/^ {10}/, ''))
     .join('\n');
+  const iosChanged = ios === 'true' || quality === 'true';
   const values = {
+    'github.event_name': event,
     'needs.detect-changes.result': 'success',
     'needs.mac-runner-routing-tests.result': 'success',
     'needs.detect-changes.outputs.web': web,
     'needs.detect-changes.outputs.ios_unit': ios,
     'needs.detect-changes.outputs.ios_quality': quality,
     'needs.detect-changes.outputs.ios_quality_deferred': 'false',
-    'needs.detect-changes.outputs.ios_changed': ios,
+    'needs.detect-changes.outputs.ios_changed': iosChanged ? 'true' : 'false',
     'needs.js.result': js,
     'needs.ios.result': iosResult,
     'needs.ios_quality.result': qualityResult,
+    'needs.ios_storekit.result': storekitResult ?? (event === 'push' || iosChanged ? 'success' : 'skipped'),
   };
   const rendered = script.replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_, expr) => {
     assert.ok(expr in values, `unrendered expression ${expr}`);
@@ -287,6 +311,17 @@ function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult 
 
 test('CI Summary passes a web-only change with iOS skipped', () => {
   assert.equal(runSummaryGate({ web: 'true', ios: 'false', js: 'success', iosResult: 'skipped', qualityResult: 'skipped' }), 0);
+});
+
+test('CI Summary rejects missing or failing StoreKit evidence on native changes and every main push', () => {
+  const webOnMain = { web: 'true', ios: 'false', js: 'success', iosResult: 'skipped', qualityResult: 'skipped', event: 'push' };
+  const native = { web: 'false', ios: 'false', quality: 'true', js: 'skipped', iosResult: 'skipped', qualityResult: 'success' };
+  for (const change of [webOnMain, native]) {
+    assert.equal(runSummaryGate({ ...change, storekitResult: 'success' }), 0);
+    for (const storekitResult of ['skipped', 'failure', 'cancelled']) {
+      assert.notEqual(runSummaryGate({ ...change, storekitResult }), 0, storekitResult);
+    }
+  }
 });
 
 test('CI Summary requires both iOS jobs to pass when native code changed', () => {

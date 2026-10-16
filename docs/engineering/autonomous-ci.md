@@ -8,7 +8,7 @@ This policy is intentionally compatible with Jovie's harness model so common CI 
 
 Only deterministic release-breakers should block merges:
 
-- `CI Summary`: aggregate status for changed-path install, lint, typecheck, tests, and iOS validation.
+- `CI Summary`: aggregate status for changed-path install, lint, typecheck, tests, and iOS validation. It also requires the iOS StoreKit purchase and restore job on every `main` push and whenever iOS inputs change. That job does not replace Unit or Launch Quality.
 - Security or secret checks when they produce concrete evidence.
 - Migration, release-signing, App Store, RevenueCat, Jovie Auth, Neon, or workflow changes that can break production and have a reproducible failure mode.
 - Fork safety checks for untrusted pull requests.
