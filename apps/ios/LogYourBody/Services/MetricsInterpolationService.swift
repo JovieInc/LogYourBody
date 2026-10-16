@@ -47,7 +47,7 @@ class MetricsInterpolationService {
     final class WeightInterpolationContext {
         private let metrics: [BodyMetrics]
         private let maxGapDays: Int
-        private let calendar = Calendar.current
+        private let calendar: Calendar
 
         // Cached trend-weight series for efficiency when querying multiple dates
         private var trendWeightCache: [Date: InterpolatedMetric] = [:]
@@ -56,9 +56,10 @@ class MetricsInterpolationService {
         // Higher values react more quickly to new weigh-ins.
         private let trendAlpha: Double = 0.25
 
-        init(metrics: [BodyMetrics], maxGapDays: Int) {
+        init(metrics: [BodyMetrics], maxGapDays: Int, calendar: Calendar = .current) {
             self.metrics = metrics
             self.maxGapDays = maxGapDays
+            self.calendar = calendar
         }
 
         /// Returns a recency-weighted "trend" weight using an exponential moving average
@@ -177,12 +178,25 @@ class MetricsInterpolationService {
         /// Latest weigh-in on `day` that does not look ahead of `query`.
         /// Days with no eligible weigh-in stay on midnight so gaps still interpolate.
         private func trendSampleDate(on day: Date, query: Date) -> Date {
-            if let measured = metrics.last(where: {
-                calendar.isDate($0.date, inSameDayAs: day) && $0.date <= query
-            }) {
-                return measured.date
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else {
+                return day
             }
-            return day
+            // The immutable history is sorted by date. Find the last eligible
+            // observation without a calendar conversion for every history row.
+            // The next midnight is exclusive; the query timestamp is inclusive.
+            var low = 0
+            var high = metrics.count
+            while low < high {
+                let middle = (low + high) / 2
+                let observedAt = metrics[middle].date
+                if observedAt < nextDay && observedAt <= query {
+                    low = middle + 1
+                } else {
+                    high = middle
+                }
+            }
+            guard low > 0, metrics[low - 1].date >= day else { return day }
+            return metrics[low - 1].date
         }
 
         func estimate(for date: Date) -> InterpolatedMetric? {
