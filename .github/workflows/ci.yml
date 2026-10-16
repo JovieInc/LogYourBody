@@ -209,6 +209,66 @@ jobs:
             scripts/neon/test-reported-measurements.py --run --postgres-bin /usr/lib/postgresql/16/bin \
             | tee artifacts/reported-measurements/results.log
 
+      - name: Verify daily step deletions on disposable PostgreSQL16
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          evidence=artifacts/reported-measurements/daily-step-deletions
+          mkdir -p "$evidence/coverage"
+          git rev-parse HEAD > "$evidence/source-revision.txt"
+          sha256sum scripts/neon/verify-daily-step-deletions.py apps/web/src/lib/neon/native-product-records-adapter.ts apps/web/src/lib/neon/native-account-admission.ts apps/web/db/migrations/20260714183000_create_app_users.sql apps/web/db/migrations/20260813130000_native_product_records.sql apps/web/db/migrations/20261010120000_native_account_admission.sql > "$evidence/source-sha256.txt"
+          python3 -m trace --count --summary --missing \
+            --ignore-dir "$(python3 -c 'import sys; print(sys.prefix)')" \
+            --coverdir "$evidence/coverage" \
+            scripts/neon/verify-daily-step-deletions.py --run --postgres-bin /usr/lib/postgresql/16/bin \
+            | tee "$evidence/results.log"
+          python3 - <<'PY'
+          import hashlib, json, pathlib, re
+          root = pathlib.Path.cwd()
+          evidence = root / "artifacts/reported-measurements/daily-step-deletions"
+          reports = [json.loads(line) for line in (evidence / "results.log").read_text().splitlines() if line.startswith("{")]
+          assert len(reports) == 1, "Expected one completed deletion report"
+          report = reports[0]
+          expected = [
+              'DELETE then different-ID POST waits on actual account lock and retains unrelated fields',
+              'POST then different-ID DELETE waits on actual account lock and retains unrelated fields',
+              'same-ID stale replay cannot move or erase marker/date/notes/unknown JSON',
+              'different-ID recorded zero and positive imports inherit the owner/day marker',
+              'repeat deletion accepts equivalent offset instants and retains original marker',
+              'half-open end leaves the following day unchanged',
+              "foreign-ID collision cannot change anchor or authorize another owner's day deletion",
+              "different owner completes while first owner's lock remains held",
+              'later transaction failure rolls back marker and every daily write',
+              'captured old account incarnation cannot create a deletion marker',
+          ]
+          assert report["passed"] == 10 and report["checks"] == expected, "Incomplete or changed deletion contracts"
+          assert report["liveDatabase"] is False
+          schedules = [name.split(" waits on")[0] for name in expected[:2]]
+          assert report["lockObservations"] == [
+              {"schedule": name, "waitEventType": "Lock", "actualHolderInBlockingPids": True} for name in schedules
+          ], "Missing actual owner-lock observations"
+          assert set(report["postgresTools"]) == {"initdb", "pg_ctl", "psql"}
+          assert all(re.search(r"\(PostgreSQL\) 16(?:\.|$)", version) for version in report["postgresTools"].values())
+          recorded = {}
+          for line in (evidence / "source-sha256.txt").read_text().splitlines():
+              digest, name = line.split(maxsplit=1)
+              recorded[name] = digest
+          sources = [
+              'scripts/neon/verify-daily-step-deletions.py',
+              'apps/web/src/lib/neon/native-product-records-adapter.ts',
+              'apps/web/src/lib/neon/native-account-admission.ts',
+              'apps/web/db/migrations/20260714183000_create_app_users.sql',
+              'apps/web/db/migrations/20260813130000_native_product_records.sql',
+              'apps/web/db/migrations/20261010120000_native_account_admission.sql',
+          ]
+          assert set(recorded) == set(sources), "Incomplete source inventory"
+          assert re.fullmatch(r"[0-9a-f]{40}", (evidence / "source-revision.txt").read_text().strip())
+          assert all(hashlib.sha256((root / name).read_bytes()).hexdigest() == recorded[name] for name in sources)
+          assert report["sourceSha256"] == {str(root / name): recorded[name] for name in sources[1:]}, "Report source mismatch"
+          print("Verified 10 deletion contracts, 2 owner-lock observations, PostgreSQL16 tools and exact source")
+          PY
+
       - name: Upload reported measurement execution evidence
         if: always()
         uses: actions/upload-artifact@v4

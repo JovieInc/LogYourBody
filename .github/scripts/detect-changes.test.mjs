@@ -383,3 +383,172 @@ test('required SQL CI step propagates verifier failure through tee', () => {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("isolated daily-step SQL verifier changes select the required JS lane", () => {
+  const fx = queueFixture({
+    "scripts/neon/verify-daily-step-deletions.py": "changed",
+  });
+  try {
+    assert.deepEqual(
+      detect(fx.workspace, mergeGroup(fx)).outputs,
+      surfaces("true", "false", "false", "false"),
+    );
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("daily-step SQL qualification enforces actual report and source evidence through the real CI shell", () => {
+  const js = ciWorkflow.split("  js:\n")[1].split("\n  ios:")[0];
+  assert.match(js, /runs-on: ubuntu-24\.04/);
+  const step = js
+    .split(
+      "      - name: Verify daily step deletions on disposable PostgreSQL16\n",
+    )[1]
+    .split("\n      - name:")[0];
+  assert.match(step, /shell: bash/);
+  assert.match(step, /timeout-minutes: 5/);
+  assert.match(step, /--run --postgres-bin \/usr\/lib\/postgresql\/16\/bin/);
+  assert.match(
+    js,
+    /Upload reported measurement execution evidence\n        if: always\(\)/,
+  );
+  const body = step.split("        run: |\n")[1].replace(/^          /gm, "");
+  const realPython = execFileSync("sh", ["-c", "command -v python3"], {
+    encoding: "utf8",
+  }).trim();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "daily-delete-ci-"));
+  const sourceFiles = [
+    "scripts/neon/verify-daily-step-deletions.py",
+    "apps/web/src/lib/neon/native-product-records-adapter.ts",
+    "apps/web/src/lib/neon/native-account-admission.ts",
+    "apps/web/db/migrations/20260714183000_create_app_users.sql",
+    "apps/web/db/migrations/20260813130000_native_product_records.sql",
+    "apps/web/db/migrations/20261010120000_native_account_admission.sql",
+  ];
+  const expectedChecks = [
+    "DELETE then different-ID POST waits on actual account lock and retains unrelated fields",
+    "POST then different-ID DELETE waits on actual account lock and retains unrelated fields",
+    "same-ID stale replay cannot move or erase marker/date/notes/unknown JSON",
+    "different-ID recorded zero and positive imports inherit the owner/day marker",
+    "repeat deletion accepts equivalent offset instants and retains original marker",
+    "half-open end leaves the following day unchanged",
+    "foreign-ID collision cannot change anchor or authorize another owner's day deletion",
+    "different owner completes while first owner's lock remains held",
+    "later transaction failure rolls back marker and every daily write",
+    "captured old account incarnation cannot create a deletion marker",
+  ];
+  try {
+    for (const name of sourceFiles) {
+      fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+      fs.writeFileSync(path.join(root, name), "synthetic source: " + name);
+    }
+    const bin = path.join(root, "bin");
+    fs.mkdirSync(bin);
+    fs.writeFileSync(
+      path.join(bin, "git"),
+      "#!/bin/sh\necho 0123456789abcdef0123456789abcdef01234567\n",
+      { mode: 0o755 },
+    );
+    // Substitute only the verifier process; the exact YAML validator uses real Python.
+    fs.writeFileSync(
+      path.join(bin, "python3"),
+      `#!/bin/sh
+if [ "$1" = "-m" ] && [ "$2" = "trace" ]; then
+  exec "$REAL_PYTHON" "$FIXTURE_REPORT"
+fi
+exec "$REAL_PYTHON" "$@"
+`,
+      { mode: 0o755 },
+    );
+    const reportScript = path.join(root, "fixture-report.py");
+    fs.writeFileSync(
+      reportScript,
+      `import hashlib, json, os, pathlib, sys
+mode = os.environ["FIXTURE_MODE"]
+if mode == "sql-error":
+    print("injected verifier-command failure", flush=True)
+    sys.exit(42)
+if mode == "missing-report": sys.exit(0)
+checks = json.loads(os.environ["FIXTURE_CHECKS"])
+sources = json.loads(os.environ["FIXTURE_SOURCES"])
+report = {"passed": 10, "checks": checks, "liveDatabase": False,
+          "lockObservations": [{"schedule": x.split(" waits on")[0], "waitEventType": "Lock", "actualHolderInBlockingPids": True} for x in checks[:2]],
+          "postgresTools": {x: x + " (PostgreSQL) 16.15" for x in ["initdb", "pg_ctl", "psql"]},
+          "sourceSha256": {str(pathlib.Path.cwd() / x): hashlib.sha256(pathlib.Path(x).read_bytes()).hexdigest() for x in sources[1:]}}
+if mode == "dropped-check": report["checks"] = checks[:-1]
+if mode == "duplicate-check": report["checks"] = checks[:-1] + checks[:1]
+if mode == "missing-lock": report["lockObservations"] = report["lockObservations"][:1]
+if mode == "source-mismatch": report["sourceSha256"][str(pathlib.Path.cwd() / sources[1])] = "0" * 64
+if mode == "wrong-version": report["postgresTools"]["psql"] = "psql (PostgreSQL) 18.4"
+if mode == "live-database": report["liveDatabase"] = True
+print(json.dumps(report))
+if mode == "duplicate-report": print(json.dumps(report))
+`,
+    );
+    const modes = [
+      "valid",
+      "sql-error",
+      "missing-report",
+      "dropped-check",
+      "duplicate-check",
+      "missing-lock",
+      "source-mismatch",
+      "wrong-version",
+      "live-database",
+      "duplicate-report",
+    ];
+    for (const mode of modes) {
+      fs.rmSync(path.join(root, "artifacts"), { recursive: true, force: true });
+      const result = spawnSync(
+        "bash",
+        ["--noprofile", "--norc", "-eo", "pipefail", "-c", body],
+        {
+          cwd: root,
+          encoding: "utf8",
+          env: {
+            ...gitEnv,
+            PATH: bin + ":" + process.env.PATH,
+            REAL_PYTHON: realPython,
+            FIXTURE_REPORT: reportScript,
+            FIXTURE_MODE: mode,
+            FIXTURE_CHECKS: JSON.stringify(expectedChecks),
+            FIXTURE_SOURCES: JSON.stringify(sourceFiles),
+          },
+        },
+      );
+      if (mode === "valid") assert.equal(result.status, 0, result.stderr);
+      else if (mode === "sql-error")
+        assert.equal(result.status, 42, result.stderr);
+      else assert.notEqual(result.status, 0, mode);
+      assert.ok(
+        fs.existsSync(
+          path.join(
+            root,
+            "artifacts/reported-measurements/daily-step-deletions/results.log",
+          ),
+        ),
+        "tee retained evidence: " + mode,
+      );
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("daily-step verifier rejects execution without explicit disposable opt-in", () => {
+  const verifier = path.join(
+    scriptDir,
+    "../../scripts/neon/verify-daily-step-deletions.py",
+  );
+  const result = spawnSync(
+    "python3",
+    [verifier, "--postgres-bin", "/unavailable"],
+    { encoding: "utf8", env: gitEnv },
+  );
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(
+    result.stderr,
+    /Pass --run to create an isolated socket-only cluster/,
+  );
+});
