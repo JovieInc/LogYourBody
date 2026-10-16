@@ -9,6 +9,17 @@ The engineering pipeline is fully automated. **One human step** stands between t
 - TestFlight upload waits for Apple to finish processing the build before assigning tester groups. The deploy job allows up to 60 minutes for that provider-controlled step.
 - App Store submission is gated behind `paywall_testflight_verified: true` — a deliberate manual gate so no build ships without a proven purchase/restore.
 
+## Read-only readiness check
+
+Dispatch `app-store-connect-readiness.yml` on `main` before Submit. It writes a pass/fail table to the job summary for version state, the newest TestFlight-uploaded build, both pro1 3-day-trial subscriptions, and What's New plus the rest of the committed storefront metadata. A green job means the readback finished. A FAIL row names a Tim-only follow-up and does not submit, attach a build, or write metadata.
+
+```bash
+gh workflow run app-store-connect-readiness.yml --ref main
+gh run list --workflow app-store-connect-readiness.yml --branch main --event workflow_dispatch --limit 5
+```
+
+[#1197](https://github.com/JovieInc/LogYourBody/pull/1197) already merged on 2026-10-11 (`fe054800d6c4db490e780a8a8620571ebdcacdd2`). The check compares live What's New with that committed text.
+
 ## Preconditions (machine-verified, no action needed)
 
 These run inside `ios-release-loop.yml`'s `build-release` job and fail the lane if unmet:
