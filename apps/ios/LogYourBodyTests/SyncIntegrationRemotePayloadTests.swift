@@ -1086,3 +1086,89 @@ extension SyncIntegrationRemotePayloadTests {
         }
     }
 }
+
+@MainActor
+extension SyncIntegrationRemotePayloadTests {
+    func testProfilePullPersistsDateOnlyBirthDateFromMobileAPI() async throws {
+        let id = UUID().uuidString
+        try await seedBirthDateProfile(id: id)
+        await applyBirthDateProfileThroughSave(from: [
+            "id": id, "full_name": "Mobile profile", "date_of_birth": "1990-01-01"
+        ])
+        let date = try await persistedProfileBirthDate(id: id)
+        let expected = try XCTUnwrap(BodyMetricSyncDateParser.date(from: "1990-01-01T00:00:00Z"))
+        XCTAssertEqual(date, expected)
+    }
+
+    func testProfilePullRetainsWholeAndFractionalTimestampBirthDates() async throws {
+        for timestamp in ["1990-01-01T00:00:00Z", "1990-01-01T00:00:00.125Z"] {
+            let id = UUID().uuidString
+            try await seedBirthDateProfile(id: id)
+            await applyBirthDateProfileThroughSave(from: [
+                "id": id, "full_name": "Legacy profile", "date_of_birth": timestamp
+            ])
+            let stored = try await persistedProfileBirthDate(id: id)
+            let date = try XCTUnwrap(stored)
+            let expected = try XCTUnwrap(BodyMetricSyncDateParser.date(from: timestamp))
+            XCTAssertEqual(date.timeIntervalSince(expected), 0, accuracy: 0.001)
+        }
+    }
+
+    func testProfilePullDoesNotEraseBirthDateForMalformedMissingOrNullValues() async throws {
+        let id = UUID().uuidString
+        try await seedBirthDateProfile(id: id)
+        let expected = try XCTUnwrap(BodyMetricSyncDateParser.date(from: "1990-01-01T00:00:00Z"))
+        await applyBirthDateProfileThroughSave(from: [
+            "id": id, "full_name": "Existing profile", "date_of_birth": "1990-01-01T00:00:00Z"
+        ])
+        for value in ["1990-02-30", "1990-13-01", "1990-1-1", "not-a-date", "", NSNull()] as [Any] {
+            await applyBirthDateProfileThroughSave(from: [
+                "id": id, "full_name": "Existing profile", "date_of_birth": value
+            ])
+            let stored = try await persistedProfileBirthDate(id: id)
+            XCTAssertEqual(stored, expected)
+        }
+        await applyBirthDateProfileThroughSave(from: ["id": id, "full_name": "Existing profile"])
+        let stored = try await persistedProfileBirthDate(id: id)
+        XCTAssertEqual(stored, expected)
+    }
+
+    private func applyBirthDateProfileThroughSave(from payload: [String: Any]) async {
+        // Apply completion runs before saveQueue dispatches the actual context save.
+        // Observe that save; this test must never perform the production save itself.
+        let saved = expectation(forNotification: .NSManagedObjectContextDidSave, object: coreData.viewContext)
+        await coreData.updateOrCreateProfileAndWait(from: payload)
+        await fulfillment(of: [saved], timeout: 5)
+    }
+
+    private func persistedProfileBirthDate(id: String) async throws -> Date? {
+        await coreData.viewContext.perform { }
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = coreData.viewContext.persistentStoreCoordinator
+        return try await context.perform {
+            let request = CachedProfile.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id)
+            let rows = try context.fetch(request)
+            XCTAssertEqual(rows.count, 1)
+            return try XCTUnwrap(rows.first).dateOfBirth
+        }
+    }
+
+    private func seedBirthDateProfile(id: String) async throws {
+        let context = coreData.viewContext
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        try await context.perform {
+            let row = CachedProfile(context: context)
+            row.id = id
+            row.fullName = "Birthday sync fixture"
+            row.email = "birthday-sync@example.com"
+            row.createdAt = date.addingTimeInterval(-300)
+            row.height = 180
+            row.updatedAt = date
+            row.lastModified = date
+            row.syncStatus = "pending"
+            row.isSynced = false
+            try context.save()
+        }
+    }
+}
