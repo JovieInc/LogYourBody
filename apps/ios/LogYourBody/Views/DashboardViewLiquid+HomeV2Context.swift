@@ -7,6 +7,29 @@ import SwiftUI
 import OSLog
 #endif
 
+/// Record identity and account lifetime are captured together at the Edit action.
+struct HomeV2EditSession: Identifiable {
+    let metric: BodyMetrics
+    let owner: AuthManager.ProfileSessionOwnership
+    var id: String { metric.id }
+
+    /// The body-fat figure the sheet shows. Equality with that figure is "unchanged".
+    var displayedBodyFat: Double? {
+        metric.bodyFatPercentage.flatMap {
+            HomeV2WeightStepPolicy.parse(String(format: "%.1f", $0))
+        }
+    }
+
+    /// Compare with the sheet's displayed values, not its higher-precision source.
+    /// A retained field is a nil patch; the stored raw value stays authoritative.
+    func measurementReplacements(
+        value: Double, bodyFat: Double?, initialDisplayedWeight: Double
+    ) -> (weight: Double?, bodyFat: Double?) {
+        let displayedWeight = HomeV2WeightStepPolicy.parse(HomeV2WeightStepPolicy.text(initialDisplayedWeight))
+        return (value == displayedWeight ? nil : value, bodyFat == displayedBodyFat ? nil : bodyFat)
+    }
+}
+
 extension DashboardViewLiquid {
     func homeV2Metric(on date: Date) -> BodyMetrics? {
         let localDate = BodyMetricLocalDate.key(for: date)
@@ -38,11 +61,12 @@ extension DashboardViewLiquid {
             selectedDay: $homeV2ContextDay,
             detail: { homeV2DayDetail(for: $0, preferredMetricID: homeV2ContextMetricID) },
             onClose: { isHomeV2ContextPresented = false },
-            onEditEntry: {
+            onEditEntry: { metric in
+                guard let owner = authManager.captureAccountSession(), owner.subject == metric.userId else { return }
                 #if DEBUG
                 recordHomeEditTransition("callback.begin")
                 #endif
-                homeV2EditingMetric = $0
+                homeV2EditingSession = HomeV2EditSession(metric: metric, owner: owner)
                 #if DEBUG
                 recordHomeEditTransition("callback.assigned")
                 #endif
@@ -155,7 +179,8 @@ extension DashboardViewLiquid {
     }
 
     /// Edit entry (Pencil E1) with the delete confirmation (E2) inside.
-    func homeV2EditEntrySheet(for metric: BodyMetrics) -> some View {
+    func homeV2EditEntrySheet(for session: HomeV2EditSession) -> some View {
+        let metric = session.metric
         let system = currentMeasurementSystem
         let unit = homeV2DisplayUnit
         let initial = metric.weight.map { convertWeight($0, to: system) ?? $0 }
@@ -173,40 +198,40 @@ extension DashboardViewLiquid {
             ),
             existingPhotoURL: PhotoTimelineHUDPolicy.hasUsablePhoto(metric) ? metric.photoUrl : nil,
             onSave: { value, bodyFat in
-                await saveHomeV2Correction(metric, value: value, bodyFat: bodyFat)
+                let replacement = session.measurementReplacements(
+                    value: value, bodyFat: bodyFat, initialDisplayedWeight: initial
+                )
+                let kilograms = replacement.weight.map { system == .imperial ? $0.lbsToKg : $0 }
+                let bodyFatUnchanged = bodyFat == session.displayedBodyFat
+                let method = bodyFatUnchanged || bodyFat == nil || metric.bodyFatPercentage != nil
+                    ? nil
+                    : BodyFatEntryMethod.bioelectrical.rawValue
+                let changed = kilograms != nil || !bodyFatUnchanged
+                return await saveHomeV2Entry(
+                    weightKilograms: kilograms,
+                    bodyFat: bodyFatUnchanged ? nil : bodyFat,
+                    clearBodyFat: !bodyFatUnchanged && bodyFat == nil,
+                    bodyFatMethod: method,
+                    markManualCorrection: changed && metric.metricSource != .manual,
+                    session: session,
+                    displayValue: value,
+                    displayUnit: unit
+                )
             },
-            onDelete: { await deleteHomeV2Entry(metric) },
+            onDelete: {
+                guard authManager.ownsAccountSession(session.owner) else { return false }
+                return await deleteHomeV2Entry(metric)
+            },
             onAddPhoto: { _ in
-                homeV2EditingMetric = nil
+                guard authManager.ownsAccountSession(session.owner) else { return }
+                homeV2EditingSession = nil
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(450))
+                    do { try await Task.sleep(for: .milliseconds(450)) } catch { return }
+                    guard authManager.ownsAccountSession(session.owner), isHomeV2ContextPresented else { return }
                     presentProgressPhotoAttach(for: metric)
                 }
             }
         )
-    }
-
-    @MainActor
-    func saveHomeV2Correction(_ metric: BodyMetrics, value: Double, bodyFat: Double?) async -> Bool {
-        guard metric.userId == authManager.currentUser?.id else { return false }
-        let kilograms = currentMeasurementSystem == .imperial ? value.lbsToKg : value
-        let corrected = HomeV2CorrectionPolicy.correctedMetric(
-            metric,
-            kilograms: kilograms,
-            bodyFatPercentage: bodyFat
-        )
-
-        do {
-            try await CoreDataManager.shared.saveBodyMetricsAndWait(corrected, userId: metric.userId)
-            RealtimeSyncManager.shared.syncIfNeeded()
-            BodyScoreCache.shared.invalidate(for: metric.userId)
-            BodyScoreRecalculationService.shared.scheduleRecalculation()
-            HapticManager.shared.successAction()
-            await refreshHomeV2AfterWrite(selecting: corrected.id)
-            return true
-        } catch {
-            return false
-        }
     }
 
     @MainActor
@@ -236,7 +261,7 @@ extension DashboardViewLiquid {
               let bundle = process.environment["XCTestBundlePath"],
               bundle.hasSuffix("/LogYourBodyUITests.xctest") else { return }
         let state = "event=\(event) context=\(isHomeV2ContextPresented) " +
-            "item=\(homeV2EditingMetric != nil) addEntry=\(showAddEntrySheet) " +
+            "item=\(homeV2EditingSession != nil) addEntry=\(showAddEntrySheet) " +
             "photoAttach=\(isProgressPhotoAttachPresented) viewer=\(isHomeV2ViewerPresented) " +
             "allPhotos=\(isHomeV2AllPhotosPresented) menu=\(isShowingPhotoTimelineMenu) help=\(isHomeV2HelpPresented)"
         Logger(subsystem: "com.logyourbody.home-edit-transition-diagnostic", category: "fixture")
