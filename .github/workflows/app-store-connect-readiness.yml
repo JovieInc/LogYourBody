@@ -1,10 +1,20 @@
 name: App Store Connect Readiness (Read Only)
 
-# Manual readback for App Store 1.2.0. GET requests only. Red table rows are a
+# Readback for App Store 1.2.0. GET requests only. Red table rows are a
 # completed readback with a named Tim-only follow-up; they do not submit,
 # attach a build, or write metadata.
+# Push and the daily schedule start the same job. workflow_dispatch remains
+# for a token that has actions:write.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/app-store-connect-readiness.yml
+      - apps/ios/fastlane/metadata/**
+      - apps/ios/fastlane/storefront-manifest.generated.json
+  schedule:
+    - cron: '0 16 * * *'
 
 permissions:
   contents: read

@@ -90,7 +90,7 @@ Reusable/manual iOS release loop for TestFlight/App Store release paths.
 
 ### `app-store-connect-readiness.yml`
 
-Manual read-only App Store Connect check for version 1.2.0. It reports version state, whether the newest TestFlight upload is processed and selectable, whether both pro1 subscriptions are Ready to Submit or already attached, and whether What's New and storefront metadata match the committed manifest. It does not submit, attach a build, or write metadata.
+Read-only App Store Connect check for version 1.2.0. It runs on a push to `main` that changes this workflow or Fastlane metadata, daily at 16:00 UTC, and on `workflow_dispatch`. It reports version state, whether the newest TestFlight upload is processed and selectable, whether both pro1 subscriptions are Ready to Submit or already attached, and whether What's New and storefront metadata match the committed manifest. It does not submit, attach a build, or write metadata.
 
 ### `ios-testflight-deploy.yml`
 
