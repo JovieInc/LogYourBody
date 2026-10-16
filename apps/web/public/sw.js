@@ -1,5 +1,7 @@
+/* global caches, self, clients */
 // Service Worker for LogYourBody PWA
-const CACHE_NAME = 'logyourbody-v2'; // Increment version to force update
+const CACHE_PREFIX = 'logyourbody-';
+const CACHE_NAME = `${CACHE_PREFIX}v3`;
 const OFFLINE_PAGE = '/offline.html';
 
 // Files to cache for offline use (only critical assets)
@@ -9,41 +11,85 @@ const urlsToCache = [
   '/favicon.ico',
   '/android-chrome-192x192.png',
   '/android-chrome-512x512.png',
-  '/apple-touch-icon.png'
+  '/apple-touch-icon.png',
 ];
 
-// Install event - cache essential files
+// Cache only explicitly public files. Never persist account HTML, API data,
+// private photos, or URLs carrying query credentials in the Cache API.
+function isPublicAsset(request, url) {
+  return (
+    !url.search &&
+    !request.headers.has('authorization') &&
+    request.cache !== 'no-store' &&
+    (urlsToCache.includes(url.pathname) || url.pathname.startsWith('/_next/static/'))
+  );
+}
+
+function canCache(response) {
+  const policy = response.headers.get('cache-control') || '';
+  const vary = response.headers.get('vary') || '';
+  return (
+    response.status === 200 &&
+    !response.redirected &&
+    (response.type === 'basic' || response.type === 'default') &&
+    !/(?:^|,)\s*(?:private|no-store|no-cache)(?:\s*(?:=|,|$))/i.test(policy) &&
+    !vary
+      .split(',')
+      .some((header) => ['*', 'cookie', 'authorization'].includes(header.trim().toLowerCase()))
+  );
+}
+
+async function cachedPublicAsset(request) {
+  try {
+    const cache = await caches.open(CACHE_NAME);
+    return await cache.match(request);
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchPublicAsset(request) {
+  const response = await fetch(request, { credentials: 'omit' });
+  if (canCache(response)) {
+    try {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response.clone());
+    } catch {
+      // Storage may be unavailable or full; the network response is still valid.
+    }
+  }
+  return response;
+}
+
+// Install event - cache the public offline shell and icons without cookies.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
+    Promise.all(urlsToCache.map((url) => fetchPublicAsset(url))).then(() => self.skipWaiting()),
   );
-  // Force the waiting service worker to become the active service worker
-  self.skipWaiting();
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches
+      .keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            // v1/v2 may contain private responses. Purge them, preserving caches
+            // belonging to other applications on this origin.
+            if (cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME) {
+              return caches.delete(cacheName);
+            }
+          }),
+        );
+      })
+      .then(() => self.clients.claim()),
   );
-  // Claim all clients to ensure the new service worker takes effect immediately
-  self.clients.claim();
 });
 
-// Fetch event - Network First strategy for HTML, Cache First for assets
+// Navigation stays network-only, with a generic offline fallback. APIs and
+// all other dynamic requests remain entirely under the browser's network path.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -52,80 +98,43 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   // Skip cross-origin requests
-  if (!url.origin.includes(self.location.origin)) return;
+  if (url.origin !== self.location.origin) return;
 
-  // Network First for HTML/API requests (always get fresh content)
-  if (request.mode === 'navigate' || 
-      request.headers.get('accept')?.includes('text/html') ||
-      url.pathname.startsWith('/api/')) {
+  if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then(response => {
-          // Clone the response before using it
-          const responseToCache = response.clone();
-          
-          // Update cache in the background
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, responseToCache);
-          });
-          
-          return response;
-        })
-        .catch(() => {
-          // If network fails, try cache
-          return caches.match(request).then(response => {
-            return response || caches.match(OFFLINE_PAGE);
-          });
-        })
+      fetch(request).catch(
+        async () =>
+          (await cachedPublicAsset(OFFLINE_PAGE)) ||
+          new Response('You are offline.', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
+          }),
+      ),
     );
     return;
   }
 
-  // Cache First for static assets (images, CSS, JS)
-  if (url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|ico|webp|woff2?)$/)) {
-    event.respondWith(
-      caches.match(request)
-        .then(response => {
-          if (response) {
-            // Return cached version and update cache in background
-            const fetchPromise = fetch(request).then(networkResponse => {
-              caches.open(CACHE_NAME).then(cache => {
-                cache.put(request, networkResponse.clone());
-              });
-              return networkResponse;
-            });
-            
-            return response;
-          }
-          
-          // Not in cache, fetch from network
-          return fetch(request).then(response => {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(request, responseToCache);
-            });
-            return response;
-          });
-        })
-    );
-    return;
-  }
-
-  // Default: Network First
-  event.respondWith(
-    fetch(request).catch(() => caches.match(request))
+  if (!isPublicAsset(request, url)) return;
+  const response = cachedPublicAsset(request).then((cached) => cached || fetchPublicAsset(request));
+  event.respondWith(response);
+  event.waitUntil(
+    response.then(
+      () => undefined,
+      () => undefined,
+    ),
   );
 });
 
 // Check for updates periodically
 self.addEventListener('message', (event) => {
+  if (event.origin !== self.location.origin) return;
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+    event.waitUntil(self.skipWaiting());
   }
-  
+
   if (event.data && event.data.type === 'CHECK_UPDATE') {
     // Force check for updates
-    self.registration.update();
+    event.waitUntil(self.registration.update());
   }
 });
 
@@ -138,19 +147,15 @@ self.addEventListener('push', (event) => {
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
-      primaryKey: 1
-    }
+      primaryKey: 1,
+    },
   };
 
-  event.waitUntil(
-    self.registration.showNotification('LogYourBody', options)
-  );
+  event.waitUntil(self.registration.showNotification('LogYourBody', options));
 });
 
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(
-    clients.openWindow('/')
-  );
+  event.waitUntil(clients.openWindow('/'));
 });
