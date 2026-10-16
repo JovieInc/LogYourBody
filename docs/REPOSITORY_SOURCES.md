@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `59bd692e6f0a61ed3df5d783db0b523b692f232c82cf07e10ba42e47a74adeb4`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ded68620444bed4436636d0c53d0f163726c68de53fd36636225c7ccdb1cc958`)
 
 ### `package.json`: packageManager
 
@@ -224,6 +224,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "eve:info": "bash scripts/eve/run-node24.sh info",
   "eve:smoke": "bash scripts/eve/local-smoke.sh",
   "format": "prettier --write .",
+  "growth:report": "node packages/shared-lib/scripts/growth-report.mjs",
   "ios": "cd apps/ios && open LogYourBody.xcodeproj",
   "ios:bootstrap-local-config": "bash scripts/ios/bootstrap-local-config.sh",
   "ios:ettrace-profile": "bash scripts/ios/ettrace-profile.sh",

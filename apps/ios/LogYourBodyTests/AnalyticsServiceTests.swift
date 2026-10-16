@@ -357,7 +357,7 @@ final class AnalyticsServiceTests: XCTestCase {
         viewModel.currentStep = .bodyScore
         let controller = UIHostingController(rootView: BodyScoreRevealView(
             viewModel: viewModel, analyticsTracker: service
-        ).environment(\.scenePhase, .active).environment(\.accessibilityReduceMotion, true))
+        ).environment(\.scenePhase, .active))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         window.rootViewController = controller
         window.makeKeyAndVisible()
@@ -395,7 +395,7 @@ final class AnalyticsServiceTests: XCTestCase {
         let viewModel = OnboardingFlowViewModel(entryContext: .preAuth)
         let controller = UIHostingController(rootView: BodyScoreRevealView(
             viewModel: viewModel, analyticsTracker: service
-        ).environment(\.scenePhase, .active).environment(\.accessibilityReduceMotion, true))
+        ).environment(\.scenePhase, .active))
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         window.rootViewController = controller
         window.makeKeyAndVisible()
