@@ -5,6 +5,66 @@
 import Combine
 import Foundation
 
+/// Editing an imported record must not turn a missing or untouched reading into a new measurement.
+enum HomeV2EntryEditPolicy {
+    static let gateKey = "home_v2_entry_edit_preservation_v1"
+    static let fixtureArgument = "-lybUITestHomeEntryEditPreservation"
+
+    @MainActor
+    static func isEnabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isGateEnabled: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        if arguments.filter({ $0 == fixtureArgument }).count == 1,
+           arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
+           arguments.contains(HomeV2Policy.photoFixtureArgument),
+           !arguments.contains(HomeV2Policy.rollbackFixtureArgument),
+           UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil,
+           environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") == true {
+            return true
+        }
+        #endif
+        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return check(gateKey)
+    }
+
+    static func weight(text: String, initialValue: Double?, unit: String, preserving: Bool) throws -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if preserving, initialValue == nil, trimmed.isEmpty { return nil }
+        guard let value = HomeV2WeightStepPolicy.parse(trimmed), value.isFinite else {
+            throw ValidationError.invalidWeight(HomeV2Copy.weightRangeError(unit: unit))
+        }
+        if preserving, let initialValue, initialValue.isFinite,
+           value == HomeV2WeightStepPolicy.parse(HomeV2WeightStepPolicy.text(initialValue)) {
+            return value
+        }
+        guard HomeV2WeightStepPolicy.range(unit: unit).contains(value) else {
+            throw ValidationError.invalidWeight(HomeV2Copy.weightRangeError(unit: unit))
+        }
+        return value
+    }
+
+    static func bodyFat(text: String, initialValue: Double?, preserving: Bool) throws -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if preserving {
+            if let initialValue, initialValue.isFinite,
+               let value = HomeV2WeightStepPolicy.parse(trimmed),
+               value == HomeV2WeightStepPolicy.parse(String(format: "%.1f", initialValue)) {
+                return value
+            }
+            return try ValidationService.shared.validateBodyFat(trimmed)
+        }
+        guard let value = HomeV2WeightStepPolicy.parse(trimmed),
+              HomeV2WeightStepPolicy.bodyFatRange.contains(value) else {
+            throw ValidationError.invalidBodyFat(HomeV2Copy.bodyFatRangeError)
+        }
+        return value
+    }
+}
+
 /// Copy for Context (Pencil N2), Entries (E0), Edit entry (E1) and the
 /// delete confirmation (E2). Deletion scope is always spelled out.
 enum HomeV2ContextCopy {

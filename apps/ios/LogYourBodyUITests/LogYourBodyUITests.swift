@@ -2335,6 +2335,37 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
 
+    func testHomeV2PhotoOnlyEditorDoesNotInventWeight() throws {
+        let app = XCUIApplication()
+        app.forwardActualXCTestContext()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2UndoPhotoOnlyFixture", "-lybUITestHomeEntryEditPreservation"
+        ])
+        let context = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(context.waitForExistence(timeout: 30))
+        context.tap()
+        let edit = app.buttons["home_v2_edit_entry"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context_row_weight"].exists)
+        edit.tap()
+        let weight = app.textFields["home_v2_log_sheet_value"]
+        XCTAssertTrue(weight.waitForExistence(timeout: 8))
+        XCTAssertEqual(weight.value as? String, "Add", "A missing reading is a prompt, never a default measurement")
+        attachScreenshot(named: "entry-edit-missing-weight", from: app)
+        app.buttons["home_v2_log_sheet_save"].tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 8), "A photo-only entry saves without requiring weight")
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context_row_weight"].exists)
+        app.buttons["home_v2_context_close"].tap()
+        let confirmation = app.staticTexts["Entry saved."]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 8))
+        let home = app.scrollViews["home_v2_content_scroll"]
+        XCTAssertTrue(home.waitForExistence(timeout: 8))
+        for _ in 0..<3 where !confirmation.isHittable { home.swipeUp() }
+        XCTAssertTrue(confirmation.isHittable, "The weight-free confirmation is reachable on the real Home")
+        attachScreenshot(named: "entry-edit-missing-weight-saved", from: app)
+    }
+
     func testHomeV2ContextShowsTheDayAndEditsTheEntry() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])

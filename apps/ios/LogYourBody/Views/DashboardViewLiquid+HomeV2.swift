@@ -46,7 +46,7 @@ extension DashboardViewLiquid {
                 for: HomeV2TimelinePolicy.EntryID(metric), system: currentMeasurementSystem
             ),
             dateText: { formatHUDDate($0.date) },
-            loggedSentence: homeV2Logged.map { HomeV2Copy.loggedSentence(value: $0.valueText, unit: $0.unit) },
+            loggedSentence: homeV2Logged.map { $0.confirmationText },
             systemState: homeV2SystemState,
             onOpenPhoto: { isHomeV2ViewerPresented = true },
             onViewProgress: { openHomeV2Progress() },
@@ -239,7 +239,7 @@ extension DashboardViewLiquid {
         bodyFatMethod: String? = nil,
         markManualCorrection: Bool = false,
         session: HomeV2EditSession,
-        displayValue: Double,
+        displayValue: Double?,
         displayUnit: String
     ) async -> Bool {
         let admission: CoreDataManager.WriteAdmission = {
@@ -269,7 +269,7 @@ extension DashboardViewLiquid {
                 homeV2Logged = HomeV2LoggedEntry(
                     metricId: saved.id, userId: session.owner.subject, date: saved.date,
                     previousMetric: result.previousMetric,
-                    valueText: HomeV2WeightStepPolicy.text(displayValue), unit: displayUnit,
+                    valueText: displayValue.map { HomeV2WeightStepPolicy.text($0) } ?? "", unit: displayUnit,
                     savedMetric: saved
                 )
             }

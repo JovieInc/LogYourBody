@@ -814,6 +814,48 @@ private final class UndoFailingSaveContext: NSManagedObjectContext, @unchecked S
 
 @MainActor
 extension PhotoMetadataServiceTests {
+    func testEditorValidationPreservesMissingAndHistoricalFieldsThroughCommittedWrite() async throws {
+        for weight in [nil, 31.234567] as [Double?] {
+            let store = makePhotoAdmissionStore()
+            let fixture = undoFixture(weight: weight, bodyFat: 71.234567, method: "caliper")
+            try await store.saveBodyMetricsAndWait(fixture, userId: fixture.userId)
+            let before = try XCTUnwrap(try exactEditStoredRows(store).first)
+            let session = HomeV2EditSession(
+                metric: fixture,
+                owner: AuthManager.ProfileSessionOwnership(subject: fixture.userId, generation: 1)
+            )
+            let inputWeight = try HomeV2EntryEditPolicy.weight(
+                text: weight.map { HomeV2WeightStepPolicy.text($0) } ?? "",
+                initialValue: weight, unit: "kg", preserving: true
+            )
+            let inputBodyFat = try HomeV2EntryEditPolicy.bodyFat(
+                text: "71.2", initialValue: fixture.bodyFatPercentage, preserving: true
+            )
+            let retained = session.measurementReplacements(
+                value: inputWeight, bodyFat: inputBodyFat,
+                initialDisplayedWeight: weight ?? HomeV2WeightStepPolicy.defaultValue(unit: "kg")
+            )
+            XCTAssertNil(retained.weight)
+            XCTAssertNil(retained.bodyFat)
+            _ = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+                id: session.id, userId: session.owner.subject, weight: retained.weight,
+                bodyFatPercentage: retained.bodyFat, bodyFatMethod: nil,
+                writeAdmission: {}, coreDataManager: store
+            )
+            XCTAssertEqual(try exactEditStoredRows(store), [before], "Untouched fields retain raw precision and source")
+            let replacement = try HomeV2EntryEditPolicy.bodyFat(text: "21.3", initialValue: 71.234567, preserving: true)
+            let changed = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+                id: session.id, userId: session.owner.subject, weight: nil, bodyFatPercentage: replacement,
+                bodyFatMethod: nil, markManualCorrection: true, writeAdmission: {}, coreDataManager: store
+            )
+            XCTAssertEqual(changed.metrics.weight, weight)
+            XCTAssertEqual(changed.metrics.bodyFatPercentage, 21.3)
+            XCTAssertEqual(changed.metrics.bodyFatMethod, "caliper")
+            XCTAssertEqual(changed.metrics.date, fixture.date)
+            XCTAssertEqual(changed.metrics.measurementSource(for: .bodyFat), .manual)
+        }
+    }
+
     func testPhotoPlaceholderCreationRejectsReplacementAtStoreAdmission() async throws {
         let auth = AuthManager.shared
         let previousUser = auth.currentUser
