@@ -11,11 +11,10 @@ The engineering pipeline is fully automated. **One human step** stands between t
 
 ## Read-only readiness check
 
-Dispatch `app-store-connect-readiness.yml` on `main` before Submit. It writes a pass/fail table to the job summary for version state, the newest TestFlight-uploaded build, both pro1 3-day-trial subscriptions, and What's New plus the rest of the committed storefront metadata. A green job means the readback finished. A FAIL row names a Tim-only follow-up and does not submit, attach a build, or write metadata.
+`app-store-connect-readiness.yml` writes a pass/fail table to the job summary for version state, the newest TestFlight-uploaded build, both pro1 3-day-trial subscriptions, and What's New plus the rest of the committed storefront metadata. It runs on a push to `main` that changes the workflow or Fastlane metadata, and daily at 16:00 UTC. A green job means the readback finished. A FAIL row names a Tim-only follow-up and does not submit, attach a build, or write metadata.
 
 ```bash
-gh workflow run app-store-connect-readiness.yml --ref main
-gh run list --workflow app-store-connect-readiness.yml --branch main --event workflow_dispatch --limit 5
+gh run list --workflow app-store-connect-readiness.yml --branch main --limit 5
 ```
 
 [#1197](https://github.com/JovieInc/LogYourBody/pull/1197) already merged on 2026-10-11 (`fe054800d6c4db490e780a8a8620571ebdcacdd2`). The check compares live What's New with that committed text.

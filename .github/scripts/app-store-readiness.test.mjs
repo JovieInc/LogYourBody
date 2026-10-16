@@ -371,7 +371,12 @@ test('GitHub log reads allow escape sequences and the workflow stays read-only',
   }
   const workflow = readFileSync(new URL('../workflows/app-store-connect-readiness.yml', import.meta.url), 'utf8');
   assert.match(workflow, /workflow_dispatch:/);
-  assert.doesNotMatch(workflow, /pull_request:|schedule:|contents: write|environment:/);
+  assert.match(workflow, /branches: \[main\]/);
+  assert.match(workflow, /\.github\/workflows\/app-store-connect-readiness\.yml/);
+  assert.match(workflow, /apps\/ios\/fastlane\/metadata\/\*\*/);
+  assert.match(workflow, /storefront-manifest\.generated\.json/);
+  assert.match(workflow, /cron: '0 16 \* \* \*'/);
+  assert.doesNotMatch(workflow, /pull_request:|contents: write|actions: write|environment:/);
   assert.match(workflow, /contents: read/);
   assert.match(workflow, /actions: read/);
   assert.match(workflow, /secrets\.APP_STORE_CONNECT_API_KEY_ID/);
