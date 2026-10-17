@@ -110,6 +110,10 @@ jobs:
           rescue StandardError => error
             message = error.message.to_s
             message = "App Store Connect rejected What's New" if message.match?(/BEGIN |PRIVATE KEY|api_key/i)
+            if message.include?("cannot be edited")
+              puts "App Store Connect refused What's New: attribute cannot be edited on this version"
+              exit 0
+            end
             warn message
             exit 1
           end
