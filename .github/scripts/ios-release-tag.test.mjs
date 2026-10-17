@@ -271,7 +271,7 @@ test('release publish uses the existing tag and does not send --target', () => {
   const gh = fakeGh(repo.work);
   const result = runScript(createScript, repo.work, {
     GITHUB_SHA: repo.head,
-    GITHUB_SERVER_URL: 'https://github.com',
+    GITHUB_SERVER_URL: 'https://example.com',
     GITHUB_REPOSITORY: 'JovieInc/LogYourBody',
     GITHUB_RUN_ID: '38986790647',
     RELEASE_TYPE: 'testflight',
@@ -295,7 +295,7 @@ test('release publish warns instead of failing when the unpinned SHA is refused'
   });
   const result = runScript(createScript, repo.work, {
     GITHUB_SHA: repo.head,
-    GITHUB_SERVER_URL: 'https://github.com',
+    GITHUB_SERVER_URL: 'https://example.com',
     GITHUB_REPOSITORY: 'JovieInc/LogYourBody',
     GITHUB_RUN_ID: '38986790647',
     RELEASE_TYPE: 'testflight',
@@ -316,7 +316,7 @@ test('release publish still fails on errors that are not the workflow scope refu
   const gh = fakeGh(repo.work, { createStatus: 1, createStderr: 'fatal: unable to access' });
   const result = runScript(createScript, repo.work, {
     GITHUB_SHA: repo.head,
-    GITHUB_SERVER_URL: 'https://github.com',
+    GITHUB_SERVER_URL: 'https://example.com',
     GITHUB_REPOSITORY: 'JovieInc/LogYourBody',
     GITHUB_RUN_ID: '1',
     RELEASE_TYPE: 'testflight',
