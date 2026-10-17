@@ -1340,7 +1340,8 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         probe.result.anchors = HealthKitSmartScaleAnchors(weight: Data([1, 2, 3]), bodyFat: nil)
         let result = await manager.performSmartScaleRefresh()
         XCTAssertEqual(result.imported, 1)
-        let row = try XCTUnwrap(try await durableImportedMetrics().first)
+        let rows = try await durableImportedMetrics()
+        let row = try XCTUnwrap(rows.first)
         XCTAssertEqual(row.date.timeIntervalSince1970, backdated.timeIntervalSince1970, accuracy: 1)
         XCTAssertFalse(Calendar.current.isDateInToday(row.date))
         XCTAssertEqual(row.dataSource, BodyMetricSource.healthKit.rawValue)
@@ -1353,7 +1354,8 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         let repeatResult = await manager.performSmartScaleRefresh()
         XCTAssertEqual(repeatResult.skippedDuplicates, 1)
         XCTAssertEqual(repeatResult.imported, 0)
-        XCTAssertEqual(try await durableImportedMetrics().count, 1)
+        let stored = try await durableImportedMetrics()
+        XCTAssertEqual(stored.count, 1)
     }
 
     func testSmartScaleRefreshSkipsManualAndDexaMatches() async throws {
@@ -1380,7 +1382,8 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         let result = await manager.performSmartScaleRefresh()
         XCTAssertEqual(result.imported, 0)
         XCTAssertEqual(result.skippedCovered, 2)
-        XCTAssertEqual(try await durableImportedMetrics().count, 2)
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, 2)
     }
 
     func testSmartScalePolicyKeepsADistinctSameDayReading() throws {
