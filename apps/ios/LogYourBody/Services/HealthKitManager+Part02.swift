@@ -932,12 +932,13 @@ func scheduleObservedBodyMetricSync() {
 
 @MainActor
     func scheduleObservedBodyMetricSync(for currentUserId: String?, debounce: TimeInterval = 5) {
-        // Check if we should sync (not more than once per hour)
+        // Legacy observers stay hourly. The smart-scale gate reconciles every delivery.
         let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
+        let smartScale = smartScaleSyncEnabled()
         let shouldSync: Bool = {
+            if smartScale { return true }
             if let lastSync = userDefaults.object(forKey: lastSyncKey) as? Date {
-                let minutesSinceLastSync = Date().timeIntervalSince(lastSync) / 60
-                return minutesSinceLastSync >= 60
+                return Date().timeIntervalSince(lastSync) / 60 >= 60
             }
             return true
         }()
@@ -957,6 +958,11 @@ func scheduleObservedBodyMetricSync() {
                 guard signedInId == currentUserId, let currentUserId, !currentUserId.isEmpty else {
                     return
                 }
+                let useSmartScale = MainActor.assumeIsolated { self?.smartScaleSyncEnabled() ?? false }
+                if useSmartScale {
+                    Task { await self?.refreshSmartScaleSamplesIfEnabled() }
+                    return
+                }
                 self?.userDefaults.set(Date(), forKey: lastSyncKey)
                 Task { [weak self] in
                     // Weight sync imports both weight and body fat for the recent window.
@@ -964,6 +970,199 @@ func scheduleObservedBodyMetricSync() {
                 }
             }
         }
+    }
+
+    func refreshSmartScaleSamplesIfEnabled() async {
+        _ = await performSmartScaleRefresh()
+    }
+
+    /// Reads new weight and body-fat samples, including ones dated before today.
+    /// Anchor advances only after a successful reconcile. Permission denial reads nothing.
+    @MainActor
+    func performSmartScaleRefresh() async -> HealthKitSmartScaleRefreshResult {
+        guard smartScaleSyncEnabled() else { return .inactive }
+        guard isAuthorized else { return .denied }
+        guard beginWeightSyncIfPossible() else { return .busy }
+        defer { endWeightSync() }
+        guard let ownership = await captureImportOwnership() else { return .unavailable }
+        do {
+            let queried = try await querySmartScaleSamples(readSmartScaleAnchors(for: ownership.subject))
+            try await requireImportOwnership(ownership)
+            let existing = await existingSmartScaleReadings(for: ownership.subject)
+            try await requireImportOwnership(ownership)
+            let admissions = HealthKitSmartScaleSyncPolicy.reconcile(
+                authorized: true, samples: queried.samples, existing: existing
+            )
+            let counts = try await persistSmartScaleAdmissions(admissions, ownership: ownership)
+            try await requireImportOwnership(ownership)
+            writeSmartScaleAnchors(queried.anchors, userId: ownership.subject)
+            if counts.imported > 0 { await finishSmartScaleImport(ownership) }
+            return HealthKitSmartScaleRefreshResult(
+                outcome: .refreshed, imported: counts.imported,
+                skippedDuplicates: counts.duplicates, skippedCovered: counts.covered
+            )
+        } catch {
+            return isSmartScaleAuthorizationDenial(error) ? .denied : .failed
+        }
+    }
+
+    private func querySmartScaleSamples(
+        _ anchors: HealthKitSmartScaleAnchors
+    ) async throws -> HealthKitSmartScaleQueryResult {
+        if let smartScaleSampleQuery { return try await smartScaleSampleQuery(anchors) }
+        return try await fetchAnchoredSmartScaleSamples(anchors)
+    }
+
+    private func fetchAnchoredSmartScaleSamples(
+        _ anchors: HealthKitSmartScaleAnchors
+    ) async throws -> HealthKitSmartScaleQueryResult {
+        let weight = try await anchoredSmartScaleSamples(
+            type: weightType, anchorData: anchors.weight, kind: .weight
+        )
+        let bodyFat = try await anchoredSmartScaleSamples(
+            type: bodyFatType, anchorData: anchors.bodyFat, kind: .bodyFat
+        )
+        return HealthKitSmartScaleQueryResult(
+            samples: weight.samples + bodyFat.samples,
+            anchors: HealthKitSmartScaleAnchors(weight: weight.anchor, bodyFat: bodyFat.anchor)
+        )
+    }
+
+    private func anchoredSmartScaleSamples(
+        type: HKQuantityType, anchorData: Data?, kind: HealthKitSmartScaleSyncPolicy.Kind
+    ) async throws -> (samples: [HealthKitSmartScaleSyncPolicy.Sample], anchor: Data?) {
+        let anchor = anchorData.flatMap {
+            try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: $0)
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKAnchoredObjectQuery(
+                type: type, predicate: nil, anchor: anchor, limit: HKObjectQueryNoLimit
+            ) { [weak self] _, samples, _, newAnchor, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let mapped = (samples as? [HKQuantitySample] ?? []).compactMap {
+                    self?.smartScaleSample($0, kind: kind)
+                }
+                let data = newAnchor.flatMap {
+                    try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true)
+                }
+                continuation.resume(returning: (mapped, data))
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    private func smartScaleSample(
+        _ sample: HKQuantitySample, kind: HealthKitSmartScaleSyncPolicy.Kind
+    ) -> HealthKitSmartScaleSyncPolicy.Sample? {
+        let value = kind == .weight
+            ? sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
+            : sample.quantity.doubleValue(for: HKUnit.percent()) * 100
+        return HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: sample.uuid.uuidString, kind: kind, value: value,
+            date: sample.startDate, sourceName: sample.sourceRevision.source.name
+        )
+    }
+
+    private func readSmartScaleAnchors(for userId: String) -> HealthKitSmartScaleAnchors {
+        HealthKitSmartScaleAnchors(
+            weight: userDefaults.data(forKey: HealthKitDefaultsKey.smartScaleWeightAnchor.scoped(with: userId)),
+            bodyFat: userDefaults.data(forKey: HealthKitDefaultsKey.smartScaleBodyFatAnchor.scoped(with: userId))
+        )
+    }
+
+    private func writeSmartScaleAnchors(_ anchors: HealthKitSmartScaleAnchors, userId: String) {
+        userDefaults.set(
+            anchors.weight, forKey: HealthKitDefaultsKey.smartScaleWeightAnchor.scoped(with: userId)
+        )
+        userDefaults.set(
+            anchors.bodyFat, forKey: HealthKitDefaultsKey.smartScaleBodyFatAnchor.scoped(with: userId)
+        )
+    }
+
+    private func existingSmartScaleReadings(for userId: String) async -> [HealthKitSmartScaleSyncPolicy.Existing] {
+        let rows = await (importCoreDataManager ?? .shared).fetchBodyMetrics(for: userId)
+        return rows.compactMap { cached in
+            guard let metric = cached.toBodyMetrics() else { return nil }
+            let ids = HealthKitSmartScaleSyncPolicy.recordedIdentities(metadata: metric.sourceMetadata)
+            return HealthKitSmartScaleSyncPolicy.Existing(
+                source: metric.metricSource, date: metric.date, weightKg: metric.weight,
+                bodyFatPercent: metric.bodyFatPercentage, weightSampleId: ids.weight,
+                bodyFatSampleId: ids.bodyFat
+            )
+        }
+    }
+
+    private struct SmartScalePersistCounts {
+        var imported = 0
+        var duplicates = 0
+        var covered = 0
+    }
+
+    private func persistSmartScaleAdmissions(
+        _ admissions: [HealthKitSmartScaleSyncPolicy.Admission],
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async throws -> SmartScalePersistCounts {
+        var counts = SmartScalePersistCounts()
+        for admission in admissions {
+            switch admission {
+            case .imported(let sample):
+                try await saveBodyMetrics(smartScaleMetric(sample, userId: ownership.subject), ownership: ownership)
+                counts.imported += 1
+            case .skippedDuplicate:
+                counts.duplicates += 1
+            case .skippedCovered:
+                counts.covered += 1
+            }
+        }
+        return counts
+    }
+
+    private func smartScaleMetric(
+        _ sample: HealthKitSmartScaleSyncPolicy.Sample, userId: String
+    ) -> BodyMetrics {
+        let now = Date()
+        let isWeight = sample.kind == .weight
+        let metadata = BodyMetricSourceMetadata(
+            vendor: "apple_health", sourceName: sample.sourceName, sampleId: sample.sampleId,
+            quantityType: isWeight
+                ? HKQuantityTypeIdentifier.bodyMass.rawValue
+                : HKQuantityTypeIdentifier.bodyFatPercentage.rawValue
+        )
+        return BodyMetrics(
+            id: UUID().uuidString, userId: userId, date: sample.date, weight: isWeight ? sample.value : nil,
+            weightUnit: "kg", bodyFatPercentage: isWeight ? nil : sample.value,
+            bodyFatMethod: isWeight ? nil : "HealthKit", muscleMass: nil, boneMass: nil,
+            notes: "Imported from Apple Health", photoUrl: nil,
+            dataSource: BodyMetricSource.healthKit.rawValue, sourceMetadata: metadata,
+            createdAt: now, updatedAt: now
+        )
+    }
+
+    private func finishSmartScaleImport(_ ownership: AuthManager.ProfileSessionOwnership) async {
+        await MainActor.run {
+            guard (importAuthManager ?? .shared).ownsAccountSession(ownership) else { return }
+            if let importCompletion {
+                importCompletion(ownership.subject)
+            } else {
+                BodyScoreCache.shared.invalidate(for: ownership.subject)
+                if let trigger = bodyScoreRecalculationTrigger {
+                    trigger()
+                } else {
+                    BodyScoreRecalculationService.shared.scheduleRecalculation()
+                }
+            }
+        }
+    }
+
+    private func isSmartScaleAuthorizationDenial(_ error: Error) -> Bool {
+        if error is HealthKitError { return true }
+        let nsError = error as NSError
+        guard nsError.domain == HKErrorDomain else { return false }
+        return nsError.code == HKError.Code.errorAuthorizationDenied.rawValue ||
+            nsError.code == HKError.Code.errorAuthorizationNotDetermined.rawValue
     }
 }
 
