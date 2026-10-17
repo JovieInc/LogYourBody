@@ -5,7 +5,7 @@
 import SwiftUI
 
 extension DashboardViewLiquid {
-    /// Home v2 owns the Today page: v2 chrome, no chat composer, the check-in dock.
+    /// Home owns the timeline with the pinned Ask composer and check-in dock.
     var isHomeV2CheckIn: Bool {
         HomeV2Policy.isEnabled() && selectedPhotoTimelineRootPage == .timeline && !isHomeChatExpanded
     }
@@ -19,6 +19,10 @@ extension DashboardViewLiquid {
         HomeV2Copy.displayUnit(currentMeasurementSystem)
     }
 
+    var homeV2TodayMetric: BodyMetrics? {
+        bodyMetrics.first { Calendar.current.isDateInToday($0.date) }
+    }
+
     var homeV2InsightMetrics: [BodyMetrics] {
         bodyMetrics.filter {
             $0.weight == nil || HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight)
@@ -27,19 +31,46 @@ extension DashboardViewLiquid {
 
     /// Photo-first Home behind `HomeV2Policy`; the legacy `LaunchTimelineSurface`
     /// keeps serving when the gate is off.
+    @ViewBuilder
     func homeV2Surface(for metric: BodyMetrics) -> some View {
-        let unit = homeV2DisplayUnit
+        let snapshot = homeV2Timeline
+        let ownership = authManager.captureAccountSession()
+        if let ownership, hasCurrentDashboardPublication, snapshot.isOwned(by: ownership),
+           let selection = homeV2TimelineSelection,
+           selection.id == HomeV2TimelinePolicy.EntryID(metric), selection.date == metric.date,
+           let presentation = snapshot.presentation(
+            for: selection, heightCm: authManager.currentUser?.profile?.height, currentOwnership: ownership
+           ) {
+            admittedHomeV2Surface(metric: metric, snapshot: snapshot, presentation: presentation, ownership: ownership)
+        } else {
+            HomeV2LoadingHome()
+        }
+    }
 
+    private func admittedHomeV2Surface(
+        metric: BodyMetrics, snapshot: HomeV2TimelinePolicy.Snapshot,
+        presentation: HomeV2TimelinePolicy.Presentation, ownership: AuthManager.ProfileSessionOwnership
+    ) -> some View {
         return HomeV2Surface(
             metric: metric,
-            bodyMetrics: homeV2Timeline.metrics,
-            timeline: homeV2Timeline,
-            hasAnyPhotoInHistory: bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) },
-            selectedID: Binding(get: { HomeV2TimelinePolicy.EntryID(metric) }, set: selectHomeV2TimelineEntry),
-            weightValue: HomeV2EditorialPolicy.displayWeight(in: metric, system: currentMeasurementSystem)
-                .map { String(format: "%.1f", $0) } ?? "—",
-            weightUnit: unit,
-            ffmiValue: homeV2FFMIValue(metric).map { String(format: "%.1f", $0) },
+            bodyMetrics: snapshot.metrics,
+            timeline: snapshot,
+            presentation: presentation,
+            heightCm: authManager.currentUser?.profile?.height,
+            isCurrent: { candidate in
+                authManager.ownsAccountSession(ownership) && hasCurrentDashboardPublication &&
+                snapshot.admitsPresentation(
+                    candidate, selected: homeV2TimelineSelection,
+                    currentOwnership: authManager.captureAccountSession(),
+                    currentMetrics: bodyMetrics, currentSnapshot: homeV2Timeline
+                )
+            },
+            selectedMetric: homeV2HeroMetric, system: currentMeasurementSystem,
+            onSelectMetric: { homeV2HeroMetric = $0 },
+            selectedID: Binding(
+                get: { homeV2TimelineSelection?.id ?? presentation.selection.id },
+                set: selectHomeV2TimelineEntry
+            ),
             stepsValue: homeV2StepsText(for: metric).value,
             stepsDetail: homeV2StepsText(for: metric).detail,
             changeSentence: homeV2Timeline.weightChangeSentence(
@@ -48,12 +79,26 @@ extension DashboardViewLiquid {
             dateText: { formatHUDDate($0.date) },
             loggedSentence: homeV2Logged.map { $0.confirmationText },
             systemState: homeV2SystemState,
-            onOpenPhoto: { isHomeV2ViewerPresented = true },
+            onOpenPhoto: {
+                guard !isHomeV2PhotoScrubNavigating, authManager.ownsAccountSession(ownership),
+                      snapshot.admitsPhotoPresentation(
+                          presentation, selected: homeV2TimelineSelection,
+                          currentOwnership: authManager.captureAccountSession(),
+                          currentMetrics: bodyMetrics, currentSnapshot: homeV2Timeline
+                      ) else { return }
+                presentHomeV2PhotoViewer()
+            },
             onViewProgress: { openHomeV2Progress() },
             onViewMetric: { openHomeV2Progress(metric: $0) },
-            onTodayDetails: { openHomeV2Context() },
+            onTodayDetails: {
+                guard authManager.ownsAccountSession(ownership), homeV2TimelineSelection == presentation.selection else { return }
+                openHomeV2Context(on: presentation.selection.date)
+            },
             onAllPhotos: { isHomeV2AllPhotosPresented = true },
-            onLogWeight: { presentHomeV2LogSheet(for: metric.date, initialTab: 1) },
+            onLogWeight: {
+                guard authManager.ownsAccountSession(ownership), homeV2TimelineSelection == presentation.selection else { return }
+                presentHomeV2LogSheet(for: presentation.selection.date, initialTab: 1)
+            },
             onConnectHealth: {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
@@ -63,33 +108,138 @@ extension DashboardViewLiquid {
             isPhotoScrubNavigating: isHomeV2PhotoScrubNavigating
         )
         .task(id: homeV2StepsRequest(on: metric.date)) {
-            guard let ownership = authManager.captureAccountSession() else { return }
+            guard authManager.ownsAccountSession(ownership),
+                  homeV2TimelineSelection == presentation.selection, homeV2Timeline.isOwned(by: ownership) else { return }
             await homeV2StepsReader.load(
                 metric: metric, ownership: ownership, ownsSession: authManager.ownsAccountSession
             )
         }
         // Chart caches refresh centrally when measurements change. Phase copy
         // must also follow edits to an existing day, not just added rows.
-        .task(id: bodyMetrics) {
-            let insight = PhaseInsightPolicy.insight(for: homeV2InsightMetrics)
+        .task(id: snapshot.metrics) {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            let insightMetrics = snapshot.metrics.filter {
+                $0.weight == nil || HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight)
+            }
+            let insight = PhaseInsightPolicy.insight(for: insightMetrics)
             homeV2PhaseSentence = HomeV2Copy.phaseSentence(
                 kind: insight.kind,
-                weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: homeV2InsightMetrics)
+                weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: insightMetrics)
             )
         }
     }
 
-    private var isHomeV2PhotoScrubNavigating: Bool {
-        selectedPhotoTimelineRootPage != .timeline || isHomeChatExpanded ||
-            isShowingPhotoTimelineMenu || isHomeV2ViewerPresented || isHomeV2ContextPresented ||
+    var homeV2HeroShareKind: ContextualMetricKind {
+        switch homeV2HeroMetric {
+        case .bodyFat: return .bodyFat
+        case .weight: return .weight
+        case .ffmi: return .ffmi
+        case .steps: return .steps
+        }
+    }
+
+    /// Capture all editor options from one admitted moment; retain display-only evidence.
+    var homeV2HeroShareSnapshots: [ContextualMetricSnapshot] {
+        let snapshot = homeV2Timeline
+        guard let ownership = authManager.captureAccountSession(), hasCurrentDashboardPublication,
+              snapshot.isOwned(by: ownership), let selection = homeV2TimelineSelection,
+              let metric = snapshot.metric(for: selection.id),
+              let presentation = snapshot.presentation(
+                  for: selection, heightCm: authManager.currentUser?.profile?.height,
+                  currentOwnership: ownership
+              ), snapshot.admitsPresentation(
+                  presentation, selected: homeV2TimelineSelection, currentOwnership: ownership,
+                  currentMetrics: bodyMetrics, currentSnapshot: homeV2Timeline
+              ) else { return [] }
+        let steps = homeV2StepsText(for: metric)
+        let stepsState = homeV2StepsReader.state(
+            for: metric, ownership: ownership, ownsSession: authManager.ownsAccountSession
+        )
+        let stepsAreLoading: Bool
+        if case .loading = stepsState { stepsAreLoading = true } else { stepsAreLoading = false }
+        return HomeV2ProgressMetric.allCases.map { kind in
+            let reading = presentation.reading(for: kind, system: currentMeasurementSystem, steps: steps)
+            let shareKind: ContextualMetricKind
+            switch kind {
+            case .bodyFat: shareKind = .bodyFat
+            case .weight: shareKind = .weight
+            case .ffmi: shareKind = .ffmi
+            case .steps: shareKind = .steps
+            }
+            return ContextualMetricSnapshot(
+                kind: shareKind, value: reading.value ?? "—", unit: reading.unit,
+                observation: selection.date.formatted(date: .abbreviated, time: .shortened),
+                range: "", trend: nil,
+                provenance: reading.evidence == nil ? nil : reading.explanation,
+                evidence: reading.detail, isLoading: kind == .steps && stepsAreLoading
+            )
+        }
+    }
+
+    var isHomeV2PhotoScrubNavigating: Bool {
+        isHomeV2TimelineCovered || isHomeV2ViewerPresented || homeV2PhotoRoute != nil
+    }
+
+    var isHomeV2PhotoViewerForeground: Bool {
+        !isHomeV2TimelineCovered && isHomeV2ViewerPresented && homeV2PhotoRoute == nil
+    }
+
+    private var isHomeV2TimelineCovered: Bool {
+        !isHomeV2PhotoHomeForeground || !isHomeV2SceneActive || hasHomeV2CompetingPresentation
+    }
+
+    var isHomeV2PhotoHomeForeground: Bool {
+        selectedPhotoTimelineRootPage == .timeline && !isHomeChatExpanded
+    }
+
+    var hasHomeV2CompetingPresentation: Bool {
+            isShowingPhotoTimelineMenu || isHomeV2ContextPresented ||
             isHomeV2EntriesPresented || isHomeV2AllPhotosPresented || isHomeV2SettingsPresented ||
-            isHomeV2HelpPresented || showAddEntrySheet || isMetricDetailActive || isStatsDestinationActive
+            isHomeV2HelpPresented || showAddEntrySheet || isMetricDetailActive || isStatsDestinationActive ||
+            bodyScoreSharePayload != nil || showsScreenshotShareChoice || showSyncDetails ||
+            isProgressPhotoAttachPresented || isPhotoTimelineSettingsPresented || homeV2EditingMetric != nil ||
+            showsHomeV2UndoError
+    }
+
+    /// Each real opening gets its own identity before SwiftUI presents the cover.
+    func presentHomeV2PhotoViewer() {
+        guard !isHomeV2PhotoScrubNavigating, hasCurrentDashboardPublication,
+              let ownership = authManager.captureAccountSession(),
+              let selection = homeV2TimelineSelection,
+              let presentation = homeV2Timeline.presentation(
+                  for: selection, heightCm: nil, currentOwnership: ownership
+              ), homeV2Timeline.admitsPhotoPresentation(
+                  presentation, selected: selection, currentOwnership: ownership,
+                  currentMetrics: bodyMetrics, currentSnapshot: homeV2Timeline
+              ) else { return }
+        homeV2PhotoViewerOpeningID = UUID()
+        isHomeV2ViewerPresented = true
+    }
+
+    func admitsHomeV2PhotoViewer(_ admission: HomeV2TimelinePolicy.PhotoViewerAdmission) -> Bool {
+        admission.admits(
+            currentOpeningID: homeV2PhotoViewerOpeningID,
+            visibility: .init(
+                isPresented: isHomeV2ViewerPresented,
+                isHomeForeground: isHomeV2PhotoHomeForeground,
+                isActive: isHomeV2SceneActive,
+                hasCompetingPresentation: hasHomeV2CompetingPresentation,
+                hasChildRoute: homeV2PhotoRoute != nil,
+                hasCurrentDashboardPublication: hasCurrentDashboardPublication
+            ),
+            currentSelection: homeV2TimelineSelection,
+            currentOwnership: authManager.captureAccountSession(),
+            currentMetrics: bodyMetrics, currentSnapshot: homeV2Timeline
+        )
     }
 
     /// The ID remains authoritative when a background refresh inserts, reorders or deletes rows.
     func reconcileHomeV2Timeline(with metrics: [BodyMetrics]) {
         guard layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled() else { return }
-        let snapshot = HomeV2TimelinePolicy.Snapshot(metrics: metrics, owner: authManager.currentUser?.id)
+        let ownership = authManager.captureAccountSession()
+        let snapshot = HomeV2TimelinePolicy.Snapshot(
+            metrics: metrics, owner: ownership?.subject, ownership: ownership
+        )
         let selected = snapshot.reconcile(homeV2TimelineSelection)
         homeV2Timeline = snapshot
         homeV2TimelineSelection = selected
@@ -98,13 +248,15 @@ extension DashboardViewLiquid {
 
     func recordHomeV2TimelineSelection(at index: Int) {
         guard layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled(),
+              let ownership = authManager.captureAccountSession(), homeV2Timeline.isOwned(by: ownership),
               let selection = homeV2Timeline.selection(atSourceIndex: index),
               selection.id.owner == authManager.currentUser?.id else { return }
         homeV2TimelineSelection = selection
     }
 
     func selectHomeV2TimelineEntry(_ id: HomeV2TimelinePolicy.EntryID) {
-        guard id.owner == authManager.currentUser?.id,
+        guard let ownership = authManager.captureAccountSession(),
+              homeV2Timeline.isOwned(by: ownership), id.owner == ownership.subject,
               let index = homeV2Timeline.sourceIndex(for: id),
               let selection = homeV2Timeline.selection(atSourceIndex: index) else { return }
         homeV2TimelineSelection = selection
@@ -116,7 +268,7 @@ extension DashboardViewLiquid {
         let isAuthorized = HealthKitManager.shared.isAuthorized
         HomeV2SystemStatePolicy.recordAuthorization(isAuthorized)
         return HomeV2SystemStatePolicy.state(
-            hasLoadedInitialData: viewModel.hasLoadedInitialData,
+            hasLoadedInitialData: hasLoadedCurrentDashboardData,
             isOnline: realtimeSyncManager.isOnline,
             healthSyncEnabled: UserDefaults.standard.object(forKey: Constants.healthKitSyncEnabledKey) as? Bool ?? true,
             healthAuthorized: isAuthorized,
@@ -238,51 +390,39 @@ extension DashboardViewLiquid {
         }
     }
 
-    /// Generic Edit targets the captured record, even if another row arrives that day.
+    /// Saves a weight (and optional body fat) for a day. Today gets the C2
+    /// logged state with Undo; other days just save and refresh.
     @MainActor
-    func saveHomeV2Entry(
-        weightKilograms: Double?,
-        bodyFat: Double?,
-        clearBodyFat: Bool = false,
-        bodyFatMethod: String? = nil,
-        markManualCorrection: Bool = false,
-        session: HomeV2EditSession,
-        displayValue: Double?,
-        displayUnit: String
-    ) async -> Bool {
-        let admission: CoreDataManager.WriteAdmission = {
-            guard authManager.ownsAccountSession(session.owner),
-                  session.metric.userId == session.owner.subject,
-                  homeV2EditingSession?.owner == session.owner,
-                  homeV2EditingSession?.id == session.id, isHomeV2ContextPresented else {
-                throw CancellationError()
-            }
-        }
+    func saveHomeV2Weight(value: Double, bodyFat: Double?, on date: Date = Date()) async -> Bool {
+        guard let userId = authManager.currentUser?.id else { return false }
+        let kilograms = currentMeasurementSystem == .imperial ? value.lbsToKg : value
+
         do {
-            try admission()
-            let result = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
-                id: session.id, userId: session.owner.subject, weight: weightKilograms,
-                bodyFatPercentage: bodyFat, bodyFatMethod: bodyFatMethod,
-                clearBodyFat: clearBodyFat, markManualCorrection: markManualCorrection,
-                writeAdmission: admission
+            let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+                for: date,
+                weight: kilograms,
+                bodyFatPercentage: bodyFat,
+                bodyFatMethod: bodyFat == nil ? nil : BodyFatEntryMethod.bioelectrical.rawValue,
+                userId: userId
             )
-            try admission()
             let saved = result.metrics
-            guard saved.id == session.id, saved.userId == session.owner.subject else { return false }
             RealtimeSyncManager.shared.syncIfNeeded()
-            BodyScoreCache.shared.invalidate(for: session.owner.subject)
+            BodyScoreCache.shared.invalidate(for: userId)
             BodyScoreRecalculationService.shared.scheduleRecalculation()
             HapticManager.shared.successAction()
+
             if Calendar.current.isDateInToday(saved.date) {
                 homeV2Logged = HomeV2LoggedEntry(
-                    metricId: saved.id, userId: session.owner.subject, date: saved.date,
+                    metricId: saved.id,
+                    userId: userId,
+                    date: saved.date,
                     previousMetric: result.previousMetric,
-                    valueText: displayValue.map { HomeV2WeightStepPolicy.text($0) } ?? "", unit: displayUnit,
+                    valueText: HomeV2WeightStepPolicy.text(value),
+                    unit: homeV2DisplayUnit,
                     savedMetric: saved
                 )
             }
-            await refreshHomeV2AfterWrite(selecting: saved.id, ownership: session.owner)
-            try admission()
+            await refreshHomeV2AfterWrite(selecting: saved.id)
             return true
         } catch {
             return false
@@ -326,14 +466,11 @@ extension DashboardViewLiquid {
     }
 
     @MainActor
-    func refreshHomeV2AfterWrite(
-        selecting id: String?, ownership: AuthManager.ProfileSessionOwnership? = nil
-    ) async {
+    func refreshHomeV2AfterWrite(selecting id: String?) async {
         await viewModel.refreshData(
             authManager: authManager,
             realtimeSyncManager: realtimeSyncManager
         )
-        if let ownership, !authManager.ownsAccountSession(ownership) { return }
         refreshGlobalTimelineStore()
 
         if let id, let index = bodyMetrics.firstIndex(where: { $0.id == id }) {

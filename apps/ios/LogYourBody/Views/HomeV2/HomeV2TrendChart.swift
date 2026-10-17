@@ -13,6 +13,20 @@ enum HomeV2TrendPolicy {
     static let sevenDayAverageLabel = "7-day average"
     static let notEnoughData = "Your trend appears after 7 days"
 
+    /// A stable history axis may widen a visible range, but must never clip an
+    /// observed value, claim a zero anchor it lacks, or introduce invalid bounds.
+    static func displayDomain(
+        fixed: ClosedRange<Double>?, observedValues: [Double], fallback: ClosedRange<Double>, anchorsToZero: Bool
+    ) -> ClosedRange<Double> {
+        guard let fixed,
+              fixed.lowerBound.isFinite, fixed.upperBound.isFinite,
+              fixed.lowerBound >= 0, fixed.lowerBound < fixed.upperBound,
+              !anchorsToZero || fixed.lowerBound == 0,
+              observedValues.allSatisfy({ $0.isFinite && fixed.contains($0) }) else { return fallback }
+        return fixed
+    }
+
+
     static func points(
         _ points: [MetricChartDataPoint],
         in range: TimeRange,
@@ -64,11 +78,88 @@ struct HomeV2TrendChart: View {
     var plotIdentifier = "home_v2_trend_chart"
     /// Progress can scrub a day. The home pager keeps the drag for changing days.
     var allowsSelection = true
+    /// Home supplies its immutable timeline moment; Progress retains its local read-a-day gesture.
+    var selectedMoment: Date?
+    var selectedMomentValue: Double?
+    var selectedMomentProvenance: String?
+    var emptyMessage: String?
     var formatValue: (Double) -> String = { String(format: "%.1f", $0) }
     var onSelection: (HomeV2ChartIntegrity.Sample?) -> Void = { _ in }
+    var fixedYDomain: ClosedRange<Double>?
     var now = Date()
 
     @State private var selectedX: Date?
+
+    /// One immutable projection per body evaluation, retaining frozen parent focus.
+    private var rendering: HomeV2TrendChartRendering {
+        let visibleDaily = HomeV2TrendPolicy.points(daily, in: range, now: now)
+        let visibleTrend = HomeV2TrendPolicy.points(trend, in: range, now: now)
+        let plot = HomeV2ChartIntegrity.plot(
+            points: usesSevenDayAverage ? visibleTrend : visibleDaily,
+            dotPoints: showsDots ? visibleDaily : [], anchorsToZero: anchorsToZero,
+            keepsCarriedValues: usesSevenDayAverage
+        )
+        var values = plot.marks.map(\.value)
+        if let selectedMoment, selectedMoment.timeIntervalSince1970.isFinite,
+           let selectedMomentValue, selectedMomentValue.isFinite, selectedMomentValue >= 0 {
+            values.append(selectedMomentValue)
+        }
+        let focusedDomain = values.count == plot.marks.count ? plot.yDomain :
+            HomeV2ChartIntegrity.yDomain(values: values, anchorsToZero: anchorsToZero)
+        let domain = HomeV2TrendPolicy.displayDomain(
+            fixed: fixedYDomain, observedValues: values, fallback: focusedDomain, anchorsToZero: anchorsToZero
+        )
+        return HomeV2TrendChartRendering(
+            visibleDaily: visibleDaily,
+            hasEnoughData: HomeV2TrendPolicy.hasEnoughData(HomeV2MetricEditorial.observedPoints(visibleDaily)),
+            plotted: plot, selectionSamples: plot.selectionSamples, selectionDomain: domain,
+            accent: accent, range: $range, showsRangeTabs: showsRangeTabs, chartHeight: chartHeight,
+            axis: axis, axisDates: axisDates, formatAxisDate: formatAxisDate, metricTitle: metricTitle,
+            usesSevenDayAverage: usesSevenDayAverage, anchorsToZero: anchorsToZero,
+            requiresMinimumDays: requiresMinimumDays, plotIdentifier: plotIdentifier,
+            allowsSelection: allowsSelection, selectedMoment: selectedMoment,
+            selectedMomentValue: selectedMomentValue, selectedMomentProvenance: selectedMomentProvenance,
+            emptyMessage: emptyMessage, formatValue: formatValue, onSelection: onSelection,
+            selectedX: $selectedX
+        )
+    }
+
+    var hasValidParentFocus: Bool { rendering.hasValidParentFocus }
+    var showsPlot: Bool { rendering.showsPlot }
+    var selectionDomain: ClosedRange<Double> { rendering.selectionDomain }
+    var accessibilitySummary: String { rendering.accessibilitySummary }
+    var accessibilityValueText: String { rendering.accessibilityValueText }
+    var body: some View { rendering }
+}
+
+/// Axes, marks, selection and accessibility share one normalized plot and domain.
+/// Only the public chart owns selectedX; no cross-publication data cache is added.
+private struct HomeV2TrendChartRendering: View {
+    let visibleDaily: [MetricChartDataPoint]
+    let hasEnoughData: Bool
+    let plotted: HomeV2ChartIntegrity.Plot
+    let selectionSamples: [HomeV2ChartIntegrity.Sample]
+    let selectionDomain: ClosedRange<Double>
+    let accent: Color
+    @Binding var range: TimeRange
+    let showsRangeTabs: Bool
+    let chartHeight: CGFloat
+    let axis: HomeV2TrendChart.Axis
+    let axisDates: [Date]?
+    let formatAxisDate: ((Date) -> String)?
+    let metricTitle: String
+    let usesSevenDayAverage: Bool
+    let anchorsToZero: Bool
+    let requiresMinimumDays: Bool
+    let plotIdentifier: String
+    let allowsSelection: Bool
+    let selectedMoment: Date?
+    let selectedMomentValue: Double?
+    let selectedMomentProvenance: String?
+    let emptyMessage: String?
+    let formatValue: (Double) -> String
+    let onSelection: (HomeV2ChartIntegrity.Sample?) -> Void
+    @Binding var selectedX: Date?
 
     private static let startFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -76,30 +167,28 @@ struct HomeV2TrendChart: View {
         return formatter
     }()
 
-    private var visibleDaily: [MetricChartDataPoint] { HomeV2TrendPolicy.points(daily, in: range, now: now) }
-    private var visibleTrend: [MetricChartDataPoint] { HomeV2TrendPolicy.points(trend, in: range, now: now) }
-    private var hasEnoughData: Bool { HomeV2TrendPolicy.hasEnoughData(HomeV2MetricEditorial.observedPoints(visibleDaily)) }
-
-    private var plotted: HomeV2ChartIntegrity.Plot {
-        HomeV2ChartIntegrity.plot(
-            points: usesSevenDayAverage ? visibleTrend : visibleDaily,
-            dotPoints: showsDots ? visibleDaily : [],
-            anchorsToZero: anchorsToZero,
-            keepsCarriedValues: usesSevenDayAverage
-        )
+    var hasValidParentFocus: Bool {
+        guard let selectedMoment, selectedMoment.timeIntervalSince1970.isFinite,
+              let selectedMomentValue, selectedMomentValue.isFinite, selectedMomentValue >= 0 else { return false }
+        return true
     }
 
-    private var showsPlot: Bool {
+    var showsPlot: Bool {
         if requiresMinimumDays { return hasEnoughData && !plotted.marks.isEmpty }
-        return !plotted.marks.isEmpty
+        return !plotted.marks.isEmpty || hasValidParentFocus
     }
 
     private var selectedSample: HomeV2ChartIntegrity.Sample? {
         guard let selectedX else { return nil }
-        return HomeV2ChartIntegrity.nearest(to: selectedX, in: plotted.selectionSamples)
+        return HomeV2ChartIntegrity.nearest(to: selectedX, in: selectionSamples)
     }
 
     private var selectedTooltip: String? {
+        if let selectedMoment, selectedMoment.timeIntervalSince1970.isFinite {
+            let value = hasValidParentFocus ? selectedMomentValue.map(formatValue) ?? "Unavailable" : "Unavailable"
+            let date = selectedMoment.formatted(date: .complete, time: .shortened)
+            return "\(date): \(value) · \(selectedMomentProvenance ?? "Selected")"
+        }
         guard let selectedSample else { return nil }
         return HomeV2ChartIntegrity.tooltip(
             date: selectedSample.date,
@@ -111,15 +200,17 @@ struct HomeV2TrendChart: View {
 
     var accessibilitySummary: String {
         guard showsPlot else {
-            return "\(metricTitle) history. \(HomeV2TrendPolicy.notEnoughData)"
+            return "\(metricTitle) history. \(emptyMessage ?? HomeV2TrendPolicy.notEnoughData)"
         }
+        if plotted.marks.isEmpty && hasValidParentFocus { return "\(metricTitle) selected moment" }
         return usesSevenDayAverage
             ? "\(metricTitle) trend, \(HomeV2TrendPolicy.sevenDayAverageLabel)"
             : "\(metricTitle) history"
     }
 
     var accessibilityValueText: String {
-        let ticks = plotted.yTicks
+        let domain = selectionDomain
+        let ticks = [domain.lowerBound, domain.upperBound]
         let low = HomeV2ChartIntegrity.tickLabel(ticks.first ?? 0, integers: anchorsToZero)
         let high = HomeV2ChartIntegrity.tickLabel(ticks.last ?? 0, integers: anchorsToZero)
         var parts = ["Scale from \(low) to \(high)"]
@@ -181,7 +272,11 @@ struct HomeV2TrendChart: View {
     @ViewBuilder
     private var plottedChart: some View {
         if allowsSelection {
-            plotMarks.chartXSelection(value: $selectedX)
+            plotMarks
+                .chartXSelection(value: $selectedX)
+                .accessibilityAdjustableAction { direction in
+                    adjustSelection(direction)
+                }
         } else {
             plotMarks
         }
@@ -190,9 +285,6 @@ struct HomeV2TrendChart: View {
     private var plotMarks: some View {
         accessiblePlot
             .accessibilityIdentifier(plotIdentifier)
-            .accessibilityAdjustableAction { direction in
-                adjustSelection(direction)
-            }
     }
 
     private var accessiblePlot: some View {
@@ -201,7 +293,7 @@ struct HomeV2TrendChart: View {
             .accessibilityLabel(accessibilitySummary)
             .accessibilityValue(accessibilityValueText)
             .accessibilityHint(allowsSelection ? "Drag across the chart to read a day" : "")
-            .accessibilityHidden(!allowsSelection)
+            .accessibilityHidden(!allowsSelection && !hasValidParentFocus)
     }
 
     private var styledPlot: some View {
@@ -215,7 +307,10 @@ struct HomeV2TrendChart: View {
     private var chartWithAxes: some View {
         chartWithXAxis
             .chartYAxis {
-                AxisMarks(position: .leading, values: plotted.yTicks) { _ in
+                let domain = selectionDomain
+                AxisMarks(position: .leading, values: [
+                    domain.lowerBound, (domain.lowerBound + domain.upperBound) / 2, domain.upperBound
+                ]) { _ in
                     AxisGridLine().foregroundStyle(HomeV2Tokens.Colors.border)
                     if anchorsToZero {
                         AxisValueLabel(format: FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0)))
@@ -254,7 +349,7 @@ struct HomeV2TrendChart: View {
 
     private var scaledChart: some View {
         chartContent
-            .chartYScale(domain: plotted.yDomain)
+            .chartYScale(domain: selectionDomain)
     }
 
     private var chartContent: some View {
@@ -285,7 +380,7 @@ struct HomeV2TrendChart: View {
 
     @ChartContentBuilder
     private var pointMarks: some ChartContent {
-        // `plotted` rebuilds the full history; never read it inside the per-point closure.
+        // Marks share the plot normalized once by the public chart body.
         let marks = plotted.marks
         let lastSampleID = marks.last?.id
         ForEach(marks) { sample in
@@ -297,7 +392,16 @@ struct HomeV2TrendChart: View {
 
     @ChartContentBuilder
     private var selectionMarks: some ChartContent {
-        if let selectedSample {
+        if let selectedMoment, selectedMoment.timeIntervalSince1970.isFinite {
+            RuleMark(x: .value("Selected", selectedMoment))
+                .lineStyle(StrokeStyle(lineWidth: 1))
+                .foregroundStyle(HomeV2Tokens.Colors.secondary)
+            if hasValidParentFocus, let selectedMomentValue {
+                PointMark(x: .value("Selected", selectedMoment), y: .value("Selected", selectedMomentValue))
+                    .symbolSize(80)
+                    .foregroundStyle(accent)
+            }
+        } else if let selectedSample {
             RuleMark(x: .value("Selected", selectedSample.date))
                 .lineStyle(StrokeStyle(lineWidth: 1))
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
@@ -311,7 +415,7 @@ struct HomeV2TrendChart: View {
     }
 
     private func adjustSelection(_ direction: AccessibilityAdjustmentDirection) {
-        let ordered = plotted.selectionSamples
+        let ordered = selectionSamples
         guard !ordered.isEmpty else { return }
         let current = selectedSample.flatMap { sample in ordered.firstIndex { $0.id == sample.id } }
         let nextIndex: Int
@@ -327,7 +431,7 @@ struct HomeV2TrendChart: View {
     }
 
     private var placeholder: some View {
-        Text(HomeV2TrendPolicy.notEnoughData)
+        Text(emptyMessage ?? HomeV2TrendPolicy.notEnoughData)
             .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
             .foregroundStyle(HomeV2Tokens.Colors.secondary)
             .multilineTextAlignment(.center)

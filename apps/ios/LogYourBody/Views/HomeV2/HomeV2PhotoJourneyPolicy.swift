@@ -172,10 +172,182 @@ enum HomeV2PhotoTool: String, CaseIterable, Identifiable {
 enum HomeV2PhotoRulerPolicy {
     static let minimumSpanDays = 56
 
+    struct CalendarLabel: Equatable {
+        let date: Date
+        let text: String
+        /// Logical left-to-right display position after edge clamping. The view
+        /// mirrors this once for RTL; spacing is verified in this same space.
+        let position: CGFloat
+    }
+
+    /// A display projection only: every original date remains in the selection
+    /// array. Density depends on available points, never the history's age/count.
+    struct RenderPlan {
+        let entryIndices: [Int]
+        let minorTicks: [Date]
+        let majorTicks: [Date]
+        let labels: [CalendarLabel]
+    }
+
+    static func renderPlan(
+        dates: [Date],
+        selected: Int,
+        span: DateInterval,
+        width: CGFloat,
+        minimumTickSpacing: CGFloat = 6,
+        minimumLabelSpacing: CGFloat = 72,
+        calendar: Calendar = .current,
+        locale: Locale = .current
+    ) -> RenderPlan {
+        // Invalid/transient layout sizes must not create an unbounded allocation.
+        // Cap the density budget, while label positions use the actual valid
+        // drawing width so unusually wide containers still align with their ticks.
+        let drawingWidth = width.isFinite ? max(width, 0) : 0
+        let width = min(drawingWidth, 4_096)
+        let tickSpacing = minimumTickSpacing.isFinite ? max(minimumTickSpacing, 2) : 6
+        let labelSpacing = minimumLabelSpacing.isFinite ? max(minimumLabelSpacing, 24) : 72
+        let entryBudget = max(1, Int(width / tickSpacing))
+        var buckets: [Int: Int] = [:]
+        for index in dates.indices {
+            let bucket = min(entryBudget - 1, Int(fraction(of: dates[index], in: span) * CGFloat(entryBudget)))
+            // Keep the original input order for coincident observations. The
+            // selected observation always owns its bucket, even in dense history.
+            if buckets[bucket] == nil || index == selected { buckets[bucket] = index }
+        }
+
+        let major = calendarTicks(in: span, budget: Int(width / 48), startsAtWeek: false, calendar: calendar)
+        let majorSet = Set(major.dates)
+        let minor = calendarTicks(in: span, budget: Int(width / 12), startsAtWeek: true, calendar: calendar)
+        let labels = calendarTicks(in: span, budget: Int(width / labelSpacing), startsAtWeek: false, calendar: calendar)
+        let crossesYear = calendar.component(.year, from: span.start) != calendar.component(.year, from: span.end)
+        let dateTemplate = labels.isYear ? "yyyy" : (crossesYear ? "MMM yyyy" : "MMM")
+        return RenderPlan(
+            entryIndices: buckets.keys.sorted().compactMap { buckets[$0] },
+            minorTicks: minor.dates.filter { !majorSet.contains($0) },
+            majorTicks: major.dates,
+            labels: positionedLabels(
+                dates: labels.dates, span: span, width: drawingWidth, minimumLabelSpacing: labelSpacing,
+                dateTemplate: dateTemplate, calendar: calendar, locale: locale
+            )
+        )
+    }
+
+    /// Candidate dates can be well spaced before an edge label is clamped into
+    /// view. Retain labels only when their actual displayed centers remain apart
+    /// by a complete label frame. All dates remain available for tick selection.
+    static func positionedLabels(
+        dates: [Date],
+        span: DateInterval,
+        width: CGFloat,
+        minimumLabelSpacing: CGFloat,
+        dateTemplate: String = "MMM",
+        calendar: Calendar = .current,
+        locale: Locale = .current
+    ) -> [CalendarLabel] {
+        let width = width.isFinite ? max(width, 0) : 0
+        guard width > 0 else { return [] }
+        let spacing = minimumLabelSpacing.isFinite ? max(minimumLabelSpacing, 24) : 72
+        let halfWidth = min(spacing, width) / 2
+        var labels: [CalendarLabel] = []
+        for date in dates.sorted() {
+            let rawPosition = fraction(of: date, in: span) * width
+            let position = min(max(rawPosition, halfWidth), max(halfWidth, width - halfWidth))
+            if let previous = labels.last, position - previous.position < spacing { continue }
+            labels.append(CalendarLabel(
+                date: date,
+                text: labelFormatters.string(from: date, template: dateTemplate, calendar: calendar, locale: locale),
+                position: position
+            ))
+        }
+        return labels
+    }
+
+    /// A fixed-size cache avoids formatter allocation on every scrub. Access and
+    /// formatting share a lock so mutable DateFormatter instances never escape.
+    private static let labelFormatters = LabelFormatterCache()
+
+    private final class LabelFormatterCache: @unchecked Sendable {
+        private struct Key: Hashable {
+            let template: String
+            let calendar: Calendar
+            let localeIdentifier: String
+        }
+
+        private let lock = NSLock()
+        private var formatters: [Key: DateFormatter] = [:]
+        private var insertionOrder: [Key] = []
+        private let capacity = 8
+
+        func string(from date: Date, template: String, calendar: Calendar, locale: Locale) -> String {
+            lock.lock()
+            defer { lock.unlock() }
+            let key = Key(template: template, calendar: calendar, localeIdentifier: locale.identifier)
+            if let formatter = formatters[key] { return formatter.string(from: date) }
+            let formatter = DateFormatter()
+            formatter.calendar = calendar
+            formatter.locale = locale
+            formatter.timeZone = calendar.timeZone
+            formatter.setLocalizedDateFormatFromTemplate(template)
+            if insertionOrder.count == capacity {
+                formatters.removeValue(forKey: insertionOrder.removeFirst())
+            }
+            insertionOrder.append(key)
+            formatters[key] = formatter
+            return formatter.string(from: date)
+        }
+    }
+
+    /// Gesture coordinates and visual positions use the same direction. VoiceOver
+    /// increment/decrement still walks the complete chronological source array.
+    static func logicalFraction(at position: CGFloat, width: CGFloat, isRightToLeft: Bool = false) -> CGFloat {
+        guard width.isFinite, width > 0, position.isFinite else { return 0 }
+        let fraction = min(max(position / width, 0), 1)
+        return isRightToLeft ? 1 - fraction : fraction
+    }
+
+    private struct CalendarStride {
+        let component: Calendar.Component
+        let count: Int
+    }
+
+    /// Choose the calendar stride before iterating. We never construct thousands
+    /// of weeks/months and then discard most of them after layout.
+    private static func calendarTicks(
+        in span: DateInterval, budget: Int, startsAtWeek: Bool, calendar: Calendar
+    ) -> (dates: [Date], isYear: Bool) {
+        guard budget > 0 else { return ([], false) }
+        let candidates = (startsAtWeek ? [CalendarStride(component: .weekOfYear, count: 1),
+                                          CalendarStride(component: .weekOfYear, count: 2)
+                ] : []) + [1, 2, 3, 6].map { CalendarStride(component: .month, count: $0) } +
+            [1, 2, 5, 10, 20, 50, 100, 200, 500, 1_000, 10_000].map { CalendarStride(component: .year, count: $0) }
+        let stride = candidates.first {
+                let units =
+                    calendar.dateComponents([$0.component], from: span.start, to: span.end).value(for: $0.component)
+                    ?? Int.max
+                return units >= 0 && units / $0.count < max(1, budget - 1)
+        } ?? CalendarStride(component: .year, count: 10_000)
+        guard var cursor = calendar.dateInterval(of: stride.component, for: span.start)?.start else {
+            return ([], stride.component == .year)
+        }
+        if cursor < span.start {
+            guard let next = calendar.date(byAdding: stride.component, value: stride.count, to: cursor), next > cursor else {
+                return ([], stride.component == .year)
+            }
+            cursor = next
+        }
+        var ticks: [Date] = []
+        while cursor <= span.end, ticks.count < budget {
+            ticks.append(cursor)
+            guard let next = calendar.date(byAdding: stride.component, value: stride.count, to: cursor), next > cursor
+            else { break }
+            cursor = next
+        }
+        return (ticks, stride.component == .year)
+    }
+
     static func span(for dates: [Date], calendar: Calendar = .current, now: Date = Date()) -> DateInterval {
-        let sorted = dates.sorted()
-        let end = sorted.last ?? now
-        let first = sorted.first ?? end
+        let end = dates.max() ?? now
+        let first = dates.min() ?? end
         // Pad short histories backward; the latest timestamp is never future axis space.
         let minimumStart = calendar.date(byAdding: .day, value: -minimumSpanDays, to: end) ?? first
         let start = calendar.startOfDay(for: min(first, minimumStart))

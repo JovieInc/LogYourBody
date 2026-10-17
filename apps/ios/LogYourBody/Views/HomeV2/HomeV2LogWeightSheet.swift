@@ -23,10 +23,30 @@ struct HomeV2LogWeightSheet: View {
     /// The day's existing photo, shown in the Front slot instead of a camera.
     let existingPhotoURL: String?
     let onSave: (_ value: Double?, _ bodyFat: Double?) async -> Bool
+    let onCorrectionSave: ((
+        HomeV2CorrectionPolicy.Changes, AuthManager.ProfileSessionOwnership?,
+        HomeV2CorrectionReturnReceipt?, @escaping @MainActor () -> Bool
+    ) async -> Bool)?
+    let ownsCorrectionSession: (AuthManager.ProfileSessionOwnership) -> Bool
+    let initialBodyFatMethod: String?
+    let currentCorrectionOwnership: AuthManager.ProfileSessionOwnership?
+    let currentCorrectionReturnDestination: HomeV2ContextRoute?
+    let onCorrectionReturnEnded: (HomeV2CorrectionReturnReceipt) -> Void
     let onDelete: (() async -> Bool)?
     let onAddPhoto: (_ pose: String) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    #if DEBUG
+    @Environment(\.homeV2CorrectionFixtureHold) private var correctionFixtureHold
+    @Environment(\.homeV2CorrectionFixtureGraph) private var correctionFixtureGraph
+    @State private var fixtureMountedReceipt: HomeV2CorrectionReturnReceipt?
+    #endif
+    @State private var bodyFatMethod: String?
+    @State private var correctionOwnership: AuthManager.ProfileSessionOwnership?
+    @State private var correctionReturnDestination: HomeV2ContextRoute?
+    @State private var correctionTask: Task<Void, Never>?
+    @State private var correctionLifetime = UUID()
+    @State private var correctionInvalidated = false
     @State private var valueText: String
     @State private var preservesRecordedValues: Bool
     @State private var bodyFatPrimary: Bool
@@ -47,10 +67,19 @@ struct HomeV2LogWeightSheet: View {
         initialValue: Double,
         initialBodyFat: Double?,
         initialWeightIsMissing: Bool = false,
+        initialBodyFatMethod: String? = nil,
+        correctionOwnership: AuthManager.ProfileSessionOwnership? = nil,
+        correctionReturnDestination: HomeV2ContextRoute? = nil,
+        onCorrectionReturnEnded: @escaping (HomeV2CorrectionReturnReceipt) -> Void = { _ in },
+        ownsCorrectionSession: @escaping (AuthManager.ProfileSessionOwnership) -> Bool = { _ in false },
         dateText: String,
         deleteScope: String? = nil,
         existingPhotoURL: String? = nil,
         onSave: @escaping (_ value: Double?, _ bodyFat: Double?) async -> Bool,
+        onCorrectionSave: ((
+            HomeV2CorrectionPolicy.Changes, AuthManager.ProfileSessionOwnership?,
+            HomeV2CorrectionReturnReceipt?, @escaping @MainActor () -> Bool
+        ) async -> Bool)? = nil,
         onDelete: (() async -> Bool)? = nil,
         onAddPhoto: @escaping (_ pose: String) -> Void
     ) {
@@ -63,12 +92,24 @@ struct HomeV2LogWeightSheet: View {
         self.deleteScope = deleteScope
         self.existingPhotoURL = existingPhotoURL
         self.onSave = onSave
+        self.onCorrectionSave = onCorrectionSave
+        self.ownsCorrectionSession = ownsCorrectionSession
+        self.initialBodyFatMethod = initialBodyFatMethod
+        self.currentCorrectionOwnership = correctionOwnership
+        self.currentCorrectionReturnDestination = correctionReturnDestination
+        self.onCorrectionReturnEnded = onCorrectionReturnEnded
+        _correctionReturnDestination = State(initialValue: correctionReturnDestination)
+        _bodyFatMethod = State(initialValue: BodyFatEntryMethod.initialSelection(
+            bodyFat: initialBodyFat, recordedMethod: initialBodyFatMethod
+        ))
+        _correctionOwnership = State(initialValue: correctionOwnership)
         self.onDelete = onDelete
         self.onAddPhoto = onAddPhoto
         // Hold the policy for this presentation; a flag refresh must not replace a focused draft.
         let primary = mode == .edit && HomeV2EntryBodyFatPrimaryPolicy.isEnabled()
         _bodyFatPrimary = State(initialValue: primary)
-        let preservesRecordedValues = primary || (mode == .edit && HomeV2EntryEditPolicy.isEnabled())
+        let preservesRecordedValues = onCorrectionSave != nil || primary
+            || (mode == .edit && HomeV2EntryEditPolicy.isEnabled())
         _preservesRecordedValues = State(initialValue: preservesRecordedValues)
         _valueText = State(initialValue: preservesRecordedValues && initialWeightIsMissing
             ? "" : HomeV2WeightStepPolicy.text(initialValue))
@@ -85,7 +126,73 @@ struct HomeV2LogWeightSheet: View {
         mode == .edit ? HomeV2ContextCopy.saveChanges : HomeV2Copy.saveWeight
     }
 
+    private var isCorrectionCurrent: Bool {
+        guard !correctionInvalidated,
+              HomeV2CorrectionPolicy.isEditorCurrent(
+                original: correctionOwnership, current: currentCorrectionOwnership
+              ), let ownership = correctionOwnership else { return false }
+        guard ownsCorrectionSession(ownership) else { return false }
+        if let destination = correctionReturnDestination {
+            return destination.id == currentCorrectionReturnDestination?.id
+                && destination.ownership == currentCorrectionReturnDestination?.ownership
+        }
+        return currentCorrectionReturnDestination == nil
+    }
+
     var body: some View {
+        Group {
+            if onCorrectionSave == nil || isCorrectionCurrent {
+                editorContent
+            } else {
+                Color.clear
+            }
+        }
+        .onChange(of: currentCorrectionOwnership) { _, _ in
+            if onCorrectionSave != nil, !isCorrectionCurrent { invalidateCorrection() }
+        }
+        .onAppear {
+            #if DEBUG
+            if correctionFixtureGraph != nil, onCorrectionSave != nil, fixtureMountedReceipt == nil,
+               let destination = correctionReturnDestination {
+                fixtureMountedReceipt = .init(destination: destination, editorLifetime: correctionLifetime)
+            }
+            observeFixtureEditor(visible: true)
+            #endif
+            if onCorrectionSave != nil, !isCorrectionCurrent { invalidateCorrection() }
+        }
+        #if DEBUG
+        .onChange(of: isSaving) { _, _ in observeFixtureEditor(visible: true) }
+        .onChange(of: errorText) { _, _ in observeFixtureEditor(visible: true) }
+        #endif
+        .onChange(of: currentCorrectionReturnDestination?.id) { _, _ in
+            if onCorrectionSave != nil, !isCorrectionCurrent { invalidateCorrection() }
+        }
+        #if DEBUG
+        .safeAreaInset(edge: .top) {
+            if let graph = correctionFixtureGraph, let receipt = fixtureMountedReceipt {
+                HomeV2CorrectionFixturePanel(
+                    graph: graph, editor: receipt, liveRoute: currentCorrectionReturnDestination, scope: "editor"
+                )
+            }
+        }
+        #endif
+        .onDisappear {
+            #if DEBUG
+            observeFixtureEditor(visible: false)
+            #endif
+            if onCorrectionSave != nil {
+                finishCorrectionReturn()
+                correctionInvalidated = true
+                correctionLifetime = UUID()
+                correctionTask?.cancel()
+                correctionTask = nil
+                isSaving = false
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var editorContent: some View {
         if bodyFatPrimary {
             HomeV2EntryEditorLayout(
                 unit: unit, dateText: dateText, initialWeightIsMissing: initialWeightIsMissing,
@@ -94,6 +201,14 @@ struct HomeV2LogWeightSheet: View {
                 onSave: save, onDelete: onDelete == nil ? nil : { isConfirmingDelete = true },
                 onAddPhoto: { onAddPhoto("Front") }, onClose: { dismiss() }, onStep: step
             )
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if mode == .edit, onCorrectionSave != nil {
+                    correctionMethodPicker
+                        .padding(.horizontal, HomeV2Tokens.Space.margin)
+                        .padding(.vertical, HomeV2Tokens.Space.tight)
+                        .background(HomeV2Tokens.Colors.canvas)
+                }
+            }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .presentationBackground(HomeV2Tokens.Colors.canvas)
@@ -308,6 +423,10 @@ struct HomeV2LogWeightSheet: View {
             .frame(minHeight: HomeV2Tokens.rowHeight)
             .overlay(alignment: .bottom) { HomeV2Hairline() }
 
+            if mode == .edit, onCorrectionSave != nil {
+                correctionMethodPicker
+            }
+
             HStack(spacing: HomeV2Tokens.Space.tight) {
                 ForEach(HomeV2Copy.poses, id: \.self) { pose in
                     photoSlot(pose)
@@ -319,6 +438,22 @@ struct HomeV2LogWeightSheet: View {
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var correctionMethodPicker: some View {
+        Picker("Method", selection: $bodyFatMethod) {
+            if BodyFatEntryMethod.needsPreservedOption(bodyFatMethod) {
+                Text(BodyFatEntryMethod.selectionTitle(bodyFatMethod)).tag(bodyFatMethod)
+            }
+            ForEach(BodyFatEntryMethod.allCases, id: \.rawValue) { method in
+                Text(method.title).tag(Optional(method.rawValue))
+            }
+        }
+        .pickerStyle(.menu)
+        .disabled(isSaving)
+        .accessibilityLabel("Body fat measurement method")
+        .accessibilityValue(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
+        .accessibilityIdentifier("home_v2_edit_body_fat_method")
     }
 
     private func photoSlot(_ pose: String) -> some View {
@@ -403,11 +538,15 @@ struct HomeV2LogWeightSheet: View {
     }
 
     private func performDelete() {
-        guard let onDelete else { return }
+        guard !isSaving, onCorrectionSave == nil || isCorrectionCurrent, let onDelete else { return }
         focusedField = nil
         isSaving = true
+        let lifetime = correctionLifetime
         Task { @MainActor in
             let deleted = await onDelete()
+            if onCorrectionSave != nil {
+                guard !Task.isCancelled, correctionLifetime == lifetime, isCorrectionCurrent else { return }
+            }
             isSaving = false
             if deleted {
                 dismiss()
@@ -417,7 +556,122 @@ struct HomeV2LogWeightSheet: View {
         }
     }
 
+    #if DEBUG
+    private func observeFixtureEditor(visible: Bool) {
+        guard let graph = correctionFixtureGraph, let receipt = fixtureMountedReceipt else { return }
+        graph.observeEditor(.init(
+            receipt: receipt, visible: visible, isSaving: isSaving, error: errorText,
+            invalidated: correctionInvalidated, currentLifetime: correctionLifetime
+        ))
+    }
+    #endif
+
+    private func finishCorrectionReturn() {
+        guard let destination = correctionReturnDestination else { return }
+        onCorrectionReturnEnded(.init(destination: destination, editorLifetime: correctionLifetime))
+    }
+
+    private func invalidateCorrection() {
+        guard onCorrectionSave != nil else { return }
+        finishCorrectionReturn()
+        #if DEBUG
+        if let destination = correctionReturnDestination {
+            correctionFixtureHold?.recordCancellation(.init(
+                destination: destination, editorLifetime: correctionLifetime
+            ))
+        }
+        #endif
+        correctionInvalidated = true
+        correctionLifetime = UUID()
+        correctionTask?.cancel()
+        correctionTask = nil
+        isSaving = false
+        dismiss()
+    }
+
+    private func saveCorrection(
+        using save: @escaping (
+            HomeV2CorrectionPolicy.Changes, AuthManager.ProfileSessionOwnership?,
+            HomeV2CorrectionReturnReceipt?, @escaping @MainActor () -> Bool
+        ) async -> Bool
+    ) {
+        guard !isSaving, isCorrectionCurrent, let ownership = correctionOwnership else { return }
+        focusedField = nil
+        let weight: Double?
+        let bodyFat: Double?
+        do {
+            validationErrorField = .weight
+            weight = try HomeV2EntryEditPolicy.weight(
+                text: valueText, initialValue: initialWeightIsMissing ? nil : initialValue,
+                unit: unit, preserving: true
+            )
+            validationErrorField = .bodyFat
+            bodyFat = try HomeV2EntryEditPolicy.bodyFat(
+                text: bodyFatText, initialValue: initialBodyFat, preserving: true
+            )
+        } catch {
+            errorText = error.localizedDescription
+            return
+        }
+        validationErrorField = nil
+
+        // The editor shows rounded values. Returning to that display is a no-op,
+        // including for imported values whose stored precision or range differs.
+        let displayedWeight = initialWeightIsMissing ? nil
+            : HomeV2WeightStepPolicy.parse(HomeV2WeightStepPolicy.text(initialValue))
+        let displayedBodyFat = initialBodyFat.flatMap {
+            HomeV2WeightStepPolicy.parse(String(format: "%.1f", $0))
+        }
+        var changes = HomeV2CorrectionPolicy.Changes()
+        if weight != displayedWeight, let weight {
+            changes.weight = .kilograms(unit == "lb" ? weight.lbsToKg : weight)
+        }
+        if bodyFat != displayedBodyFat {
+            if let bodyFat {
+                changes.bodyFat = .reading(bodyFat, method: bodyFatMethod)
+            } else if initialBodyFat != nil {
+                changes.bodyFat = .clear
+            }
+        } else if bodyFatMethod != BodyFatEntryMethod.initialSelection(
+            bodyFat: initialBodyFat, recordedMethod: initialBodyFatMethod
+        ), let initialBodyFat {
+            // A method-only correction must retain the original raw reading.
+            changes.bodyFat = .reading(initialBodyFat, method: bodyFatMethod)
+        }
+        errorText = nil
+        isSaving = true
+        let lifetime = correctionLifetime
+        correctionTask = Task { @MainActor in
+            let receipt = correctionReturnDestination.map {
+                HomeV2CorrectionReturnReceipt(destination: $0, editorLifetime: lifetime)
+            }
+            let saved = await save(changes, ownership, receipt, {
+                !Task.isCancelled && correctionLifetime == lifetime && isCorrectionCurrent
+            })
+            guard !Task.isCancelled, correctionLifetime == lifetime else { return }
+            guard isCorrectionCurrent else {
+                invalidateCorrection()
+                return
+            }
+            isSaving = false
+            correctionTask = nil
+            if saved { dismiss() } else { errorText = HomeV2Copy.saveFailed }
+        }
+        #if DEBUG
+        if let correctionTask, let destination = correctionReturnDestination {
+            correctionFixtureHold?.observeTask(correctionTask, receipt: .init(
+                destination: destination, editorLifetime: lifetime
+            ))
+        }
+        #endif
+    }
+
     private func save() {
+        if mode == .edit, let onCorrectionSave {
+            saveCorrection(using: onCorrectionSave)
+            return
+        }
+        guard !isSaving else { return }
         focusedField = nil
         let value: Double?
         let bodyFat: Double?

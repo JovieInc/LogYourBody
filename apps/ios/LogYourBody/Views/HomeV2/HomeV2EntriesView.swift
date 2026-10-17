@@ -10,7 +10,7 @@ struct HomeV2EntriesView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let sections: [HomeV2EntriesSection]
-    let onSelect: (HomeV2EntriesRow) -> Void
+    let onSelect: (BodyMetrics) -> Void
     let onBack: () -> Void
 
     var body: some View {
@@ -81,7 +81,7 @@ struct HomeV2EntriesView: View {
 
     private func entryRow(_ row: HomeV2EntriesRow) -> some View {
         Button {
-            onSelect(row)
+            onSelect(row.metric)
         } label: {
             Group {
                 if dynamicTypeSize.isAccessibilitySize {

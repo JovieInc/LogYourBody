@@ -4,33 +4,24 @@
 //
 import SwiftUI
 
-/// Where the sidebar goes (Pencil N1).
+/// The MVP root workspaces; photos and entries stay contextual.
 enum HomeV2SidebarDestination: String, CaseIterable, Identifiable {
     case today
-    case photos
     case progress
-    case entries
-    case ask
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .today: return HomeV2Copy.title
-        case .photos: return HomeV2PhotoCopy.photos
         case .progress: return HomeV2ProgressCopy.title
-        case .entries: return HomeV2ContextCopy.entries
-        case .ask: return "Ask"
         }
     }
 
     var systemImage: String {
         switch self {
         case .today: return "sun.max"
-        case .photos: return "photo.on.rectangle"
         case .progress: return "chart.xyaxis.line"
-        case .entries: return "list.bullet"
-        case .ask: return "bubble.left"
         }
     }
 }
@@ -38,21 +29,19 @@ enum HomeV2SidebarDestination: String, CaseIterable, Identifiable {
 enum HomeV2SidebarCopy {
     static let settings = "Settings"
     static let help = "Help & feedback"
-    static let search = "Search conversations"
     static let recent = "Recent conversations"
     static let closeSidebar = "Close sidebar"
     static let freePlan = "Free"
     static let proPlan = "Pro"
 }
 
-/// Sidebar (Pencil N1): who, the five destinations, recent conversations
-/// kept secondary, Settings and Help at the bottom. Slides in from the left
-/// over a dimmed Home.
+/// Sidebar: profile, Home and Progress, then any available recent conversations.
+/// Settings and Help remain at the bottom, over a dimmed Home.
 struct HomeV2SidebarView: View {
     let name: String
     let planText: String
     let avatarURL: URL?
-    let photoCount: Int
+    var profileDetail: String?
     let selected: HomeV2SidebarDestination
     let recentConversations: [String]
     let onSelect: (HomeV2SidebarDestination) -> Void
@@ -142,22 +131,17 @@ struct HomeV2SidebarView: View {
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("home_v2_sidebar")
+                if let profileDetail, !profileDetail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text(profileDetail)
+                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                        .accessibilityIdentifier("home_v2_sidebar_profile_detail")
+                }
                 Text(planText)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
                     .foregroundStyle(HomeV2Tokens.Colors.secondary)
             }
             Spacer(minLength: HomeV2Tokens.Space.tight)
-            Button {
-                onSelect(.ask)
-            } label: {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                    .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(HomeV2SidebarCopy.search)
         }
         .padding(.horizontal, HomeV2Tokens.Space.tight)
         .frame(minHeight: 64)
@@ -202,11 +186,6 @@ struct HomeV2SidebarView: View {
                         relativeTo: .body
                     )
                 Spacer(minLength: HomeV2Tokens.Space.tight)
-                if destination == .photos, photoCount > 0 {
-                    Text("\(photoCount)")
-                        .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
-                        .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                }
             }
             .foregroundStyle(isSelected ? HomeV2Tokens.Colors.ink : HomeV2Tokens.Colors.secondary)
             .padding(.horizontal, HomeV2Tokens.Space.row)

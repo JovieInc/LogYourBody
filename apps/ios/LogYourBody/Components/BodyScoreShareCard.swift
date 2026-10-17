@@ -243,7 +243,7 @@ struct BodyScoreShareCardView: View {
         VStack(alignment: .leading, spacing: layout.summarySpacing) {
             HStack(alignment: .lastTextBaseline, spacing: layout.scoreSpacing) {
                 HStack(alignment: .lastTextBaseline, spacing: layout.scoreLabelSpacing) {
-                    Text(payload.snapshot(for: options)?.value ?? payload.scoreText)
+                    Text(payload.snapshot(for: options)?.displayValue ?? payload.scoreText)
                         .font(.system(size: layout.scoreFontSize, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .foregroundColor(.white)
@@ -543,6 +543,7 @@ struct BodyScoreShareSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let payload: BodyScoreSharePayload
     let onClose: (() -> Void)?
@@ -680,7 +681,7 @@ struct BodyScoreShareSheet: View {
                 ) {
                     closeShareSheet()
                 } else {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86)) {
                         dragOffsetY = 0
                     }
                 }
@@ -760,13 +761,18 @@ struct BodyScoreShareSheet: View {
                 .accessibilityLabel("Card format")
 
                 if !payload.contextualMetrics.isEmpty {
-                    Picker("Metric", selection: $shareOptions.selectedMetric) {
-                        if payload.score > 0 { Text("Body Score").tag(Optional<ContextualMetricKind>.none) }
-                        ForEach(payload.contextualMetrics) { snapshot in
-                            Text(snapshot.kind.title).tag(Optional(snapshot.kind))
-                        }
-                    }
-                    .accessibilityIdentifier("contextual_share_metric_picker")
+                    metricPicker
+                        .padding(.horizontal, JovieTokens.screenInset)
+                        .accessibilityLabel("Shared metric")
+                        .accessibilityIdentifier("contextual_share_metric_picker")
+                }
+
+                if let snapshot = payload.snapshot(for: shareOptions), let message = snapshot.unavailableMessage {
+                    Text(message)
+                        .font(theme.typography.bodyMedium)
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .padding(.horizontal, JovieTokens.screenInset)
+                        .accessibilityIdentifier(snapshot.isLoading ? "contextual_share_loading" : "contextual_share_unavailable")
                 }
 
                 contentControls
@@ -774,7 +780,7 @@ struct BodyScoreShareSheet: View {
                 cardPreview(height: previewHeight)
 
                 shareActions
-                    .disabled(isRendering)
+                    .disabled(isRendering || !payload.canExport(options: shareOptions))
             }
             // The content is a real sibling of Close/title under the world screen root.
             .accessibilityElement(children: .contain)
@@ -784,14 +790,45 @@ struct BodyScoreShareSheet: View {
         .padding(.bottom, JovieTokens.compactInset)
     }
 
+    @ViewBuilder
+    private var metricPicker: some View {
+        // Large accessibility text uses the native inline presentation instead of compressed segments.
+        if dynamicTypeSize.isAccessibilitySize {
+            metricPickerContent.pickerStyle(.inline)
+        } else {
+            metricPickerContent.pickerStyle(.segmented)
+        }
+    }
+
+    private var metricPickerContent: some View {
+        Picker("Metric", selection: $shareOptions.selectedMetric) {
+            if payload.score > 0 { Text("Body Score").tag(Optional<ContextualMetricKind>.none) }
+            ForEach(payload.contextualMetrics) { snapshot in
+                Text(snapshot.kind.title).tag(Optional(snapshot.kind))
+            }
+        }
+    }
+
     private var contentControls: some View {
         DisclosureGroup(isExpanded: $areContentControlsExpanded) {
             VStack(spacing: 0) {
                 if shareOptions.selectedMetric != nil {
-                    Toggle("Date", isOn: $shareOptions.includeObservation)
-                    Toggle("Range", isOn: $shareOptions.includeRange)
-                    Toggle("Trend", isOn: $shareOptions.includeTrend)
-                    Toggle("Source", isOn: $shareOptions.includeProvenance)
+                    if ContextualMetricSharePolicy.hasDetail(payload.snapshot(for: shareOptions)?.observation) {
+                        Toggle("Date", isOn: $shareOptions.includeObservation)
+                            .accessibilityIdentifier("contextual_share_include_date")
+                    }
+                    if ContextualMetricSharePolicy.hasDetail(payload.snapshot(for: shareOptions)?.range) {
+                        Toggle("Range", isOn: $shareOptions.includeRange)
+                            .accessibilityIdentifier("contextual_share_include_range")
+                    }
+                    if ContextualMetricSharePolicy.hasDetail(payload.snapshot(for: shareOptions)?.trend) {
+                        Toggle("Trend", isOn: $shareOptions.includeTrend)
+                            .accessibilityIdentifier("contextual_share_include_trend")
+                    }
+                    if ContextualMetricSharePolicy.hasDetail(payload.snapshot(for: shareOptions)?.provenance) {
+                        Toggle("Source", isOn: $shareOptions.includeProvenance)
+                            .accessibilityIdentifier("contextual_share_include_source")
+                    }
                 } else {
                 Toggle("Weight", isOn: $shareOptions.includeWeight)
                 Toggle("Body fat", isOn: $shareOptions.includeBodyFat)
@@ -889,7 +926,8 @@ struct BodyScoreShareSheet: View {
 
     @MainActor
     private func renderImage() {
-        guard payload.isOwned(by: authManager.ownsAccountSession) else {
+        guard payload.isOwned(by: authManager.ownsAccountSession),
+              payload.canExport(options: shareOptions) else {
             invalidatePrivateExport()
             return
         }
@@ -909,7 +947,8 @@ struct BodyScoreShareSheet: View {
 
     @MainActor
     private func shareImage() async {
-        guard payload.isOwned(by: authManager.ownsAccountSession) else {
+        guard payload.isOwned(by: authManager.ownsAccountSession),
+              payload.canExport(options: shareOptions) else {
             invalidatePrivateExport()
             return
         }
@@ -925,7 +964,8 @@ struct BodyScoreShareSheet: View {
 
     @MainActor
     private func saveToPhotos() async {
-        guard payload.isOwned(by: authManager.ownsAccountSession) else {
+        guard payload.isOwned(by: authManager.ownsAccountSession),
+              payload.canExport(options: shareOptions) else {
             invalidatePrivateExport()
             return
         }

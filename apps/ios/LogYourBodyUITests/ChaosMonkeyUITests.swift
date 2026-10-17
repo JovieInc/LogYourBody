@@ -607,13 +607,12 @@ final class ChaosMonkeyUITests: XCTestCase {
     private func openDefaultHomeAsk(in app: XCUIApplication) {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 30))
         XCTAssertFalse(app.descendants(matching: .any)["launch_timeline_surface"].exists)
-        let menu = app.buttons["photo_timeline_root_menu"]
-        XCTAssertTrue(menu.isHittable)
-        menu.tap()
-        let ask = app.buttons["home_v2_sidebar_ask"]
-        XCTAssertTrue(ask.waitForExistence(timeout: 5))
-        ask.tap()
-        XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 8))
+        let composer = app.textFields["chat_composer"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        XCTAssertTrue(composer.isHittable, "Default Home keeps Ask pinned and reachable")
+        composer.tap()
+        XCTAssertTrue(app.buttons["home_chat_collapse"].waitForExistence(timeout: 8))
+        XCTAssertTrue(composer.waitForExistence(timeout: 8))
     }
 
     private static let edgeStrings: [String] = [

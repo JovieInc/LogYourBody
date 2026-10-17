@@ -88,6 +88,8 @@ struct ContentView: View {
     @State private var pendingDexaPDF: DexaPDFFileSelection?
     @AppStorage("biometricLockEnabled") private var biometricLockEnabled = false
     private let releaseReviewStateStore = ReleaseReviewStateStore()
+    private let suppliedDashboardViewModel: DashboardViewModel?
+    private let suppliedAnalyticsTracker: AnalyticsTracking?
 
     private var suppressWhatsNewForUITests: Bool {
         ProcessInfo.processInfo.arguments.contains("-lybUITestSuppressWhatsNew")
@@ -105,10 +107,21 @@ struct ContentView: View {
         authManager.isAuthenticated && biometricLockEnabled && !disableBiometricLockForUITests
     }
 
-    init() {
-        // We need to initialize LoadingManager with a temporary AuthManager
-        // The actual authManager will be injected from environment
-        _loadingManager = StateObject(wrappedValue: LoadingManager(authManager: AuthManager.shared))
+    init(
+        loadingManager: LoadingManager? = nil, dashboardViewModel: DashboardViewModel? = nil,
+        analyticsTracker: AnalyticsTracking? = nil
+    ) {
+        suppliedDashboardViewModel = dashboardViewModel
+        suppliedAnalyticsTracker = analyticsTracker
+        if let loadingManager {
+            _loadingManager = StateObject(wrappedValue: loadingManager)
+        } else {
+            _loadingManager = StateObject(wrappedValue: LoadingManager(authManager: AuthManager.shared))
+        }
+    }
+
+    private var selectedAnalyticsTracker: AnalyticsTracking {
+        suppliedAnalyticsTracker ?? AppServicePorts.analyticsTracker
     }
 
     private var currentReleaseReviewCatalog: [ReleaseReviewItem] {
@@ -350,7 +363,7 @@ struct ContentView: View {
                 // only picks the sign-in screen.
                 BodyScoreOnboardingFlowView()
                     .onAppear {
-                        AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                        selectedAnalyticsTracker.track(event: "onboarding_view")
                     }
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
@@ -359,9 +372,12 @@ struct ContentView: View {
                     .environmentObject(authManager)
                     .environmentObject(subscriptionManager)
             } else {
-                MainTabView(releaseReviewDestination: $releaseReviewDestination)
+                MainTabView(
+                    releaseReviewDestination: $releaseReviewDestination,
+                    dashboardViewModel: suppliedDashboardViewModel, analyticsTracker: suppliedAnalyticsTracker
+                )
                     .onAppear {
-                        AppServicePorts.analyticsTracker.track(event: "dashboard_view")
+                        selectedAnalyticsTracker.track(event: "dashboard_view")
                         showDailyReminderOffer = shouldShowDailyReminderPrompt
                     }
                     .onChange(of: shouldShowDailyReminderPrompt) { _, shouldShow in

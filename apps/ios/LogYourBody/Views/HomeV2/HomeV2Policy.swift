@@ -444,6 +444,27 @@ struct HomeV2LoggedEntry: Equatable {
     let unit: String
     var savedMetric: BodyMetrics?
 
+    /// Called only with the admitted writer's actual preimage and committed DTO.
+    /// A body-fat-only edit, an unchanged weight, or an older day has no weight receipt.
+    static func correction(
+        previous: BodyMetrics, stored: BodyMetrics,
+        ownership: AuthManager.ProfileSessionOwnership,
+        system: MeasurementSystem, now: Date = Date(), calendar: Calendar = .current
+    ) -> Self? {
+        guard !ownership.subject.isEmpty, previous.userId == ownership.subject,
+              stored.userId == ownership.subject, stored.id == previous.id,
+              stored.date == previous.date, previous.weight != stored.weight,
+              let kilograms = stored.weight,
+              HomeV2WeightQuality.isWithinSupportedLoggingRange(kilograms),
+              calendar.isDate(stored.date, inSameDayAs: now) else { return nil }
+        let displayed = system == .imperial ? kilograms.kgToLbs : kilograms
+        return Self(
+            metricId: stored.id, userId: stored.userId, date: stored.date,
+            previousMetric: previous, valueText: HomeV2WeightStepPolicy.text(displayed),
+            unit: HomeV2Copy.displayUnit(system), savedMetric: stored
+        )
+    }
+
     var confirmationText: String {
         valueText.isEmpty ? "Entry saved." : HomeV2Copy.loggedSentence(value: valueText, unit: unit)
     }

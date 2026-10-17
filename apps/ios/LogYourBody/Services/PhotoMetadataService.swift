@@ -29,6 +29,7 @@ enum PhotoMetricsRestoreError: Error {
 
 enum PhotoMetricsEditError: Error {
     case entryNotFound
+    case entryChanged
     case pendingEdit
     case uncommittedWrite
 }
@@ -254,14 +255,19 @@ class PhotoMetadataService {
     func updateExistingMeasurementsWithResult(
         id: String, userId: String, weight: Double?, bodyFatPercentage: Double?,
         bodyFatMethod: String?, clearBodyFat: Bool = false, markManualCorrection: Bool = false,
+        replaceBodyFatMethod: Bool = false, expectedOriginal: BodyMetrics? = nil,
         writeAdmission: @escaping CoreDataManager.WriteAdmission,
+        onStored: (@MainActor (PhotoMetricsUpdateResult) throws -> Void)? = nil,
+        onWriterAdmission: (@MainActor (Result<Void, Error>) -> Void)? = nil,
         coreDataManager: CoreDataManager = .shared
     ) async throws -> PhotoMetricsUpdateResult {
         try writeAdmission()
         let result = try await coreDataManager.updateExistingMetricMeasurementsAndWait(
             id: id, userId: userId, weight: weight, bodyFatPercentage: bodyFatPercentage,
             bodyFatMethod: bodyFatMethod, clearBodyFat: clearBodyFat,
-            markManualCorrection: markManualCorrection, writeAdmission: writeAdmission
+            markManualCorrection: markManualCorrection,
+            replaceBodyFatMethod: replaceBodyFatMethod, expectedOriginal: expectedOriginal,
+            writeAdmission: writeAdmission, onStored: onStored, onWriterAdmission: onWriterAdmission
         )
         try writeAdmission()
         return result

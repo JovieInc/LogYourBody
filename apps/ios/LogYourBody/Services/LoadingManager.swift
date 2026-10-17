@@ -12,7 +12,7 @@ class LoadingManager: ObservableObject {
 
     private let authManager: AuthManager
     private let coreDataManager = CoreDataManager.shared
-    private let syncManager = RealtimeSyncManager.shared
+    private let syncManager: RealtimeSyncManager
     private let healthSyncCoordinator: HealthSyncCoordinating
     private let initializeAuthentication: @MainActor () -> Task<Void, Never>
 
@@ -74,10 +74,12 @@ class LoadingManager: ObservableObject {
     init(
         authManager: AuthManager,
         healthSyncCoordinator: HealthSyncCoordinating,
-        initializeAuthentication: (@MainActor () -> Task<Void, Never>)? = nil
+        initializeAuthentication: (@MainActor () -> Task<Void, Never>)? = nil,
+        realtimeSyncManager: RealtimeSyncManager? = nil
     ) {
         self.authManager = authManager
         self.healthSyncCoordinator = healthSyncCoordinator
+        self.syncManager = realtimeSyncManager ?? RealtimeSyncManager.shared
         self.initializeAuthentication = initializeAuthentication ?? {
             authManager.ensureAuthInitializationTask()
         }
@@ -89,6 +91,14 @@ class LoadingManager: ObservableObject {
             healthSyncCoordinator: HealthSyncCoordinator.shared
         )
     }
+
+    #if DEBUG
+    func usesFixtureDependencies(
+        realtime: RealtimeSyncManager, health: HomeV2CorrectionFixtureHealthSync
+    ) -> Bool {
+        syncManager === realtime && (healthSyncCoordinator as AnyObject) === health
+    }
+    #endif
 
     func startLoading() async {
         resetLoadingState()

@@ -724,79 +724,125 @@ extension CoreDataManager {
     func updateExistingMetricMeasurementsAndWait(
         id: String, userId: String, weight: Double?, bodyFatPercentage: Double?,
         bodyFatMethod: String?, clearBodyFat: Bool = false, markManualCorrection: Bool = false,
+        replaceBodyFatMethod: Bool = false, expectedOriginal: BodyMetrics? = nil,
         writeAdmission: @escaping WriteAdmission,
+        onStored: (@MainActor (PhotoMetricsUpdateResult) throws -> Void)? = nil,
+        onWriterAdmission: (@MainActor (Result<Void, Error>) -> Void)? = nil,
         commit: @escaping (NSManagedObjectContext) throws -> Void = { try $0.save() }
     ) async throws -> PhotoMetricsUpdateResult {
         let shared = viewContext
         return try await shared.perform {
-            try MainActor.assumeIsolated { try writeAdmission() }
-            guard !id.isEmpty, !userId.isEmpty else { throw PhotoMetricsEditError.entryNotFound }
-            let dirty = shared.insertedObjects.union(shared.updatedObjects).union(shared.deletedObjects)
-            guard !dirty.contains(where: { object in
-                guard let row = object as? CachedBodyMetrics else { return false }
-                return row.id == id || row.committedValues(forKeys: ["id"])["id"] as? String == id
-            }) else { throw PhotoMetricsEditError.pendingEdit }
-            let transaction = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
-            transaction.persistentStoreCoordinator = shared.persistentStoreCoordinator
-            transaction.mergePolicy = NSErrorMergePolicy
-            transaction.undoManager = nil
-            return try transaction.performAndWait {
-                let request = CachedBodyMetrics.fetchRequest()
-                request.predicate = NSPredicate(format: "id == %@", id)
-                let rows = try transaction.fetch(request)
-                guard rows.count == 1, let row = rows.first,
-                      row.userId == userId, !row.isMarkedDeleted,
-                      let previous = row.toBodyMetrics() else { throw PhotoMetricsEditError.entryNotFound }
-                do {
-                    if let weight, weight != previous.weight {
-                        row.weight = weight
-                        row.weightUnit = "kg"
+            var reportedAdmission = false
+            func reportAdmission(_ result: Result<Void, Error>) {
+                guard !reportedAdmission else { return }
+                reportedAdmission = true
+                MainActor.assumeIsolated { onWriterAdmission?(result) }
+            }
+            func hasPendingTargetEdit() -> Bool {
+                let dirty = shared.insertedObjects.union(shared.updatedObjects).union(shared.deletedObjects)
+                return dirty.contains(where: { object in
+                    guard let row = object as? CachedBodyMetrics else { return false }
+                    return row.id == id || row.committedValues(forKeys: ["id"])["id"] as? String == id
+                })
+            }
+            do {
+                try MainActor.assumeIsolated { try writeAdmission() }
+                guard !id.isEmpty, !userId.isEmpty else { throw PhotoMetricsEditError.entryNotFound }
+                guard !hasPendingTargetEdit() else { throw PhotoMetricsEditError.pendingEdit }
+                let transaction = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+                transaction.persistentStoreCoordinator = shared.persistentStoreCoordinator
+                transaction.mergePolicy = NSErrorMergePolicy
+                transaction.undoManager = nil
+                return try transaction.performAndWait {
+                    let request = CachedBodyMetrics.fetchRequest()
+                    request.predicate = NSPredicate(format: "id == %@", id)
+                    let rows = try transaction.fetch(request)
+                    guard rows.count == 1, let row = rows.first,
+                          row.userId == userId, !row.isMarkedDeleted,
+                          let previous = row.toBodyMetrics() else { throw PhotoMetricsEditError.entryNotFound }
+                    // This is the transaction's fetched revision, after any queued
+                    // editor/debug hold. No shared-context or date-only substitute.
+                    if let expectedOriginal, previous != expectedOriginal {
+                        throw PhotoMetricsEditError.entryChanged
                     }
-                    // A nil body-fat argument retains the stored value. Clearing the
-                    // field is explicit, as is marking a real change manual.
-                    if clearBodyFat {
-                        row.bodyFatPercentage = 0
-                        row.bodyFatMethod = nil
-                    } else if let bodyFatPercentage,
-                              bodyFatPercentage != previous.bodyFatPercentage ||
-                                bodyFatMethod.map({ $0 != previous.bodyFatMethod }) == true {
-                        row.bodyFatPercentage = bodyFatPercentage
-                        if let bodyFatMethod { row.bodyFatMethod = bodyFatMethod }
-                    }
-                    if markManualCorrection {
-                        var fields: Set<BodyMetricField> = []
-                        if let weight, weight != previous.weight { fields.insert(.weight) }
-                        if clearBodyFat && previous.bodyFatPercentage != nil ||
-                            bodyFatPercentage.map({ $0 != previous.bodyFatPercentage }) == true ||
-                            bodyFatPercentage != nil && bodyFatMethod.map({ $0 != previous.bodyFatMethod }) == true {
-                            fields.insert(.bodyFat)
+                    let result: PhotoMetricsUpdateResult
+                    var committed = false
+                    do {
+                        if let weight, weight != previous.weight {
+                            row.weight = weight
+                            row.weightUnit = "kg"
                         }
-                        if !fields.isEmpty {
-                            row.sourceMetadataJSON = (previous.sourceMetadata ?? BodyMetricSourceMetadata())
-                                .settingEntrySource(.manual, fields: fields, bodyFatMethod: bodyFatMethod).jsonString
+                        // Generic nil retains the existing method. Home may opt
+                        // into replacing it with nil for an explicit reading edit.
+                        let replacesMethod = bodyFatPercentage != nil && (replaceBodyFatMethod
+                            ? (bodyFatMethod != previous.bodyFatMethod ||
+                                bodyFatMethod != previous.attributedBodyFatMethod)
+                            : bodyFatMethod.map({ $0 != previous.bodyFatMethod }) == true)
+                        if clearBodyFat {
+                            row.bodyFatPercentage = 0
+                            row.bodyFatMethod = nil
+                        } else if let bodyFatPercentage,
+                                  bodyFatPercentage != previous.bodyFatPercentage || replacesMethod {
+                            row.bodyFatPercentage = bodyFatPercentage
+                            if replaceBodyFatMethod || bodyFatMethod != nil {
+                                row.bodyFatMethod = bodyFatMethod
+                            }
                         }
+                        if markManualCorrection {
+                            var fields: Set<BodyMetricField> = []
+                            if let weight, weight != previous.weight { fields.insert(.weight) }
+                            if clearBodyFat && (previous.bodyFatPercentage != nil || previous.bodyFatMethod != nil) ||
+                                bodyFatPercentage.map({ $0 != previous.bodyFatPercentage }) == true || replacesMethod {
+                                fields.insert(.bodyFat)
+                            }
+                            if !fields.isEmpty {
+                                row.sourceMetadataJSON = (previous.sourceMetadata ?? BodyMetricSourceMetadata())
+                                    .settingEntrySource(.manual, fields: fields, bodyFatMethod: bodyFatMethod).jsonString
+                            }
+                        }
+                        if transaction.hasChanges {
+                            let now = Date()
+                            row.updatedAt = now
+                            row.lastModified = now
+                            row.isSynced = false
+                            row.syncStatus = "pending"
+                        }
+                        try MainActor.assumeIsolated { try writeAdmission() }
+                        guard !hasPendingTargetEdit() else { throw PhotoMetricsEditError.pendingEdit }
+                        // The observer reports the final validated precommit
+                        // decision once; a later save/publication error is separate.
+                        reportAdmission(.success(()))
+                        if transaction.hasChanges {
+                            try commit(transaction)
+                            guard !transaction.hasChanges else { throw PhotoMetricsEditError.uncommittedWrite }
+                            committed = true
+                            NSManagedObjectContext.mergeChanges(
+                                fromRemoteContextSave: [NSUpdatedObjectsKey: [row.objectID]], into: [shared]
+                            )
+                            // The retained route bridge reads viewContext in its
+                            // immediate callback. Refault only this clean target;
+                            // unrelated unsaved drafts remain untouched.
+                            if let sharedRow = shared.registeredObject(for: row.objectID) {
+                                guard !sharedRow.isInserted, !sharedRow.isUpdated, !sharedRow.isDeleted else {
+                                    throw PhotoMetricsEditError.pendingEdit
+                                }
+                                shared.refresh(sharedRow, mergeChanges: false)
+                            }
+                        }
+                        guard let updated = row.toBodyMetrics() else { throw PhotoMetricsEditError.entryNotFound }
+                        result = PhotoMetricsUpdateResult(metrics: updated, createdNewEntry: false, previousMetric: previous)
+                    } catch {
+                        if !committed { transaction.rollback() }
+                        throw error
                     }
-                    if transaction.hasChanges {
-                        let now = Date()
-                        row.updatedAt = now
-                        row.lastModified = now
-                        row.isSynced = false
-                        row.syncStatus = "pending"
-                    }
-                    try MainActor.assumeIsolated { try writeAdmission() }
-                    if transaction.hasChanges {
-                        try commit(transaction)
-                        guard !transaction.hasChanges else { throw PhotoMetricsEditError.uncommittedWrite }
-                        NSManagedObjectContext.mergeChanges(
-                            fromRemoteContextSave: [NSUpdatedObjectsKey: [row.objectID]], into: [shared]
-                        )
-                    }
-                    guard let updated = row.toBodyMetrics() else { throw PhotoMetricsEditError.entryNotFound }
-                    return PhotoMetricsUpdateResult(metrics: updated, createdNewEntry: false, previousMetric: previous)
-                } catch {
-                    transaction.rollback()
-                    throw error
+                    // Actual committed DTOs bridge the route while still inside
+                    // the writer. Callback failure cannot roll back a durable save.
+                    try MainActor.assumeIsolated { try onStored?(result) }
+                    return result
                 }
+            } catch {
+                reportAdmission(.failure(error))
+                throw error
             }
         }
     }

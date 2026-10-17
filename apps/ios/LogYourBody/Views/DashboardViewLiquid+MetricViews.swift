@@ -228,7 +228,7 @@ extension DashboardViewLiquid {
             && !isPhotoTimelineSettingsPresented && !isHomeV2ViewerPresented
             && !isHomeV2ContextPresented && !isHomeV2EntriesPresented && !isHomeV2MetricProvenancePresented
             && !isHomeV2SettingsPresented && !isHomeV2HelpPresented && !isHomeV2AllPhotosPresented
-            && !isShowingPhotoTimelineMenu && homeV2EditingSession == nil && !showsHomeV2UndoError
+            && !isShowingPhotoTimelineMenu && homeV2EditingMetric == nil && !showsHomeV2UndoError
             && bodyScoreSharePayload == nil && !isHomeChatExpanded
     }
 

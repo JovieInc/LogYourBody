@@ -11,7 +11,13 @@ extension DashboardViewLiquid {
             Group {
                 if let metric = currentMetric {
                     if HomeV2Policy.isEnabled() {
-                        homeV2Surface(for: metric)
+                        if let selection = homeV2TimelineSelection,
+                           homeV2Timeline.isOwned(by: authManager.captureAccountSession()),
+                           let selected = homeV2Timeline.metric(for: selection.id) {
+                            homeV2Surface(for: selected)
+                        } else {
+                            HomeV2LoadingHome()
+                        }
                     } else {
                         let bodyScore = bodyScoreText()
 
@@ -74,7 +80,7 @@ extension DashboardViewLiquid {
                 .accessibilityHidden(isHomeChatExpanded)
                 .clipped()
 
-            if !isHomeV2CheckIn, HomeChatChromePolicy.shouldShowComposer(
+            if HomeChatChromePolicy.shouldShowComposer(
                 isChatExpanded: isHomeChatExpanded,
                 isOnStats: selectedPhotoTimelineRootPage == .analytics
             ) {
@@ -114,15 +120,15 @@ extension DashboardViewLiquid {
         .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
             homeV2AllPhotosFromHome
         }
-        .sheet(item: $homeV2EditingSession) { session in
-            homeV2EditEntrySheet(for: session)
+        .sheet(item: $homeV2EditingMetric) { metric in
+            homeV2EditEntrySheet(for: metric)
                 #if DEBUG
                 .onAppear { recordHomeEditTransition("sheet.appear") }
                 .onDisappear { recordHomeEditTransition("sheet.disappear") }
                 #endif
         }
         #if DEBUG
-        .onChange(of: homeV2EditingSession?.id) { _, _ in
+        .onChange(of: homeV2EditingMetric?.id) { _, _ in
             recordHomeEditTransition("item.changed")
         }
         .onChange(of: isHomeV2ContextPresented) { _, _ in
@@ -133,7 +139,7 @@ extension DashboardViewLiquid {
             homeV2ContextView
         }
         .navigationDestination(isPresented: $isHomeV2EntriesPresented) {
-            homeV2EntriesView
+            homeV2SelectedMetricEntries
         }
         .fullScreenCover(isPresented: $isShowingPhotoTimelineMenu) {
             if HomeV2Policy.isEnabled() {
@@ -283,8 +289,13 @@ extension DashboardViewLiquid {
             .frame(maxWidth: .infinity)
 
             if isHomeV2CheckIn {
+                let ownership = authManager.captureAccountSession()
+                let selection = homeV2TimelineSelection
                 Button {
-                    openHomeV2Context()
+                    guard let ownership, authManager.ownsAccountSession(ownership),
+                          homeV2Timeline.isOwned(by: ownership),
+                          let selection, homeV2TimelineSelection == selection else { return }
+                    openHomeV2Context(on: selection.date)
                 } label: {
                     Image(systemName: "calendar")
                         .font(.system(size: 20, weight: .medium))
@@ -293,7 +304,8 @@ extension DashboardViewLiquid {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Today’s details")
+                .disabled(selection == nil || ownership == nil)
+                .accessibilityLabel(selection.map { "Details for \(formatHUDDate($0.date))" } ?? "Selected day’s details")
                 .accessibilityHint("Opens the selected day")
                 .accessibilityIdentifier("home_v2_context_button")
             } else if isHomeChatExpanded {

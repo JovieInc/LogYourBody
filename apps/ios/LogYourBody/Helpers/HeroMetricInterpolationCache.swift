@@ -84,8 +84,9 @@ final class HeroMetricInterpolationCache {
         }
     }
 
-    /// Content fingerprint over exactly the inputs that determine the contexts:
-    /// each metric's date, weight and body-fat, plus the height used for FFMI.
+    /// Content fingerprint over the inputs that determine the contexts. Body-fat
+    /// attribution controls eligibility for the wider DEXA interpolation window;
+    /// the captured calendar controls same-day matching and trend-weight days.
     static func fingerprint(metrics: [BodyMetrics], heightInches: Double?) -> Int {
         var hasher = Hasher()
         hasher.combine(metrics.count)
@@ -93,8 +94,11 @@ final class HeroMetricInterpolationCache {
             hasher.combine(metric.date)
             hasher.combine(metric.weight)
             hasher.combine(metric.bodyFatPercentage)
+            hasher.combine(metric.attributedBodyFatMethod)
+            hasher.combine(metric.measurementSource(for: .bodyFat).rawValue)
         }
         hasher.combine(heightInches)
+        hasher.combine(Calendar.current)
         return hasher.finalize()
     }
 }

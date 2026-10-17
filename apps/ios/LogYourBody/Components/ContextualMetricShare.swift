@@ -37,9 +37,18 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
     let trend: String?
     let provenance: String?
     var evidence: String?
+    var isLoading = false
 
     var id: ContextualMetricKind { kind }
-    var isAvailable: Bool { !["", "–", "—", "-"].contains(value.trimmingCharacters(in: .whitespacesAndNewlines)) }
+    var isAvailable: Bool {
+        !isLoading && !["", "–", "—", "-"].contains(value.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+    var displayValue: String { isLoading ? "—" : value }
+
+    var unavailableMessage: String? {
+        guard !isAvailable else { return nil }
+        return isLoading ? "Loading \(kind.title)…" : "\(kind.title) is unavailable for this date."
+    }
 
     static func steps(_ daily: DailyMetrics?, value: String, range: String) -> Self {
         Self(kind: .steps, value: value, unit: "steps",
@@ -72,7 +81,7 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
          options.includeRange ? range : nil,
          options.includeTrend ? trend : nil,
          options.includeProvenance ? provenance : nil]
-            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+            .compactMap { $0 }.filter { ContextualMetricSharePolicy.hasDetail($0) }.joined(separator: " · ")
     }
 }
 
@@ -170,14 +179,25 @@ enum ContextualMetricSourcePolicy {
 }
 
 enum ContextualMetricSharePolicy {
+    static func hasDetail(_ value: String?) -> Bool {
+        guard let value else { return false }
+        return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     static func canOfferScreenshot(isActive: Bool, isVisible: Bool, isPresenting: Bool) -> Bool {
         isActive && isVisible && !isPresenting
     }
 }
 
 extension BodyScoreSharePayload {
-    static func contextual(_ snapshots: [ContextualMetricSnapshot], selected: ContextualMetricKind) -> Self? {
-        let available = snapshots.filter(\.isAvailable)
+    static func contextual(
+        _ snapshots: [ContextualMetricSnapshot], selected: ContextualMetricKind,
+        includeUnavailableSelection: Bool = false
+    ) -> Self? {
+        // Home may retain its explicitly chosen unavailable metric. Never choose a replacement.
+        let available = snapshots.filter {
+            $0.isAvailable || (includeUnavailableSelection && $0.kind == selected)
+        }
         guard available.contains(where: { $0.kind == selected }) else { return nil }
         return Self(
             score: 0, scoreText: "", tagline: "", ffmiValue: "", ffmiCaption: "",
@@ -189,6 +209,14 @@ extension BodyScoreSharePayload {
 
     func snapshot(for options: BodyScoreShareOptions) -> ContextualMetricSnapshot? {
         contextualMetrics.first { $0.kind == options.selectedMetric }
+    }
+
+    /// A placeholder is an honest preview, never an exportable measurement.
+    func canExport(options: BodyScoreShareOptions) -> Bool {
+        guard options.selectedMetric != nil else {
+            return contextualMetrics.isEmpty || score > 0
+        }
+        return snapshot(for: options)?.isAvailable == true
     }
 }
 
@@ -214,7 +242,7 @@ struct AccountBoundShareCapture {
     mutating func clear() { payload = nil }
 }
 
-/// Screenshot capture remains entirely owned by iOS. Only an explicit acceptance opens the composer.
+/// Screenshot capture stays owned by iOS; an eligible screenshot opens the existing editor.
 struct ContextualMetricShareModifier: ViewModifier {
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.scenePhase) private var scenePhase
@@ -227,7 +255,6 @@ struct ContextualMetricShareModifier: ViewModifier {
     }
     @State private var contextOwner: AuthManager.ProfileSessionOwnership?
     @State private var isOnScreen = false
-    @State private var showsOffer = false
     @State private var showsComposer = false
 
     func body(content: Content) -> some View {
@@ -243,32 +270,31 @@ struct ContextualMetricShareModifier: ViewModifier {
             .onChange(of: authManager.captureAccountSession()) { _, owner in
                 invalidateShareContext(currentOwner: owner)
             }
+            .onChange(of: isVisible) { _, visible in
+                guard !visible else { return }
+                capture.clear()
+                showsComposer = false
+                directRequest = false
+            }
             .onScreenshot {
                 guard let payload, let contextOwner, authManager.ownsAccountSession(contextOwner),
                       ContextualMetricSharePolicy.canOfferScreenshot(
                         isActive: scenePhase == .active,
                         isVisible: isVisible && isOnScreen,
-                        isPresenting: showsOffer || showsComposer
+                        isPresenting: showsComposer
                       ) else { return }
                 capture.freeze(payload, owner: contextOwner)
-                showsOffer = true
-            }
-            .confirmationDialog("Create a share card?", isPresented: $showsOffer, titleVisibility: .visible) {
-                Button("Share \(pendingPayload?.preferredMetric?.title ?? "metric")") {
-                    guard pendingPayload?.isOwned(by: authManager.ownsAccountSession) == true else {
-                        invalidateShareContext()
-                        return
-                    }
-                    showsComposer = true
-                }
-                Button("Not now", role: .cancel) { capture.clear() }
-            } message: {
-                Text("Your screenshot stays unchanged. Choose the details to include before sharing.")
+                showsComposer = true
             }
             .onChange(of: directRequest) { _, requested in
                 guard requested else { return }
                 directRequest = false
-                guard isVisible, isOnScreen, let payload, let contextOwner,
+                guard ContextualMetricSharePolicy.canOfferScreenshot(
+                        isActive: scenePhase == .active,
+                        isVisible: isVisible && isOnScreen,
+                        isPresenting: showsComposer
+                      ) else { return }
+                guard let payload, let contextOwner,
                       authManager.ownsAccountSession(contextOwner) else {
                     invalidateShareContext()
                     return
@@ -286,7 +312,6 @@ struct ContextualMetricShareModifier: ViewModifier {
     private func invalidateShareContext(currentOwner: AuthManager.ProfileSessionOwnership? = nil) {
         capture.reconcile(currentOwner: currentOwner)
         contextOwner = nil
-        showsOffer = false
         showsComposer = false
         directRequest = false
     }

@@ -1177,3 +1177,508 @@ def test_failed_merge_group_cancels_its_mac_jobs_instead_of_holding_them() -> No
     summary = _job_block("ci.yml", "ci-summary")
     # The required check must still conclude after the cancel.
     assert "if: always()" in summary
+
+
+def test_current_home_diagnostic_cases_use_real_combined_selection_and_passed_evidence() -> None:
+    import copy
+    import importlib.util
+    import re
+    import pytest
+
+    source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
+    selection = "LAUNCH_QUALITY_UI_TESTS=(" + source.split(
+        "LAUNCH_QUALITY_UI_TESTS=(", 1
+    )[1].split("UI_RESULT_BUNDLE=", 1)[0]
+    result = subprocess.run(
+        ["bash", "-e", "-u", "-c", selection +
+         '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
+         'printf "evidence:%s\\n" "${UI_EVIDENCE_ARGS[@]}"\n'],
+        text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+    )
+    assert result.returncode == 0, result.stderr
+    selectors = [line.removeprefix("selector:") for line in result.stdout.splitlines()
+                 if line.startswith("selector:")]
+    arguments = [line.removeprefix("evidence:") for line in result.stdout.splitlines()
+                 if line.startswith("evidence:")]
+    expected = arguments[1::2]
+    assert arguments[::2] == ["--expected-test"] * len(selectors)
+    assert len(selectors) == len(set(selectors))
+    assert len(expected) == len(set(expected))
+    assert expected == [item.removeprefix("-only-testing:LogYourBodyUITests/") + "()"
+                        for item in selectors]
+    # Explicit acceptance identities are preserved; additional future cases may grow.
+    required = [
+        'LogYourBodyUITests/testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch',
+        'LogYourBodyUITests/testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity',
+        'LogYourBodyUITests/testHomeV2AskSyntheticCancelledTurnRecovers',
+        'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces',
+        'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA',
+        'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA',
+        'LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces',
+        'LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail',
+        'OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal',
+        'ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration',
+        'ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory',
+        'ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote',
+        'ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies',
+        'ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor',
+        'ChaosMonkeyUITests/testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates',
+        'ChaosMonkeyUITests/testSystemAlertsRequireKnownDenyOnlyAction',
+        'ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending',
+        'ChaosMonkeyUITests/testProfilePhotoImportIsExcludedFromMonkeyCandidates',
+        'ChaosMonkeyUITests/testMissingActionTargetsDoNotCompleteMonkeySteps',
+        'ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget',
+        'ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion',
+        'HomeV2LayoutUITests/testLogSheetHasOneHeadingAndKeepsEntryControls',
+        'HomeV2LayoutUITests/testLogSheetEditsUnitsWithKeyboardAndCancelsWithoutChangingHome',
+        'HomeV2LayoutUITests/testLogSheetAtLargestTextKeepsValueAndDetailsReachable',
+        'HomeV2LayoutUITests/testEditorialDataHeroLabelsVisualEstimate',
+        'HomeV2LayoutUITests/testEditorialSingleWeightDoesNotInventAHistory',
+        'HomeV2LayoutUITests/testEditorialSingleReadingDoesNotClaimAWeightTrendBehindPhotoOrBodyFat',
+        'HomeV2LayoutUITests/testCompositionHomeShowsBodyFatFirstAndHonestSupportingMetrics',
+        'HomeV2LayoutUITests/testSupportingMetricTapsOpenTheirOwnProgressWorkspace',
+        'HomeV2LayoutUITests/testBodyFatCheckInRefreshesDataHeroWithoutSavingWeight',
+        'HomeV2LayoutUITests/testCompositionContextAtLargestTextKeepsEachSupportingMetricReachable',
+        'HomeV2LayoutUITests/testBodyFatEditorAtLargestTextPreservesMethodUntilExplicitSelection',
+        'HomeV2TimelineIntegrationUITests/testHorizontalPhotoDragPagesPixelsAndMetricsWithoutOpeningViewer',
+        'HomeV2TimelineIntegrationUITests/testSelectedWeightOnlyDayNeverBorrowsTodaysBodyFat',
+        'HomeV2TimelineIntegrationUITests/testBodyFatCheckInUpdatesSelectedHistoricalPhotoWithoutChangingWeight',
+        'HomeV2TimelineIntegrationUITests/testSelectedDayStepsAtLargestTextFollowThePhotoAndRemainReachable',
+        'LogYourBodyUITests/testHomeV2PhotoFirstKeepsTheNumberBelowThePhoto',
+        'LogYourBodyUITests/testHomeV2ProgressIsOneMetricWorkspace',
+        'LogYourBodyUITests/testHomeV2MetricFirstLogsWeightAndConfirmsInPlace',
+        'LogYourBodyUITests/testHomeV2ProgressRefreshesAfterEditingAnExistingDay',
+        'HomeV2TimelineIntegrationUITests/testVerticalRulerDragDoesNotSelectOrNavigateAndHorizontalScrubStillWorks',
+        'HomeV2LayoutUITests/testEditorialWeightOnlyHeroShowsActualSparseReadings',
+        'LogYourBodyUITests/testHomeV2ChangingLogDateDoesNotCreateATodayUndoReceipt',
+        'ChaosEdgeCaseUITests/testBodyFatEntryRejectsOutOfRangeValues',
+        'LogYourBodyUITests/testHomeV2SwipeMovesPhotoDateAndMetricsTogether',
+        'LogYourBodyUITests/testHomeV2ScrubberJumpsThroughBodyHistory',
+        'LogYourBodyUITests/testHomeV2TimelineCoachMarkDismissesPermanently',
+        'HomeV2TimelineIntegrationUITests/testDiagnosticMountedCurrentPhotoCodeRejectsHistoricalIdentity',
+        'HomeV2TimelineIntegrationUITests/testDiagnosticMountedHistoricalPhotoCodeRejectsCurrentIdentity',
+        'HomeV2TimelineIntegrationUITests/testDiagnosticMountedDefaultGrayAndBlankRejectPhotoIdentity',
+        'HomeV2TimelineIntegrationUITests/testSelectedMomentInfersBracketedBodyFatWithProvenance',
+        'HomeV2TimelineIntegrationUITests/testMountedHeldCorrectionKeepsOriginalContextThroughActualStoredReturn',
+        'HomeV2TimelineIntegrationUITests/testMountedHeldCorrectionRejectsOldTaskAfterSameSubjectNewEditorABA',
+    ]
+    for identifier in required:
+        assert expected.count(identifier + "()") == 1
+    for identifier in expected:
+        suite, method = identifier.removesuffix("()").split("/")
+        swift = (_REPO_ROOT / "apps/ios/LogYourBodyUITests" / (suite + ".swift")).read_text()
+        assert len(re.findall(r"func " + re.escape(method) + r"\(", swift)) == 1, identifier
+    spec = importlib.util.spec_from_file_location(
+        "home_diagnostic_evidence", _REPO_ROOT / "scripts/ios/launch-quality-evidence.py"
+    )
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    cases = [{"nodeType": "Test Case", "nodeIdentifier": identifier, "result": "Passed"}
+             for identifier in expected]
+    assert len(evidence.validate_cases({"testNodes": cases}, expected)) == len(expected)
+    for identifier in expected:
+        for state in ("missing", "Skipped", "Failed", "duplicate"):
+            invalid = copy.deepcopy(cases)
+            target = next(case for case in invalid if case["nodeIdentifier"] == identifier)
+            if state == "missing":
+                invalid.remove(target)
+            elif state == "duplicate":
+                invalid.append(copy.deepcopy(target))
+            else:
+                target["result"] = state
+            with pytest.raises(ValueError):
+                evidence.validate_cases({"testNodes": invalid}, expected)
+
+
+def test_mounted_correction_calibration_is_required_before_ui_zero_claims() -> None:
+    import copy
+    import importlib.util
+    import re
+    import pytest
+
+    script = _REPO_ROOT / "scripts/ios/launch-quality-audit.sh"
+    source = script.read_text()
+    construction = "CORRECTION_FIXTURE_UNIT_TESTS=(" + source.split(
+        "CORRECTION_FIXTURE_UNIT_TESTS=(", 1
+    )[1].split("# The whole unit target is the gate:", 1)[0]
+    result = subprocess.run(
+        ["bash", "-e", "-u", "-c", construction +
+         '\n' + 'printf "%s\\n" "${CORRECTION_FIXTURE_UNIT_EVIDENCE_ARGS[@]}"'],
+        text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+    )
+    assert result.returncode == 0, result.stderr
+    arguments = result.stdout.splitlines()
+    assert arguments[::2] == ["--expected-test"] * len(arguments[1::2])
+    expected = arguments[1::2]
+    swift = (_REPO_ROOT / "apps/ios/LogYourBodyTests/HomeV2ContextPolicyTests.swift").read_text()
+    actual = ["HomeV2ContextPolicyTests/" + name + "()"
+              for name in re.findall(r"func (test\w+)\(", swift)]
+    assert expected == actual
+    assert len(expected) == len(set(expected))
+    unit_gate = source.split('# The whole unit target is the gate:', 1)[1].split(
+        'LAUNCH_QUALITY_UI_TESTS=(', 1
+    )[0]
+    assert '"${CORRECTION_FIXTURE_UNIT_EVIDENCE_ARGS[@]}"' in unit_gate
+    assert "-only-testing:LogYourBodyTests" in unit_gate
+    spec = importlib.util.spec_from_file_location(
+        "mounted_correction_evidence", script.with_name("launch-quality-evidence.py")
+    )
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    cases = [{"nodeType": "Test Case", "nodeIdentifier": name, "result": "Passed"} for name in expected]
+    assert len(evidence.validate_cases({"testNodes": cases}, expected)) == len(expected)
+    for name in expected:
+        for state in ("missing", "Failed", "Skipped", "duplicate"):
+            invalid = copy.deepcopy(cases)
+            target = next(case for case in invalid if case["nodeIdentifier"] == name)
+            if state == "missing":
+                invalid.remove(target)
+            elif state == "duplicate":
+                invalid.append(copy.deepcopy(target))
+            else:
+                target["result"] = state
+            with pytest.raises(ValueError):
+                evidence.validate_cases({"testNodes": invalid}, expected)
+
+
+def test_weight_hero_witnesses_share_the_required_native_selector_and_evidence_loop() -> None:
+    import copy
+    import importlib.util
+    import pytest
+
+    source = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text()
+    selection = 'LAUNCH_QUALITY_UI_TESTS=(' + source.split('LAUNCH_QUALITY_UI_TESTS=(', 1)[1].split('UI_RESULT_BUNDLE=', 1)[0]
+    result = subprocess.run(['bash', '-e', '-u', '-c', selection + '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\nprintf "evidence:%s\\n" "${UI_EVIDENCE_ARGS[@]}"\n'], text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+    assert result.returncode == 0, result.stderr
+    selectors = [line.removeprefix('selector:') for line in result.stdout.splitlines() if line.startswith('selector:')]
+    args = [line.removeprefix('evidence:') for line in result.stdout.splitlines() if line.startswith('evidence:')]
+    expected = args[1::2]
+    required = ['HomeV2LayoutUITests/' + name + '()' for name in [
+        'testEditorialWeightOnlyHeroShowsActualSparseReadings',
+        'testEditorialSingleWeightDoesNotInventAHistory',
+        'testEditorialUnsupportedWeightKeepsRawValueAndReviewVisible']]
+    assert args[::2] == ['--expected-test'] * len(selectors)
+    assert len(selectors) == len(set(selectors))
+    for identifier in required:
+        assert selectors.count('-only-testing:LogYourBodyUITests/' + identifier.removesuffix('()')) == 1
+        assert expected.count(identifier) == 1
+    spec = importlib.util.spec_from_file_location('weight_hero_evidence', _REPO_ROOT / 'scripts/ios/launch-quality-evidence.py')
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    passed = {'testNodes': [{'nodeType': 'Test Case', 'nodeIdentifier': name, 'result': 'Passed'} for name in required]}
+    assert len(evidence.validate_cases(passed, required)) == len(required)
+    for index in range(len(required)):
+        for status in [None, 'Skipped', 'Failed']:
+            negative = copy.deepcopy(passed)
+            if status is None:
+                negative['testNodes'].pop(index)
+            else:
+                negative['testNodes'][index]['result'] = status
+            with pytest.raises(ValueError):
+                evidence.validate_cases(negative, required)
+
+
+def test_selected_moment_companion_requires_actual_mounted_cases_and_strict_evidence() -> None:
+    import copy
+    import importlib.util
+    import pytest
+    import re
+
+    source = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text()
+    selection = 'LAUNCH_QUALITY_UI_TESTS=(' + source.split('LAUNCH_QUALITY_UI_TESTS=(', 1)[1].split('UI_RESULT_BUNDLE=', 1)[0]
+    result = subprocess.run(['bash', '-e', '-u', '-c', selection + '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\nprintf "evidence:%s\\n" "${UI_EVIDENCE_ARGS[@]}"\n'], text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+    assert result.returncode == 0, result.stderr
+    selectors = [line.removeprefix('selector:') for line in result.stdout.splitlines() if line.startswith('selector:')]
+    args = [line.removeprefix('evidence:') for line in result.stdout.splitlines() if line.startswith('evidence:')]
+    expected = args[1::2]
+    required = ['HomeV2LayoutUITests/' + name + '()' for name in ['testSelectedMomentUnavailableWeightDoesNotCarryPastReading', 'testSelectedMomentBodyFatOnlyKeepsSourceWithoutFalseAbsence', 'testSelectedInferredWeightHasRealFocusWithZeroPastSamples', 'testSelectedInferredWeightHasRealFocusWithOnePastSample']]
+    assert args[::2] == ['--expected-test'] * len(selectors)
+    assert len(selectors) == len(set(selectors))
+    assert len(expected) == len(set(expected))
+    assert expected == [identifier.removeprefix("-only-testing:LogYourBodyUITests/") + "()" for identifier in selectors]
+    swift = (_REPO_ROOT / "apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift").read_text()
+    for identifier in required:
+        method = identifier.removesuffix("()").split("/")[1]
+        assert len(re.findall(r"func " + re.escape(method) + r"\(", swift)) == 1
+    for identifier in required:
+        assert selectors.count('-only-testing:LogYourBodyUITests/' + identifier.removesuffix('()')) == 1
+        assert expected.count(identifier) == 1
+    spec = importlib.util.spec_from_file_location('weight_hero_evidence', _REPO_ROOT / 'scripts/ios/launch-quality-evidence.py')
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    passed = {'testNodes': [{'nodeType': 'Test Case', 'nodeIdentifier': name, 'result': 'Passed'} for name in required]}
+    assert len(evidence.validate_cases(passed, required)) == len(required)
+    for index in range(len(required)):
+        for status in [None, 'Skipped', 'Failed', 'duplicate']:
+            negative = copy.deepcopy(passed)
+            if status is None:
+                negative['testNodes'].pop(index)
+            elif status == 'duplicate':
+                negative['testNodes'].append(copy.deepcopy(negative['testNodes'][index]))
+            else:
+                negative['testNodes'][index]['result'] = status
+            with pytest.raises(ValueError):
+                evidence.validate_cases(negative, required)
+
+
+def test_fixed_current_main_and_combined_step_cases_use_required_whole_unit_evidence() -> None:
+    import copy
+    import importlib.util
+    import re
+    import pytest
+
+    script = _REPO_ROOT / "scripts/ios/launch-quality-audit.sh"
+    source = script.read_text()
+    construction = "CURRENT_COMPOSITION_UNIT_TESTS=(" + source.split(
+        "CURRENT_COMPOSITION_UNIT_TESTS=(", 1
+    )[1].split("# The whole unit target is the gate:", 1)[0]
+    result = subprocess.run(
+        ["bash", "-e", "-u", "-c", construction +
+         '\n' + 'printf "%s\\n" "${CURRENT_COMPOSITION_UNIT_EVIDENCE_ARGS[@]}"'],
+        text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+    )
+    assert result.returncode == 0, result.stderr
+    arguments = result.stdout.splitlines()
+    assert arguments[::2] == ["--expected-test"] * len(arguments[1::2])
+    expected = arguments[1::2]
+    required = [
+        "DashboardStepPersistenceTests/testMissingHealthKitStepsDoNotCreateAnEmptyDashboardDay",
+        "DashboardStepPersistenceTests/testMissingHealthKitStepsLeaveExistingDashboardRowUnchanged",
+        "DashboardStepPersistenceTests/testObservedHealthKitZeroStillPersistsThroughDashboard",
+        "HealthKitImportOwnershipTests/testCancelledMissingTodayQueryCannotClearCurrentReading",
+        "HealthKitImportOwnershipTests/testLateMissingTodayQueryCannotClearReplacementAccountReading",
+        "HealthKitImportOwnershipTests/testObservedTodayZeroPublishesAndPersistsAsAnActualReading",
+        "HealthKitImportOwnershipTests/testTodayMissingQuantityAndHealthKitNoDataDoNotPublishAReading",
+        "HealthKitStepCountPolicyTests/testMissingQuantityRemainsAbsentWhileMeasuredZeroIsPreserved",
+        "HealthKitStepCountPolicyTests/testNoDataIsRecognizedWithoutInventingAStepCount",
+        "PhotoMetadataServiceTests/testBodyFatEstimateBecomesAbsentWhenTheLastValueIsRemoved",
+        "PhotoMetadataServiceTests/testBodyFatEstimateDoesNotCollideOnCommaSeparatedIDs",
+        "PhotoMetadataServiceTests/testBodyFatEstimateDoesNotReuseAnotherOwnersSameRecordID",
+        "PhotoMetadataServiceTests/testBodyFatEstimatePreservesUnsortedInterpolationAndEqualDateSelection",
+        "PhotoMetadataServiceTests/testBodyFatEstimateReflectsChangedDatesWithStableRecordIDs",
+        "PhotoMetadataServiceTests/testBodyFatEstimateReflectsChangedValuesWithStableRecordIDs",
+        "ProfileSettingsPolicyTests/testBirthdayAgeChangesOnTheLocalBirthdayAcrossTimeZones",
+        "ProfileSettingsPolicyTests/testBirthdayAgeRetainsLeapDayAndIgnoresLegacyTimestampTimeOfDay",
+        "ProfileSettingsPolicyTests/testBirthdayAgeUsesGregorianYearsWithANonGregorianUserCalendar",
+        "ProfileSettingsPolicyTests/testBirthdayPickerCalendarRoundTripsThroughTheActualProfilePayload",
+        "ProfileSettingsPolicyTests/testBirthdayPresentationAndBirthYearPreserveTheAPIJanFirstDate",
+        "ProfileSettingsPolicyTests/testBirthdayTodayBoundaryUsesTheLocalDayOnEitherSideOfTheDateLine",
+        "ProfileSettingsPolicyTests/testBirthdayValidationDoesNotAdmitAnUnderageUserBeforeTheirLocalBirthday",
+        "SyncIntegrationRemotePayloadTests/testMalformedProfilePullDoesNotInsertOrPoisonFollowingValidSave",
+        "SyncIntegrationRemotePayloadTests/testMobileProfilePullPersistsRequiredFieldsIntoIndependentContext",
+        "SyncIntegrationRemotePayloadTests/testProfilePullDoesNotEraseBirthDateForMalformedMissingOrNullValues",
+        "SyncIntegrationRemotePayloadTests/testProfilePullPersistsDateOnlyBirthDateFromMobileAPI",
+        "SyncIntegrationRemotePayloadTests/testProfilePullPreservesKnownMetadataWhenMobilePayloadOmitsIt",
+        "SyncIntegrationRemotePayloadTests/testProfilePullRetainsWholeAndFractionalTimestampBirthDates",
+        "SyncIntegrationRemotePayloadTests/testProfilePullUpdatesEmailAndVersionWithoutReplacingCreationDate",
+        "DashboardViewModelHealthSyncWiringTests/testSupersededRefreshMissingStepsCannotFinishNewerSameOwnerRefresh",
+        "DashboardViewModelHealthSyncWiringTests/testCurrentObservedZeroSavesAndReadsBackBeforeReceiptPublicationAndSync",
+        "DashboardViewModelHealthSyncWiringTests/testHeldObservedZeroIsRejectedInsideStoreAfterSupersessionOrCancellation"
+]
+    assert len(expected) == len(set(expected))
+    assert expected == [identifier + "()" for identifier in required]
+    for identifier in required:
+        suite, method = identifier.split("/")
+        swift = (_REPO_ROOT / "apps/ios/LogYourBodyTests" / (suite + ".swift")).read_text()
+        assert len(re.findall(r"\bfunc\s+" + re.escape(method) + r"\s*\(", swift)) == 1, identifier
+    obsolete = [
+        "HealthKitImportOwnershipTests/testTodayMissingQuantityAndHealthKitNoDataStillPublishZero",
+        "HealthKitStepCountPolicyTests/testMissingQuantityAndZeroRemainZero",
+        "HealthKitStepCountPolicyTests/testNoDataForTodayReadsAsZeroSteps",
+    ]
+    assert not set(required).intersection(obsolete)
+    unit_gate = source.split("# The whole unit target is the gate:", 1)[1].split(
+        "LAUNCH_QUALITY_UI_TESTS=(", 1
+    )[0]
+    assert "-only-testing:LogYourBodyTests" in unit_gate
+    assert '"${CHAT_UNIT_EVIDENCE_ARGS[@]}"' in unit_gate
+    assert '"${CORRECTION_FIXTURE_UNIT_EVIDENCE_ARGS[@]}"' in unit_gate
+    assert '"${CURRENT_COMPOSITION_UNIT_EVIDENCE_ARGS[@]}"' in unit_gate
+    assert unit_gate.index("assert_xcresult_evidence") < unit_gate.index("native-coverage-ratchet.py")
+    spec = importlib.util.spec_from_file_location(
+        "current_composition_evidence", script.with_name("launch-quality-evidence.py")
+    )
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    cases = [{"nodeType": "Test Case", "nodeIdentifier": name, "result": "Passed"} for name in expected]
+    assert len(evidence.validate_cases({"testNodes": cases}, expected)) == len(expected)
+    for name in expected:
+        for state in ("missing", "Failed", "Skipped", "duplicate", "failed-repetition", "skipped-repetition"):
+            invalid = copy.deepcopy(cases)
+            target = next(case for case in invalid if case["nodeIdentifier"] == name)
+            if state == "missing":
+                invalid.remove(target)
+            elif state == "duplicate":
+                invalid.append(copy.deepcopy(target))
+            elif state.endswith("-repetition"):
+                target["children"] = [{
+                    "nodeType": "Test Case Run",
+                    "result": "Failed" if state.startswith("failed") else "Skipped",
+                }]
+            else:
+                target["result"] = state
+            with pytest.raises(ValueError):
+                evidence.validate_cases({"testNodes": invalid}, expected)
+
+
+def _timeline_repair_route_arguments(source: str) -> tuple[list[str], list[str]]:
+    """Evaluate only selector construction; never run xcodebuild or app code."""
+    unit_start = source.index("TIMELINE_REPAIR_UNIT_TESTS=(")
+    unit_end = source.index("# The whole unit target is the gate:", unit_start)
+    ui_start = source.index("LAUNCH_QUALITY_UI_TESTS=(")
+    ui_end = source.index("UI_RESULT_BUNDLE=", ui_start)
+    fragment = source[unit_start:unit_end] + source[ui_start:ui_end]
+    result = subprocess.run(
+        ["bash", "-c", fragment +
+         '\nprintf "native:%s\\n" "${TIMELINE_REPAIR_UNIT_EVIDENCE_ARGS[@]}"' +
+         '\nprintf "ui:%s\\n" "${UI_SELECTORS[@]}"' +
+         '\nprintf "evidence:%s\\n" "${UI_EVIDENCE_ARGS[@]}"'],
+        capture_output=True, text=True, check=True, pass_fds=_coverage_fds(),
+    )
+    lines = result.stdout.splitlines()
+    native = [line.removeprefix("native:") for line in lines if line.startswith("native:")]
+    selectors = [line.removeprefix("ui:") for line in lines if line.startswith("ui:")]
+    evidence = [line.removeprefix("evidence:") for line in lines if line.startswith("evidence:")]
+    assert native[::2] == ["--expected-test"] * (len(native) // 2)
+    assert evidence[::2] == ["--expected-test"] * len(selectors)
+    assert [s.removeprefix("-only-testing:LogYourBodyUITests/") + "()" for s in selectors] == evidence[1::2]
+    return native[1::2], selectors
+
+
+def _assert_timeline_repair_release_route(source: str) -> None:
+    required_native = {
+        'HomeV2PhotoJourneyPolicyTests/testPhotoScrubRequiresMoreThanASecondAndMapsBothDirectionsWithoutAnInitialJump()',
+        'HomeV2PhotoJourneyPolicyTests/testPhotoScrubRejectsEmptySingleOrInvalidSelectionsAndGeometry()',
+        'HomeV2PhotoJourneyPolicyTests/testPhotoScrubGateDefaultsOffAndUsesThePlatformPort()',
+        'HomeV2PhotoJourneyPolicyTests/testAdaptiveRulerCapsTenYearDailyHistoryAndKeepsSelectedObservation()',
+        'HomeV2PhotoJourneyPolicyTests/testAdaptiveRulerSparseTenYearHistoryDoesNotGenerateCalendarNoise()',
+        'HomeV2PhotoJourneyPolicyTests/testAdaptiveRulerNeverLosesASelectedCoincidentOriginalIndex()',
+        'HomeV2PhotoJourneyPolicyTests/testAdaptiveRulerRapidForwardReverseSelectionRetainsEveryRawSelectableDate()',
+        'HomeV2PhotoJourneyPolicyTests/testAdaptiveRulerReversedInputPreservesOriginalIndicesAndTimestamps()',
+        'HomeV2PhotoJourneyPolicyTests/testAdaptiveRulerBoundsExtremeHistoryBeforeIteratingCalendarMarks()',
+        'HomeV2PhotoJourneyPolicyTests/testAdaptiveRulerCalendarLocaleAndLargeTypeRespectActualLabelSpacing()',
+        'HomeV2PhotoJourneyPolicyTests/testAdaptiveRulerInvalidGeometryStaysFiniteAndSelectedIsVisible()',
+        'HomeV2PhotoJourneyPolicyTests/testAdaptiveRulerRTLAndLTRMapTheSameObservedMomentAndClampEdges()',
+        'HomeV2PhotoJourneyPolicyTests/testHomeWeightScaleUsesSupportedObservedBoundsWithoutInventingReadings()',
+        'HomeV2PhotoJourneyPolicyTests/testHomeWeightScaleSnapshotExcludesForeignOwnersAndReflectsSameRowCorrection()',
+        'HomeV2PhotoJourneyPolicyTests/testHomeWeightScaleUnitChangeConvertsOnceAndKeepsCanonicalBounds()',
+        'HomeV2PhotoJourneyPolicyTests/testHomeFixedChartScaleSurvivesVisibleDateChangesWhenItEnclosesObservedValues()',
+        'HomeV2PhotoJourneyPolicyTests/testHomeFixedChartScaleRejectsClippingInvalidBoundsAndZeroAnchorContradictions()',
+        'HomeV2PhotoJourneyPolicyTests/testHeroCacheMethodOnlyCorrectionRevokesAndRestoresWideDEXAEstimate()',
+        'HomeV2PhotoJourneyPolicyTests/testHeroCacheFieldSourceOnlyCorrectionRevokesAndRestoresWideDEXAEstimate()',
+        'HomeV2PhotoJourneyPolicyTests/testHeroCacheHeightChangePreservesMeasurementsAndRecomputesCanonicalFFMI()',
+        'HomeV2PhotoJourneyPolicyTests/testHeroReadingMissingRequestedMetricCannotSubstituteAnotherAvailableKind()',
+        'HomeV2PhotoJourneyPolicyTests/testHeroReadingRejectsInvalidCompositionGeometryWithoutRewritingDisplayValue()',
+        'HomeV2PhotoJourneyPolicyTests/testContextualShareStartsWithChosenMetricAndKeepsTheFrozenMomentAcrossPickerChanges()',
+        'HomeV2PhotoJourneyPolicyTests/testContextualShareUnavailableChosenMetricStaysChosenAndCannotExport()',
+        'HomeV2PhotoJourneyPolicyTests/testContextualSharePrivacyDefaultsDoNotAddUnselectedHealthFieldsOrVisuals()',
+        'HomeV2PhotoJourneyPolicyTests/testScreenshotOfferRequiresActiveVisibleAndNoExistingPresentation()',
+        'HomeV2PhotoJourneyPolicyTests/testMVPTopLevelSidebarHasOnlyTodayAndProgress()',
+        'HomeV2PhotoJourneyPolicyTests/testFrozenHomeShareRejectsLogoutAccountReplacementAndSameSubjectGenerationChange()',
+        'HomeV2PhotoJourneyPolicyTests/testRulerDropsLabelsWhoseActualClampedFramesOverlapAtEitherEdge()',
+        'HomeV2PhotoJourneyPolicyTests/testRulerActualLabelGeometryStaysBoundedAtAccessibilitySpacingAndNarrowWidths()',
+        'HomeV2PhotoJourneyPolicyTests/testLoadingSelectedShareSnapshotCannotExportOrReuseAStaleNumber()',
+        'HomeV2PhotoJourneyPolicyTests/testShareDetailControlsUseOnlyNonblankFieldsOfTheSelectedFrozenSnapshot()',
+        'HomeV2TimelinePolicyTests/testChosenMetricAdapterRetainsActualBracketedValuesAnchorsAndCanonicalFFMI()',
+        'HomeV2TimelinePolicyTests/testChosenMetricAdapterConvertsWeightOnceAndPreservesInferenceAcrossUnitChanges()',
+        'HomeV2TimelinePolicyTests/testChosenMetricAdapterExactSelectedRecordWinsOverBracketedHistory()',
+        'HomeV2TimelinePolicyTests/testChosenMetricAdapterKeepsUnavailableKindAndDoesNotClaimFFMIWasLogged()',
+        'HomeV2TimelinePolicyTests/testNonPhotoPresentationAdmitsValidOwnedMomentWithoutAuthorizingPhotoWork()',
+        'HomeV2TimelinePolicyTests/testNonPhotoPresentationRejectsDeletedCorrectedAndReconciledReplacementRows()',
+        'HomeV2TimelinePolicyTests/testOrdinaryTimelineSwipeRequiresHorizontalIntentBeforeRecognition()',
+        'HomeV2TimelinePolicyTests/testOrdinaryTimelineSlowSwipeUsesIndependentWidthThresholdsAndDirection()',
+        'HomeV2TimelinePolicyTests/testOrdinaryTimelineFastReverseFlickUsesFinalVelocityAndMinimumTravel()',
+        'HomeV2TimelinePolicyTests/testOrdinaryTimelineSwipeMirrorsRTLAndRejectsMalformedOrVerticalGeometry()',
+        'HomeV2TimelinePolicyTests/testRapidReverseSwipeResolvesExistingIDsAndKeepsTheRequestedMissingMetric()',
+        'HomeV2TimelinePolicyTests/testPhotoViewerAdmissionRequiresTheExactOpeningEvenWhenOwnerRowsAndPhotoAreUnchanged()',
+        'HomeV2TimelinePolicyTests/testPhotoViewerAdmissionRejectsDismissalNonactiveRootAndEveryCompetingRoute()',
+        'HomeV2TimelinePolicyTests/testPhotoViewerAdmissionRetainsActualSelectionSessionAndRawPhotoRevisionFences()',
+        'HomeV2TimelinePolicyTests/testPhotoViewerAdmissionCannotUseGeneralNonPhotoAdmissionToAuthorizeViewerWork()',
+        'HomeV2TimelinePolicyTests/testHeldPhotoViewerCallbackCannotActAfterSameOwnerDataAndPhotoCloseReopen()',
+        'HomeV2ContextPolicyTests/testBodyFatEditorGateRequiresExplicitRolloutOrAuthenticatedExclusiveFixture()',
+        'HomeV2ContextPolicyTests/testContextStepsDoesNotInventAValueForMissingData()',
+        'HomeV2ContextPolicyTests/testContextStepsPreservesPositiveCountFormatting()',
+        'HomeV2ContextPolicyTests/testContextStepsRejectsNegativeCounts()',
+        'HomeV2ContextPolicyTests/testContextStepsRetainsAnExplicitZero()',
+        'HomeV2ContextPolicyTests/testEditorDisplayFontIsBundledAndRegistered()',
+        'HomeV2ContextPolicyTests/testEntryEditHistoricalReadingsSurviveButReplacementValuesAreValidated()',
+        'HomeV2ContextPolicyTests/testEntryEditMissingWeightStaysMissingAndExistingWeightCannotBeCleared()',
+        'HomeV2ContextPolicyTests/testEntryEditPreservationRequiresItsOwnGateOrAuthenticatedTestFixture()',
+        'HomeV2ContextPolicyTests/testEntryEditRejectsInvalidNumbersWithoutSubstitutingDefaults()',
+        'HomeV2ContextPolicyTests/testEntrySavedConfirmationDoesNotInventWeight()',
+        'HomeV2ContextPolicyTests/testCurrentMainHistoricalEntriesPreserveFlaggedTimesAndImportProvenance()',
+        'HomeV2ContextPolicyTests/testCurrentMainLegacyCorrectionPreservesImportOriginAndManualFieldProvenance()',
+        'HomeV2ContextPolicyTests/testCorrectionWriterDirtyTargetAndMovedCommittedIdentityKeepEveryPendingDraft()',
+        'HomeV2ContextPolicyTests/testCorrectionWriterComparesActualFetchedFullPreimageAfterFirstInsideAdmission()',
+        'HomeV2ContextPolicyTests/testCorrectionWriterKeepsOpaqueColumnsAndUnrelatedDraftThroughRealIndependentRead()',
+        'HomeV2ContextPolicyTests/testCorrectionWriterOrdersTwoInsideAdmissionsOneObserverAndImmediateActualStoredDTO()',
+        'HomeV2ContextPolicyTests/testCorrectionWriterRejectsSecondAdmissionOrLateDirtyTargetBeforeObserverSuccessAndCommit()',
+        'HomeV2ContextPolicyTests/testCorrectionPostcommitFailuresKeepDurableDataAndNeverBecomeAdmissionRejections()',
+        'HomeV2ContextPolicyTests/testCorrectionWriterGenericNilRetainsButExplicitMethodNilAndClearUseActualStoredValues()',
+        'HomeV2ContextPolicyTests/testDisplayedCorrectionIntentPreservesRawNoOpPrecisionAndParsesOnlyGenuineUnitEdits()',
+        'HomeV2ContextPolicyTests/testCorrectionSaveSkipsSemanticNoOpEffectsButPersistsExplicitMethodChanges()',
+        'HomeV2ContextPolicyTests/testTodayCorrectionReceiptUsesActualWriterPreviousAndCommittedChangedWeight()',
+        'HomeV2ContextPolicyTests/testTodayCorrectionReceiptRejectsActualBodyFatOnlyMissingWeightAndNoOpWriterResults()',
+        'DashboardViewModelHealthSyncWiringTests/testHeldLatestLoadCannotPublishAcrossOwnerOrGenerationReplacement()',
+        'DashboardViewModelHealthSyncWiringTests/testCancelledHeldLoadCannotPublishAndCurrentOwnerCanRecover()',
+        'DashboardViewModelHealthSyncWiringTests/testNewerSameOwnerLoadKeepsDailyTailWhenOlderLatestReturns()',
+        'DashboardViewModelHealthSyncWiringTests/testPublishedLifetimeClearsWithoutHeldReaderReturning()',
+        'DashboardViewModelHealthSyncWiringTests/testNilOwnerAndOwnedEmptyLoadHaveDifferentCompletionSemantics()',
+        'DashboardViewModelHealthSyncWiringTests/testQueuedNilCaptureCannotRebaseOrClearNewerHeldRefresh()',
+        'DashboardViewModelHealthSyncWiringTests/testActualStartupPaintsLatestBeforeHeldCoordinatorAndThenLoadsHistory()',
+        'DashboardViewModelHealthSyncWiringTests/testSupersededStartupCannotReplaceNewerSameOwnerHeldRefresh()',
+        'DashboardViewModelHealthSyncWiringTests/testSupersededStartupCannotRestartAfterNewerSameOwnerLoadCompletes()',
+        'DashboardViewModelHealthSyncWiringTests/testSameLifetimeProfilePublicationPreservesHeldRequest()',
+        'DashboardViewModelHealthSyncWiringTests/testActualPublishedPayloadsCarryReceiptBeforeStoredGetterChanges()',
+        'DashboardViewModelHealthSyncWiringTests/testCoordinatorErrorStillCompletesOwnedLocalRefreshWithoutStuckSpinner()',
+        'DashboardViewModelHealthSyncWiringTests/testHistoricalTaskUsesOriginalLifetimeAndCurrentOwnerRecovers()',
+        'DashboardViewModelHealthSyncWiringTests/testOlderHeldRefreshCannotClearNewerRefreshTerminalState()',
+        'DashboardViewModelHealthSyncWiringTests/testStaleExplicitRefreshReceiptCannotInvalidateCurrentPublication()',
+        'DashboardViewModelHealthSyncWiringTests/testHeldRefreshCannotAdoptReplacementOrFinishAfterCancellation()',
+    }
+    required_ui = {
+        '-only-testing:LogYourBodyUITests/LogYourBodyUITests/testBodyFatEditorImportedCorrectionAndDeleteCancelPreserveSource',
+        '-only-testing:LogYourBodyUITests/LogYourBodyUITests/testBodyFatEditorLargestTextKeepsFocusedMetricAndDoneVisible',
+        '-only-testing:LogYourBodyUITests/LogYourBodyUITests/testBodyFatEditorPreservesMissingWeightAndRecoversFromValidation',
+        '-only-testing:LogYourBodyUITests/LogYourBodyUITests/testHomeV2ManualCorrectionKeepsImportedSiblingAndUndoSource',
+        '-only-testing:LogYourBodyUITests/LogYourBodyUITests/testHomeV2PhotoOnlyEditorDoesNotInventWeight',
+        '-only-testing:LogYourBodyUITests/HomeV2TimelineIntegrationUITests/testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap',
+        '-only-testing:LogYourBodyUITests/HomeV2TimelineIntegrationUITests/testPhotoScrubResetsWhenNavigatingToTheMenuAndBack',
+    }
+    native, ui = _timeline_repair_route_arguments(source)
+    assert len(native) == len(set(native))
+    assert required_native <= set(native)
+    assert required_ui <= set(ui)
+    unit = source.index('"$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage')
+    unit_end = source.index("\n\n", unit)
+    assert '"${TIMELINE_REPAIR_UNIT_EVIDENCE_ARGS[@]}"' in source[unit:unit_end]
+    assert source.rfind("-only-testing:LogYourBodyTests", 0, unit) != -1
+    assert unit < source.index('python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py"') < source.index("LAUNCH_QUALITY_UI_TESTS=(")
+    assert '"${UI_SELECTORS[@]}"' in source[source.index("UI_RESULT_BUNDLE="):]
+    assert 'assert_xcresult_evidence "$UI_RESULT_BUNDLE" "${UI_EVIDENCE_ARGS[@]}"' in source
+    assert 'DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90' in source
+    assert 'MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180' in source
+    assert 'UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1500' in source
+
+
+def test_timeline_repair_native_and_retained_ui_purposes_require_executed_evidence() -> None:
+    source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
+    _assert_timeline_repair_release_route(source)
+
+
+def test_timeline_repair_route_rejects_missing_witness_or_disconnected_evidence() -> None:
+    source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
+    mutations = [
+        source.replace('  "HomeV2TimelinePolicyTests/testHeldPhotoViewerCallbackCannotActAfterSameOwnerDataAndPhotoCloseReopen"\n', "", 1),
+        source.replace('  "LogYourBodyUITests/testHomeV2PhotoOnlyEditorDoesNotInventWeight"\n', "", 1),
+        source.replace(' "${TIMELINE_REPAIR_UNIT_EVIDENCE_ARGS[@]}"\n', "\n", 1),
+        source.replace('  UI_EVIDENCE_ARGS+=(--expected-test "$test_id()")', '  UI_EVIDENCE_ARGS+=(--expected-test "WrongClass/testWrongPurpose()")', 1),
+    ]
+    for changed in mutations:
+        assert changed != source
+        try:
+            _assert_timeline_repair_release_route(changed)
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError("The release route accepted a missing or disconnected repair witness")

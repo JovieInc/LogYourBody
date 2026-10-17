@@ -23,9 +23,16 @@ struct DashboardViewLiquid: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var realtimeSyncManager: RealtimeSyncManager
     @Environment(\.scenePhase) private var scenePhase
+    var isHomeV2SceneActive: Bool { scenePhase == .active }
     @Environment(\.theme) var theme
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
-    @StateObject var viewModel = DashboardViewModel()
+    #if DEBUG
+    @Environment(\.homeV2CorrectionFixtureHold) var correctionFixtureHold
+    @Environment(\.homeV2CorrectionFixtureGraph) var correctionFixtureGraph
+    @State private var correctionFixtureHUDIdentity = UUID()
+    #endif
+    @StateObject var viewModel: DashboardViewModel
+    private let suppliedAnalyticsTracker: AnalyticsTracking?
     @StateObject var globalTimelineStore = GlobalTimelineStore()
 
     // Core data / selection
@@ -98,14 +105,18 @@ struct DashboardViewLiquid: View {
     @State var isShowingPhotoTimelineMenu = false
     @State var isPhotoTimelineSettingsPresented = false
     @State var isHomeV2ViewerPresented = false
+    @State var homeV2PhotoViewerOpeningID: UUID?
     @State var isHomeV2ContextPresented = false
     @State var isHomeV2MetricProvenancePresented = false
+    // Explicit hero identity is independent of the metric inspected in Progress.
+    @State var homeV2HeroMetric: HomeV2ProgressMetric = .bodyFat
     @State var homeV2ProgressMetric: HomeV2ProgressMetric = .bodyFat
     @StateObject var homeV2StepsReader = HomeV2DailyStepsReader()
     @State var isHomeV2EntriesPresented = false
     @State var homeV2ContextDay = Date()
-    @State var homeV2ContextMetricID: String?
-    @State var homeV2EditingSession: HomeV2EditSession?
+    @State var homeV2ContextRoute: HomeV2ContextRoute?
+    @State var homeV2CorrectionReturnBridge: HomeV2CorrectionReturnBridge?
+    @State var homeV2EditingMetric: BodyMetrics?
     @State var homeV2PhotoRoute: HomeV2PhotoRoute?
     @State var isHomeV2SettingsPresented = false
     @State var isHomeV2HelpPresented = false
@@ -149,10 +160,17 @@ struct DashboardViewLiquid: View {
 
     init(
         layoutMode: LayoutMode = .photoTimelineHUD,
-        releaseReviewDestination: Binding<ReleaseReviewDestination?> = .constant(nil)
+        releaseReviewDestination: Binding<ReleaseReviewDestination?> = .constant(nil),
+        viewModel: DashboardViewModel? = nil, analyticsTracker: AnalyticsTracking? = nil
     ) {
         self.layoutMode = layoutMode
         _releaseReviewDestination = releaseReviewDestination
+        suppliedAnalyticsTracker = analyticsTracker
+        if let viewModel {
+            _viewModel = StateObject(wrappedValue: viewModel)
+        } else {
+            _viewModel = StateObject(wrappedValue: DashboardViewModel())
+        }
 
         #if DEBUG
         let opensAnalyticsPage = ProcessInfo.processInfo.arguments.contains("-lybUITestPhotoTimelineAnalyticsFixture")
@@ -244,8 +262,22 @@ struct DashboardViewLiquid: View {
             bodyScoreShareOverlay
         }
 
-        let withLifecycle = base
+        #if DEBUG
+        let fixtureBase = base
+            .safeAreaInset(edge: .top) {
+                if let graph = correctionFixtureGraph, !isHomeV2ContextPresented, homeV2EditingMetric == nil {
+                    HomeV2CorrectionFixturePanel(graph: graph, scope: "home")
+                }
+            }
+        #else
+        let fixtureBase = base
+        #endif
+
+        let withLifecycle = fixtureBase
             .onAppear {
+                #if DEBUG
+                correctionFixtureGraph?.observeHUD(correctionFixtureHUDIdentity)
+                #endif
                 LaunchMetrics.markFirstDashboardFrame()
                 openReleaseReviewDestinationIfNeeded()
                 Task { @MainActor in
@@ -277,14 +309,27 @@ struct DashboardViewLiquid: View {
                 scheduleDashboardDerivedStateRefresh(rebuildDailyMetricsLookup: true)
                 scheduleMetricCacheRefresh()
             }
-            .onReceive(viewModel.$bodyMetrics) { metrics in
+            .onReceive(viewModel.$bodyMetrics.map { metrics in
+                // Capture the original receipt with the emitted payload, before @Published stores it.
+                (metrics, viewModel.publicationOwnership)
+            }) { publication in
+                let metrics: [BodyMetrics]
+                if let ownership = publication.1, authManager.ownsAccountSession(ownership) {
+                    metrics = publication.0
+                } else {
+                    metrics = []
+                }
                 reconcileHomeV2Timeline(with: metrics)
+                #if DEBUG
+                if let ownership = publication.1, authManager.ownsAccountSession(ownership) {
+                    correctionFixtureGraph?.observePublication(ownership, rows: metrics)
+                }
+                #endif
                 scheduleDashboardDerivedStateRefresh()
                 scheduleMetricCacheRefresh()
             }
-            .onChange(of: authManager.captureAccountSession()) { _, owner in
-                invalidateDashboardShareContext(currentOwner: owner)
-                homeV2EditingSession = nil
+            .onChange(of: authManager.captureAccountSession()) { _, ownership in
+                invalidateDashboardShareContext(currentOwner: ownership)
                 homeV2TimelineSelection = nil
                 isMetricDetailActive = false
                 isStatsDestinationActive = false
@@ -295,7 +340,12 @@ struct DashboardViewLiquid: View {
                 fullChartCache = [:]
                 fullTrendChartCache = [:]
                 metricEntriesCache = [:]
-                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
+                reconcileHomeV2Timeline(with: bodyMetrics)
+                Task { @MainActor in
+                    await viewModel.loadDataForCapturedSession(
+                        ownership, authManager: authManager, loadOnlyNewest: true, selectedIndex: 0
+                    )
+                }
             }
             .onChange(of: selectedRange) { _, newValue in
                 storedTimeRangeRawValue = newValue.rawValue
@@ -316,7 +366,7 @@ struct DashboardViewLiquid: View {
             }
             .onChange(of: selectedTab) { _, newTab in
                 if newTab == .photos {
-                    AppServicePorts.analyticsTracker.track(event: "photos_tab_opened")
+                    (suppliedAnalyticsTracker ?? AppServicePorts.analyticsTracker).track(event: "photos_tab_opened")
                 }
             }
             .onChange(of: releaseReviewDestination) { _, _ in
@@ -327,7 +377,7 @@ struct DashboardViewLiquid: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
                 featureGateRefreshToken = UUID()
-                reconcileHomeV2Timeline(with: viewModel.bodyMetrics)
+                reconcileHomeV2Timeline(with: bodyMetrics)
                 loadGlp1WeeklyCheckInDataIfNeeded()
             }
 
@@ -376,6 +426,15 @@ struct DashboardViewLiquid: View {
                       isMetricShareContextVisible, !showsScreenshotShareChoice,
                       let ownership = authManager.captureAccountSession(),
                       dashboardMetricsBelong(to: ownership) else { return }
+                if HomeV2Policy.isEnabled() {
+                    guard let payload = BodyScoreSharePayload.contextual(
+                        homeV2HeroShareSnapshots, selected: homeV2HeroShareKind,
+                        includeUnavailableSelection: true
+                    ) else { return }
+                    bodyScoreSharePresentationID = UUID()
+                    bodyScoreSharePayload = payload.owned(by: ownership)
+                    return
+                }
                 screenshotShareOwner = ownership
                 screenshotShareSnapshots = dashboardMetricShareSnapshots
                 showsScreenshotShareChoice = !screenshotShareSnapshots.isEmpty
@@ -451,6 +510,7 @@ struct DashboardViewLiquid: View {
                 bodyScoreSharePayload = nil
                 bodyScoreSharePresentationID = nil
             }
+            .id(bodyScoreSharePresentationID)
             .ignoresSafeArea()
             .zIndex(20)
             .transition(.opacity)
@@ -492,24 +552,22 @@ struct DashboardViewLiquid: View {
         loadMetricsOrder()
 
         selectedRange = TimeRange(rawValue: storedTimeRangeRawValue) ?? .month1
-        if !viewModel.hasLoadedInitialData {
-            Task {
-                await viewModel.loadData(
-                    authManager: authManager,
-                    loadOnlyNewest: !usesTimelinePerformanceTraceFixture,
-                    selectedIndex: selectedIndex
-                )
-                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
-            }
-        }
-
-        // Then refresh async (loads all data in background) once per dashboard lifecycle
+        let ownership = authManager.captureAccountSession()
+        // One startup task preserves latest first paint before starting the health refresh.
         if !hasPerformedInitialRefresh && !usesTimelinePerformanceTraceFixture {
             hasPerformedInitialRefresh = true
             Task {
-                await viewModel.refreshData(
-                    authManager: authManager,
-                    realtimeSyncManager: realtimeSyncManager
+                await viewModel.loadInitialDataAndRefresh(
+                    for: ownership, authManager: authManager, realtimeSyncManager: realtimeSyncManager,
+                    loadOnlyNewest: true, selectedIndex: selectedIndex
+                )
+                scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
+            }
+        } else if !hasLoadedCurrentDashboardData {
+            Task {
+                await viewModel.loadDataForCapturedSession(
+                    ownership, authManager: authManager,
+                    loadOnlyNewest: !usesTimelinePerformanceTraceFixture, selectedIndex: selectedIndex
                 )
                 scheduleDashboardDerivedStateRefresh(animatedIndex: selectedIndex)
             }
@@ -537,7 +595,7 @@ struct DashboardViewLiquid: View {
     }
 
     private func handleCoreDataContextChange(_ notification: Notification) {
-        guard !viewModel.isSyncingData else { return }
+        guard !isSyncingCurrentDashboardData else { return }
 
         let hasRelevantChange: Bool = {
             guard let userInfo = notification.userInfo else { return false }
@@ -591,7 +649,7 @@ struct DashboardViewLiquid: View {
         // global timeline buckets (that is multi-ms main-thread work and causes jank).
         if let animatedIndex, !rebuildDailyMetricsLookup {
             Task { @MainActor in
-                guard !viewModel.bodyMetrics.isEmpty else { return }
+                guard !bodyMetrics.isEmpty else { return }
                 PerfSignpost.measure("dashboard_scrub_refresh") {
                     updateAnimatedValues(for: animatedIndex, animate: false)
                 }
@@ -609,7 +667,7 @@ struct DashboardViewLiquid: View {
 
                 refreshGlobalTimelineStore()
 
-                if let animatedIndex, !viewModel.bodyMetrics.isEmpty {
+                if let animatedIndex, !bodyMetrics.isEmpty {
                     updateAnimatedValues(for: animatedIndex, animate: true)
                 }
             }
@@ -747,11 +805,11 @@ struct DashboardViewLiquid: View {
 
     @ViewBuilder
     private var dashboardContent: some View {
-        if viewModel.bodyMetrics.isEmpty && !viewModel.hasLoadedInitialData {
+        if bodyMetrics.isEmpty && !hasLoadedCurrentDashboardData {
             DashboardSkeleton(measurementSystem: currentMeasurementSystem)
         } else if layoutMode == .photoTimelineHUD {
             photoTimelineRoot
-        } else if viewModel.bodyMetrics.isEmpty {
+        } else if bodyMetrics.isEmpty {
             emptyState
         } else {
             TabView(selection: $selectedTab) {

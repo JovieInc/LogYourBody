@@ -4,9 +4,8 @@
 //
 import SwiftUI
 
-/// The scrubbable ruler under a photo (Pencil P3): months, weekly ticks,
-/// a tick per photo, the selected photo tallest. Dragging selects the
-/// nearest photo.
+/// The scrubbable ruler under a photo (Pencil P3). Screen-space buckets bound
+/// the visible marks; the complete date array still drives drag and accessibility.
 struct HomeV2PhotoTimelineRuler: View {
     let dates: [Date]
     let selected: Int
@@ -17,20 +16,41 @@ struct HomeV2PhotoTimelineRuler: View {
     var accessibilityId = "home_v2_photo_ruler"
     var accessibilityName = "Photo timeline"
 
-    private static let monthFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.setLocalizedDateFormatFromTemplate("MMM")
-        return formatter
-    }()
-
-    private var span: DateInterval { HomeV2PhotoRulerPolicy.span(for: dates, calendar: calendar) }
+    @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.locale) private var locale
+    @ScaledMetric(relativeTo: .caption) private var minimumLabelSpacing: CGFloat = 88
 
     var body: some View {
+        // One immutable span per evaluation. Both rendering and all gesture
+        // callbacks capture this value; scrubbing never sorts/rebuilds the axis.
+        let span = HomeV2PhotoRulerPolicy.span(for: dates, calendar: calendar)
         VStack(spacing: HomeV2Tokens.Space.tight) {
             if showsMonthLabels {
-                monthLabels
+                // Intrinsic caption height participates in safe-area measurement,
+                // including Dynamic Type, without a fixed-height label row.
+                Text("September 2026")
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
+                    .lineLimit(1)
+                    .hidden()
+                    .frame(maxWidth: .infinity)
             }
-            ticks
+            Color.clear.frame(height: JovieTokens.minimumHitTarget)
+        }
+        .overlay {
+            GeometryReader { geometry in
+                let width = geometry.size.width
+                let plan = HomeV2PhotoRulerPolicy.renderPlan(
+                    dates: dates, selected: selected, span: span, width: width,
+                    minimumLabelSpacing: minimumLabelSpacing, calendar: calendar, locale: locale
+                )
+                VStack(spacing: HomeV2Tokens.Space.tight) {
+                    if showsMonthLabels {
+                        monthLabels(plan.labels, width: width)
+                            .frame(height: max(0, geometry.size.height - JovieTokens.minimumHitTarget - HomeV2Tokens.Space.tight))
+                    }
+                    ticks(plan, width: width, span: span)
+                }
+            }
         }
         .padding(.horizontal, HomeV2Tokens.Space.inset)
         .accessibilityElement(children: .ignore)
@@ -46,67 +66,57 @@ struct HomeV2PhotoTimelineRuler: View {
         .accessibilityIdentifier(accessibilityId)
     }
 
-    private var monthLabels: some View {
-        // The intrinsic caption height must participate in the dock's safe-area
-        // measurement; a fixed row lets larger text overflow into scroll content.
-        Text(Self.monthFormatter.string(from: span.start))
-            .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
-            .hidden()
-            .frame(maxWidth: .infinity)
-            .overlay {
-                GeometryReader { geometry in
-                    let width = geometry.size.width
-                    ForEach(HomeV2PhotoRulerPolicy.monthStarts(in: span, calendar: calendar), id: \.self) { month in
-                        let x = HomeV2PhotoRulerPolicy.fraction(of: month, in: span) * width
-                        Text(Self.monthFormatter.string(from: month))
-                            .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
-                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                            .position(x: min(max(x, 14), width - 14), y: geometry.size.height / 2)
-                    }
-                }
-            }
-    }
-
-    private var ticks: some View {
+    private func monthLabels(_ labels: [HomeV2PhotoRulerPolicy.CalendarLabel], width: CGFloat) -> some View {
         GeometryReader { geometry in
-            let width = geometry.size.width
-            if allowsVerticalScrolling {
-                tickMarks(width: width)
-                    .gesture(HomeV2HorizontalPhotoScrub { position in
-                        select(at: position, width: width)
-                    })
-                    .simultaneousGesture(
-                        SpatialTapGesture().onEnded { value in select(at: value.location.x, width: width) }
-                    )
-            } else {
-                tickMarks(width: width)
-                    .gesture(DragGesture(minimumDistance: 0).onChanged { value in
-                        select(at: value.location.x, width: width)
-                    })
+            ForEach(labels, id: \.date) { label in
+                Text(label.text)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.small, relativeTo: .caption)
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    .lineLimit(1)
+                    .frame(width: min(minimumLabelSpacing, width))
+                    .position(x: layoutDirection == .rightToLeft ? width - label.position : label.position,
+                              y: geometry.size.height / 2)
             }
         }
-        .frame(height: JovieTokens.minimumHitTarget)
     }
 
-    private func tickMarks(width: CGFloat) -> some View {
+    @ViewBuilder
+    private func ticks(_ plan: HomeV2PhotoRulerPolicy.RenderPlan, width: CGFloat, span: DateInterval) -> some View {
+        if allowsVerticalScrolling {
+            tickMarks(plan, width: width, span: span)
+                .gesture(HomeV2HorizontalPhotoScrub { position in
+                    select(at: position, width: width, span: span)
+                })
+                .simultaneousGesture(
+                    SpatialTapGesture().onEnded { value in select(at: value.location.x, width: width, span: span) }
+                )
+        } else {
+            tickMarks(plan, width: width, span: span)
+                .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+                    select(at: value.location.x, width: width, span: span)
+                })
+        }
+    }
+
+    private func tickMarks(_ plan: HomeV2PhotoRulerPolicy.RenderPlan, width: CGFloat, span: DateInterval) -> some View {
         ZStack(alignment: .leading) {
-            ForEach(HomeV2PhotoRulerPolicy.weekTicks(in: span, calendar: calendar), id: \.self) { week in
+            ForEach(plan.minorTicks, id: \.self) { week in
                 tick(
-                    at: HomeV2PhotoRulerPolicy.fraction(of: week, in: span) * width,
+                    at: position(of: week, width: width, span: span),
                     height: 8,
                     color: HomeV2Tokens.Colors.borderStrong
                 )
             }
-            ForEach(HomeV2PhotoRulerPolicy.monthStarts(in: span, calendar: calendar), id: \.self) { month in
+            ForEach(plan.majorTicks, id: \.self) { month in
                 tick(
-                    at: HomeV2PhotoRulerPolicy.fraction(of: month, in: span) * width,
+                    at: position(of: month, width: width, span: span),
                     height: 20,
                     color: HomeV2Tokens.Colors.quiet
                 )
             }
-            ForEach(dates.indices, id: \.self) { index in
+            ForEach(plan.entryIndices, id: \.self) { index in
                 tick(
-                    at: HomeV2PhotoRulerPolicy.fraction(of: dates[index], in: span) * width,
+                    at: position(of: dates[index], width: width, span: span),
                     height: index == selected ? 28 : 14,
                     color: index == selected ? HomeV2Tokens.Colors.ink : HomeV2Tokens.Colors.secondary
                 )
@@ -116,12 +126,19 @@ struct HomeV2PhotoTimelineRuler: View {
         .contentShape(Rectangle())
     }
 
-    private func select(at position: CGFloat, width: CGFloat) {
-        let fraction = position / max(width, 1)
+    private func select(at position: CGFloat, width: CGFloat, span: DateInterval) {
+        let fraction = HomeV2PhotoRulerPolicy.logicalFraction(
+            at: position, width: width, isRightToLeft: layoutDirection == .rightToLeft
+        )
         if let index = HomeV2PhotoRulerPolicy.nearestIndex(to: fraction, dates: dates, span: span), index != selected {
             onSelect(index)
             HapticManager.shared.selection()
         }
+    }
+
+    private func position(of date: Date, width: CGFloat, span: DateInterval) -> CGFloat {
+        let fraction = HomeV2PhotoRulerPolicy.fraction(of: date, in: span)
+        return (layoutDirection == .rightToLeft ? 1 - fraction : fraction) * width
     }
 
     private func tick(at x: CGFloat, height: CGFloat, color: Color) -> some View {

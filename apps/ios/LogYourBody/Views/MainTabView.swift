@@ -13,8 +13,21 @@ struct MainTabView: View {
     @State private var selectedSurface: PaidAppSurface = PaidAppSurfacePolicy.surface()
     @Binding private var releaseReviewDestination: ReleaseReviewDestination?
 
-    init(releaseReviewDestination: Binding<ReleaseReviewDestination?> = .constant(nil)) {
+    #if DEBUG
+    @Environment(\.homeV2CorrectionFixtureGraph) private var correctionFixtureGraph
+    @State private var correctionFixtureRootIdentity = UUID()
+    #endif
+
+    private let suppliedDashboardViewModel: DashboardViewModel?
+    private let suppliedAnalyticsTracker: AnalyticsTracking?
+
+    init(
+        releaseReviewDestination: Binding<ReleaseReviewDestination?> = .constant(nil),
+        dashboardViewModel: DashboardViewModel? = nil, analyticsTracker: AnalyticsTracking? = nil
+    ) {
         _releaseReviewDestination = releaseReviewDestination
+        suppliedDashboardViewModel = dashboardViewModel
+        suppliedAnalyticsTracker = analyticsTracker
     }
 
     var body: some View {
@@ -23,18 +36,23 @@ struct MainTabView: View {
             case .photoTimelineHUD:
                 DashboardViewLiquid(
                     layoutMode: .photoTimelineHUD,
-                    releaseReviewDestination: $releaseReviewDestination
+                    releaseReviewDestination: $releaseReviewDestination,
+                    viewModel: suppliedDashboardViewModel, analyticsTracker: suppliedAnalyticsTracker
                 )
             case .legacyFullDashboardBeta:
                 DashboardViewLiquid(
                     layoutMode: .legacyTabbed,
-                    releaseReviewDestination: $releaseReviewDestination
+                    releaseReviewDestination: $releaseReviewDestination,
+                    viewModel: suppliedDashboardViewModel, analyticsTracker: suppliedAnalyticsTracker
                 )
             case .weightLoggerMVP:
                 PaidWeightLoggerMVPView()
             }
         }
         .onAppear {
+            #if DEBUG
+            correctionFixtureGraph?.observeMainTab(correctionFixtureRootIdentity)
+            #endif
             updateSelectedSurface()
         }
         .onChange(of: releaseReviewDestination) { _, destination in

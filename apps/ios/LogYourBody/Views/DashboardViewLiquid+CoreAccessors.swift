@@ -27,20 +27,33 @@ extension DashboardViewLiquid {
         currentMeasurementSystem.weightUnit
     }
 
+    var hasCurrentDashboardPublication: Bool {
+        viewModel.hasCurrentPublication(for: authManager)
+    }
+
+    var hasLoadedCurrentDashboardData: Bool {
+        viewModel.hasLoadedInitialData &&
+            (hasCurrentDashboardPublication || authManager.captureAccountSession() == nil)
+    }
+
+    var isSyncingCurrentDashboardData: Bool {
+        viewModel.hasCurrentActivity(for: authManager) && viewModel.isSyncingData
+    }
+
     var bodyMetrics: [BodyMetrics] {
-        viewModel.bodyMetrics
+        hasCurrentDashboardPublication ? viewModel.bodyMetrics : []
     }
 
     var sortedBodyMetricsAscending: [BodyMetrics] {
-        viewModel.sortedBodyMetricsAscending
+        hasCurrentDashboardPublication ? viewModel.sortedBodyMetricsAscending : []
     }
 
     var recentDailyMetrics: [DailyMetrics] {
-        viewModel.recentDailyMetrics
+        hasCurrentDashboardPublication ? viewModel.recentDailyMetrics : []
     }
 
     var dailyMetrics: DailyMetrics? {
-        viewModel.dailyMetrics
+        hasCurrentDashboardPublication ? viewModel.dailyMetrics : nil
     }
 
     /// Calculate age from date of birth
@@ -50,12 +63,14 @@ extension DashboardViewLiquid {
     }
 
     var currentMetric: BodyMetrics? {
+        guard hasCurrentDashboardPublication else { return nil }
         if layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled() {
-            guard let selection = homeV2TimelineSelection,
-                  selection.id.owner == authManager.currentUser?.id else { return nil }
+            guard let ownership = authManager.captureAccountSession(), homeV2Timeline.isOwned(by: ownership),
+                  let selection = homeV2TimelineSelection,
+                  selection.id.owner == ownership.subject else { return nil }
             return homeV2Timeline.metric(for: selection.id)
         }
-        let metrics = viewModel.bodyMetrics
+        let metrics = bodyMetrics
         guard !metrics.isEmpty, selectedIndex >= 0, selectedIndex < metrics.count else { return nil }
         return metrics[selectedIndex]
     }

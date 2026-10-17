@@ -14,6 +14,19 @@ extension DashboardViewLiquid {
         return authManager.currentUser?.email ?? "You"
     }
 
+    /// Profile stores canonical centimetres; display respects the chosen units.
+    var homeV2ProfileDetail: String? {
+        guard let profile = authManager.currentUser?.profile else { return nil }
+        var parts: [String] = []
+        if let sex = profile.gender?.trimmingCharacters(in: .whitespacesAndNewlines), !sex.isEmpty {
+            parts.append(sex.capitalized)
+        }
+        if let cm = profile.height, cm.isFinite, cm > 0 {
+            parts.append(UnitConversion.formatHeight(cm, useMetric: currentMeasurementSystem == .metric))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     var homeV2PlanText: String {
         let manager = SubscriptionManager.shared
         return HomeV2SettingsCopy.planText(
@@ -23,7 +36,6 @@ extension DashboardViewLiquid {
     }
 
     var homeV2SidebarSelection: HomeV2SidebarDestination {
-        if isHomeChatExpanded || selectedPhotoTimelineRootPage == .chat { return .ask }
         return selectedPhotoTimelineRootPage == .analytics ? .progress : .today
     }
 
@@ -33,7 +45,7 @@ extension DashboardViewLiquid {
             name: homeV2ProfileName,
             planText: homeV2PlanText,
             avatarURL: avatarURL,
-            photoCount: HomeV2PhotoIndex.photoIndices(in: bodyMetrics).count,
+            profileDetail: homeV2ProfileDetail,
             selected: homeV2SidebarSelection,
             // ponytail: chat history isn't exposed to the dashboard yet; the Ask slice fills this.
             recentConversations: [],
@@ -61,19 +73,8 @@ extension DashboardViewLiquid {
         case .today:
             selectedPhotoTimelineRootPage = .timeline
             isHomeChatExpanded = false
-        case .photos:
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(400))
-                isHomeV2AllPhotosPresented = true
-            }
         case .progress:
             openHomeV2Progress()
-        case .entries:
-            isHomeV2EntriesPresented = true
-        case .ask:
-            // Expand over the current workspace. Changing pages also collapses
-            // chat, and would dismiss Ask when it is opened from Progress.
-            isHomeChatExpanded = true
         }
     }
 
