@@ -30,6 +30,16 @@ const PASS_VERSION_STATES = new Set([
   'PREORDER_READY_FOR_SALE',
 ]);
 
+// A version that is or was on the store. Approved-but-unreleased states stay
+// out of this set: Apple and deliver only accept What's New after a release.
+export const RELEASED_VERSION_STATES = new Set([
+  'READY_FOR_SALE',
+  'READY_FOR_DISTRIBUTION',
+  'REPLACED_WITH_NEW_VERSION',
+  'DEVELOPER_REMOVED_FROM_SALE',
+  'REMOVED_FROM_SALE',
+]);
+
 const METADATA_FIELDS = [
   ['description', 'version', 'description'],
   ['keywords', 'version', 'keywords'],
@@ -302,7 +312,18 @@ export async function readReadiness({ asc, evidence = latestTestFlightUpload, ma
   const rows = [];
   const check = async (name, action, read) => {
     try {
-      rows.push({ check: name, pass: true, detail: await read(), action: '—' });
+      const value = await read();
+      if (value && typeof value === 'object') {
+        rows.push({
+          check: name,
+          pass: value.pass !== false,
+          result: value.result,
+          detail: value.detail,
+          action: value.action ?? '—',
+        });
+        return;
+      }
+      rows.push({ check: name, pass: true, detail: value, action: '—' });
     } catch (error) {
       rows.push({ check: name, pass: false, detail: error.message, action });
     }
@@ -436,11 +457,41 @@ export async function readReadiness({ asc, evidence = latestTestFlightUpload, ma
     "What's New",
     "Tim-only T6: replace ASC What's New with the committed storefront release notes. This workflow cannot write metadata.",
     async () => {
+      requireTrue(version?.id, `App Store ${VERSION} unavailable; see Version state`);
+      for (const locale of expectedLocales(manifest)) {
+        const expected = normalize(locale.metadata?.releaseNotes);
+        requireTrue(
+          expected && !expected.startsWith(STALE_WHATS_NEW_PREFIX),
+          `${locale.id} committed release notes are blank or pre-#1197`,
+        );
+      }
+      // Unfiltered by version string. readVersion asks only for 1.2.0; this
+      // list is how we tell a first version from one that follows a live release.
+      const versions = await asc.all(`/v1/apps/${APP_ID}/appStoreVersions`, {
+        'filter[platform]': 'IOS',
+        'fields[appStoreVersions]': 'versionString,appVersionState,platform',
+        limit: 200,
+      });
+      const iosVersions = versions.filter((item) => {
+        const platform = attributes(item).platform;
+        return !platform || platform === 'IOS';
+      });
+      const priorLive = iosVersions.filter(
+        (item) => item.id !== version.id && RELEASED_VERSION_STATES.has(attributes(item).appVersionState),
+      );
+      if (priorLive.length === 0) {
+        const listed = iosVersions
+          .map((item) => `${attributes(item).versionString || item.id} ${attributes(item).appVersionState || 'UNKNOWN'}`)
+          .join(', ');
+        return {
+          result: 'N/A',
+          detail: `N/A: no previously released iOS version (${listed || 'none listed'})`,
+        };
+      }
       const live = await versionLocales();
       const notes = [];
       for (const locale of expectedLocales(manifest)) {
         const expected = normalize(locale.metadata?.releaseNotes);
-        requireTrue(expected && !expected.startsWith(STALE_WHATS_NEW_PREFIX), `${locale.id} committed release notes are blank or pre-#1197`);
         const actual = live.find((item) => attributes(item).locale === locale.id);
         const whatsNew = normalize(attributes(actual).whatsNew);
         requireTrue(
@@ -491,14 +542,21 @@ const cell = (value) =>
   String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '&#124;').replace(/[\r\n]+/g, ' ');
 
 export function renderSummary(rows) {
+  const failed = rows.some((row) => row.pass === false);
+  const closing = failed
+    ? 'Resolve every FAIL row using its named Tim-only item before Submit.'
+    : 'No FAIL rows.';
   return (
     `## App Store ${VERSION} readiness\n\nRead-only App Store Connect snapshot. No submit, build attach, release, or metadata write.\n\n` +
     '| Check | Result | Evidence | Follow-up |\n| --- | --- | --- | --- |\n' +
     rows
-      .map((row) => `| ${cell(row.check)} | ${row.pass ? 'PASS' : 'FAIL'} | ${cell(row.detail)} | ${cell(row.action)} |`)
+      .map((row) => {
+        const label = row.result || (row.pass ? 'PASS' : 'FAIL');
+        return `| ${cell(row.check)} | ${label} | ${cell(row.detail)} | ${cell(row.action)} |`;
+      })
       .join('\n') +
-    `\n\nReadback complete. ${rows.every((row) => row.pass) ? 'All reported checks pass.' : 'Resolve every FAIL row using its named Tim-only item before Submit.'}\n\n` +
-    '[#1197](https://github.com/JovieInc/LogYourBody/pull/1197) merged 2026-10-11 (fe054800d6c4db490e780a8a8620571ebdcacdd2). Live What\'s New is checked above against that committed text.\n\n' +
+    `\n\nReadback complete. ${closing}\n\n` +
+    '[#1197](https://github.com/JovieInc/LogYourBody/pull/1197) merged 2026-10-11 (fe054800d6c4db490e780a8a8620571ebdcacdd2). What\'s New is N/A when no iOS version was previously released. A prior live version is still compared with that committed text.\n\n' +
     'Scope: version state, the newest uploaded build, the two pro1 subscriptions, and storefront metadata. Screenshots, privacy declarations, agreements, and a real-device purchase/restore remain on the release checklist. A green job means the readback ran; the table is the result.\n'
   );
 }

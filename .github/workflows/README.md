@@ -96,7 +96,7 @@ Uploads committed Fastlane metadata to App Store version 1.2.0 with deliver (`sk
 
 ### `app-store-connect-readiness.yml`
 
-Read-only App Store Connect check for version 1.2.0. It runs on a push to `main` that changes this workflow or Fastlane metadata, daily at 16:00 UTC, on `workflow_dispatch`, and after `app-store-metadata-sync.yml` succeeds. It reports version state, whether the newest TestFlight upload is processed and selectable, whether both pro1 subscriptions are Ready to Submit or already attached, and whether What's New and storefront metadata match the committed manifest. It does not submit, attach a build, or write metadata.
+Read-only App Store Connect check for version 1.2.0. It runs on a push to `main` that changes this workflow, the readiness script, or Fastlane metadata, daily at 16:00 UTC, on `workflow_dispatch`, and after `app-store-metadata-sync.yml` succeeds. It reports version state, whether the newest TestFlight upload is processed and selectable, whether both pro1 subscriptions are Ready to Submit or already attached, and whether storefront metadata matches the committed manifest. What's New is N/A when no iOS version was previously released, and FAILs when a prior live version's text differs. It does not submit, attach a build, or write metadata.
 
 ### `ios-testflight-deploy.yml`
 
