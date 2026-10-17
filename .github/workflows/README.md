@@ -92,7 +92,7 @@ Reusable/manual iOS release loop for TestFlight/App Store release paths.
 
 ### `app-store-metadata-sync.yml`
 
-Uploads committed Fastlane metadata to App Store version 1.2.0 with deliver (`skip_binary_upload`, no screenshots, no submit, no build attach). deliver skips What's New on the first version, so the job writes that field from the committed release notes. It runs on a push to `main` that changes this workflow or `apps/ios/fastlane/metadata/**`.
+Uploads committed Fastlane metadata to App Store version 1.2.0 with deliver (`skip_binary_upload`, no screenshots, no submit, no build attach). deliver skips What's New on the first version. The job still tries to write that field from the committed release notes. Apple's rejection of `whatsNew` on the only iOS version is a warning, not a failure. That same rejection fails the job once a second version exists. It runs on a push to `main` that changes this workflow or `apps/ios/fastlane/metadata/**`.
 
 ### `app-store-connect-readiness.yml`
 
