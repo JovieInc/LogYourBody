@@ -577,7 +577,8 @@ extension HomeV2ContextPolicyTests {
             let store = correctionStore()
             let original = correctionMetric()
             try await store.saveBodyMetricsAndWait(original, userId: original.userId)
-            let row = try XCTUnwrap(store.fetchBodyMetricsSync(for: original.userId).first)
+            let savedRows = await store.fetchBodyMetrics(for: original.userId)
+            let row = try XCTUnwrap(savedRows.first)
             let storedOriginal = correctionMetric(updatedAt: try XCTUnwrap(row.updatedAt))
             installCorrectionSession(original.userId)
             let ownership = try XCTUnwrap(auth.captureAccountSession())
@@ -626,7 +627,8 @@ extension HomeV2ContextPolicyTests {
             let store = correctionStore()
             let original = correctionMetric()
             try await store.saveBodyMetricsAndWait(original, userId: original.userId)
-            let row = try XCTUnwrap(store.fetchBodyMetricsSync(for: original.userId).first)
+            let savedRows = await store.fetchBodyMetrics(for: original.userId)
+            let row = try XCTUnwrap(savedRows.first)
             let storedOriginal = correctionMetric(updatedAt: try XCTUnwrap(row.updatedAt))
             installCorrectionSession(original.userId)
             let ownership = try XCTUnwrap(auth.captureAccountSession())
@@ -656,7 +658,8 @@ extension HomeV2ContextPolicyTests {
             XCTAssertEqual(saved, !replaceAfterWrite)
             XCTAssertEqual(published, replaceAfterWrite ? 0 : 1)
             XCTAssertEqual(row.weight, 82)
-            XCTAssertEqual(store.fetchBodyMetricsSync(for: original.userId).map(\.id), [original.id])
+            let rowsAfterWrite = await store.fetchBodyMetrics(for: original.userId)
+            XCTAssertEqual(rowsAfterWrite.map(\.id), [original.id])
             XCTAssertEqual(row.photoUrl, original.photoUrl)
             // A write already admitted for A remains A's write; this is not rollback.
         }
@@ -679,7 +682,8 @@ extension HomeV2ContextPolicyTests {
             let store = correctionStore()
             let original = correctionMetric()
             try await store.saveBodyMetricsAndWait(original, userId: original.userId)
-            let row = try XCTUnwrap(store.fetchBodyMetricsSync(for: original.userId).first)
+            let savedRows = await store.fetchBodyMetrics(for: original.userId)
+            let row = try XCTUnwrap(savedRows.first)
             let storedOriginal = correctionMetric(updatedAt: try XCTUnwrap(row.updatedAt))
             if scenario == "tombstone" { row.isMarkedDeleted = true }
             if scenario == "newer" { row.updatedAt = storedOriginal.updatedAt.addingTimeInterval(1) }
@@ -722,7 +726,8 @@ extension HomeV2ContextPolicyTests {
         let store = correctionStore()
         let original = correctionMetric()
         try await store.saveBodyMetricsAndWait(original, userId: original.userId)
-        let owned = try XCTUnwrap(store.fetchBodyMetricsSync(for: original.userId).first)
+        let savedRows = await store.fetchBodyMetrics(for: original.userId)
+        let owned = try XCTUnwrap(savedRows.first)
         let storedOriginal = correctionMetric(updatedAt: try XCTUnwrap(owned.updatedAt))
         // Deliberate legitimate pending context row: do not save/uniqueness-merge it away.
         let legacy = CachedBodyMetrics(context: store.viewContext)
@@ -935,7 +940,8 @@ extension HomeV2ContextPolicyTests {
         installCorrectionSession("entries-owner")
         let receipt = try XCTUnwrap(auth.captureAccountSession())
         for metric in originals { try await store.saveBodyMetricsAndWait(metric, userId: metric.userId) }
-        let before = store.fetchBodyMetricsSync(for: "entries-owner").compactMap { $0.toBodyMetrics() }
+        let beforeRows = await store.fetchBodyMetrics(for: "entries-owner")
+        let before = beforeRows.compactMap { $0.toBodyMetrics() }
             .sorted { $0.id < $1.id }
         XCTAssertEqual(before.count, 3)
         let selected = try XCTUnwrap(before.first(where: { $0.id == "selected" }))
@@ -951,7 +957,8 @@ extension HomeV2ContextPolicyTests {
             metrics: snapshot.metrics, unit: "kg", weightValue: { $0.weight }, hasPhoto: { _ in false }
         ).flatMap(\.rows)
         XCTAssertNil(try XCTUnwrap(rows.first(where: { $0.id == "selected" })).metric.bodyFatPercentage)
-        let after = store.fetchBodyMetricsSync(for: "entries-owner").compactMap { $0.toBodyMetrics() }
+        let afterRows = await store.fetchBodyMetrics(for: "entries-owner")
+        let after = afterRows.compactMap { $0.toBodyMetrics() }
             .sorted { $0.id < $1.id }
         XCTAssertEqual(after, before, "Re-fetch actual stored values/methods/metadata/revisions after read-only presentation")
         XCTAssertFalse(store.viewContext.hasChanges)
@@ -963,7 +970,8 @@ extension HomeV2ContextPolicyTests {
         let store = correctionStore()
         let originalInput = entriesBoundaryMetric("return-target", bodyFat: 16.2, method: "dexa")
         try await store.saveBodyMetricsAndWait(originalInput, userId: originalInput.userId)
-        let original = try XCTUnwrap(store.fetchBodyMetricsSync(for: originalInput.userId).first?.toBodyMetrics())
+        let originalRows = await store.fetchBodyMetrics(for: originalInput.userId)
+        let original = try XCTUnwrap(originalRows.first?.toBodyMetrics())
         let ownership = AuthManager.ProfileSessionOwnership(subject: original.userId, generation: 1)
         let route = HomeV2ContextRoute(metric: original, ownership: ownership)
         let receipt = HomeV2CorrectionReturnReceipt(destination: route, editorLifetime: UUID())
@@ -985,7 +993,8 @@ extension HomeV2ContextPolicyTests {
         XCTAssertTrue(bridge.admits(current: bridge.destination, metrics: [original], currentOwnership: ownership))
         XCTAssertTrue(bridge.admits(current: bridge.destination, metrics: [stored], currentOwnership: ownership))
         XCTAssertFalse(bridge.completed(current: bridge.destination, metrics: [original], currentOwnership: ownership))
-        let refreshed = store.fetchBodyMetricsSync(for: original.userId).compactMap { $0.toBodyMetrics() }
+        let refreshedRows = await store.fetchBodyMetrics(for: original.userId)
+        let refreshed = refreshedRows.compactMap { $0.toBodyMetrics() }
         XCTAssertTrue(bridge.completed(current: bridge.destination, metrics: refreshed, currentOwnership: ownership))
         XCTAssertEqual(HomeV2EntriesPolicy.admittedDestination(
             bridge.destination, current: bridge.destination, metrics: refreshed, currentOwnership: ownership
@@ -999,7 +1008,8 @@ extension HomeV2ContextPolicyTests {
         let store = correctionStore()
         let input = entriesBoundaryMetric("return-target")
         try await store.saveBodyMetricsAndWait(input, userId: input.userId)
-        let original = try XCTUnwrap(store.fetchBodyMetricsSync(for: input.userId).first?.toBodyMetrics())
+        let originalRows = await store.fetchBodyMetrics(for: input.userId)
+        let original = try XCTUnwrap(originalRows.first?.toBodyMetrics())
         let ownership = AuthManager.ProfileSessionOwnership(subject: original.userId, generation: 1)
         let route = HomeV2ContextRoute(metric: original, ownership: ownership)
         let receipt = HomeV2CorrectionReturnReceipt(destination: route, editorLifetime: UUID())
@@ -1038,7 +1048,8 @@ extension HomeV2ContextPolicyTests {
         let store = correctionStore()
         let input = entriesBoundaryMetric("generation-target")
         try await store.saveBodyMetricsAndWait(input, userId: input.userId)
-        let original = try XCTUnwrap(store.fetchBodyMetricsSync(for: input.userId).first?.toBodyMetrics())
+        let originalRows = await store.fetchBodyMetrics(for: input.userId)
+        let original = try XCTUnwrap(originalRows.first?.toBodyMetrics())
         let ownership = AuthManager.ProfileSessionOwnership(subject: original.userId, generation: 1)
         var current = ownership
         let changes = HomeV2CorrectionPolicy.Changes(weight: .kilograms(84))
@@ -1121,7 +1132,8 @@ extension HomeV2ContextPolicyTests {
         let store = correctionStore()
         let input = entriesBoundaryMetric("failed-case-real-writer", owner: owner)
         try await store.saveBodyMetricsAndWait(input, userId: owner)
-        let original = try XCTUnwrap(store.fetchBodyMetricsSync(for: owner).first?.toBodyMetrics())
+        let originalRows = await store.fetchBodyMetrics(for: owner)
+        let original = try XCTUnwrap(originalRows.first?.toBodyMetrics())
         let receipt = HomeV2CorrectionReturnReceipt(
             destination: .init(metric: original, ownership: ownership), editorLifetime: UUID()
         )
@@ -1238,7 +1250,8 @@ extension HomeV2ContextPolicyTests {
         let owner = "ui_test_photo_hud_user_\(UUID().uuidString)"
         let input = entriesBoundaryMetric("held-real-writer", owner: owner)
         try await store.saveBodyMetricsAndWait(input, userId: owner)
-        let original = try XCTUnwrap(store.fetchBodyMetricsSync(for: owner).first?.toBodyMetrics())
+        let originalRows = await store.fetchBodyMetrics(for: owner)
+        let original = try XCTUnwrap(originalRows.first?.toBodyMetrics())
         let ownership = AuthManager.ProfileSessionOwnership(subject: owner, generation: 1)
         let receipt = HomeV2CorrectionReturnReceipt(
             destination: .init(metric: original, ownership: ownership), editorLifetime: UUID()
@@ -1963,7 +1976,8 @@ extension HomeV2ContextPolicyTests {
         for moveIdentity in [false, true] {
             let store = correctionStore()
             let original = try await contextWriterSeed(store)
-            let row = try XCTUnwrap(store.fetchBodyMetricsSync(for: original.userId).first)
+            let targetRows = await store.fetchBodyMetrics(for: original.userId)
+            let row = try XCTUnwrap(targetRows.first)
             row.notes = "Uncommitted selected target"
             if moveIdentity { row.id = "moved-uncommitted-id" }
             let draft = CachedBodyMetrics(context: store.viewContext)
@@ -2004,7 +2018,8 @@ extension HomeV2ContextPolicyTests {
         for field in ["weight", "notes", "photo"] {
             let store = correctionStore()
             let expected = try await contextWriterSeed(store)
-            let row = try XCTUnwrap(store.fetchBodyMetricsSync(for: expected.userId).first)
+            let targetRows = await store.fetchBodyMetrics(for: expected.userId)
+            let row = try XCTUnwrap(targetRows.first)
             var admissions = 0, commits = 0, bridges = 0, rejected = 0
             do {
                 _ = try await store.updateExistingMetricMeasurementsAndWait(
@@ -2053,7 +2068,8 @@ extension HomeV2ContextPolicyTests {
     func testCorrectionWriterKeepsOpaqueColumnsAndUnrelatedDraftThroughRealIndependentRead() async throws {
         let store = correctionStore()
         let seeded = try await contextWriterSeed(store)
-        let row = try XCTUnwrap(store.fetchBodyMetricsSync(for: seeded.userId).first)
+        let targetRows = await store.fetchBodyMetrics(for: seeded.userId)
+        let row = try XCTUnwrap(targetRows.first)
         row.originalPhotoUrl = "synthetic-original-owner/photo.jpg"
         row.photoProcessedAt = seeded.date
         row.waistCircumference = 89.123
@@ -2110,7 +2126,17 @@ extension HomeV2ContextPolicyTests {
                 captured = actual
                 XCTAssertEqual(actual.previousMetric, original)
                 XCTAssertEqual(try self.contextWriterRead(store, id: original.id).metric, actual.metrics)
-                let shared = try XCTUnwrap(store.fetchBodyMetricsSync(for: original.userId).first?.toBodyMetrics())
+                // Keep this shared-context witness inside onStored, before the writer returns.
+                // An awaited read here would weaken the synchronous ordering assertion.
+                let request = CachedBodyMetrics.fetchRequest()
+                request.predicate = NSPredicate(
+                    format: "id == %@ AND userId == %@ AND isMarkedDeleted == NO", original.id, original.userId
+                )
+                let shared = try store.viewContext.performAndWait {
+                    let rows = try store.viewContext.fetch(request)
+                    XCTAssertEqual(rows.count, 1)
+                    return try XCTUnwrap(rows.first?.toBodyMetrics())
+                }
                 XCTAssertEqual(
                     shared,
                     actual.metrics,
@@ -2143,7 +2169,8 @@ extension HomeV2ContextPolicyTests {
         for mode in ["denied", "late-dirty"] {
             let store = correctionStore()
             let original = try await contextWriterSeed(store)
-            let row = try XCTUnwrap(store.fetchBodyMetricsSync(for: original.userId).first)
+            let targetRows = await store.fetchBodyMetrics(for: original.userId)
+            let row = try XCTUnwrap(targetRows.first)
             var admissions = 0, accepted = 0, rejected = 0, commits = 0, stored = 0
             do {
                 _ = try await store.updateExistingMetricMeasurementsAndWait(
@@ -2272,7 +2299,8 @@ extension HomeV2ContextPolicyTests {
         // Selecting the raw method again must correct the actual field metadata.
         let attributedStore = correctionStore()
         let imported = try await contextWriterSeed(attributedStore)
-        let attributedRow = try XCTUnwrap(attributedStore.fetchBodyMetricsSync(for: imported.userId).first)
+        let attributedRows = await attributedStore.fetchBodyMetrics(for: imported.userId)
+        let attributedRow = try XCTUnwrap(attributedRows.first)
         attributedRow.sourceMetadataJSON = try XCTUnwrap(imported.sourceMetadata)
             .settingEntrySource(.manual, fields: [.bodyFat], bodyFatMethod: "bia_scale").jsonString
         try attributedStore.viewContext.save()
@@ -2349,7 +2377,8 @@ extension HomeV2ContextPolicyTests {
             let store = correctionStore()
             let seeded = try await contextWriterSeed(store)
             if changesAttribution {
-                let row = try XCTUnwrap(store.fetchBodyMetricsSync(for: seeded.userId).first)
+                let seededRows = await store.fetchBodyMetrics(for: seeded.userId)
+                let row = try XCTUnwrap(seededRows.first)
                 row.sourceMetadataJSON = try XCTUnwrap(seeded.sourceMetadata)
                     .settingEntrySource(.manual, fields: [.bodyFat], bodyFatMethod: "bia_scale").jsonString
                 try store.viewContext.save()
