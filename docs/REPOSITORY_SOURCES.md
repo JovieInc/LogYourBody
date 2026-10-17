@@ -22,7 +22,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11d9a680ec4c2c74193f2bd1bc9dd544c6ca3bc397bea165bfc08fd0e15933e0`)
 - `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `edc60551d0911cfbad4778b82a6d7376d2d123ee40be983e8376e1e5b7a2dd16`)
 - `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b43be4748356308f2098e4cf6e44f935a66d842588cb822752f27a4fcff636cb`)
-- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fce884bd92127e3886770b00ea3c1a622e9979708f51e9b4ff03c3d4c524c967`)
+- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `0197d22c1c7066516a92fd96fd42d4a0af9720ec6dc604882f8b10a54375ab6e`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `06ee02d964e6aa3f4b01b00a39a0112d2296b0dc2a213ba1873d437bf0b302ae`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `24015f5812c3157efebc973c6aa0bbd00eae6e1747be4966eb9dff152e46377c`)
@@ -381,7 +381,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3228ca0acd307954a34b4b5518a2b9a51aa9570e96aa4ea99a26ccff503ba140`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `9c5d7aca303f49a2960887203c255a0338df115548e765b097f80a339cbaefe5`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5c4e7893db7cd05bb3312add2b1b5a60bfcba4a68c8f9603043eaccfe75f0d27`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
