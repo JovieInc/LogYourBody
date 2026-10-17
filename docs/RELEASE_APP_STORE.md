@@ -11,7 +11,9 @@ The engineering pipeline is fully automated. **One human step** stands between t
 
 ## Read-only readiness check
 
-`app-store-connect-readiness.yml` writes a pass/fail table to the job summary for version state, the newest TestFlight-uploaded build, both pro1 3-day-trial subscriptions, and What's New plus the rest of the committed storefront metadata. It runs on a push to `main` that changes the workflow or Fastlane metadata, and daily at 16:00 UTC. A green job means the readback finished. A FAIL row names a Tim-only follow-up and does not submit, attach a build, or write metadata.
+`app-store-metadata-sync.yml` uploads the committed Fastlane metadata to the editable 1.2.0 version with `upload_to_app_store` (`skip_binary_upload`, `skip_screenshots`, `submit_for_review:false`). It runs on a push to `main` that changes that workflow or the metadata paths. It does not attach a build or submit.
+
+`app-store-connect-readiness.yml` writes a pass/fail table to the job summary for version state, the newest TestFlight-uploaded build, both pro1 3-day-trial subscriptions, and What's New plus the rest of the committed storefront metadata. It runs on a push to `main` that changes the workflow or Fastlane metadata, daily at 16:00 UTC, and again after the metadata sync succeeds. A green job means the readback finished. A FAIL row names a follow-up and does not submit, attach a build, or write metadata.
 
 ```bash
 gh run list --workflow app-store-connect-readiness.yml --branch main --limit 5
