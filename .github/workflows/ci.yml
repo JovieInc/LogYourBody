@@ -286,6 +286,7 @@ jobs:
           --test-coverage-include=.github/scripts/validate-release-checks.mjs
           --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90
           .github/scripts/validate-release-source.test.mjs
+          .github/scripts/ios-release-tag.test.mjs
 
       - name: Test
         run: pnpm test:ci
