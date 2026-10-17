@@ -137,6 +137,17 @@ function world(mutate = () => {}) {
 const report = (input) => readReadiness(input);
 const row = (rows, name) => rows.find((entry) => entry.check === name);
 
+function versionsIncluding(state, prior) {
+  state.versions = [
+    resource('version-120', {
+      versionString: '1.2.0',
+      platform: 'IOS',
+      appVersionState: state.versionState,
+    }),
+    ...(prior ? [prior] : []),
+  ];
+}
+
 test('committed release notes are the post-#1197 text', () => {
   const notes = manifest.locales[0].metadata.releaseNotes;
   assert.equal(notes.startsWith(STALE_WHATS_NEW_PREFIX), false);
@@ -151,7 +162,12 @@ test('a processed selectable 1.2.0 build with Ready to Submit subscriptions pass
   assert.match(row(rows, 'Version state').detail, /state=PREPARE_FOR_SUBMISSION/);
   assert.match(row(rows, 'Build processed and selectable').detail, /selectable; selected build=none/);
   assert.match(row(rows, ANNUAL).detail, /READY_TO_SUBMIT/);
-  assert.match(row(rows, "What's New").detail, /post-#1197/);
+  const whatsNew = row(rows, "What's New");
+  assert.equal(whatsNew.pass, true);
+  assert.equal(whatsNew.result, 'N/A');
+  assert.match(whatsNew.detail, /no previously released/);
+  assert.match(renderSummary(rows), /\| What's New \| N\/A \|/);
+  assert.match(renderSummary(rows), /No FAIL rows/);
 });
 
 test('an unselected build is selectable when the version relationship is empty or 404', async () => {
@@ -244,6 +260,11 @@ test('Ready to Submit passes and another state passes only when attached to 1.2.
 test("What's New rejects the pre-#1197 sentence and metadata mismatches stay visible", async () => {
   const stale = await report(world((state) => {
     state.whatsNew = `${STALE_WHATS_NEW_PREFIX}, weight and body-fat logging.`;
+    versionsIncluding(state, resource('version-100', {
+      versionString: '1.0.0',
+      platform: 'IOS',
+      appVersionState: 'READY_FOR_SALE',
+    }));
   }));
   const whatsNew = row(stale, "What's New");
   assert.equal(whatsNew.pass, false);
@@ -255,7 +276,72 @@ test("What's New rejects the pre-#1197 sentence and metadata mismatches stay vis
   }));
   assert.equal(row(metadata, 'Storefront metadata').pass, false);
   assert.match(row(metadata, 'Storefront metadata').detail, /description/);
-  assert.equal(row(metadata, "What's New").pass, true);
+  const notes = row(metadata, "What's New");
+  assert.equal(notes.pass, true);
+  assert.equal(notes.result, 'N/A');
+});
+
+test("What's New is N/A until a previously released iOS version exists", async () => {
+  const empty = await report(world((state) => {
+    state.whatsNew = '';
+  }));
+  const na = row(empty, "What's New");
+  assert.equal(na.result, 'N/A');
+  assert.equal(na.pass, true);
+  assert.match(na.detail, /1\.2\.0 PREPARE_FOR_SUBMISSION/);
+
+  for (const appVersionState of ['PREPARE_FOR_SUBMISSION', 'PENDING_APPLE_RELEASE', 'PENDING_DEVELOPER_RELEASE']) {
+    const pending = await report(world((state) => {
+      versionsIncluding(state, resource('version-090', {
+        versionString: '1.0.0',
+        platform: 'IOS',
+        appVersionState,
+      }));
+    }));
+    assert.equal(row(pending, "What's New").result, 'N/A', appVersionState);
+  }
+
+  const otherPlatform = await report(world((state) => {
+    versionsIncluding(state, resource('version-mac', {
+      versionString: '1.0.0',
+      platform: 'MAC_OS',
+      appVersionState: 'READY_FOR_SALE',
+    }));
+  }));
+  assert.equal(row(otherPlatform, "What's New").result, 'N/A');
+
+  const match = await report(world((state) => {
+    versionsIncluding(state, resource('version-100', {
+      versionString: '1.0.0',
+      platform: 'IOS',
+      appVersionState: 'READY_FOR_SALE',
+    }));
+  }));
+  const matched = row(match, "What's New");
+  assert.equal(matched.pass, true);
+  assert.equal(matched.result, undefined);
+  assert.match(matched.detail, /post-#1197/);
+
+  for (const appVersionState of [
+    'READY_FOR_SALE',
+    'READY_FOR_DISTRIBUTION',
+    'REPLACED_WITH_NEW_VERSION',
+    'DEVELOPER_REMOVED_FROM_SALE',
+    'REMOVED_FROM_SALE',
+  ]) {
+    const differ = await report(world((state) => {
+      state.whatsNew = 'Different notes for a later release.';
+      versionsIncluding(state, resource('version-100', {
+        versionString: '1.0.0',
+        platform: 'IOS',
+        appVersionState,
+      }));
+    }));
+    const failed = row(differ, "What's New");
+    assert.equal(failed.pass, false, appVersionState);
+    assert.match(failed.detail, /differs from the committed post-#1197/);
+    assert.match(failed.action, /Tim-only T6/);
+  }
 });
 
 test('rejected and missing versions fail closed without dropping the other rows', async () => {
@@ -373,6 +459,8 @@ test('GitHub log reads allow escape sequences and the workflow stays read-only',
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /branches: \[main\]/);
   assert.match(workflow, /\.github\/workflows\/app-store-connect-readiness\.yml/);
+  assert.match(workflow, /\.github\/scripts\/app-store-readiness\.mjs/);
+  assert.match(workflow, /\.github\/scripts\/app-store-readiness\.test\.mjs/);
   assert.match(workflow, /apps\/ios\/fastlane\/metadata\/\*\*/);
   assert.match(workflow, /storefront-manifest\.generated\.json/);
   assert.match(workflow, /cron: '0 16 \* \* \*'/);
