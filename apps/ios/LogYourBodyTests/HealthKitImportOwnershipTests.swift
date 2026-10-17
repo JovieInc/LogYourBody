@@ -1327,7 +1327,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         let probe = SmartScaleQueryProbe()
         let manager = smartScaleManager(probe)
         var parts = DateComponents()
-        parts.year = 2018
+        parts.year = 2_018
         parts.month = 3
         parts.day = 4
         parts.hour = 7
@@ -1360,7 +1360,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         let probe = SmartScaleQueryProbe()
         let manager = smartScaleManager(probe)
         let day = try XCTUnwrap(
-            Calendar.current.date(from: DateComponents(year: 2024, month: 6, day: 2, hour: 8))
+            Calendar.current.date(from: DateComponents(year: 2_024, month: 6, day: 2, hour: 8))
         )
         try await coreData.saveBodyMetricsAndWait(
             reading(source: .manual, date: day, weight: 80, bodyFat: nil), userId: "synthetic-health-A"
@@ -1369,11 +1369,11 @@ final class HealthKitImportOwnershipTests: XCTestCase {
             reading(source: .bodySpecDexa, date: day, weight: nil, bodyFat: 18.4), userId: "synthetic-health-A"
         )
         let weight = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
-            sampleId: "scale-same-day-weight", kind: .weight, value: 80.05, date: day.addingTimeInterval(3600),
+            sampleId: "scale-same-day-weight", kind: .weight, value: 80.05, date: day.addingTimeInterval(3_600),
             sourceName: "Withings"
         ))
         let fat = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
-            sampleId: "scale-same-day-fat", kind: .bodyFat, value: 18.5, date: day.addingTimeInterval(3600),
+            sampleId: "scale-same-day-fat", kind: .bodyFat, value: 18.5, date: day.addingTimeInterval(3_600),
             sourceName: "Withings"
         ))
         probe.result.samples = [weight, fat]
