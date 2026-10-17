@@ -3,8 +3,9 @@
 #
 # Env: QUALITY_RESULT, RETRY_RESULT (job results), HEAD_SHA, RUN_URL, GITHUB_REPOSITORY, GH_TOKEN.
 # Passed (first attempt or retry): close every open post-merge-lq-red issue. Failed twice: open
-# the issue, or comment on the open one, and exit 1. Anything else (a cancelled or skipped
-# attempt) is unknown: no issue change, exit 1, so this SHA is not recorded as verified.
+# the issue, or comment on the open one, and exit 1. A cancelled first attempt with a skipped
+# retry is neutral only when live main has advanced: no issue change, no SHA verification.
+# Anything else unfinished is unknown: no issue change, exit 1.
 # The open issue is the hold: while it exists, iOS merge groups run Launch Quality again.
 set -uo pipefail
 
@@ -29,6 +30,16 @@ if [[ "$QUALITY_RESULT" == 'success' || "${RETRY_RESULT:-}" == 'success' ]]; the
   done
   echo "Launch Quality passed on $short."
   exit 0
+fi
+
+if [[ "$QUALITY_RESULT" == 'cancelled' && "${RETRY_RESULT:-}" == 'skipped' ]]; then
+  # The checkout's origin/main can be stale. Read the live ref; uncertainty fails closed.
+  # The cancelled quality job keeps the workflow cancelled, outside the verified-success base.
+  if main_sha=$(gh api "repos/$repo/git/ref/heads/main" --jq '.object.sha') &&
+    [[ "$main_sha" =~ ^[0-9a-f]{40}$ && "$main_sha" != "$HEAD_SHA" ]]; then
+    echo "::notice::Launch Quality cancelled on superseded main SHA $short (main=${main_sha:0:12}); not recording $short as verified."
+    exit 0
+  fi
 fi
 
 if [[ "$QUALITY_RESULT" != 'failure' || "${RETRY_RESULT:-}" != 'failure' ]]; then

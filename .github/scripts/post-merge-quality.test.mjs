@@ -63,10 +63,15 @@ test('runs on main pushes, latest SHA only, retrying once before reporting', () 
   assert.match(report, /run: bash \.github\/scripts\/post-merge-quality-report\.sh/);
 });
 
-// gh fake: `open` is the issue list output (or null for an API failure); every call is recorded.
-function report(env, { open = '' } = {}) {
+const headSha = 'abcdef1234567890'.padEnd(40, '0');
+const newerSha = 'f'.repeat(40);
+
+// gh fake: issue list and live main ref responses; every call is recorded.
+function report(env, { open = '', main = headSha, mainStatus = 0 } = {}) {
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'pmq-bin-'));
   const calls = path.join(bin, 'calls');
+  const output = path.join(bin, 'output');
+  fs.writeFileSync(output, '');
   const list = open === null ? 'exit 1' : `printf '%b' ${JSON.stringify(open)}`;
   fs.writeFileSync(
     path.join(bin, 'gh'),
@@ -74,6 +79,7 @@ function report(env, { open = '' } = {}) {
 echo "$*" >> ${JSON.stringify(calls)}
 case "$*" in
   *"issues?labels=post-merge-lq-red&state=open"*) ${list} ;;
+  *"git/ref/heads/main"*) printf '%s\\n' "$FIXTURE_MAIN_SHA"; exit "$FIXTURE_MAIN_STATUS" ;;
 esac
 `,
     { mode: 0o755 },
@@ -84,13 +90,16 @@ esac
       ...process.env,
       PATH: `${bin}:${process.env.PATH}`,
       GITHUB_REPOSITORY: 'JovieInc/LogYourBody',
-      HEAD_SHA: 'abcdef1234567890',
+      HEAD_SHA: headSha,
       RUN_URL: 'https://github.com/JovieInc/LogYourBody/actions/runs/1',
+      GITHUB_OUTPUT: output,
+      FIXTURE_MAIN_SHA: main,
+      FIXTURE_MAIN_STATUS: String(mainStatus),
       ...env,
     },
   });
   const recorded = fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').trim().split('\n') : [];
-  return { status: result.status, calls: recorded, out: result.stdout + result.stderr };
+  return { status: result.status, calls: recorded, out: result.stdout + result.stderr, output: fs.readFileSync(output, 'utf8') };
 }
 
 const writes = (calls) => calls.filter((call) => /-X (POST|PATCH)|label create/.test(call));
@@ -133,6 +142,59 @@ test('an unfinished attempt changes nothing and is not recorded as verified', ()
     const result = report({ QUALITY_RESULT: first, RETRY_RESULT: retry }, { open: '7' });
     assert.equal(result.status, 1, `${first}/${retry}`);
     assert.deepEqual(writes(result.calls), [], `${first}/${retry}`);
+  }
+});
+
+test('a superseded cancellation succeeds without touching issues or verifying the SHA', () => {
+  for (const open of ['', '7']) {
+    const result = report({ QUALITY_RESULT: 'cancelled', RETRY_RESULT: 'skipped' }, { open, main: newerSha });
+    assert.equal(result.status, 0, result.out);
+    assert.deepEqual(result.calls, ['api repos/JovieInc/LogYourBody/git/ref/heads/main --jq .object.sha']);
+    assert.match(result.out, /superseded/i);
+    assert.match(result.out, /not recording abcdef123456 as verified/);
+    assert.doesNotMatch(result.out, /Launch Quality passed/);
+    assert.equal(result.output, '');
+  }
+});
+
+test('a cancellation at the current main tip still fails closed', () => {
+  const result = report({ QUALITY_RESULT: 'cancelled', RETRY_RESULT: 'skipped' });
+  assert.equal(result.status, 1, result.out);
+  assert.deepEqual(writes(result.calls), []);
+  assert.match(result.out, /result unknown/);
+});
+
+test('a cancellation with an unreadable or malformed main ref still fails closed', () => {
+  for (const lookup of [
+    { main: '', mainStatus: 1 },
+    { main: newerSha, mainStatus: 1 },
+    { main: '' },
+    { main: 'null' },
+    { main: 'not-a-sha' },
+    { main: newerSha.slice(0, 12) },
+  ]) {
+    const result = report({ QUALITY_RESULT: 'cancelled', RETRY_RESULT: 'skipped' }, { open: '7', ...lookup });
+    assert.equal(result.status, 1, JSON.stringify(lookup));
+    assert.deepEqual(writes(result.calls), []);
+  }
+});
+
+test('supersession never excuses a failure or another unknown result', () => {
+  for (const [first, retry] of [
+    ['failure', 'failure'],
+    ['failure', 'cancelled'],
+    ['failure', 'skipped'],
+    ['cancelled', 'failure'],
+    ['skipped', 'skipped'],
+  ]) {
+    const result = report({ QUALITY_RESULT: first, RETRY_RESULT: retry }, { open: '7', main: newerSha });
+    assert.equal(result.status, 1, `${first}/${retry}`);
+    assert.ok(!result.calls.some((call) => call.includes('git/ref/heads/main')), 'only cancelled/skipped needs the main ref');
+    if (first === 'failure' && retry === 'failure') {
+      assert.ok(result.calls.some((call) => /-X POST .*issues\/7\/comments/.test(call)));
+    } else {
+      assert.deepEqual(writes(result.calls), []);
+    }
   }
 });
 
