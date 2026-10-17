@@ -395,6 +395,8 @@ test('metadata sync uses deliver without a binary, submit, or screenshot upload'
   assert.match(workflow, /submit_for_review:false/);
   assert.match(workflow, /app_version:"1\.2\.0"/);
   assert.match(workflow, /metadata_path:"fastlane\/metadata"/);
+  assert.match(workflow, /release_notes\.txt/);
+  assert.match(workflow, /whats_new: notes/);
   assert.match(workflow, /apps\/ios\/fastlane\/metadata\/\*\*/);
   assert.match(workflow, /contents: read/);
   assert.equal(workflow.includes('actions:'), false);
