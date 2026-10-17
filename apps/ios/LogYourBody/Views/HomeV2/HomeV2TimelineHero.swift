@@ -146,6 +146,7 @@ struct HomeV2TimelinePager: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(width: size.width, height: size.height)
             }
         }
         .frame(width: size.width, height: size.height)

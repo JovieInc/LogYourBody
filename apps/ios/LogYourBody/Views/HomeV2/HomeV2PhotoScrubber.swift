@@ -44,6 +44,14 @@ struct HomeV2PhotoScrubber<Selection: Hashable, Content: View>: View {
     private var isAvailable: Bool { values.count > 1 && HomeV2PhotoScrubPolicy.isEnabled() }
 
     var body: some View {
+        if isAvailable {
+            interactiveContent
+        } else {
+            content(false)
+        }
+    }
+
+    private var interactiveContent: some View {
         ZStack(alignment: .top) {
             content(isActive)
             if isActive {

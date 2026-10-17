@@ -125,6 +125,7 @@ struct HomeV2PhotoViewer: View {
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(width: size.width, height: size.height)
                 }
             }
             .accessibilityElement(children: .ignore)

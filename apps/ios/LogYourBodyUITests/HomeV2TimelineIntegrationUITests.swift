@@ -5,7 +5,7 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
 
     func testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap() {
-        let app = launch(holdScrub: true)
+        let app = launch(withSteps: true, holdScrub: true)
         let stage = app.buttons["home_v2_photo_stage"]
         let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
         let loaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
@@ -13,6 +13,7 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         let caption = app.staticTexts["home_v2_photo_caption"]
         let weight = app.staticTexts["home_v2_weight_value"]
         let date = caption.label, initialWeight = weight.label
+        assertStepCount(6_000, in: app)
         let mode = app.staticTexts["home_v2_photo_scrub_mode"]
         stage.press(forDuration: 0.7)
         XCTAssertFalse(mode.exists, "A short hold must not activate scrubbing")
@@ -24,11 +25,14 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         XCTAssertTrue(mode.waitForExistence(timeout: 5))
         XCTAssertNotEqual(caption.label, date)
         XCTAssertNotEqual(weight.label, initialWeight)
+        let stepsDate = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Steps · ")).firstMatch
+        XCTAssertTrue(caption.label.hasPrefix(stepsDate.label.replacingOccurrences(of: "Steps · ", with: "")))
         XCTAssertFalse(close.exists, "Holding and scrubbing must not open the photo viewer")
         let surface = pager.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
         surface.press(forDuration: 0.05, thenDragTo: surface.withOffset(CGVector(dx: pager.frame.width * 0.85, dy: 0)))
         XCTAssertEqual(caption.label, date)
         XCTAssertEqual(weight.label, initialWeight)
+        assertStepCount(6_000, in: app)
         stage.press(forDuration: 1.3)
         XCTAssertFalse(mode.exists)
         stage.tap()
@@ -308,14 +312,18 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
     }
 
     private func drag(_ stage: XCUIElement, from: CGFloat, to: CGFloat) {
-        stage.coordinate(withNormalizedOffset: CGVector(dx: from, dy: 0.5)).press(
-            forDuration: 0.05, thenDragTo: stage.coordinate(withNormalizedOffset: CGVector(dx: to, dy: 0.5))
-        )
+        // The photo moves during paging; keep both endpoints in the fixed window.
+        let frame = stage.frame
+        let origin = XCUIApplication().windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        let start = origin.withOffset(CGVector(dx: frame.minX + frame.width * from, dy: frame.midY))
+        let end = origin.withOffset(CGVector(dx: frame.minX + frame.width * to, dy: frame.midY))
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.15)
     }
 
     private func assertPhotoColor(_ stage: XCUIElement, red: Bool) throws {
         let loaded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-            guard let image = stage.screenshot().image.cgImage,
+            guard stage.exists, !stage.frame.isEmpty,
+                  let image = stage.screenshot().image.cgImage,
                   let corner = image.cropping(to: CGRect(
                     x: CGFloat(image.width) / 10, y: CGFloat(image.height) / 10, width: 4, height: 4
                   )) else {
@@ -328,7 +336,13 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
                     space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
                 ) else { return false }
                 context.draw(corner, in: CGRect(x: 0, y: 0, width: 1, height: 1))
-                return red ? Int(bytes[0]) > Int(bytes[2]) + 40 : Int(bytes[2]) > Int(bytes[0]) + 40
+                let redChannel = Int(bytes[0]), blueChannel = Int(bytes[2])
+                let brightness = (redChannel + Int(bytes[1]) + blueChannel) / 3
+                // The production subject plate desaturates and dims backgrounds.
+                // Both hue and luminance must identify the actual selected fixture.
+                return red
+                    ? redChannel > blueChannel + 2 && brightness > 50
+                    : blueChannel > redChannel + 2 && brightness < 50
             }
         }, object: nil)
         XCTAssertEqual(
