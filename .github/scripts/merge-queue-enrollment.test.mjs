@@ -309,35 +309,82 @@ test('changes-requested and other review blocks are not eligible', async () => {
   }
 });
 
-test('a review block beside another refusal still fails', async () => {
+const mergeConflicts = 'Pull request has merge conflicts';
+const notMergeable = 'Pull request not in mergeable state';
+
+test('mergeability refusals record a non-failing outcome for the exact green head', async () => {
+  for (const messages of [
+    [mergeConflicts],
+    [`${notMergeable}.`],
+    [`${mergeConflicts} and ${notMergeable}`],
+    [mergeConflicts, notMergeable],
+    [changesRequested, `${mergeConflicts} and ${notMergeable}`],
+    [`${changesRequested.slice(0, -1)} and ${mergeConflicts} and ${notMergeable}`],
+  ]) {
+    const enqueueError = graphqlFailure(
+      messages.map((message) => ({ type: 'UNPROCESSABLE', message })),
+    );
+    const { calls, core } = await nativeScenario({ enqueueError });
+    assert.equal(calls.length, 1, 'Do not retry or bypass the mergeability refusal');
+    assert.equal(calls[0].variables.expectedHeadOid, head);
+    assert.ok(core.messages.some((notice) => notice.startsWith('NOT_MERGEABLE:')
+      && notice.includes('#1284') && notice.includes('rebase')));
+    assert.ok(!core.messages.some((notice) => notice.startsWith('ENQUEUED:')));
+    assert.equal(core.tables.length, 1);
+    assert.equal(core.tables[0][0][1], 'NOT_MERGEABLE');
+    assert.equal(core.tables[0][2][1], head);
+    assert.equal(core.tables[0][3][1], messages.join('; '));
+  }
+});
+
+test('a clean enrollment cycle succeeds after a mergeability refusal', async () => {
+  const blocked = await nativeScenario({
+    enqueueError: graphqlFailure([{ type: 'UNPROCESSABLE', message: notMergeable }]),
+  });
+  assert.equal(blocked.core.tables[0][0][1], 'NOT_MERGEABLE');
+
+  const rebasedHead = 'b'.repeat(40);
+  const { calls, core } = await nativeScenario({
+    mutate: ({ run, pull }) => {
+      run.head_sha = rebasedHead;
+      pull.head.sha = rebasedHead;
+    },
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].variables.expectedHeadOid, rebasedHead);
+  assert.equal(core.tables[0][0][1], 'ENQUEUED');
+  assert.equal(core.tables[0][2][1], rebasedHead);
+});
+
+test('mergeability handling preserves unexpected, permission and mixed failures', async () => {
+  const conflict = { type: 'UNPROCESSABLE', message: mergeConflicts };
+  const unknown = { type: 'UNPROCESSABLE', message: 'Unexpected enqueue service failure' };
+  const forbidden = { type: 'FORBIDDEN', message: 'Resource not accessible by integration' };
   for (const errors of [
-    [
-      { type: 'UNPROCESSABLE', message: changesRequested },
-      {
-        type: 'UNPROCESSABLE',
-        message: 'Pull request has merge conflicts and Pull request not in mergeable state',
-      },
-    ],
-    [
-      {
-        type: 'UNPROCESSABLE',
-        message: `${changesRequested.slice(0, -1)} and Pull request has merge conflicts and Pull request not in mergeable state`,
-      },
-    ],
+    [{ ...conflict, type: 'FORBIDDEN' }],
+    [{ message: notMergeable }],
+    [{ type: 'UNPROCESSABLE', message: `${notMergeable} because of a service failure` }],
+    [conflict, unknown],
+    [conflict, forbidden],
+    [{ ...conflict, message: `${mergeConflicts} and ${unknown.message}` }],
+    [{ ...conflict, message: `${mergeConflicts} and Pull request is a draft.` }],
+    [...alreadyQueuedError().errors, unknown],
+    [...alreadyQueuedError().errors, forbidden],
     [{ type: 'FORBIDDEN', message: changesRequested }],
+    [null],
     [],
   ]) {
+    const enqueueError = graphqlFailure(errors);
     await assert.rejects(
-      nativeScenario({ enqueueError: graphqlFailure(errors) }),
-      /GraphQL enrollment failed/,
+      nativeScenario({ enqueueError }),
+      (error) => error === enqueueError,
     );
   }
 });
 
-test('draft, conflict, and permission refusals still fail', async () => {
+test('draft and permission refusals still fail', async () => {
   for (const message of [
     'Pull request is a draft.',
-    'Pull request has merge conflicts and Pull request not in mergeable state',
     'Pull request refusing to allow a GitHub App to create or update workflow `.github/workflows/ci.yml` without `workflows` permission',
   ]) {
     await assert.rejects(
