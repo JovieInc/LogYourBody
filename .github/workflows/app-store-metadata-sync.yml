@@ -80,6 +80,42 @@ jobs:
             run_precheck_before_submit:false \
             precheck_include_in_app_purchases:false
 
+      - name: Set What's New on the first App Store version
+        working-directory: apps/ios
+        env:
+          APP_STORE_CONNECT_API_KEY_PATH: ${{ env.APP_STORE_CONNECT_API_KEY_PATH }}
+        run: |
+          bundle exec ruby <<'RUBY'
+          require "spaceship"
+
+          notes = File.read("fastlane/metadata/en-US/release_notes.txt").strip
+          abort "Committed release notes are empty" if notes.empty?
+
+          Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from(
+            filepath: ENV.fetch("APP_STORE_CONNECT_API_KEY_PATH")
+          )
+          app = Spaceship::ConnectAPI::App.find("com.logyourbody.app")
+          abort "App not found" unless app
+          version = app.get_edit_app_store_version(platform: Spaceship::ConnectAPI::Platform::IOS)
+          abort "No editable App Store version" unless version
+          abort "Editable version is #{version.version_string}, expected 1.2.0" unless version.version_string == "1.2.0"
+
+          localization = Spaceship::ConnectAPI::AppStoreVersionLocalization.all(
+            app_store_version_id: version.id
+          ).find { |item| item.locale == "en-US" }
+          abort "en-US localization missing" unless localization
+
+          begin
+            localization.update(attributes: { whats_new: notes })
+          rescue StandardError => error
+            message = error.message.to_s
+            message = "App Store Connect rejected What's New" if message.match?(/BEGIN |PRIVATE KEY|api_key/i)
+            warn message
+            exit 1
+          end
+          puts "Set en-US What's New on #{version.version_string} (#{notes.bytesize} bytes)"
+          RUBY
+
       - name: Cleanup
         if: always()
         run: rm -f apps/ios/fastlane/api_key.json
