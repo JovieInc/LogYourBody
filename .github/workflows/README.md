@@ -20,6 +20,8 @@ Primary pull request workflow for `main`.
 
 Launch Quality for `main` after merge, on the latest SHA only (`cancel-in-progress`). It checks iOS inputs changed since the newest SHA this workflow verified (`detect-changes.sh` with that base), so a run cancelled by a newer push is still covered. A failure is retried once. A second failure opens or updates the `post-merge-lq-red` issue (`.github/scripts/post-merge-quality-report.sh`, tested by `post-merge-quality.test.mjs`), and the next passing SHA closes it. There is no auto-revert: Launch Quality failed in 15% of merge groups over 2026-10-06..13, nearly all timeouts and recurring flakes.
 
+A cancelled first attempt with a skipped retry leaves Report green only when the live `main` ref differs from the run's SHA. It leaves the hold issue untouched; the cancelled quality job keeps the workflow cancelled, so the SHA is not selected as a verified base. Cancellation at the current main tip, an unreadable or malformed main ref, and any failure without a passing retry still fail closed.
+
 ## Merge Queue Auto-Land
 
 `main` uses GitHub's native merge queue (ruleset "Main - Protect", `ALLGREEN`, `MERGE`, required check `CI Summary`, 60-minute check timeout). Two secret-boundaried workflows make landing hands-off:
