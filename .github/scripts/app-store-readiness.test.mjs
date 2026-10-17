@@ -376,6 +376,8 @@ test('GitHub log reads allow escape sequences and the workflow stays read-only',
   assert.match(workflow, /apps\/ios\/fastlane\/metadata\/\*\*/);
   assert.match(workflow, /storefront-manifest\.generated\.json/);
   assert.match(workflow, /cron: '0 16 \* \* \*'/);
+  assert.match(workflow, /workflow_run:/);
+  assert.match(workflow, /App Store Metadata Sync/);
   assert.doesNotMatch(workflow, /pull_request:|contents: write|actions: write|environment:/);
   assert.match(workflow, /contents: read/);
   assert.match(workflow, /actions: read/);
@@ -383,6 +385,20 @@ test('GitHub log reads allow escape sequences and the workflow stays read-only',
   assert.match(workflow, /secrets\.APP_STORE_CONNECT_API_KEY_ISSUER_ID/);
   assert.match(workflow, /secrets\.APP_STORE_CONNECT_API_KEY }}/);
   assert.equal(workflow.includes('submit_for_review'), false);
+});
+
+test('metadata sync uses deliver without a binary, submit, or screenshot upload', () => {
+  const workflow = readFileSync(new URL('../workflows/app-store-metadata-sync.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /upload_to_app_store/);
+  assert.match(workflow, /skip_binary_upload:true/);
+  assert.match(workflow, /skip_screenshots:true/);
+  assert.match(workflow, /submit_for_review:false/);
+  assert.match(workflow, /app_version:"1\.2\.0"/);
+  assert.match(workflow, /metadata_path:"fastlane\/metadata"/);
+  assert.match(workflow, /apps\/ios\/fastlane\/metadata\/\*\*/);
+  assert.match(workflow, /contents: read/);
+  assert.equal(workflow.includes('actions:'), false);
+  assert.doesNotMatch(workflow, /pull_request:|contents: write|actions: write|environment:|reject_if_possible|build_number:|automatic_release|ipa:/);
 });
 
 test('the summary escapes markup and names a Tim-only item for every failure', () => {

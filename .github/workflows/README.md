@@ -88,9 +88,13 @@ Reusable/manual web release loop. This is no longer the automatic main-branch re
 
 Reusable/manual iOS release loop for TestFlight/App Store release paths.
 
+### `app-store-metadata-sync.yml`
+
+Uploads committed Fastlane metadata to App Store version 1.2.0 with deliver (`skip_binary_upload`, no screenshots, no submit, no build attach). It runs on a push to `main` that changes this workflow or `apps/ios/fastlane/metadata/**`.
+
 ### `app-store-connect-readiness.yml`
 
-Read-only App Store Connect check for version 1.2.0. It runs on a push to `main` that changes this workflow or Fastlane metadata, daily at 16:00 UTC, and on `workflow_dispatch`. It reports version state, whether the newest TestFlight upload is processed and selectable, whether both pro1 subscriptions are Ready to Submit or already attached, and whether What's New and storefront metadata match the committed manifest. It does not submit, attach a build, or write metadata.
+Read-only App Store Connect check for version 1.2.0. It runs on a push to `main` that changes this workflow or Fastlane metadata, daily at 16:00 UTC, on `workflow_dispatch`, and after `app-store-metadata-sync.yml` succeeds. It reports version state, whether the newest TestFlight upload is processed and selectable, whether both pro1 subscriptions are Ready to Submit or already attached, and whether What's New and storefront metadata match the committed manifest. It does not submit, attach a build, or write metadata.
 
 ### `ios-testflight-deploy.yml`
 

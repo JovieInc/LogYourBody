@@ -1,0 +1,85 @@
+name: App Store Metadata Sync
+
+# Uploads the committed Fastlane metadata to the editable App Store version.
+# deliver skips the binary. This does not attach a build, submit, or upload screenshots.
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/app-store-metadata-sync.yml
+      - apps/ios/fastlane/metadata/**
+      - apps/ios/fastlane/storefront-manifest.generated.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-store-metadata-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync en-US metadata to App Store 1.2.0
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Ruby and Bundler
+        uses: ./.github/actions/setup-ruby-bundler
+        with:
+          working-directory: apps/ios
+          cache-key-prefix: ios-metadata-sync-gems
+
+      - name: Setup App Store Connect Authentication
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          cd apps/ios
+          mkdir -p fastlane
+
+          ruby <<'RUBY'
+          require "json"
+
+          api_key = {
+            "key_id" => ENV.fetch("ASC_KEY_ID"),
+            "issuer_id" => ENV.fetch("ASC_ISSUER_ID"),
+            "key" => ENV.fetch("ASC_PRIVATE_KEY").gsub("\\n", "\n"),
+            "duration" => 1200,
+            "in_house" => false
+          }
+
+          File.write("fastlane/api_key.json", JSON.pretty_generate(api_key))
+          JSON.parse(File.read("fastlane/api_key.json"))
+          RUBY
+
+          echo "APP_STORE_CONNECT_API_KEY_PATH=$(pwd)/fastlane/api_key.json" >> "$GITHUB_ENV"
+
+      - name: Upload metadata with deliver
+        working-directory: apps/ios
+        env:
+          APP_IDENTIFIER: com.logyourbody.app
+          FASTLANE_SKIP_UPDATE_CHECK: "1"
+          FASTLANE_HIDE_CHANGELOG: "1"
+          FASTLANE_DISABLE_ANIMATION: "1"
+        run: |
+          bundle exec fastlane run upload_to_app_store \
+            api_key_path:"$APP_STORE_CONNECT_API_KEY_PATH" \
+            app_identifier:"com.logyourbody.app" \
+            app_version:"1.2.0" \
+            metadata_path:"fastlane/metadata" \
+            skip_binary_upload:true \
+            skip_screenshots:true \
+            submit_for_review:false \
+            force:true \
+            run_precheck_before_submit:false \
+            precheck_include_in_app_purchases:false
+
+      - name: Cleanup
+        if: always()
+        run: rm -f apps/ios/fastlane/api_key.json
