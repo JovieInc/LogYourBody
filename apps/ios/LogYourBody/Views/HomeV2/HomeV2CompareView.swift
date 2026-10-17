@@ -27,7 +27,6 @@ struct HomeV2CompareView: View {
     @Binding var pair: HomeV2PhotoPair
     let formatters: HomeV2Formatters
     let ffmiValue: (BodyMetrics) -> Double?
-    let bodyFatSource: String?
     let onClose: () -> Void
     let onShare: (HomeV2PhotoPair) -> Void
     let onChangeDates: () -> Void
@@ -40,6 +39,14 @@ struct HomeV2CompareView: View {
 
     private var before: BodyMetrics? { bodyMetrics.indices.contains(pair.before) ? bodyMetrics[pair.before] : nil }
     private var after: BodyMetrics? { bodyMetrics.indices.contains(pair.after) ? bodyMetrics[pair.after] : nil }
+
+    /// Provenance belongs to the two captured photo rows, never the latest global entry.
+    static func bodyFatCaption(before: BodyMetrics, after: BodyMetrics) -> String? {
+        guard let before = HomeV2EditorialPolicy.bodyFat(in: before),
+              let after = HomeV2EditorialPolicy.bodyFat(in: after) else { return nil }
+        if before.caption == after.caption { return before.caption }
+        return "Before: \(before.caption). After: \(after.caption)."
+    }
 
     private var days: Int {
         guard let before, let after else { return 0 }
@@ -202,11 +209,14 @@ struct HomeV2CompareView: View {
 
     private func deltaRow(before: BodyMetrics, after: BodyMetrics) -> some View {
         let weightDelta = zip(formatters.weightValue(after), formatters.weightValue(before)).map { $0 - $1 }
-        let bodyFatDelta = zip(formatters.bodyFatValue(after), formatters.bodyFatValue(before)).map { $0 - $1 }
+        let bodyFatDelta = zip(
+            HomeV2EditorialPolicy.bodyFat(in: after)?.percentage,
+            HomeV2EditorialPolicy.bodyFat(in: before)?.percentage
+        ).map { $0 - $1 }
         let ffmiDelta = zip(ffmiValue(after), ffmiValue(before)).map { $0 - $1 }
         return HStack(alignment: .top, spacing: HomeV2Tokens.Space.tight) {
             deltaCell(weightDelta.map { "\(HomeV2PhotoCopy.signed($0)) \(formatters.weightUnit)" }, label: HomeV2PhotoCopy.weight)
-            deltaCell(bodyFatDelta.map { "\(HomeV2PhotoCopy.signed($0)) pts" }, label: HomeV2PhotoCopy.estimatedBodyFat)
+            deltaCell(bodyFatDelta.map { "\(HomeV2PhotoCopy.signed($0)) pts" }, label: "Body fat")
             deltaCell(ffmiDelta.map { HomeV2PhotoCopy.signed($0) }, label: HomeV2PhotoCopy.derivedFFMI)
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
@@ -256,10 +266,10 @@ struct HomeV2CompareView: View {
     private func pickDates(before: BodyMetrics, after: BodyMetrics) -> some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
             if let transition = HomeV2PhotoCopy.bodyFatTransition(
-                from: formatters.bodyFatValue(before),
-                to: formatters.bodyFatValue(after)
+                from: HomeV2EditorialPolicy.bodyFat(in: before)?.percentage,
+                to: HomeV2EditorialPolicy.bodyFat(in: after)?.percentage
             ) {
-                let lines = [transition, bodyFatSource.map(HomeV2PhotoCopy.estimatedBySource)].compactMap { $0 }
+                let lines = [transition, Self.bodyFatCaption(before: before, after: after)].compactMap { $0 }
                 Text(lines.joined(separator: "\n"))
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                     .foregroundStyle(HomeV2Tokens.Colors.secondary)
