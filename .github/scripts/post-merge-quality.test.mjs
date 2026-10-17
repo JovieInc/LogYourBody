@@ -54,13 +54,30 @@ test('runs on main pushes, latest SHA only, retrying once before reporting', () 
   assert.match(jobBlock('quality'), /if: needs\.scope\.outputs\.ios == 'true'/);
   assert.match(jobBlock('retry'), /if: \$\{\{ !cancelled\(\) && needs\.quality\.result == 'failure' \}\}/);
 
+  const supersede = jobBlock('supersede');
+  assert.match(supersede, /needs: \[scope, quality, retry\]/);
+  assert.match(
+    supersede,
+    /if: \$\{\{ always\(\) && needs\.scope\.outputs\.ios == 'true' && \(needs\.quality\.result == 'cancelled' \|\| needs\.retry\.result == 'cancelled'\) \}\}/,
+  );
+  assert.match(supersede, /permissions:\n {6}contents: read\n/);
+  assert.doesNotMatch(supersede, /actions:|checks:|issues:|id-token:|pull-requests:|secrets\.(?!GITHUB_TOKEN)/);
+  assert.match(supersede, /CHECK_SUPERSEDED: '1'/);
+  assert.match(supersede, /REF_NAME: \$\{\{ github\.ref_name \}\}/);
+  assert.match(supersede, /RUN_ID: \$\{\{ github\.run_id \}\}/);
+
   const report = jobBlock('report');
-  assert.match(report, /needs: \[scope, quality, retry\]/);
-  assert.match(report, /if: \$\{\{ always\(\) && needs\.scope\.outputs\.ios == 'true' \}\}/);
-  assert.match(report, /issues: write/);
+  assert.match(report, /needs: \[scope, quality, retry, supersede\]/);
+  assert.match(
+    report,
+    /if: \$\{\{ always\(\) && needs\.scope\.outputs\.ios == 'true' && needs\.supersede\.outputs\.superseded != 'true' \}\}/,
+  );
+  assert.match(report, /permissions:\n {6}contents: read\n {6}issues: write\n/);
+  assert.doesNotMatch(report, /actions:|checks:|id-token:|pull-requests:/);
   assert.match(report, /QUALITY_RESULT: \$\{\{ needs\.quality\.result \}\}/);
   assert.match(report, /RETRY_RESULT: \$\{\{ needs\.retry\.result \}\}/);
   assert.match(report, /run: bash \.github\/scripts\/post-merge-quality-report\.sh/);
+  assert.doesNotMatch(report, /CHECK_SUPERSEDED/);
 });
 
 const headSha = 'abcdef1234567890'.padEnd(40, '0');
@@ -131,6 +148,119 @@ test('two failures open the hold issue, or update the open one, and fail the run
   assert.ok(updated.calls.some((call) => /-X POST repos\/JovieInc\/LogYourBody\/issues\/7\/comments/.test(call)));
   assert.ok(!updated.calls.some((call) => /-X POST repos\/JovieInc\/LogYourBody\/issues /.test(call)));
   assert.ok(!updated.calls.some((call) => /state=closed/.test(call)));
+});
+
+// gh fake for the supersede check: `runs` and `compare` are response bodies, or null for a failure.
+function supersede(env, { runs = null, compare = null } = {}) {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'pmq-sup-'));
+  const calls = path.join(bin, 'calls');
+  const output = path.join(bin, 'output');
+  fs.writeFileSync(output, '');
+  const body = (value) => (value === null ? 'exit 1' : `printf '%s' ${JSON.stringify(value)}`);
+  fs.writeFileSync(
+    path.join(bin, 'gh'),
+    `#!/usr/bin/env bash
+echo "$*" >> ${JSON.stringify(calls)}
+case "$*" in
+  *actions/workflows/ios-post-merge-quality.yml/runs*) ${body(runs)} ;;
+  */compare/*) ${body(compare)} ;;
+  *) exit 1 ;;
+esac
+`,
+    { mode: 0o755 },
+  );
+  const result = spawnSync('bash', [reportScript], {
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      GITHUB_REPOSITORY: 'JovieInc/LogYourBody',
+      GITHUB_OUTPUT: output,
+      HEAD_SHA: 'abcdef1234567890',
+      REF_NAME: 'main',
+      RUN_ID: '10',
+      CHECK_SUPERSEDED: '1',
+      ...env,
+    },
+  });
+  const recorded = fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8').trim().split('\n') : [];
+  const superseded = fs.readFileSync(output, 'utf8').trim();
+  return { status: result.status, calls: recorded, out: result.stdout + result.stderr, superseded };
+}
+
+test('a superseded cancel is skipped only when a newer run or a newer commit exists', () => {
+  const runs = (rows) => JSON.stringify(rows);
+  const newerRun = supersede(
+    { QUALITY_RESULT: 'cancelled', RETRY_RESULT: 'skipped' },
+    {
+      runs: runs([
+        { id: 11, created_at: '2026-10-17T00:05:00Z' },
+        { id: 10, created_at: '2026-10-17T00:00:00Z' },
+      ]),
+      compare: JSON.stringify({ status: 'identical', ahead_by: 0 }),
+    },
+  );
+  assert.equal(newerRun.status, 0);
+  assert.equal(newerRun.superseded, 'superseded=true');
+  assert.ok(!newerRun.calls.some((call) => call.includes('/compare/')));
+
+  const newerCommit = supersede(
+    { QUALITY_RESULT: 'cancelled', RETRY_RESULT: 'skipped' },
+    { compare: JSON.stringify({ status: 'ahead', ahead_by: 2 }) },
+  );
+  assert.equal(newerCommit.status, 0);
+  assert.equal(newerCommit.superseded, 'superseded=true');
+  assert.match(newerCommit.out, /2 commit/);
+
+  const retryCancelled = supersede(
+    { QUALITY_RESULT: 'failure', RETRY_RESULT: 'cancelled' },
+    { compare: JSON.stringify({ status: 'ahead', ahead_by: 1 }) },
+  );
+  assert.equal(retryCancelled.superseded, 'superseded=true');
+});
+
+test('a real cancel or a failure is not classified as superseded', () => {
+  const identical = JSON.stringify({ status: 'identical', ahead_by: 0 });
+  const sameRuns = JSON.stringify([
+    { id: 10, created_at: '2026-10-17T00:00:00Z' },
+    { id: 9, created_at: '2026-10-16T23:00:00Z' },
+  ]);
+  const real = supersede(
+    { QUALITY_RESULT: 'cancelled', RETRY_RESULT: 'skipped' },
+    { runs: sameRuns, compare: identical },
+  );
+  assert.equal(real.status, 0);
+  assert.equal(real.superseded, 'superseded=false');
+
+  const diverged = supersede(
+    { QUALITY_RESULT: 'cancelled', RETRY_RESULT: 'skipped' },
+    { compare: JSON.stringify({ status: 'diverged', ahead_by: 3 }) },
+  );
+  assert.equal(diverged.superseded, 'superseded=false');
+
+  // Our run missing from the page is not proof of a newer one.
+  const missing = supersede(
+    { QUALITY_RESULT: 'cancelled', RETRY_RESULT: 'skipped' },
+    {
+      runs: JSON.stringify([{ id: 11, created_at: '2026-10-17T00:05:00Z' }]),
+      compare: identical,
+    },
+  );
+  assert.equal(missing.superseded, 'superseded=false');
+
+  const unknown = supersede({ QUALITY_RESULT: 'cancelled', RETRY_RESULT: 'skipped' });
+  assert.equal(unknown.superseded, 'superseded=false');
+  assert.match(unknown.out, /treating the cancel as real/);
+
+  for (const [first, retry] of [
+    ['failure', 'failure'],
+    ['success', 'skipped'],
+    ['failure', 'skipped'],
+  ]) {
+    const result = supersede({ QUALITY_RESULT: first, RETRY_RESULT: retry }, { compare: JSON.stringify({ status: 'ahead', ahead_by: 4 }) });
+    assert.equal(result.superseded, 'superseded=false', `${first}/${retry}`);
+    assert.deepEqual(result.calls, [], `${first}/${retry}`);
+  }
 });
 
 test('an unfinished attempt changes nothing and is not recorded as verified', () => {
