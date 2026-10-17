@@ -334,16 +334,76 @@ test('a review block beside another refusal still fails', async () => {
   }
 });
 
-test('draft, conflict, and permission refusals still fail', async () => {
+test('conflicted or not-mergeable refusals skip with a logged reason', async () => {
+  const conflict = 'Pull request has merge conflicts';
+  const notMergeable = 'Pull request not in mergeable state';
+  for (const message of [
+    `${conflict} and ${notMergeable}`,
+    conflict,
+    notMergeable,
+    `${conflict}.`,
+    `${notMergeable}.`,
+  ]) {
+    const { calls, core } = await nativeScenario({
+      enqueueError: graphqlFailure([{ type: 'UNPROCESSABLE', message }]),
+    });
+    assert.equal(calls.length, 1, 'Do not retry a conflicted or not-mergeable pull request');
+    assert.match(calls[0].query, /mutation Enqueue/);
+    assert.ok(core.messages.some((notice) => notice.startsWith('SKIPPED:')
+      && notice.includes('conflicted or not mergeable')
+      && notice.includes(message)));
+    assert.ok(!core.messages.some((notice) => notice.startsWith('ENQUEUED:')));
+    assert.equal(core.tables.length, 1);
+    assert.equal(core.tables[0][0][1], 'SKIPPED');
+    assert.equal(core.tables[0][1][1], 'Pull request is conflicted or not mergeable');
+    assert.equal(core.tables[0][2][1], head);
+    assert.equal(core.tables[0][3][1], message);
+  }
+  const separate = await nativeScenario({
+    enqueueError: graphqlFailure([
+      { type: 'UNPROCESSABLE', message: conflict },
+      { type: 'UNPROCESSABLE', message: notMergeable },
+    ]),
+  });
+  assert.equal(separate.calls.length, 1);
+  assert.equal(separate.core.tables[0][0][1], 'SKIPPED');
+  assert.equal(separate.core.tables[0][3][1], `${conflict}; ${notMergeable}`);
+});
+
+test('draft and permission refusals still fail', async () => {
   for (const message of [
     'Pull request is a draft.',
-    'Pull request has merge conflicts and Pull request not in mergeable state',
     'Pull request refusing to allow a GitHub App to create or update workflow `.github/workflows/ci.yml` without `workflows` permission',
   ]) {
     await assert.rejects(
       nativeScenario({
         enqueueError: graphqlFailure([{ type: 'UNPROCESSABLE', message }]),
       }),
+      /GraphQL enrollment failed/,
+    );
+  }
+});
+
+test('a conflict beside a real enqueue error still fails', async () => {
+  const conflict = 'Pull request has merge conflicts and Pull request not in mergeable state';
+  for (const errors of [
+    [{ type: 'UNPROCESSABLE', message: 'Pull request has merge conflicts with protected files' }],
+    [{ type: 'UNPROCESSABLE', message: 'Pull request not mergeable' }],
+    [{ type: 'FORBIDDEN', message: conflict }],
+    [
+      { type: 'UNPROCESSABLE', message: conflict },
+      {
+        type: 'UNPROCESSABLE',
+        message: 'Pull request refusing to allow a GitHub App to create or update workflow `.github/workflows/ci.yml` without `workflows` permission',
+      },
+    ],
+    [
+      { type: 'UNPROCESSABLE', message: conflict },
+      { type: 'UNPROCESSABLE', message: 'Pull request is a draft.' },
+    ],
+  ]) {
+    await assert.rejects(
+      nativeScenario({ enqueueError: graphqlFailure(errors) }),
       /GraphQL enrollment failed/,
     );
   }

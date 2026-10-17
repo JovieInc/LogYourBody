@@ -24,7 +24,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b43be4748356308f2098e4cf6e44f935a66d842588cb822752f27a4fcff636cb`)
 - `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fce884bd92127e3886770b00ea3c1a622e9979708f51e9b4ff03c3d4c524c967`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
-- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `1f983f111be350f7dcc132040702bdbecb29433fa4a7edfb6e2e80a49ca02856`)
+- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `c9a2c85a46ac748afd7d6dc07f2c35fbe1dff7fcfd737affad74bb35a9aca3c2`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `24015f5812c3157efebc973c6aa0bbd00eae6e1747be4966eb9dff152e46377c`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
