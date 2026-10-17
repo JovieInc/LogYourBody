@@ -600,8 +600,9 @@ private struct PaidWeightLoggerMVPView: View {
 
         isLoading = true
         let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-        recentMetrics = cachedMetrics
-            .compactMap { $0.toBodyMetrics() }
+        let metrics = await CachedBodyMetrics.bodyMetricsInBatches(from: cachedMetrics)
+        guard authManager.currentUser?.id == userId else { return }
+        recentMetrics = metrics
             .filter { $0.weight != nil }
             .sorted { $0.date > $1.date }
         exportFileURL = nil

@@ -94,9 +94,9 @@ final class DashboardViewModel: ObservableObject {
             historicalLoadTask?.cancel()
             historicalLoadTask = nil
             let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-            let allMetrics = fetchedMetrics
-                .compactMap { $0.toBodyMetrics() }
+            let allMetrics = await CachedBodyMetrics.bodyMetricsInBatches(from: fetchedMetrics)
                 .sorted { $0.date > $1.date }
+            guard authManager.currentUser?.id == userId else { return }
 
             bodyMetrics = allMetrics
             sortedBodyMetricsAscending = allMetrics.sorted { $0.date < $1.date }
@@ -124,8 +124,7 @@ final class DashboardViewModel: ObservableObject {
             guard !Task.isCancelled else { return }
 
             let fetchedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-            let allMetrics = fetchedMetrics
-                .compactMap { $0.toBodyMetrics() }
+            let allMetrics = await CachedBodyMetrics.bodyMetricsInBatches(from: fetchedMetrics)
                 .sorted { $0.date > $1.date }
 
             guard !Task.isCancelled else { return }
