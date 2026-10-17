@@ -33,6 +33,7 @@ struct HomeV2Surface: View {
     let onDone: () -> Void
     let onUndo: () -> Void
     var onProvenancePresentationChange: (Bool) -> Void = { _ in }
+    var isPhotoScrubNavigating = false
 
     @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
     @State private var showsProvenance = false
@@ -49,7 +50,8 @@ struct HomeV2Surface: View {
                     HomeV2TimelinePager(
                         snapshot: timeline, selectedID: userSelection,
                         size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
-                        unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto
+                        unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
+                        isNavigating: isPhotoScrubNavigating || showsProvenance
                     )
                     photoNumberBlock
                     if hasAnyPhotoInHistory {

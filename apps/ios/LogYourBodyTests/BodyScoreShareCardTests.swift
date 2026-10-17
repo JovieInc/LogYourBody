@@ -935,11 +935,12 @@ final class BodyScoreShareCardTests: XCTestCase {
         }
         let ffmi = try XCTUnwrap(UnitConversion.calculateFFMI(weightKg: 80, bodyFatPercentage: 20, heightCm: 180))
         let value = kind == .bodyFat ? 17.4 : ffmi
-        let points = (0..<7).map { index in
-            MetricChartDataPoint(
-                date: date.addingTimeInterval(Double(index - 3) * 86_400),
-                value: index == 3 ? value : value + Double(index - 3) * 0.2,
-                presence: kind == .bodyFat ? .estimated : .present)
+        let presence: MetricPresence = kind == .bodyFat ? .estimated : .present
+        let points: [MetricChartDataPoint] = (0..<7).map { index in
+            let offset = Double(index - 3)
+            let pointValue = index == 3 ? value : value + offset * 0.2
+            return MetricChartDataPoint(
+                date: date.addingTimeInterval(offset * 86_400), value: pointValue, presence: presence)
         }
         let selected = try XCTUnwrap(ContextualMetricProgressPolicy.presentationSelection(
             points: points, averages: [],
