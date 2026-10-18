@@ -931,7 +931,22 @@ struct ChatTabView: View {
         }
     }
 
+    @ViewBuilder
     private var chatSurface: some View {
+        if showsTranscript {
+            expandedChatSurface
+        } else {
+            // Both controls contribute to the collapsed dock's actual bounds.
+            // An inset on intrinsic content can draw outside its hit-test area.
+            VStack(spacing: 0) {
+                starterPrompts
+                composer
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var expandedChatSurface: some View {
         VStack(spacing: 0) {
             if showsTranscript {
                 chatMessages

@@ -580,32 +580,40 @@ struct HomeV2ProvenanceChip: View {
 
 struct HomeV2ProvenanceSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let detail: HomeV2ProvenanceDetail
 
     var body: some View {
-        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
-            Text(detail.title)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle, weight: .semibold, relativeTo: .title2)
-                .foregroundStyle(HomeV2Tokens.Colors.ink)
-            Text(detail.body)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
-                .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+        ScrollView {
+            VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+                Text(detail.title)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.sheetTitle, weight: .semibold, relativeTo: .title2)
+                    .foregroundStyle(HomeV2Tokens.Colors.ink)
+                Text(detail.body)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, relativeTo: .body)
+                    .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(HomeV2Tokens.Space.margin)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             Button(action: { dismiss() }, label: {
                 Text(HomeV2Copy.done)
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.body, weight: .semibold, relativeTo: .body)
                     .foregroundStyle(HomeV2Tokens.Colors.ctaInk)
                     .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     .background(HomeV2Tokens.Colors.ctaFill, in: Capsule())
+                    .contentShape(Capsule())
             })
             .buttonStyle(.plain)
             .accessibilityIdentifier("home_v2_provenance_done")
+            .padding(HomeV2Tokens.Space.margin)
+            .background(HomeV2Tokens.Colors.canvas)
         }
-        .padding(HomeV2Tokens.Space.margin)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(HomeV2Tokens.Colors.canvas.ignoresSafeArea())
-        .presentationDetents([.medium])
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large])
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_v2_provenance_detail")
     }

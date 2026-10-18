@@ -496,9 +496,19 @@ final class HomeV2LayoutUITests: XCTestCase {
     }
 
     private func selectWeightEntry(in app: XCUIApplication) {
-        let segment = app.segmentedControls.firstMatch.buttons["Weight"]
-        XCTAssertTrue(segment.waitForExistence(timeout: 8))
+        // Share the existing eight-second budget across native readiness and
+        // selection publication; the Home metric picker is a separate control.
+        let deadline = ProcessInfo.processInfo.systemUptime + 8
+        let pickers = app.segmentedControls.matching(identifier: "Entry type selector")
+        XCTAssertTrue(pickers.element.waitForExistence(timeout: 8))
+        XCTAssertEqual(pickers.count, 1)
+        let segment = pickers.element.buttons["Weight"]
+        XCTAssertTrue(segment.exists)
+        XCTAssertTrue(segment.isHittable)
         segment.tap()
+        let selected = expectation(for: NSPredicate(format: "selected == YES"), evaluatedWith: segment)
+        let remaining = max(0, deadline - ProcessInfo.processInfo.systemUptime)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: remaining), .completed)
         XCTAssertTrue(segment.isSelected)
     }
 
@@ -749,6 +759,8 @@ final class HomeV2LayoutUITests: XCTestCase {
             XCTAssertEqual(matching.count, 1, "The selected moment must retain evidence: \(fragment)")
         }
         let done = app.buttons["home_v2_provenance_done"]
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(done.frame))
         XCTAssertTrue(done.isHittable)
         done.tap()
         XCTAssertTrue(detail.waitForNonExistence(timeout: 8))

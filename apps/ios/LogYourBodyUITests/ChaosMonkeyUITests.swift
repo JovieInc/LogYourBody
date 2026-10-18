@@ -470,7 +470,11 @@ final class ChaosMonkeyUITests: XCTestCase {
             XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 2))
         }
         let recovery = app.buttons["home_chat_recovery"]
-        XCTAssertTrue(recovery.waitForExistence(timeout: 8))
+        let recoveryReady = expectation(
+            for: NSPredicate(format: "exists == YES AND hittable == YES"), evaluatedWith: recovery
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [recoveryReady], timeout: 8), .completed)
+        XCTAssertTrue(recovery.exists)
         XCTAssertGreaterThanOrEqual(recovery.frame.height, 44)
         XCTAssertTrue(app.windows.firstMatch.frame.contains(recovery.frame))
         XCTAssertTrue(recovery.isHittable, "Collapsed recovery must remain actionable without covering Home")
