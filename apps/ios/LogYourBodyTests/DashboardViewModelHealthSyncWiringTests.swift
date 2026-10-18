@@ -464,8 +464,10 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
     func testSupersededStartupCannotReplaceNewerSameOwnerHeldRefresh() async throws {
         let authDefaultsName = "dashboard_auth_fixture_\(UUID().uuidString)"
         let authDefaults = try XCTUnwrap(UserDefaults(suiteName: authDefaultsName))
-        defer { authDefaults.removePersistentDomain(forName: authDefaultsName) }
         let auth = AuthManager(userDefaults: authDefaults)
+        let tasks = HistoricalDashboardTaskFixture(auth: auth, defaults: authDefaults, suite: authDefaultsName)
+        // Own cleanup before seeding or launching an actual child.
+        addTeardownBlock { @MainActor in await tasks.tearDown(test: self) }
         let subject = "dashboard_startup_newer_refresh_\(UUID().uuidString)"
         installDashboardSession(auth, subject: subject)
         try await saveHistoryMetric(userId: subject, index: 0, date: Date())
@@ -473,20 +475,31 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
         let newest = try XCTUnwrap(cached?.toBodyMetrics())
         let latest = HeldDashboardRead<BodyMetrics?>()
         let coordinator = HeldDashboardSyncCoordinator()
-        let health = HealthKitManager.shared
-        let wasAuthorized = health.isAuthorized
-        defer { health.isAuthorized = wasAuthorized }
+        let health = HealthKitManager(userDefaults: authDefaults, authManager: auth, coreDataManager: .shared)
         health.isAuthorized = true
         let sync = makeDashboardSync(auth: auth)
         var latestCalls = 0
         let vm = DashboardViewModel(
-            healthSyncCoordinator: coordinator, latestMetricLoader: { userId in
+            healthKitManager: health, healthSyncCoordinator: coordinator, latestMetricLoader: { userId in
                 latestCalls += 1
                 if latestCalls == 1 { return await latest.read() }
                 return await CoreDataManager.shared.fetchLatestBodyMetric(for: userId)?.toBodyMetrics()
             },
-            todayStepCountLoader: { 0 }, dailyStepWriter: { _, admission in try admission() }, stepSyncTrigger: {}
+            todayStepCountLoader: { 0 }, dailyStepWriter: { _, admission in try admission() }, stepSyncTrigger: {},
+            historicalLoadPriority: .userInitiated
         )
+        // Match the existing actual-history ownership fixture without changing
+        // production background priority or assuming the native timeout's cause.
+        tasks.releaseHeldReads = { owner in
+            // Capture before cancellation can clear the view model's storage,
+            // including exits before the explicit historical join below.
+            if let pending = vm.pendingHistoricalLoadForTests() {
+                owner.track(pending, phase: "cancelled newer refresh historical child")
+            }
+            latest.resumeIfWaiting(returning: newest)
+            coordinator.held.resumeIfWaiting(returning: ())
+            coordinator.next.resumeIfWaiting(returning: ())
+        }
         let ownership = try XCTUnwrap(auth.captureAccountSession())
         let old = Task {
             await vm.loadInitialDataAndRefresh(
@@ -494,25 +507,22 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
                 loadOnlyNewest: true, selectedIndex: 0
             )
         }
-        defer {
-            old.cancel()
-            latest.resumeIfWaiting(returning: newest)
-            coordinator.held.resumeIfWaiting(returning: ())
-            coordinator.next.resumeIfWaiting(returning: ())
-        }
+        let oldRecord = tasks.track(old, phase: "superseded startup after latest read released")
         await fulfillment(of: [latest.started], timeout: 3)
         let newer = Task { await vm.refreshData(authManager: auth, realtimeSyncManager: sync) }
-        defer { newer.cancel() }
+        let newerRecord = tasks.track(newer, phase: "newer same-owner refresh after coordinator released")
         await fulfillment(of: [coordinator.held.started], timeout: 3)
         XCTAssertTrue(vm.isSyncingData)
         latest.resumeIfWaiting(returning: newest)
-        await awaitDashboardTask(old, phase: "superseded startup after latest read released")
+        let oldTerminal = await tasks.observeTerminal(oldRecord, test: self)
+        XCTAssertTrue(oldTerminal, "Observe the actual old startup return before checking its successor")
         XCTAssertEqual(coordinator.weightCalls, 1, "Old startup must not enter a successor coordinator")
         XCTAssertTrue(vm.isSyncingData, "Old startup must not cancel or finish newer held refresh")
         XCTAssertNil(vm.lastRefreshDate)
         XCTAssertTrue(vm.bodyMetrics.isEmpty, "Rejected old latest read cannot publish")
         coordinator.held.resumeIfWaiting(returning: ())
-        await awaitDashboardTask(newer, timeout: 5, phase: "newer same-owner refresh after coordinator released")
+        let newerTerminal = await tasks.observeTerminal(newerRecord, test: self, timeout: 5)
+        XCTAssertTrue(newerTerminal, "Observe the actual newer refresh return")
         XCTAssertEqual(vm.bodyMetrics, [newest])
         XCTAssertTrue(vm.hasCurrentPublication(for: auth))
         XCTAssertFalse(vm.isSyncingData)
@@ -520,8 +530,10 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
         XCTAssertEqual(coordinator.weightCalls, 1)
         XCTAssertEqual(latestCalls, 2, "Recovery uses the actual latest-reader port after the rejected held read")
         if let history = vm.pendingHistoricalLoadForTests() {
+            let record = tasks.track(history, phase: "cancelled newer refresh historical child")
             history.cancel()
-            await awaitDashboardTask(history, phase: "cancelled newer refresh historical child")
+            let terminal = await tasks.observeTerminal(record, test: self)
+            XCTAssertTrue(terminal, "Cancellation alone is not actual history completion")
         }
     }
 
@@ -1146,11 +1158,12 @@ private final class HeldDashboardRead<Value> {
 @MainActor
 private final class HistoricalDashboardTaskRecord {
     let task: Task<Void, Never>
+    let phase: String
     var observers: [UUID: XCTestExpectation] = [:]
     var terminal = false
     var waiter: Task<Void, Never>?
 
-    init(task: Task<Void, Never>) { self.task = task }
+    init(task: Task<Void, Never>, phase: String) { self.task = task; self.phase = phase }
 }
 
 @MainActor
@@ -1159,6 +1172,7 @@ private final class HistoricalDashboardTaskFixture {
     let defaults: UserDefaults
     let suite: String
     private var records: [HistoricalDashboardTaskRecord] = []
+    var releaseHeldReads: (@MainActor (HistoricalDashboardTaskFixture) -> Void)?
 
     init(auth: AuthManager, defaults: UserDefaults, suite: String) {
         self.auth = auth
@@ -1166,8 +1180,10 @@ private final class HistoricalDashboardTaskFixture {
         self.suite = suite
     }
 
-    func track(_ task: Task<Void, Never>) -> HistoricalDashboardTaskRecord {
-        let record = HistoricalDashboardTaskRecord(task: task)
+    @discardableResult
+    func track(_ task: Task<Void, Never>, phase: String = "historical task") -> HistoricalDashboardTaskRecord {
+        if let existing = records.first(where: { $0.task == task }) { return existing }
+        let record = HistoricalDashboardTaskRecord(task: task, phase: phase)
         records.append(record)
         record.waiter = Task {
             await task.value
@@ -1181,11 +1197,14 @@ private final class HistoricalDashboardTaskFixture {
     }
 
     func observeTerminal(
-        _ record: HistoricalDashboardTaskRecord, test: XCTestCase, timeout: TimeInterval = 3
+        _ record: HistoricalDashboardTaskRecord, test: XCTestCase, timeout: TimeInterval = 3,
+        file: StaticString = #filePath, line: UInt = #line
     ) async -> Bool {
         guard !record.terminal else { return true }
         let observerID = UUID()
-        let completed = XCTestExpectation(description: "Actual historical task value completed")
+        let completed = XCTestExpectation(
+            description: "Actual dashboard task value completed: \(record.phase) [\(file):\(line)]"
+        )
         record.observers[observerID] = completed
         await test.fulfillment(of: [completed], timeout: timeout)
         // A later cleanup observation uses a fresh expectation, never this timed-out waiter.
@@ -1194,14 +1213,15 @@ private final class HistoricalDashboardTaskFixture {
     }
 
     func tearDown(test: XCTestCase) async {
+        releaseHeldReads?(self)
         records.forEach { $0.task.cancel() }
         for record in records { _ = await observeTerminal(record, test: test) }
         let allTerminal = records.allSatisfy(\.terminal)
         let attachment = XCTAttachment(string: """
-            Actual history tasks: \(records.count); terminal: \(records.filter(\.terminal).count).
+            Actual dashboard tasks: \(records.count); terminal: \(records.filter(\.terminal).count).
             A timeout is not task completion. Auth/defaults retained until every actual child returns.
             """)
-        attachment.name = "historical-task-owned-cleanup"
+        attachment.name = "dashboard-task-owned-cleanup"
         attachment.lifetime = .keepAlways
         test.add(attachment)
         guard allTerminal else {
@@ -1210,6 +1230,7 @@ private final class HistoricalDashboardTaskFixture {
         }
         for record in records { await record.waiter?.value }
         records.removeAll()
+        releaseHeldReads = nil
         defaults.removePersistentDomain(forName: suite)
     }
 }
