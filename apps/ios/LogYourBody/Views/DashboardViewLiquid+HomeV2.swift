@@ -196,7 +196,7 @@ extension DashboardViewLiquid {
             isShowingPhotoTimelineMenu || isHomeV2ContextPresented ||
             isHomeV2EntriesPresented || isHomeV2AllPhotosPresented || isHomeV2SettingsPresented ||
             isHomeV2HelpPresented || showAddEntrySheet || isMetricDetailActive || isStatsDestinationActive ||
-            bodyScoreSharePayload != nil || showsScreenshotShareChoice || showSyncDetails ||
+            bodyScoreSharePayload != nil || isScreenshotShareChoicePresented || showSyncDetails ||
             isProgressPhotoAttachPresented || isPhotoTimelineSettingsPresented || homeV2EditingMetric != nil ||
             showsHomeV2UndoError
     }

@@ -147,6 +147,8 @@ struct DashboardViewLiquid: View {
     @State private var screenshotShareSnapshots: [ContextualMetricSnapshot] = []
     @State private var screenshotShareOwner: AuthManager.ProfileSessionOwnership?
     @State private var showsScreenshotShareChoice = false
+    // Other view extensions may inspect presentation state without exposing its binding.
+    var isScreenshotShareChoicePresented: Bool { showsScreenshotShareChoice }
     @State var bodyScoreSharePresentationID: UUID?
     @State private var hasPerformedInitialRefresh = false
     @State var featureGateRefreshToken = UUID()
