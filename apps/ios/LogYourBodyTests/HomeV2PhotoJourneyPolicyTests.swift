@@ -201,6 +201,161 @@ final class HomeV2PhotoJourneyPolicyTests: XCTestCase {
         XCTAssertEqual(HomeV2PhotoPair(before: 2, after: 5).id, "2-5")
     }
 
+    @MainActor
+    func testBoundedTimelapsePreparationRequiresItsRolloutGate() {
+        XCTAssertFalse(HomeV2TimelapsePolicy.usesBoundedPrefetch(arguments: [], environment: [:]) { key in
+            XCTAssertEqual(key, "home_v2_timelapse_bounded_prefetch_v1")
+            return false
+        })
+        XCTAssertTrue(HomeV2TimelapsePolicy.usesBoundedPrefetch(arguments: [], environment: [:]) { _ in true })
+    }
+
+    @MainActor
+    func testTimelapsePrefetchFixtureRequiresAnAuthenticatedUITestProcess() {
+        let arguments = [HomeV2TimelapsePolicy.prefetchFixtureArgument,
+                         "-lybUITestPhotoTimelineHUDFixture", HomeV2Policy.photoFixtureArgument]
+        let environment = ["XCTestSessionIdentifier": UUID().uuidString,
+                           "XCTestBundlePath": "/Tests/LogYourBodyUITests.xctest"]
+        #if DEBUG
+        XCTAssertTrue(HomeV2TimelapsePolicy.usesBoundedPrefetch(
+            arguments: arguments, environment: environment, isGateEnabled: { _ in false }
+        ))
+        XCTAssertFalse(HomeV2TimelapsePolicy.usesBoundedPrefetch(
+            arguments: arguments + [HomeV2Policy.rollbackFixtureArgument],
+            environment: environment, isGateEnabled: { _ in false }
+        ))
+        #endif
+        XCTAssertFalse(HomeV2TimelapsePolicy.usesBoundedPrefetch(
+            arguments: arguments, environment: [:], isGateEnabled: { _ in false }
+        ))
+        XCTAssertFalse(HomeV2TimelapsePolicy.usesBoundedPrefetch(
+            arguments: arguments + [HomeV2TimelapsePolicy.prefetchFixtureArgument],
+            environment: environment, isGateEnabled: { _ in false }
+        ))
+    }
+
+    @MainActor
+    func testTimelapseLongHistoryLoadsOnlyCurrentAndTwoUpcomingFrames() async {
+        var events: [String] = []
+        await HomeV2TimelapsePolicy.prepareWindow(
+            from: 0, count: 3_000, loops: false,
+            load: { events.append("load \($0)") },
+            currentReady: { events.append("ready") }
+        )
+        XCTAssertEqual(events, ["load 0", "ready", "load 1", "load 2"])
+    }
+
+    func testTimelapseWindowHandlesEndLoopAndSmallHistoriesWithoutDuplicates() {
+        XCTAssertEqual(HomeV2TimelapsePolicy.prefetchFrames(from: 2_999, count: 3_000, loops: false), [2_999])
+        XCTAssertEqual(HomeV2TimelapsePolicy.prefetchFrames(from: 2_999, count: 3_000, loops: true), [2_999, 0, 1])
+        XCTAssertEqual(HomeV2TimelapsePolicy.prefetchFrames(from: 1, count: 2, loops: true), [1, 0])
+        XCTAssertEqual(HomeV2TimelapsePolicy.prefetchFrames(from: 0, count: 1, loops: true), [0])
+        XCTAssertTrue(HomeV2TimelapsePolicy.prefetchFrames(from: 0, count: 0, loops: true).isEmpty)
+        XCTAssertTrue(HomeV2TimelapsePolicy.prefetchFrames(from: -1, count: 3, loops: false).isEmpty)
+        XCTAssertTrue(HomeV2TimelapsePolicy.prefetchFrames(from: 3, count: 3, loops: false).isEmpty)
+    }
+
+    @MainActor
+    func testTimelapseIsReadyBeforeSlowSuccessorAndCancellationStopsFurtherPrefetch() async {
+        let successorStarted = expectation(description: "Successor is loading")
+        var resumeSuccessor: CheckedContinuation<Void, Never>?
+        var loaded: [Int] = []
+        var ready = false
+        let task = Task {
+            await HomeV2TimelapsePolicy.prepareWindow(
+                from: 0, count: 3_000, loops: false,
+                load: { frame in
+                    loaded.append(frame)
+                    if frame == 1 {
+                        await withCheckedContinuation {
+                            resumeSuccessor = $0
+                            successorStarted.fulfill()
+                        }
+                    }
+                },
+                currentReady: { ready = true }
+            )
+        }
+        await fulfillment(of: [successorStarted], timeout: 2)
+        XCTAssertTrue(ready, "A slow future photo must not disable playback of the current photo")
+        task.cancel()
+        resumeSuccessor?.resume()
+        await task.value
+        XCTAssertEqual(loaded, [0, 1], "Leaving or scrubbing must not start another stale prefetch")
+    }
+
+    @MainActor
+    func testCancelledCurrentFrameCannotPublishReadinessOrWarmSuccessors() async {
+        let currentStarted = expectation(description: "Current photo is loading")
+        var resumeCurrent: CheckedContinuation<Void, Never>?
+        var loaded: [Int] = []
+        var ready = false
+        let task = Task {
+            await HomeV2TimelapsePolicy.prepareWindow(
+                from: 0, count: 3_000, loops: false,
+                load: { frame in
+                    loaded.append(frame)
+                    await withCheckedContinuation {
+                        resumeCurrent = $0
+                        currentStarted.fulfill()
+                    }
+                },
+                currentReady: { ready = true }
+            )
+        }
+        await fulfillment(of: [currentStarted], timeout: 2)
+        task.cancel()
+        resumeCurrent?.resume()
+        await task.value
+        XCTAssertFalse(ready)
+        XCTAssertEqual(loaded, [0])
+    }
+
+    @MainActor
+    func testEmptyTimelapseDoesNotLoadOrPublishReadiness() async {
+        await HomeV2TimelapsePolicy.prepareWindow(
+            from: 0, count: 0, loops: true,
+            load: { _ in XCTFail("There is no photo to load") },
+            currentReady: { XCTFail("An empty history cannot play") }
+        )
+    }
+
+    func testTimelapseScrubDuringPreparationAndPauseCannotBeOverridden() {
+        var state = HomeV2TimelapsePlaybackState()
+        state.select(2)
+        state.prepared(frame: 0, count: 3)
+        XCTAssertFalse(state.isReady, "The old preparation cannot enable a different frame")
+        state.prepared(frame: 2, count: 3)
+        XCTAssertTrue(state.isReady)
+        XCTAssertFalse(state.isPlaying, "Scrubbing before readiness cancels initial autoplay")
+        state.togglePlayback()
+        XCTAssertTrue(state.isPlaying)
+        state.togglePlayback()
+        state.prepared(frame: 2, count: 3)
+        XCTAssertFalse(state.isPlaying, "A restarted prefetch must preserve an explicit pause")
+        state.select(2)
+        XCTAssertTrue(state.isReady, "Selecting the same frame must not wait for a task that will not restart")
+    }
+
+    func testTimelapseAutoplaysOnlyOnceAndOnlyWithMultiplePhotos() {
+        for count in [0, 1, 3] {
+            var state = HomeV2TimelapsePlaybackState()
+            state.prepared(frame: 0, count: count)
+            XCTAssertEqual(state.isReady, count >= 1)
+            XCTAssertEqual(state.isPlaying, count > 1)
+            state.isPlaying = false
+            state.prepared(frame: 0, count: count)
+            XCTAssertFalse(state.isPlaying)
+        }
+        var legacy = HomeV2TimelapsePlaybackState()
+        legacy.select(1, needsPreparation: false)
+        XCTAssertFalse(legacy.isReady, "Legacy scrubbing still waits for its preparation task")
+        legacy.prepared(frame: 1, count: 3)
+        legacy.select(2, needsPreparation: false)
+        XCTAssertTrue(legacy.isReady, "Legacy scrubbing retains completed preparation")
+        XCTAssertFalse(legacy.isPlaying)
+    }
+
     func testMissingMeasurementsDoNotClaimNoChange() {
         for delta: Double? in [nil, .nan, .infinity, -.infinity] {
             XCTAssertEqual(

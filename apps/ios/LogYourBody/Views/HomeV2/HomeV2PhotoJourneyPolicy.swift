@@ -226,6 +226,57 @@ enum HomeV2PhotoRulerPolicy {
 enum HomeV2TimelapsePolicy {
     static let speeds: [Double] = [0.5, 1, 2]
     static let baseFrameSeconds = 0.6
+    static let prefetchGateKey = "home_v2_timelapse_bounded_prefetch_v1"
+    static let prefetchFixtureArgument = "-lybUITestTimelapseBoundedPrefetch"
+
+    @MainActor
+    static func usesBoundedPrefetch(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isGateEnabled: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        if arguments.filter({ $0 == prefetchFixtureArgument }).count == 1,
+           arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
+           arguments.contains(HomeV2Policy.photoFixtureArgument),
+           !arguments.contains(HomeV2Policy.rollbackFixtureArgument),
+           UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil,
+           environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") == true {
+            return true
+        }
+        #endif
+        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return check(prefetchGateKey)
+    }
+
+    /// Current photo plus two successors, well below the rendered-plate cache limit.
+    static func prefetchFrames(from index: Int, count: Int, loops: Bool) -> [Int] {
+        guard (0..<max(0, count)).contains(index) else { return [] }
+        var frames = [index]
+        while frames.count < min(3, count),
+              let following = next(after: frames[frames.count - 1], count: count, loops: loops) {
+            frames.append(following)
+        }
+        return frames
+    }
+
+    /// Publish readiness before warming successors. Shared image loads may finish
+    /// after cancellation, so never start another load or publish stale readiness.
+    @MainActor
+    static func prepareWindow(
+        from index: Int,
+        count: Int,
+        loops: Bool,
+        load: (Int) async -> Void,
+        currentReady: () -> Void
+    ) async {
+        for frame in prefetchFrames(from: index, count: count, loops: loops) {
+            guard !Task.isCancelled else { return }
+            await load(frame)
+            guard !Task.isCancelled else { return }
+            if frame == index { currentReady() }
+        }
+    }
 
     static func frameInterval(speed: Double) -> TimeInterval {
         baseFrameSeconds / max(speed, 0.1)
@@ -236,6 +287,36 @@ enum HomeV2TimelapsePolicy {
         guard count >= 1 else { return nil }
         if index + 1 < count { return index + 1 }
         return loops ? 0 : nil
+    }
+}
+
+/// Preparation must not override a pause or scrub while a shared load finishes.
+struct HomeV2TimelapsePlaybackState {
+    var frame = 0
+    var isPlaying = false
+    private(set) var isReady = false
+    private var allowsInitialAutoplay = true
+
+    mutating func select(_ selected: Int, needsPreparation: Bool = true) {
+        if needsPreparation, frame != selected { isReady = false }
+        frame = selected
+        isPlaying = false
+        allowsInitialAutoplay = false
+    }
+
+    mutating func prepared(frame preparedFrame: Int, count: Int) {
+        guard preparedFrame == frame else { return }
+        isReady = count >= 1
+        if allowsInitialAutoplay {
+            allowsInitialAutoplay = false
+            isPlaying = count > 1
+        }
+    }
+
+    mutating func togglePlayback() {
+        guard isReady else { return }
+        allowsInitialAutoplay = false
+        isPlaying.toggle()
     }
 }
 
