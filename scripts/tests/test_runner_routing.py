@@ -1682,3 +1682,83 @@ def test_timeline_repair_route_rejects_missing_witness_or_disconnected_evidence(
             pass
         else:
             raise AssertionError("The release route accepted a missing or disconnected repair witness")
+
+
+def _run_launch_quality_retry_fixture(tmp_path: Path, statuses: str, output: str) -> subprocess.CompletedProcess[str]:
+    """Execute the actual audit function with a synthetic command result, never Xcode."""
+    import re
+
+    source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
+    functions = []
+    for name in ("is_simulator_infra_failure", "run_xcodebuild_test"):
+        match = re.search(rf"^{name}\(\) \{{\n.*?^\}}\n", source, re.MULTILINE | re.DOTALL)
+        assert match, f"Missing actual audit function: {name}"
+        functions.append(match.group())
+    tmp_path.mkdir()
+    shell = r'''
+set -euo pipefail
+COMMON_XCODEBUILD_ARGS=(-fixture)
+XCODEBUILD_SETTINGS_ARRAY=(FIXTURE_ONLY=YES)
+XCODEBUILD_COMMAND_TIMEOUT_SECONDS=1500
+cleanup_booted_simulator_apps() { :; }
+start_launch_probe() { :; }
+stop_launch_probe() { :; }
+sleep() { :; }
+run_with_timeout() {
+  local invocation=0
+  if [[ -f "$FIXTURE_DIR/calls" ]]; then invocation="$(cat "$FIXTURE_DIR/calls")"; fi
+  invocation=$((invocation + 1))
+  printf '%s' "$invocation" > "$FIXTURE_DIR/calls"
+  local -a statuses
+  IFS=, read -r -a statuses <<< "$FIXTURE_STATUSES"
+  printf '%s\n' "$FIXTURE_OUTPUT"
+  mkdir -p "$FIXTURE_DIR/result.xcresult"
+  return "${statuses[$((invocation - 1))]}"
+}
+'''
+    command = shell + "\n".join(functions) + r'''
+run_xcodebuild_test fixture "$FIXTURE_DIR/result.xcresult" "$FIXTURE_DIR/invocations.log"
+'''
+    environment = os.environ | {
+        "FIXTURE_DIR": str(tmp_path), "FIXTURE_STATUSES": statuses, "FIXTURE_OUTPUT": output,
+    }
+    return subprocess.run(
+        ["bash", "-c", command], env=environment, text=True, capture_output=True,
+        check=False, timeout=10, pass_fds=_coverage_fds(),
+    )
+
+
+def test_launch_quality_never_retries_timeout_or_executed_tests(tmp_path: Path) -> None:
+    infra = "Failed to get background assertion"
+    cases = [
+        (124, infra),
+        (124, infra + "\nTest Case '-[FixtureTests testRealFailure]' started."),
+        (65, infra + "\nFixture.swift:42: error: XCTAssertTrue failed"),
+        (65, infra + "\nTest Case '-[FixtureTests testRealFailure]' started."),
+        (65, infra + "\nTest Suite 'Selected tests' started."),
+        (65, infra + "\nExecuted 3 tests, with 1 failure"),
+        (65, "Unclassified build or test failure"),
+    ]
+    for index, (status, output) in enumerate(cases):
+        directory = tmp_path / str(index)
+        result = _run_launch_quality_retry_fixture(directory, f"{status},0", output)
+        assert result.returncode == status, result.stdout + result.stderr
+        assert (directory / "calls").read_text() == "1"
+        assert "Retrying" not in result.stdout
+        assert (directory / "result.xcresult").is_dir()
+        assert not (directory / "result.attempt-1.xcresult").exists()
+        if status == 124:
+            assert "timed out after 1500s" in result.stdout
+
+
+def test_launch_quality_prelaunch_infra_retry_is_bounded_and_retains_first_bundle(tmp_path: Path) -> None:
+    for name, statuses, expected in (("recovers", "65,0", 0), ("fails", "65,65", 65)):
+        directory = tmp_path / name
+        result = _run_launch_quality_retry_fixture(
+            directory, statuses, "Failed to install or launch the test runner"
+        )
+        assert result.returncode == expected, result.stdout + result.stderr
+        assert (directory / "calls").read_text() == "2"
+        assert result.stdout.count("Retrying fixture") == 1
+        assert (directory / "result.attempt-1.xcresult").is_dir()
+        assert (directory / "result.xcresult").is_dir()

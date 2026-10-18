@@ -486,7 +486,6 @@ struct HomeV2DataHero: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(HomeV2Tokens.Colors.card)
-        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder

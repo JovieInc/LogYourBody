@@ -582,7 +582,9 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         XCTAssertTrue(rawFat.waitForExistence(timeout: 5))
         XCTAssertTrue(rawWeight.label.contains("Apple Health"))
         XCTAssertTrue(rawFat.label.contains("16.0"))
-        XCTAssertTrue(rawFat.label.contains("Apple Health"), "Original field provenance must survive the edit")
+        XCTAssertTrue(rawFat.label.contains("Typed"), "The changed body-fat field must disclose its manual correction")
+        XCTAssertFalse(rawFat.label.contains("From Apple Health"),
+                       "Original import lineage must not misattribute the newly typed field to Apple Health")
         XCTAssertFalse(rawFat.label.contains("Visual estimate"))
         capture(app, "timeline-edited-field-actual-source-details")
         app.buttons["home_v2_context_close"].tap()

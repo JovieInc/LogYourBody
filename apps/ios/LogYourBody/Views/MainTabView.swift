@@ -1089,7 +1089,24 @@ struct ChatTabView: View {
     private var starterPrompts: some View {
         VStack(spacing: 0) {
             if let chatErrorMessage {
-                recoveryNotice(message: chatErrorMessage)
+                if showsTranscript {
+                    recoveryNotice(message: chatErrorMessage)
+                } else {
+                    // Keep Home's viewport available. The complete explanation
+                    // and original retry action remain in the expanded Ask view.
+                    Button(action: onExpandRequest) {
+                        Label("Conversation needs attention", systemImage: "exclamationmark.circle")
+                            .font(.system(size: starterPromptFontSize, weight: .medium))
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
+                            .padding(.horizontal, 20)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .accessibilityLabel(chatErrorMessage)
+                    .accessibilityHint("Open Ask to review and retry")
+                    .accessibilityIdentifier("home_chat_recovery")
+                }
             }
 
             if messages == [.welcome] && !isComposerFocused && !isLoadingConversation {
@@ -1102,6 +1119,9 @@ struct ChatTabView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
                 }
+                // Horizontal scrolling must take its content's height instead
+                // of greedily consuming the vertical Home viewport.
+                .fixedSize(horizontal: false, vertical: true)
                 .transition(.opacity)
             }
         }

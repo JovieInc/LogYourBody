@@ -593,6 +593,18 @@ struct HomeV2TimelinePager: View {
     @Environment(\.layoutDirection) private var layoutDirection
 
     var body: some View {
+        ZStack {
+            timelineContent
+        }
+        .frame(width: size.width, height: size.height)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Body timeline")
+        .accessibilityValue("Entry \(snapshot.chronologicalPosition(for: selectedID) + 1) of \(snapshot.metrics.count)")
+        .accessibilityHint("Use the timeline ruler to change the selected date")
+        .accessibilityIdentifier("home_v2_timeline_pager")
+    }
+
+    private var timelineContent: some View {
         HomeV2PhotoScrubber(
             values: snapshot.chronologicalIDs,
             selection: $selectedID, width: size.width,
@@ -623,18 +635,8 @@ struct HomeV2TimelinePager: View {
                 transaction.disablesAnimations = true
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Body timeline")
-        .accessibilityValue("Entry \(snapshot.chronologicalPosition(for: selectedID) + 1) of \(snapshot.metrics.count)")
-        .accessibilityHint("Adjust up for newer entries or down for older entries")
-        .accessibilityIdentifier("home_v2_timeline_pager")
-        .accessibilityAdjustableAction { direction in
-            switch direction {
-            case .increment: adjust(newer: true)
-            case .decrement: adjust(newer: false)
-            @unknown default: break
-            }
-        }
+        // Keep this container separate from its actionable photo and graphic
+        // descendants. The timeline ruler retains native date adjustment.
     }
 
     private func adjust(newer: Bool) {
@@ -704,7 +706,7 @@ private struct HomeV2TimelinePage: View {
     var body: some View {
         let admitted = presentation.map(isCurrent) ?? false
         let reading = admitted ? presentation?.reading(for: selectedMetric, system: system, steps: steps) : nil
-        Group {
+        ZStack {
             if admitted, let photo = presentation?.photo, let photoURL = photo.photoUrl {
                 self.photo(url: photoURL, photo: photo, admitted: admitted, reading: reading ?? .unavailable(selectedMetric))
             } else {
@@ -719,7 +721,6 @@ private struct HomeV2TimelinePage: View {
                     fixedWeightDomain: fixedWeightDomain
                 )
                 .frame(width: size.width, height: size.height)
-                    .accessibilityIdentifier("home_v2_metric_first")
             }
         }
         .frame(width: size.width, height: size.height)

@@ -105,6 +105,12 @@ cleanup_booted_simulator_apps() {
 is_simulator_infra_failure() {
   local log_file="$1"
 
+  # Retry is only for infrastructure failure before any test executes.
+  # Incidental simulator messages cannot erase actual XCTest execution/failure.
+  if grep -Eq "Test (Case|Suite) .* started|Executed [0-9]+ tests|XCTAssert.*failed|: error: .*XCTAssert" "$log_file"; then
+    return 1
+  fi
+
   # Command-timeout is intentionally absent. Merge-group run 36947770736
   # reached it on the last chaos test while that test was still scanning, then
   # this matcher retried the whole group and the 26-minute step died mid-retry.
@@ -213,6 +219,7 @@ run_xcodebuild_test() {
 
     if [[ "$status" -eq 124 ]]; then
       echo "xcodebuild command timed out after ${XCODEBUILD_COMMAND_TIMEOUT_SECONDS}s" | tee -a "$log_file"
+      return "$status"
     fi
 
     if [[ "$status" -eq 0 ]]; then

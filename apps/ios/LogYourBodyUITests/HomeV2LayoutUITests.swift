@@ -305,8 +305,19 @@ final class HomeV2LayoutUITests: XCTestCase {
         assertBodyFatEntry(in: app, expected: "15.8")
         let field = app.textFields["Body fat percentage value"]
         field.tap()
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "17.0")
+        // A native center tap may place the caret inside the prefilled value.
+        // Select all rather than assuming eight backspaces clear text after it.
+        field.press(forDuration: 1.1)
+        let selectAll = app.menuItems["Select All"].exists
+            ? app.menuItems["Select All"] : app.buttons["Select All"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
+        XCTAssertTrue(selectAll.isHittable)
+        selectAll.tap()
+        field.typeText("17.0")
+        XCTAssertEqual(field.value as? String, "17.0", "Save must receive the exact intended body-fat edit")
         let save = app.buttons["home_v2_log_sheet_save"]
+        let valid = expectation(for: NSPredicate(format: "enabled == YES"), evaluatedWith: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [valid], timeout: 5), .completed)
         XCTAssertTrue(save.isEnabled)
         XCTAssertTrue(save.isHittable)
         save.tap()
@@ -704,6 +715,9 @@ final class HomeV2LayoutUITests: XCTestCase {
             let option = segmented.buttons[title]
             XCTAssertTrue(option.waitForExistence(timeout: 5))
             option.tap()
+            let selected = expectation(for: NSPredicate(format: "selected == YES"), evaluatedWith: option)
+            XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 8), .completed,
+                           "The native picker must publish the explicitly selected metric")
             XCTAssertTrue(option.isSelected, "The hero must retain the explicitly selected metric")
             return
         }
@@ -767,6 +781,7 @@ final class HomeV2LayoutUITests: XCTestCase {
 
     private func launch(photo: Bool, state: String, largestText: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
+        app.forwardActualXCTestContext()
         app.launchArguments = [
             "-lybUITestPhotoTimelineHUDFixture",
             photo ? "-lybUITestHomeV2PhotoFixture" : "-lybUITestHomeV2Fixture",

@@ -444,12 +444,14 @@ final class ChaosMonkeyUITests: XCTestCase {
         composer.tap()
         let draft = "local chaos draft"
         composer.typeText(draft)
+        XCTAssertFalse(app.buttons["home_chat_collapse"].exists,
+                       "Focusing and typing a draft must not expand or submit Ask")
         XCTAssertEqual(
             dismissKeyboardForStep(app: app, refocusingIfNeeded: composer),
             .executed(.dismiss)
         )
         XCTAssertFalse(app.keyboards.element.exists)
-        // Default Home removes the Ask view when collapsed; reopen before inspecting its draft.
+        // Navigation may hide the composer; return before inspecting the same local draft.
         if !composer.exists { openDefaultHomeAsk(in: app) }
         let tree = XCTAttachment(string: app.debugDescription)
         tree.name = "Keyboard dismissal draft preservation"
@@ -457,6 +459,18 @@ final class ChaosMonkeyUITests: XCTestCase {
         add(tree)
         XCTAssertEqual(composer.value as? String, draft, "Keyboard dismissal must not submit or clear a draft.")
         XCTAssertFalse(app.staticTexts[draft].exists, "Keyboard dismissal must not submit the local draft.")
+        let closeMenu = app.buttons["home_v2_sidebar_scrim"]
+        if closeMenu.exists { closeMenu.tap() }
+        let recovery = app.buttons["home_chat_recovery"]
+        XCTAssertTrue(recovery.waitForExistence(timeout: 8))
+        XCTAssertTrue(recovery.isHittable, "Collapsed recovery must remain actionable without covering Home")
+        recovery.tap()
+        XCTAssertTrue(app.buttons["home_chat_collapse"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["chat_recovery_message"].exists,
+                      "The expanded view must retain the complete original recovery explanation")
+        XCTAssertTrue(app.buttons["Reload"].exists, "The original conversation recovery action must remain available")
+        XCTAssertEqual(composer.value as? String, draft)
+        XCTAssertFalse(app.staticTexts[draft].exists, "Reviewing a recovery error must not send the draft")
     }
 
     func testSystemAlertsRequireKnownDenyOnlyAction() {
@@ -610,9 +624,8 @@ final class ChaosMonkeyUITests: XCTestCase {
         let composer = app.textFields["chat_composer"]
         XCTAssertTrue(composer.waitForExistence(timeout: 8))
         XCTAssertTrue(composer.isHittable, "Default Home keeps Ask pinned and reachable")
-        composer.tap()
-        XCTAssertTrue(app.buttons["home_chat_collapse"].waitForExistence(timeout: 8))
-        XCTAssertTrue(composer.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.buttons["home_chat_collapse"].exists,
+                       "Home keeps a draft-only composer until an explicit Ask action or send")
     }
 
     private static let edgeStrings: [String] = [

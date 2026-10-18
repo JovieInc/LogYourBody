@@ -3370,9 +3370,12 @@ final class LogYourBodyUITests: XCTestCase {
 
         // Home's dock appears once the fixture has seeded.
         XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 45),
-            "A new subscriber lands on Today"
+            app.descendants(matching: .any)["home_v2_timeline_pager"].waitForExistence(timeout: 45),
+            "A new subscriber lands on the unified Today timeline"
         )
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_selected_body_fat_graphic"].exists,
+                      "The no-photo fixture must mount its actual saved-data hero before the reminder flow")
+        XCTAssertFalse(app.buttons["home_v2_photo_stage"].exists)
         let logWeight = app.buttons["home_v2_log_weight"]
         XCTAssertTrue(logWeight.waitForExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].exists, "No reminder ask before Today")
