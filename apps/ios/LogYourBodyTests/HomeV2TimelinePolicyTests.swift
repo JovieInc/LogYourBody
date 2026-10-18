@@ -852,6 +852,59 @@ final class HomeV2TimelinePolicyTests: XCTestCase {
             XCTAssertFalse(admitted)
             XCTAssertEqual(publications, 0)
         }
+
+        // Initial newest-only paint and the later full history have the same
+        // photo/selected row. The exact raw publication must still restart a
+        // rejected image task instead of leaving its loading fallback forever.
+        let selected = moment("latest-photo", seconds: 10, weight: 83.4, photo: "file:///same-photo.png")
+        let older = moment("history", seconds: 0, weight: 80)
+        let initial = HomeV2TimelinePolicy.Snapshot(
+            metrics: [selected], owner: "owner", ownership: selectedMomentOwnership
+        )
+        let expanded = HomeV2TimelinePolicy.Snapshot(
+            metrics: [selected, older], owner: "owner", ownership: selectedMomentOwnership
+        )
+        let initialPresentation = try XCTUnwrap(initial.presentation(
+            for: .init(selected), heightCm: nil, currentOwnership: selectedMomentOwnership
+        ))
+        let expandedPresentation = try XCTUnwrap(expanded.presentation(
+            for: .init(selected), heightCm: nil, currentOwnership: selectedMomentOwnership
+        ))
+        let size = CGSize(width: 393, height: 491.25)
+        let initialKey = HomeV2TimelinePolicy.PhotoLoadIdentity(
+            ownership: selectedMomentOwnership, selection: .init(selected), photo: selected,
+            metrics: initial.metrics, size: size, admitted: true
+        )
+        let expandedKey = HomeV2TimelinePolicy.PhotoLoadIdentity(
+            ownership: selectedMomentOwnership, selection: .init(selected), photo: selected,
+            metrics: expanded.metrics, size: size, admitted: true
+        )
+        XCTAssertEqual(initialPresentation.selection, expandedPresentation.selection)
+        XCTAssertEqual(initialPresentation.photo, expandedPresentation.photo)
+        XCTAssertNotEqual(initialKey, expandedKey, "The actual .task identity must include its raw history fence")
+        XCTAssertEqual(expandedKey, HomeV2TimelinePolicy.PhotoLoadIdentity(
+            ownership: selectedMomentOwnership, selection: .init(selected), photo: selected,
+            metrics: expanded.metrics, size: size, admitted: true
+        ), "An unchanged publication must not restart image work")
+        var publications = 0
+        let oldAdmitted = HomeV2TimelinePolicy.performPhotoOperation(ifCurrent: {
+            initial.admitsPhotoPresentation(
+                initialPresentation, selected: .init(selected), currentOwnership: selectedMomentOwnership,
+                currentMetrics: expanded.metrics, currentSnapshot: expanded
+            )
+        }, operation: { publications += 1 })
+        XCTAssertFalse(oldAdmitted)
+        XCTAssertEqual(publications, 0)
+        let replacementAdmitted = HomeV2TimelinePolicy.performPhotoOperation(ifCurrent: {
+            expanded.admitsPhotoPresentation(
+                expandedPresentation, selected: .init(selected), currentOwnership: selectedMomentOwnership,
+                currentMetrics: expanded.metrics, currentSnapshot: expanded
+            )
+        }, operation: { publications += 1 })
+        XCTAssertTrue(replacementAdmitted, "A fresh admitted load must recover at the same selected photo")
+        XCTAssertEqual(publications, 1)
+        XCTAssertEqual(initial.metrics, [selected])
+        XCTAssertEqual(expanded.metrics, [selected, older])
     }
 
     func testSelectedMomentDecimalMidpointDisplayPreservesAnchorPrecision() throws {

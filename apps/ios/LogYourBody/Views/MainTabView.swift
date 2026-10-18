@@ -1100,6 +1100,7 @@ struct ChatTabView: View {
                             .lineLimit(1)
                             .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
                             .padding(.horizontal, 20)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(theme.colors.textSecondary)

@@ -461,8 +461,18 @@ final class ChaosMonkeyUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts[draft].exists, "Keyboard dismissal must not submit the local draft.")
         let closeMenu = app.buttons["home_v2_sidebar_scrim"]
         if closeMenu.exists { closeMenu.tap() }
+        // Returning from a navigation cover can restore the field's focus.
+        // Dismiss that real keyboard before measuring an underlying control.
+        if app.keyboards.firstMatch.exists {
+            let home = app.scrollViews["home_v2_content_scroll"]
+            XCTAssertTrue(home.isHittable)
+            home.swipeDown()
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 2))
+        }
         let recovery = app.buttons["home_chat_recovery"]
         XCTAssertTrue(recovery.waitForExistence(timeout: 8))
+        XCTAssertGreaterThanOrEqual(recovery.frame.height, 44)
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(recovery.frame))
         XCTAssertTrue(recovery.isHittable, "Collapsed recovery must remain actionable without covering Home")
         recovery.tap()
         XCTAssertTrue(app.buttons["home_chat_collapse"].waitForExistence(timeout: 8))
@@ -1204,7 +1214,12 @@ final class ChaosMonkeyUITests: XCTestCase {
                 return .skipped("text field did not regain keyboard focus")
             }
         }
-        let scroll = app.scrollViews.firstMatch
+        // The first native scroll can be the prompt strip behind the keyboard.
+        // Target the actual visible Home/transcript scrolling surface first.
+        let home = app.scrollViews["home_v2_content_scroll"]
+        let transcript = app.scrollViews["chat_messages"]
+        let scroll = home.exists && home.isHittable ? home :
+            (transcript.exists && transcript.isHittable ? transcript : app.scrollViews.firstMatch)
         if scroll.exists && hasFiniteNonZeroFrame(scroll) && scroll.isHittable {
             scroll.swipeDown()
             if app.keyboards.element.waitForNonExistence(timeout: 2) { return .executed(.dismiss) }

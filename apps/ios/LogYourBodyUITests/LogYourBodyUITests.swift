@@ -2559,7 +2559,7 @@ final class LogYourBodyUITests: XCTestCase {
     func testDefaultPhotoHeroSwipeDoesNotNavigateTheRoot() throws {
         let app = XCUIApplication()
         launchDefaultHome(app, extra: ["-lybUITestPhotoTimelinePhotoFixture"])
-        let card = app.descendants(matching: .any)["home_v2_editorial_card"].firstMatch
+        let card = app.buttons["home_v2_photo_stage"]
         XCTAssertTrue(card.waitForExistence(timeout: 30))
         let start = card.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
         start.press(forDuration: 0.05, thenDragTo: card.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)))
@@ -2589,7 +2589,7 @@ final class LogYourBodyUITests: XCTestCase {
     private func assertDefaultHomeStates(largestText: Bool) throws {
         let states = [
             ("photo", ["-lybUITestPhotoTimelinePhotoFixture"], "home_v2_photo_stage"),
-            ("data", [], "home_v2_body_fat_graphic"),
+            ("data", [], "home_v2_selected_body_fat_graphic"),
             ("empty", ["-lybUITestPhotoTimelineEmptyFixture"], "home_v2_day_zero")
         ]
         for (name, dataArguments, identifier) in states {
@@ -2597,7 +2597,8 @@ final class LogYourBodyUITests: XCTestCase {
             let typeArguments = largestText
                 ? ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] : []
             launchDefaultHome(app, extra: dataArguments + typeArguments)
-            let card = app.descendants(matching: .any)["home_v2_editorial_card"].firstMatch
+            let cardID = name == "photo" ? "home_v2_photo_stage" : "home_v2_editorial_card"
+            let card = app.descendants(matching: .any)[cardID]
             XCTAssertTrue(card.waitForExistence(timeout: 30))
             XCTAssertTrue(app.descendants(matching: .any)[identifier].waitForExistence(timeout: 5))
             let window = app.windows.firstMatch.frame
@@ -3370,7 +3371,7 @@ final class LogYourBodyUITests: XCTestCase {
 
         // Home's dock appears once the fixture has seeded.
         XCTAssertTrue(
-            app.descendants(matching: .any)["home_v2_timeline_pager"].waitForExistence(timeout: 45),
+            app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 45),
             "A new subscriber lands on the unified Today timeline"
         )
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_selected_body_fat_graphic"].exists,

@@ -70,6 +70,17 @@ enum HomeV2TimelinePolicy {
         }
     }
 
+    /// A rejected load must restart when the admitted raw publication changes,
+    /// even when its selected row, photo URL and account are unchanged.
+    struct PhotoLoadIdentity: Equatable {
+        let ownership: AuthManager.ProfileSessionOwnership?
+        let selection: Selection
+        let photo: BodyMetrics
+        let metrics: [BodyMetrics]
+        let size: CGSize
+        let admitted: Bool
+    }
+
     struct EntryID: Hashable {
         let owner: String
         let record: String
@@ -597,11 +608,8 @@ struct HomeV2TimelinePager: View {
             timelineContent
         }
         .frame(width: size.width, height: size.height)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Body timeline")
-        .accessibilityValue("Entry \(snapshot.chronologicalPosition(for: selectedID) + 1) of \(snapshot.metrics.count)")
-        .accessibilityHint("Use the timeline ruler to change the selected date")
-        .accessibilityIdentifier("home_v2_timeline_pager")
+        // The real photo or metric graphic owns its accessibility element.
+        // A single-child container can otherwise replace that element's ID.
     }
 
     private var timelineContent: some View {
@@ -618,7 +626,8 @@ struct HomeV2TimelinePager: View {
                     presentation: selectedPresentation, ownership: snapshot.ownership,
                     isCurrent: { candidate in isCurrent(candidate) && selectedID == candidate.selection.id },
                     selectedMetric: selectedMetric, system: system, steps: steps,
-                    fixedWeightDomain: snapshot.weightScale.domain(unit: unit)
+                    fixedWeightDomain: snapshot.weightScale.domain(unit: unit),
+                    entryAccessibilityValue: "Entry \(snapshot.chronologicalPosition(for: selectedPresentation.selection.id) + 1) of \(snapshot.metrics.count)"
                 )
                 .contentShape(Rectangle())
                 .gesture(HomeV2TimelineSwipeGesture(
@@ -701,7 +710,8 @@ private struct HomeV2TimelinePage: View {
     let system: MeasurementSystem
     let steps: (value: String, detail: String)?
     let fixedWeightDomain: ClosedRange<Double>?
-    @State private var editorialPhoto: (key: String, image: UIImage?)?
+    let entryAccessibilityValue: String
+    @State private var editorialPhoto: (key: HomeV2TimelinePolicy.PhotoLoadIdentity, image: UIImage?)?
 
     var body: some View {
         let admitted = presentation.map(isCurrent) ?? false
@@ -718,14 +728,13 @@ private struct HomeV2TimelinePage: View {
                     selectedMetric: selectedMetric,
                     system: system,
                     steps: steps,
-                    fixedWeightDomain: fixedWeightDomain
+                    fixedWeightDomain: fixedWeightDomain,
+                    entryAccessibilityValue: admitted ? entryAccessibilityValue : ""
                 )
                 .frame(width: size.width, height: size.height)
             }
         }
         .frame(width: size.width, height: size.height)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("home_v2_editorial_card")
     }
 
     private func metricOverlay(_ reading: HomeV2TimelinePolicy.HeroReading) -> some View {
@@ -747,10 +756,10 @@ private struct HomeV2TimelinePage: View {
     }
 
     private func photo(url: String, photo: BodyMetrics, admitted: Bool, reading: HomeV2TimelinePolicy.HeroReading) -> some View {
-        let key = photo.userId + "|" + photo.id + "|" + url + "|" +
-            String(ownership?.generation ?? 0) + "|" + metric.id + "|" +
-            String(presentation?.selection.date.timeIntervalSince1970 ?? 0) + "|" +
-            String(photo.updatedAt.timeIntervalSince1970) + (admitted ? "|selected" : "|inactive")
+        let key = HomeV2TimelinePolicy.PhotoLoadIdentity(
+            ownership: ownership, selection: .init(metric), photo: photo,
+            metrics: metrics, size: size, admitted: admitted
+        )
         let failed = admitted && editorialPhoto?.key == key && editorialPhoto?.image == nil
         return ZStack(alignment: .top) {
             if admitted, let snapshot = editorialPhoto, snapshot.key == key, let image = snapshot.image {
@@ -785,7 +794,8 @@ private struct HomeV2TimelinePage: View {
         .accessibilityAction(.default, onOpenPhoto)
         .accessibilityLabel((failed ? "Photo unavailable. Saved measurements shown. " : "Progress photo, ") +
                             "\(dateText(photo)). Actual photo date. Selected time \(presentation?.selection.date.formatted(date: .complete, time: .shortened) ?? ""). \(reading.accessibilitySummary)")
-        .accessibilityHint("Open the photo")
+        .accessibilityValue(entryAccessibilityValue)
+        .accessibilityHint("Open the photo. Use the timeline ruler to change the selected date")
         .accessibilityIdentifier("home_v2_photo_stage")
         .task(id: key) {
             guard !Task.isCancelled, let presentation, isCurrent(presentation) else { return }

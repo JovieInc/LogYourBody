@@ -126,7 +126,8 @@ final class HomeV2LayoutUITests: XCTestCase {
         let fixtures = ["-lybUITestHomeV2PhotoFixture", "-lybUITestHomeV2Fixture", "-lybUITestHomeV2EmptyFixture"]
         for fixture in fixtures {
             let app = launchEditorial(fixture: fixture)
-            let card = app.descendants(matching: .any)["home_v2_editorial_card"].firstMatch
+            let cardID = fixture == "-lybUITestHomeV2PhotoFixture" ? "home_v2_photo_stage" : "home_v2_editorial_card"
+            let card = app.descendants(matching: .any)[cardID]
             XCTAssertTrue(card.waitForExistence(timeout: 30))
             XCTAssertEqual(card.frame.minX, app.windows.firstMatch.frame.minX, accuracy: 1)
             XCTAssertEqual(card.frame.width, app.windows.firstMatch.frame.width, accuracy: 1)
@@ -175,7 +176,7 @@ final class HomeV2LayoutUITests: XCTestCase {
             XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_review_graphic"].exists)
             XCTAssertEqual(graphic.frame.width, app.windows.firstMatch.frame.width, accuracy: 1)
             XCTAssertEqual(graphic.frame.height, graphic.frame.width / 0.8, accuracy: 1)
-            XCTAssertFalse(app.descendants(matching: .any)["home_v2_body_fat_graphic"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["home_v2_selected_body_fat_graphic"].exists)
             captureWeightBranch(app, named: largestText ? "editorial-weight-only-ax5" : "editorial-weight-only")
             assertReachableByScrolling("home_v2_today_details", in: app)
             capture(app, named: largestText ? "editorial-weight-only-ax5-scrolled" : "editorial-weight-only-scrolled")
@@ -197,7 +198,7 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_plot"].exists,
                        "One exact reading must remain a value, not a history plot")
         XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_review_graphic"].exists)
-        XCTAssertFalse(app.descendants(matching: .any)["home_v2_body_fat_graphic"].exists)
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_selected_body_fat_graphic"].exists)
         XCTAssertEqual(app.staticTexts["home_v2_weight_value"].label, "181.0")
         XCTAssertEqual(app.staticTexts["home_v2_change_sentence"].label, "Weight · No 30-day trend yet")
         assertSingleReadingRulerShowsToday(in: app, launchedAt: launchedAt)
@@ -213,7 +214,8 @@ final class HomeV2LayoutUITests: XCTestCase {
                 fixture: photo ? "-lybUITestHomeV2PhotoFixture" : "-lybUITestHomeV2Fixture",
                 extra: ["-lybUITestHomeV2SingleReadingFixture"]
             )
-            XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
+            let primaryID = photo ? "home_v2_photo_stage" : "home_v2_editorial_card"
+            XCTAssertTrue(app.descendants(matching: .any)[primaryID].waitForExistence(timeout: 30))
             if photo {
                 XCTAssertTrue(app.buttons["home_v2_photo_stage"].exists)
             } else {
@@ -304,17 +306,7 @@ final class HomeV2LayoutUITests: XCTestCase {
         app.buttons["home_v2_log_weight"].tap()
         assertBodyFatEntry(in: app, expected: "15.8")
         let field = app.textFields["Body fat percentage value"]
-        field.tap()
-        // A native center tap may place the caret inside the prefilled value.
-        // Select all rather than assuming eight backspaces clear text after it.
-        field.press(forDuration: 1.1)
-        let selectAll = app.menuItems["Select All"].exists
-            ? app.menuItems["Select All"] : app.buttons["Select All"]
-        XCTAssertTrue(selectAll.waitForExistence(timeout: 5))
-        XCTAssertTrue(selectAll.isHittable)
-        selectAll.tap()
-        field.typeText("17.0")
-        XCTAssertEqual(field.value as? String, "17.0", "Save must receive the exact intended body-fat edit")
+        replaceNumericText(in: field, with: "17.0")
         let save = app.buttons["home_v2_log_sheet_save"]
         let valid = expectation(for: NSPredicate(format: "enabled == YES"), evaluatedWith: save)
         XCTAssertEqual(XCTWaiter.wait(for: [valid], timeout: 5), .completed)
@@ -349,7 +341,9 @@ final class HomeV2LayoutUITests: XCTestCase {
             recordCompositionPhase("\(item.name)-before-launch")
             let app = launchEditorial(fixture: item.fixture, extra: item.extra, largestText: true)
             recordCompositionPhase("\(item.name)-after-launch")
-            XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
+            let primaryID = item.fixture == "-lybUITestHomeV2PhotoFixture"
+                ? "home_v2_photo_stage" : "home_v2_editorial_card"
+            XCTAssertTrue(app.descendants(matching: .any)[primaryID].waitForExistence(timeout: 30))
             assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "composition-ax5-\(item.name)-primary")
             // Pinned controls do not move while this fixture's content scrolls.
             // Capture their viewport once, rather than resolving the same AX trees for every metric.
@@ -388,8 +382,7 @@ final class HomeV2LayoutUITests: XCTestCase {
             }
             let field = app.textFields["Body fat percentage value"]
             assertSheetControlReachable(field, in: app, screenshot: "body-fat-ax5-value-\(value)")
-            field.tap()
-            field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + value)
+            replaceNumericText(in: field, with: value)
             capture(app, named: "body-fat-ax5-keyboard-\(value)")
             let save = app.buttons["home_v2_log_sheet_save"]
             XCTAssertEqual(save.label, "Save Body Fat")
@@ -561,7 +554,7 @@ final class HomeV2LayoutUITests: XCTestCase {
                 "Outside the supported logging range. Source value kept unchanged."
             ), review.label)
             XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_graphic"].exists)
-            XCTAssertFalse(app.descendants(matching: .any)["home_v2_body_fat_graphic"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["home_v2_selected_body_fat_graphic"].exists)
             XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_plot"].exists,
                            "An unsupported source value must not be rendered as a supported trend")
             XCTAssertEqual(card.frame.width, app.windows.firstMatch.frame.width, accuracy: 1)
@@ -657,7 +650,7 @@ final class HomeV2LayoutUITests: XCTestCase {
         defer { app.terminate() }
         selectHeroMetric("Weight", in: app)
         let card = try uniqueWeightBranch(in: app, identifier: "home_v2_editorial_card")
-        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
+        let pager = app.descendants(matching: .any)["home_v2_weight_graphic"]
         let initial = expectation(for: NSPredicate(format: "value == %@", "Entry 3 of 3"), evaluatedWith: pager)
         XCTAssertEqual(XCTWaiter.wait(for: [initial], timeout: 8), .completed)
         card.swipeLeft()
@@ -706,6 +699,16 @@ final class HomeV2LayoutUITests: XCTestCase {
         )
         XCTAssertTrue(detail.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Entered by you")).firstMatch.exists)
         captureWeightBranch(app, named: zero ? "inferred-zero-prior-anchor-provenance" : "inferred-one-prior-anchor-provenance")
+    }
+
+    /// Native editing only: tap beyond the centered numeric text to put the
+    /// caret at its end, then require exact readback before Save validation.
+    private func replaceNumericText(in field: XCUIElement, with value: String) {
+        XCTAssertTrue(field.isHittable)
+        let previous = field.value as? String ?? ""
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: max(8, previous.count)) + value)
+        XCTAssertEqual(field.value as? String, value, "Save must receive the exact intended numeric edit")
     }
 
     /// Hero identity is an explicit user choice; sparse data must not choose it for the test.

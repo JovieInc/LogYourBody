@@ -387,9 +387,8 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         XCTAssertTrue(heroPicker.buttons["Body fat"].isSelected)
         let stage = app.buttons["home_v2_photo_stage"]
         let caption = app.staticTexts["home_v2_photo_caption"]
-        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
         let historyLoaded = expectation(
-            for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager
+            for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: stage
         )
         guard XCTWaiter.wait(for: [historyLoaded], timeout: 8) == .completed,
               Calendar.current.isDate(launchedAt, inSameDayAs: Date()),
@@ -605,8 +604,7 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         let app = launch(largestText: true, withSteps: true)
         let stage = app.buttons["home_v2_photo_stage"]
         let caption = app.staticTexts["home_v2_photo_caption"]
-        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
-        let historyLoaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
+        let historyLoaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: stage)
         XCTAssertEqual(XCTWaiter.wait(for: [historyLoaded], timeout: 8), .completed)
         let firstCaption = caption.label
         let initialCardY = stage.frame.minY
@@ -764,8 +762,7 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         let stage = app.buttons["home_v2_photo_stage"]
         let caption = app.staticTexts["home_v2_photo_caption"]
         let weight = app.staticTexts["home_v2_weight_value"]
-        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
-        let ready = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
+        let ready = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: stage)
         let readyResult = XCTWaiter.wait(for: [ready], timeout: 8)
         capturePhotoDiagnostic(app, stage: stage, name: "bracket-before-navigation", requested: "0")
         guard readyResult == .completed, Calendar.current.isDate(launchDate, inSameDayAs: Date()),
@@ -1205,8 +1202,7 @@ extension HomeV2TimelineIntegrationUITests {
     func testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap() {
         let app = launchHoldScrubFixture(withSteps: true, holdScrub: true)
         let stage = app.buttons["home_v2_photo_stage"]
-        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
-        let loaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
+        let loaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: stage)
         XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 8), .completed)
         let caption = app.staticTexts["home_v2_photo_caption"]
         let weight = app.staticTexts["home_v2_weight_value"]
@@ -1226,8 +1222,8 @@ extension HomeV2TimelineIntegrationUITests {
         let stepsDate = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Steps · ")).firstMatch
         XCTAssertTrue(caption.label.hasPrefix(stepsDate.label.replacingOccurrences(of: "Steps · ", with: "")))
         XCTAssertFalse(close.exists, "Holding and scrubbing must not open the photo viewer")
-        let surface = pager.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
-        surface.press(forDuration: 0.05, thenDragTo: surface.withOffset(CGVector(dx: pager.frame.width * 0.85, dy: 0)))
+        let surface = stage.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5))
+        surface.press(forDuration: 0.05, thenDragTo: surface.withOffset(CGVector(dx: stage.frame.width * 0.85, dy: 0)))
         XCTAssertEqual(caption.label, date)
         XCTAssertEqual(weight.label, initialWeight)
         assertStepCount(6_000, in: app)
@@ -1240,8 +1236,7 @@ extension HomeV2TimelineIntegrationUITests {
     func testPhotoScrubResetsWhenNavigatingToTheMenuAndBack() {
         let app = launchHoldScrubFixture(holdScrub: true)
         let stage = app.buttons["home_v2_photo_stage"]
-        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
-        let loaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
+        let loaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: stage)
         XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 8), .completed)
         stage.press(forDuration: 1.3)
         let mode = app.staticTexts["home_v2_photo_scrub_mode"]

@@ -122,6 +122,7 @@ struct HomeV2Surface: View {
                 .frame(minHeight: geometry.size.height, alignment: .top)
             }
             .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
             .accessibilityIdentifier("home_v2_content_scroll")
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -455,6 +456,7 @@ struct HomeV2DataHero: View {
     var system: MeasurementSystem = .metric
     var steps: (value: String, detail: String)?
     var fixedWeightDomain: ClosedRange<Double>?
+    var entryAccessibilityValue = ""
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var selectedPresentation: HomeV2TimelinePolicy.Presentation? {
@@ -469,20 +471,25 @@ struct HomeV2DataHero: View {
 
     var body: some View {
         GeometryReader { geometry in
-            Group {
+            // A real viewport keeps its native boundary and the graphic's
+            // own semantic group distinct. Normal text keeps fixed geometry;
+            // accessibility text can scroll inside the same 4:5 viewport.
+            ScrollView(.vertical) {
                 if dynamicTypeSize.isAccessibilitySize {
-                    ScrollView(.vertical) {
-                        graphic(height: geometry.size.height, accessible: true)
-                            .frame(maxWidth: .infinity, minHeight: geometry.size.height)
-                    }
-                    .scrollBounceBehavior(.basedOnSize)
-                    .accessibilityIdentifier("home_v2_data_hero_accessibility_scroll")
+                    graphic(height: geometry.size.height, accessible: true)
+                        .accessibilityValue(entryAccessibilityValue)
+                        .frame(maxWidth: .infinity, minHeight: geometry.size.height)
                 } else {
                     graphic(height: geometry.size.height, accessible: false)
+                        .accessibilityValue(entryAccessibilityValue)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
                 }
             }
+            .scrollDisabled(!dynamicTypeSize.isAccessibilitySize)
+            .scrollBounceBehavior(.basedOnSize)
             .frame(width: geometry.size.width, height: geometry.size.height)
             .clipped()
+            .accessibilityIdentifier("home_v2_editorial_card")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(HomeV2Tokens.Colors.card)
@@ -566,7 +573,6 @@ struct HomeV2DataHero: View {
         .padding(44)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(reading.accessibilitySummary)
-        .accessibilityIdentifier("home_v2_body_fat_graphic")
     }
 
     private var selectedWeightUnavailableGraphic: some View {
