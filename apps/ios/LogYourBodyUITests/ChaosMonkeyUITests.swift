@@ -473,7 +473,8 @@ final class ChaosMonkeyUITests: XCTestCase {
         let recoveryReady = expectation(
             for: NSPredicate(format: "exists == YES AND hittable == YES"), evaluatedWith: recovery
         )
-        XCTAssertEqual(XCTWaiter.wait(for: [recoveryReady], timeout: 8), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [recoveryReady], timeout: 8), .completed,
+                       nativeFailureState(recovery, in: app))
         XCTAssertTrue(recovery.exists)
         XCTAssertGreaterThanOrEqual(recovery.frame.height, 44)
         XCTAssertTrue(app.windows.firstMatch.frame.contains(recovery.frame))
@@ -485,6 +486,21 @@ final class ChaosMonkeyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Reload"].exists, "The original conversation recovery action must remain available")
         XCTAssertEqual(composer.value as? String, draft)
         XCTAssertFalse(app.staticTexts[draft].exists, "Reviewing a recovery error must not send the draft")
+    }
+
+    /// Failure-only sequential reads from this case's actual native element and app.
+    /// This observes state; it does not set traits, change selection, or retry an action.
+    private func nativeFailureState(_ element: XCUIElement, in app: XCUIApplication) -> String {
+        let observedAt = Date().ISO8601Format()
+        let exists = element.exists
+        let state: String
+        if exists {
+            state = "exists=true, enabled=\(element.isEnabled), selected=\(element.isSelected), " +
+                "hittable=\(element.isHittable), value=\(String(describing: element.value)), frame=\(element.frame)"
+        } else {
+            state = "exists=false"
+        }
+        return "Sequential native failure observations at \(observedAt): \(state)\n\(app.debugDescription)"
     }
 
     func testSystemAlertsRequireKnownDenyOnlyAction() {

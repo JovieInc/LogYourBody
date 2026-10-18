@@ -508,7 +508,8 @@ final class HomeV2LayoutUITests: XCTestCase {
         segment.tap()
         let selected = expectation(for: NSPredicate(format: "selected == YES"), evaluatedWith: segment)
         let remaining = max(0, deadline - ProcessInfo.processInfo.systemUptime)
-        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: remaining), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: remaining), .completed,
+                       nativeFailureState(segment, in: app))
         XCTAssertTrue(segment.isSelected)
     }
 
@@ -578,7 +579,8 @@ final class HomeV2LayoutUITests: XCTestCase {
                 app.buttons["home_v2_context_button"].tap()
                 let rawWeight = app.descendants(matching: .any).matching(identifier: "home_v2_context_row_weight")
                 let rawFat = app.descendants(matching: .any).matching(identifier: "home_v2_context_row_body_fat")
-                XCTAssertTrue(rawWeight.element.waitForExistence(timeout: 8))
+                XCTAssertTrue(rawWeight.element.waitForExistence(timeout: 8),
+                              nativeFailureState(rawWeight.element, in: app))
                 XCTAssertEqual(rawWeight.count, 1)
                 XCTAssertEqual(rawFat.count, 1)
                 XCTAssertTrue(rawWeight.element.label.contains("39.68 lb"), rawWeight.element.label)
@@ -759,11 +761,26 @@ final class HomeV2LayoutUITests: XCTestCase {
             XCTAssertEqual(matching.count, 1, "The selected moment must retain evidence: \(fragment)")
         }
         let done = app.buttons["home_v2_provenance_done"]
-        XCTAssertGreaterThanOrEqual(done.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(done.frame.height, 44, nativeFailureState(done, in: app))
         XCTAssertTrue(app.windows.firstMatch.frame.contains(done.frame))
         XCTAssertTrue(done.isHittable)
         done.tap()
         XCTAssertTrue(detail.waitForNonExistence(timeout: 8))
+    }
+
+    /// Failure-only sequential reads from this case's actual native element and app.
+    /// This observes state; it does not set traits, change selection, or retry an action.
+    private func nativeFailureState(_ element: XCUIElement, in app: XCUIApplication) -> String {
+        let observedAt = Date().ISO8601Format()
+        let exists = element.exists
+        let state: String
+        if exists {
+            state = "exists=true, enabled=\(element.isEnabled), selected=\(element.isSelected), " +
+                "hittable=\(element.isHittable), value=\(String(describing: element.value)), frame=\(element.frame)"
+        } else {
+            state = "exists=false"
+        }
+        return "Sequential native failure observations at \(observedAt): \(state)\n\(app.debugDescription)"
     }
 
     private func uniqueWeightBranch(in app: XCUIApplication, identifier: String) throws -> XCUIElement {
