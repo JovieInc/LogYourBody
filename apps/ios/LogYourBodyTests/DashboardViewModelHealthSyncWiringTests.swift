@@ -506,13 +506,13 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
         await fulfillment(of: [coordinator.held.started], timeout: 3)
         XCTAssertTrue(vm.isSyncingData)
         latest.resumeIfWaiting(returning: newest)
-        await awaitDashboardTask(old)
+        await awaitDashboardTask(old, phase: "superseded startup after latest read released")
         XCTAssertEqual(coordinator.weightCalls, 1, "Old startup must not enter a successor coordinator")
         XCTAssertTrue(vm.isSyncingData, "Old startup must not cancel or finish newer held refresh")
         XCTAssertNil(vm.lastRefreshDate)
         XCTAssertTrue(vm.bodyMetrics.isEmpty, "Rejected old latest read cannot publish")
         coordinator.held.resumeIfWaiting(returning: ())
-        await awaitDashboardTask(newer, timeout: 5)
+        await awaitDashboardTask(newer, timeout: 5, phase: "newer same-owner refresh after coordinator released")
         XCTAssertEqual(vm.bodyMetrics, [newest])
         XCTAssertTrue(vm.hasCurrentPublication(for: auth))
         XCTAssertFalse(vm.isSyncingData)
@@ -521,7 +521,7 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
         XCTAssertEqual(latestCalls, 2, "Recovery uses the actual latest-reader port after the rejected held read")
         if let history = vm.pendingHistoricalLoadForTests() {
             history.cancel()
-            await awaitDashboardTask(history)
+            await awaitDashboardTask(history, phase: "cancelled newer refresh historical child")
         }
     }
 
@@ -1111,8 +1111,13 @@ final class DashboardViewModelHealthSyncWiringTests: XCTestCase {
         try await CoreDataManager.shared.saveDailyMetricsAndWait(row, userId: subject)
     }
 
-    private func awaitDashboardTask(_ task: Task<Void, Never>, timeout: TimeInterval = 3) async {
-        let completed = expectation(description: "Actual dashboard task completed")
+    private func awaitDashboardTask(
+        _ task: Task<Void, Never>, timeout: TimeInterval = 3, phase: String = "dashboard task",
+        file: StaticString = #filePath, line: UInt = #line
+    ) async {
+        let completed = expectation(
+            description: "Actual dashboard task completed: \(phase) [\(file):\(line)]"
+        )
         Task { await task.value; completed.fulfill() }
         await fulfillment(of: [completed], timeout: timeout)
     }
