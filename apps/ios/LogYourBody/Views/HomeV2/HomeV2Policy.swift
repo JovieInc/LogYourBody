@@ -101,6 +101,8 @@ enum HomeV2Copy {
     static let viewProgress = "View progress"
     static let firstCheckInTitle = "Your first check-in"
     static let firstCheckInBody = "Track weight and body fat to follow changes in your shape over time."
+    static let nothingLoggedToday = "Nothing logged today"
+    static let earlierEntriesBody = "Your earlier entries are still in Entries. Log today’s weight when you’re ready."
     static let connectHealthInstead = "Connect Apple Health instead"
     static let logSheetTitle = "Log weight"
     static let addDetails = "Add details or photos"
@@ -175,6 +177,7 @@ enum HomeV2Copy {
 
     /// The editorial plate on a day without a photo.
     static let noPhotoThisDay = "No photo this day"
+
     /// Shown once, then gone for good.
     static let timelineCoachHint = "Swipe through your history. Drag the timeline to jump in time."
     static let coachDismissedDefaultsKey = "home_v2_timeline_coach_dismissed"
@@ -228,11 +231,11 @@ enum HomeV2CompositionPolicy {
             return HomeV2Copy.compositionTrackingPrompt
         }
 
-        let method = methodKey(latest.bodyFatMethod)
+        let method = methodKey(latest.attributedBodyFatMethod)
         let label = measurementLabel(for: method)
         let latestText = String(format: "%.1f", latestValue)
         let earlier = readings
-            .filter { $0.localDate != latest.localDate && methodKey($0.bodyFatMethod) == method }
+            .filter { $0.localDate != latest.localDate && methodKey($0.attributedBodyFatMethod) == method }
             .max(by: { $0.date < $1.date })
 
         guard let earlier, let earlierValue = earlier.bodyFatPercentage else {
@@ -318,7 +321,7 @@ enum HomeV2WeightStepPolicy {
     static let bodyFatRange: ClosedRange<Double> = 2...70
 
     static func range(unit: String) -> ClosedRange<Double> {
-        unit == "kg" ? 20...500 : 44...1_100
+        unit == "kg" ? 32...300 : 70...660
     }
 
     static func defaultValue(unit: String) -> Double {
@@ -338,12 +341,96 @@ enum HomeV2WeightStepPolicy {
         clamped(value + Double(direction) * step, unit: unit)
     }
 
+    static func converted(_ value: Double, from sourceUnit: String, to destinationUnit: String) -> Double {
+        let source = sourceUnit.lowercased()
+        let destination = destinationUnit.lowercased()
+        guard source != destination else { return rounded(value) }
+        if source == "kg", destination == "lbs" || destination == "lb" {
+            return rounded(value.kgToLbs)
+        }
+        if source == "lbs" || source == "lb", destination == "kg" {
+            return rounded(value.lbsToKg)
+        }
+        return rounded(value)
+    }
+
     static func rounded(_ value: Double) -> Double {
         (value * 10).rounded() / 10
     }
 
     static func text(_ value: Double) -> String {
         String(format: "%.1f", rounded(value))
+    }
+}
+
+/// Manual entry and trend presentation share one adult logging range. Imported
+/// samples outside it remain stored and visible with provenance for correction.
+enum HomeV2WeightQuality {
+    static let supportedKilograms: ClosedRange<Double> = 32...300
+    static let reviewMessage = "Outside the supported logging range. Source value kept unchanged."
+
+    static func isWithinSupportedLoggingRange(_ kilograms: Double?) -> Bool {
+        guard let kilograms, kilograms.isFinite else { return false }
+        return supportedKilograms.contains(kilograms)
+    }
+
+    /// Exclude flagged source measurements before interpolation and smoothing:
+    /// an average containing an unsupported reading can itself look supported.
+    static func trendContext(
+        for metrics: [BodyMetrics]
+    ) -> MetricsInterpolationService.WeightInterpolationContext? {
+        MetricsInterpolationService.shared.makeWeightInterpolationContext(
+            for: metrics.filter { isWithinSupportedLoggingRange($0.weight) }
+        )
+    }
+
+    static func trendWeight(for metric: BodyMetrics, in metrics: [BodyMetrics]) -> Double? {
+        // Keep the original flagged measurement visible for correction; do not
+        // replace it with a trend from otherwise supported surrounding records.
+        guard metric.weight == nil || isWithinSupportedLoggingRange(metric.weight) else { return nil }
+        return trendContext(for: metrics)?.trendWeight(for: metric.date)?.value
+    }
+}
+
+/// Today never falls back to the latest historical row. Earlier imports stay in
+/// Entries and the selected-day Context surface.
+enum HomeV2TodayPolicy {
+    static func metrics(
+        in metrics: [BodyMetrics],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [BodyMetrics] {
+        let today = BodyMetricLocalDate.key(for: now, calendar: calendar)
+        return metrics.filter { $0.localDate == today }
+            .sorted { $0.date == $1.date ? $0.id > $1.id : $0.date > $1.date }
+    }
+}
+
+/// Sparse recorded-weight charts label every unique sample for 0/1/2 points,
+/// then only their bounds. Repeated samples on one day use times, not duplicate
+/// day labels.
+enum HomeV2RecordedWeightChartPolicy {
+    enum LabelGranularity: Equatable {
+        case day
+        case time
+    }
+
+    static func axisDates(for readings: [HomeV2EditorialPolicy.WeightReading]) -> [Date] {
+        let unique = readings.map(\.date).sorted().reduce(into: [Date]()) { dates, date in
+            if dates.last != date { dates.append(date) }
+        }
+        guard unique.count > 2 else { return unique }
+        return [unique[0], unique[unique.count - 1]]
+    }
+
+    static func labelGranularity(
+        for readings: [HomeV2EditorialPolicy.WeightReading],
+        calendar: Calendar = .current
+    ) -> LabelGranularity {
+        let dates = axisDates(for: readings)
+        guard dates.count > 1,
+              dates.allSatisfy({ calendar.isDate($0, inSameDayAs: dates[0]) }) else { return .day }
+        return .time
     }
 }
 
@@ -355,6 +442,11 @@ struct HomeV2LoggedEntry: Equatable {
     let previousMetric: BodyMetrics?
     let valueText: String
     let unit: String
+    var savedMetric: BodyMetrics?
+
+    var confirmationText: String {
+        valueText.isEmpty ? "Entry saved." : HomeV2Copy.loggedSentence(value: valueText, unit: unit)
+    }
 }
 
 /// Geometry that must hold on every iPhone: the photo stays full width at 4:5
@@ -412,7 +504,7 @@ enum HomeV2EditorialPolicy {
     static func bodyFat(in metric: BodyMetrics?) -> BodyFatReading? {
         guard let metric, let value = metric.bodyFatPercentage,
               value.isFinite, value > 0, value < 100 else { return nil }
-        let method = metric.bodyFatMethod?.lowercased()
+        let method = metric.attributedBodyFatMethod?.lowercased()
             .split(whereSeparator: \.isWhitespace).joined(separator: " ") ?? ""
         // Synthetic estimates must not be presented as recorded body fat.
         guard !method.contains("interpolat"), !method.contains("derived") else { return nil }
@@ -447,8 +539,193 @@ enum HomeV2EditorialPolicy {
         return metrics.compactMap { metric in
             guard metric.userId == selected.userId,
                   metric.date >= start, metric.date <= selected.date,
-                  let weight = metric.weight, weight.isFinite, weight > 0 else { return nil }
+                  let weight = metric.weight,
+                  HomeV2WeightQuality.isWithinSupportedLoggingRange(weight) else { return nil }
             return WeightReading(id: metric.id, date: metric.date, kilograms: weight)
         }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date < $1.date }
+    }
+}
+
+/// Display-only body fat for one selected moment. A stored reading wins.
+/// Inside two stored readings the value is time-weighted and labeled inferred.
+/// Nothing here is saved, and the slope stops at the outer readings.
+enum HomeV2SelectedMomentPolicy {
+    enum Kind: Equatable { case measured, inferred, lastKnown, unavailable }
+
+    struct Anchor {
+        let metric: BodyMetrics
+        let reading: HomeV2EditorialPolicy.BodyFatReading
+    }
+
+    struct Presentation {
+        let kind: Kind
+        let sentence: String
+        let percentage: Double?
+        let older: BodyMetrics?
+        let newer: BodyMetrics?
+        let olderReading: HomeV2EditorialPolicy.BodyFatReading?
+        let newerReading: HomeV2EditorialPolicy.BodyFatReading?
+    }
+
+    static func sentence(for metric: BodyMetrics, in history: [BodyMetrics]) -> String {
+        presentation(for: metric, in: history).sentence
+    }
+
+    static func presentation(for metric: BodyMetrics, in history: [BodyMetrics]) -> Presentation {
+        if let reading = HomeV2EditorialPolicy.bodyFat(in: metric) {
+            return Presentation(
+                kind: .measured,
+                sentence: HomeV2TimelinePolicy.bodyFatSentence(for: metric),
+                percentage: reading.percentage,
+                older: nil, newer: nil, olderReading: nil, newerReading: nil
+            )
+        }
+        let bracket = anchors(around: metric, in: history)
+        if let older = bracket.older, let newer = bracket.newer,
+           let inferred = inferredPresentation(selected: metric, older: older, newer: newer) {
+            return inferred
+        }
+        if let older = bracket.older, bracket.newer == nil {
+            return lastKnownPresentation(older)
+        }
+        return unavailablePresentation()
+    }
+
+    static func inferredPresentation(selected: BodyMetrics, older: Anchor, newer: Anchor) -> Presentation? {
+        guard let value = interpolatedBodyFat(
+            olderDate: older.metric.date, olderValue: older.reading.percentage,
+            newerDate: newer.metric.date, newerValue: newer.reading.percentage, at: selected.date
+        ) else { return nil }
+        return Presentation(
+            kind: .inferred,
+            sentence: "Inferred body fat \(oneDecimal(value))%.",
+            percentage: value,
+            older: older.metric, newer: newer.metric,
+            olderReading: older.reading, newerReading: newer.reading
+        )
+    }
+
+    static func interpolatedBodyFat(
+        olderDate: Date, olderValue: Double, newerDate: Date, newerValue: Double, at date: Date
+    ) -> Double? {
+        let span = newerDate.timeIntervalSince(olderDate)
+        guard span > 0 else { return nil }
+        let fraction = date.timeIntervalSince(olderDate) / span
+        guard fraction > 0, fraction < 1 else { return nil }
+        let value = olderValue + (newerValue - olderValue) * fraction
+        guard value.isFinite, value > 0, value < 100 else { return nil }
+        return value
+    }
+
+    static func displayFFMI(
+        for metric: BodyMetrics, in history: [BodyMetrics], owner: String?, heightCm: Double?
+    ) -> Double? {
+        if let measured = HomeV2EditorialPolicy.ffmi(in: metric, owner: owner, heightCm: heightCm) {
+            return measured
+        }
+        let moment = presentation(for: metric, in: history)
+        guard metric.userId == owner, moment.kind == .inferred, let percentage = moment.percentage,
+              let weight = HomeV2EditorialPolicy.weight(in: metric),
+              let heightCm, heightCm.isFinite, heightCm > 0 else { return nil }
+        return UnitConversion.calculateFFMI(
+            weightKg: weight, bodyFatPercentage: percentage, heightCm: heightCm
+        )
+    }
+
+    static func displayPhoto(for metric: BodyMetrics, in history: [BodyMetrics]) -> BodyMetrics? {
+        if PhotoTimelineHUDPolicy.hasUsablePhoto(metric) { return metric }
+        let photos = history.filter { candidate in
+            candidate.userId == metric.userId && PhotoTimelineHUDPolicy.hasUsablePhoto(candidate)
+        }
+        return photos.min { lhs, rhs in
+            let left = abs(lhs.date.timeIntervalSince(metric.date))
+            let right = abs(rhs.date.timeIntervalSince(metric.date))
+            if left != right { return left < right }
+            if lhs.date != rhs.date { return lhs.date > rhs.date }
+            return lhs.id < rhs.id
+        }
+    }
+
+    static func provenanceSentence(for presentation: Presentation, heightCm: Double?) -> String {
+        guard presentation.kind == .inferred, let older = presentation.older, let newer = presentation.newer,
+              let olderReading = presentation.olderReading,
+              let newerReading = presentation.newerReading else {
+            return presentation.sentence
+        }
+        let olderText = "\(mediumDate(older.date)) \(anchorPercent(olderReading.percentage)) \(olderReading.caption)"
+        let newerText = "\(mediumDate(newer.date)) \(anchorPercent(newerReading.percentage)) \(newerReading.caption)"
+        return "Inferred from \(olderText) and \(newerText). Height \(heightText(heightCm)) cm."
+    }
+
+    private static func anchors(
+        around metric: BodyMetrics, in history: [BodyMetrics]
+    ) -> (older: Anchor?, newer: Anchor?) {
+        let readings = history.compactMap { candidate -> Anchor? in
+            guard candidate.userId == metric.userId, candidate.id != metric.id,
+                  candidate.date != metric.date,
+                  let reading = HomeV2EditorialPolicy.bodyFat(in: candidate) else { return nil }
+            return Anchor(metric: candidate, reading: reading)
+        }
+        let older = ordered(readings.filter { $0.metric.date < metric.date }, newestFirst: true).first
+        let newer = ordered(readings.filter { $0.metric.date > metric.date }, newestFirst: false).first
+        return (older, newer)
+    }
+
+    private static func ordered(_ readings: [Anchor], newestFirst: Bool) -> [Anchor] {
+        readings.sorted { lhs, rhs in
+            if lhs.metric.date != rhs.metric.date {
+                return newestFirst ? lhs.metric.date > rhs.metric.date : lhs.metric.date < rhs.metric.date
+            }
+            return lhs.metric.id < rhs.metric.id
+        }
+    }
+
+    private static func lastKnownPresentation(_ older: Anchor) -> Presentation {
+        let shown = oneDecimal(older.reading.percentage)
+        return Presentation(
+            kind: .lastKnown,
+            sentence: "Last known body fat \(shown)% on \(mediumDate(older.metric.date)).",
+            percentage: older.reading.percentage,
+            older: older.metric, newer: nil, olderReading: older.reading, newerReading: nil
+        )
+    }
+
+    private static func unavailablePresentation() -> Presentation {
+        Presentation(
+            kind: .unavailable, sentence: "Body fat not logged for this day.",
+            percentage: nil, older: nil, newer: nil, olderReading: nil, newerReading: nil
+        )
+    }
+
+    private static func oneDecimal(_ value: Double) -> String {
+        let handler = NSDecimalNumberHandler(
+            roundingMode: .plain, scale: 1, raiseOnExactness: false,
+            raiseOnOverflow: false, raiseOnUnderflow: false, raiseOnDivideByZero: false
+        )
+        let parsed = NSDecimalNumber(
+            string: String(format: "%.4f", value), locale: Locale(identifier: "en_US_POSIX")
+        )
+        let tenths = parsed.rounding(accordingToBehavior: handler)
+            .multiplying(by: NSDecimalNumber(string: "10", locale: Locale(identifier: "en_US_POSIX")))
+            .intValue
+        return "\(tenths / 10).\(abs(tenths % 10))"
+    }
+
+    private static func anchorPercent(_ value: Double) -> String {
+        String(format: "%.2f %%", value)
+    }
+
+    private static func mediumDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+
+    private static func heightText(_ heightCm: Double?) -> String {
+        guard let heightCm, heightCm.isFinite, heightCm > 0 else { return "not recorded" }
+        if heightCm == heightCm.rounded() { return String(format: "%.0f", heightCm) }
+        return String(format: "%.1f", heightCm)
     }
 }

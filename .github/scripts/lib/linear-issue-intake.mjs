@@ -381,6 +381,8 @@ export async function upsertLinearIssue({
   createStateName = null,
   // Optional label ids applied only when a new issue is created.
   createLabelIds = [],
+  createLabelNames = [],
+  createIssueId = null,
   reopenTerminal = false,
   provenance = null,
   teamId = JOVIE_TEAM_ID,
@@ -539,6 +541,12 @@ export async function upsertLinearIssue({
   const labelIds = [...createLabelIds, labelIdResult.id, receiptLabel.id].filter(Boolean);
 
   if (!match) {
+    for (const name of createLabelNames) {
+      const extra = await ensureTeamLabelId({ label: name, labels: availableLabels,
+        recover: true, teamId, apiKey, fetchImpl });
+      if (!extra.ok) return extra;
+      labelIds.push(extra.id);
+    }
     const states = found.data?.team?.states?.nodes ?? [];
     const createStateId = createStateName
       ? (states.find((state) => state?.name === createStateName)?.id ?? null)
@@ -556,8 +564,10 @@ export async function upsertLinearIssue({
             ${typeof priority === 'number' ? '$priority: Int' : ''}
             $stateId: String
             $labelIds: [String!]
+            ${createIssueId ? '$id: String!' : ''}
           ) {
             issueCreate(input: {
+              ${createIssueId ? 'id: $id' : ''}
               teamId: $teamId
               title: $title
               description: $description
@@ -572,6 +582,7 @@ export async function upsertLinearIssue({
         `,
         variables: {
           teamId,
+          ...(createIssueId ? { id: createIssueId } : {}),
           title,
           description,
           ...(typeof priority === 'number' ? { priority } : {}),

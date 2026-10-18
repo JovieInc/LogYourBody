@@ -109,7 +109,7 @@ struct ReportedMeasurements: Codable, Equatable {
 
 // The interoperable server contract uses finite IEEE-754 numbers. Preserve native
 // Int64/UInt64 tokens exactly as well; do not coerce every opaque value to Double.
-private indirect enum ReportedMeasurementJSON: Equatable, Encodable {
+indirect enum ReportedMeasurementJSON: Equatable, Encodable {
     case null
     case boolean(Bool)
     case signed(Int64)

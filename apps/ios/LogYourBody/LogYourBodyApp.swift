@@ -268,7 +268,8 @@ struct LogYourBodyApp: App {
                     // fixtures or external-service stubs in that environment.
                     guard !Self.isRunningUnitTests else { return }
 #if DEBUG
-                    guard !ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") else { return }
+                    guard !ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture"),
+                          !ProcessInfo.processInfo.arguments.contains("-lybUITestCanvasFixture") else { return }
 #endif
                     await performStartupSequence()
                     resolvePendingEntryDeepLinkIfPossible()
@@ -318,7 +319,9 @@ struct LogYourBodyApp: App {
     @ViewBuilder
     private var appContent: some View {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") {
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestCanvasFixture") {
+            MesocycleCanvasFixtureView()
+        } else if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingFixture") {
             TrainingLiveSessionFixtureView()
         } else {
             ContentView()
@@ -649,6 +652,12 @@ struct LogYourBodyApp: App {
     }
 
     private func seedFullDashboardUITestFixtureData(userId: String, photoURL: String? = nil) async {
+        let calendar = Calendar.current
+        let now = Date()
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2HistoricalOnlyFixture") {
+            await seedHistoricalWeightUITestFixtureData(userId: userId, calendar: calendar, now: now)
+            return
+        }
         guard let expectedMetricIDs = try? await UITestFixtureIsolation.seedDashboardMetrics(
             userId: userId, photoURL: photoURL, now: Date(),
             timelinePhoto: { writeHomeV2FixturePhoto(variant: $0, fixtureUserId: userId) }
@@ -696,6 +705,64 @@ struct LogYourBodyApp: App {
                 "Steps UI fixture expected its saved owner/day total before authentication"
             )
         }
+    }
+
+    private func seedHistoricalWeightUITestFixtureData(
+        userId: String,
+        calendar: Calendar,
+        now: Date
+    ) async {
+        UserDefaults.standard.set(
+            MeasurementSystem.metric.rawValue,
+            forKey: Constants.preferredMeasurementSystemKey
+        )
+        let day = calendar.date(from: DateComponents(year: 2_018, month: 11, day: 2)) ?? now
+        let samples: [(id: String, hour: Int, minute: Int, weight: Double)] = [
+            ("morning", 7, 2, 18),
+            ("evening", 19, 4, 17.99)
+        ]
+
+        for sample in samples {
+            let date = calendar.date(
+                bySettingHour: sample.hour,
+                minute: sample.minute,
+                second: 0,
+                of: day
+            ) ?? day
+            let metric = BodyMetrics(
+                id: "\(userId)_historical_\(sample.id)",
+                userId: userId,
+                date: date,
+                weight: sample.weight,
+                weightUnit: "kg",
+                bodyFatPercentage: nil,
+                bodyFatMethod: nil,
+                muscleMass: nil,
+                boneMass: nil,
+                notes: "Imported from Apple Health",
+                photoUrl: nil,
+                dataSource: BodyMetricSource.healthKit.rawValue,
+                sourceMetadata: BodyMetricSourceMetadata(
+                    vendor: "healthkit",
+                    sourceName: "Withings",
+                    sourceBundleId: "com.withings.wiScaleNG",
+                    sampleId: "historical-\(sample.id)",
+                    quantityType: "HKQuantityTypeIdentifierBodyMass"
+                ),
+                createdAt: now,
+                updatedAt: now
+            )
+            try? await CoreDataManager.shared.saveBodyMetricsAndWait(
+                metric,
+                userId: userId,
+                markAsSynced: true
+            )
+        }
+
+        let savedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+        let savedIds = Set(savedMetrics.compactMap { $0.toBodyMetrics()?.id })
+        let expectedIds = Set(samples.map { "\(userId)_historical_\($0.id)" })
+        precondition(savedIds == expectedIds, "Historical UI fixture did not save both source samples")
     }
 
     private func seedGlp1WeeklyCheckInUITestFixtureData(userId: String) async {
@@ -843,6 +910,8 @@ enum UITestFixtureIsolation {
             } else {
                 fixturePhotoURL = timelinePhotoURL
             }
+            let fixtureSource = arguments.contains("-lybUITestHomeV2ImportedCorrectionFixture") && entry.daysAgo == 0
+                ? BodyMetricSource.healthKit.rawValue : entry.source
             let metric = BodyMetrics(
                 id: "\(metricIdPrefix)_\(entry.daysAgo)",
                 userId: userId,
@@ -852,7 +921,7 @@ enum UITestFixtureIsolation {
                 bodyFatPercentage: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly
                     ? nil : entry.bodyFat,
                 bodyFatMethod: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly || entry.bodyFat == nil
-                    ? nil : (usesVisualEstimateHero ? "visual_estimate" : entry.source),
+                    ? nil : (usesVisualEstimateHero ? "visual_estimate" : fixtureSource),
                 muscleMass: isPhotoOnly ? nil : entry.muscle,
                 boneMass: nil,
                 waistCm: nil,
@@ -860,7 +929,7 @@ enum UITestFixtureIsolation {
                 waistUnit: nil,
                 notes: entry.notes,
                 photoUrl: fixturePhotoURL,
-                dataSource: entry.source,
+                dataSource: fixtureSource,
                 createdAt: date,
                 updatedAt: now
             )

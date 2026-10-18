@@ -443,6 +443,34 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertTrue(segment.isSelected)
     }
 
+    func testHistoricalOnlyDataKeepsSourceReadingsReachableAtLargestText() {
+        let app = launchEditorial(extra: ["-lybUITestHomeV2HistoricalOnlyFixture"], largestText: true)
+
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_day_zero"].exists)
+        let ruler = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(ruler.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(ruler.frame))
+        assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "historical-only-selected-day")
+
+        app.buttons["photo_timeline_root_menu"].tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_entries"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.staticTexts["November 2018"].exists)
+        let rows = app.buttons.matching(identifier: "home_v2_entries_row")
+        XCTAssertEqual(rows.count, 2)
+        let sourceSample = rows.matching(NSPredicate(format: "label CONTAINS %@", "17.99 kg")).firstMatch
+        XCTAssertTrue(sourceSample.exists)
+        XCTAssertTrue(sourceSample.label.contains("Withings via Apple Health"))
+        XCTAssertTrue(sourceSample.label.contains("Source value kept unchanged"))
+        sourceSample.tap()
+
+        let contextWeight = app.descendants(matching: .any)["home_v2_context_row_weight"]
+        XCTAssertTrue(contextWeight.waitForExistence(timeout: 8))
+        XCTAssertTrue(contextWeight.label.contains("17.99 kg"))
+        XCTAssertTrue(contextWeight.label.contains("Withings via Apple Health"))
+    }
+
     private func launchEditorial(
         fixture: String = "-lybUITestHomeV2Fixture", extra: [String] = [], largestText: Bool = false
     ) -> XCUIApplication {

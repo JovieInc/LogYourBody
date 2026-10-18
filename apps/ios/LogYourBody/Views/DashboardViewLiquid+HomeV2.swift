@@ -19,8 +19,10 @@ extension DashboardViewLiquid {
         HomeV2Copy.displayUnit(currentMeasurementSystem)
     }
 
-    var homeV2TodayMetric: BodyMetrics? {
-        bodyMetrics.first { Calendar.current.isDateInToday($0.date) }
+    var homeV2InsightMetrics: [BodyMetrics] {
+        bodyMetrics.filter {
+            $0.weight == nil || HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight)
+        }
     }
 
     /// Photo-first Home behind `HomeV2Policy`; the legacy `LaunchTimelineSurface`
@@ -30,8 +32,9 @@ extension DashboardViewLiquid {
 
         return HomeV2Surface(
             metric: metric,
-            bodyMetrics: homeV2Timeline.metrics,
+            bodyMetrics: homeV2Timeline.metrics, heightCm: authManager.currentUser?.profile?.height,
             timeline: homeV2Timeline,
+            hasAnyPhotoInHistory: bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) },
             selectedID: Binding(get: { HomeV2TimelinePolicy.EntryID(metric) }, set: selectHomeV2TimelineEntry),
             weightValue: HomeV2EditorialPolicy.displayWeight(in: metric, system: currentMeasurementSystem)
                 .map { String(format: "%.1f", $0) } ?? "—",
@@ -43,7 +46,7 @@ extension DashboardViewLiquid {
                 for: HomeV2TimelinePolicy.EntryID(metric), system: currentMeasurementSystem
             ),
             dateText: { formatHUDDate($0.date) },
-            loggedSentence: homeV2Logged.map { HomeV2Copy.loggedSentence(value: $0.valueText, unit: $0.unit) },
+            loggedSentence: homeV2Logged.map { $0.confirmationText },
             systemState: homeV2SystemState,
             onOpenPhoto: { isHomeV2ViewerPresented = true },
             onViewProgress: { openHomeV2Progress() },
@@ -55,7 +58,9 @@ extension DashboardViewLiquid {
                 Task { _ = await HealthKitManager.shared.requestAuthorization() }
             },
             onDone: { homeV2Logged = nil },
-            onUndo: { Task { await undoHomeV2Logged() } }
+            onUndo: { Task { await undoHomeV2Logged() } },
+            onProvenancePresentationChange: { isHomeV2MetricProvenancePresented = $0 },
+            isPhotoScrubNavigating: isHomeV2PhotoScrubNavigating
         )
         .task(id: homeV2StepsRequest(on: metric.date)) {
             guard let ownership = authManager.captureAccountSession() else { return }
@@ -66,12 +71,19 @@ extension DashboardViewLiquid {
         // Chart caches refresh centrally when measurements change. Phase copy
         // must also follow edits to an existing day, not just added rows.
         .task(id: bodyMetrics) {
-            let insight = PhaseInsightPolicy.insight(for: bodyMetrics)
+            let insight = PhaseInsightPolicy.insight(for: homeV2InsightMetrics)
             homeV2PhaseSentence = HomeV2Copy.phaseSentence(
                 kind: insight.kind,
-                weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: bodyMetrics)
+                weeks: HomeV2PhasePolicy.weeks(kind: insight.kind, metrics: homeV2InsightMetrics)
             )
         }
+    }
+
+    private var isHomeV2PhotoScrubNavigating: Bool {
+        selectedPhotoTimelineRootPage != .timeline || isHomeChatExpanded ||
+            isShowingPhotoTimelineMenu || isHomeV2ViewerPresented || isHomeV2ContextPresented ||
+            isHomeV2EntriesPresented || isHomeV2AllPhotosPresented || isHomeV2SettingsPresented ||
+            isHomeV2HelpPresented || showAddEntrySheet || isMetricDetailActive || isStatsDestinationActive
     }
 
     /// The ID remains authoritative when a background refresh inserts, reorders or deletes rows.
@@ -175,8 +187,11 @@ extension DashboardViewLiquid {
 
     func presentHomeV2LogSheet(for date: Date = Date(), initialTab: Int = 0) {
         let existing = homeV2Metric(on: date)
-        let latestKilograms = existing?.weight
-            ?? bodyMetrics.filter { $0.weight != nil && $0.date <= date }.max { $0.date < $1.date }?.weight
+        let latestKilograms = existing?.weight.flatMap {
+            HomeV2WeightQuality.isWithinSupportedLoggingRange($0) ? $0 : nil
+        } ?? bodyMetrics.filter {
+            $0.date <= date && HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight)
+        }.max { $0.date < $1.date }?.weight
         let initial = latestKilograms.map { convertWeight($0, to: currentMeasurementSystem) ?? $0 }
             ?? HomeV2WeightStepPolicy.defaultValue(unit: homeV2DisplayUnit)
         HapticManager.shared.selection()
@@ -212,7 +227,8 @@ extension DashboardViewLiquid {
                 date: saved.date,
                 previousMetric: result.previousMetric,
                 valueText: HomeV2WeightStepPolicy.text(value),
-                unit: homeV2DisplayUnit
+                unit: homeV2DisplayUnit,
+                savedMetric: saved
             )
             BodyScoreCache.shared.invalidate(for: userId)
         }
@@ -222,38 +238,51 @@ extension DashboardViewLiquid {
         }
     }
 
-    /// Saves a weight (and optional body fat) for a day. Today gets the C2
-    /// logged state with Undo; other days just save and refresh.
+    /// Generic Edit targets the captured record, even if another row arrives that day.
     @MainActor
-    func saveHomeV2Weight(value: Double, bodyFat: Double?, on date: Date = Date()) async -> Bool {
-        guard let userId = authManager.currentUser?.id else { return false }
-        let kilograms = currentMeasurementSystem == .imperial ? value.lbsToKg : value
-
+    func saveHomeV2Entry(
+        weightKilograms: Double?,
+        bodyFat: Double?,
+        clearBodyFat: Bool = false,
+        bodyFatMethod: String? = nil,
+        markManualCorrection: Bool = false,
+        session: HomeV2EditSession,
+        displayValue: Double?,
+        displayUnit: String
+    ) async -> Bool {
+        let admission: CoreDataManager.WriteAdmission = {
+            guard authManager.ownsAccountSession(session.owner),
+                  session.metric.userId == session.owner.subject,
+                  homeV2EditingSession?.owner == session.owner,
+                  homeV2EditingSession?.id == session.id, isHomeV2ContextPresented else {
+                throw CancellationError()
+            }
+        }
         do {
-            let result = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
-                for: date,
-                weight: kilograms,
-                bodyFatPercentage: bodyFat,
-                bodyFatMethod: bodyFat == nil ? nil : BodyFatEntryMethod.bioelectrical.rawValue,
-                userId: userId
+            try admission()
+            let result = try await PhotoMetadataService.shared.updateExistingMeasurementsWithResult(
+                id: session.id, userId: session.owner.subject, weight: weightKilograms,
+                bodyFatPercentage: bodyFat, bodyFatMethod: bodyFatMethod,
+                clearBodyFat: clearBodyFat, markManualCorrection: markManualCorrection,
+                writeAdmission: admission
             )
+            try admission()
             let saved = result.metrics
+            guard saved.id == session.id, saved.userId == session.owner.subject else { return false }
             RealtimeSyncManager.shared.syncIfNeeded()
-            BodyScoreCache.shared.invalidate(for: userId)
+            BodyScoreCache.shared.invalidate(for: session.owner.subject)
             BodyScoreRecalculationService.shared.scheduleRecalculation()
             HapticManager.shared.successAction()
-
             if Calendar.current.isDateInToday(saved.date) {
                 homeV2Logged = HomeV2LoggedEntry(
-                    metricId: saved.id,
-                    userId: userId,
-                    date: saved.date,
+                    metricId: saved.id, userId: session.owner.subject, date: saved.date,
                     previousMetric: result.previousMetric,
-                    valueText: HomeV2WeightStepPolicy.text(value),
-                    unit: homeV2DisplayUnit
+                    valueText: displayValue.map { HomeV2WeightStepPolicy.text($0) } ?? "", unit: displayUnit,
+                    savedMetric: saved
                 )
             }
-            await refreshHomeV2AfterWrite(selecting: saved.id)
+            await refreshHomeV2AfterWrite(selecting: saved.id, ownership: session.owner)
+            try admission()
             return true
         } catch {
             return false
@@ -274,7 +303,8 @@ extension DashboardViewLiquid {
                 try await PhotoMetadataService.shared.restoreMeasurements(
                     id: logged.metricId,
                     userId: userId,
-                    previous: previous
+                    previous: previous,
+                    replacing: logged.savedMetric
                 )
             } else {
                 guard await RealtimeSyncManager.shared.deleteBodyMetric(id: logged.metricId) else {
@@ -296,11 +326,14 @@ extension DashboardViewLiquid {
     }
 
     @MainActor
-    func refreshHomeV2AfterWrite(selecting id: String?) async {
+    func refreshHomeV2AfterWrite(
+        selecting id: String?, ownership: AuthManager.ProfileSessionOwnership? = nil
+    ) async {
         await viewModel.refreshData(
             authManager: authManager,
             realtimeSyncManager: realtimeSyncManager
         )
+        if let ownership, !authManager.ownsAccountSession(ownership) { return }
         refreshGlobalTimelineStore()
 
         if let id, let index = bodyMetrics.firstIndex(where: { $0.id == id }) {

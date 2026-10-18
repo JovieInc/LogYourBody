@@ -51,7 +51,8 @@ enum HomeV2TimelinePolicy {
         /// one pass after the history sort. Future weights can never enter its window.
         private static func weightChanges(in metrics: [BodyMetrics], calendar: Calendar) -> [EntryID: Double] {
             let weights = metrics.reversed().compactMap { metric -> HomeV2EditorialPolicy.WeightReading? in
-                guard let weight = metric.weight, weight.isFinite, weight > 0 else { return nil }
+                guard let weight = metric.weight,
+                      HomeV2WeightQuality.isWithinSupportedLoggingRange(weight) else { return nil }
                 return .init(id: metric.id, date: metric.date, kilograms: weight)
             }
             var changes: [EntryID: Double] = [:]
@@ -91,6 +92,10 @@ enum HomeV2TimelinePolicy {
             let position = chronologicalPosition(for: id) + (newer ? 1 : -1)
             return self.id(atChronologicalPosition: position)
         }
+
+        func photoCaptionDate(for metric: BodyMetrics) -> BodyMetrics {
+            HomeV2SelectedMomentPolicy.displayPhoto(for: metric, in: metrics) ?? metric
+        }
     }
 
     static func chronologicalIndices(in bodyMetrics: [BodyMetrics]) -> [Int] {
@@ -123,17 +128,31 @@ struct HomeV2TimelinePager: View {
     let unit: String
     let dateText: (BodyMetrics) -> String
     let onOpenPhoto: () -> Void
+    var isNavigating = false
 
     var body: some View {
-        TabView(selection: $selectedID) {
-            ForEach(snapshot.metrics) { metric in
+        HomeV2PhotoScrubber(
+            values: snapshot.metrics.reversed().map(HomeV2TimelinePolicy.EntryID.init),
+            selection: $selectedID, width: size.width,
+            canActivate: snapshot.metric(for: selectedID).map(PhotoTimelineHUDPolicy.hasUsablePhoto) ?? false,
+            isNavigating: isNavigating, identifier: "home_v2_photo"
+        ) { isScrubbing in
+            if isScrubbing, let metric = snapshot.metric(for: selectedID) {
                 HomeV2TimelinePage(metric: metric, metrics: snapshot.metrics, size: size, unit: unit,
-                                   dateText: dateText(metric), onOpenPhoto: onOpenPhoto)
-                    .tag(HomeV2TimelinePolicy.EntryID(metric))
-                    .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
+                                   dateText: dateText(snapshot.photoCaptionDate(for: metric)), onOpenPhoto: {})
+            } else {
+                TabView(selection: $selectedID) {
+                    ForEach(snapshot.metrics) { metric in
+                        HomeV2TimelinePage(metric: metric, metrics: snapshot.metrics, size: size, unit: unit,
+                                           dateText: dateText(snapshot.photoCaptionDate(for: metric)), onOpenPhoto: onOpenPhoto)
+                            .tag(HomeV2TimelinePolicy.EntryID(metric))
+                            .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(width: size.width, height: size.height)
             }
         }
-        .tabViewStyle(.page(indexDisplayMode: .never))
         .frame(width: size.width, height: size.height)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Body timeline")
@@ -167,7 +186,7 @@ private struct HomeV2TimelinePage: View {
 
     var body: some View {
         Group {
-            if PhotoTimelineHUDPolicy.hasUsablePhoto(metric), let photoURL = metric.photoUrl {
+            if let photoURL = HomeV2SelectedMomentPolicy.displayPhoto(for: metric, in: metrics)?.photoUrl {
                 photo(url: photoURL)
             } else {
                 HomeV2DataHero(metric: metric, metrics: metrics, unit: unit)
@@ -207,7 +226,7 @@ private struct HomeV2TimelinePage: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(.default, onOpenPhoto)
         .accessibilityLabel((failed ? "Photo unavailable. Saved measurements shown. " : "Progress photo, ") +
-                            "\(dateText). \(HomeV2TimelinePolicy.bodyFatSentence(for: metric))")
+                            "\(dateText). \(HomeV2SelectedMomentPolicy.sentence(for: metric, in: metrics))")
         .accessibilityHint("Open the photo")
         .accessibilityIdentifier("home_v2_photo_stage")
         .task(id: key) {

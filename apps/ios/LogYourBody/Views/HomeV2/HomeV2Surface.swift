@@ -11,7 +11,9 @@ import SwiftUI
 struct HomeV2Surface: View {
     let metric: BodyMetrics
     let bodyMetrics: [BodyMetrics]
+    let heightCm: Double?
     let timeline: HomeV2TimelinePolicy.Snapshot
+    let hasAnyPhotoInHistory: Bool
     @Binding var selectedID: HomeV2TimelinePolicy.EntryID
     let weightValue: String
     let weightUnit: String
@@ -31,6 +33,8 @@ struct HomeV2Surface: View {
     var onConnectHealth: () -> Void = {}
     let onDone: () -> Void
     let onUndo: () -> Void
+    var onProvenancePresentationChange: (Bool) -> Void = { _ in }
+    var isPhotoScrubNavigating = false
 
     @AppStorage(HomeV2Copy.coachDismissedDefaultsKey) private var coachDismissed = false
     @State private var showsProvenance = false
@@ -38,9 +42,6 @@ struct HomeV2Surface: View {
 
     private var isLogged: Bool { loggedSentence != nil }
     private var isHealthOff: Bool { systemState == .healthOff }
-    private var hasAnyPhoto: Bool {
-        bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) }
-    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -50,10 +51,11 @@ struct HomeV2Surface: View {
                     HomeV2TimelinePager(
                         snapshot: timeline, selectedID: userSelection,
                         size: CGSize(width: geometry.size.width, height: geometry.size.width / HomeV2Tokens.photoAspectRatio),
-                        unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto
+                        unit: weightUnit, dateText: dateText, onOpenPhoto: onOpenPhoto,
+                        isNavigating: isPhotoScrubNavigating || showsProvenance
                     )
                     photoNumberBlock
-                    if hasAnyPhoto {
+                    if hasAnyPhotoInHistory {
                         HomeV2DisclosureLink(
                             title: HomeV2PhotoCopy.allPhotos,
                             identifier: "home_v2_all_photos_row",
@@ -79,6 +81,14 @@ struct HomeV2Surface: View {
             }
             .background(HomeV2Tokens.Colors.shell)
         }
+        .sheet(isPresented: $showsProvenance) {
+            if let detail = HomeV2MetricEditorial.timelineProvenance(for: metric, in: bodyMetrics, heightCm: heightCm) {
+                HomeV2ProvenanceSheet(detail: detail)
+            }
+        }
+        .onChange(of: metric.id) { _, _ in showsProvenance = false }
+        .onChange(of: showsProvenance) { _, presented in onProvenancePresentationChange(presented) }
+        .onDisappear { onProvenancePresentationChange(false) }
     }
 
     @ViewBuilder
@@ -133,12 +143,12 @@ struct HomeV2Surface: View {
 
     private var photoNumberBlock: some View {
         VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-            Text(dateText(metric))
+            Text(dateText(timeline.photoCaptionDate(for: metric)))
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .accessibilityIdentifier("home_v2_photo_caption")
 
-            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
+            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric, in: bodyMetrics, heightCm: heightCm) {
                 HomeV2ProvenanceChip(detail: provenance) { showsProvenance = true }
             }
 
@@ -178,12 +188,6 @@ struct HomeV2Surface: View {
         }
         .padding(.horizontal, HomeV2Tokens.Space.margin)
         .padding(.top, HomeV2Tokens.Space.compact)
-        .sheet(isPresented: $showsProvenance) {
-            if let provenance = HomeV2MetricEditorial.timelineProvenance(for: metric) {
-                HomeV2ProvenanceSheet(detail: provenance)
-            }
-        }
-        .onChange(of: metric.id) { _, _ in showsProvenance = false }
     }
 
     private var ffmiSummary: some View {
@@ -227,12 +231,9 @@ struct HomeV2Surface: View {
         .accessibilityIdentifier("home_v2_\(kind.identifier)_summary")
     }
 
-    /// The missing-day sentence stays exact. A recorded percentage names no second source.
+    /// Shown only when this record has no stored body fat. Bracketed gaps say inferred.
     private var visibleComposition: String {
-        guard let reading = HomeV2EditorialPolicy.bodyFat(in: metric) else {
-            return HomeV2TimelinePolicy.bodyFatSentence(for: metric)
-        }
-        return HomeV2MetricEditorial.compositionLine(percentage: reading.percentage)
+        HomeV2SelectedMomentPolicy.sentence(for: metric, in: bodyMetrics)
     }
 
     private var todayDetailsRow: some View {
@@ -363,20 +364,28 @@ struct HomeV2DataHero: View {
     let metric: BodyMetrics?
     let metrics: [BodyMetrics]
     let unit: String
-
     private var bodyFat: HomeV2EditorialPolicy.BodyFatReading? { HomeV2EditorialPolicy.bodyFat(in: metric) }
     private var weights: [HomeV2EditorialPolicy.WeightReading] {
         HomeV2EditorialPolicy.weights(in: metrics, selected: metric)
+    }
+    private var weightNeedsReview: Bool {
+        guard let weight = metric?.weight else { return false }
+        return !HomeV2WeightQuality.isWithinSupportedLoggingRange(weight)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             if let bodyFat {
                 bodyFatGraphic(bodyFat)
-            } else if !weights.isEmpty {
-                weightGraphic
+            } else if weightNeedsReview {
+                weightReviewGraphic
             } else {
-                emptyGraphic
+                let readings = weights
+                if !readings.isEmpty {
+                    weightGraphic(readings)
+                } else {
+                    emptyGraphic
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -421,14 +430,16 @@ struct HomeV2DataHero: View {
         .accessibilityIdentifier("home_v2_body_fat_graphic")
     }
 
-    private var weightGraphic: some View {
-        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.margin) {
+    private func weightGraphic(_ weights: [HomeV2EditorialPolicy.WeightReading]) -> some View {
+        let axisDates = HomeV2RecordedWeightChartPolicy.axisDates(for: weights)
+        let labelGranularity = HomeV2RecordedWeightChartPolicy.labelGranularity(for: weights)
+        return VStack(alignment: .leading, spacing: HomeV2Tokens.Space.margin) {
             Text("Recorded weight")
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, weight: .semibold, relativeTo: .headline)
                 .foregroundStyle(HomeV2Tokens.Colors.ink)
             if weights.count > 1 {
                 HomeV2TrendChart(
-                    daily: weightPoints,
+                    daily: weightPoints(weights),
                     trend: [],
                     accent: HomeV2Tokens.Metric.weight,
                     range: .constant(.month1),
@@ -436,6 +447,8 @@ struct HomeV2DataHero: View {
                     showsDots: true,
                     chartHeight: HomeV2Tokens.chartHeight,
                     axis: .months,
+                    axisDates: axisDates,
+                    formatAxisDate: { chartAxisLabel(for: $0, granularity: labelGranularity) },
                     metricTitle: "Weight",
                     usesSevenDayAverage: false,
                     anchorsToZero: false,
@@ -462,11 +475,46 @@ struct HomeV2DataHero: View {
         }
         .padding(HomeV2Tokens.Space.margin)
         .accessibilityElement(children: weights.count == 1 ? .contain : .ignore)
-        .accessibilityLabel(weightSummary)
+        .accessibilityLabel(weightSummary(weights))
         .accessibilityIdentifier("home_v2_weight_graphic")
     }
 
-    private var weightSummary: String {
+    private var weightReviewGraphic: some View {
+        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.compact) {
+            Spacer(minLength: 0)
+            if let weight = metric?.weight {
+                Text(String(format: "%.2f", displayWeight(weight)))
+                    .scaledSystemFont(size: 72, weight: .semibold, relativeTo: .largeTitle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                Text(unit)
+                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .body)
+            }
+            Label(HomeV2WeightQuality.reviewMessage, systemImage: "exclamationmark.triangle")
+                .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
+                .foregroundStyle(HomeV2Tokens.Metric.steps)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(HomeV2Tokens.Space.margin)
+        .foregroundStyle(HomeV2Tokens.Colors.ink)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home_v2_weight_review_graphic")
+    }
+
+    private func chartAxisLabel(
+        for date: Date,
+        granularity: HomeV2RecordedWeightChartPolicy.LabelGranularity
+    ) -> String {
+        switch granularity {
+        case .day:
+            return date.formatted(.dateTime.month(.abbreviated).day())
+        case .time:
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+    }
+
+    private func weightSummary(_ weights: [HomeV2EditorialPolicy.WeightReading]) -> String {
         guard let latest = weights.last else { return "No weight recorded." }
         return "\(weights.count) recorded weight \(weights.count == 1 ? "entry" : "entries") in 30 days. " +
             "Latest \(String(format: "%.1f", displayWeight(latest.kilograms))) \(unit). Body fat not logged for this day."
@@ -489,7 +537,7 @@ struct HomeV2DataHero: View {
         .padding(HomeV2Tokens.Space.margin)
     }
 
-    private var weightPoints: [MetricChartDataPoint] {
+    private func weightPoints(_ weights: [HomeV2EditorialPolicy.WeightReading]) -> [MetricChartDataPoint] {
         weights.map { reading in
             MetricChartDataPoint(
                 date: reading.date,

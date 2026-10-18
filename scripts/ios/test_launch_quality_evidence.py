@@ -35,6 +35,9 @@ class EvidenceTests(unittest.TestCase):
             (evidence.FIRST_PHOTO_TEST, ['launch-quality-onboarding-first-photo']),
             (evidence.TIMELINE_TEST, ['launch-quality-home-timeline',
                                       'launch-quality-body-score-share', 'launch-quality-analytics']),
+            (evidence.CANVAS_REDUCED_TEST, ['launch-quality-canvas-reduced-motion']),
+            (evidence.CANVAS_REPLAY_TEST, ['launch-quality-canvas-replay-readback',
+                                           'launch-quality-canvas-undo-readback']),
         ]
         self.manifest = [{'testIdentifier': identifier, 'attachments': []}
                          for identifier, _ in capture_groups]
@@ -114,8 +117,109 @@ class EvidenceTests(unittest.TestCase):
     def test_passed_expected_case_and_all_seven_capture_hashes(self):
         self.assertEqual(self.validate()[0]['result'], 'Passed')
         captures = self.captures()
-        self.assertEqual(len(captures), 7)
+        self.assertEqual(len(captures), 10)
         self.assertEqual(captures[0]['sha256'], evidence.digest(self.root / '0.png'))
+
+    def test_canvas_cases_must_both_pass(self):
+        for identifier in (evidence.CANVAS_REDUCED_TEST, evidence.CANVAS_REPLAY_TEST):
+            for result in ('Skipped', 'Failed', None):
+                payload = copy.deepcopy(self.payload)
+                case = next(item for item in payload['testNodes'][0]['children']
+                            if item['nodeIdentifier'] == identifier)
+                case['result'] = result
+                with self.subTest(identifier=identifier, result=result), self.assertRaises(ValueError):
+                    evidence.validate_cases(payload, evidence.REQUIRED_TESTS)
+
+    def test_canvas_coverage_requires_the_actual_app_and_view_body(self):
+        source = {'name': 'MesocycleCanvas.swift',
+                  'path': '/checkout/apps/ios/LogYourBody/Views/MesocycleCanvas.swift',
+                  'coveredLines': 600, 'executableLines': 1058,
+                  'functions': [{'name': 'MesocycleCanvasContainer.body.getter',
+                                 'coveredLines': 30, 'executableLines': 40}]}
+        payload = {'targets': [{'name': 'LogYourBody.app', 'files': [source]}]}
+        self.assertEqual(evidence.validate_canvas_coverage(payload)['coveredLines'], 600)
+        for mutation in ('empty', 'model_only', 'missing_body', 'duplicate', 'wrong_target', 'wrong_path'):
+            item = copy.deepcopy(payload)
+            file = item['targets'][0]['files'][0]
+            if mutation == 'empty':
+                file['coveredLines'] = 0
+            elif mutation == 'model_only':
+                file['functions'][0]['coveredLines'] = 0
+            elif mutation == 'missing_body':
+                file['functions'] = []
+            elif mutation == 'duplicate':
+                item['targets'][0]['files'].append(copy.deepcopy(file))
+            elif mutation == 'wrong_target':
+                item['targets'][0]['name'] = 'LogYourBodyTests.xctest'
+            else:
+                file['path'] = '/tests/MesocycleCanvas.swift'
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                evidence.validate_canvas_coverage(item)
+
+    def test_canvas_cli_requires_executed_view_coverage_and_records_it(self):
+        source = {'path': '/checkout/apps/ios/LogYourBody/Views/MesocycleCanvas.swift',
+                  'coveredLines': 600, 'executableLines': 1058,
+                  'functions': [{'name': 'MesocycleCanvasContainer.body.getter',
+                                 'coveredLines': 30, 'executableLines': 40}]}
+        coverage = {'targets': [{'name': 'LogYourBody.app', 'files': [source]}]}
+        with patch.object(evidence, 'run_json', return_value=self.payload), \
+             patch.object(evidence.subprocess, 'check_output', return_value=json.dumps(coverage)) as command:
+            self.assertEqual(self.run_main(critical=False, canvas=True), 0)
+        self.assertEqual(command.call_args.args[0],
+                         ['xcrun', 'xccov', 'view', '--report', '--json', str(self.bundle)])
+        receipt = json.loads(self.bundle.with_suffix('.evidence.json').read_text())
+        self.assertEqual(receipt['canvasCoverage']['viewBody']['coveredLines'], 30)
+        self.assertEqual(receipt['coverageSha256'], evidence.digest(self.bundle.with_suffix('.coverage.json')))
+        source['functions'][0]['coveredLines'] = 0
+        with patch.object(evidence, 'run_json', return_value=self.payload), \
+             patch.object(evidence.subprocess, 'check_output', return_value=json.dumps(coverage)):
+            self.assertEqual(self.run_main(critical=False, canvas=True), 65)
+        self.assertFalse(self.bundle.with_suffix('.evidence.json').exists())
+
+    def test_combined_runner_selects_and_validates_canvas_without_losing_inherited_cases(self):
+        source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
+        selectors = source[source.index('LAUNCH_QUALITY_UI_TESTS=('):source.index('UI_RESULT_BUNDLE=')]
+        command = 'set -euo pipefail\n' + selectors + '\nprintf "%s\\n" "${UI_SELECTORS[@]}" "${UI_EVIDENCE_ARGS[@]}"'
+        output = subprocess.check_output(['bash', '-c', command], text=True).splitlines()
+        # Preserve each inherited case, while allowing newly merged regressions.
+        inherited_cases = (
+            'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces',
+            'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA',
+            'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA',
+            'LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces',
+            'LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail',
+            'OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal',
+            'MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards',
+            'MesocycleCanvasUITests/testGoalThroughUndoKeepsTheCanvasAndReadbackTogether',
+            'ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration',
+            'ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory',
+            'ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote',
+            'ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies',
+            'ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor',
+            'ChaosMonkeyUITests/testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates',
+            'ChaosMonkeyUITests/testSystemAlertsRequireKnownDenyOnlyAction',
+            'ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending',
+            'ChaosMonkeyUITests/testProfilePhotoImportIsExcludedFromMonkeyCandidates',
+            'ChaosMonkeyUITests/testMissingActionTargetsDoNotCompleteMonkeySteps',
+            'ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget',
+            'ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion',
+        )
+        selected = [line.removeprefix('-only-testing:LogYourBodyUITests/')
+                    for line in output if line.startswith('-only-testing:')]
+        expected = [output[index + 1] for index, line in enumerate(output)
+                    if line == '--expected-test']
+        self.assertEqual(len(selected), len(set(selected)), 'A native case must be selected exactly once')
+        self.assertCountEqual([identifier + '()' for identifier in selected], expected,
+                              'Every selected native case must require its exact execution evidence')
+        for identifier in inherited_cases:
+            self.assertIn(identifier, selected)
+        for identifier in evidence.REQUIRED_TESTS:
+            self.assertIn('-only-testing:LogYourBodyUITests/' + identifier.removesuffix('()'), output)
+            self.assertIn(identifier, output)
+        self.assertIn('--require-canvas-coverage', source)
+        swift = Path(__file__).resolve().parents[2] / 'apps/ios/LogYourBodyUITests/MesocycleCanvasUITests.swift'
+        for name in evidence.REQUIRED_CAPTURES[-3:]:
+            self.assertIn('attachScreenshot(named: "' + name + '"', swift.read_text())
 
     def test_zero_cases_and_all_skipped_rejected(self):
         for nodes in ([], [{'nodeType': 'Test Case', 'result': 'Skipped'}]):
@@ -196,13 +300,15 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.captures()
 
-    def run_main(self, critical=True, expected=True):
+    def run_main(self, critical=True, expected=True, canvas=False):
         args = ['validator', '--bundle', str(self.bundle), '--started-at', '100']
         if expected:
             for identifier in evidence.REQUIRED_TESTS:
                 args += ['--expected-test', identifier]
         if critical:
             args += ['--critical-captures']
+        if canvas:
+            args += ['--require-canvas-coverage']
         with patch.object(sys, 'argv', args):
             return evidence.main()
 
@@ -228,7 +334,7 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(receipt['sourcePatchSha256'], evidence.digest(self.root / 'source-working-tree.patch'))
         self.assertEqual(receipt['exactDeployedBuild'], 'not_verified')
         self.assertEqual(set(receipt['liveVerification'].values()), {'not_verified'})
-        self.assertEqual(len(receipt['captures']), 7)
+        self.assertEqual(len(receipt['captures']), 10)
         self.assertEqual(receipt['devices'], self.payload['devices'])
 
     def test_retry_without_first_result_bundle_still_reports_recovery(self):

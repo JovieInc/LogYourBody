@@ -142,6 +142,52 @@ final class HeroMetricInterpolationCacheTests: XCTestCase {
         XCTAssertNil(context.trendWeight(for: noon.addingTimeInterval(-86_400)))
     }
 
+    func testHomeWeightTrendExcludesFlaggedSourcesBeforeSmoothing() throws {
+        let firstDay = Calendar.current.startOfDay(for: Self.baseDate)
+        let flaggedDay = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: 1, to: firstDay))
+        let lastDay = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: 2, to: firstDay))
+        let supported = Self.metric(daysAgo: 2, weight: 80, bodyFat: 18, dateOverride: firstDay)
+        let flagged = Self.metric(daysAgo: 1, weight: 18, bodyFat: 18, dateOverride: flaggedDay)
+        let latest = Self.metric(daysAgo: 0, weight: 80, bodyFat: 18, dateOverride: lastDay)
+        let metrics = [supported, flagged, latest]
+
+        let context = try XCTUnwrap(HomeV2WeightQuality.trendContext(for: metrics))
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: flaggedDay)).value, 80)
+        XCTAssertEqual(try XCTUnwrap(context.trendWeight(for: lastDay)).value, 80)
+        XCTAssertEqual(HomeV2WeightQuality.trendWeight(for: latest, in: metrics), 80)
+        XCTAssertNil(HomeV2WeightQuality.trendWeight(for: flagged, in: metrics))
+        XCTAssertEqual(
+            TimelineWeightHeadlinePolicy.kilograms(
+                measuredWeight: flagged.weight,
+                trendWeight: HomeV2WeightQuality.trendWeight(for: flagged, in: metrics),
+                prefersTrend: true
+            ),
+            18,
+            "A flagged source must remain visible instead of becoming an apparently valid trend"
+        )
+        XCTAssertEqual(metrics.map(\.weight), [80, 18, 80])
+    }
+
+    func testHomeWeightTrendUsesStoredKilogramsAndKeepsSupportedBounds() throws {
+        for kilograms in [32.0, 80.0, 300.0] {
+            let metric = Self.metric(daysAgo: 0, weight: kilograms, bodyFat: nil)
+            let trend = try XCTUnwrap(HomeV2WeightQuality.trendWeight(for: metric, in: [metric]))
+            XCTAssertEqual(trend, kilograms)
+            XCTAssertEqual(trend.kgToLbs.lbsToKg, kilograms, accuracy: 0.000001)
+            XCTAssertTrue(HomeV2WeightQuality.isWithinSupportedLoggingRange(trend.kgToLbs.lbsToKg))
+        }
+        let unsupported: [Double?] = [nil, 31.99, 300.01, .nan, .infinity, -.infinity]
+        for kilograms in unsupported {
+            let metric = Self.metric(daysAgo: 0, weight: kilograms, bodyFat: nil)
+            XCTAssertNil(HomeV2WeightQuality.trendContext(for: [metric]))
+            XCTAssertNil(HomeV2WeightQuality.trendWeight(for: metric, in: [metric]))
+        }
+        let supported = Self.metric(daysAgo: 1, weight: 80, bodyFat: 18)
+        let photoOnly = Self.metric(daysAgo: 0, weight: nil, bodyFat: 18)
+        XCTAssertEqual(HomeV2WeightQuality.trendWeight(for: photoOnly, in: [supported, photoOnly]), 80)
+        XCTAssertNil(photoOnly.weight)
+    }
+
     // MARK: - Fixtures
 
     private static let baseDate = Date(timeIntervalSinceReferenceDate: 700_000_000)

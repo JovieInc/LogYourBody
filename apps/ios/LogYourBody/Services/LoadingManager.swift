@@ -14,6 +14,7 @@ class LoadingManager: ObservableObject {
     private let coreDataManager = CoreDataManager.shared
     private let syncManager = RealtimeSyncManager.shared
     private let healthSyncCoordinator: HealthSyncCoordinating
+    private let initializeAuthentication: @MainActor () -> Task<Void, Never>
 
     /// Runs after the cached profile fetch returns and before that profile is applied.
     /// Production leaves this nil.
@@ -72,10 +73,14 @@ class LoadingManager: ObservableObject {
 
     init(
         authManager: AuthManager,
-        healthSyncCoordinator: HealthSyncCoordinating
+        healthSyncCoordinator: HealthSyncCoordinating,
+        initializeAuthentication: (@MainActor () -> Task<Void, Never>)? = nil
     ) {
         self.authManager = authManager
         self.healthSyncCoordinator = healthSyncCoordinator
+        self.initializeAuthentication = initializeAuthentication ?? {
+            authManager.ensureAuthInitializationTask()
+        }
     }
 
     convenience init(authManager: AuthManager) {
@@ -127,10 +132,9 @@ class LoadingManager: ObservableObject {
             }
             #endif
 
-            let authTask = authManager.ensureAuthInitializationTask()
+            _ = initializeAuthentication()
             let maxWaitTimeNanoseconds: UInt64 = 500_000_000 // 0.5 seconds
             let authReady = await waitForAuthInitialization(
-                task: authTask,
                 timeoutNanoseconds: maxWaitTimeNanoseconds
             )
 
@@ -252,24 +256,25 @@ class LoadingManager: ObservableObject {
         try? await Task.sleep(nanoseconds: 10_000_000) // 0.01s
     }
 
-    private func waitForAuthInitialization(
-        task: Task<Void, Never>,
-        timeoutNanoseconds: UInt64
-    ) async -> Bool {
-        await withTaskGroup(of: Bool.self) { group in
-            group.addTask {
-                await task.value
-                return true
-            }
+    func waitForAuthInitialization(timeoutNanoseconds: UInt64) async -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .nanoseconds(Int64(clamping: timeoutNanoseconds)))
 
-            group.addTask {
-                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+        // A task-group timeout still waits for a child suspended on authTask.value.
+        // Observe the provider's terminal state instead; only these short sleeps are
+        // owned by loading. Authentication keeps its existing lifetime and account gates.
+        while !Task.isCancelled {
+            if authManager.isAuthProviderLoaded || authManager.authProviderInitError != nil {
+                return authManager.isAuthProviderReady
+            }
+            let now = clock.now
+            guard now < deadline else { return false }
+            do {
+                try await clock.sleep(until: min(deadline, now.advanced(by: .milliseconds(10))))
+            } catch {
                 return false
             }
-
-            let result = await group.next() ?? false
-            group.cancelAll()
-            return result
         }
+        return false
     }
 }

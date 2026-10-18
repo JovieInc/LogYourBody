@@ -47,20 +47,19 @@ class MetricsInterpolationService {
     final class WeightInterpolationContext {
         private let metrics: [BodyMetrics]
         private let maxGapDays: Int
-        private let calendar = Calendar.current
+        private let calendar: Calendar
 
         // Cached trend-weight series for efficiency when querying multiple dates
         private var trendWeightCache: [Date: InterpolatedMetric] = [:]
         private var trendRawValues: [Date: Double] = [:]
-        private var trendLastDay: Date?
-        private var trendLastValue: Double?
         // Smoothing factor for exponential moving average (EMA).
         // Higher values react more quickly to new weigh-ins.
         private let trendAlpha: Double = 0.25
 
-        init(metrics: [BodyMetrics], maxGapDays: Int) {
+        init(metrics: [BodyMetrics], maxGapDays: Int, calendar: Calendar = .current) {
             self.metrics = metrics
             self.maxGapDays = maxGapDays
+            self.calendar = calendar
         }
 
         /// Returns a recency-weighted "trend" weight using an exponential moving average
@@ -73,10 +72,6 @@ class MetricsInterpolationService {
 
             if targetDay < firstDay {
                 return nil
-            }
-
-            if let cached = trendWeightCache[targetDay] {
-                return cached
             }
 
             // There is no new measurement after the final metric. Walking the
@@ -93,25 +88,21 @@ class MetricsInterpolationService {
                 processingEndDay = targetDay
             }
 
+            // Only completed earlier days are reusable EMA checkpoints. The
+            // target day's eligible weigh-in depends on the query timestamp.
             let cachedAnchor = trendRawValues
-                .filter { $0.key <= targetDay }
+                .filter { $0.key < targetDay }
                 .max { $0.key < $1.key }
-            var ema = cachedAnchor?.value ?? trendLastValue
-            var currentDay: Date
-
-            if let cachedAnchor {
-                currentDay = calendar.date(byAdding: .day, value: 1, to: cachedAnchor.key) ?? cachedAnchor.key
-            } else if let lastDay = trendLastDay, let lastValue = ema, lastDay >= firstDay, targetDay >= lastDay {
-                currentDay = calendar.date(byAdding: .day, value: 1, to: lastDay) ?? lastDay
-                ema = lastValue
-            } else {
-                currentDay = firstDay
-                ema = nil
+            var ema = cachedAnchor?.value
+            let nextDay = cachedAnchor.flatMap {
+                calendar.date(byAdding: .day, value: 1, to: $0.key)
             }
+            var currentDay = nextDay ?? firstDay
 
             while currentDay <= processingEndDay {
-                // Seed the first day at its actual measurement time, not an earlier midnight.
-                let sampleDate = currentDay == firstDay ? firstMetric.date : currentDay
+                // Midnight is before a weigh-in later that day. Sampling it marks
+                // the weigh-in interpolated and drops it from Progress and Share.
+                let sampleDate = trendSampleDate(on: currentDay, query: date)
                 guard let weightResult = estimate(for: sampleDate) else {
                     // A gap larger than the interpolation limit cannot yield a
                     // result on any intervening day. Jump to the next known
@@ -145,14 +136,14 @@ class MetricsInterpolationService {
                     confidenceLevel: weightResult.confidenceLevel
                 )
 
-                trendWeightCache[currentDay] = trendMetric
-                trendRawValues[currentDay] = emaValue
-                trendLastDay = currentDay
-                trendLastValue = emaValue
-
+                // A partial target day must neither replace an earlier
+                // query's result nor seed the EMA for a later day.
                 if currentDay == targetDay {
                     return trendMetric
                 }
+
+                trendWeightCache[currentDay] = trendMetric
+                trendRawValues[currentDay] = emaValue
 
                 guard let nextDay = calendar.date(byAdding: .day, value: 1, to: currentDay) else {
                     break
@@ -179,7 +170,33 @@ class MetricsInterpolationService {
                 )
             }
 
-            return trendWeightCache[targetDay]
+            // No eligible sample was produced for this query. A completed
+            // checkpoint from a later query cannot fill this unresolved day.
+            return nil
+        }
+
+        /// Latest weigh-in on `day` that does not look ahead of `query`.
+        /// Days with no eligible weigh-in stay on midnight so gaps still interpolate.
+        private func trendSampleDate(on day: Date, query: Date) -> Date {
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else {
+                return day
+            }
+            // The immutable history is sorted by date. Find the last eligible
+            // observation without a calendar conversion for every history row.
+            // The next midnight is exclusive; the query timestamp is inclusive.
+            var low = 0
+            var high = metrics.count
+            while low < high {
+                let middle = (low + high) / 2
+                let observedAt = metrics[middle].date
+                if observedAt < nextDay && observedAt <= query {
+                    low = middle + 1
+                } else {
+                    high = middle
+                }
+            }
+            guard low > 0, metrics[low - 1].date >= day else { return day }
+            return metrics[low - 1].date
         }
 
         func estimate(for date: Date) -> InterpolatedMetric? {
@@ -417,8 +434,8 @@ class MetricsInterpolationService {
         }
 
         private func isDexaMeasurement(_ metric: BodyMetrics) -> Bool {
-            let method = metric.bodyFatMethod?.lowercased() ?? ""
-            let source = metric.dataSource?.lowercased() ?? ""
+            let method = metric.attributedBodyFatMethod?.lowercased() ?? ""
+            let source = metric.measurementSource(for: .bodyFat).rawValue
             return method.contains("dexa") || source.contains("bodyspec_dexa")
         }
 

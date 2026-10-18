@@ -41,5 +41,32 @@
     }
   ],
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "routes": [
+    {
+      "src": "^/(?!api(?:/|$)|_next(?:/|$)|\\.well-known(?:/|$)|signin(?:/|$)|signup(?:/|$)|login(?:/|$)|dashboard(?:/|$)|log(?:/|$)|onboarding(?:/|$)|settings(?:/|$)|photos(?:/|$)|steps(?:/|$)|import(?:/|$)|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*",
+      "methods": ["GET", "HEAD"],
+      "missing": [
+        {
+          "type": "header",
+          "key": "rsc"
+        },
+        {
+          "type": "header",
+          "key": "next-router-prefetch"
+        }
+      ],
+      "continue": true,
+      "transforms": [
+        {
+          "type": "response.headers",
+          "op": "append",
+          "target": {
+            "key": "Vary"
+          },
+          "args": "Accept"
+        }
+      ]
+    }
+  ]
 }

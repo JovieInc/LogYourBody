@@ -473,9 +473,14 @@ final class ChaosMonkeyUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = [
             "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
-            "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock"
+            "-lybUITestSuppressWhatsNew", "-lybUITestDisableBiometricLock",
+            "-lybUITestHomeEditPresentationDiagnostic"
         ]
         app.forwardActualXCTestContext()
+        let session = try XCTUnwrap(app.launchEnvironment["XCTestSessionIdentifier"])
+        XCTAssertNotNil(UUID(uuidString: session))
+        let bundle = try XCTUnwrap(app.launchEnvironment["XCTestBundlePath"])
+        XCTAssertTrue(bundle.hasSuffix("/LogYourBodyUITests.xctest"))
         app.launch()
         popToRootIfNeeded(in: app)
         let contextButton = app.buttons["home_v2_context_button"]
@@ -489,9 +494,19 @@ final class ChaosMonkeyUITests: XCTestCase {
                        "Monkey must not open the personal photo picker from Context.")
         let edit = app.buttons["home_v2_edit_entry"]
         XCTAssertTrue(edit.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons.matching(identifier: "home_v2_edit_entry").count, 1)
+        XCTAssertEqual(edit.label, "Edit entry")
+        XCTAssertTrue(edit.isEnabled)
+        XCTAssertTrue(edit.isHittable)
+        XCTAssertTrue(app.frame.contains(edit.frame))
+        XCTAssertGreaterThanOrEqual(edit.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(edit.frame.height, 44)
+        captureHomeEditTransition(app, phase: "before-tap")
         edit.tap()
         let sheet = app.descendants(matching: .any)["home_v2_log_sheet"]
-        XCTAssertTrue(sheet.waitForExistence(timeout: 8))
+        let sheetAppeared = sheet.waitForExistence(timeout: 8)
+        captureHomeEditTransition(app, phase: "after-existing-wait")
+        XCTAssertTrue(sheetAppeared)
         XCTAssertEqual(sheet.label, "Edit entry")
         let tree = XCTAttachment(string: app.debugDescription)
         tree.name = "Photo import control scanner tree"
@@ -512,6 +527,24 @@ final class ChaosMonkeyUITests: XCTestCase {
                                "Generic parent activation center enters protected photo control: \(candidate.identifier) \(candidate.frame)")
             }
         }
+    }
+
+    private func captureHomeEditTransition(_ app: XCUIApplication, phase: String) {
+        let edit = app.buttons["home_v2_edit_entry"]
+        let exists = edit.exists
+        let frame = exists ? edit.frame : CGRect.zero
+        let enabled = exists && edit.isEnabled
+        let hittable = exists && edit.isHittable
+        let geometry = "phase=\(phase) window=\(app.frame) edit=\(frame) " +
+            "exists=\(exists) enabled=\(enabled) hittable=\(hittable)"
+        let details = XCTAttachment(string: geometry + "\n" + app.debugDescription)
+        details.name = "home-edit-transition-\(phase)"
+        details.lifetime = .keepAlways
+        add(details)
+        let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screen.name = "home-edit-transition-\(phase)"
+        screen.lifetime = .keepAlways
+        add(screen)
     }
 
     func testNativeScrollClippingRequiresActualScrollAncestor() throws {
@@ -1028,7 +1061,9 @@ final class ChaosMonkeyUITests: XCTestCase {
         let edge = Self.edgeStrings.randomElement(using: &rng) ?? ""
         guard !edge.isEmpty else { return .skipped("seeded text was empty") }
         field.typeText(String(edge.prefix(24)))
-        guard dismissKeyboardForStep(app: app) == .executed(.dismiss) else {
+        // A view update can drop the keyboard after typing. Refocus so dismissal
+        // is still verified instead of skipping a step that already entered text.
+        guard dismissKeyboardForStep(app: app, refocusingIfNeeded: field) == .executed(.dismiss) else {
             return .skipped("typing finished but keyboard dismissal was not verified")
         }
         return .executed(.type)

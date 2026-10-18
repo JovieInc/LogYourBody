@@ -9,6 +9,12 @@ import SwiftUI
 enum HomeV2Tokens {
     typealias Colors = HomeV2Palette
 
+    enum Editor {
+        static func display(size: CGFloat, weight: Font.Weight, relativeTo style: Font.TextStyle) -> Font {
+            .custom("InterTight-Regular", size: size, relativeTo: style).weight(weight)
+        }
+    }
+
     enum Metric {
         static let weight = Colors.ion
         static let bodyFat = Colors.ultra

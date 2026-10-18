@@ -54,10 +54,10 @@ extension DashboardViewLiquid {
         )
     }
 
-    /// FFMI for one day from that day's own numbers, so compare reads "Derived".
+    /// FFMI from the selected weight and its measured or bracketed body fat.
     func homeV2FFMIValue(_ metric: BodyMetrics) -> Double? {
-        HomeV2EditorialPolicy.ffmi(
-            in: metric, owner: authManager.currentUser?.id,
+        HomeV2SelectedMomentPolicy.displayFFMI(
+            for: metric, in: bodyMetrics, owner: authManager.currentUser?.id,
             heightCm: authManager.currentUser?.profile?.height
         )
     }
@@ -66,7 +66,7 @@ extension DashboardViewLiquid {
         bodyMetrics
             .filter { $0.bodyFatPercentage != nil }
             .max { $0.date < $1.date }
-            .map { HomeV2Provenance.label(for: $0) }
+            .map { HomeV2Provenance.label(for: $0, field: .bodyFat) }
     }
 
     /// The pair a tool starts from: the first photo against the selected one.

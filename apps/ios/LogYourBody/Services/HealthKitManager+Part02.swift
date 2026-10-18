@@ -87,7 +87,7 @@ extension HealthKitManager {
         guard await ownsImport(ownership) else { throw HealthKitError.notAuthorized }
     }
 
-func fetchTodayStepCount() async throws -> Int {
+func fetchTodayStepCount() async throws -> Int? {
         guard isAuthorized, let ownership = await captureImportOwnership() else {
             throw HealthKitError.notAuthorized
         }
@@ -97,7 +97,7 @@ func fetchTodayStepCount() async throws -> Int {
         let now = Date()
         let startOfDay = calendar.startOfDay(for: now)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? now
-        let stepCount: Int
+        let stepCount: Int?
         do {
             let quantity: Double?
             if let todayStepQuantityQuery {
@@ -107,8 +107,8 @@ func fetchTodayStepCount() async throws -> Int {
             }
             stepCount = try HealthKitStepCountPolicy.stepCount(from: quantity)
         } catch {
-            guard let noData = HealthKitStepCountPolicy.stepCount(forNoData: error) else { throw error }
-            stepCount = noData
+            guard HealthKitStepCountPolicy.isNoData(error) else { throw error }
+            stepCount = nil
         }
 
         try Task.checkCancellation()
@@ -119,10 +119,10 @@ func fetchTodayStepCount() async throws -> Int {
                   self.admitsAutomaticImportForCurrentAccount() else {
                 throw HealthKitError.notAuthorized
             }
-            self.todayStepCountOwner = ownership
-            self.todayStepCount = stepCount
+            self.todayStepCountOwner = stepCount == nil ? nil : ownership
+            self.todayStepCount = stepCount ?? 0
             self.latestStepCount = stepCount
-            self.latestStepCountDate = now
+            self.latestStepCountDate = stepCount == nil ? nil : now
             return stepCount
         }
     }
@@ -147,7 +147,7 @@ func fetchTodayStepCount() async throws -> Int {
         }
     }
 
-func fetchStepCount(for date: Date) async throws -> Int {
+func fetchStepCount(for date: Date) async throws -> Int? {
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }
@@ -169,7 +169,11 @@ func fetchStepCount(for date: Date) async throws -> Int {
                 options: .cumulativeSum
             ) { _, statistics, error in
                 if let error = error {
-                    continuation.resume(throwing: error)
+                    if HealthKitStepCountPolicy.isNoData(error) {
+                        continuation.resume(returning: nil)
+                    } else {
+                        continuation.resume(throwing: error)
+                    }
                     return
                 }
 
@@ -337,6 +341,7 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
             await claimAutomaticImportAccount()
         }
         guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else { return false }
+        let importsBodyFatOnly = await bodyFatOnlyImportEnabled()
         let operation = UUID()
         let admitted = await MainActor.run {
             guard (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return false }
@@ -357,11 +362,20 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
 
         do {
             let defaultHistoricalRange = TimeInterval(10 * 365 * 24 * 60 * 60)
-            let earliestDate = try await getEarliestWeightDate()
-                ?? Date().addingTimeInterval(-defaultHistoricalRange)
+            let earliestWeightDate = try await getEarliestWeightDate()
             try await requireImportOwnership(ownership)
+            let earliestBodyFatDate: Date?
+            if importsBodyFatOnly {
+                earliestBodyFatDate = try await getEarliestBodyFatDate()
+                try await requireImportOwnership(ownership)
+            } else {
+                earliestBodyFatDate = nil
+            }
+            let earliestDate = [earliestWeightDate, earliestBodyFatDate].compactMap { $0 }.min()
+                ?? Date().addingTimeInterval(-defaultHistoricalRange)
             let (totalImported, totalSkipped) = try await processHistoricalHealthKitBatches(
-                earliestDate: earliestDate, endDate: Date(), ownership: ownership, operation: operation
+                earliestDate: earliestDate, endDate: Date(), ownership: ownership, operation: operation,
+                bodyFatOnlyPolicy: importsBodyFatOnly
             )
             try await requireImportOwnership(ownership)
             let completed = await MainActor.run {
@@ -429,10 +443,16 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
 
 func processHistoricalHealthKitBatches(
         earliestDate: Date, endDate: Date, ownership: AuthManager.ProfileSessionOwnership? = nil,
-        operation: UUID? = nil
+        operation: UUID? = nil, bodyFatOnlyPolicy: Bool? = nil
     ) async throws -> (imported: Int, skipped: Int) {
         guard let ownership = await captureImportOwnership(ownership) else { throw HealthKitError.notAuthorized }
         try await requireImportOwnership(ownership)
+        let importsBodyFatOnly: Bool
+        if let bodyFatOnlyPolicy {
+            importsBodyFatOnly = bodyFatOnlyPolicy
+        } else {
+            importsBodyFatOnly = await bodyFatOnlyImportEnabled()
+        }
         let calendar = Calendar.current
         let components = calendar.dateComponents([.month], from: earliestDate, to: endDate)
         let totalMonths = Double(components.month ?? 0)
@@ -474,7 +494,8 @@ func processHistoricalHealthKitBatches(
             // Process this batch
             let (imported, skipped) = await processBatchHealthKitData(
                 weightHistory: weightBatch,
-                bodyFatHistory: bodyFatBatch, ownership: ownership
+                bodyFatHistory: bodyFatBatch, ownership: ownership,
+                bodyFatOnlyPolicy: importsBodyFatOnly
             )
 
             try await requireImportOwnership(ownership)
@@ -538,6 +559,23 @@ func getEarliestWeightDate() async throws -> Date? {
         }
     }
 
+func getEarliestBodyFatDate() async throws -> Date? {
+        if let earliestBodyFatImportDateQuery { return try await earliestBodyFatImportDateQuery() }
+        return try await withCheckedThrowingContinuation { continuation in
+            let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
+            let query = HKSampleQuery(
+                sampleType: bodyFatType, predicate: nil, limit: 1, sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: (samples?.first as? HKQuantitySample)?.startDate)
+                }
+            }
+            healthStore.execute(query)
+        }
+    }
+
 func processBatchHealthKitData(
         weightHistory: [(weight: Double, date: Date)],
         bodyFatHistory: [(percentage: Double, date: Date)]
@@ -555,7 +593,7 @@ func processBatchHealthKitData(
 func processBatchHealthKitData(
         weightHistory: [HealthKitWeightImportSample],
         bodyFatHistory: [HealthKitBodyFatImportSample],
-        ownership: AuthManager.ProfileSessionOwnership? = nil
+        ownership: AuthManager.ProfileSessionOwnership? = nil, bodyFatOnlyPolicy: Bool? = nil
     ) async -> (imported: Int, skipped: Int) {
         guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else {
             return (0, 0)
@@ -603,7 +641,12 @@ func processBatchHealthKitData(
             }
         }
 
-        let importsBodyFatOnly = await bodyFatOnlyImportEnabled()
+        let importsBodyFatOnly: Bool
+        if let bodyFatOnlyPolicy {
+            importsBodyFatOnly = bodyFatOnlyPolicy
+        } else {
+            importsBodyFatOnly = await bodyFatOnlyImportEnabled()
+        }
         var newlyCombinedSampleIDs = Set<String>()
         for sample in weightHistory {
             guard await ownsImport(ownership) else { return (imported, skipped) }
@@ -828,7 +871,7 @@ func syncSingleStepFromHistory(
         date: Date,
         ownership: AuthManager.ProfileSessionOwnership? = nil
     ) async throws {
-        guard stepCount > 0 else { return }
+        guard stepCount >= 0 else { return }
         guard let ownership = await captureImportOwnership(ownership) else {
             throw HealthKitError.notAuthorized
         }
@@ -889,12 +932,13 @@ func scheduleObservedBodyMetricSync() {
 
 @MainActor
     func scheduleObservedBodyMetricSync(for currentUserId: String?, debounce: TimeInterval = 5) {
-        // Check if we should sync (not more than once per hour)
+        // Legacy observers stay hourly. The smart-scale gate reconciles every delivery.
         let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
+        let smartScale = smartScaleSyncEnabled()
         let shouldSync: Bool = {
+            if smartScale { return true }
             if let lastSync = userDefaults.object(forKey: lastSyncKey) as? Date {
-                let minutesSinceLastSync = Date().timeIntervalSince(lastSync) / 60
-                return minutesSinceLastSync >= 60
+                return Date().timeIntervalSince(lastSync) / 60 >= 60
             }
             return true
         }()
@@ -914,6 +958,11 @@ func scheduleObservedBodyMetricSync() {
                 guard signedInId == currentUserId, let currentUserId, !currentUserId.isEmpty else {
                     return
                 }
+                let useSmartScale = MainActor.assumeIsolated { self?.smartScaleSyncEnabled() ?? false }
+                if useSmartScale {
+                    Task { await self?.refreshSmartScaleSamplesIfEnabled() }
+                    return
+                }
                 self?.userDefaults.set(Date(), forKey: lastSyncKey)
                 Task { [weak self] in
                     // Weight sync imports both weight and body fat for the recent window.
@@ -922,11 +971,204 @@ func scheduleObservedBodyMetricSync() {
             }
         }
     }
+
+    func refreshSmartScaleSamplesIfEnabled() async {
+        _ = await performSmartScaleRefresh()
+    }
+
+    /// Reads new weight and body-fat samples, including ones dated before today.
+    /// Anchor advances only after a successful reconcile. Permission denial reads nothing.
+    @MainActor
+    func performSmartScaleRefresh() async -> HealthKitSmartScaleRefreshResult {
+        guard smartScaleSyncEnabled() else { return .inactive }
+        guard isAuthorized else { return .denied }
+        guard beginWeightSyncIfPossible() else { return .busy }
+        defer { endWeightSync() }
+        guard let ownership = await captureImportOwnership() else { return .unavailable }
+        do {
+            let queried = try await querySmartScaleSamples(readSmartScaleAnchors(for: ownership.subject))
+            try await requireImportOwnership(ownership)
+            let existing = await existingSmartScaleReadings(for: ownership.subject)
+            try await requireImportOwnership(ownership)
+            let admissions = HealthKitSmartScaleSyncPolicy.reconcile(
+                authorized: true, samples: queried.samples, existing: existing
+            )
+            let counts = try await persistSmartScaleAdmissions(admissions, ownership: ownership)
+            try await requireImportOwnership(ownership)
+            writeSmartScaleAnchors(queried.anchors, userId: ownership.subject)
+            if counts.imported > 0 { await finishSmartScaleImport(ownership) }
+            return HealthKitSmartScaleRefreshResult(
+                outcome: .refreshed, imported: counts.imported,
+                skippedDuplicates: counts.duplicates, skippedCovered: counts.covered
+            )
+        } catch {
+            return isSmartScaleAuthorizationDenial(error) ? .denied : .failed
+        }
+    }
+
+    private func querySmartScaleSamples(
+        _ anchors: HealthKitSmartScaleAnchors
+    ) async throws -> HealthKitSmartScaleQueryResult {
+        if let smartScaleSampleQuery { return try await smartScaleSampleQuery(anchors) }
+        return try await fetchAnchoredSmartScaleSamples(anchors)
+    }
+
+    private func fetchAnchoredSmartScaleSamples(
+        _ anchors: HealthKitSmartScaleAnchors
+    ) async throws -> HealthKitSmartScaleQueryResult {
+        let weight = try await anchoredSmartScaleSamples(
+            type: weightType, anchorData: anchors.weight, kind: .weight
+        )
+        let bodyFat = try await anchoredSmartScaleSamples(
+            type: bodyFatType, anchorData: anchors.bodyFat, kind: .bodyFat
+        )
+        return HealthKitSmartScaleQueryResult(
+            samples: weight.samples + bodyFat.samples,
+            anchors: HealthKitSmartScaleAnchors(weight: weight.anchor, bodyFat: bodyFat.anchor)
+        )
+    }
+
+    private func anchoredSmartScaleSamples(
+        type: HKQuantityType, anchorData: Data?, kind: HealthKitSmartScaleSyncPolicy.Kind
+    ) async throws -> (samples: [HealthKitSmartScaleSyncPolicy.Sample], anchor: Data?) {
+        let anchor = anchorData.flatMap {
+            try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: $0)
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKAnchoredObjectQuery(
+                type: type, predicate: nil, anchor: anchor, limit: HKObjectQueryNoLimit
+            ) { [weak self] _, samples, _, newAnchor, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                let mapped = (samples as? [HKQuantitySample] ?? []).compactMap {
+                    self?.smartScaleSample($0, kind: kind)
+                }
+                let data = newAnchor.flatMap {
+                    try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true)
+                }
+                continuation.resume(returning: (mapped, data))
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    private func smartScaleSample(
+        _ sample: HKQuantitySample, kind: HealthKitSmartScaleSyncPolicy.Kind
+    ) -> HealthKitSmartScaleSyncPolicy.Sample? {
+        let value = kind == .weight
+            ? sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
+            : sample.quantity.doubleValue(for: HKUnit.percent()) * 100
+        return HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: sample.uuid.uuidString, kind: kind, value: value,
+            date: sample.startDate, sourceName: sample.sourceRevision.source.name
+        )
+    }
+
+    private func readSmartScaleAnchors(for userId: String) -> HealthKitSmartScaleAnchors {
+        HealthKitSmartScaleAnchors(
+            weight: userDefaults.data(forKey: HealthKitDefaultsKey.smartScaleWeightAnchor.scoped(with: userId)),
+            bodyFat: userDefaults.data(forKey: HealthKitDefaultsKey.smartScaleBodyFatAnchor.scoped(with: userId))
+        )
+    }
+
+    private func writeSmartScaleAnchors(_ anchors: HealthKitSmartScaleAnchors, userId: String) {
+        userDefaults.set(
+            anchors.weight, forKey: HealthKitDefaultsKey.smartScaleWeightAnchor.scoped(with: userId)
+        )
+        userDefaults.set(
+            anchors.bodyFat, forKey: HealthKitDefaultsKey.smartScaleBodyFatAnchor.scoped(with: userId)
+        )
+    }
+
+    private func existingSmartScaleReadings(for userId: String) async -> [HealthKitSmartScaleSyncPolicy.Existing] {
+        let rows = await (importCoreDataManager ?? .shared).fetchBodyMetrics(for: userId)
+        return rows.compactMap { cached in
+            guard let metric = cached.toBodyMetrics() else { return nil }
+            let ids = HealthKitSmartScaleSyncPolicy.recordedIdentities(metadata: metric.sourceMetadata)
+            return HealthKitSmartScaleSyncPolicy.Existing(
+                source: metric.metricSource, date: metric.date, weightKg: metric.weight,
+                bodyFatPercent: metric.bodyFatPercentage, weightSampleId: ids.weight,
+                bodyFatSampleId: ids.bodyFat
+            )
+        }
+    }
+
+    private struct SmartScalePersistCounts {
+        var imported = 0
+        var duplicates = 0
+        var covered = 0
+    }
+
+    private func persistSmartScaleAdmissions(
+        _ admissions: [HealthKitSmartScaleSyncPolicy.Admission],
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async throws -> SmartScalePersistCounts {
+        var counts = SmartScalePersistCounts()
+        for admission in admissions {
+            switch admission {
+            case .imported(let sample):
+                try await saveBodyMetrics(smartScaleMetric(sample, userId: ownership.subject), ownership: ownership)
+                counts.imported += 1
+            case .skippedDuplicate:
+                counts.duplicates += 1
+            case .skippedCovered:
+                counts.covered += 1
+            }
+        }
+        return counts
+    }
+
+    private func smartScaleMetric(
+        _ sample: HealthKitSmartScaleSyncPolicy.Sample, userId: String
+    ) -> BodyMetrics {
+        let now = Date()
+        let isWeight = sample.kind == .weight
+        let metadata = BodyMetricSourceMetadata(
+            vendor: "apple_health", sourceName: sample.sourceName, sampleId: sample.sampleId,
+            quantityType: isWeight
+                ? HKQuantityTypeIdentifier.bodyMass.rawValue
+                : HKQuantityTypeIdentifier.bodyFatPercentage.rawValue
+        )
+        return BodyMetrics(
+            id: UUID().uuidString, userId: userId, date: sample.date, weight: isWeight ? sample.value : nil,
+            weightUnit: "kg", bodyFatPercentage: isWeight ? nil : sample.value,
+            bodyFatMethod: isWeight ? nil : "HealthKit", muscleMass: nil, boneMass: nil,
+            notes: "Imported from Apple Health", photoUrl: nil,
+            dataSource: BodyMetricSource.healthKit.rawValue, sourceMetadata: metadata,
+            createdAt: now, updatedAt: now
+        )
+    }
+
+    private func finishSmartScaleImport(_ ownership: AuthManager.ProfileSessionOwnership) async {
+        await MainActor.run {
+            guard (importAuthManager ?? .shared).ownsAccountSession(ownership) else { return }
+            if let importCompletion {
+                importCompletion(ownership.subject)
+            } else {
+                BodyScoreCache.shared.invalidate(for: ownership.subject)
+                if let trigger = bodyScoreRecalculationTrigger {
+                    trigger()
+                } else {
+                    BodyScoreRecalculationService.shared.scheduleRecalculation()
+                }
+            }
+        }
+    }
+
+    private func isSmartScaleAuthorizationDenial(_ error: Error) -> Bool {
+        if error is HealthKitError { return true }
+        let nsError = error as NSError
+        guard nsError.domain == HKErrorDomain else { return false }
+        return nsError.code == HKError.Code.errorAuthorizationDenied.rawValue ||
+            nsError.code == HKError.Code.errorAuthorizationNotDetermined.rawValue
+    }
 }
 
-/// HealthKit answers a cumulative-sum query with `HKError.errorNoData` when
-/// nothing has been recorded for the predicate yet. For today's steps that is
-/// zero, not a failure, so it must not reach Sentry as a non-fatal error.
+/// Empty HealthKit results can also mean read access was not granted. Keep
+/// missing readings distinct from a recorded zero without reporting no-data as
+/// an operational failure.
 enum HealthKitStepCountPolicy {
     enum QuantityError: Error, LocalizedError {
         case invalidStepCount
@@ -935,9 +1177,9 @@ enum HealthKitStepCountPolicy {
     }
 
     /// Preserve HealthKit's existing truncation to a stored Int32 count, with
-    /// validation before conversion or publication. Missing data still means zero.
-    static func stepCount(from quantity: Double?) throws -> Int {
-        guard let quantity else { return 0 }
+    /// validation before conversion or publication. Missing data remains absent.
+    static func stepCount(from quantity: Double?) throws -> Int? {
+        guard let quantity else { return nil }
         guard quantity.isFinite, quantity >= 0 else { throw QuantityError.invalidStepCount }
         let wholeCount = quantity.rounded(.towardZero)
         guard wholeCount <= Double(Int32.max), let count = Int(exactly: wholeCount) else {
@@ -946,11 +1188,8 @@ enum HealthKitStepCountPolicy {
         return count
     }
 
-    static func stepCount(forNoData error: Error) -> Int? {
+    static func isNoData(_ error: Error) -> Bool {
         let nsError = error as NSError
-        guard nsError.domain == HKErrorDomain, nsError.code == HKError.Code.errorNoData.rawValue else {
-            return nil
-        }
-        return 0
+        return nsError.domain == HKErrorDomain && nsError.code == HKError.Code.errorNoData.rawValue
     }
 }

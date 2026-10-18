@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isLandingAudience, type LandingAudience } from '@/lib/marketing/landing-registry';
 import { authCookies } from '@/lib/auth/constants';
+import { prefersMarkdown, varyOnAccept } from '@/lib/marketing/accept-markdown';
+import {
+  homepageMarkdown,
+  markdownResponse,
+  publicMarkdownEnabled,
+  PUBLIC_MARKDOWN_HEADER,
+} from '@/lib/marketing/public-markdown';
 
 const LANDING_AUDIENCE_COOKIE = 'lyb_landing_audience_v1';
 const protectedRoutePrefixes = [
@@ -66,9 +73,33 @@ export function resolveLandingAudience(req: NextRequest) {
   return { audience: randomLandingAudience(), source: 'experiment' as const };
 }
 
-export default function middleware(req: NextRequest) {
+export default async function middleware(req: NextRequest) {
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.delete(PUBLIC_MARKDOWN_HEADER);
+  const isPublicDocument =
+    ['GET', 'HEAD'].includes(req.method) &&
+    !req.headers.has('rsc') &&
+    !req.headers.has('next-router-prefetch') &&
+    !shouldUseProductAuthMiddleware(req) &&
+    !['/api', '/_next', '/.well-known', '/signin', '/signup', '/login'].some(
+      (prefix) => req.nextUrl.pathname === prefix || req.nextUrl.pathname.startsWith(prefix + '/'),
+    );
+  const wantsMarkdown = isPublicDocument && prefersMarkdown(req.headers.get('Accept'));
+  function publicHeaders(response: NextResponse): NextResponse {
+    if (isPublicDocument) varyOnAccept(response.headers);
+    // Do not cache a gate-off/failure HTML response under a Markdown Accept key.
+    if (wantsMarkdown) response.headers.set('Cache-Control', 'private, no-store');
+    return response;
+  }
   if (shouldBlockDebugRoute(req.nextUrl.pathname)) {
     return new NextResponse(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  if (wantsMarkdown && (await publicMarkdownEnabled())) {
+    if (req.nextUrl.pathname === '/') {
+      return markdownResponse(homepageMarkdown(), 200, req.method);
+    }
+    requestHeaders.set(PUBLIC_MARKDOWN_HEADER, '1');
   }
 
   if (
@@ -80,7 +111,7 @@ export default function middleware(req: NextRequest) {
     const rewrittenUrl = req.nextUrl.clone();
     rewrittenUrl.searchParams.set('_lyb_audience', assignment.audience);
     rewrittenUrl.searchParams.set('_lyb_assignment_source', assignment.source);
-    const response = NextResponse.rewrite(rewrittenUrl);
+    const response = NextResponse.rewrite(rewrittenUrl, { request: { headers: requestHeaders } });
     response.cookies.set(LANDING_AUDIENCE_COOKIE, assignment.audience, {
       httpOnly: true,
       sameSite: 'lax',
@@ -88,7 +119,7 @@ export default function middleware(req: NextRequest) {
       maxAge: 60 * 60 * 24 * 30,
       path: '/',
     });
-    return response;
+    return publicHeaders(response);
   }
 
   if (shouldUseProductAuthMiddleware(req)) {
@@ -102,7 +133,7 @@ export default function middleware(req: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return publicHeaders(NextResponse.next({ request: { headers: requestHeaders } }));
 }
 
 export const config = {

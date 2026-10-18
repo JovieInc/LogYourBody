@@ -391,13 +391,12 @@ private func buildFullScreenWeightTrendChartData(
     bodyMetrics: [BodyMetrics],
     measurementSystem: MeasurementSystem
 ) -> [MetricChartDataPoint] {
-    guard let interpolationContext = MetricsInterpolationService.shared
-        .makeWeightInterpolationContext(for: bodyMetrics) else {
+    guard let interpolationContext = HomeV2WeightQuality.trendContext(for: bodyMetrics) else {
         return []
     }
 
     return sortedBodyMetricsAscending.compactMap { metric in
-        guard metric.weight != nil,
+        guard HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight),
               let trend = interpolationContext.trendWeight(for: metric.date) else {
             return nil
         }
@@ -440,7 +439,7 @@ private func buildFullScreenBodyFatChartData(
                 return MetricChartDataPoint(
                     date: metric.date,
                     value: bf,
-                    isEstimated: metric.bodyFatMethod == "visual_estimate"
+                    isEstimated: metric.attributedBodyFatMethod == "visual_estimate"
                 )
             }
 
@@ -476,7 +475,7 @@ private func buildFullScreenFFMIChartData(
                 isLastKnown: ffmiResult.isLastKnown,
                 isInterpolated: ffmiResult.isInterpolated,
                 hasDirectBodyFat: metric.bodyFatPercentage != nil,
-                directBodyFatMethod: metric.bodyFatMethod
+                directBodyFatMethod: metric.attributedBodyFatMethod
             )
 
             return MetricChartDataPoint(
@@ -519,11 +518,10 @@ private func buildBodyScoreChartAndEntriesData(
         return ([], nil)
     }
 
-    let calendar = Calendar.current
     guard let dateOfBirth = profile.dateOfBirth else {
         return ([], nil)
     }
-    let birthYear = calendar.component(.year, from: dateOfBirth)
+    let birthYear = ProfileBirthDatePolicy.year(from: dateOfBirth)
 
     guard let heightCm = profile.height, heightCm > 0 else {
         return ([], nil)

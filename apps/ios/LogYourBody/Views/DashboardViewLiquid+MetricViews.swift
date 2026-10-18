@@ -91,14 +91,16 @@ extension DashboardViewLiquid {
                 iconColor: theme.colors.accentOrange,
                 currentValue: formatSteps(dailyMetrics?.steps),
                 unit: "steps",
-                currentDate: formatDate(dailyMetrics?.updatedAt ?? Date()),
+                currentDate: formatDate(dailyMetrics?.date ?? Date()),
                 chartData: cachedChartData(for: .steps, generator: generateFullScreenStepsChartData),
                 onAdd: nil,
                 metricEntries: cachedMetricEntries(for: .steps),
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .steps),
                 goalValue: Double(stepGoal),
                 selectedTimeRange: $selectedRange,
-                selectedTimelineDate: metricDetailSelectedDateBinding
+                selectedTimelineDate: metricDetailSelectedDateBinding,
+                shareSnapshots: dashboardMetricShareSnapshots,
+                isShareContextVisible: isMetricShareContextVisible
             )
 
         case .weight:
@@ -124,6 +126,8 @@ extension DashboardViewLiquid {
                 goalValue: weightGoal.flatMap { convertWeight($0, to: currentMeasurementSystem) },
                 selectedTimeRange: $selectedRange,
                 selectedTimelineDate: metricDetailSelectedDateBinding,
+                shareSnapshots: dashboardMetricShareSnapshots,
+                isShareContextVisible: isMetricShareContextVisible,
                 initialChartMode: weightUsesTrend ? .trend : .raw
             )
 
@@ -143,7 +147,9 @@ extension DashboardViewLiquid {
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .bodyFat),
                 goalValue: bodyFatGoal,
                 selectedTimeRange: $selectedRange,
-                selectedTimelineDate: metricDetailSelectedDateBinding
+                selectedTimelineDate: metricDetailSelectedDateBinding,
+                shareSnapshots: dashboardMetricShareSnapshots,
+                isShareContextVisible: isMetricShareContextVisible
             )
 
         case .ffmi:
@@ -160,7 +166,9 @@ extension DashboardViewLiquid {
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .ffmi),
                 goalValue: ffmiGoal,
                 selectedTimeRange: $selectedRange,
-                selectedTimelineDate: metricDetailSelectedDateBinding
+                selectedTimelineDate: metricDetailSelectedDateBinding,
+                shareSnapshots: dashboardMetricShareSnapshots,
+                isShareContextVisible: isMetricShareContextVisible
             )
 
         case .bodyScore:
@@ -178,7 +186,9 @@ extension DashboardViewLiquid {
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .bodyScore),
                 goalValue: nil,
                 selectedTimeRange: $selectedRange,
-                selectedTimelineDate: metricDetailSelectedDateBinding
+                selectedTimelineDate: metricDetailSelectedDateBinding,
+                shareSnapshots: dashboardMetricShareSnapshots,
+                isShareContextVisible: isMetricShareContextVisible
             )
 
         case .glp1:
@@ -204,9 +214,58 @@ extension DashboardViewLiquid {
                 relatedMetrics: metricDetailRelatedMetrics(excluding: .glp1),
                 goalValue: nil,
                 selectedTimeRange: $selectedRange,
-                selectedTimelineDate: metricDetailSelectedDateBinding
+                selectedTimelineDate: metricDetailSelectedDateBinding,
+                shareSnapshots: dashboardMetricShareSnapshots,
+                isShareContextVisible: isMetricShareContextVisible
             )
         }
+    }
+
+    /// Owner state gates the receiver even when SwiftUI keeps a covered view mounted.
+    var isMetricShareContextVisible: Bool {
+        authManager.captureAccountSession().map { dashboardMetricsBelong(to: $0) } == true
+            && !showAddEntrySheet && !showSyncDetails && !isProgressPhotoAttachPresented
+            && !isPhotoTimelineSettingsPresented && !isHomeV2ViewerPresented
+            && !isHomeV2ContextPresented && !isHomeV2EntriesPresented && !isHomeV2MetricProvenancePresented
+            && !isHomeV2SettingsPresented && !isHomeV2HelpPresented && !isHomeV2AllPhotosPresented
+            && !isShowingPhotoTimelineMenu && homeV2EditingSession == nil && !showsHomeV2UndoError
+            && bodyScoreSharePayload == nil && !isHomeChatExpanded
+    }
+
+    var dashboardMetricShareSnapshots: [ContextualMetricSnapshot] {
+        let date = currentMetric.map { formatDate($0.date) } ?? ""
+        let source = currentMetric.map { HomeV2Provenance.label(for: $0, field: .bodyFat) }
+        let range = selectedRange.accessibilityLabel
+        var snapshots = [
+            ContextualMetricSnapshot.steps(dailyMetrics, value: formatSteps(dailyMetrics?.steps), range: range),
+            ContextualMetricSnapshot.weight(
+                currentMetric, metrics: bodyMetrics, prefersTrend: weightUsesTrend,
+                context: (unit: weightUnit, observation: date, range: range),
+                formatValue: { kilograms in
+                    let value = convertWeight(kilograms, to: currentMeasurementSystem) ?? kilograms
+                    return String(format: "%.1f", value)
+                }),
+            ContextualMetricSnapshot(
+                kind: .bodyFat,
+                value: currentMetric.flatMap { formatBodyFatValue($0.bodyFatPercentage) } ?? "—",
+                unit: "%", observation: date, range: range, trend: nil,
+                provenance: currentMetric?.bodyFatPercentage == nil ? nil : source,
+                evidence: ContextualMetricEvidencePolicy.label(
+                    for: .bodyFat, isEstimated: currentMetric?.bodyFatPercentage == nil,
+                    bodyFatMethod: currentMetric?.attributedBodyFatMethod)),
+            ContextualMetricSnapshot(
+                kind: .ffmi, value: currentMetric.map { formatFFMIValue($0) } ?? "—",
+                unit: "", observation: date, range: range, trend: nil,
+                provenance: "Weight, body fat and height", evidence: ContextualMetricEvidencePolicy.label(for: .ffmi))
+        ]
+        let score = bodyScoreText()
+        if score.score > 0 {
+            snapshots.append(ContextualMetricSnapshot(
+                kind: .bodyScore, value: score.scoreText, unit: "",
+                observation: date, range: range, trend: heroBodyScoreDeltaText(), provenance: nil,
+                evidence: ContextualMetricEvidencePolicy.label(for: .bodyScore)))
+        }
+        return snapshots.filter(\.isAvailable)
     }
 
     func metricDetailRelatedMetrics(excluding selected: MetricType) -> [MetricDetailRelatedMetric] {

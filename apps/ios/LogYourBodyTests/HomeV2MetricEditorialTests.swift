@@ -423,3 +423,29 @@ final class HomeV2MetricEditorialTests: XCTestCase {
         )
     }
 }
+
+extension HomeV2MetricEditorialTests {
+    func testChartLabelsAndTooltipsUseTheProvidedTimeZoneAcrossDateBoundaries() throws {
+        let instant = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-01-01T03:00:00Z"))
+        for (zone, expectedDay, expectedMonth) in [
+            ("UTC", "Jan 1", "Jan 2026"),
+            ("America/Los_Angeles", "Dec 31", "Dec 2025"),
+            ("Pacific/Honolulu", "Dec 31", "Dec 2025"),
+            ("Asia/Tokyo", "Jan 1", "Jan 2026"),
+            ("Pacific/Kiritimati", "Jan 1", "Jan 2026")
+        ] {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = try XCTUnwrap(TimeZone(identifier: zone))
+            let locale = Locale(identifier: "en_US")
+            XCTAssertEqual(HomeV2ChartIntegrity.axisLabel(
+                date: instant, range: .month1, locale: locale, calendar: calendar
+            ), expectedDay, zone)
+            XCTAssertEqual(HomeV2ChartIntegrity.axisLabel(
+                date: instant, range: .all, locale: locale, calendar: calendar
+            ), expectedMonth, zone)
+            XCTAssertEqual(HomeV2ChartIntegrity.tooltip(
+                date: instant, valueText: "8,000", locale: locale, calendar: calendar
+            ), "\(expectedDay) · 8,000 · Daily value", zone)
+        }
+    }
+}

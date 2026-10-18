@@ -49,6 +49,7 @@ def main():
     parser.add_argument('--postgres-bin', type=Path, required=True)
     parser.add_argument('--migration', type=Path, help='Optional candidate migration for deliberate regression checks')
     parser.add_argument('--admission-migration', type=Path, help='Optional admission migration for deliberate regression checks')
+    parser.add_argument('--canvas-migration', type=Path, help='Optional canvas migration for deliberate regression checks')
     args = parser.parse_args()
     web = Path(__file__).resolve().parents[2]
     env = isolated_environment(os.environ)
@@ -85,6 +86,8 @@ def main():
             run(client + ['-f', str(web / 'db/migrations/20261010120000_native_account_admission.sql')])
             run(client + ['-f', str(web / 'db/migrations/20261013100000_training_swap_mutation.sql')])
             run(client + ['-f', str(web / 'db/migrations/20261014103000_training_execution_cas.sql')])
+
+            run(client + ['-f', str(args.canvas_migration or web / 'db/migrations/20261014180000_training_canvas_ledger.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -376,6 +379,12 @@ def main():
             assert mutate(subject,admission,'set_correct',dict(fresh,revision=3,expectedRevision=2))['kind']=='record_conflict'
             assert sql(f"select count(*) from native_records where collection='logged_sets' and id={quote(row['id'])} and deleted_at is null;")=='0'
             check('set correction cannot omit revision, cross owners, or revive a tombstone')
+
+            canvas_env = {**env, 'TSX_TSCONFIG_PATH': str(web / 'tsconfig.json')}
+            print(run_command(['node', '--conditions=react-server', '--import',
+                str(web / 'node_modules/tsx/dist/loader.mjs'),
+                str(web / 'db/tests/verify-training-canvas.ts'), json.dumps(client)], canvas_env), flush=True)
+            check('canvas actual adapter/handler and SQL qualification')
 
             print(json.dumps({'passed':len(checks),'checks':checks,'postgresTools':versions,'scope':'disposable PostgreSQL16; actual migrations, observed owner locks, synthetic rows only'}))
         finally:

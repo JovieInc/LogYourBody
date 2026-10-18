@@ -10,6 +10,8 @@ enum HealthKitDefaultsKey: String {
     case readProbeRecord = "healthKitReadProbeRecord"
     case lastObserverSyncDate = "lastHealthKitObserverSyncDate"
     case fullSyncCompleted = "hasPerformedFullHealthKitSync"
+    case smartScaleWeightAnchor = "healthKitSmartScaleWeightAnchor"
+    case smartScaleBodyFatAnchor = "healthKitSmartScaleBodyFatAnchor"
 
     func scoped(with userId: String?) -> String {
         guard let userId = userId, !userId.isEmpty else {
@@ -228,6 +230,7 @@ class HealthKitManager: ObservableObject {
     let todayStepQuantityQuery: ((Date, Date) async throws -> Double?)?
     let stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])?
     let earliestImportDateQuery: (() async throws -> Date?)?
+    let earliestBodyFatImportDateQuery: (() async throws -> Date?)?
     let importSyncTrigger: (@MainActor () -> Void)?
     let importCompletion: (@MainActor (String) -> Void)?
     let bodyScoreRecalculationTrigger: (@MainActor () -> Void)?
@@ -238,6 +241,9 @@ class HealthKitManager: ObservableObject {
     /// can stay unscheduled for 30s+ on a loaded CI simulator.
     let historicalImportPriority: TaskPriority
     let bodyFatOnlyImportEnabled: @MainActor () -> Bool
+    /// Tests replace these. Production uses the Statsig gate and anchored HealthKit reads.
+    var smartScaleSyncEnabled: @MainActor () -> Bool = { HealthKitSmartScaleSyncPolicy.isEnabled() }
+    var smartScaleSampleQuery: ((HealthKitSmartScaleAnchors) async throws -> HealthKitSmartScaleQueryResult)?
 
     init(
         userDefaults: UserDefaults = .standard,
@@ -248,6 +254,7 @@ class HealthKitManager: ObservableObject {
         todayStepQuantityQuery: ((Date, Date) async throws -> Double?)? = nil,
         stepHistoryQuery: ((Int) async throws -> [(stepCount: Int, date: Date)])? = nil,
         earliestImportDateQuery: (() async throws -> Date?)? = nil,
+        earliestBodyFatImportDateQuery: (() async throws -> Date?)? = nil,
         syncTrigger: (@MainActor () -> Void)? = nil,
         importCompletion: (@MainActor (String) -> Void)? = nil,
         bodyScoreRecalculationTrigger: (@MainActor () -> Void)? = nil,
@@ -264,6 +271,7 @@ class HealthKitManager: ObservableObject {
         self.todayStepQuantityQuery = todayStepQuantityQuery
         self.stepHistoryQuery = stepHistoryQuery
         self.earliestImportDateQuery = earliestImportDateQuery
+        self.earliestBodyFatImportDateQuery = earliestBodyFatImportDateQuery
         importSyncTrigger = syncTrigger
         self.importCompletion = importCompletion
         self.bodyScoreRecalculationTrigger = bodyScoreRecalculationTrigger
@@ -435,5 +443,163 @@ enum HealthKitBodyFatOnlyImportPolicy {
     static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
         return checkGate(gateKey)
+    }
+}
+
+struct HealthKitSmartScaleAnchors: Equatable {
+    var weight: Data?
+    var bodyFat: Data?
+}
+
+struct HealthKitSmartScaleQueryResult: Equatable {
+    var samples: [HealthKitSmartScaleSyncPolicy.Sample]
+    var anchors: HealthKitSmartScaleAnchors
+}
+
+struct HealthKitSmartScaleRefreshResult: Equatable {
+    enum Outcome: Equatable {
+        case inactive
+        case denied
+        case unavailable
+        case busy
+        case refreshed
+        case failed
+    }
+
+    var outcome: Outcome
+    var imported = 0
+    var skippedDuplicates = 0
+    var skippedCovered = 0
+
+    static let inactive = HealthKitSmartScaleRefreshResult(outcome: .inactive)
+    static let denied = HealthKitSmartScaleRefreshResult(outcome: .denied)
+    static let unavailable = HealthKitSmartScaleRefreshResult(outcome: .unavailable)
+    static let busy = HealthKitSmartScaleRefreshResult(outcome: .busy)
+    static let failed = HealthKitSmartScaleRefreshResult(outcome: .failed)
+}
+
+/// Foreground and observer reconciliation for scale weight and body fat.
+/// Unset Statsig gates stay off. Sample dates are kept, including backdated ones.
+enum HealthKitSmartScaleSyncPolicy {
+    static let gateKey = "healthkit_smart_scale_sync_v1"
+    static let weightToleranceKg = 0.1
+    static let bodyFatTolerance = 0.2
+
+    enum Kind: String, Equatable {
+        case weight
+        case bodyFat
+    }
+
+    struct Sample: Equatable {
+        let sampleId: String
+        let kind: Kind
+        let value: Double
+        let date: Date
+        let sourceName: String?
+    }
+
+    struct Existing: Equatable {
+        let source: BodyMetricSource
+        let date: Date
+        let weightKg: Double?
+        let bodyFatPercent: Double?
+        let weightSampleId: String?
+        let bodyFatSampleId: String?
+    }
+
+    enum Admission: Equatable {
+        case imported(Sample)
+        case skippedDuplicate(String)
+        case skippedCovered(String, BodyMetricSource)
+    }
+
+    private static let coveredSources: Set<String> = [
+        BodyMetricSource.manual.rawValue,
+        BodyMetricSource.smartScale.rawValue,
+        BodyMetricSource.bodySpecDexa.rawValue,
+        BodyMetricSource.dexaPDF.rawValue,
+        BodyMetricSource.inbodyPDF.rawValue,
+        BodyMetricSource.pdfImport.rawValue
+    ]
+
+    @MainActor
+    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
+        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return checkGate(gateKey)
+    }
+
+    static func makeSample(
+        sampleId: String, kind: Kind, value: Double, date: Date, sourceName: String?
+    ) -> Sample? {
+        let id = sampleId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty, value.isFinite, value > 0 else { return nil }
+        let name = sourceName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleaned = (name?.isEmpty == false) ? name : nil
+        return Sample(sampleId: id, kind: kind, value: value, date: date, sourceName: cleaned)
+    }
+
+    static func attribution(sourceName: String?) -> String {
+        guard let name = sourceName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
+              name.caseInsensitiveCompare("Apple Health") != .orderedSame else {
+            return "Apple Health"
+        }
+        return "\(name) via Apple Health"
+    }
+
+    static func recordedIdentities(metadata: BodyMetricSourceMetadata?) -> (weight: String?, bodyFat: String?) {
+        guard let metadata else { return (nil, nil) }
+        let bodyFatType = HKQuantityTypeIdentifier.bodyFatPercentage.rawValue
+        let weightType = HKQuantityTypeIdentifier.bodyMass.rawValue
+        let bodyFat = metadata.bodyFatSampleId ?? (metadata.quantityType == bodyFatType ? metadata.sampleId : nil)
+        let weight = metadata.quantityType == weightType || metadata.bodyFatSampleId != nil
+            ? metadata.sampleId : nil
+        return (weight, bodyFat)
+    }
+
+    static func reconcile(
+        authorized: Bool, samples: [Sample], existing: [Existing], calendar: Calendar = .current
+    ) -> [Admission] {
+        guard authorized else { return [] }
+        var seen = Set(existing.flatMap { identities(for: $0) })
+        return samples.compactMap { sample in
+            let key = identity(sample.sampleId, sample.kind)
+            if seen.contains(key) { return .skippedDuplicate(sample.sampleId) }
+            if let cover = coveringSource(for: sample, existing: existing, calendar: calendar) {
+                seen.insert(key)
+                return .skippedCovered(sample.sampleId, cover)
+            }
+            seen.insert(key)
+            return .imported(sample)
+        }
+    }
+
+    private static func identities(for entry: Existing) -> [String] {
+        [entry.weightSampleId.map { identity($0, .weight) }, entry.bodyFatSampleId.map { identity($0, .bodyFat) }]
+            .compactMap { $0 }
+    }
+
+    private static func identity(_ sampleId: String, _ kind: Kind) -> String {
+        "\(kind.rawValue):\(sampleId)"
+    }
+
+    private static func coveringSource(
+        for sample: Sample, existing: [Existing], calendar: Calendar
+    ) -> BodyMetricSource? {
+        existing.first { entry in
+            coveredSources.contains(entry.source.rawValue) &&
+                calendar.isDate(entry.date, inSameDayAs: sample.date) &&
+                matches(sample, entry)
+        }?.source
+    }
+
+    private static func matches(_ sample: Sample, _ entry: Existing) -> Bool {
+        switch sample.kind {
+        case .weight:
+            guard let weight = entry.weightKg else { return false }
+            return abs(weight - sample.value) <= weightToleranceKg
+        case .bodyFat:
+            guard let bodyFat = entry.bodyFatPercent else { return false }
+            return abs(bodyFat - sample.value) <= bodyFatTolerance
+        }
     }
 }

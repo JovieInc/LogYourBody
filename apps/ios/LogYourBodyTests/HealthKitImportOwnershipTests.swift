@@ -131,6 +131,9 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         stepQuery: HeldStepHistoryQuery? = nil,
         todayQuery: HeldTodayStepQuantityQuery? = nil,
         earliestQuery: (() async throws -> Date?)? = nil,
+        earliestBodyFatQuery: (() async throws -> Date?)? = nil,
+        bodyFatQuery: ((Date) async throws -> [HealthKitBodyFatImportSample])? = nil,
+        bodyFatPolicy: (@MainActor () -> Bool)? = nil,
         metricStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil,
         rawStore: (([HKRawSample]) async -> Void)? = nil,
         bodyFatOnlyEnabled: Bool = false
@@ -141,10 +144,11 @@ final class HealthKitImportOwnershipTests: XCTestCase {
                 if let query { return await query.fetch() }
                 return []
             },
-            bodyFatImportQuery: { _ in [] },
+            bodyFatImportQuery: bodyFatQuery ?? { _ in [] },
             todayStepQuantityQuery: todayQuery.map { held in { _, _ in try await held.fetch() } },
             stepHistoryQuery: stepQuery.map { held in { _ in try await held.fetch() } },
             earliestImportDateQuery: earliestQuery,
+            earliestBodyFatImportDateQuery: earliestBodyFatQuery,
             syncTrigger: { self.syncTriggers += 1 },
             importCompletion: { owner in self.completedOwners.append(owner) },
             metricImportStore: metricStore,
@@ -153,7 +157,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
             // weight-query wait on a loaded runner (merge group 38341522837). The
             // ownership assertions do not depend on scheduling priority.
             historicalImportPriority: .userInitiated,
-            bodyFatOnlyImportEnabled: { bodyFatOnlyEnabled }
+            bodyFatOnlyImportEnabled: bodyFatPolicy ?? { bodyFatOnlyEnabled }
         )
         manager.isAuthorized = true
         return manager
@@ -208,7 +212,9 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertEqual(syncTriggers, 0)
     }
 
-    private func assertHeldTodayQueryIsRejected(replace: () -> Void, cancel: Bool = false) async throws {
+    private func assertHeldTodayQueryIsRejected(
+        replace: () -> Void, cancel: Bool = false, quantity: Double? = 4_321.75
+    ) async throws {
         let query = HeldTodayStepQuantityQuery()
         let manager = manager(todayQuery: query)
         let task = Task { try await manager.fetchTodayStepCount() }
@@ -222,7 +228,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         manager.latestStepCount = 77
         manager.latestStepCountDate = replacementDate
         if cancel { task.cancel() }
-        query.complete(.success(4_321.75))
+        query.complete(.success(quantity))
         do {
             _ = try await task.value
             XCTFail("A stale or cancelled today query must not return a usable count")
@@ -274,19 +280,51 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertLessThanOrEqual(date, Date())
     }
 
-    func testTodayMissingQuantityAndHealthKitNoDataStillPublishZero() async throws {
+    func testTodayMissingQuantityAndHealthKitNoDataDoNotPublishAReading() async throws {
         let noData = NSError(domain: HKErrorDomain, code: HKError.Code.errorNoData.rawValue)
         for result: Result<Double?, Error> in [.success(nil), .failure(noData)] {
             let query = HeldTodayStepQuantityQuery()
             let manager = manager(todayQuery: query)
+            manager.todayStepCount = 123
+            manager.todayStepCountOwner = auth.captureAccountSession()
+            manager.latestStepCount = 123
+            manager.latestStepCountDate = Date()
             query.complete(result)
             let count = try await manager.fetchTodayStepCount()
-            XCTAssertEqual(count, 0)
+            XCTAssertNil(count)
             XCTAssertEqual(manager.todayStepCount, 0)
-            XCTAssertEqual(manager.latestStepCount, 0)
-            XCTAssertNotNil(manager.latestStepCountDate)
-            XCTAssertEqual(manager.todayStepCountOwner, auth.captureAccountSession())
+            XCTAssertNil(manager.latestStepCount)
+            XCTAssertNil(manager.latestStepCountDate)
+            XCTAssertNil(manager.todayStepCountOwner)
+            await manager.syncStepsToProductAPI(userId: "synthetic-health-A")
+            let rows = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
+            XCTAssertTrue(rows.isEmpty)
+            XCTAssertEqual(syncTriggers, 0)
         }
+    }
+
+    func testObservedTodayZeroPublishesAndPersistsAsAnActualReading() async throws {
+        let query = HeldTodayStepQuantityQuery()
+        let manager = manager(todayQuery: query)
+        query.complete(.success(0))
+        let count = try await manager.fetchTodayStepCount()
+        XCTAssertEqual(count, 0)
+        XCTAssertEqual(manager.latestStepCount, 0)
+        XCTAssertNotNil(manager.latestStepCountDate)
+        XCTAssertEqual(manager.todayStepCountOwner, auth.captureAccountSession())
+        await manager.syncStepsToProductAPI(userId: "synthetic-health-A")
+        let rows = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.steps, 0)
+        XCTAssertEqual(syncTriggers, 1)
+    }
+
+    func testLateMissingTodayQueryCannotClearReplacementAccountReading() async throws {
+        try await assertHeldTodayQueryIsRejected(replace: { setAccount("synthetic-health-B") }, quantity: nil)
+    }
+
+    func testCancelledMissingTodayQueryCannotClearCurrentReading() async throws {
+        try await assertHeldTodayQueryIsRejected(replace: {}, cancel: true, quantity: nil)
     }
 
     func testTodaySDKAndQuantityErrorsDoNotPublish() async {
@@ -361,13 +399,14 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         try await task.value
         let records = await coreData.fetchDailyMetrics(for: "synthetic-health-A")
         let record = try XCTUnwrap(records.first)
-        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.count, 2)
+        XCTAssertEqual(records.last?.steps, 0)
         XCTAssertEqual(record.userId, "synthetic-health-A")
         XCTAssertEqual(record.steps, 4_321)
         XCTAssertEqual(record.notes, "Imported from HealthKit")
         let recordsB = await coreData.fetchDailyMetrics(for: "synthetic-health-B")
         XCTAssertTrue(recordsB.isEmpty)
-        XCTAssertEqual(syncTriggers, 1)
+        XCTAssertEqual(syncTriggers, 2)
     }
 
     func testStepImportDoesNotLandWhenAnotherAccountOwnsHealthSync() async {
@@ -775,6 +814,229 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         try await assertHeldBodyFatWriteRejectsReplacement("synthetic-health-A")
     }
 
+    func testFullHistoryIncludesBodyFatOlderThanFirstWeight() async throws {
+        let now = Date()
+        let fat = HealthKitBodyFatImportSample(
+            percentage: 18.4, date: now.addingTimeInterval(-60 * 86_400),
+            sourceMetadata: BodyMetricSourceMetadata(
+                vendor: "apple_health", sourceName: "Synthetic BF Scale", sampleId: "earlier-bf",
+                quantityType: HKQuantityTypeIdentifier.bodyFatPercentage.rawValue
+            )
+        )
+        let weight = HealthKitWeightImportSample(
+            weight: 70.123, date: now.addingTimeInterval(-5 * 86_400),
+            sourceMetadata: BodyMetricSourceMetadata(vendor: "apple_health", sampleId: "first-weight")
+        )
+        let importer = HealthKitManager(
+            userDefaults: defaults, authManager: auth, coreDataManager: coreData,
+            weightImportQuery: { start, end in [weight].filter { $0.date >= start && $0.date <= end } },
+            bodyFatImportQuery: { start in [fat].filter { $0.date >= start } },
+            earliestImportDateQuery: { weight.date },
+            earliestBodyFatImportDateQuery: { fat.date },
+            syncTrigger: {}, importCompletion: { _ in },
+            rawImportStore: { _ in XCTFail("Synthetic query must not execute raw SDK persistence") },
+            bodyFatOnlyImportEnabled: { true }
+        )
+        importer.isAuthorized = true
+        let completed = await importer.syncAllHistoricalHealthKitData()
+        XCTAssertTrue(completed)
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, 2)
+        let fatRow = try XCTUnwrap(rows.first { $0.sourceMetadata?.sampleId == "earlier-bf" })
+        XCTAssertNil(fatRow.weight)
+        XCTAssertEqual(fatRow.bodyFatPercentage, fat.percentage)
+        XCTAssertEqual(fatRow.date, fat.date)
+        XCTAssertEqual(fatRow.sourceMetadata, fat.sourceMetadata)
+        let weightRow = try XCTUnwrap(rows.first { $0.sourceMetadata?.sampleId == "first-weight" })
+        XCTAssertEqual(weightRow.weight, weight.weight)
+        XCTAssertNil(weightRow.bodyFatPercentage)
+    }
+
+    private func datedHistoryBodyFat(_ date: Date, id: String = "range-bf") -> HealthKitBodyFatImportSample {
+        HealthKitBodyFatImportSample(
+            percentage: 18.4, date: date,
+            sourceMetadata: BodyMetricSourceMetadata(
+                vendor: "apple_health", sampleId: id, quantityType: HKQuantityTypeIdentifier.bodyFatPercentage.rawValue
+            )
+        )
+    }
+
+    private func assertHistoryLowerBound(weightDate: Date?, fatDate: Date) async throws {
+        let fat = datedHistoryBodyFat(fatDate)
+        var starts: [Date] = []
+        let importer = manager(
+            earliestQuery: { weightDate }, earliestBodyFatQuery: { fatDate },
+            bodyFatQuery: { start in
+                await MainActor.run { starts.append(start) }
+                return [fat].filter { $0.date >= start }
+            }, bodyFatOnlyEnabled: true
+        )
+        let completed = await importer.syncAllHistoricalHealthKitData()
+        XCTAssertTrue(completed)
+        XCTAssertEqual(starts.first, min(weightDate ?? fatDate, fatDate))
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.date, fatDate)
+        XCTAssertNil(rows.first?.weight)
+    }
+
+    func testHistoryUsesEarlierWeightWhenBodyFatIsLater() async throws {
+        let now = Date()
+        try await assertHistoryLowerBound(
+            weightDate: now.addingTimeInterval(-60 * 86_400), fatDate: now.addingTimeInterval(-5 * 86_400)
+        )
+    }
+
+    func testHistoryUsesBodyFatDateWhenNoWeightExists() async throws {
+        try await assertHistoryLowerBound(weightDate: nil, fatDate: Date().addingTimeInterval(-5 * 86_400))
+    }
+
+    func testHistoryBothMissingDatesKeepsExistingTenYearFallback() async throws {
+        var starts: [Date] = []
+        let importer = manager(
+            earliestQuery: { nil }, earliestBodyFatQuery: { nil },
+            bodyFatQuery: { start in await MainActor.run { starts.append(start) }; return [] },
+            bodyFatOnlyEnabled: true
+        )
+        let before = Date()
+        let completed = await importer.syncAllHistoricalHealthKitData()
+        let after = Date()
+        XCTAssertTrue(completed)
+        let start = try XCTUnwrap(starts.first)
+        let fallback = TimeInterval(10 * 365 * 24 * 60 * 60)
+        XCTAssertGreaterThanOrEqual(start, before.addingTimeInterval(-fallback))
+        XCTAssertLessThanOrEqual(start, after.addingTimeInterval(-fallback))
+        let rows = try await durableImportedMetrics()
+        XCTAssertTrue(rows.isEmpty)
+        XCTAssertTrue(completedOwners.isEmpty)
+        XCTAssertEqual(syncTriggers, 0)
+    }
+
+    func testHistoryGateOffDoesNotQueryEarliestBodyFat() async throws {
+        let weightDate = Date().addingTimeInterval(-5 * 86_400)
+        var starts: [Date] = []
+        let importer = manager(
+            earliestQuery: { weightDate },
+            earliestBodyFatQuery: { XCTFail("Gate-off must not issue an earliest-BF query"); return nil },
+            bodyFatQuery: { start in await MainActor.run { starts.append(start) }; return [] }
+        )
+        let completed = await importer.syncAllHistoricalHealthKitData()
+        XCTAssertTrue(completed)
+        XCTAssertEqual(starts, [weightDate])
+        let rows = try await durableImportedMetrics()
+        XCTAssertTrue(rows.isEmpty)
+    }
+
+    func testHistoryEarliestBodyFatErrorDoesNotMarkComplete() async throws {
+        let importer = manager(
+            earliestQuery: { Date() },
+            earliestBodyFatQuery: { throw NSError(domain: "SyntheticHistory", code: 1) },
+            bodyFatQuery: { _ in XCTFail("Failed earliest query must not start batches"); return [] },
+            bodyFatOnlyEnabled: true
+        )
+        let scheduled = await importer.triggerFullHealthKitSyncIfNeeded(imported: 0)
+        let task = try XCTUnwrap(scheduled)
+        await task.value
+        XCTAssertFalse(defaults.bool(forKey: HealthKitDefaultsKey.fullSyncCompleted.scoped(with: "synthetic-health-A")))
+        XCTAssertFalse(importer.isImporting)
+        let rows = try await durableImportedMetrics()
+        XCTAssertTrue(rows.isEmpty)
+    }
+
+    private func assertEarliestBodyFatReplacementRejects(_ subject: String) async throws {
+        let gate = HeldWeightImportQuery()
+        let fatDate = Date().addingTimeInterval(-5 * 86_400)
+        let importer = manager(
+            earliestQuery: { Date() }, earliestBodyFatQuery: { _ = await gate.fetch(); return fatDate },
+            bodyFatQuery: { _ in XCTFail("Stale earliest query must not start batches"); return [] },
+            bodyFatOnlyEnabled: true
+        )
+        let scheduled = await importer.triggerFullHealthKitSyncIfNeeded(imported: 0)
+        let task = try XCTUnwrap(scheduled)
+        defer { gate.complete([]) }
+        await waitForWeightQuery(gate)
+        setAccount(subject)
+        gate.complete([])
+        await task.value
+        XCTAssertFalse(defaults.bool(forKey: HealthKitDefaultsKey.fullSyncCompleted.scoped(with: "synthetic-health-A")))
+        XCTAssertTrue(completedOwners.isEmpty)
+        XCTAssertEqual(syncTriggers, 0)
+        let rows = try await durableImportedMetrics()
+        XCTAssertTrue(rows.isEmpty)
+    }
+
+    func testHeldEarliestBodyFatCannotStartBatchesAfterSameSubjectReplacement() async throws {
+        try await assertEarliestBodyFatReplacementRejects("synthetic-health-A")
+    }
+
+    func testHeldEarliestBodyFatCannotStartBatchesAfterDifferentSubjectReplacement() async throws {
+        try await assertEarliestBodyFatReplacementRejects("synthetic-health-B")
+    }
+
+    func testCancelledEarliestBodyFatCannotStartBatchesAndReleasesOwnImport() async throws {
+        let gate = HeldWeightImportQuery()
+        let fatDate = Date().addingTimeInterval(-5 * 86_400)
+        let importer = manager(
+            earliestQuery: { Date() }, earliestBodyFatQuery: { _ = await gate.fetch(); return fatDate },
+            bodyFatQuery: { _ in XCTFail("Cancelled earliest query must not start batches"); return [] },
+            bodyFatOnlyEnabled: true
+        )
+        let task = Task { await importer.syncAllHistoricalHealthKitData() }
+        defer { gate.complete([]) }
+        await waitForWeightQuery(gate)
+        task.cancel()
+        gate.complete([])
+        let completed = await task.value
+        XCTAssertFalse(completed)
+        XCTAssertFalse(importer.isImporting)
+        XCTAssertNil(importer.historicalImportOperation)
+        XCTAssertTrue(completedOwners.isEmpty)
+        XCTAssertEqual(syncTriggers, 0)
+        let rows = try await durableImportedMetrics()
+        XCTAssertTrue(rows.isEmpty)
+    }
+
+    func testHistoryKeepsAdmittedBodyFatPolicyAcrossEarliestQueryAwait() async throws {
+        var gateEnabled = true
+        var gateReads = 0
+        let fat = datedHistoryBodyFat(Date().addingTimeInterval(-5 * 86_400))
+        let importer = manager(
+            earliestQuery: { Date() },
+            earliestBodyFatQuery: {
+                await MainActor.run { gateEnabled = false }
+                return fat.date
+            },
+            bodyFatQuery: { start in [fat].filter { $0.date >= start } },
+            bodyFatPolicy: { gateReads += 1; return gateEnabled }
+        )
+        let completed = await importer.syncAllHistoricalHealthKitData()
+        XCTAssertTrue(completed)
+        XCTAssertFalse(gateEnabled)
+        XCTAssertEqual(gateReads, 1)
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.sourceMetadata, fat.sourceMetadata)
+        XCTAssertNil(rows.first?.weight)
+    }
+
+    func testHistoryBatchUpperBoundExcludesFutureBodyFatUntilItsBatch() async throws {
+        let now = Date()
+        let early = datedHistoryBodyFat(now.addingTimeInterval(-100 * 86_400), id: "range-early")
+        let later = datedHistoryBodyFat(now.addingTimeInterval(-5 * 86_400), id: "range-later")
+        let importer = manager(
+            bodyFatQuery: { start in [early, later].filter { $0.date >= start } }, bodyFatOnlyEnabled: true
+        )
+        let result = try await importer.processHistoricalHealthKitBatches(
+            earliestDate: now.addingTimeInterval(-120 * 86_400), endDate: now
+        )
+        XCTAssertEqual(result.imported, 2)
+        XCTAssertEqual(result.skipped, 0)
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(Set(rows.compactMap { $0.sourceMetadata?.sampleId }), ["range-early", "range-later"])
+        XCTAssertTrue(rows.allSatisfy { $0.weight == nil })
+    }
+
     private func metric() -> BodyMetrics {
         let date = Date()
         return BodyMetrics(
@@ -1030,5 +1292,164 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         XCTAssertFalse(succeeded)
         XCTAssertEqual(queries, 0)
         XCTAssertFalse(manager.isImporting)
+    }
+
+    func testSmartScaleRefreshDeniesWithoutReadingWhenUnauthorized() async {
+        let probe = SmartScaleQueryProbe()
+        let manager = smartScaleManager(probe)
+        manager.isAuthorized = false
+        let result = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(result, .denied)
+        XCTAssertEqual(probe.calls, 0)
+        let rows = try? await durableImportedMetrics()
+        XCTAssertEqual(rows?.isEmpty, true)
+    }
+
+    func testSmartScaleRefreshSkipsDuplicateSampleUpdates() async throws {
+        let probe = SmartScaleQueryProbe()
+        let manager = smartScaleManager(probe)
+        let date = Date()
+        let sample = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "scale-weight-1", kind: .weight, value: 81.4, date: date, sourceName: "Withings"
+        ))
+        try await coreData.saveBodyMetricsAndWait(storedSmartScaleMetric(sample), userId: "synthetic-health-A")
+        probe.result.samples = [sample]
+        let result = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(result.outcome, .refreshed)
+        XCTAssertEqual(result.imported, 0)
+        XCTAssertEqual(result.skippedDuplicates, 1)
+        XCTAssertEqual(probe.calls, 1)
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, 1)
+    }
+
+    func testSmartScaleRefreshKeepsBackdatedSampleDateAndSource() async throws {
+        let probe = SmartScaleQueryProbe()
+        let manager = smartScaleManager(probe)
+        var parts = DateComponents()
+        parts.year = 2_018
+        parts.month = 3
+        parts.day = 4
+        parts.hour = 7
+        parts.minute = 15
+        let backdated = try XCTUnwrap(Calendar.current.date(from: parts))
+        let sample = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "scale-backdated", kind: .weight, value: 79.2, date: backdated, sourceName: "Withings"
+        ))
+        probe.result.samples = [sample]
+        probe.result.anchors = HealthKitSmartScaleAnchors(weight: Data([1, 2, 3]), bodyFat: nil)
+        let result = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(result.imported, 1)
+        let rows = try await durableImportedMetrics()
+        let row = try XCTUnwrap(rows.first)
+        XCTAssertEqual(row.date.timeIntervalSince1970, backdated.timeIntervalSince1970, accuracy: 1)
+        XCTAssertFalse(Calendar.current.isDateInToday(row.date))
+        XCTAssertEqual(row.dataSource, BodyMetricSource.healthKit.rawValue)
+        XCTAssertEqual(HomeV2Provenance.detailedLabel(for: row, field: .weight), "Withings via Apple Health")
+        XCTAssertEqual(
+            defaults.data(forKey: HealthKitDefaultsKey.smartScaleWeightAnchor.scoped(with: "synthetic-health-A")),
+            Data([1, 2, 3])
+        )
+        probe.result.samples = [sample]
+        let repeatResult = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(repeatResult.skippedDuplicates, 1)
+        XCTAssertEqual(repeatResult.imported, 0)
+        let stored = try await durableImportedMetrics()
+        XCTAssertEqual(stored.count, 1)
+    }
+
+    func testSmartScaleRefreshSkipsManualAndDexaMatches() async throws {
+        let probe = SmartScaleQueryProbe()
+        let manager = smartScaleManager(probe)
+        let day = try XCTUnwrap(
+            Calendar.current.date(from: DateComponents(year: 2_024, month: 6, day: 2, hour: 8))
+        )
+        try await coreData.saveBodyMetricsAndWait(
+            reading(source: .manual, date: day, weight: 80, bodyFat: nil), userId: "synthetic-health-A"
+        )
+        try await coreData.saveBodyMetricsAndWait(
+            reading(source: .bodySpecDexa, date: day, weight: nil, bodyFat: 18.4), userId: "synthetic-health-A"
+        )
+        let weight = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "scale-same-day-weight", kind: .weight, value: 80.05, date: day.addingTimeInterval(3_600),
+            sourceName: "Withings"
+        ))
+        let fat = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "scale-same-day-fat", kind: .bodyFat, value: 18.5, date: day.addingTimeInterval(3_600),
+            sourceName: "Withings"
+        ))
+        probe.result.samples = [weight, fat]
+        let result = await manager.performSmartScaleRefresh()
+        XCTAssertEqual(result.imported, 0)
+        XCTAssertEqual(result.skippedCovered, 2)
+        let rows = try await durableImportedMetrics()
+        XCTAssertEqual(rows.count, 2)
+    }
+
+    func testSmartScalePolicyKeepsADistinctSameDayReading() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let morning = Date(timeIntervalSince1970: 1_700_000_000)
+        let existing = HealthKitSmartScaleSyncPolicy.Existing(
+            source: .manual, date: morning, weightKg: 80, bodyFatPercent: nil,
+            weightSampleId: nil, bodyFatSampleId: nil
+        )
+        let different = try XCTUnwrap(HealthKitSmartScaleSyncPolicy.makeSample(
+            sampleId: "later-weigh-in", kind: .weight, value: 82.4,
+            date: morning.addingTimeInterval(3_600), sourceName: "Renpho"
+        ))
+        let admissions = HealthKitSmartScaleSyncPolicy.reconcile(
+            authorized: true, samples: [different], existing: [existing], calendar: calendar
+        )
+        XCTAssertEqual(admissions, [.imported(different)])
+        XCTAssertEqual(HealthKitSmartScaleSyncPolicy.attribution(sourceName: "Renpho"), "Renpho via Apple Health")
+        XCTAssertFalse(HealthKitSmartScaleSyncPolicy.isEnabled { _ in false })
+        XCTAssertEqual(HealthKitSmartScaleSyncPolicy.gateKey, "healthkit_smart_scale_sync_v1")
+    }
+
+    private func smartScaleManager(_ probe: SmartScaleQueryProbe) -> HealthKitManager {
+        let manager = manager()
+        manager.smartScaleSyncEnabled = { true }
+        manager.smartScaleSampleQuery = { anchors in try await probe.fetch(anchors) }
+        return manager
+    }
+
+    private func storedSmartScaleMetric(_ sample: HealthKitSmartScaleSyncPolicy.Sample) -> BodyMetrics {
+        BodyMetrics(
+            id: UUID().uuidString, userId: "synthetic-health-A", date: sample.date,
+            weight: sample.value, weightUnit: "kg", bodyFatPercentage: nil, bodyFatMethod: nil,
+            muscleMass: nil, boneMass: nil, notes: nil, photoUrl: nil,
+            dataSource: BodyMetricSource.healthKit.rawValue,
+            sourceMetadata: BodyMetricSourceMetadata(
+                vendor: "apple_health", sourceName: sample.sourceName, sampleId: sample.sampleId,
+                quantityType: HKQuantityTypeIdentifier.bodyMass.rawValue
+            ),
+            createdAt: sample.date, updatedAt: sample.date
+        )
+    }
+
+    private func reading(
+        source: BodyMetricSource, date: Date, weight: Double?, bodyFat: Double?
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: UUID().uuidString, userId: "synthetic-health-A", date: date,
+            weight: weight, weightUnit: "kg", bodyFatPercentage: bodyFat,
+            bodyFatMethod: bodyFat == nil ? nil : "DEXA", muscleMass: nil, boneMass: nil,
+            notes: nil, photoUrl: nil, dataSource: source.rawValue,
+            createdAt: date, updatedAt: date
+        )
+    }
+}
+
+private final class SmartScaleQueryProbe: @unchecked Sendable {
+    var calls = 0
+    var result = HealthKitSmartScaleQueryResult(samples: [], anchors: HealthKitSmartScaleAnchors())
+    var error: Error?
+
+    func fetch(_ anchors: HealthKitSmartScaleAnchors) async throws -> HealthKitSmartScaleQueryResult {
+        calls += 1
+        _ = anchors
+        if let error { throw error }
+        return result
     }
 }

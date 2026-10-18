@@ -217,7 +217,7 @@ final class ChaosEdgeCaseUITests: XCTestCase {
             } else {
                 XCTAssertFalse(
                     saveButton.isEnabled,
-                    "Body fat '\(value)%' is out of the valid 3-60% range and must not be saveable."
+                    "Body fat '\(value)%' is outside the supported body-fat range and must not be saveable."
                 )
             }
         }

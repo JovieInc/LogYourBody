@@ -600,8 +600,9 @@ private struct PaidWeightLoggerMVPView: View {
 
         isLoading = true
         let cachedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
-        recentMetrics = cachedMetrics
-            .compactMap { $0.toBodyMetrics() }
+        let metrics = await CachedBodyMetrics.bodyMetricsInBatches(from: cachedMetrics)
+        guard authManager.currentUser?.id == userId else { return }
+        recentMetrics = metrics
             .filter { $0.weight != nil }
             .sorted { $0.date > $1.date }
         exportFileURL = nil
@@ -902,6 +903,12 @@ struct ChatTabView: View {
                 VoiceSetReviewView(session: session, heard: heard) { proposal in
                     commitVoiceSet(proposal)
                 }
+            case .canvas(let ownership):
+                MesocycleCanvasScreen(
+                    ownership: ownership,
+                    isCurrentAccount: { authManager.ownsAccountSession(ownership) },
+                    accessToken: { await chatAccessToken() }
+                )
             }
         }
     }
@@ -1171,6 +1178,10 @@ struct ChatTabView: View {
         TrainingCoachPolicy.isEnabled { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
     }
 
+    private var canvasEnabled: Bool {
+        MesocycleCanvasPolicy.isEnabled { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+    }
+
     private var voiceCoachEnabled: Bool {
         trainingCoachEnabled && VoiceCoachPolicy.isEnabled {
             AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0)
@@ -1210,6 +1221,16 @@ struct ChatTabView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .accessibilityIdentifier("training_error_card")
+        }
+        if canvasEnabled {
+            Button("Open week plan") {
+                guard let ownership = authManager.captureAccountSession() else { return }
+                trainingPresentation = .canvas(ownership)
+            }
+                .buttonStyle(.plain)
+                .font(.system(size: 15, weight: .semibold))
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .accessibilityIdentifier("training_open_canvas")
         }
     }
 

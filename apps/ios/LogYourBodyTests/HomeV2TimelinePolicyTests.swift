@@ -170,12 +170,206 @@ final class HomeV2TimelinePolicyTests: XCTestCase {
         }
     }
 
-    func testOverflowingDisplayConversionUsesMissingTrendCopy() throws {
+    func testMeasuredBodyFatWinsAndKeepsItsOwnFFMI() {
+        let selected = entry("today", day: 7, weight: 82.1, bodyFat: 15.8, method: "manual")
+        let history = [entry("older", day: 0, bodyFat: 10, method: "manual"), selected,
+                       entry("newer", day: 14, bodyFat: 30, method: "manual")]
+        let moment = HomeV2SelectedMomentPolicy.presentation(for: selected, in: history)
+        XCTAssertEqual(moment.kind, .measured)
+        XCTAssertEqual(moment.sentence, HomeV2TimelinePolicy.bodyFatSentence(for: selected))
+        XCTAssertFalse(moment.sentence.contains("Inferred"))
+        XCTAssertEqual(HomeV2SelectedMomentPolicy.sentence(for: selected, in: history), moment.sentence)
+        XCTAssertEqual(
+            HomeV2SelectedMomentPolicy.displayFFMI(for: selected, in: history, owner: "owner", heightCm: 178),
+            HomeV2EditorialPolicy.ffmi(in: selected, owner: "owner", heightCm: 178)
+        )
+    }
+
+    func testBracketedBodyFatIsTimeWeightedLabeledAndNotStored() throws {
+        let older = entry("older", day: 0, weight: 84, bodyFat: 16.9, method: "bodyspec_dexa")
+        let selected = entry("selected", day: 7, weight: 83.4)
+        let newer = entry("newer", day: 14, weight: 82.8, bodyFat: 16.2, method: "healthkit")
+        let history = [newer, selected, older]
+        let moment = HomeV2SelectedMomentPolicy.presentation(for: selected, in: history)
+        XCTAssertEqual(moment.kind, .inferred)
+        XCTAssertEqual(moment.sentence, "Inferred body fat 16.6%.")
+        XCTAssertEqual(moment.percentage ?? 0, 16.55, accuracy: 0.0001)
+        XCTAssertNil(selected.bodyFatPercentage)
+        XCTAssertEqual(moment.older?.id, "older")
+        XCTAssertEqual(moment.newer?.id, "newer")
+        let ffmi = try XCTUnwrap(HomeV2SelectedMomentPolicy.displayFFMI(
+            for: selected, in: history, owner: "owner", heightCm: 178
+        ))
+        XCTAssertEqual(String(format: "%.1f", ffmi), "22.1")
+        XCTAssertNil(HomeV2SelectedMomentPolicy.displayFFMI(
+            for: selected, in: history, owner: "other", heightCm: 178
+        ))
+        XCTAssertNil(HomeV2SelectedMomentPolicy.displayFFMI(
+            for: selected, in: history, owner: "owner", heightCm: nil
+        ))
+        let detail = try XCTUnwrap(HomeV2MetricEditorial.timelineProvenance(
+            for: selected, in: history, heightCm: 178
+        ))
+        XCTAssertEqual(detail.chip, "Inferred")
+        XCTAssertTrue(detail.body.contains("Weight is from"))
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        for token in [formatter.string(from: older.date), formatter.string(from: newer.date),
+                      "16.90 %", "16.20 %", "From your DEXA scan", "From Apple Health", "178"] {
+            XCTAssertTrue(detail.body.contains(token), token)
+        }
+        let fractional = HomeV2SelectedMomentPolicy.provenanceSentence(for: moment, heightCm: 178.4)
+        XCTAssertTrue(fractional.contains("178.4"))
+        XCTAssertTrue(HomeV2SelectedMomentPolicy.provenanceSentence(for: moment, heightCm: nil).contains("not recorded"))
+        XCTAssertTrue(
+            HomeV2SelectedMomentPolicy.provenanceSentence(for: moment, heightCm: .nan).contains("not recorded")
+        )
+        let missing = HomeV2SelectedMomentPolicy.presentation(for: entry("none", day: 1), in: [])
+        XCTAssertEqual(
+            HomeV2SelectedMomentPolicy.provenanceSentence(for: missing, heightCm: 178), missing.sentence
+        )
+    }
+
+    func testBodyFatStopsAtBracketsAndIgnoresForeignOrSyntheticAnchors() {
+        let older = entry("older", day: 0, bodyFat: 10, method: "manual")
+        let second = entry("second", day: 10, bodyFat: 30, method: "manual")
+        let after = entry("after", day: 20, weight: 80)
+        let history = [older, second, after]
+        let lastKnown = HomeV2SelectedMomentPolicy.presentation(for: after, in: history)
+        XCTAssertEqual(lastKnown.kind, .lastKnown)
+        XCTAssertTrue(lastKnown.sentence.contains("30"))
+        XCTAssertFalse(lastKnown.sentence.contains("Inferred"))
+        XCTAssertFalse(lastKnown.sentence.contains("50"))
+        XCTAssertNil(HomeV2SelectedMomentPolicy.displayFFMI(
+            for: after, in: history, owner: "owner", heightCm: 178
+        ))
+        let detail = HomeV2MetricEditorial.timelineProvenance(for: after, in: history, heightCm: 178)
+        XCTAssertNotEqual(detail?.chip, "Inferred")
+        XCTAssertTrue(detail?.body.contains("Last known") == true)
+        XCTAssertFalse(detail?.body.contains("Inferred") == true)
+
+        let before = entry("before", day: -5)
+        let futureOnly = [before, entry("later", day: 30, bodyFat: 21, method: "manual")]
+        let unavailable = HomeV2SelectedMomentPolicy.presentation(for: before, in: futureOnly)
+        XCTAssertEqual(unavailable.kind, .unavailable)
+        XCTAssertEqual(unavailable.sentence, "Body fat not logged for this day.")
+
+        let wide = HomeV2SelectedMomentPolicy.presentation(
+            for: entry("middle", day: 50, weight: 80),
+            in: [entry("early", day: 0, bodyFat: 10, method: "manual"),
+                 entry("late", day: 100, bodyFat: 20, method: "manual")]
+        )
+        XCTAssertEqual(wide.kind, .inferred)
+        XCTAssertEqual(wide.sentence, "Inferred body fat 15.0%.")
+        let flagged = HomeV2SelectedMomentPolicy.presentation(
+            for: entry("between", day: 7, weight: 83.4),
+            in: [entry("low", day: 0, weight: 1, bodyFat: 10, method: "manual"),
+                 entry("high", day: 14, weight: 1, bodyFat: 20, method: "manual")]
+        )
+        XCTAssertEqual(flagged.kind, .inferred)
+        XCTAssertEqual(flagged.sentence, "Inferred body fat 15.0%.")
+
+        let selected = entry("selected", day: 10, weight: 80)
+        let synthetic = entry("synthetic", day: 8, bodyFat: 50, method: "interpolated estimate")
+        let twin = entry("twin", day: 10, bodyFat: 12, method: "manual")
+        let foreign = entry("foreign", day: 9, owner: "other", bodyFat: 40, method: "manual")
+        let later = entry("later", day: 20, bodyFat: 20, method: "manual")
+        let bracket = HomeV2SelectedMomentPolicy.presentation(
+            for: selected, in: [older, synthetic, foreign, twin, selected, later]
+        )
+        XCTAssertEqual(bracket.kind, .inferred)
+        XCTAssertEqual(bracket.older?.id, "older")
+        XCTAssertEqual(bracket.newer?.id, "later")
+        XCTAssertFalse(bracket.sentence.contains("50"))
+        XCTAssertFalse(bracket.sentence.contains("12"))
+        let alone = HomeV2SelectedMomentPolicy.presentation(for: selected, in: [selected, twin])
+        XCTAssertEqual(alone.kind, .unavailable)
+    }
+
+    func testInterpolationRejectsFlatSpansEdgesAndNonFiniteValues() {
+        let start = Date(timeIntervalSince1970: 0)
+        let end = Date(timeIntervalSince1970: 86_400)
+        XCTAssertNil(HomeV2SelectedMomentPolicy.interpolatedBodyFat(
+            olderDate: start, olderValue: 10, newerDate: start, newerValue: 20, at: start
+        ))
+        XCTAssertNil(HomeV2SelectedMomentPolicy.interpolatedBodyFat(
+            olderDate: start, olderValue: 10, newerDate: end, newerValue: 20, at: start
+        ))
+        XCTAssertNil(HomeV2SelectedMomentPolicy.interpolatedBodyFat(
+            olderDate: start, olderValue: 10, newerDate: end, newerValue: 20, at: end
+        ))
+        XCTAssertNil(HomeV2SelectedMomentPolicy.interpolatedBodyFat(
+            olderDate: start, olderValue: 0, newerDate: end, newerValue: 0, at: start.addingTimeInterval(43_200)
+        ))
+        XCTAssertNil(HomeV2SelectedMomentPolicy.interpolatedBodyFat(
+            olderDate: start, olderValue: .nan, newerDate: end, newerValue: 20, at: start.addingTimeInterval(43_200)
+        ))
+        let older = entry("older", day: 0, bodyFat: 10, method: "manual")
+        let newer = entry("newer", day: 0, bodyFat: 20, method: "manual")
+        let reading = HomeV2EditorialPolicy.BodyFatReading(percentage: 10, caption: "Entered by you")
+        XCTAssertNil(HomeV2SelectedMomentPolicy.inferredPresentation(
+            selected: entry("selected", day: 0),
+            older: HomeV2SelectedMomentPolicy.Anchor(metric: older, reading: reading),
+            newer: HomeV2SelectedMomentPolicy.Anchor(metric: newer, reading: reading)
+        ))
+    }
+
+    func testNearestPhotoKeepsItsOwnCaptureAndBreaksTiesTowardNewerThenSmallerId() {
+        let selected = entry("selected", day: 10)
+        let nearer = entry("near", day: 11, photo: "file:///near.jpg")
+        let farther = entry("far", day: 0, photo: "file:///far.jpg")
+        XCTAssertEqual(
+            HomeV2SelectedMomentPolicy.displayPhoto(for: selected, in: [selected, nearer, farther])?.id, "near"
+        )
+        let olderTie = entry("older-tie", day: 8, photo: "file:///older.jpg")
+        let newerTie = entry("newer-tie", day: 12, photo: "file:///newer.jpg")
+        XCTAssertEqual(
+            HomeV2SelectedMomentPolicy.displayPhoto(for: selected, in: [olderTie, newerTie])?.id, "newer-tie"
+        )
+        let lowId = entry("a", day: 10, photo: "file:///a.jpg")
+        let highId = entry("b", day: 10, photo: "file:///b.jpg")
+        XCTAssertEqual(
+            HomeV2SelectedMomentPolicy.displayPhoto(for: selected, in: [highId, lowId])?.id, "a"
+        )
+        let own = entry("own", day: 10, photo: "file:///own.jpg")
+        XCTAssertEqual(HomeV2SelectedMomentPolicy.displayPhoto(for: own, in: [own, nearer])?.id, "own")
+        let blank = entry("blank", day: 10, photo: "   ")
+        let foreign = entry("foreign", day: 10, owner: "other", photo: "file:///foreign.jpg")
+        XCTAssertEqual(
+            HomeV2SelectedMomentPolicy.displayPhoto(for: selected, in: [blank, foreign, farther])?.id, "far"
+        )
+        XCTAssertNil(HomeV2SelectedMomentPolicy.displayPhoto(for: selected, in: [selected, blank]))
+        let withPhoto = HomeV2TimelinePolicy.Snapshot(metrics: [selected, nearer], owner: "owner")
+        XCTAssertEqual(withPhoto.photoCaptionDate(for: selected).id, "near")
+        let bare = entry("bare", day: 3)
+        let withoutPhoto = HomeV2TimelinePolicy.Snapshot(metrics: [bare], owner: "owner")
+        XCTAssertEqual(withoutPhoto.photoCaptionDate(for: bare).id, "bare")
+    }
+
+    func testAnchorOrderUsesTheLaterBoundaryThenTheSmallerIdentifier() {
+        let selected = entry("selected", day: 10, weight: 80)
+        let earlyHigh = entry("b", day: 0, bodyFat: 10, method: "manual")
+        let earlyLow = entry("a", day: 0, bodyFat: 12, method: "manual")
+        let laterOlder = entry("c", day: 5, bodyFat: 20, method: "manual")
+        let newerHigh = entry("z", day: 20, bodyFat: 30, method: "manual")
+        let newerLow = entry("m", day: 20, bodyFat: 40, method: "manual")
+        let distant = entry("q", day: 30, bodyFat: 50, method: "manual")
+        let moment = HomeV2SelectedMomentPolicy.presentation(
+            for: selected, in: [earlyHigh, earlyLow, laterOlder, selected, newerHigh, newerLow, distant]
+        )
+        XCTAssertEqual(moment.older?.id, "c")
+        XCTAssertEqual(moment.newer?.id, "m")
+        XCTAssertEqual(moment.kind, .inferred)
+    }
+
+    func testUnsupportedWeightsUseMissingTrendCopy() {
         let first = entry("first", day: 0, weight: 1)
         let latest = entry("latest", day: 1, weight: Double.greatestFiniteMagnitude)
         let snapshot = HomeV2TimelinePolicy.Snapshot(metrics: [latest, first], owner: "owner")
         let id = HomeV2TimelinePolicy.EntryID(latest)
-        XCTAssertTrue(try XCTUnwrap(snapshot.weightDeltaKilograms30d(for: id)).isFinite)
+        XCTAssertNil(snapshot.weightDeltaKilograms30d(for: id))
         XCTAssertEqual(snapshot.weightChangeSentence(for: id, system: .imperial), "No 30-day trend yet")
     }
 

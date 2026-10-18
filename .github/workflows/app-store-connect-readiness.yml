@@ -1,0 +1,57 @@
+name: App Store Connect Readiness (Read Only)
+
+# Readback for App Store 1.2.0. GET requests only. Red table rows are a
+# completed readback with a named Tim-only follow-up; they do not submit,
+# attach a build, or write metadata.
+# Push and the daily schedule start the same job. workflow_dispatch remains
+# for a token that has actions:write. workflow_run reads again after the
+# metadata sync finishes, so this check does not race the deliver write.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/app-store-connect-readiness.yml
+      - .github/scripts/app-store-readiness.mjs
+      - .github/scripts/app-store-readiness.test.mjs
+      - apps/ios/fastlane/metadata/**
+      - apps/ios/fastlane/storefront-manifest.generated.json
+  schedule:
+    - cron: '0 16 * * *'
+  workflow_run:
+    workflows: ["App Store Metadata Sync"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: app-store-connect-readiness
+  cancel-in-progress: false
+
+jobs:
+  readiness:
+    name: Read App Store 1.2.0 Readiness
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Test the read-only report
+        run: node --test .github/scripts/app-store-readiness.test.mjs
+
+      - name: Read readiness and write pass/fail table
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: node .github/scripts/app-store-readiness.mjs

@@ -114,9 +114,21 @@ extension DashboardViewLiquid {
         .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
             homeV2AllPhotosFromHome
         }
-        .sheet(item: $homeV2EditingMetric) { metric in
-            homeV2EditEntrySheet(for: metric)
+        .sheet(item: $homeV2EditingSession) { session in
+            homeV2EditEntrySheet(for: session)
+                #if DEBUG
+                .onAppear { recordHomeEditTransition("sheet.appear") }
+                .onDisappear { recordHomeEditTransition("sheet.disappear") }
+                #endif
         }
+        #if DEBUG
+        .onChange(of: homeV2EditingSession?.id) { _, _ in
+            recordHomeEditTransition("item.changed")
+        }
+        .onChange(of: isHomeV2ContextPresented) { _, _ in
+            recordHomeEditTransition("context.changed")
+        }
+        #endif
         .navigationDestination(isPresented: $isHomeV2ContextPresented) {
             homeV2ContextView
         }

@@ -3,6 +3,7 @@
 // LogYourBody
 //
 import XCTest
+import UIKit
 
 final class LogYourBodyUITests: XCTestCase {
     override func setUpWithError() throws {
@@ -2291,6 +2292,269 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "home-v2-day-zero", from: app)
     }
 
+    func testHomeV2ManualCorrectionKeepsImportedSiblingAndUndoSource() throws {
+        let app = XCUIApplication()
+        app.forwardActualXCTestContext()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2ImportedCorrectionFixture"
+        ])
+        let context = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(context.waitForExistence(timeout: 30))
+        context.tap()
+        let weight = app.descendants(matching: .any)["home_v2_context_row_weight"]
+        let fat = app.descendants(matching: .any)["home_v2_context_row_body_fat"]
+        XCTAssertTrue(weight.waitForExistence(timeout: 8))
+        XCTAssertTrue(fat.waitForExistence(timeout: 8))
+        XCTAssertTrue(weight.label.contains("Apple Health"), weight.label)
+        XCTAssertTrue(fat.label.contains("Apple Health"), fat.label)
+        let originalWeight = weight.label
+        let originalFat = fat.label
+        attachScreenshot(named: "field-provenance-imported", from: app)
+        app.buttons["home_v2_edit_entry"].tap()
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 8))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+        let typed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "Typed"), object: weight
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [typed], timeout: 8), .completed)
+        XCTAssertFalse(weight.label.contains("Apple Health"), weight.label)
+        XCTAssertEqual(fat.label, originalFat, "Untouched body fat retains its imported source and raw display")
+        attachScreenshot(named: "field-provenance-mixed-after-edit", from: app)
+        app.buttons["home_v2_context_close"].tap()
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 8))
+        undo.tap()
+        XCTAssertTrue(context.waitForExistence(timeout: 8))
+        context.tap()
+        XCTAssertTrue(weight.waitForExistence(timeout: 8))
+        XCTAssertEqual(weight.label, originalWeight)
+        XCTAssertEqual(fat.label, originalFat)
+        attachScreenshot(named: "field-provenance-restored-after-undo", from: app)
+    }
+
+
+    func testBodyFatEditorPreservesMissingWeightAndRecoversFromValidation() throws {
+        let app = openBodyFatEditor(photoOnly: true)
+        let weight = app.textFields["home_v2_log_sheet_value"]
+        let fat = app.textFields["home_v2_log_sheet_body_fat"]
+        XCTAssertEqual(weight.value as? String, "Add")
+        XCTAssertLessThan(fat.frame.maxY, weight.frame.minY, "Body fat leads the generic editor")
+        XCTAssertFalse(app.buttons["home_v2_log_sheet_photo_side"].exists)
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_photo_front"].exists)
+        attachScreenshot(named: "body-fat-editor-missing-weight", from: app)
+        fat.tap()
+        fat.typeText("77")
+        app.buttons["home_v2_edit_done_editing"].tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+        let error = app.staticTexts["home_v2_log_sheet_error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["home_v2_log_sheet_body_fat"].exists)
+        attachScreenshot(named: "body-fat-editor-invalid", from: app)
+        fat.tap()
+        fat.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2) + "18.4")
+        XCTAssertTrue(error.waitForNonExistence(timeout: 5), "Editing the rejected field clears its stale message")
+        app.buttons["home_v2_edit_done_editing"].tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+        let edit = app.buttons["home_v2_edit_entry"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context_row_weight"].exists)
+        let savedFat = app.descendants(matching: .any)["home_v2_context_row_body_fat"]
+        XCTAssertTrue(savedFat.waitForExistence(timeout: 5))
+        XCTAssertTrue(savedFat.label.contains("18.4"), savedFat.label)
+        app.buttons["home_v2_context_close"].tap()
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 8))
+        undo.tap()
+        app.buttons["home_v2_context_button"].tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context_row_weight"].exists)
+        XCTAssertFalse(savedFat.exists, "Undo restores the original photo-only record")
+    }
+
+    func testBodyFatEditorLargestTextKeepsFocusedMetricAndDoneVisible() throws {
+        let app = openBodyFatEditor(photoOnly: true, largestText: true)
+        let fat = app.textFields["home_v2_log_sheet_body_fat"]
+        let scroll = app.scrollViews["home_v2_edit_content_scroll"]
+        for _ in 0..<3 where !fat.isHittable { scroll.swipeUp() }
+        XCTAssertTrue(fat.isHittable)
+        fat.tap()
+        fat.typeText("77")
+        let done = app.buttons["home_v2_edit_done_editing"]
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        let label = app.staticTexts["home_v2_edit_body_fat_label"]
+        let unit = app.staticTexts["home_v2_edit_body_fat_unit"]
+        let focused = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            scroll.frame.contains(label.frame) && scroll.frame.contains(fat.frame) && scroll.frame.contains(unit.frame)
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [focused], timeout: 5), .completed,
+                       "The complete focused metric must fit above the dock: \(scroll.frame), \(label.frame), \(fat.frame), \(unit.frame)")
+        XCTAssertTrue(done.isHittable)
+        XCTAssertFalse(app.buttons["home_v2_log_sheet_save"].exists)
+        attachScreenshot(named: "body-fat-editor-ax5-focused", from: app)
+        done.tap()
+        let save = app.buttons["home_v2_log_sheet_save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertTrue(save.isHittable)
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_delete"].isHittable)
+        let restoredHeader = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let date = app.staticTexts["home_v2_edit_date_text"]
+            let title = app.staticTexts["home_v2_log_sheet"]
+            return scroll.frame.contains(date.frame) && scroll.frame.contains(title.frame)
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [restoredHeader], timeout: 5), .completed,
+                       "Done editing restores the complete recorded date and title above the anchored actions")
+        attachScreenshot(named: "body-fat-editor-ax5-after-done", from: app)
+        save.tap()
+        let error = app.staticTexts["home_v2_log_sheet_error"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        let visibleError = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            error.isHittable && scroll.frame.contains(error.frame)
+        }, object: nil)
+        let visibility = XCTWaiter.wait(for: [visibleError], timeout: 5)
+        attachScreenshot(named: "body-fat-editor-ax5-invalid", from: app)
+        XCTAssertEqual(visibility, .completed, "A rejected save must reveal its complete validation message")
+        let title = app.staticTexts["home_v2_log_sheet"]
+        for _ in 0..<3 where !title.isHittable { scroll.swipeDown() }
+        XCTAssertTrue(title.isHittable)
+        save.tap()
+        let repeatedError = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            error.isHittable && scroll.frame.contains(error.frame)
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [repeatedError], timeout: 5), .completed,
+                       "An unchanged rejected value must reveal its error on every save attempt")
+        for _ in 0..<3 where !fat.isHittable { scroll.swipeDown() }
+        fat.tap()
+        fat.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 2) + "18.4")
+        app.buttons["home_v2_edit_done_editing"].tap()
+        save.tap()
+        XCTAssertTrue(app.buttons["home_v2_edit_entry"].waitForExistence(timeout: 8))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context_row_weight"].exists)
+    }
+
+    func testBodyFatEditorImportedCorrectionAndDeleteCancelPreserveSource() throws {
+        let app = openBodyFatEditor()
+        let date = app.staticTexts["home_v2_edit_date_text"].label
+        attachScreenshot(named: "body-fat-editor-imported-before-confirmation", from: app)
+        app.buttons["home_v2_log_sheet_delete"].tap()
+        let cancel = app.buttons.matching(identifier: "home_v2_log_sheet_delete_cancel").firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        XCTAssertTrue(cancel.isHittable)
+        XCTAssertTrue(app.frame.contains(cancel.frame))
+        cancel.tap()
+        XCTAssertTrue(app.alerts.firstMatch.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["home_v2_log_sheet_save"].isHittable)
+        XCTAssertEqual(app.staticTexts["home_v2_edit_date_text"].label, date)
+        attachScreenshot(named: "body-fat-editor-imported", from: app)
+        let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screen.name = "body-fat-editor-imported-native-screen"
+        screen.lifetime = .keepAlways
+        add(screen)
+        let repainted = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.editorChromeIsPainted(app)
+        }, object: nil)
+        let paintingResult = XCTWaiter.wait(for: [repainted], timeout: 5)
+        attachScreenshot(named: "body-fat-editor-imported-settled", from: app)
+        XCTAssertEqual(paintingResult, .completed, "Cancel must restore the visible editor title and primary action")
+        app.buttons["home_v2_log_sheet_plus"].tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+        let weight = app.descendants(matching: .any)["home_v2_context_row_weight"]
+        let fat = app.descendants(matching: .any)["home_v2_context_row_body_fat"]
+        XCTAssertTrue(weight.waitForExistence(timeout: 8))
+        XCTAssertTrue(weight.label.contains("Typed"), weight.label)
+        XCTAssertTrue(fat.label.contains("Apple Health"), fat.label)
+        app.buttons["home_v2_context_close"].tap()
+        let undo = app.buttons["home_v2_undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 8))
+        undo.tap()
+        app.buttons["home_v2_context_button"].tap()
+        XCTAssertTrue(weight.waitForExistence(timeout: 8))
+        XCTAssertTrue(weight.label.contains("Apple Health"), weight.label)
+        XCTAssertTrue(fat.label.contains("Apple Health"), fat.label)
+    }
+
+    private func editorChromeIsPainted(_ app: XCUIApplication) -> Bool {
+        guard let image = app.screenshot().image.cgImage else { return false }
+        let scale = CGFloat(image.width) / app.frame.width
+        let regions = [(app.staticTexts["home_v2_log_sheet"].frame, 0.005),
+                       (app.buttons["home_v2_log_sheet_save"].frame, 0.5)]
+        for (frame, minimum) in regions {
+            let pixels = CGRect(x: (frame.minX - app.frame.minX) * scale,
+                                y: (frame.minY - app.frame.minY) * scale,
+                                width: frame.width * scale, height: frame.height * scale).integral
+            guard let crop = image.cropping(to: pixels), crop.width > 0, crop.height > 0 else { return false }
+            var data = [UInt8](repeating: 0, count: crop.width * crop.height * 4)
+            let drawn = data.withUnsafeMutableBytes { bytes -> Bool in
+                guard let context = CGContext(data: bytes.baseAddress, width: crop.width, height: crop.height,
+                                              bitsPerComponent: 8, bytesPerRow: crop.width * 4,
+                                              space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+                context.draw(crop, in: CGRect(x: 0, y: 0, width: crop.width, height: crop.height))
+                return true
+            }
+            guard drawn else { return false }
+            let lightPixels = stride(from: 0, to: data.count, by: 4).filter {
+                data[$0] > 200 && data[$0 + 1] > 200 && data[$0 + 2] > 200
+            }.count
+            if Double(lightPixels) / Double(crop.width * crop.height) < minimum { return false }
+        }
+        return true
+    }
+
+    private func openBodyFatEditor(photoOnly: Bool = false, largestText: Bool = false) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.forwardActualXCTestContext()
+        var arguments = ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+                         "-lybUITestEntryBodyFatPrimary"]
+        arguments.append(photoOnly ? "-lybUITestHomeV2UndoPhotoOnlyFixture" : "-lybUITestHomeV2ImportedCorrectionFixture")
+        if largestText {
+            arguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        }
+        launch(app, with: arguments)
+        let context = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(context.waitForExistence(timeout: 30))
+        context.tap()
+        let edit = app.buttons["home_v2_edit_entry"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 8))
+        edit.tap()
+        XCTAssertTrue(app.textFields["home_v2_log_sheet_body_fat"].waitForExistence(timeout: 8))
+        return app
+    }
+
+
+    func testHomeV2PhotoOnlyEditorDoesNotInventWeight() throws {
+        let app = XCUIApplication()
+        app.forwardActualXCTestContext()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture",
+            "-lybUITestHomeV2UndoPhotoOnlyFixture", "-lybUITestHomeEntryEditPreservation"
+        ])
+        let context = app.buttons["home_v2_context_button"]
+        XCTAssertTrue(context.waitForExistence(timeout: 30))
+        context.tap()
+        let edit = app.buttons["home_v2_edit_entry"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 8))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context_row_weight"].exists)
+        edit.tap()
+        let weight = app.textFields["home_v2_log_sheet_value"]
+        XCTAssertTrue(weight.waitForExistence(timeout: 8))
+        XCTAssertEqual(weight.value as? String, "Add", "A missing reading is a prompt, never a default measurement")
+        attachScreenshot(named: "entry-edit-missing-weight", from: app)
+        app.buttons["home_v2_log_sheet_save"].tap()
+        XCTAssertTrue(edit.waitForExistence(timeout: 8), "A photo-only entry saves without requiring weight")
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_context_row_weight"].exists)
+        app.buttons["home_v2_context_close"].tap()
+        let confirmation = app.staticTexts["Entry saved."]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 8))
+        let home = app.scrollViews["home_v2_content_scroll"]
+        XCTAssertTrue(home.waitForExistence(timeout: 8))
+        for _ in 0..<3 where !confirmation.isHittable { home.swipeUp() }
+        XCTAssertTrue(confirmation.isHittable, "The weight-free confirmation is reachable on the real Home")
+        attachScreenshot(named: "entry-edit-missing-weight-saved", from: app)
+    }
+
     func testHomeV2ContextShowsTheDayAndEditsTheEntry() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
@@ -2321,8 +2585,13 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(edit.waitForExistence(timeout: 8), "Saving returns to the day")
         app.buttons["home_v2_context_close"].tap()
-        let home = app.descendants(matching: .any)["home_v2_change_sentence"]
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_context"].waitForNonExistence(timeout: 8),
+            "Closing removes Context"
+        )
+        let home = app.scrollViews["home_v2_content_scroll"]
         XCTAssertTrue(home.waitForExistence(timeout: 8), "Closing returns Home")
+        XCTAssertTrue(contextButton.isHittable, "The returned Home header can reopen the day's details")
         XCTAssertTrue(
             app.buttons["home_v2_done"].exists || app.buttons["home_v2_log_weight"].exists,
             "Home shows the logged state for today's edit, or the check-in"
@@ -2385,6 +2654,74 @@ final class LogYourBodyUITests: XCTestCase {
         row.tap()
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_context"].waitForExistence(timeout: 8), "A row opens that day")
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_context_row_weight"].waitForExistence(timeout: 5))
+    }
+
+    func testProgressShareKeepsSelectedMetricAndVisibleValue() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2Fixture", "-lybUITestHomeV2StepsFixture"
+        ])
+        let progress = app.buttons["home_v2_view_progress"]
+        XCTAssertTrue(progress.waitForExistence(timeout: 30))
+        assertTodayProvenancePresentation(in: app)
+        progress.tap()
+        let value = app.staticTexts["home_v2_progress_value"]
+        XCTAssertTrue(value.waitForExistence(timeout: 8))
+        let loaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label != %@", "—"), object: value)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 10), .completed)
+        var sharedMetrics = Set<String>()
+        for (identifier, title) in [("steps", "Steps"), ("weight", "Weight"), ("body_fat", "Body fat"), ("ffmi", "FFMI")] {
+            app.buttons["home_v2_progress_tab_\(identifier)"].tap()
+            let expectedValue = value.label
+            let share = app.buttons["home_v2_progress_share"]
+            if ["—", "–"].contains(expectedValue) {
+                XCTAssertFalse(share.exists, "Missing data must not become Body Score")
+                continue
+            }
+            var expectedUnit: String?
+            if identifier == "steps" || identifier == "weight" {
+                // This fixture selects imperial units; HomeV2Copy displays "lb".
+                let progressUnitLabel = identifier == "steps" ? "steps" : "lb"
+                let progressUnits = app.scrollViews["home_v2_progress_scroll"].staticTexts.matching(
+                    NSPredicate(format: "label == %@", progressUnitLabel)
+                )
+                XCTAssertEqual(progressUnits.count, 1)
+                let progressUnit = try XCTUnwrap(progressUnits.count == 1 ? progressUnits.allElementsBoundByIndex.first : nil)
+                let capturedUnit = progressUnit.label
+                XCTAssertFalse(capturedUnit.isEmpty)
+                expectedUnit = capturedUnit
+            } else if identifier == "body_fat" {
+                expectedUnit = "%"
+            }
+            XCTAssertTrue(share.waitForExistence(timeout: 5))
+            share.tap()
+            let sheet = app.descendants(matching: .any)["body_score_share_sheet"]
+            XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+            XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_shareBodyScore"].exists)
+            let summary = sheet.descendants(matching: .any)["body_score_share_summary"]
+            XCTAssertTrue(summary.exists)
+            XCTAssertTrue(summary.staticTexts["body_score_share_score"].exists)
+            XCTAssertEqual(summary.staticTexts["body_score_share_score"].label, expectedValue)
+            XCTAssertTrue(summary.staticTexts["body_score_share_footer"].exists)
+            XCTAssertEqual(summary.staticTexts["body_score_share_footer"].label, "Shared from LogYourBody")
+            if identifier != "ffmi" {
+                let unitIdentifier = identifier == "body_fat" ? "body_score_share_unit" : "body_score_share_tagline"
+                XCTAssertTrue(summary.staticTexts[unitIdentifier].exists)
+                XCTAssertEqual(summary.staticTexts[unitIdentifier].label, try XCTUnwrap(expectedUnit))
+            }
+            XCTAssertTrue(app.staticTexts["Share \(title)"].exists)
+            XCTAssertEqual(app.staticTexts["body_score_share_score"].label, expectedValue)
+            XCTAssertFalse(app.staticTexts["Share Body Score"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["body_score_share_photo_visual"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["body_score_share_avatar_visual"].exists)
+            XCTAssertTrue(app.buttons["body_score_share_system_button"].exists)
+            attachScreenshot(named: "contextual-share-\(identifier)", from: app)
+            app.buttons["body_score_share_close_button"].tap()
+            XCTAssertTrue(sheet.waitForNonExistence(timeout: 5))
+            sharedMetrics.insert(identifier)
+        }
+        XCTAssertTrue(Set(["steps", "weight"]).isSubset(of: sharedMetrics), "Fixture must exercise Steps and Weight")
+        assertProgressProvenanceCoversShare(in: app)
     }
 
     func testDefaultHomeHeaderSwipesOpenProgressReturnHomeAndOpenSidebar() throws {
@@ -2481,6 +2818,73 @@ final class LogYourBodyUITests: XCTestCase {
             XCTAssertTrue(log.waitForExistence(timeout: 8))
             app.terminate()
         }
+    }
+
+    private func assertTodayProvenancePresentation(in app: XCUIApplication) {
+        let chip = app.buttons["home_v2_provenance_chip"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5))
+        chip.tap()
+        let detail = app.descendants(matching: .any)["home_v2_provenance_detail"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 5), "Today has one working provenance presenter")
+        XCTAssertFalse(app.buttons["home_v2_view_progress"].isHittable)
+        app.buttons["home_v2_provenance_done"].tap()
+        XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
+        let progress = app.buttons["home_v2_view_progress"]
+        let scroll = app.scrollViews["home_v2_content_scroll"]
+        let ruler = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5))
+        XCTAssertTrue(ruler.waitForExistence(timeout: 5))
+        // XCUI can report content behind the pinned ruler as hittable.
+        let viewport = CGRect(
+            x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
+            height: max(0, min(ruler.frame.minY, scroll.frame.maxY) - scroll.frame.minY)
+        )
+        XCTAssertGreaterThan(viewport.height, 88)
+        let origin = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+        for _ in 0..<6 {
+            if progress.isHittable && viewport.contains(progress.frame) { break }
+            let distance = min(viewport.height - 80, max(0, progress.frame.maxY - viewport.maxY) + 12)
+            let start = origin.withOffset(CGVector(dx: viewport.midX, dy: viewport.maxY - 40))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -distance)),
+                        withVelocity: .slow, thenHoldForDuration: 0.15)
+        }
+        XCTAssertTrue(progress.isHittable)
+        XCTAssertTrue(viewport.contains(progress.frame), "View progress must clear the pinned ruler: \(progress.frame)")
+    }
+
+    private func assertProgressProvenanceCoversShare(in app: XCUIApplication) {
+        app.buttons["home_v2_progress_tab_ffmi"].tap()
+        let range = app.buttons["home_v2_range_1M"]
+        let values = app.staticTexts.matching(identifier: "home_v2_progress_value")
+        let share = app.buttons["home_v2_progress_share"]
+        guard range.exists, range.isSelected, values.count == 1 else {
+            attachScreenshot(named: "progress-ffmi-current-month-prerequisite", from: app)
+            XCTFail("Require the selected1M range and unique typed FFMI value before provenance")
+            return
+        }
+        let value = values.element
+        // Five actual seeded weights, daily0.1kg rounding and alpha0.25 EMA
+        // yield82.4..82.5kg; at15.8% and178cm normalized FFMI displays22.0.
+        guard value.label == "22.0", share.exists, share.isHittable else {
+            attachScreenshot(named: "progress-ffmi-share-positive-prerequisite", from: app)
+            XCTFail("Require the real current1M fixture value22.0 and available Share before overlay")
+            return
+        }
+        let selectedValue = value.label
+        attachScreenshot(named: "progress-ffmi-observed-share-before-provenance", from: app)
+        let chip = app.buttons["home_v2_provenance_chip"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "The derived FFMI fixture exposes its provenance")
+        chip.tap()
+        let detail = app.descendants(matching: .any)["home_v2_provenance_detail"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["home_v2_progress_share"].isHittable, "The underlying Share action is covered")
+        app.buttons["home_v2_provenance_done"].tap()
+        XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["home_v2_progress_share"].isHittable)
+        XCTAssertTrue(range.isSelected)
+        XCTAssertEqual(values.count, 1)
+        XCTAssertEqual(value.label, selectedValue)
+        attachScreenshot(named: "progress-ffmi-share-restored-after-provenance", from: app)
     }
 
     func testHomeV2ProgressIsOneMetricWorkspace() throws {
@@ -3122,7 +3526,13 @@ final class LogYourBodyUITests: XCTestCase {
         app.buttons["photo_timeline_root_menu"].tap()
         let ask = app.buttons["home_v2_sidebar_ask"]
         XCTAssertTrue(ask.waitForExistence(timeout: 5))
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true AND enabled == true"), object: ask
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 5), .completed)
         ask.tap()
+        XCTAssertTrue(ask.waitForNonExistence(timeout: 5), "One Ask tap must dismiss the sidebar")
+        XCTAssertTrue(app.buttons["home_chat_collapse"].waitForExistence(timeout: 5), "Ask must expand before typing")
         XCTAssertTrue(app.textFields["chat_composer"].waitForExistence(timeout: 8))
     }
 
@@ -3137,7 +3547,15 @@ final class LogYourBodyUITests: XCTestCase {
         menu.tap()
         let ask = app.buttons["home_v2_sidebar_ask"]
         XCTAssertTrue(ask.waitForExistence(timeout: 8), "The sidebar lists Ask")
+        // Swipes starting on a row still dismiss; observing them must not consume a later row tap.
+        ask.swipeLeft()
+        XCTAssertTrue(ask.waitForNonExistence(timeout: 5), "A left swipe dismisses the sidebar")
+        XCTAssertTrue(app.buttons["home_v2_log_weight"].isHittable, "A dismissal swipe must keep Today open")
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        XCTAssertTrue(ask.waitForExistence(timeout: 8))
         ask.tap()
+        XCTAssertTrue(ask.waitForNonExistence(timeout: 5), "One Ask tap dismisses the sidebar")
 
         XCTAssertTrue(app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8), "Ask opens the chat surface")
         XCTAssertTrue(app.staticTexts["Ask"].waitForExistence(timeout: 5), "The root header owns the title")

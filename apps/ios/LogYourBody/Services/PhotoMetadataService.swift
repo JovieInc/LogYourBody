@@ -21,16 +21,20 @@ struct PhotoMetricsUpdateResult {
 
 enum PhotoMetricsRestoreError: Error {
     case entryNotFound
+    case entryChanged
     #if DEBUG
     case simulatedSaveFailure
     #endif
 }
 
+enum PhotoMetricsEditError: Error {
+    case entryNotFound
+    case pendingEdit
+    case uncommittedWrite
+}
+
 class PhotoMetadataService {
     static let shared = PhotoMetadataService()
-
-    // Cache for body fat estimations to avoid repeated calculations
-    private var estimationCache: [String: (value: Double, isEstimated: Bool)] = [:]
 
     private init() {}
 
@@ -173,6 +177,16 @@ class PhotoMetadataService {
                 existing.bodyFatMethod
             }
 
+            var changedFields: Set<BodyMetricField> = []
+            if updatedWeight != existing.weight { changedFields.insert(.weight) }
+            if updatedBodyFat != existing.bodyFatPercentage || updatedBodyFatMethod != existing.bodyFatMethod {
+                changedFields.insert(.bodyFat)
+            }
+            let metadata = changedFields.isEmpty ? existing.sourceMetadata :
+                (existing.sourceMetadata ?? BodyMetricSourceMetadata()).settingEntrySource(
+                    BodyMetricSource(dataSource), fields: changedFields, bodyFatMethod: bodyFatMethod
+                )
+
             // Update existing metrics
             let updated = BodyMetrics(
                 id: existing.id,
@@ -185,10 +199,13 @@ class PhotoMetadataService {
                 bodyFatMethod: updatedBodyFatMethod,
                 muscleMass: existing.muscleMass,
                 boneMass: existing.boneMass,
+                waistCm: existing.waistCm,
+                hipCm: existing.hipCm,
+                waistUnit: existing.waistUnit,
                 notes: existing.notes,
                 photoUrl: photoUrl ?? existing.photoUrl,
                 dataSource: existing.dataSource,
-                sourceMetadata: existing.sourceMetadata,
+                sourceMetadata: metadata,
                 createdAt: existing.createdAt,
                 updatedAt: Date()
             )
@@ -232,6 +249,24 @@ class PhotoMetadataService {
         }
     }
 
+    /// Only generic Edit uses this path. Day-based log/create keeps its existing API.
+    @MainActor
+    func updateExistingMeasurementsWithResult(
+        id: String, userId: String, weight: Double?, bodyFatPercentage: Double?,
+        bodyFatMethod: String?, clearBodyFat: Bool = false, markManualCorrection: Bool = false,
+        writeAdmission: @escaping CoreDataManager.WriteAdmission,
+        coreDataManager: CoreDataManager = .shared
+    ) async throws -> PhotoMetricsUpdateResult {
+        try writeAdmission()
+        let result = try await coreDataManager.updateExistingMetricMeasurementsAndWait(
+            id: id, userId: userId, weight: weight, bodyFatPercentage: bodyFatPercentage,
+            bodyFatMethod: bodyFatMethod, clearBodyFat: clearBodyFat,
+            markManualCorrection: markManualCorrection, writeAdmission: writeAdmission
+        )
+        try writeAdmission()
+        return result
+    }
+
     /// The Add Entry sheet dismisses as soon as this method returns. A fire-and-
     /// forget `saveBodyMetrics` lets the sheet close before the row exists, so
     /// the timeline can miss today's measured log and sync can skip it.
@@ -245,6 +280,7 @@ class PhotoMetadataService {
         id: String,
         userId: String,
         previous: BodyMetrics,
+        replacing saved: BodyMetrics? = nil,
         context: NSManagedObjectContext? = nil
     ) async throws {
         guard previous.id == id, previous.userId == userId else {
@@ -266,14 +302,42 @@ class PhotoMetadataService {
                 throw PhotoMetricsRestoreError.entryNotFound
             }
 
+            var fields = Set(BodyMetricField.allCases)
+            if let saved {
+                guard saved.id == id, saved.userId == userId,
+                      let current = cached.toBodyMetrics() else { throw PhotoMetricsRestoreError.entryNotFound }
+                fields = []
+                if saved.weight != previous.weight || saved.weightUnit != previous.weightUnit {
+                    guard current.weight == saved.weight, current.weightUnit == saved.weightUnit,
+                          current.sourceMetadata?.entrySource(for: .weight) ==
+                            saved.sourceMetadata?.entrySource(for: .weight),
+                          current.dataSource == saved.dataSource else { throw PhotoMetricsRestoreError.entryChanged }
+                    fields.insert(.weight)
+                }
+                if saved.bodyFatPercentage != previous.bodyFatPercentage || saved.bodyFatMethod != previous.bodyFatMethod {
+                    guard current.bodyFatPercentage == saved.bodyFatPercentage, current.bodyFatMethod == saved.bodyFatMethod,
+                          current.sourceMetadata?.entrySource(for: .bodyFat) ==
+                            saved.sourceMetadata?.entrySource(for: .bodyFat),
+                          current.sourceMetadata?.enteredBodyFatMethod == saved.sourceMetadata?.enteredBodyFatMethod,
+                          current.dataSource == saved.dataSource else { throw PhotoMetricsRestoreError.entryChanged }
+                    fields.insert(.bodyFat)
+                }
+            }
+            guard !fields.isEmpty else { return }
             let previousValues = cached.dictionaryWithValues(forKeys: [
-                "weight", "weightUnit", "bodyFatPercentage", "bodyFatMethod", "updatedAt",
+                "weight", "weightUnit", "bodyFatPercentage", "bodyFatMethod", "sourceMetadataJSON", "updatedAt",
                 "lastModified", "isSynced", "syncStatus"
             ])
-            cached.weight = previous.weight ?? 0
-            cached.weightUnit = previous.weightUnit
-            cached.bodyFatPercentage = previous.bodyFatPercentage ?? 0
-            cached.bodyFatMethod = previous.bodyFatMethod
+            if fields.contains(.weight) {
+                cached.weight = previous.weight ?? 0
+                cached.weightUnit = previous.weightUnit
+            }
+            if fields.contains(.bodyFat) {
+                cached.bodyFatPercentage = previous.bodyFatPercentage ?? 0
+                cached.bodyFatMethod = previous.bodyFatMethod
+            }
+            cached.sourceMetadataJSON = (BodyMetricSourceMetadata(jsonString: cached.sourceMetadataJSON) ??
+                BodyMetricSourceMetadata()).restoringEntrySources(from: previous.sourceMetadata, fields: fields).jsonString
             let now = Date()
             cached.updatedAt = now
             cached.lastModified = now
@@ -362,49 +426,28 @@ class PhotoMetadataService {
         return BodyMetricSource.photo.rawValue
     }
 
-    /// Estimate body fat percentage based on nearby entries (with caching for performance)
+    /// Estimate from the current measurements without retaining results across edits or accounts.
     func estimateBodyFat(for date: Date, metrics: [BodyMetrics]) -> (value: Double, isEstimated: Bool)? {
-        // Create cache key from date and metrics IDs
-        let cacheKey = "\(date.timeIntervalSince1970)-\(metrics.map { $0.id }.joined(separator: ","))"
-
-        // Check cache first
-        if let cached = estimationCache[cacheKey] {
-            return cached
+        var before: BodyMetrics?
+        var after: BodyMetrics?
+        for metric in metrics where metric.bodyFatPercentage != nil {
+            if metric.date <= date {
+                // Match stable chronological sorting: the last equal-date entry wins before.
+                if let previous = before, previous.date > metric.date { continue }
+                before = metric
+            } else {
+                if let following = after, following.date <= metric.date { continue }
+                after = metric
+            }
         }
 
-        let sortedMetrics = metrics.filter { $0.bodyFatPercentage != nil }.sorted { $0.date < $1.date }
-        guard !sortedMetrics.isEmpty else { return nil }
-
-        // Find metrics before and after the date
-        let before = sortedMetrics.last { $0.date <= date }
-        let after = sortedMetrics.first { $0.date > date }
-
-        var result: (value: Double, isEstimated: Bool)?
-
-        if let beforeMetric = before, let afterMetric = after,
-           let beforeBF = beforeMetric.bodyFatPercentage, let afterBF = afterMetric.bodyFatPercentage {
-            // Linear interpolation between two points
-            let totalInterval = afterMetric.date.timeIntervalSince(beforeMetric.date)
-            let progressInterval = date.timeIntervalSince(beforeMetric.date)
-            let progress = progressInterval / totalInterval
-
-            let estimatedBF = beforeBF + (afterBF - beforeBF) * progress
-            result = (round(estimatedBF * 10) / 10, true)
-        } else if let closestMetric = before ?? after {
-            // Use the closest available metric
-            result = (closestMetric.bodyFatPercentage ?? 0, true)
+        if let before, let after,
+           let beforeValue = before.bodyFatPercentage, let afterValue = after.bodyFatPercentage {
+            let interval = after.date.timeIntervalSince(before.date)
+            let progress = date.timeIntervalSince(before.date) / interval
+            return (round((beforeValue + (afterValue - beforeValue) * progress) * 10) / 10, true)
         }
-
-        // Cache the result
-        if let result = result {
-            estimationCache[cacheKey] = result
-        }
-
-        return result
-    }
-
-    /// Clear estimation cache (call when metrics data changes)
-    func clearEstimationCache() {
-        estimationCache.removeAll()
+        guard let value = (before ?? after)?.bodyFatPercentage else { return nil }
+        return (value, true)
     }
 }

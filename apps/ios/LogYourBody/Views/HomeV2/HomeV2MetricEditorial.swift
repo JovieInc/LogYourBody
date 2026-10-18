@@ -224,6 +224,7 @@ enum HomeV2ChartIntegrity {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         if let days = range.days, days <= 31 {
             formatter.setLocalizedDateFormatFromTemplate("MMMd")
         } else if range == .all {
@@ -257,6 +258,7 @@ enum HomeV2ChartIntegrity {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
         formatter.setLocalizedDateFormatFromTemplate("MMMd")
         return "\(formatter.string(from: date)) · \(valueText) · \(kind == .sevenDayAverage ? "7-day average" : "Daily value")"
     }
@@ -423,14 +425,17 @@ enum HomeV2MetricEditorial {
         }
     }
 
-    static func timelineProvenance(for metric: BodyMetrics) -> HomeV2ProvenanceDetail? {
+    static func timelineProvenance(
+        for metric: BodyMetrics, in history: [BodyMetrics] = [], heightCm: Double? = nil
+    ) -> HomeV2ProvenanceDetail? {
+        let moment = HomeV2SelectedMomentPolicy.presentation(for: metric, in: history)
         let fat = HomeV2EditorialPolicy.bodyFat(in: metric)
         let hasWeight = metric.weight != nil
         guard hasWeight || fat != nil else { return nil }
-        let weightSource = HomeV2Provenance.label(for: metric)
+        let weightSource = HomeV2Provenance.label(for: metric, field: .weight)
         let weightChip = chip(for: weightSource)
         let fatChip = fat.map { chip(for: $0.caption) }
-        let resolved: String
+        var resolved: String
         if let fatChip, hasWeight, fatChip != weightChip {
             resolved = "Sources"
         } else if hasWeight {
@@ -441,6 +446,12 @@ enum HomeV2MetricEditorial {
         var lines: [String] = []
         if hasWeight { lines.append("Weight is from \(weightSource).") }
         if let fat { lines.append("Body fat: \(fat.caption).") }
+        if moment.kind == .inferred {
+            resolved = "Inferred"
+            lines.append(HomeV2SelectedMomentPolicy.provenanceSentence(for: moment, heightCm: heightCm))
+        } else if moment.kind == .lastKnown {
+            lines.append(moment.sentence)
+        }
         return HomeV2ProvenanceDetail(chip: resolved, title: "Source", body: lines.joined(separator: " "))
     }
 
@@ -494,6 +505,7 @@ struct HomeV2MetricHero: View {
     let unit: String
     let comparison: String
     var provenance: HomeV2ProvenanceDetail?
+    var onProvenancePresentationChange: (Bool) -> Void = { _ in }
     var valueIdentifier = "home_v2_progress_value"
     var comparisonIdentifier = "home_v2_progress_delta"
     var valueSize: CGFloat = HomeV2Tokens.TypeSize.progressValue
@@ -521,6 +533,8 @@ struct HomeV2MetricHero: View {
             }
         }
         .onChange(of: provenance) { _, _ in showsProvenance = false }
+        .onChange(of: showsProvenance) { _, presented in onProvenancePresentationChange(presented) }
+        .onDisappear { onProvenancePresentationChange(false) }
     }
 
     @ViewBuilder
@@ -601,6 +615,7 @@ struct HomeV2ProvenanceSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(HomeV2Tokens.Colors.canvas.ignoresSafeArea())
         .presentationDetents([.medium])
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home_v2_provenance_detail")
     }
 }

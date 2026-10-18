@@ -5,6 +5,95 @@
 import Combine
 import Foundation
 
+/// Present the editorial editor only after explicit rollout or an authenticated test override.
+enum HomeV2EntryBodyFatPrimaryPolicy {
+    static let gateKey = "home_v2_entry_body_fat_primary_v1"
+    static let fixtureArgument = "-lybUITestEntryBodyFatPrimary"
+    static let disabledFixtureArgument = "-lybUITestEntryBodyFatPrimaryDisabled"
+
+    @MainActor
+    static func isEnabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isGateEnabled: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        let enabled = arguments.filter { $0 == fixtureArgument }.count
+        let disabled = arguments.filter { $0 == disabledFixtureArgument }.count
+        if enabled + disabled == 1,
+           arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
+           arguments.contains(HomeV2Policy.photoFixtureArgument),
+           !arguments.contains(HomeV2Policy.rollbackFixtureArgument),
+           UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil,
+           environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") == true {
+            return enabled == 1
+        }
+        #endif
+        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return check(gateKey)
+    }
+}
+
+/// Editing an imported record must not turn a missing or untouched reading into a new measurement.
+enum HomeV2EntryEditPolicy {
+    static let gateKey = "home_v2_entry_edit_preservation_v1"
+    static let fixtureArgument = "-lybUITestHomeEntryEditPreservation"
+
+    @MainActor
+    static func isEnabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isGateEnabled: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        if arguments.filter({ $0 == fixtureArgument }).count == 1,
+           arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
+           arguments.contains(HomeV2Policy.photoFixtureArgument),
+           !arguments.contains(HomeV2Policy.rollbackFixtureArgument),
+           UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil,
+           environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") == true {
+            return true
+        }
+        #endif
+        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return check(gateKey)
+    }
+
+    static func weight(text: String, initialValue: Double?, unit: String, preserving: Bool) throws -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if preserving, initialValue == nil, trimmed.isEmpty { return nil }
+        guard let value = HomeV2WeightStepPolicy.parse(trimmed), value.isFinite else {
+            throw ValidationError.invalidWeight(HomeV2Copy.weightRangeError(unit: unit))
+        }
+        if preserving, let initialValue, initialValue.isFinite,
+           value == HomeV2WeightStepPolicy.parse(HomeV2WeightStepPolicy.text(initialValue)) {
+            return value
+        }
+        guard HomeV2WeightStepPolicy.range(unit: unit).contains(value) else {
+            throw ValidationError.invalidWeight(HomeV2Copy.weightRangeError(unit: unit))
+        }
+        return value
+    }
+
+    static func bodyFat(text: String, initialValue: Double?, preserving: Bool) throws -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if preserving {
+            if let initialValue, initialValue.isFinite,
+               let value = HomeV2WeightStepPolicy.parse(trimmed),
+               value == HomeV2WeightStepPolicy.parse(String(format: "%.1f", initialValue)) {
+                return value
+            }
+            return try ValidationService.shared.validateBodyFat(trimmed)
+        }
+        guard let value = HomeV2WeightStepPolicy.parse(trimmed),
+              HomeV2WeightStepPolicy.bodyFatRange.contains(value) else {
+            throw ValidationError.invalidBodyFat(HomeV2Copy.bodyFatRangeError)
+        }
+        return value
+    }
+}
+
 /// Copy for Context (Pencil N2), Entries (E0), Edit entry (E1) and the
 /// delete confirmation (E2). Deletion scope is always spelled out.
 enum HomeV2ContextCopy {
@@ -89,9 +178,9 @@ enum HomeV2Provenance {
         return formatter
     }()
 
-    static func label(for metric: BodyMetrics) -> String {
+    static func label(for metric: BodyMetrics, field: BodyMetricField? = nil) -> String {
         let named = metric.sourceMetadata?.sourceName?.trimmingCharacters(in: .whitespaces)
-        switch metric.metricSource {
+        switch field.map({ metric.measurementSource(for: $0) }) ?? metric.metricSource {
         case .healthKit:
             return (named?.isEmpty == false ? named : nil) ?? HomeV2ContextCopy.appleHealth
         case .smartScale:
@@ -107,6 +196,25 @@ enum HomeV2Provenance {
         }
     }
 
+    static func detailedLabel(for metric: BodyMetrics, field: BodyMetricField? = nil) -> String {
+        if let field, metric.sourceMetadata?.entrySource(for: field) == .manual {
+            return HomeV2ContextCopy.typed
+        }
+        let named = metric.sourceMetadata?.sourceName?.trimmingCharacters(in: .whitespaces)
+        if metric.metricSource == .manual, let named, !named.isEmpty {
+            let cameThroughHealth = metric.sourceMetadata?.sourceBundleId != nil ||
+                metric.sourceMetadata?.quantityType != nil ||
+                metric.sourceMetadata?.vendor?.lowercased() == "healthkit"
+            let original = cameThroughHealth ? "\(named) via \(HomeV2ContextCopy.appleHealth)" : named
+            return "\(original) · corrected in LogYourBody"
+        }
+
+        let label = label(for: metric, field: field)
+        guard metric.metricSource == .healthKit,
+              label != HomeV2ContextCopy.appleHealth else { return label }
+        return "\(label) via \(HomeV2ContextCopy.appleHealth)"
+    }
+
     /// The time of day an entry was stored, or nil for midnight (a date-only entry).
     static func timeText(for date: Date, calendar: Calendar = .current) -> String? {
         let components = calendar.dateComponents([.hour, .minute], from: date)
@@ -115,19 +223,80 @@ enum HomeV2Provenance {
     }
 
     /// "Apple Health, 7:02 AM" or just "Apple Health".
-    static func subline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
-        let source = label(for: metric)
+    static func subline(
+        for metric: BodyMetrics, field: BodyMetricField? = nil, calendar: Calendar = .current
+    ) -> String {
+        let source = detailedLabel(for: metric, field: field)
         guard let time = timeText(for: metric.date, calendar: calendar) else { return source }
         return "\(source), \(time)"
     }
 
+    static func weightSubline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
+        let provenance = subline(for: metric, field: .weight, calendar: calendar)
+        guard !HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight) else { return provenance }
+        return "\(provenance). \(HomeV2WeightQuality.reviewMessage)"
+    }
+
+    static func weightText(displayValue: Double, metric: BodyMetrics, unit: String) -> String {
+        let value = HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight)
+            ? HomeV2WeightStepPolicy.text(displayValue)
+            : String(format: "%.2f", displayValue)
+        return "\(value) \(unit)"
+    }
+
     /// Body fat names its method when that is more specific than the source.
     static func bodyFatSubline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
-        switch metric.bodyFatMethod {
+        switch metric.attributedBodyFatMethod {
         case "dexa": return "DEXA"
         case "caliper": return "Calipers"
-        default: return subline(for: metric, calendar: calendar)
+        default: return subline(for: metric, field: .bodyFat, calendar: calendar)
         }
+    }
+}
+
+/// A correction replaces only the selected record's measurements. Its stable
+/// identity, original timestamp, and import lineage remain available in Context.
+enum HomeV2CorrectionPolicy {
+    static func correctedMetric(
+        _ metric: BodyMetrics,
+        kilograms: Double,
+        bodyFatPercentage: Double?,
+        updatedAt: Date = Date()
+    ) -> BodyMetrics {
+        let bodyFatMethod: String? = if bodyFatPercentage == nil {
+            nil
+        } else if metric.bodyFatPercentage != nil {
+            metric.bodyFatMethod
+        } else {
+            BodyFatEntryMethod.bioelectrical.rawValue
+        }
+
+        var changedFields: Set<BodyMetricField> = []
+        if kilograms != metric.weight { changedFields.insert(.weight) }
+        if bodyFatPercentage != metric.bodyFatPercentage { changedFields.insert(.bodyFat) }
+        let metadata = changedFields.isEmpty ? metric.sourceMetadata :
+            (metric.sourceMetadata ?? BodyMetricSourceMetadata()).settingEntrySource(.manual, fields: changedFields)
+        return BodyMetrics(
+            id: metric.id,
+            userId: metric.userId,
+            date: metric.date,
+            localDate: metric.localDate,
+            weight: kilograms,
+            weightUnit: metric.weightUnit,
+            bodyFatPercentage: bodyFatPercentage,
+            bodyFatMethod: bodyFatMethod,
+            muscleMass: metric.muscleMass,
+            boneMass: metric.boneMass,
+            waistCm: metric.waistCm,
+            hipCm: metric.hipCm,
+            waistUnit: metric.waistUnit,
+            notes: metric.notes,
+            photoUrl: metric.photoUrl,
+            dataSource: metric.dataSource,
+            sourceMetadata: metadata,
+            createdAt: metric.createdAt,
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -137,6 +306,17 @@ struct HomeV2DayEntryRow: Identifiable, Equatable {
     let label: String
     let subline: String
     let value: String
+
+    /// A recorded zero is a value; absent and invalid counts do not create a row.
+    static func steps(_ value: Int?) -> HomeV2DayEntryRow? {
+        guard let value, value >= 0 else { return nil }
+        return HomeV2DayEntryRow(
+            id: "steps",
+            label: HomeV2ContextCopy.steps,
+            subline: HomeV2ContextCopy.appleHealth,
+            value: FormatterCache.stepsFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
+        )
+    }
 }
 
 /// Everything Context shows for one day.
@@ -203,14 +383,21 @@ enum HomeV2EntriesPolicy {
         }
         return monthsNewestFirst.compactMap { key -> HomeV2EntriesSection? in
             guard let monthMetrics = grouped[key], let newest = monthMetrics.first else { return nil }
-            let chronological = monthMetrics.reversed().compactMap(weightValue)
+            let chronological: [Double] = monthMetrics.reversed().compactMap { metric -> Double? in
+                guard HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight) else { return nil }
+                return weightValue(metric)
+            }
             let rows = monthMetrics.map { metric -> HomeV2EntriesRow in
-                let value = weightValue(metric).map { "\(HomeV2WeightStepPolicy.text($0)) \(unit)" } ?? "—"
+                let value = weightValue(metric).map {
+                    HomeV2Provenance.weightText(displayValue: $0, metric: metric, unit: unit)
+                } ?? "—"
                 return HomeV2EntriesRow(
                     id: metric.id,
                     date: metric.date,
-                    dayText: HomeV2ContextCopy.weekdayDayFormatter.string(from: metric.date),
-                    source: HomeV2Provenance.label(for: metric),
+                    dayText: HomeV2ContextCopy.entryDateText(metric.date, calendar: calendar),
+                    source: metric.weight == nil
+                        ? HomeV2Provenance.subline(for: metric, calendar: calendar)
+                        : HomeV2Provenance.weightSubline(for: metric, calendar: calendar),
                     valueText: value,
                     photoURL: hasPhoto(metric) ? metric.photoUrl : nil
                 )

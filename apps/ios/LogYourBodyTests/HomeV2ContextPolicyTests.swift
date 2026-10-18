@@ -4,10 +4,133 @@
 //
 import CoreData
 import XCTest
+import UIKit
 @testable import LogYourBody
 
 final class HomeV2ContextPolicyTests: XCTestCase {
+    @MainActor
+    func testBodyFatEditorGateRequiresExplicitRolloutOrAuthenticatedExclusiveFixture() {
+        let context = ["XCTestSessionIdentifier": UUID().uuidString,
+                       "XCTestBundlePath": "/Fixtures/LogYourBodyUITests.xctest"]
+        let base = ["-lybUITestPhotoTimelineHUDFixture", HomeV2Policy.photoFixtureArgument]
+        let enabled = base + [HomeV2EntryBodyFatPrimaryPolicy.fixtureArgument]
+        let disabled = base + [HomeV2EntryBodyFatPrimaryPolicy.disabledFixtureArgument]
+        XCTAssertFalse(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(arguments: [], environment: [:], isGateEnabled: { _ in false }))
+        XCTAssertTrue(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(arguments: [], environment: [:], isGateEnabled: { key in
+            XCTAssertEqual(key, HomeV2EntryBodyFatPrimaryPolicy.gateKey)
+            return true
+        }))
+        #if DEBUG
+        XCTAssertTrue(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(
+                arguments: enabled, environment: context, isGateEnabled: { _ in false }
+            ))
+        XCTAssertFalse(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(
+                arguments: disabled, environment: context, isGateEnabled: { _ in true }
+            ))
+        for arguments in [enabled + [HomeV2EntryBodyFatPrimaryPolicy.fixtureArgument], enabled + disabled,
+                          enabled + [HomeV2Policy.rollbackFixtureArgument], [HomeV2EntryBodyFatPrimaryPolicy.fixtureArgument]] {
+            XCTAssertFalse(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(
+                arguments: arguments, environment: context, isGateEnabled: { _ in false }
+            ))
+        }
+        for environment in [[:], context.merging(["XCTestSessionIdentifier": "invalid"]) { _, new in new },
+                            context.merging(["XCTestBundlePath": "/Fixtures/Other.xctest"]) { _, new in new }] {
+            XCTAssertFalse(HomeV2EntryBodyFatPrimaryPolicy.isEnabled(
+                arguments: enabled, environment: environment, isGateEnabled: { _ in false }
+            ))
+        }
+        #endif
+    }
+
+    func testEditorDisplayFontIsBundledAndRegistered() throws {
+        let bundle = Bundle(for: AuthManager.self)
+        XCTAssertNotNil(bundle.url(forResource: "InterTight", withExtension: "ttf"))
+        XCTAssertNotNil(bundle.url(forResource: "InterTight-OFL", withExtension: "txt"))
+        XCTAssertTrue((bundle.object(forInfoDictionaryKey: "UIAppFonts") as? [String])?.contains("InterTight.ttf") == true)
+        XCTAssertNotNil(UIFont(name: "InterTight-Regular", size: 84), "Editorial display must use its actual bundled font")
+    }
+
+
+    @MainActor
+    func testEntryEditPreservationRequiresItsOwnGateOrAuthenticatedTestFixture() {
+        let arguments = ["-lybUITestPhotoTimelineHUDFixture", HomeV2Policy.photoFixtureArgument,
+                         HomeV2EntryEditPolicy.fixtureArgument]
+        let context = ["XCTestSessionIdentifier": UUID().uuidString,
+                       "XCTestBundlePath": "/Fixtures/LogYourBodyUITests.xctest"]
+        for environment in [[:], context.merging(["XCTestSessionIdentifier": "invalid"]) { _, new in new }] {
+            XCTAssertFalse(HomeV2EntryEditPolicy.isEnabled(
+                arguments: arguments, environment: environment, isGateEnabled: { key in
+                    XCTAssertEqual(key, HomeV2EntryEditPolicy.gateKey)
+                    return false
+                }
+            ))
+        }
+        XCTAssertTrue(HomeV2EntryEditPolicy.isEnabled(
+            arguments: [], environment: [:], isGateEnabled: { $0 == HomeV2EntryEditPolicy.gateKey }
+        ))
+        #if DEBUG
+        XCTAssertTrue(HomeV2EntryEditPolicy.isEnabled(
+            arguments: arguments, environment: context, isGateEnabled: { _ in
+                XCTFail("The isolated UI fixture must not depend on remote flags")
+                return false
+            }
+        ))
+        for invalid in [arguments + [HomeV2EntryEditPolicy.fixtureArgument],
+                        arguments + [HomeV2Policy.rollbackFixtureArgument],
+                        [HomeV2EntryEditPolicy.fixtureArgument]] {
+            XCTAssertFalse(HomeV2EntryEditPolicy.isEnabled(
+                arguments: invalid, environment: context, isGateEnabled: { _ in false }
+            ))
+        }
+        #endif
+    }
+
+    func testEntryEditMissingWeightStaysMissingAndExistingWeightCannotBeCleared() throws {
+        XCTAssertNil(try HomeV2EntryEditPolicy.weight(text: " \n", initialValue: nil, unit: "kg", preserving: true))
+        XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: "", initialValue: 80, unit: "kg", preserving: true))
+        XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: "", initialValue: nil, unit: "kg", preserving: false))
+        XCTAssertEqual(try HomeV2EntryEditPolicy.weight(text: "80,5", initialValue: nil, unit: "kg", preserving: true), 80.5)
+    }
+
+    func testEntryEditHistoricalReadingsSurviveButReplacementValuesAreValidated() throws {
+        for (raw, unit) in [(31.2345, "kg"), (700.1234, "lb")] {
+            let text = HomeV2WeightStepPolicy.text(raw)
+            XCTAssertNotNil(try HomeV2EntryEditPolicy.weight(text: text, initialValue: raw, unit: unit, preserving: true))
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: text, initialValue: raw, unit: unit, preserving: false))
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: text, initialValue: nil, unit: unit, preserving: true))
+        }
+        for raw in [2.4567, 61.2345, 71.2345] {
+            let text = String(format: "%.1f", raw)
+            XCTAssertNotNil(try HomeV2EntryEditPolicy.bodyFat(text: text, initialValue: raw, preserving: true))
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.bodyFat(text: text, initialValue: nil, preserving: true))
+        }
+        XCTAssertEqual(try HomeV2EntryEditPolicy.bodyFat(text: "21,25", initialValue: nil, preserving: true), 21.3)
+        XCTAssertNil(try HomeV2EntryEditPolicy.bodyFat(text: "", initialValue: 21.3, preserving: true),
+                     "Clearing body fat remains an explicit removal, unlike an untouched historical value")
+        XCTAssertEqual(try HomeV2EntryEditPolicy.bodyFat(text: "65", initialValue: nil, preserving: false), 65,
+                       "The disabled gate retains the existing editor range")
+    }
+
+    func testEntryEditRejectsInvalidNumbersWithoutSubstitutingDefaults() {
+        for text in ["0", "-1", "NaN", "infinity", "1.2.3", "no reading"] {
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.weight(text: text, initialValue: nil, unit: "kg", preserving: true))
+            XCTAssertThrowsError(try HomeV2EntryEditPolicy.bodyFat(text: text, initialValue: nil, preserving: true))
+        }
+    }
+
+    func testEntrySavedConfirmationDoesNotInventWeight() {
+        let entry = HomeV2LoggedEntry(
+            metricId: "photo", userId: "owner", date: Date(), previousMetric: nil, valueText: "", unit: "kg"
+        )
+        XCTAssertEqual(entry.confirmationText, "Entry saved.")
+        let weight = HomeV2LoggedEntry(
+            metricId: "weight", userId: "owner", date: Date(), previousMetric: nil, valueText: "80.1", unit: "kg"
+        )
+        XCTAssertEqual(weight.confirmationText, HomeV2Copy.loggedSentence(value: "80.1", unit: "kg"))
+    }
+
     private func metric(
+        id: String? = nil,
         daysAgo: Int,
         weight: Double?,
         bodyFat: Double? = nil,
@@ -22,7 +145,7 @@ final class HomeV2ContextPolicyTests: XCTestCase {
         let day = calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: now)) ?? now
         let date = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day
         return BodyMetrics(
-            id: "m\(daysAgo)",
+            id: id ?? "m\(daysAgo)",
             userId: "user",
             date: date,
             weight: weight,
@@ -34,7 +157,14 @@ final class HomeV2ContextPolicyTests: XCTestCase {
             notes: nil,
             photoUrl: photo,
             dataSource: source,
-            sourceMetadata: sourceName.map { BodyMetricSourceMetadata(sourceName: $0) },
+            sourceMetadata: sourceName.map {
+                BodyMetricSourceMetadata(
+                    vendor: source == "healthkit" ? "healthkit" : nil,
+                    sourceName: $0,
+                    sourceBundleId: source == "healthkit" ? "com.withings.wiScaleNG" : nil,
+                    quantityType: source == "healthkit" ? "HKQuantityTypeIdentifierBodyMass" : nil
+                )
+            },
             createdAt: date,
             updatedAt: date
         )
@@ -52,6 +182,11 @@ final class HomeV2ContextPolicyTests: XCTestCase {
         let timed = metric(daysAgo: 0, weight: 80, source: "healthkit", hour: 7, minute: 2)
         XCTAssertTrue(HomeV2Provenance.subline(for: timed).hasPrefix("Apple Health, "), HomeV2Provenance.subline(for: timed))
         XCTAssertEqual(HomeV2Provenance.subline(for: metric(daysAgo: 0, weight: 80, source: "healthkit")), "Apple Health")
+        XCTAssertTrue(
+            HomeV2Provenance.subline(
+                for: metric(daysAgo: 0, weight: 80, source: "healthkit", sourceName: "Withings", hour: 7)
+            ).hasPrefix("Withings via Apple Health, ")
+        )
     }
 
     func testWeekStripCoversSevenDaysAroundTheDate() {
@@ -157,6 +292,89 @@ final class HomeV2ContextPolicyTests: XCTestCase {
         XCTAssertEqual(sections[1].delta, "Down 0.4 kg")
         XCTAssertNil(sections[0].delta)
         XCTAssertNil(sections[2].delta)
+    }
+
+    func testHistoricalSamplesKeepTimestampSourceAndReviewWarning() throws {
+        let calendar = try fixedCalendar()
+        let now = try XCTUnwrap(calendar.date(from: DateComponents(year: 2_026, month: 10, day: 14)))
+        let sections = HomeV2EntriesPolicy.sections(
+            metrics: [
+                metric(
+                    id: "morning",
+                    daysAgo: 2_903,
+                    weight: 18,
+                    source: "healthkit",
+                    sourceName: "Withings",
+                    hour: 7,
+                    minute: 2,
+                    now: now,
+                    calendar: calendar
+                ),
+                metric(
+                    id: "evening",
+                    daysAgo: 2_903,
+                    weight: 17.99,
+                    source: "healthkit",
+                    sourceName: "Withings",
+                    hour: 19,
+                    minute: 4,
+                    now: now,
+                    calendar: calendar
+                )
+            ],
+            unit: "kg",
+            weightValue: { $0.weight },
+            hasPhoto: { _ in false },
+            calendar: calendar,
+            now: now
+        )
+
+        let rows = try XCTUnwrap(sections.first?.rows)
+        XCTAssertEqual(sections.first?.title, "November 2018")
+        XCTAssertEqual(rows.count, 2, "Repeated-day source samples stay individually visible")
+        XCTAssertTrue(rows.allSatisfy { $0.dayText.contains("Nov 2") })
+        XCTAssertNotEqual(rows[0].dayText, rows[1].dayText, "Their timestamps disambiguate repeated-day labels")
+        XCTAssertTrue(rows.allSatisfy { $0.source.contains("Withings via Apple Health") })
+        XCTAssertTrue(rows.allSatisfy { $0.source.contains("Source value kept unchanged") })
+        XCTAssertEqual(Set(rows.map(\.valueText)), Set(["18.00 kg", "17.99 kg"]))
+        XCTAssertNil(sections.first?.delta, "Flagged source values must not create a misleading trend")
+    }
+
+    func testCorrectionTargetsOneRecordAndPreservesItsImportLineage() {
+        let original = metric(
+            id: "specific-sample",
+            daysAgo: 2_903,
+            weight: 17.99,
+            bodyFat: 12,
+            source: "healthkit",
+            sourceName: "Withings",
+            hour: 19,
+            minute: 4
+        )
+        let updateTime = Date(timeIntervalSince1970: 1_800_000_000)
+
+        let corrected = HomeV2CorrectionPolicy.correctedMetric(
+            original,
+            kilograms: 79.5,
+            bodyFatPercentage: nil,
+            updatedAt: updateTime
+        )
+
+        XCTAssertEqual(corrected.id, original.id)
+        XCTAssertEqual(corrected.date, original.date)
+        XCTAssertEqual(corrected.localDate, original.localDate)
+        XCTAssertEqual(corrected.metricSource, .healthKit)
+        XCTAssertEqual(corrected.measurementSource(for: .weight), .manual)
+        XCTAssertEqual(corrected.sourceMetadata?.sourceName, original.sourceMetadata?.sourceName)
+        XCTAssertEqual(corrected.createdAt, original.createdAt)
+        XCTAssertEqual(corrected.updatedAt, updateTime)
+        XCTAssertEqual(corrected.weight, 79.5)
+        XCTAssertNil(corrected.bodyFatPercentage)
+        XCTAssertNil(corrected.bodyFatMethod)
+        XCTAssertEqual(
+            HomeV2Provenance.detailedLabel(for: corrected, field: .weight),
+            "Typed"
+        )
     }
 }
 
@@ -447,5 +665,32 @@ private final class HeldDailyStepsRead {
         let continuation = try XCTUnwrap(continuation)
         self.continuation = nil
         continuation.resume(returning: rows)
+    }
+}
+
+extension HomeV2ContextPolicyTests {
+    func testContextStepsRetainsAnExplicitZero() throws {
+        let row = try XCTUnwrap(HomeV2DayEntryRow.steps(0))
+        XCTAssertEqual(row.id, "steps")
+        XCTAssertEqual(row.label, "Steps")
+        XCTAssertEqual(row.subline, "Apple Health")
+        XCTAssertEqual(row.value, "0")
+    }
+
+    func testContextStepsDoesNotInventAValueForMissingData() {
+        XCTAssertNil(HomeV2DayEntryRow.steps(nil))
+    }
+
+    func testContextStepsRejectsNegativeCounts() {
+        XCTAssertNil(HomeV2DayEntryRow.steps(-1))
+        XCTAssertNil(HomeV2DayEntryRow.steps(Int.min))
+    }
+
+    func testContextStepsPreservesPositiveCountFormatting() throws {
+        let row = try XCTUnwrap(HomeV2DayEntryRow.steps(5_432))
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 0
+        XCTAssertEqual(row.value, formatter.string(from: 5_432))
     }
 }
