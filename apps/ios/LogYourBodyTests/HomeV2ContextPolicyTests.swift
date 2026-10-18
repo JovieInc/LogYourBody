@@ -790,6 +790,7 @@ extension HomeV2ContextPolicyTests {
             XCTAssertFalse(label.contains("corrected"))
             XCTAssertFalse(label.contains("via Apple Health"), "Arbitrary bundle/type metadata is not HealthKit history")
             XCTAssertTrue(label.contains("Named source"))
+            XCTAssertEqual(label, "Named source", "A named source is not evidence of a correction")
         }
         XCTAssertEqual(HomeV2Provenance.detailedLabel(for: metric), "Withings via Apple Health")
         let changes = try HomeV2CorrectionPolicy.changes(

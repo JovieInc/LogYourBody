@@ -1392,7 +1392,12 @@ final class HomeV2TimelinePolicyTests: XCTestCase {
                            "No preceding body-fat anchor exists; swiping cannot borrow the later measurement or choose weight")
             XCTAssertNil(presentation.photo)
         }
-        XCTAssertEqual(snapshot.metrics, rows)
+        XCTAssertEqual(snapshot.metrics, [latest, middle, oldest], "Snapshot traversal has canonical newest-first order")
+        XCTAssertEqual(rows, [latest, oldest, middle], "Swiping must not mutate the source publication")
+        for (index, row) in rows.enumerated() {
+            XCTAssertEqual(snapshot.sourceIndex(for: .init(row)), index)
+            XCTAssertEqual(snapshot.metric(for: .init(row)), row, "Sorting must preserve every exact raw record")
+        }
     }
 
     private func viewerAdmissionFixture() throws -> (

@@ -20,6 +20,7 @@ final class DashboardViewModel: ObservableObject {
     private let dailyStepLoader: @MainActor (String, Date) async -> DailyMetrics?
     private let dailyStepWriter: @MainActor (DailyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void
     private let stepSyncTrigger: (@MainActor () -> Void)?
+    private let historicalLoadPriority: TaskPriority
     private var historicalLoadTask: Task<Void, Never>?
     private var historicalLoadID: UUID?
     private var requestRevision: UInt64 = 0
@@ -141,7 +142,8 @@ final class DashboardViewModel: ObservableObject {
                 metrics, userId: metrics.userId, writeAdmission: admission
             )
         },
-        stepSyncTrigger: (@MainActor () -> Void)? = nil
+        stepSyncTrigger: (@MainActor () -> Void)? = nil,
+        historicalLoadPriority: TaskPriority = .background
     ) {
         self.healthKitManager = healthKitManager
         self.healthSyncCoordinator = healthSyncCoordinator
@@ -150,6 +152,7 @@ final class DashboardViewModel: ObservableObject {
         self.dailyStepLoader = dailyStepLoader
         self.dailyStepWriter = dailyStepWriter
         self.stepSyncTrigger = stepSyncTrigger
+        self.historicalLoadPriority = historicalLoadPriority
     }
 
     convenience init(healthKitManager: HealthKitManager = .shared) {
@@ -257,7 +260,7 @@ final class DashboardViewModel: ObservableObject {
         guard historicalLoadTask == nil else { return }
         let taskID = UUID()
         historicalLoadID = taskID
-        historicalLoadTask = Task(priority: .background) {
+        historicalLoadTask = Task(priority: historicalLoadPriority) {
             defer {
                 if self.historicalLoadID == taskID {
                     self.historicalLoadTask = nil

@@ -207,7 +207,7 @@ enum HomeV2Provenance {
             // Health import. Preserve the explicit vendor's recorded lineage.
             let cameThroughHealth = metric.sourceMetadata?.vendor?.lowercased() == "healthkit"
             let original = cameThroughHealth ? "\(named) via \(HomeV2ContextCopy.appleHealth)" : named
-            return "\(original) · corrected in LogYourBody"
+            return original
         }
 
         let label = label(for: metric, field: field)
