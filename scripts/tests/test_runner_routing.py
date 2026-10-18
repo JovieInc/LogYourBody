@@ -1177,3 +1177,638 @@ def test_failed_merge_group_cancels_its_mac_jobs_instead_of_holding_them() -> No
     summary = _job_block("ci.yml", "ci-summary")
     # The required check must still conclude after the cancel.
     assert "if: always()" in summary
+
+# Focused diagnostics are deliberately separate from every qualification gate.
+def _diagnostic_step(name: str) -> str:
+    source = (_WORKFLOWS / 'ios-ui-diagnostics.yml').read_text()
+    step = source.split('      - name: ' + name + '\n', 1)[1].split('\n      - ', 1)[0]
+    return textwrap.dedent(step.split('        run: |\n', 1)[1])
+
+
+def _diagnostic_python(marker: str, source: str) -> dict[str, Any]:
+    body = source.split("<<'" + marker + "'\n", 1)[1].split('\n' + marker, 1)[0]
+    namespace: dict[str, Any] = {'__name__': 'diagnostic_test'}
+    exec(compile(body, '<actual-' + marker + '>', 'exec'), namespace)
+    return namespace
+
+
+def _diagnostic_receipt_module() -> dict[str, Any]:
+    return _diagnostic_python('DIAGNOSTIC_RECEIPT_PY',
+        (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text())
+
+
+def _diagnostic_ids() -> list[str]:
+    source = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text()
+    block = source.split('DIAGNOSTIC_SEVEN_TESTS=(\n', 1)[1].split('\n)', 1)[0]
+    return [line.strip().strip('"') + '()' for line in block.splitlines()]
+
+
+def _diagnostic_payload() -> tuple[dict[str, Any], str]:
+    ids = _diagnostic_ids()
+    payload = {'testNodes': [{'nodeType': 'UI test bundle', 'children': [
+        {'nodeType': 'Test Case', 'nodeIdentifier': i, 'result': 'Passed'} for i in ids]}]}
+    lines = []
+    for identifier in ids:
+        suite, method = identifier[:-2].split('/')
+        lines += [f"Test Case '-[LogYourBodyUITests.{suite} {method}]' started.",
+                  f"Test Case '-[LogYourBodyUITests.{suite} {method}]' passed (0.1 seconds)."]
+    return payload, '\n'.join(lines) + '\n'
+
+
+def test_focused_diagnostic_exact_catalogue_and_actual_events_reject_repetitions() -> None:
+    import copy
+    import pytest
+    validate = _diagnostic_receipt_module()['strict_diagnostic_cases']
+    payload, log = _diagnostic_payload()
+    ids = _diagnostic_ids()
+    assert len(validate(payload, ids, log)) == 7
+    # One explicit native run leaf is valid; extra repetitions are not.
+    one_run = copy.deepcopy(payload)
+    one_run['testNodes'][0]['children'][0]['children'] = [{'nodeType': 'Test Case Run', 'result': 'Passed'}]
+    assert len(validate(one_run, ids, log)) == 7
+    mutations = []
+    for result in ['Passed', 'Skipped', 'Failed', 'Not Run']:
+        extra = copy.deepcopy(payload)
+        extra['testNodes'][0]['children'].append({'nodeType': 'Test Case', 'nodeIdentifier': 'Extra/test()', 'result': result})
+        mutations.append(extra)
+    duplicate = copy.deepcopy(payload)
+    duplicate['testNodes'][0]['children'].append(copy.deepcopy(duplicate['testNodes'][0]['children'][0]))
+    mutations.append(duplicate)
+    partial = copy.deepcopy(payload)
+    partial['testNodes'][0]['children'].pop()
+    mutations += [partial, {'testNodes': []}, {}, {'testNodes': None}]
+    for result in ['Skipped', 'Failed', 'Not Run']:
+        failed = copy.deepcopy(payload)
+        failed['testNodes'][0]['children'][0]['result'] = result
+        mutations.append(failed)
+    for children in [[{'nodeType': 'Test Case Run', 'result': 'Passed'}] * 2,
+                     [{'nodeType': 'Test Case Run', 'result': 'Skipped'}],
+                     [{'nodeType': 'Unknown repetition', 'result': 'Passed'}]]:
+        repeated = copy.deepcopy(payload)
+        repeated['testNodes'][0]['children'][0]['children'] = children
+        mutations.append(repeated)
+    for mutation in mutations:
+        with pytest.raises((ValueError, KeyError, TypeError)):
+            validate(mutation, ids, log)
+    lines = log.splitlines()
+    for bad_log in ['', '\n'.join(lines[:-1]), log + '\n'.join(lines[:2]),
+                    '\n'.join(lines[1:]), log.replace('passed', 'failed', 1),
+                    log + "Test Case '-[OtherModule.Extra test]' passed (0.1 seconds).\n",
+                    '\n'.join([lines[1], lines[0], *lines[2:]])]:
+        with pytest.raises(ValueError):
+            validate(payload, ids, bad_log)
+    with pytest.raises(ValueError):
+        validate(payload, ids[:-1], log)
+
+
+def _diagnostic_git(directory: Path, *args: str) -> str:
+    return subprocess.check_output(['git', '-C', str(directory), *args], text=True).strip()
+
+
+def _diagnostic_repository(tmp_path: Path) -> tuple[Path, str]:
+    root = (tmp_path / 'repo').resolve()
+    (root / 'scripts/ios').mkdir(parents=True)
+    (root / 'apps/ios').mkdir(parents=True)
+    (root / 'scripts/ios/launch-quality-audit.sh').write_bytes((_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes())
+    for name, code in {
+        'bootstrap-local-config.sh': '#!/bin/bash\nprintf "bootstrap\\n" >> "$FAKE_CALLS"\n',
+        'resolve-simulator-destination.sh': '#!/bin/bash\nprintf "destination\\n" >> "$FAKE_CALLS"\nprintf "platform=iOS Simulator,id=11111111-1111-1111-1111-111111111111\\n"\n',
+        'test_launch_quality_evidence.py': 'print("Ordinary evidence tests")\n',
+    }.items():
+        (root / 'scripts/ios' / name).write_text(code)
+    _diagnostic_git(root, 'init', '-q')
+    _diagnostic_git(root, 'add', '.')
+    _diagnostic_git(root, '-c', 'user.name=Diagnostic Test', '-c', 'user.email=diagnostic@example.invalid',
+                    '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Isolated dispatcher fixture')
+    return root, _diagnostic_git(root, 'rev-parse', 'HEAD')
+
+
+def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unreviewed_source(tmp_path: Path) -> None:
+    import hashlib
+    import pytest
+    body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
+    module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
+    guard = module['validate_tooling']
+    assert module['REVIEWED_AUDIT_SHA256'] == '31c530d232d92ab814be43ab6e1b549d6bdc40e003f894d9cbba2bc92360ce0d'  # exact reviewed candidate, never the main control audit
+    root, head = _diagnostic_repository(tmp_path)
+    script = root / 'scripts/ios/launch-quality-audit.sh'
+    expected = hashlib.sha256(script.read_bytes()).hexdigest()
+    helper = root / 'scripts/ios/bootstrap-local-config.sh'
+    dependencies = {'scripts/ios/bootstrap-local-config.sh': hashlib.sha256(helper.read_bytes()).hexdigest()}
+    output = tmp_path / 'guard.json'
+    guard(root, head, expected, dependencies, output)
+    assert json.loads(output.read_text())['sourceRevision'] == head
+    for reviewed in ['', 'marker-only', 'a' * 64, 'afa2a0a00fbe402626c9b07e3ad0c4b96cffe0b5a3a4943104f2001b6e3c7487']:
+        with pytest.raises(ValueError):
+            guard(root, head, reviewed, dependencies, output)
+        assert not output.exists()
+    with pytest.raises(ValueError):
+        guard(root, head, expected, {'scripts/ios/bootstrap-local-config.sh': '0' * 64}, output)
+    with pytest.raises(OSError):
+        guard(root, head, expected, {'missing-reviewed-helper': '0' * 64}, output)
+    for wrong_source in ['main', 'A' * 40, 'b' * 40]:
+        with pytest.raises(ValueError):
+            guard(root, wrong_source, expected, dependencies, output)
+    helper.write_text('raise RuntimeError("must never execute")\n')
+    with pytest.raises(ValueError):
+        guard(root, head, expected, dependencies, output)
+    _diagnostic_git(root, 'checkout', '--', 'scripts/ios/bootstrap-local-config.sh')
+    (root / 'untracked-hook').write_text('must not execute')
+    with pytest.raises(ValueError):
+        guard(root, head, expected, dependencies, output)
+    (root / 'untracked-hook').unlink()
+    helper.unlink()
+    helper.symlink_to(script)
+    with pytest.raises(ValueError):
+        guard(root, head, expected, dependencies, output)
+    # The bound actual CLI refuses this synthetic/wrong audit before candidate execution.
+    helper.unlink()
+    _diagnostic_git(root, 'checkout', '--', 'scripts/ios/bootstrap-local-config.sh')
+    env = {**os.environ, 'GITHUB_WORKSPACE': str(root), 'CHECKOUT_REF': head, 'RUNNER_TEMP': str(tmp_path)}
+    result = subprocess.run(['bash', '-c', body], env=env, capture_output=True, text=True,
+                            check=False, pass_fds=_coverage_fds())
+    assert result.returncode != 0 and 'diagnostic-mode-unavailable' in result.stderr
+    assert not (tmp_path / 'calls').exists()
+
+
+def test_focused_diagnostic_actual_actor_guard_fails_before_checkout(tmp_path: Path) -> None:
+    body = _diagnostic_step('Validate manual diagnostic source')
+    fake = tmp_path / 'gh'
+    fake.write_text('#!/bin/bash\nset -eu\nprintf "%s\\n" "$2" >> "$FAKE_CALLS"\n'
+                    '[[ "${API_FAIL:-}" != true ]] || exit 1\n'
+                    'case "$2" in\n*/permission) printf "%s\\n" "${PERMISSION:-write}";;\n'
+                    '*/branches-where-head) printf "%s\\n" "${HEAD_PROVEN:-true}";;\n*) exit 1;;\nesac\n')
+    fake.chmod(0o700)
+    env = {**os.environ, 'PATH': f"{tmp_path}:{os.environ['PATH']}", 'FAKE_CALLS': str(tmp_path / 'calls'),
+           'GITHUB_REPOSITORY': 'JovieInc/LogYourBody', 'GITHUB_REF': 'refs/heads/main',
+           'GITHUB_EVENT_NAME': 'workflow_dispatch', 'GITHUB_SHA': 'b' * 40, 'GITHUB_WORKFLOW_SHA': 'b' * 40,
+           'GITHUB_WORKFLOW_REF': 'JovieInc/LogYourBody/.github/workflows/ios-ui-diagnostics.yml@refs/heads/main',
+           'GITHUB_RUN_ATTEMPT': '1', 'GITHUB_ACTOR': 'writer', 'GITHUB_TRIGGERING_ACTOR': 'writer', 'CHECKOUT_REF': 'a' * 40}
+    def run(overrides: dict[str, str]):
+        return subprocess.run(['bash', '-c', body], env={**env, **overrides}, text=True,
+                              capture_output=True, check=False, pass_fds=_coverage_fds())
+    for permission in ['write', 'admin']:
+        assert run({'PERMISSION': permission}).returncode == 0
+    for overrides in [{'GITHUB_REPOSITORY': 'other/repo'}, {'GITHUB_REF': 'refs/heads/topic'},
+                      {'GITHUB_EVENT_NAME': 'push'}, {'CHECKOUT_REF': 'main'}, {'CHECKOUT_REF': 'A' * 40},
+                      {'GITHUB_RUN_ATTEMPT': '2'}, {'GITHUB_WORKFLOW_SHA': 'c' * 40},
+                      {'GITHUB_WORKFLOW_REF': 'candidate-workflow'}, {'PERMISSION': 'read'},
+                      {'API_FAIL': 'true'}, {'HEAD_PROVEN': 'false'}]:
+        assert run(overrides).returncode != 0
+    # Distinct triggering actor gets its own permission check.
+    assert run({'GITHUB_TRIGGERING_ACTOR': 'second-writer'}).returncode == 0
+    calls = (tmp_path / 'calls').read_text()
+    assert '/collaborators/second-writer/permission' in calls
+
+
+def _run_diagnostic_dispatch(tmp_path: Path, *, mode: str = '--diagnostic-seven', **overrides: str):
+    import sys
+    root, head = _diagnostic_repository(tmp_path)
+    binary = tmp_path / 'bin'
+    binary.mkdir()
+    payload, _ = _diagnostic_payload()
+    fixture = tmp_path / 'catalogue.json'
+    fixture.write_text(json.dumps(payload))
+    fake = '''import json, os, pathlib, subprocess, sys
+name=pathlib.Path(sys.argv[0]).name
+args=sys.argv[1:]
+with open(os.environ['FAKE_CALLS'],'a') as f:f.write(json.dumps([name,*args])+'\\n')
+if name=='fake-timeout':
+    sys.exit(subprocess.call(args[2:]))
+if name=='xcrun':
+    if args[:3]==['xcresulttool','get','test-results']:
+        if os.environ.get('CATALOGUE_EXIT'):sys.exit(int(os.environ['CATALOGUE_EXIT']))
+        print(pathlib.Path(os.environ['FAKE_CATALOGUE']).read_text())
+    sys.exit(0)
+if 'build-for-testing' in args:sys.exit(int(os.environ.get('BUILD_EXIT','0')))
+if '-only-testing:LogYourBodyTests' in args:sys.exit(88)
+count=pathlib.Path(os.environ['FAKE_COUNT'])
+n=int(count.read_text()) if count.exists() else 0
+count.write_text(str(n+1))
+if os.environ.get('INFRA_FIRST')=='true' and n==0:
+    print('Failed to install or launch the test runner')
+    sys.exit(70)
+pathlib.Path(args[args.index('-resultBundlePath')+1]).mkdir()
+for selector in args:
+    if selector.startswith('-only-testing:LogYourBodyUITests/'):
+        _,suite,method=selector.split('/')
+        print("Test Case '-[LogYourBodyUITests.%s %s]' started."%(suite,method))
+        print("Test Case '-[LogYourBodyUITests.%s %s]' passed (0.1 seconds)."%(suite,method))
+if os.environ.get('POST_TEST_INFRA')=='true':print('Failed to install or launch the test runner')
+sys.exit(int(os.environ.get('UI_EXIT','0')))
+'''
+    for name in ['xcodebuild', 'xcrun', 'fake-timeout']:
+        p = binary / name
+        p.write_text('#!' + sys.executable + '\n' + fake)
+        p.chmod(0o700)
+    sleep = binary / 'sleep'
+    sleep.write_text('#!/bin/bash\nexit 0\n')
+    sleep.chmod(0o700)
+    env = {**os.environ, 'PATH': f"{binary}:{os.environ['PATH']}", 'FAKE_CALLS': str(tmp_path / 'calls'),
+           'FAKE_COUNT': str(tmp_path / 'count'), 'FAKE_CATALOGUE': str(fixture),
+           'DIAGNOSTIC_EXPECTED_SOURCE_SHA': head, 'ARTIFACT_DIR': str(tmp_path / 'artifacts'),
+           'LQ_LAUNCH_PROBE': 'false', 'TIMEOUT_BIN': str(binary / 'fake-timeout'),
+           'RUN_SWIFTLINT': 'false', 'RUN_STATIC_UI_REGRESSION_AUDIT': 'false',
+           'RUN_OPTICAL_GRID_AUDIT': 'false', **overrides}
+    args = [] if not mode else [mode]
+    result = subprocess.run(['bash', str(root / 'scripts/ios/launch-quality-audit.sh'), *args],
+                            cwd=root, env=env, text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+    calls = (tmp_path / 'calls').read_text().splitlines() if (tmp_path / 'calls').exists() else []
+    receipt = tmp_path / 'artifacts/diagnostic-receipt.json'
+    return result, calls, json.loads(receipt.read_text()) if receipt.exists() else None
+
+
+def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_never_qualifies(tmp_path: Path) -> None:
+    result, calls, receipt = _run_diagnostic_dispatch(tmp_path, BUILD_FOR_TESTING_TIMEOUT_SECONDS='1',
+        DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE='999', UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS='1')
+    assert result.returncode == 0, result.stdout + result.stderr
+    commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
+    assert len(commands) == 2
+    assert 'build-for-testing' in commands[0] and 'test-without-building' in commands[1]
+    selectors = [arg for arg in commands[1] if arg.startswith('-only-testing:')]
+    assert selectors == ['-only-testing:LogYourBodyUITests/' + i[:-2] for i in _diagnostic_ids()]
+    assert 'LogYourBodyTests' not in ' '.join(selectors)
+    assert '-parallel-testing-enabled' in commands[1]
+    assert commands[1][commands[1].index('-default-test-execution-time-allowance') + 1] == '90'
+    assert commands[1][commands[1].index('-maximum-test-execution-time-allowance') + 1] == '180'
+    timed = [json.loads(c) for c in calls if c.startswith('["fake-timeout"')]
+    assert timed[0][2] == '600s' and timed[1][2] == '1500s'
+    assert receipt['status'] == 'passed' and receipt['evidenceKind'] == 'diagnostic_ui_subset'
+    assert receipt['qualifying'] is False and receipt['nativeQualification'] is False
+    assert len(receipt['tests']) == 7 and receipt['uiCommandAttempts'] == 1
+    assert receipt['unitWitnessCoverageRatchetPerformanceProtectedSignedPhysical'] == 'NOT_EXECUTED_OR_QUALIFIED'
+    artifacts = tmp_path / 'artifacts'
+    assert not list(artifacts.glob('*.evidence.json')) and not list(artifacts.glob('*.coverage.json'))
+
+
+def test_focused_diagnostic_dispatch_failure_timeout_and_missing_catalogue_never_pass_or_retry_after_tests(tmp_path: Path) -> None:
+    for index, overrides in enumerate([{'BUILD_EXIT': '70'}, {'BUILD_EXIT': '124'}, {'UI_EXIT': '124'},
+                                       {'UI_EXIT': '70', 'POST_TEST_INFRA': 'true'}, {'CATALOGUE_EXIT': '1'},
+                                       {'DIAGNOSTIC_EXPECTED_SOURCE_SHA': 'b' * 40}]):
+        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / str(index), **overrides)
+        assert result.returncode != 0 and receipt['status'] == 'failed', (result.stdout, result.stderr)
+        assert receipt['qualifying'] is False and receipt['nativeQualification'] is False
+        commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
+        assert sum('test-without-building' in c for c in commands) <= 1
+        if 'BUILD_EXIT' in overrides or 'DIAGNOSTIC_EXPECTED_SOURCE_SHA' in overrides:
+            assert not any('test-without-building' in c for c in commands)
+        if overrides.get('UI_EXIT') == '124':
+            assert 'timeout' in receipt['errors']
+        if 'DIAGNOSTIC_EXPECTED_SOURCE_SHA' in overrides:
+            assert not calls and 'sourceMismatch' in receipt['errors']
+
+
+def test_focused_diagnostic_one_ui_command_even_for_infrastructure_failure_and_default_full_are_preserved(tmp_path: Path) -> None:
+    result, calls, receipt = _run_diagnostic_dispatch(tmp_path / 'infra', INFRA_FIRST='true')
+    assert result.returncode == 70, result.stdout + result.stderr
+    assert receipt['uiCommandAttempts'] == 1 and receipt['status'] == 'failed'
+    assert sum('test-without-building' in c for c in calls) == 2  # command and timeout wrapper, no second attempt
+    assert sum('build-for-testing' in c for c in calls) == 2  # native command and timeout wrapper
+    result, calls, receipt = _run_diagnostic_dispatch(tmp_path / 'default', mode='')
+    assert result.returncode == 88 and receipt is None, result.stdout + result.stderr
+    assert any('-only-testing:LogYourBodyTests' in c for c in calls)
+    assert not any('diagnostic-seven.xcresult' in c for c in calls)
+    result, calls, receipt = _run_diagnostic_dispatch(tmp_path / 'unknown', mode='--diagnostic-typo')
+    assert result.returncode == 64 and not calls and receipt is None
+
+
+def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_preserves_pending_runs() -> None:
+    source = (_WORKFLOWS / 'ios-ui-diagnostics.yml').read_text()
+    assert '  queue: max\n' in source and '  cancel-in-progress: false\n' in source
+    assert source.count('      checkout-ref:\n') == 1
+    for forbidden in ['  push:', '  pull_request:', '  schedule:', '  workflow_call:', 'uses: ./', 'mac-lane', 'secrets.']:
+        assert forbidden not in source
+    assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
+    assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
+    assert 'persist-credentials: false' in source and 'python3 -I -' in source
+    assert 'run: bash scripts/ios/launch-quality-audit.sh --diagnostic-seven' in source
+    assert 'ios-ui-diagnostic-seven-${{ github.run_id }}-${{ github.run_attempt }}' in source
+    assert 'retention-days: 14' in source and 'name: Focused UI Diagnostics (NONQUALIFYING)' in source
+    import re
+    uses = re.findall(r'uses: ([^\s]+)', source)
+    assert len(uses) == 3 and all(re.fullmatch(r'[\w-]+/[\w-]+@[0-9a-f]{40}', value) for value in uses)
+
+
+def _reviewed_diagnostic_candidate_bytes() -> bytes:
+    # Exact reviewed source fixture, decoded only for byte comparison/copying.
+    # It is never executed. Main's control audit has a distinct reviewed digest.
+    import base64
+    import hashlib
+    import zlib
+    payload = (
+        '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'
+    )
+    data = zlib.decompress(base64.b64decode(payload, validate=True))
+    assert len(data) == 50980
+    assert hashlib.sha256(data).hexdigest() == '31c530d232d92ab814be43ab6e1b549d6bdc40e003f894d9cbba2bc92360ce0d'
+    return data
+
+
+def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins(tmp_path: Path) -> None:
+    import hashlib
+    body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
+    module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
+    expected = '31c530d232d92ab814be43ab6e1b549d6bdc40e003f894d9cbba2bc92360ce0d'
+    assert module['REVIEWED_AUDIT_SHA256'] == expected
+    dependencies = module['DEPENDENCIES']
+    assert len(dependencies) == 7
+    reviewed = _reviewed_diagnostic_candidate_bytes()
+    # Recover exact old V16 only as inert bytes, to prove real CLI refusal of it.
+    legacy = reviewed.decode()
+    start = legacy.index('# An unknown mode must fail')
+    end = legacy.index('ROOT_DIR=', start)
+    legacy = legacy[:start] + legacy[end:]
+    start = legacy.index('if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then\n  PROJECT=')
+    end = legacy.index('read -r -a XCODEBUILD_SETTINGS_ARRAY', start)
+    legacy = legacy[:start] + legacy[end:]
+    legacy = legacy.replace('if [[ "$AUDIT_MODE" == full ]]; then\n  bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"\nfi\n',
+                            'bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"\n', 1)
+    start = legacy.index('    # A diagnostic has one UI command')
+    end = legacy.index('    if [[ "$attempt" -eq 1 ]]', start)
+    legacy = legacy[:start] + legacy[end:]
+    start = legacy.index('# A diagnostic subset never emits')
+    end = legacy.index('cd "$IOS_DIR"\n', start)
+    legacy = legacy[:start] + legacy[end:]
+    legacy = legacy.replace('if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then\n  run_diagnostic_seven\n  exit 0\nfi\n\n', '', 1)
+    legacy_bytes = legacy.encode()
+    assert hashlib.sha256(legacy_bytes).hexdigest() == 'afa2a0a00fbe402626c9b07e3ad0c4b96cffe0b5a3a4943104f2001b6e3c7487'
+
+    sentinel_dir = tmp_path / 'sentinels'
+    sentinel_dir.mkdir()
+    marker = tmp_path / 'forbidden-helper-or-native-execution'
+    # Bootstrap's pinned importer calls node; the pinned resolver calls xcodebuild.
+    # No candidate helper or native tool should be reached by this trusted CLI.
+    for name in ['node', 'xcodebuild', 'xcrun', 'ruby']:
+        executable = sentinel_dir / name
+        executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
+        executable.chmod(0o700)
+
+    fixtures = ['positive', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+                'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
+                'dependency-symlink']
+    for scenario in fixtures:
+        root = (tmp_path / scenario / 'repo').resolve()
+        root.mkdir(parents=True)
+        for name, digest in dependencies.items():
+            source = _REPO_ROOT / name
+            data = source.read_bytes()
+            assert source.is_file() and not source.is_symlink()
+            assert hashlib.sha256(data).hexdigest() == digest
+            target = root / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        audit = root / 'scripts/ios/launch-quality-audit.sh'
+        audit.write_bytes(reviewed)
+        helper = root / 'scripts/ios/bootstrap-local-config.sh'
+        if scenario == 'legacy-v16':
+            audit.write_bytes(legacy_bytes)
+        elif scenario == 'marker-only':
+            audit.write_text('# diagnostic-seven capability marker is insufficient\n')
+        elif scenario == 'missing-audit':
+            audit.unlink()
+        elif scenario == 'wrong-audit':
+            audit.write_bytes(reviewed + b'\n')
+        elif scenario == 'audit-symlink':
+            audit.unlink()
+            audit.symlink_to(helper)
+        elif scenario == 'wrong-dependency':
+            helper.write_bytes(helper.read_bytes() + b'\n')
+        elif scenario == 'missing-dependency':
+            helper.unlink()
+        elif scenario == 'dependency-symlink':
+            helper.unlink()
+            helper.symlink_to(audit)
+        _diagnostic_git(root, 'init', '-q')
+        _diagnostic_git(root, 'add', '.')
+        _diagnostic_git(root, '-c', 'user.name=Diagnostic Test', '-c', 'user.email=diagnostic@example.invalid',
+                        '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Isolated reviewed-tooling CLI fixture')
+        head = _diagnostic_git(root, 'rev-parse', 'HEAD')
+        if scenario == 'dirty':
+            helper.write_bytes(helper.read_bytes() + b'\n')
+        elif scenario == 'untracked':
+            (root / 'unreviewed-hook').write_text('must not execute')
+        output_dir = root.parent / 'guard-output'
+        output_dir.mkdir()
+        output = output_dir / 'diagnostic-trusted-tooling.json'
+        # A rejection must also remove any stale positive result.
+        output.write_text('{"status":"stale"}')
+        env = {**os.environ, 'GITHUB_WORKSPACE': str(root), 'CHECKOUT_REF': head,
+               'RUNNER_TEMP': str(output_dir), 'GITHUB_WORKFLOW_SHA': 'b' * 40,
+               'PATH': f"{sentinel_dir}:{os.environ['PATH']}",
+               'FORBIDDEN_DIAGNOSTIC_EXECUTION': str(marker)}
+        result = subprocess.run(['bash', '-c', body], cwd=root, env=env, text=True,
+                                capture_output=True, check=False, pass_fds=_coverage_fds())
+        assert not marker.exists(), scenario
+        if scenario == 'positive':
+            assert result.returncode == 0, result.stderr
+            receipt = json.loads(output.read_text())
+            assert receipt['sourceRevision'] == head
+            assert receipt['sourceTree'] == _diagnostic_git(root, 'rev-parse', 'HEAD^{tree}')
+            assert receipt['sha256'] == {'scripts/ios/launch-quality-audit.sh': expected, **dependencies}
+            assert receipt['policyWorkflowSHA'] == 'b' * 40
+            assert not _diagnostic_git(root, 'diff', 'HEAD', '--binary')
+            assert not _diagnostic_git(root, 'ls-files', '--others', '--exclude-standard')
+        else:
+            assert result.returncode != 0 and not output.exists(), scenario

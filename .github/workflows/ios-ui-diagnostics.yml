@@ -1,0 +1,135 @@
+name: iOS UI Diagnostics (NONQUALIFYING)
+
+on:
+  workflow_dispatch:
+    inputs:
+      checkout-ref:
+        description: Full current repository branch-head SHA for the fixed seven-case diagnostic.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Preserve both running and pending diagnostic work; a full queue rejects new work.
+concurrency:
+  group: lyb-ui-diagnostics-seven
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  diagnostic:
+    name: Focused UI Diagnostics (NONQUALIFYING)
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - name: Validate manual diagnostic source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKOUT_REF: ${{ inputs.checkout-ref }}
+        run: |
+          set -euo pipefail
+          reject() { printf '::error::%s\n' "$1"; exit 1; }
+          [[ "$GITHUB_REPOSITORY" == 'JovieInc/LogYourBody' && "$GITHUB_REF" == 'refs/heads/main' &&
+             "$GITHUB_EVENT_NAME" == 'workflow_dispatch' &&
+             "$GITHUB_WORKFLOW_REF" == 'JovieInc/LogYourBody/.github/workflows/ios-ui-diagnostics.yml@refs/heads/main' &&
+             "$GITHUB_WORKFLOW_SHA" == "$GITHUB_SHA" ]] || reject 'Dispatch only the trusted main diagnostic workflow.'
+          [[ "$CHECKOUT_REF" =~ ^[0-9a-f]{40}$ ]] || reject 'checkout-ref must be a full lowercase SHA.'
+          [[ "$GITHUB_RUN_ATTEMPT" == 1 ]] || reject 'A diagnostic rerun needs a separately reviewed new execution disposition.'
+          for actor in "$GITHUB_ACTOR" "${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}"; do
+            permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$actor/permission" --jq '.permission')" || reject 'Cannot verify actor permission.'
+            [[ "$permission" == write || "$permission" == admin ]] || reject 'Dispatch and rerun actors require write access.'
+          done
+          head_proven="$(gh api "repos/$GITHUB_REPOSITORY/commits/$CHECKOUT_REF/branches-where-head" --jq 'type == "array" and any(.[]; (.name | type == "string" and length > 0) and .commit.sha == env.CHECKOUT_REF)')" || reject 'Cannot verify current repository branch head.'
+          [[ "$head_proven" == true ]] || reject 'checkout-ref must be a current repository branch head.'
+          printf 'Diagnostic source (NONQUALIFYING): %s@%s\n' "$GITHUB_REPOSITORY" "$CHECKOUT_REF"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.checkout-ref }}
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+
+      # This server-loaded trusted-main body reads bytes only. No candidate local
+      # action, helper, help/probe, dependency hook or setup runs before this fence.
+      - name: Validate reviewed composed tooling before candidate execution
+        shell: bash
+        env:
+          CHECKOUT_REF: ${{ inputs.checkout-ref }}
+        run: |
+          python3 -I - <<'DIAGNOSTIC_TOOLING_PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import stat
+          import subprocess
+
+          # Intentionally unavailable until the FINAL composed audit and this
+          # exact policy hunk are independently reviewed. Never a caller input.
+          REVIEWED_AUDIT_SHA256 = '31c530d232d92ab814be43ab6e1b549d6bdc40e003f894d9cbba2bc92360ce0d'
+          DEPENDENCIES = {
+              'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
+              'scripts/ios/resolve-simulator-destination.sh': '9e2c125339a1ceee3ce690e50f379ce7bc0a86855cfedd4118e5467ea12ddf64',
+              'apps/ios/Scripts/import-joviekit.mjs': '35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b',
+              'apps/ios/Vendor/JovieKit.source.json': 'aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2',
+              'apps/ios/LogYourBody.xcodeproj/project.pbxproj': '5c4e7893db7cd05bb3312add2b1b5a60bfcba4a68c8f9603043eaccfe75f0d27',
+              'apps/ios/LogYourBody.xcodeproj/xcshareddata/xcschemes/LogYourBody.xcscheme': 'f8bd5d22beb90e7a04360b0a6c68d19bddc2a6ae5b076ac347f087540c870d64',
+              'apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved': '7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138',
+          }
+
+          def validate_tooling(root, expected_source, reviewed_audit, dependencies, output):
+              output.unlink(missing_ok=True)
+              if not re.fullmatch(r'[0-9a-f]{64}', reviewed_audit):
+                  raise ValueError('diagnostic-mode-unavailable: final composed tooling is not reviewed')
+              def git(*args):
+                  return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
+              if (not re.fullmatch(r'[0-9a-f]{40}', expected_source)
+                      or git('rev-parse', 'HEAD') != expected_source
+                      or git('diff', 'HEAD', '--binary')
+                      or git('ls-files', '--others', '--exclude-standard')):
+                  raise ValueError('sourceMismatch')
+              bindings = {'scripts/ios/launch-quality-audit.sh': reviewed_audit, **dependencies}
+              for name, expected in bindings.items():
+                  path = root / name
+                  if (any(parent.is_symlink() for parent in [path, *path.parents] if parent != root.parent)
+                          or not stat.S_ISREG(path.lstat().st_mode)
+                          or hashlib.sha256(path.read_bytes()).hexdigest() != expected):
+                      raise ValueError('diagnostic-mode-unavailable: reviewed dependency mismatch: ' + name)
+              output.write_text(json.dumps({'sourceRevision': expected_source,
+                  'sourceTree': git('rev-parse', 'HEAD^{tree}'), 'sha256': bindings,
+                  'policyWorkflowSHA': os.environ.get('GITHUB_WORKFLOW_SHA', 'unknown')}, indent=2) + '\n')
+
+          if __name__ == '__main__':
+              validate_tooling(Path(os.environ['GITHUB_WORKSPACE']), os.environ['CHECKOUT_REF'],
+                  REVIEWED_AUDIT_SHA256, DEPENDENCIES, Path(os.environ['RUNNER_TEMP']) / 'diagnostic-trusted-tooling.json')
+          DIAGNOSTIC_TOOLING_PY
+
+      - name: Select hosted Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: latest-stable
+
+      # No local composite setup, Ruby/Bundler install, dependency cache restore,
+      # evidence validator CLI, coverage ratchet or performance invocation here.
+      - name: Run fixed seven-case diagnostic
+        timeout-minutes: 43
+        shell: bash
+        env:
+          DIAGNOSTIC_EXPECTED_SOURCE_SHA: ${{ inputs.checkout-ref }}
+          DIAGNOSTIC_TRUSTED_TOOLING_FILE: ${{ runner.temp }}/diagnostic-trusted-tooling.json
+          ARTIFACT_DIR: ${{ runner.temp }}/quality-diagnostics/${{ github.run_id }}-${{ github.run_attempt }}
+        run: bash scripts/ios/launch-quality-audit.sh --diagnostic-seven
+
+      - name: Upload nonqualifying diagnostic artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ios-ui-diagnostic-seven-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/quality-diagnostics/${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          retention-days: 14
