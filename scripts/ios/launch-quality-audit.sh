@@ -241,7 +241,7 @@ run_xcodebuild_test() {
 
     # A diagnostic has one UI command, even when infrastructure fails before tests.
     # Retain that failure; never hide unknown prior execution behind a retry.
-    if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
+    if [[ "${AUDIT_MODE:-full}" == diagnostic-seven ]]; then
       return "$status"
     fi
 
