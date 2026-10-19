@@ -29,7 +29,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b55f50a430bac9255c72fb4849652d48b47a16cc88bf9daaa8210b2908411232`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `dd3a6afc4d5308d025dc4c2c20a39440dc2c0e461397a3b093ac496c422619c8`)
 
 ### `apps/web/package.json`: engines
 
@@ -137,7 +137,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "pdf-parse": "^1.1.4",
   "pdfjs-dist": "^6.3.289",
   "react": "^19.3.0",
-  "react-day-picker": "^10.0.1",
+  "react-day-picker": "^10.0.2",
   "react-dom": "^19.3.0",
   "react-hook-form": "^7.88.0",
   "react-markdown": "^10.1.0",
@@ -182,7 +182,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "jest": "^30.5.2",
   "jest-environment-jsdom": "^30.5.2",
   "playwright": "^1.63.0",
-  "postcss": "^8.5.28",
+  "postcss": "^8.5.30",
   "tailwindcss": "^4.3.3",
   "tsx": "^4.23.15",
   "typescript": "^5.9.3"
