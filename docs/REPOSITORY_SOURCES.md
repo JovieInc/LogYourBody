@@ -29,7 +29,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b55f50a430bac9255c72fb4849652d48b47a16cc88bf9daaa8210b2908411232`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `78102688b10e4db88969d91112edb594dd514a64827e51930150b9e668e58f69`)
 
 ### `apps/web/package.json`: engines
 
@@ -182,14 +182,14 @@ A changed fingerprint requires review of its related documentation; it does not 
   "jest": "^30.5.2",
   "jest-environment-jsdom": "^30.5.2",
   "playwright": "^1.63.0",
-  "postcss": "^8.5.28",
+  "postcss": "^8.5.30",
   "tailwindcss": "^4.3.3",
   "tsx": "^4.23.15",
   "typescript": "^5.9.3"
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ded68620444bed4436636d0c53d0f163726c68de53fd36636225c7ccdb1cc958`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `8df65819b7f4beb9ce3d65b80f169a7f55bd318ad32e26cd345c36636963f042`)
 
 ### `package.json`: packageManager
 
@@ -279,7 +279,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "lint-staged": "^15.5.2",
   "prettier": "^3.9.9",
   "prettier-plugin-tailwindcss": "^0.8.1",
-  "turbo": "^2.11.7",
+  "turbo": "^2.11.9",
   "typescript": "^5.9.3",
   "vitest": "^5.0.2"
 }
