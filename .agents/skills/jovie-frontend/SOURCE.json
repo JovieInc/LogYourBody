@@ -1,0 +1,116 @@
+{
+  "repository": "JovieInc/Jovie",
+  "revision": "d0375abd6692770d4ae41128ce79d608cb42e822",
+  "definition": "https://github.com/JovieInc/Jovie/pull/15923",
+  "files": [
+    {
+      "path": "DESIGN.md",
+      "gitBlobSHA": "b9504265018a59ce1f99bda628aa201e0fefba81",
+      "url": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/DESIGN.md",
+      "sourceSHA256": "9014111bf79cf220e03af48f4c98e3c744872798a0693968802ad768dc8cd2ab",
+      "installedSHA256": "9757107e16011b2ca67106058adce2628c29003139d9db5a944977b1b071a300",
+      "rewrittenLinks": []
+    },
+    {
+      "path": ".claude/rules/ui.md",
+      "gitBlobSHA": "d6dfc46302dbc30711659cfa2a267111109a415a",
+      "url": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/.claude/rules/ui.md",
+      "sourceSHA256": "269feca43a3956c3a353ae21c7e3dcfe7b4867388de86960e86cdfa2ce7ac590",
+      "installedSHA256": "137b8b83388a59275272b0c70f7477dbe30135f7e034b58bb2dbabeb711054dd",
+      "rewrittenLinks": []
+    },
+    {
+      "path": "docs/llms-design-manifest.txt",
+      "gitBlobSHA": "e0a3a533b2075a22c4ebe7f2b53d83dd9d5bd219",
+      "url": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/docs/llms-design-manifest.txt",
+      "sourceSHA256": "bbbfebd9c78b46bc5d213afb3b3f8e1c405fa5ef301a0dcbba063da2568fe0a7",
+      "installedSHA256": "bbbfebd9c78b46bc5d213afb3b3f8e1c405fa5ef301a0dcbba063da2568fe0a7",
+      "rewrittenLinks": []
+    },
+    {
+      "path": "docs/design-system/DETAILS.md",
+      "gitBlobSHA": "5769c0e61e33ee40a37aeb78d07073245720a432",
+      "url": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/docs/design-system/DETAILS.md",
+      "sourceSHA256": "2c76840d3e16ba5b263f9f42fdfaf8304f2af5f9024ef5ac0b177ee5623ef665",
+      "installedSHA256": "8647263cf1eac74ffd8c5011707f231209688e51f23ce39f44e27aa39d23cbae",
+      "rewrittenLinks": [
+        {
+          "original": "../../docs/marketing/AGENT_GUIDE.md#3-lock-meaning-before-writing",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/docs/marketing/AGENT_GUIDE.md#3-lock-meaning-before-writing"
+        }
+      ]
+    },
+    {
+      "path": "docs/DESIGN_TOKENS.md",
+      "gitBlobSHA": "3cdd5700fdfa4b2369b072c2326e32076d7998f1",
+      "url": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/docs/DESIGN_TOKENS.md",
+      "sourceSHA256": "99bacea71e07725fd83d0bdb5e9d25342f9a739e69476f8668b10c4ad4ff5ffa",
+      "installedSHA256": "715353fe38e5ddcdecc8d56def82ff3f468b763912fd9a956a82ff2900277440",
+      "rewrittenLinks": [
+        {
+          "original": "../apps/web/lib/canonical-surfaces.ts",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/apps/web/lib/canonical-surfaces.ts"
+        },
+        {
+          "original": "../apps/web/components/marketing",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/apps/web/components/marketing"
+        },
+        {
+          "original": "../apps/web/components/organisms/public-surface",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/apps/web/components/organisms/public-surface"
+        },
+        {
+          "original": "../apps/web/lib/canonical-surfaces.ts",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/apps/web/lib/canonical-surfaces.ts"
+        }
+      ]
+    },
+    {
+      "path": "canon/OPERATING_SYSTEM.md",
+      "gitBlobSHA": "ad2f44134cafb3f174da89247adcc1c54f58ad28",
+      "url": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/canon/OPERATING_SYSTEM.md",
+      "sourceSHA256": "405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5",
+      "installedSHA256": "fdfc1d2b05adc9c55c198d32506113e07f49b90942f87b79ed35e9388fc55e7d",
+      "rewrittenLinks": [
+        {
+          "original": "../docs/company/CAPITAL-STRATEGY.md",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/docs/company/CAPITAL-STRATEGY.md"
+        },
+        {
+          "original": "../docs/company/operating-principles.md",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/docs/company/operating-principles.md"
+        },
+        {
+          "original": "./FLEET.md",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/canon/FLEET.md"
+        },
+        {
+          "original": "./FLEET.md",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/canon/FLEET.md"
+        }
+      ]
+    },
+    {
+      "path": "canon/DESIGN.md",
+      "gitBlobSHA": "3efb0df6bbe37882d2a8bb5a9b2eef62440dff57",
+      "url": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/canon/DESIGN.md",
+      "sourceSHA256": "8a6b7095f7a50904b77c4c2b0599d1b9f4de4621ffe459d1488357a31476839f",
+      "installedSHA256": "c0e2759f0994fd313a640955abc6e90b5b32398c3a93cfd2d8ef6ee5563fe74a",
+      "rewrittenLinks": [
+        {
+          "original": "../docs/screenshots/ui-escape-holdout/holdout.json",
+          "pinned": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/docs/screenshots/ui-escape-holdout/holdout.json"
+        }
+      ]
+    },
+    {
+      "path": "packages/ui/theme/motion-policy.ts",
+      "gitBlobSHA": "b972b26e90b1872ddb78e062c8c74e59e0a65b66",
+      "url": "https://github.com/JovieInc/Jovie/blob/d0375abd6692770d4ae41128ce79d608cb42e822/packages/ui/theme/motion-policy.ts",
+      "sourceSHA256": "a7d5674a37850fda48061843a9a2c8d3886510c86e525f4739a85f664de1619c",
+      "installedSHA256": "fd446b0ddb6d4f7abb23d846b9be768364206d65f9e7b25f03961aa1e8ca15f2",
+      "rewrittenLinks": []
+    }
+  ],
+  "packaging": "Pristine GitHub download preserved separately. Installed documents rewrite non-bundled Markdown links to immutable upstream URLs and use the repository Prettier formatter; source design instructions are not changed."
+}

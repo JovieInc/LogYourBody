@@ -68,6 +68,54 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 
+    func testIntegrationDirectorySeparatesHealthAccessAndScanHistory() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestIntegrationsDirectoryFixture"])
+        assertTimelineRootAppears(in: app, timeout: 30)
+        openPhotoTimelineMenu(in: app)
+        let settings = waitForSettingsMenuEntry(in: app)
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        settings.tap()
+
+        let integrations = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'settings_integrations_link'")
+        ).firstMatch
+        XCTAssertTrue(integrations.waitForExistence(timeout: 8))
+        for _ in 0..<4 where !integrations.isHittable { app.swipeUp() }
+        XCTAssertTrue(integrations.isHittable)
+        integrations.tap()
+        XCTAssertTrue(app.navigationBars["Integrations"].waitForExistence(timeout: 8))
+
+        let health = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_health_status'")
+        ).firstMatch
+        XCTAssertTrue(health.waitForExistence(timeout: 8))
+        XCTAssertTrue(health.label.contains("Apple Health"))
+        XCTAssertFalse(health.label.contains("Connected"), "A permission request must not prove read access.")
+        let healthStatus = health.value as? String ?? ""
+        XCTAssertTrue(["Set up access", "Sync enabled", "Sync paused", "Use on iPhone", "Unavailable"].contains(healthStatus))
+        XCTAssertFalse(healthStatus.contains("Connected"), "A permission request must not prove read access.")
+
+        let bodySpec = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_link'")
+        ).firstMatch
+        XCTAssertTrue(bodySpec.waitForExistence(timeout: 8))
+        XCTAssertTrue(bodySpec.label.contains("BodySpec"))
+        XCTAssertFalse(bodySpec.label.contains("Last synced"), "A scan date must not become sync freshness.")
+        XCTAssertFalse(bodySpec.label.contains("Connection saved"), "Device scope belongs in the disclosure.")
+        XCTAssertFalse(bodySpec.label.contains("Latest scan"), "Scan history belongs in the disclosure.")
+        XCTAssertFalse(app.staticTexts["Health & Fitness"].exists)
+        attachScreenshot(named: "integrations-directory-permission-and-history-fixture", from: app)
+        let history = app.buttons.matching(
+            NSPredicate(format: "identifier CONTAINS 'integrations_bodyspec_history'")
+        ).firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 8))
+        XCTAssertTrue(history.isHittable)
+        history.tap()
+        attachScreenshot(named: "integrations-directory-expanded-history-fixture", from: app)
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+
     // MARK: - 1. Weight entry boundaries
 
     func testWeightEntryRejectsInvalidAndOutOfRangeValues() throws {
@@ -585,6 +633,32 @@ final class ChaosEdgeCaseUITests: XCTestCase {
         app.buttons["home_v2_settings_back"].tap()
         assertTimelineRootAppears(in: app, timeout: 8)
         assertNoLayoutAnomalies(in: app, context: "timeline root after round trip")
+    }
+
+    func testWeightKeyboardControlsMeetMinimumHitTarget() throws {
+        let app = XCUIApplication()
+        launch(app, with: ["-lybUITestWeightLoggerMVPFixture"])
+        try openMVPWeightEntry(in: app)
+
+        let field = app.textFields["mvp_weight_text_field"]
+        XCTAssertTrue(field.waitForExistence(timeout: 8))
+        field.tap()
+        XCTAssertTrue(waitForKeyboard(in: app), "Keyboard did not appear after tapping the weight field.")
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_done_button").firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(identifier: "mvp_keyboard_save_weight_button").firstMatch.exists)
+
+        let window = app.windows.firstMatch.frame
+        for identifier in ["mvp_keyboard_bottom_done_button", "mvp_keyboard_save_weight_bar_button"] {
+            let control = app.buttons.matching(identifier: identifier).firstMatch
+            XCTAssertTrue(control.waitForExistence(timeout: 5), identifier)
+            let frame = control.frame
+            XCTAssertTrue(window.contains(frame), "\(identifier) \(frame) window \(window)")
+            XCTAssertGreaterThanOrEqual(frame.width, 44, "\(identifier) \(frame)")
+            XCTAssertGreaterThanOrEqual(frame.height, 44, "\(identifier) \(frame)")
+        }
+
+        app.buttons.matching(identifier: "mvp_keyboard_bottom_done_button").firstMatch.tap()
+        XCTAssertTrue(app.keyboards.element.waitForNonExistence(timeout: 3))
     }
 
     // MARK: - 14. Arabic locale renders the root with a hittable composer
