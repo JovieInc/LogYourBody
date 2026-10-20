@@ -792,7 +792,9 @@ struct ChatTabView: View {
                 Text("Log \(proposal.reps) reps at \(load), \(proposal.rir) RIR for \(proposal.exerciseName), set \(proposal.setNumber)?")
             }
         }
-        .sheet(item: $trainingPresentation) { presentation in
+        .sheet(item: $trainingPresentation, onDismiss: {
+            Task { await loadTrainingNext() }
+        }, content: { presentation in
             switch presentation {
             case .setup:
                 TrainingEnrollmentView { sessionsPerWeek, equipment in
@@ -828,7 +830,7 @@ struct ChatTabView: View {
                     commitVoiceSet(proposal)
                 }
             }
-        }
+        })
     }
 
     private var chatSurface: some View {

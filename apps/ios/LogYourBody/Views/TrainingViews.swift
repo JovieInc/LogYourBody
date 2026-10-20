@@ -317,6 +317,7 @@ struct TrainingLiveSessionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
     @StateObject private var draft: TrainingSessionDraft
+    @State private var controller: WorkoutSessionController
     private var loggedSets: Set<String> { Set(draft.loggedSets.keys) }
     @State private var soreness = 0
     @State private var pump = 0
@@ -325,6 +326,8 @@ struct TrainingLiveSessionView: View {
     @State private var feedbackSaved = false
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var substitutionNotice: String?
+    @State private var painNotice: String?
 
     init(
         session: TrainingSession,
@@ -339,6 +342,10 @@ struct TrainingLiveSessionView: View {
         self.onFeedback = onFeedback
         _draft = StateObject(wrappedValue: TrainingSessionDraft(
             session: session, ownerId: ownerId, store: draftStore, isCurrent: isCurrent
+        ))
+        _controller = State(initialValue: WorkoutSessionController(
+            session: session,
+            loggedSetKeys: Set((session.loggedSets ?? []).map { "\($0.exerciseId)-\($0.setNumber)" })
         ))
     }
 
@@ -360,9 +367,19 @@ struct TrainingLiveSessionView: View {
                         Text("Week \(session.week) · \(session.title)")
                             .font(.system(size: 22, weight: .semibold, design: .rounded))
                             .foregroundStyle(theme.colors.text)
-                        ForEach(session.exercises) { exercise in
-                            exerciseCard(exercise)
+                        if let now = controller.now {
+                            nowCard(now)
+                        } else {
+                            Text("Session complete. Save your check-in so the engine can adapt.")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(theme.colors.textSecondary)
+                                .accessibilityIdentifier("training_session_complete")
                         }
+                        if let upNext = controller.upNext {
+                            upNextRow(upNext)
+                        }
+                        timeBudgetRow
+                        sessionPlanSection
                         feedbackCard
                     }
 
@@ -385,34 +402,194 @@ struct TrainingLiveSessionView: View {
             }
         }
         .interactiveDismissDisabled(isSaving || draft.isSaving)
+        .onAppear { controller.refresh(loggedSetKeys: loggedSets) }
+        .onChange(of: draft.loggedSets) { _, saved in
+            controller.refresh(loggedSetKeys: Set(saved.keys))
+        }
     }
 
-    private func exerciseCard(_ exercise: TrainingExercisePrescription) -> some View {
+    private func nowCard(_ action: WorkoutNowAction) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text("NOW")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .tracking(0.7)
+                .foregroundStyle(theme.colors.textSecondary)
             VStack(alignment: .leading, spacing: 4) {
-                Text(exercise.name)
+                Text(action.exercise.name)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(theme.colors.text)
-                Text("\(exercise.sets) sets · \(exercise.repRange.min)–\(exercise.repRange.max) reps · \(exercise.targetRir) RIR")
+                Text("Set \(action.setNumber) of \(action.totalSets) · \(action.exercise.repRange.min)–\(action.exercise.repRange.max) reps · \(action.exercise.targetRir) RIR")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(theme.colors.textSecondary)
-                if let loadInstruction = exercise.loadInstruction {
+                if let loadInstruction = action.exercise.loadInstruction {
                     Text(loadInstruction)
                         .font(.system(size: 12))
                         .foregroundStyle(theme.colors.textSecondary)
                 }
             }
+            setRow(action.exercise, setNumber: action.setNumber)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityIdentifier("training_now_card")
+    }
 
-            ForEach(1...max(1, exercise.sets), id: \.self) { setNumber in
-                setRow(exercise, setNumber: setNumber)
-                if setNumber < exercise.sets {
-                    Divider().overlay(theme.colors.border)
+    private func upNextRow(_ action: WorkoutNowAction) -> some View {
+        HStack(spacing: 8) {
+            Text("UP NEXT")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .tracking(0.7)
+                .foregroundStyle(theme.colors.textSecondary)
+            Text("\(action.exercise.name) · Set \(action.setNumber)")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(theme.colors.text)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("training_up_next")
+    }
+
+    private var timeBudgetRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if controller.exerciseLimit == nil {
+                HStack(spacing: 12) {
+                    Text("Short on time?")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(theme.colors.textSecondary)
+                    Button("30 min") { controller.shortenSession(remainingMinutes: 30) }
+                        .accessibilityIdentifier("training_shorten_30")
+                    Button("45 min") { controller.shortenSession(remainingMinutes: 45) }
+                        .accessibilityIdentifier("training_shorten_45")
                 }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(theme.colors.text)
+            } else {
+                HStack(spacing: 12) {
+                    Text("Session shortened for today.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(theme.colors.textSecondary)
+                    Button("Restore full session") { controller.restoreFullSession() }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(theme.colors.text)
+                        .accessibilityIdentifier("training_restore_full")
+                }
+            }
+        }
+    }
+
+    private var sessionPlanSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(controller.order, id: \.self) { exerciseId in
+                if let exercise = controller.exercise(for: exerciseId) {
+                    planRow(exerciseId: exerciseId, exercise: exercise)
+                    if exerciseId != controller.order.last {
+                        Divider().overlay(theme.colors.border)
+                    }
+                }
+            }
+            if let substitutionNotice {
+                Text(substitutionNotice)
+                    .font(.footnote)
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .accessibilityIdentifier("training_substitution_notice")
+            }
+            if let painNotice {
+                Text(painNotice)
+                    .font(.footnote)
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .accessibilityIdentifier("training_pain_notice")
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityIdentifier("training_plan_section")
+    }
+
+    private func planRow(exerciseId: String, exercise: TrainingExercisePrescription) -> some View {
+        let total = max(1, exercise.sets)
+        let done = (1...total).filter { loggedSets.contains("\(exercise.id)-\($0)") }.count
+        let skipped = controller.isSkipped(exerciseId)
+        let trimmed = controller.exerciseLimit.map { limit in
+            !controller.order.filter { !controller.isSkipped($0) }.prefix(limit).contains(exerciseId)
+        } ?? false
+        return VStack(alignment: .leading, spacing: JovieTokens.tightGap) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(exercise.name)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(skipped || trimmed ? theme.colors.textSecondary : theme.colors.text)
+                    if skipped {
+                        Text("Skipped today")
+                            .font(.system(size: 12))
+                            .foregroundStyle(theme.colors.textSecondary)
+                    } else if trimmed {
+                        Text("Trimmed for today")
+                            .font(.system(size: 12))
+                            .foregroundStyle(theme.colors.textSecondary)
+                    } else {
+                        Text("\(done) of \(total) sets logged")
+                            .font(.system(size: 12))
+                            .foregroundStyle(theme.colors.textSecondary)
+                    }
+                }
+                Spacer(minLength: 8)
+                if done == total, !skipped {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(theme.colors.text)
+                        .accessibilityIdentifier("training_exercise_done_\(exercise.id)")
+                }
+                if skipped || trimmed {
+                    Button("Undo") {
+                        controller.undoSkip(exerciseId: exerciseId)
+                        if trimmed { controller.restoreFullSession() }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.colors.text)
+                    .accessibilityIdentifier("training_undo_skip_\(exercise.id)")
+                } else if done < total {
+                    Menu {
+                        Button("Equipment unavailable") { handleOccupied(exerciseId) }
+                            .accessibilityIdentifier("training_occupied_\(exercise.id)")
+                        Button("Skip this today") { controller.skipForToday(exerciseId: exerciseId) }
+                            .accessibilityIdentifier("training_skip_\(exercise.id)")
+                        Button("Report pain on this") { reportPain(exercise) }
+                            .accessibilityIdentifier("training_pain_\(exercise.id)")
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(theme.colors.text)
+                            .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
+                    }
+                    .accessibilityIdentifier("training_exercise_menu_\(exercise.id)")
+                }
+            }
+            ForEach(1...total, id: \.self) { setNumber in
+                if loggedSets.contains("\(exercise.id)-\(setNumber)") {
+                    setRow(exercise, setNumber: setNumber)
+                }
+            }
+        }
+        .accessibilityIdentifier("training_plan_row_\(exercise.id)")
+    }
+
+    private func handleOccupied(_ exerciseId: String) {
+        switch controller.markOccupied(exerciseId: exerciseId) {
+        case .reordered:
+            substitutionNotice = nil
+        case .requiresSubstitution:
+            substitutionNotice = "That is the last movement left. Ask your coach in chat for an " +
+                "eligible substitute rather than guessing a load."
+        case .notActionable:
+            substitutionNotice = nil
+        }
+    }
+
+    private func reportPain(_ exercise: TrainingExercisePrescription) {
+        _ = controller.routePainReport(exerciseId: exercise.id)
+        painNotice = "Pain noted on \(exercise.name). Update your check-in below and pause " +
+            "this movement if it persists or worsens."
     }
 
     private func setRow(_ exercise: TrainingExercisePrescription, setNumber: Int) -> some View {
