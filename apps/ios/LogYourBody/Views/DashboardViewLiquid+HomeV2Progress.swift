@@ -87,7 +87,7 @@ extension DashboardViewLiquid {
     func homeV2ProgressValueText(_ metric: HomeV2ProgressMetric, _ value: Double) -> String {
         switch metric {
         case .steps:
-            return FormatterCache.formattedSteps(value) ?? "—"
+            return FormatterCache.stepsFormatter.string(from: NSNumber(value: Int(value.rounded()))) ?? "\(Int(value.rounded()))"
         case .weight, .bodyFat, .ffmi:
             return String(format: "%.1f", value)
         }

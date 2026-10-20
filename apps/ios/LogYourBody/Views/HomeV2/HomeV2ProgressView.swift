@@ -105,8 +105,8 @@ enum HomeV2ProgressCopy {
         return "\(direction) \(value)\(unitText) \(rangeLabel(range))"
     }
 
-    static func stepsAverageSentence(average: Double?, range: TimeRange) -> String {
-        guard let average, let text = FormatterCache.formattedSteps(average) else {
+    static func stepsAverageSentence(average: Int?, range: TimeRange) -> String {
+        guard let average, let text = FormatterCache.stepsFormatter.string(from: NSNumber(value: average)) else {
             return noTrendYet
         }
         return "Averaging \(text) a day \(rangeLabel(range))"
@@ -292,7 +292,7 @@ struct HomeV2ProgressView: View {
             return HomeV2ProgressCopy.dataDaysSentence(days: stats.distinctDays)
         }
         if metric == .steps {
-            return HomeV2ProgressCopy.stepsAverageSentence(average: stats.average, range: range)
+            return HomeV2ProgressCopy.stepsAverageSentence(average: stats.average.map { Int($0.rounded()) }, range: range)
         }
         return HomeV2ProgressCopy.deltaSentence(delta: stats.delta, unit: current.deltaUnit, range: range)
     }

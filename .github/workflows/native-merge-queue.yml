@@ -2,17 +2,13 @@ name: Native Merge Queue Enrollment
 
 # Every same-repo, non-draft PR to main enters the native queue once CI passes on its exact head.
 # The queue re-runs CI on the merge group before landing; no extra labels or certification gates.
-# A PR the queue drops re-enters on the `dequeued` event when its head is unchanged and still
-# green and the cause was transient (check timeout) or a first failed merge group. A second
-# failed merge group at one head is a poison: it stays out and the lanes repair owner takes it.
-# Manual and merge-conflict removals are never undone here.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
   # Draft-first PRs often go green while still drafts; enroll them when marked ready.
   pull_request_target:
-    types: [ready_for_review, dequeued]
+    types: [ready_for_review]
     branches: [main]
 
 permissions:
@@ -37,8 +33,7 @@ jobs:
             const expectedRepository = 'JovieInc/LogYourBody';
             if (`${context.repo.owner}/${context.repo.repo}` !== expectedRepository
                 || !['workflow_run', 'pull_request_target'].includes(context.eventName)
-                || (context.eventName === 'pull_request_target'
-                  && !['ready_for_review', 'dequeued'].includes(context.payload.action))) {
+                || (context.eventName === 'pull_request_target' && context.payload.action !== 'ready_for_review')) {
               core.notice('NOT_ELIGIBLE: Event is outside the repository enrollment contract');
               return;
             }
@@ -109,35 +104,6 @@ jobs:
             if (pull.head.sha !== run.head_sha) {
               await recordOutcome('STALE', 'Exact-head CI proof no longer matches the PR', pull.head.sha);
               return;
-            }
-
-            if (context.eventName === 'pull_request_target' && context.payload.action === 'dequeued') {
-              // Removals since this head's CI started belong to this head.
-              const { repository: removed } = await github.graphql(`
-                query Removals($owner: String!, $repo: String!, $number: Int!) {
-                  repository(owner: $owner, name: $repo) {
-                    pullRequest(number: $number) {
-                      timelineItems(last: 20, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) {
-                        nodes { ... on RemovedFromMergeQueueEvent { createdAt reason } }
-                      }
-                    }
-                  }
-                }
-              `, { owner: context.repo.owner, repo: context.repo.repo, number: pull.number });
-              const removals = (removed?.pullRequest?.timelineItems?.nodes ?? [])
-                .filter((item) => item?.createdAt && Date.parse(item.createdAt) >= Date.parse(run.created_at));
-              const reason = String(removals.at(-1)?.reason ?? context.payload.reason ?? '').toLowerCase();
-              const failedGroups = removals
-                .filter((item) => String(item.reason).toLowerCase() === 'failed_checks').length;
-              if (!['checks_timed_out', 'failed_checks'].includes(reason)) {
-                await recordOutcome('NOT_ELIGIBLE', 'Queue removal was not transient', reason || 'unknown');
-                return;
-              }
-              if (failedGroups >= 2) {
-                await recordOutcome('POISONED', 'Merge group failed twice at this head; left for repair',
-                  `failed_groups=${failedGroups}`);
-                return;
-              }
             }
 
             let result;

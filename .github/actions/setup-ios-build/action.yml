@@ -85,11 +85,7 @@ runs:
         working-directory: ${{ inputs.working-directory }}
         cache-key-prefix: 'ios-gems'
 
-    # Hosted only: on a persistent Mac this globs every project's DerivedData
-    # and the post-job save uploaded for 30+ min over the home uplink until the
-    # job timed out (2026-10-12, tw-mac-001). The Macs keep packages locally.
     - name: Cache Swift Package Manager
-      if: runner.environment == 'github-hosted'
       uses: actions/cache@v4
       with:
         path: |

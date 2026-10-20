@@ -15,8 +15,6 @@ struct IntegrationsView: View {
     @State private var healthSyncStatusMessage: String?
     @State private var healthSyncStatusIsError = false
     @State private var bodySpecLastSyncedText: String?
-    @State private var bodySpecHistoryFailed = false
-    @State private var historyRefreshVersion = 0
     @State private var isLoadingBodySpecLastSynced = false
     @State private var progressPhotoCount = 0
     @State private var featureGateRefreshToken = UUID()
@@ -32,73 +30,101 @@ struct IntegrationsView: View {
         .scrollBounceBehavior(.basedOnSize)
         .navigationTitle("Integrations")
         .navigationBarTitleDisplayMode(.inline)
-        .alert(
-            isDirectoryEnabled ? "Apple Health access" : "Apple Health could not be opened",
-            isPresented: $showHealthKitConnect
-        ) {
+        .alert("Apple Health could not be opened", isPresented: $showHealthKitConnect) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
-            Button(isDirectoryEnabled ? "Done" : "Not Now", role: .cancel) {}
+            Button("Not Now", role: .cancel) {}
         } message: {
-            Text(isDirectoryEnabled
-                ? "Review LogYourBody’s data access in the Health app on your iPhone or iPad."
-                : "You can log manually and try again. This is not a denial of read access.")
+            Text("You can log manually and try again. This is not a denial of read access.")
         }
-        .task(id: "\(authManager.currentUser?.id ?? ""):\(historyRefreshVersion)") {
+        .onAppear {
+            // Check HealthKit authorization status
             healthKitManager.checkAuthorizationStatus()
+
+            Task { @MainActor in
+                await loadBodySpecLastSynced()
+            }
+
             loadBulkPhotoImportActivationEvidence()
-            await loadBodySpecLastSynced()
         }
         .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
             featureGateRefreshToken = UUID()
-            historyRefreshVersion += 1
         }
         .worldClassScreen(.integrations)
     }
 
     private var healthAndFitnessSection: some View {
         SettingsSection(
-            header: isDirectoryEnabled ? "Connections" : "Health & Fitness",
+            header: "Health & Fitness",
             footer: "Control data connections and sync."
         ) {
-            if isDirectoryEnabled {
-                SettingsRow(
-                    icon: "heart.fill",
-                    title: ProductRegistry.Integrations.appleHealth.label,
-                    subtitle: "\(ProductRegistry.Integrations.appleHealth.description)\n\(appleHealthPresentation.status)"
-                )
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(ProductRegistry.Integrations.appleHealth.label)
-                .accessibilityValue(appleHealthPresentation.status)
-                .accessibilityHint(appleHealthPresentation.detail)
-                .accessibilityIdentifier("integrations_health_status")
-            }
             if healthKitManager.isHealthKitAvailable {
-                if !isDirectoryEnabled {
-                    ViewThatFits(in: .horizontal) {
-                        appleHealthConnectionRow
-                        appleHealthConnectionStack
-                    }
-                } else if !healthKitManager.isAuthorized {
-                    Button(isConnectingHealthKit ? "Requesting access…" : "Set up Apple Health") {
-                        Task { @MainActor in await connectAppleHealth() }
-                    }
-                    .disabled(isConnectingHealthKit)
-                    .accessibilityIdentifier("integrations_health_connect")
+                ViewThatFits(in: .horizontal) {
+                    appleHealthConnectionRow
+                    appleHealthConnectionStack
                 }
 
                 if healthKitManager.isAuthorized {
-                    if isDirectoryEnabled {
-                        DisclosureGroup("Sync and access") { healthSyncControls }
-                            .accessibilityIdentifier("integrations_health_options")
-                    } else {
-                        healthSyncControls
+                    SettingsToggleRow(
+                        icon: "arrow.triangle.2.circlepath",
+                        title: "Enable Sync",
+                        isOn: $healthKitSyncEnabled,
+                        subtitle: "Keep weight and steps up to date"
+                    )
+                    .onChange(of: healthKitSyncEnabled) { _, newValue in
+                        if newValue {
+                            Task {
+                                _ = await healthKitManager.requestAuthorization()
+                                let followUp = HealthKitAuthorizationPolicy.connectFollowUp(
+                                    healthKitManager.lastAuthorizationResolution
+                                        ?? HealthKitAuthorizationPolicy.resolve(
+                                            writeAuthorized: false,
+                                            probes: [:],
+                                            requestSucceeded: false
+                                        )
+                                )
+                                switch followUp {
+                                case .startSync:
+                                    await HealthSyncCoordinator.shared
+                                        .configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
+                                case .showRequestFailure:
+                                    await MainActor.run {
+                                        healthKitSyncEnabled = false
+                                        showHealthKitConnect = true
+                                    }
+                                case .showInconclusiveRead:
+                                    await MainActor.run {
+                                        healthKitSyncEnabled = false
+                                        healthSyncStatusMessage = healthKitManager.authorizationStatusText
+                                        showHealthKitConnect = false
+                                    }
+                                }
+                            }
+                        }
                     }
+
+                    Button {
+                        Task { @MainActor in
+                            await syncAllHealthData()
+                        }
+                    } label: {
+                        SettingsRow(
+                            icon: "arrow.triangle.2.circlepath",
+                            title: isSyncingHealthKit ? "Syncing historical data" : "Sync all historical data",
+                            subtitle: healthSyncStatusMessage,
+                            subtitleColor: healthSyncStatusIsError ? Color.appError : nil,
+                            showChevron: false
+                        )
+                    }
+                    .foregroundStyle(.primary)
+                    .disabled(isSyncingHealthKit)
+                    .accessibilityHint("Syncs your historical Apple Health data now.")
+                    .accessibilityIdentifier("integrations_health_sync_all_button")
                 }
-            } else if !isDirectoryEnabled {
+            } else {
                 DataInfoRow(
                     icon: "exclamationmark.triangle",
                     title: "Apple Health isn’t available",
@@ -114,92 +140,14 @@ struct IntegrationsView: View {
                 ) {
                     SettingsRow(
                         icon: "waveform.path.ecg",
-                        title: isDirectoryEnabled ? ProductRegistry.Integrations.bodyspec.label : "BodySpec",
-                        subtitle: isDirectoryEnabled ? "\(bodySpecDirectoryDetail)\n\(bodySpecConnectionStatus)" : "DEXA scans",
-                        value: isDirectoryEnabled ? nil : bodySpecSyncStatusText,
+                        title: "BodySpec",
+                        subtitle: "DEXA scans",
+                        value: bodySpecSyncStatusText,
                         showChevron: false
                     )
                 }
                 .accessibilityIdentifier("integrations_bodyspec_link")
-                if isDirectoryEnabled {
-                    DisclosureGroup("Scan history") {
-                        Text(bodySpecSyncStatusText)
-                        if BodySpecAuthManager.shared.isConnected { Text("Connection saved on this device") }
-                    }
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("integrations_bodyspec_history")
-                }
-                if isDirectoryEnabled, bodySpecHistoryFailed {
-                    Button("Refresh scan history") { historyRefreshVersion += 1 }
-                        .disabled(isLoadingBodySpecLastSynced)
-                        .accessibilityIdentifier("integrations_bodyspec_refresh")
-                }
             }
-        }
-    }
-
-    private var healthSyncControls: some View {
-        Group {
-            if isDirectoryEnabled {
-                Text("Apple Health controls which data is shared.").foregroundStyle(.secondary)
-                Button("Manage Apple Health access") { showHealthKitConnect = true }
-                    .accessibilityIdentifier("integrations_health_manage_access")
-            }
-            SettingsToggleRow(
-                icon: "arrow.triangle.2.circlepath",
-                title: "Enable Sync",
-                isOn: $healthKitSyncEnabled,
-                subtitle: "Keep weight and steps up to date"
-            )
-            .onChange(of: healthKitSyncEnabled) { _, newValue in
-                if newValue {
-                    Task {
-                        _ = await healthKitManager.requestAuthorization()
-                        let followUp = HealthKitAuthorizationPolicy.connectFollowUp(
-                            healthKitManager.lastAuthorizationResolution
-                                ?? HealthKitAuthorizationPolicy.resolve(
-                                    writeAuthorized: false,
-                                    probes: [:],
-                                    requestSucceeded: false
-                                )
-                        )
-                        switch followUp {
-                        case .startSync:
-                            await HealthSyncCoordinator.shared
-                                .configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync()
-                        case .showRequestFailure:
-                            await MainActor.run {
-                                healthKitSyncEnabled = false
-                                showHealthKitConnect = true
-                            }
-                        case .showInconclusiveRead:
-                            await MainActor.run {
-                                healthKitSyncEnabled = false
-                                healthSyncStatusMessage = healthKitManager.authorizationStatusText
-                                showHealthKitConnect = false
-                            }
-                        }
-                    }
-                }
-            }
-
-            Button {
-                Task { @MainActor in
-                    await syncAllHealthData()
-                }
-            } label: {
-                SettingsRow(
-                    icon: "arrow.triangle.2.circlepath",
-                    title: isSyncingHealthKit ? "Syncing historical data" : "Sync all historical data",
-                    subtitle: healthSyncStatusMessage,
-                    subtitleColor: healthSyncStatusIsError ? Color.appError : nil,
-                    showChevron: false
-                )
-            }
-            .foregroundStyle(.primary)
-            .disabled(isSyncingHealthKit)
-            .accessibilityHint("Syncs your historical Apple Health data now.")
-            .accessibilityIdentifier("integrations_health_sync_all_button")
         }
     }
 
@@ -323,35 +271,6 @@ struct IntegrationsView: View {
 // MARK: - BodySpec Helpers
 
 extension IntegrationsView {
-    private var isDirectoryEnabled: Bool {
-        _ = featureGateRefreshToken
-        return IntegrationStatusPolicy.isEnabled(arguments: ProcessInfo.processInfo.arguments) {
-            AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0)
-        }
-    }
-
-    private var appleHealthPresentation: IntegrationStatusPolicy.HealthPresentation {
-        IntegrationStatusPolicy.health(
-            available: healthKitManager.isHealthKitAvailable,
-            onMac: ProcessInfo.processInfo.isiOSAppOnMac,
-            requestCompleted: healthKitManager.isAuthorized,
-            syncEnabled: healthKitSyncEnabled
-        )
-    }
-
-    private var bodySpecConnectionStatus: String {
-        IntegrationStatusPolicy.bodySpecConnection(
-            configured: BodySpecAuthManager.shared.isConfigured,
-            connected: BodySpecAuthManager.shared.isConnected
-        )
-    }
-
-    private var bodySpecDirectoryDetail: String {
-        var lines = [ProductRegistry.Integrations.bodyspec.description]
-        if bodySpecHistoryFailed { lines.append("Couldn’t refresh scan history.") }
-        return lines.joined(separator: "\n")
-    }
-
     private var bodySpecSyncStatusText: String {
         if isLoadingBodySpecLastSynced {
             return "Checking"
@@ -399,7 +318,7 @@ extension IntegrationsView {
         healthSyncStatusIsError = false
         let didSucceed = await HealthSyncCoordinator.shared.forceFullHealthKitSync()
         healthSyncStatusMessage = didSucceed
-            ? (isDirectoryEnabled ? "Sync request finished" : "Historical Apple Health data synced")
+            ? "Historical Apple Health data synced"
             : "Historical sync failed. Try again."
         healthSyncStatusIsError = !didSucceed
         isSyncingHealthKit = false
@@ -448,46 +367,31 @@ extension IntegrationsView {
               let userId = authManager.currentUser?.id else {
             bodySpecLastSyncedText = nil
             isLoadingBodySpecLastSynced = false
-            bodySpecHistoryFailed = false
             return
         }
 
         isLoadingBodySpecLastSynced = true
-        bodySpecHistoryFailed = false
-        bodySpecLastSyncedText = nil
 
-        let cachedResults = await CoreDataManager.shared.fetchDexaResults(for: userId, limit: isDirectoryEnabled ? 100 : 1)
-        guard IntegrationStatusPolicy.mayApplyHistory(
-            requestedUserId: userId, currentUserId: authManager.currentUser?.id, cancelled: Task.isCancelled
-        ) else { return }
-        let cached = isDirectoryEnabled ? IntegrationStatusPolicy.bodySpecHistory(cachedResults) : cachedResults
+        let cached = await CoreDataManager.shared.fetchDexaResults(for: userId, limit: 1)
         if let latest = cached.first {
-            let date = IntegrationStatusPolicy.scanDate(latest, directoryEnabled: isDirectoryEnabled)
+            let date = latest.acquireTime ?? latest.updatedAt
             bodySpecLastSyncedText = formatBodySpecLastSynced(date: date)
         } else {
-            bodySpecLastSyncedText = isDirectoryEnabled ? "No cached scans" : "Not synced yet"
+            bodySpecLastSyncedText = "Not synced yet"
         }
 
         do {
-            let fetched = try await AppServicePorts.dexaResultRemoteDataProvider.fetchDexaResults(
-                userId: userId, limit: isDirectoryEnabled ? 100 : 1
-            )
-            guard IntegrationStatusPolicy.mayApplyHistory(
-                requestedUserId: userId, currentUserId: authManager.currentUser?.id, cancelled: Task.isCancelled
-            ) else { return }
-            let results = isDirectoryEnabled ? IntegrationStatusPolicy.bodySpecHistory(fetched) : fetched
+            let results = try await AppServicePorts.dexaResultRemoteDataProvider.fetchDexaResults(userId: userId, limit: 1)
 
             if let latest = results.first {
-                let date = IntegrationStatusPolicy.scanDate(latest, directoryEnabled: isDirectoryEnabled)
+                let date = latest.acquireTime ?? latest.updatedAt
                 bodySpecLastSyncedText = formatBodySpecLastSynced(date: date)
-            } else if !isDirectoryEnabled || cached.isEmpty {
-                bodySpecLastSyncedText = isDirectoryEnabled ? "No scans in recent history" : "Not synced yet"
+            } else {
+                bodySpecLastSyncedText = "Not synced yet"
             }
 
-            CoreDataManager.shared.saveDexaResults(fetched, userId: userId)
+            CoreDataManager.shared.saveDexaResults(results, userId: userId)
         } catch {
-            guard authManager.currentUser?.id == userId, !Task.isCancelled else { return }
-            bodySpecHistoryFailed = true
         }
 
         isLoadingBodySpecLastSynced = false
@@ -495,59 +399,12 @@ extension IntegrationsView {
 
     private func formatBodySpecLastSynced(date: Date?) -> String {
         guard let date else {
-            return isDirectoryEnabled ? "Scan date unavailable" : "Not synced yet"
+            return "Not synced yet"
         }
 
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         let relative = formatter.localizedString(for: date, relativeTo: Date())
-        return isDirectoryEnabled ? "Latest scan · \(relative)" : "Last synced · \(relative)"
-    }
-}
-
-enum IntegrationStatusPolicy {
-    static let gateKey = "lyb_integrations_directory_v1"
-
-    static func isEnabled(arguments: [String], checkGate: (String) -> Bool) -> Bool {
-        #if DEBUG
-        if arguments.contains("-lybUITestIntegrationsDirectoryFixture") { return true }
-        #endif
-        return checkGate(gateKey)
-    }
-
-    struct HealthPresentation: Equatable {
-        let status: String
-        let detail: String
-    }
-
-    static func health(available: Bool, onMac: Bool, requestCompleted: Bool, syncEnabled: Bool) -> HealthPresentation {
-        guard available else {
-            return HealthPresentation(
-                status: onMac ? "Use on iPhone" : "Unavailable",
-                detail: "Set up Apple Health in LogYourBody on a supported iPhone or iPad."
-            )
-        }
-        return HealthPresentation(
-            status: requestCompleted ? (syncEnabled ? "Sync enabled" : "Sync paused") : "Set up access",
-            detail: "\(ProductRegistry.Integrations.appleHealth.description) Apple Health controls which data is shared."
-        )
-    }
-
-    static func bodySpecConnection(configured: Bool, connected: Bool) -> String {
-        guard configured else { return "Unavailable" }
-        return connected ? "Connected" : "Not connected"
-    }
-
-    static func bodySpecHistory(_ results: [DexaResult]) -> [DexaResult] {
-        results.filter { $0.externalSource.lowercased() == "bodyspec" }
-            .sorted { ($0.acquireTime ?? .distantPast) > ($1.acquireTime ?? .distantPast) }
-    }
-
-    static func scanDate(_ result: DexaResult, directoryEnabled: Bool) -> Date? {
-        directoryEnabled ? result.acquireTime : (result.acquireTime ?? result.updatedAt)
-    }
-
-    static func mayApplyHistory(requestedUserId: String, currentUserId: String?, cancelled: Bool) -> Bool {
-        !cancelled && !requestedUserId.isEmpty && requestedUserId == currentUserId
+        return "Last synced · \(relative)"
     }
 }

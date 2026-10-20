@@ -369,11 +369,7 @@ nonisolated func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], to
         let formatter = ISO8601DateFormatter()
 
         for batch in results.chunked(into: batchSize) {
-            let payload: [[String: Any]] = try batch.map { result in
-                let measurements = ReportedMeasurements(jsonString: result.reportedMeasurementsJSON)
-                guard result.reportedMeasurementsJSON == nil || measurements != nil else {
-                    throw AppError.coreData(operation: "syncDexaReportedMeasurements", underlying: nil)
-                }
+            let payload: [[String: Any]] = batch.map { result in
                 let externalUpdateTimeValue: Any = if let externalUpdateTime = result.externalUpdateTime {
                     formatter.string(from: externalUpdateTime)
                 } else {
@@ -396,7 +392,7 @@ nonisolated func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], to
                 let muscleMassValue: Any = result.muscleMass ?? NSNull()
                 let boneMassValue: Any = result.boneMass ?? NSNull()
 
-                var record: [String: Any] = [
+                return [
                     "id": result.id,
                     "user_id": result.userId,
                     "body_metrics_id": result.bodyMetricsId as Any,
@@ -420,16 +416,12 @@ nonisolated func syncDexaResultsBatch(_ results: [PendingDexaResultSyncItem], to
                     "created_at": formatter.string(from: result.createdAt),
                     "updated_at": formatter.string(from: result.updatedAt)
                 ]
-                if let measurements {
-                    record["reported_measurements"] = measurements.jsonObject
-                }
-                return record
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload)
             let response = try await productAPIClient.upsertData(table: "dexa_results", data: data, token: token)
             let syncedIds = Set(response.compactMap { $0["id"] as? String })
-            try await coreDataManager.markDexaResultsAsSynced(batch.filter { syncedIds.contains($0.id) })
+            await coreDataManager.markAsSynced(entityName: "CachedDexaResult", ids: syncedIds)
         }
     }
 

@@ -29,32 +29,6 @@ final class BodyMetricSourceContractTests: XCTestCase {
         XCTAssertEqual(BodyMetricSource.normalizedRawValue("Photo Import"), "photo")
     }
 
-    func testExplicitPDFImportSourceIsCanonicalWithoutChangingUnknownFallback() {
-        XCTAssertEqual(BodyMetricSource.normalizedRawValue("pdf_import"), "pdf_import")
-        XCTAssertTrue(BodyMetricSource.allowedRawValues.contains("pdf_import"))
-        XCTAssertEqual(BodyMetricSource.normalizedRawValue("unidentified device"), "manual")
-        XCTAssertEqual(BodyMetricSource.normalizedRawValue("Other"), "manual")
-        XCTAssertEqual(BodyMetricSource.normalizedRawValue(nil), "manual")
-    }
-
-    func testPDFImportSourceSurvivesBodyMetricDecodeAndEncode() throws {
-        let payload: [String: Any] = [
-            "id": "pdf-metric", "user_id": "pdf-user", "date": 0,
-            "created_at": 0, "updated_at": 0, "data_source": "pdf_import",
-            "source_metadata": ["vendor": "pdf_import", "source_name": "Unidentified device"]
-        ]
-        let metric = try JSONDecoder().decode(
-            BodyMetrics.self, from: JSONSerialization.data(withJSONObject: payload)
-        )
-        XCTAssertEqual(metric.dataSource, "pdf_import")
-        XCTAssertEqual(metric.sourceMetadata?.sourceName, "Unidentified device")
-        XCTAssertNil(metric.bodyFatMethod)
-        let encoded = try XCTUnwrap(
-            JSONSerialization.jsonObject(with: JSONEncoder().encode(metric)) as? [String: Any]
-        )
-        XCTAssertEqual(encoded["data_source"] as? String, "pdf_import")
-    }
-
     func testSourceMetadataTrimsEmptyValuesAndSerializesPointersOnly() throws {
         let metadata = BodyMetricSourceMetadata(
             vendor: " BodySpec ",
@@ -71,59 +45,5 @@ final class BodyMetricSourceContractTests: XCTestCase {
         XCTAssertEqual(decoded.deviceModel, "Scanner X")
         XCTAssertEqual(decoded.externalResultId, "result-123")
         XCTAssertEqual(decoded.jsonObject["vendor"], "BodySpec")
-    }
-
-    func testUnconfiguredBuildCannotClaimAnExistingConnectionIsAvailable() {
-        XCTAssertEqual(IntegrationStatusPolicy.bodySpecConnection(configured: false, connected: true), "Unavailable")
-        XCTAssertEqual(IntegrationStatusPolicy.bodySpecConnection(configured: false, connected: false), "Unavailable")
-    }
-
-    func testScanPresenceCannotEstablishBodySpecConnection() {
-        XCTAssertEqual(IntegrationStatusPolicy.bodySpecConnection(configured: true, connected: false), "Not connected")
-        XCTAssertEqual(IntegrationStatusPolicy.bodySpecConnection(configured: true, connected: true), "Connected")
-    }
-
-    func testHistoryRefreshCannotApplyAfterAccountSwitchSignOutOrCancellation() {
-        XCTAssertTrue(IntegrationStatusPolicy.mayApplyHistory(
-            requestedUserId: "owner", currentUserId: "owner", cancelled: false
-        ))
-        for userId in ["other", nil, ""] {
-            XCTAssertFalse(IntegrationStatusPolicy.mayApplyHistory(
-                requestedUserId: "owner", currentUserId: userId, cancelled: false
-            ))
-        }
-        XCTAssertFalse(IntegrationStatusPolicy.mayApplyHistory(
-            requestedUserId: "owner", currentUserId: "owner", cancelled: true
-        ))
-        XCTAssertFalse(IntegrationStatusPolicy.mayApplyHistory(
-            requestedUserId: "", currentUserId: "", cancelled: false
-        ))
-    }
-
-    func testHistoryUsesBodySpecAcquisitionDatesRatherThanOtherVendorsOrUpdateTime() {
-        let older = scan(id: "older", source: "bodyspec", acquired: 100, updated: 900)
-        let newer = scan(id: "newer", source: "BodySpec", acquired: 200, updated: 300)
-        let other = scan(id: "other", source: "inbody_pdf", acquired: 800, updated: 800)
-        XCTAssertEqual(IntegrationStatusPolicy.bodySpecHistory([other, older, newer]).map(\.id), ["newer", "older"])
-        XCTAssertEqual(IntegrationStatusPolicy.scanDate(older, directoryEnabled: true), older.acquireTime)
-    }
-
-    func testMissingAcquisitionDateDoesNotBecomeLastSyncTime() {
-        let result = scan(id: "unknown", source: "bodyspec", acquired: nil, updated: 900)
-        XCTAssertNil(IntegrationStatusPolicy.scanDate(result, directoryEnabled: true))
-        XCTAssertEqual(IntegrationStatusPolicy.scanDate(result, directoryEnabled: false), result.updatedAt)
-        let known = scan(id: "known", source: "bodyspec", acquired: 100, updated: 100)
-        let unknown = scan(id: "another-unknown", source: "bodyspec", acquired: nil, updated: 800)
-        XCTAssertEqual(IntegrationStatusPolicy.bodySpecHistory([result, known, unknown]).first?.id, "known")
-    }
-
-    private func scan(id: String, source: String, acquired: TimeInterval?, updated: TimeInterval) -> DexaResult {
-        DexaResult(
-            id: id, userId: "owner", bodyMetricsId: nil, externalSource: source, externalResultId: id,
-            externalUpdateTime: nil, scannerModel: nil, locationId: nil, locationName: nil,
-            acquireTime: acquired.map { Date(timeIntervalSince1970: $0) }, analyzeTime: nil,
-            vatMassKg: nil, vatVolumeCm3: nil, resultPdfUrl: nil, resultPdfName: nil,
-            createdAt: Date(timeIntervalSince1970: updated), updatedAt: Date(timeIntervalSince1970: updated)
-        )
     }
 }

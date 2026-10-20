@@ -107,7 +107,7 @@ extension PreferencesView {
         let profile = authManager.currentUser?.profile
         profileEditorName = profile?.fullName ?? authManager.currentUser?.name ?? ""
         profileEditorDateOfBirth = profile?.dateOfBirth ?? Date()
-        profileEditorHeightCm = ProfileSettingsPolicy.heightEditorSeed(profile?.height)
+        profileEditorHeightCm = Int((profile?.height ?? 170).rounded())
         profileEditorUsesMetricHeight = profile?.heightUnit == "cm"
         profileEditorHasChanges = false
         activeProfileEditor = editor

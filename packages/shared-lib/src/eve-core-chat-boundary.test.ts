@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { lstatSync, readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -103,17 +103,16 @@ describe('eve.dev core-chat boundary', () => {
       encoding: 'utf8',
     })
       .split('\0')
-      .filter(Boolean)
-      // Symlinks (e.g. .claude/skills/jovie-frontend -> a directory) have no
-      // source of their own; reading one through fails with EISDIR.
-      .filter((file) => lstatSync(join(repoRoot, file)).isFile());
+      .filter(Boolean);
     const dottedName = new RegExp(['trigger', 'dev'].join('\\.'), 'i');
     const packageName = new RegExp(['trigger', 'dev'].join(''), 'i');
 
     const matches = trackedFiles.filter((file) => {
-      // Tracked symlinks (e.g. .claude/skills/* -> .agents/skills/*) are scanned via their target.
-      if (lstatSync(join(repoRoot, file)).isSymbolicLink()) return false;
-      const source = readFileSync(join(repoRoot, file)).toString('utf8');
+      const fullPath = join(repoRoot, file);
+      // git ls-files includes the Jovie frontend skill link, which points at a
+      // directory. Its tracked files are scanned at their real paths.
+      if (!statSync(fullPath).isFile()) return false;
+      const source = readFileSync(fullPath).toString('utf8');
       return dottedName.test(source) || packageName.test(source);
     });
 

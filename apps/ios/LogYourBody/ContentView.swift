@@ -72,7 +72,6 @@ struct ContentView: View {
     @EnvironmentObject var bugReportManager: BugReportManager
     @StateObject private var loadingManager: LoadingManager
     @StateObject private var notificationManager = NotificationManager.shared
-    @Environment(\.scenePhase) private var scenePhase
     private let onboardingStateManager = OnboardingStateManager.shared
     @State private var currentUserId: String?
     @State private var hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion
@@ -98,10 +97,6 @@ struct ContentView: View {
             environment: ProcessInfo.processInfo.environment,
             userId: authManager.currentUser?.id
         )
-    }
-
-    private var isBiometricLockArmed: Bool {
-        authManager.isAuthenticated && biometricLockEnabled && !disableBiometricLockForUITests
     }
 
     init() {
@@ -257,7 +252,6 @@ struct ContentView: View {
                 hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion(for: currentUserId)
             } else {
                 lastProfileCompletionSync = nil
-                isUnlocked = false
                 if hasCompletedOnboarding {
                     onboardingStateManager.updateCompletionStatus(false)
                     hasCompletedOnboarding = false
@@ -292,20 +286,8 @@ struct ContentView: View {
         .onChange(of: authManager.needsLegalConsent) { _, newValue in
             showLegalConsent = newValue
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            if BiometricLockPolicy.shouldRelock(
-                onEntering: newPhase,
-                lockEnabled: isBiometricLockArmed
-            ) {
-                isUnlocked = false
-            }
-        }
         .onShake {
-            if BiometricLockPolicy.shouldLockOnShake(isLockArmed: isBiometricLockArmed) {
-                isUnlocked = false
-            } else {
-                bugReportManager.handleShakeGesture()
-            }
+            bugReportManager.handleShakeGesture()
         }
         #if DEBUG
         .onAppear {
@@ -367,7 +349,8 @@ struct ContentView: View {
 
     private var biometricLockOverlay: some View {
         Group {
-            if isBiometricLockArmed && !isUnlocked {
+            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked
+                && !disableBiometricLockForUITests {
                 BiometricLockView(isUnlocked: $isUnlocked)
                     .transition(AnyTransition.opacity)
             }
@@ -377,7 +360,7 @@ struct ContentView: View {
     private var unlockedDexaPDFSelection: Binding<DexaPDFFileSelection?> {
         Binding(
             get: {
-                isBiometricLockArmed && !isUnlocked
+                biometricLockEnabled && !isUnlocked && !disableBiometricLockForUITests
                     ? nil
                     : pendingDexaPDF
             },

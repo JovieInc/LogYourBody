@@ -96,7 +96,17 @@ extension PreferencesView {
     }
 
     func convertHeightToCurrentSystem(height: Double, fromUnit: String) -> String {
-        ProfileSettingsPolicy.storedHeightText(height, useMetric: currentSystem == .metric, spaces: true) ?? "Not set"
+        let heightCm = height
+
+        if currentSystem == .metric {
+            let centimeters = Int(heightCm.rounded())
+            return "\(centimeters) cm"
+        }
+
+        let totalInches = Int((heightCm / 2.54).rounded())
+        let feet = totalInches / 12
+        let inches = totalInches % 12
+        return "\(feet)' \(inches)\""
     }
 
     func handlePhotoSelection(_ asset: AppPhotoAsset?) async {

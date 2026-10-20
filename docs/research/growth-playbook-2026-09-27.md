@@ -7,7 +7,7 @@ status: research, not policy
 
 # Nikita Bier's Growth Playbook — Applied to LogYourBody
 
-_Sources: his own threads (@nikitabier), the Lenny's Podcast interview and transcript, iOS 18 coverage, and his documented advisory work (Death Clock, Dupe, Protector, Explode). Compiled 2026-09-27._
+*Sources: his own threads (@nikitabier), the Lenny's Podcast interview and transcript, iOS 18 coverage, and his documented advisory work (Death Clock, Dupe, Protector, Explode). Compiled 2026-09-27.*
 
 ---
 
@@ -46,7 +46,7 @@ _Sources: his own threads (@nikitabier), the Lenny's Podcast interview and trans
 - **Older audiences are worse at inviting and better at paying** — trade K for ARPU deliberately: charge more, earlier, don't apologize for the paywall. — Explode teardown, https://www.skillsdirectory.com/skills/heyimjames-nikita-bier-consumer-apps (secondary synthesis of his methods), 2025
 - **Gate curiosity, not access.** Gas's "God Mode" ($6.99–7/week to hint who sent you compliments) drove ~$7M in 3 months because the free tier deliberately manufactures curiosity the paid tier resolves. — https://techiegamers.com/nikita-bier-viral-success/, May 2025
 - **Never paywall mid-onboarding or mid-core-action**; paywall immediately after a peak emotional moment or at the natural edge of the free tier. — same source
-- **Validate willingness to pay from day one**; if users won't pay _and_ won't invite, kill the concept. — same source
+- **Validate willingness to pay from day one**; if users won't pay *and* won't invite, kill the concept. — same source
 - **Chain a viral action into the trial:** e.g., Explode's share gate (3 shares in an hour → free month → auto-annual-trial) makes one mechanic drive both distribution and monetization. — same source
 
 **Fitness/health specifically:** "Health apps are notoriously difficult to grow: they are single-player utilities that resonate most with older audiences" — so make the experience social and manufacture a shareable artifact, or CAC will kill you. — May 2024 thread + Death Clock case study
@@ -58,20 +58,20 @@ _Sources: his own threads (@nikitabier), the Lenny's Podcast interview and trans
 1. **Paywall on first run = his cardinal sin.** Charging before the user has experienced the aha moment ("mid-onboarding: never"). You're charging for a promise, and killing activation outright.
 2. **Apple sign-in + no contacts + no social graph = zero organic distribution.** It's a single-player utility for (presumably) adults — the exact profile he calls nearly unpayable-by-organic-growth. Every install must currently be bought.
 3. **No shareable artifact.** Weight logs and progress photos are private by design; nothing turns personal data into a shared story (his Death Clock move). Progress photos especially — they're the most emotionally charged data in the app and they generate zero distribution.
-4. **Weak name-level hook.** "LogYourBody" describes the category; it doesn't provoke word-of-mouth or press. His own portfolio says the name _is_ a distribution strategy.
+4. **Weak name-level hook.** "LogYourBody" describes the category; it doesn't provoke word-of-mouth or press. His own portfolio says the name *is* a distribution strategy.
 5. **No second-network habit loop.** Nothing resurfaces on other networks to remind lapsed users the app exists — the mechanism he says habit formation depends on.
-6. **Fragmentation risk with Jovie.** Adding a coach inside a logger is exactly the "layers & subgroups" complexity he taxes at ~50% failure probability per fragment — Jovie must be the _core_ surface, not a side tab.
+6. **Fragmentation risk with Jovie.** Adding a coach inside a logger is exactly the "layers & subgroups" complexity he taxes at ~50% failure probability per fragment — Jovie must be the *core* surface, not a side tab.
 7. **No urgency/inflection-point targeting.** Body change is an inflection-point product (post-diet start, post-breakup, pre-summer, new program). The app markets to a static audience instead.
 
 ## 3) What we should do next (ranked, with the smallest test)
 
-1. **Move the paywall to after the first aha moment.** First-run flow: permission-free onboarding → log first weight + first photo → show the timeline rendering → _then_ present the paywall with proof of value. _Smallest test:_ A/B the paywall from first-run vs. after-first-entry in RevenueCat (one placement flag), watch trial-start rate and 7-day paid conversion for two weeks.
-2. **Build the shareable artifact: a progress-photo "reveal" card.** Swipeable before/after or timeline-of-change card, watermarked, exported to Stories/Notes — personal data made into a shared story. _Smallest test:_ ship a single "share month-1 vs. today" card; measure exports per 100 weekly actives. Target >5%.
-3. **Make Jovie's first answer the 3-second aha.** Open the app → one-sentence spoken-answer to "how am I doing?" before any logging (his inverted time-to-value). _Smallest test:_ prototype the first-screen voice reply from cached HealthKit data; measure screen-1 → first-log activation delta.
-4. **Add a curiosity-gated paid hook, not feature-gating.** E.g., free tier logs everything; paid tier unlocks _insight_ — the pattern that monetizes because the free tier manufactures the question ("what's driving my weight change?"). _Smallest test:_ end free Jovie answers with a locked preview of the full analysis; measure paywall CTR.
-5. **Target an inflection point in ASO/ads copy.** Pick one wedge ("first 90 days of your cut") and saturate it — one community (a fitness subreddit/Discord/reddit cohort) rather than broad ads. _Smallest test:_ one $300 creator spend on a single niche community; compare CAC vs. broad.
-6. **Instrument the 7-opens heuristic indirectly:** even in a single-player app, measure session-triggered re-engagement (timeline notifications with a rendered insight). _Smallest test:_ 3 smart weekly notifications that each carry a concrete data insight; track reopened-per-notification.
-7. **Add lightweight in-app feedback chat** — his cheapest research channel. _Smallest test:_ a Feedback entry point piping to your Slack.
+1. **Move the paywall to after the first aha moment.** First-run flow: permission-free onboarding → log first weight + first photo → show the timeline rendering → *then* present the paywall with proof of value. *Smallest test:* A/B the paywall from first-run vs. after-first-entry in RevenueCat (one placement flag), watch trial-start rate and 7-day paid conversion for two weeks.
+2. **Build the shareable artifact: a progress-photo "reveal" card.** Swipeable before/after or timeline-of-change card, watermarked, exported to Stories/Notes — personal data made into a shared story. *Smallest test:* ship a single "share month-1 vs. today" card; measure exports per 100 weekly actives. Target >5%.
+3. **Make Jovie's first answer the 3-second aha.** Open the app → one-sentence spoken-answer to "how am I doing?" before any logging (his inverted time-to-value). *Smallest test:* prototype the first-screen voice reply from cached HealthKit data; measure screen-1 → first-log activation delta.
+4. **Add a curiosity-gated paid hook, not feature-gating.** E.g., free tier logs everything; paid tier unlocks *insight* — the pattern that monetizes because the free tier manufactures the question ("what's driving my weight change?"). *Smallest test:* end free Jovie answers with a locked preview of the full analysis; measure paywall CTR.
+5. **Target an inflection point in ASO/ads copy.** Pick one wedge ("first 90 days of your cut") and saturate it — one community (a fitness subreddit/Discord/reddit cohort) rather than broad ads. *Smallest test:* one $300 creator spend on a single niche community; compare CAC vs. broad.
+6. **Instrument the 7-opens heuristic indirectly:** even in a single-player app, measure session-triggered re-engagement (timeline notifications with a rendered insight). *Smallest test:* 3 smart weekly notifications that each carry a concrete data insight; track reopened-per-notification.
+7. **Add lightweight in-app feedback chat** — his cheapest research channel. *Smallest test:* a Feedback entry point piping to your Slack.
 
 ## 4) What we already do right
 

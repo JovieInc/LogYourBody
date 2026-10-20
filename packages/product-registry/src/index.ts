@@ -5,7 +5,6 @@ export type {
   ProductEndpointHost,
   ProductEndpoints,
   ProductFeature,
-  ProductIntegration,
   ProductPlan,
   ProductPlatform,
   SupportKind,
@@ -24,7 +23,6 @@ export type {
   StorefrontSearchIntent,
 } from './storefronts/types.js';
 export { logYourBody } from './products/logyourbody.mjs';
-export { logYourBodyIntegrations } from './products/logyourbody-integrations.mjs';
 export { logYourBodyStorefront } from './storefronts/logyourbody.mjs';
 
 import { logYourBody } from './products/logyourbody.mjs';

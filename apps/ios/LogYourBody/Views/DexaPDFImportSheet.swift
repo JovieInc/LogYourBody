@@ -88,18 +88,10 @@ struct DexaPDFImportSheet: View {
             }
             .navigationTitle("Import scan PDF")
             .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Button {
-                    dismiss()
-                } label: {
-                    Text("Close")
-                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .accessibilityIdentifier("dexa_pdf_import_close_button")
-                .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.vertical, JovieTokens.itemGap)
             }
             .task {
                 await readReport()
@@ -111,7 +103,7 @@ struct DexaPDFImportSheet: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(scan.date)
                 .font(.headline)
-            Text(PDFScanProvenance(source: scan.source).displayLabel)
+            Text(scan.source ?? "DEXA scan")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Text(measurementSummary(for: scan))

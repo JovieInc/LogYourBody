@@ -86,24 +86,6 @@ export interface ProductFeature {
   readonly marketing: boolean;
 }
 
-export interface ProductIntegration {
-  readonly id: string;
-  readonly label: string;
-  readonly description: string;
-  readonly authorization: 'native_permission' | 'oauth';
-  readonly accountScope: 'device';
-  readonly platforms: readonly ProductPlatform[];
-  readonly marketing: boolean;
-  readonly capabilities: readonly {
-    readonly id: string;
-    readonly label: string;
-    readonly mode: 'read' | 'write';
-    readonly requiredScopes: readonly string[];
-    readonly requiresApproval: boolean;
-    readonly availability: 'available' | 'planned' | 'blocked';
-  }[];
-}
-
 export interface ProductPlan {
   readonly id: string;
   readonly name: string;
