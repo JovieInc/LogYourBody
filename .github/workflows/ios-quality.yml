@@ -84,6 +84,9 @@ jobs:
         timeout-minutes: 40
         env:
           DESTINATION: auto
+          # A hosted merge-group runner spent 10 minutes launching the UI test
+          # runner, then killed the active fourth capture at 720s (run 38325714313).
+          XCODEBUILD_COMMAND_TIMEOUT_SECONDS: 900
           ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality
         run: bash scripts/ios/launch-quality-audit.sh
 
