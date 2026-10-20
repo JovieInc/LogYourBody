@@ -1,0 +1,13 @@
+# fastlane precheck configuration, read by `bundle exec fastlane precheck`
+# in the iOS Release Loop "Run Fastlane Precheck" step.
+#
+# Every metadata rule stays on at precheck's default `error` level, so any
+# rule violation still fails the release.
+#
+# In-app purchases are excluded because precheck cannot read them with an App
+# Store Connect API key (fastlane 2.240.1 aborts with "Precheck cannot check
+# In-app purchases with the App Store Connect API Key (yet)"). IAP and
+# subscription readiness is covered by the App Store Connect Readiness
+# workflow (.github/workflows/app-store-connect-readiness.yml) and by the
+# "Verify App Store subscription products" step in the release build.
+include_in_app_purchases(false)

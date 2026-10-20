@@ -348,6 +348,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
@@ -401,19 +405,26 @@ jobs:
           APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
           APP_IDENTIFIER: ${{ env.LOGYOURBODY_APP_IDENTIFIER }}
 
+      # Options come from apps/ios/fastlane/Precheckfile: every metadata rule
+      # at error level, in-app purchases excluded because precheck cannot read
+      # them with an API key. IAP and subscription readiness is checked by
+      # app-store-connect-readiness.yml and the build's subscription step.
       - name: Run Fastlane Precheck
         run: |
+          set -o pipefail
           cd apps/ios
           bundle exec fastlane precheck 2>&1 | tee precheck.log
 
-          # Check for errors and surface them in the summary
-          if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" precheck.log; then
-            echo "::error::Precheck errors detected - see highlighted lines above"
+          # Second check: name real fastlane failure lines, not changelog text.
+          if ! node ../../.github/scripts/fastlane-log-failures.mjs precheck.log; then
+            echo "::error::Precheck errors detected - see lines above"
             exit 1
           fi
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
 
       - name: Submit to App Store
         run: |
@@ -439,20 +450,23 @@ jobs:
           echo "Submitting IPA: $IPA_PATH"
 
           # Submit for review
+          set -o pipefail
           bundle exec fastlane submit_app_store \
             ipa_path:"$IPA_PATH" \
             submit_for_review:$SUBMIT_FOR_REVIEW \
             automatic_release:$AUTOMATIC_RELEASE \
             phased_release:$PHASED_RELEASE 2>&1 | tee submit.log
 
-          # Check for errors and surface them in the summary
-          if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" submit.log; then
-            echo "::error::Submission errors detected - see highlighted lines above"
+          # Second check: name real fastlane failure lines, not changelog text.
+          if ! node ../../.github/scripts/fastlane-log-failures.mjs submit.log; then
+            echo "::error::Submission errors detected - see lines above"
             exit 1
           fi
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
           APP_REVIEW_FIRST_NAME: ${{ vars.APP_REVIEW_FIRST_NAME }}
           APP_REVIEW_LAST_NAME: ${{ vars.APP_REVIEW_LAST_NAME }}
           APP_REVIEW_EMAIL_ADDRESS: ${{ vars.APP_REVIEW_EMAIL_ADDRESS }}
