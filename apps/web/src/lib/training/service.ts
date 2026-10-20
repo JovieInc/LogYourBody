@@ -14,6 +14,8 @@ import type {
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
 import { catalogVariantById } from './catalog';
+import { planLayoutSchema, type PlanLayout } from './revision-contract';
+import { sessionWithLayout } from './plan-edits';
 import {
   buildMicrocycle,
   buildSession,
@@ -25,6 +27,7 @@ import {
 import {
   MUSCLE_GROUPS,
   type ExercisePrescription,
+  type Microcycle,
   type Session,
   type SetLog,
   type TrainingFeedback,
@@ -45,6 +48,8 @@ export type TrainingRecordsSnapshot = {
   setup: TrainingProgramSetup | null;
   sessions: NativeProductRecord[];
   swaps: ExerciseSwapRecord[];
+  /** Canonical weekly layouts installed by applied plan-edit revisions. */
+  layouts: PlanLayoutRecord[];
   logs: SetLog[];
   feedback: TrainingFeedback[];
 };
@@ -59,6 +64,28 @@ export type ExerciseSwapRecord = NativeProductRecord & {
   fromExerciseId: string;
   toVariantId: string;
 };
+
+/** Persisted output of an applied plan-edit revision. Only the head revision's
+ * layout stays live; superseded layouts are removed in the same transaction. */
+export type PlanLayoutRecord = NativeProductRecord & {
+  record_type: 'plan_layout';
+  programSetupId: string;
+  programRevisionId: string;
+  layout: PlanLayout;
+};
+
+function toPlanLayout(record: NativeProductRecord): PlanLayoutRecord | null {
+  const value = record as Partial<PlanLayoutRecord>;
+  if (
+    recordType(record) !== 'plan_layout' ||
+    typeof value.programSetupId !== 'string' ||
+    typeof value.programRevisionId !== 'string' ||
+    !planLayoutSchema.safeParse(value.layout).success
+  ) {
+    return null;
+  }
+  return record as PlanLayoutRecord;
+}
 
 function toExerciseSwap(record: NativeProductRecord): ExerciseSwapRecord | null {
   const value = record as Partial<ExerciseSwapRecord>;
@@ -199,6 +226,10 @@ export async function loadTrainingRecords(
       .filter(active)
       .map(toExerciseSwap)
       .filter((record): record is ExerciseSwapRecord => record !== null),
+    layouts: sessions
+      .filter(active)
+      .map(toPlanLayout)
+      .filter((record): record is PlanLayoutRecord => record !== null),
     logs: sets
       .filter(active)
       .map(toSetLog)
@@ -379,6 +410,28 @@ export async function getOrCreateNextWorkout(input: {
     logs: completedLogs,
     feedback: programFeedback,
   });
+
+  // The head revision's canonical layout (installed by applied plan edits)
+  // supersedes the default pattern contents; the engine still owns progression.
+  const layoutRecord = snapshot.layouts
+    .filter((record) => record.programSetupId === setup.id)
+    .sort(
+      (a, b) => Date.parse(b.server_updated_at) - Date.parse(a.server_updated_at),
+    )[0];
+  if (layoutRecord) {
+    microcycle.sessions = microcycle.sessions.map((session) =>
+      sessionWithLayout(session, layoutRecord.layout, completedLogs),
+    );
+    const volume: Record<string, number> = {};
+    for (const session of microcycle.sessions) {
+      for (const exercise of session.exercises) {
+        for (const [muscle, fraction] of Object.entries(exercise.muscleContribution)) {
+          volume[muscle] = (volume[muscle] ?? 0) + exercise.sets * Number(fraction);
+        }
+      }
+    }
+    microcycle.plannedFractionalVolume = volume as Microcycle['plannedFractionalVolume'];
+  }
 
   if (activeRecord?.prescription) {
     const existing = activeRecord.prescription;

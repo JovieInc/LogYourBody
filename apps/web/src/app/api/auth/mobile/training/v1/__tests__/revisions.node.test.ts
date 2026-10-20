@@ -56,6 +56,7 @@ describe('training proposal HTTP boundary', () => {
       headRevision: null,
       supportedIntent: 'initial_enrollment',
       supportedBaseline: true,
+      supportedIntents: ['initial_enrollment'],
     });
     expect(h.proposals.size).toBe(0);
     const created = await h.handlers.POST(request('POST', proposalBody));

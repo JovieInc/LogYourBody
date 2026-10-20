@@ -1,6 +1,6 @@
 import {
-  createInitialTrainingProposal,
-  decideInitialTrainingProposal,
+  createTrainingProposal,
+  decideTrainingProposal,
   trainingRequestHash,
 } from './revisions';
 import { decisionBody, proposalBody, revisionHarness } from './revisions.testing';
@@ -10,7 +10,7 @@ import { storedProposalSchema } from './revision-contract';
 
 const now = new Date('2026-10-10T12:00:00Z');
 async function proposed(h = revisionHarness()) {
-  const result = await createInitialTrainingProposal({
+  const result = await createTrainingProposal({
     revisions: h.port,
     subject: 'owner',
     body: proposalBody,
@@ -42,14 +42,14 @@ describe('reviewed initial training enrollment', () => {
   ])('fails closed for unsupported authority/intent/constraints without a write', async (body) => {
     const h = revisionHarness();
     expect(
-      await createInitialTrainingProposal({ revisions: h.port, subject: 'owner', body, now }),
+      await createTrainingProposal({ revisions: h.port, subject: 'owner', body, now }),
     ).toEqual({ kind: 'unsupported_or_invalid_intent' });
     expect(h.port.createProposal).not.toHaveBeenCalled();
   });
   it('returns original create retry and conflicts on changed reason with the same identity', async () => {
     const h = await proposed();
     expect(
-      await createInitialTrainingProposal({
+      await createTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: proposalBody,
@@ -57,7 +57,7 @@ describe('reviewed initial training enrollment', () => {
       }),
     ).toEqual({ kind: 'stored', stored: h.stored });
     expect(
-      await createInitialTrainingProposal({
+      await createTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: { ...proposalBody, reason: 'changed' },
@@ -70,7 +70,7 @@ describe('reviewed initial training enrollment', () => {
     const h = revisionHarness();
     h.context.dateOfBirth = '2020-01-01';
     expect(
-      await createInitialTrainingProposal({
+      await createTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: proposalBody,
@@ -80,7 +80,7 @@ describe('reviewed initial training enrollment', () => {
     h.context.dateOfBirth = '1990-01-01';
     h.context.generation = 1;
     expect(
-      await createInitialTrainingProposal({
+      await createTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: proposalBody,
@@ -102,7 +102,7 @@ describe('reviewed initial training enrollment', () => {
     const h = revisionHarness();
     h.context.legacySetups = [setup];
     expect(
-      await createInitialTrainingProposal({
+      await createTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: proposalBody,
@@ -112,7 +112,7 @@ describe('reviewed initial training enrollment', () => {
     h.context.legacySetups = [{ ...setup, consentVersion: 'outdated' }];
     expect(
       (
-        await createInitialTrainingProposal({
+        await createTrainingProposal({
           revisions: h.port,
           subject: 'owner',
           body: proposalBody,
@@ -124,7 +124,7 @@ describe('reviewed initial training enrollment', () => {
   it('apply days later preserves the reviewed numeric baseline and binds new workout records to the revision', async () => {
     const h = await proposed();
     const later = new Date('2026-11-10T12:00:00Z');
-    const result = await decideInitialTrainingProposal({
+    const result = await decideTrainingProposal({
       revisions: h.port,
       subject: 'owner',
       body: decisionBody(h.id),
@@ -142,7 +142,7 @@ describe('reviewed initial training enrollment', () => {
       status: 'applied',
       receipt: result.receipt,
     });
-    const retry = await decideInitialTrainingProposal({
+    const retry = await decideTrainingProposal({
       revisions: h.port,
       subject: 'owner',
       body: decisionBody(h.id),
@@ -152,7 +152,7 @@ describe('reviewed initial training enrollment', () => {
   });
   it('reject produces no applied copy or setup and cannot later apply', async () => {
     const h = await proposed();
-    const rejected = await decideInitialTrainingProposal({
+    const rejected = await decideTrainingProposal({
       revisions: h.port,
       subject: 'owner',
       body: decisionBody(h.id, 'reject'),
@@ -164,7 +164,7 @@ describe('reviewed initial training enrollment', () => {
     });
     expect((await h.records.pull('owner', 'training_feedback')).records).toHaveLength(0);
     expect(
-      await decideInitialTrainingProposal({
+      await decideTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: decisionBody(h.id),
@@ -176,7 +176,7 @@ describe('reviewed initial training enrollment', () => {
     const h = await proposed();
     h.context.profileFingerprint = 'edited-profile';
     expect(
-      await decideInitialTrainingProposal({
+      await decideTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: decisionBody(h.id),
@@ -186,7 +186,7 @@ describe('reviewed initial training enrollment', () => {
     h.context.profileFingerprint = 'profile-v1';
     h.stored.proposal.plan.sessions[0].exercises[0].targetReps += 1;
     expect(
-      await decideInitialTrainingProposal({
+      await decideTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: decisionBody(h.id),
@@ -199,7 +199,7 @@ describe('reviewed initial training enrollment', () => {
     const h = await proposed();
     jest.mocked(h.port.decide).mockRejectedValueOnce(new Error('transaction rolled back'));
     await expect(
-      decideInitialTrainingProposal({
+      decideTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: decisionBody(h.id),
@@ -247,7 +247,7 @@ describe('historical training proposal incarnation', () => {
     expect(storedProposalSchema.parse(h.stored)).toEqual(h.stored);
     expect(await h.port.exportForSubject('owner')).toMatchObject({ proposals: [h.stored] });
     expect(
-      await decideInitialTrainingProposal({
+      await decideTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: decisionBody(h.id),
@@ -260,7 +260,7 @@ describe('historical training proposal incarnation', () => {
     const h = revisionHarness();
     delete h.context.ownerId;
     await expect(
-      createInitialTrainingProposal({
+      createTrainingProposal({
         revisions: h.port,
         subject: 'owner',
         body: proposalBody,
@@ -292,7 +292,7 @@ it('reject cannot adopt a new owner context after a held old proposal read', asy
     if (input.context.ownerId !== h.context.ownerId) return { kind: 'stale_context' };
     return originalDecide(input);
   });
-  const pending = decideInitialTrainingProposal({
+  const pending = decideTrainingProposal({
     revisions: h.port,
     subject: 'owner',
     body: decisionBody(h.id, 'reject'),
@@ -328,7 +328,7 @@ it('proposal creation retains its pre-read account context when a missing propos
     if (input.proposal.context.ownerId !== h.context.ownerId) return { kind: 'stale_context' };
     return create(input);
   });
-  const pending = createInitialTrainingProposal({
+  const pending = createTrainingProposal({
     revisions: h.port,
     subject: 'owner',
     body: proposalBody,

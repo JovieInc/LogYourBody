@@ -23,11 +23,75 @@ export const initialIntentSchema = z
     equipment: z.enum(['dumbbells', 'full_gym']),
   })
   .strict();
+
+const exerciseId = z.string().trim().min(1).max(64);
+const pattern = z.enum(['A', 'B']);
+
+/** Typed canvas/chat operations against the canonical weekly plan template.
+ * Each op is inspectable, validated against the reviewed catalog, and applied
+ * only through the revision proposal pathway — never by direct record writes. */
+export const planEditOperationSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('move_exercise'),
+      exerciseId,
+      fromPattern: pattern,
+      toPattern: pattern,
+      toIndex: integer,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('reorder_exercise'),
+      exerciseId,
+      pattern,
+      toIndex: integer,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('update_sets'),
+      exerciseId,
+      pattern,
+      sets: z.number().int().min(1).max(6),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('swap_variant'),
+      exerciseId,
+      pattern,
+      toVariantId: exerciseId,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('remove_exercise'),
+      exerciseId,
+      pattern,
+    })
+    .strict(),
+]);
+export type PlanEditOperation = z.infer<typeof planEditOperationSchema>;
+
+export const planEditIntentSchema = z
+  .object({
+    kind: z.literal('plan_edit'),
+    operations: z.array(planEditOperationSchema).min(1).max(16),
+  })
+  .strict();
+export type PlanEditIntent = z.infer<typeof planEditIntentSchema>;
+
+export const proposalIntentSchema = z.discriminatedUnion('kind', [
+  initialIntentSchema,
+  planEditIntentSchema,
+]);
+
 export const createProposalInputSchema = z
   .object({
     requestId: uuid,
     expectedGeneration: integer,
-    intent: initialIntentSchema,
+    intent: proposalIntentSchema,
     reason: z.string().trim().min(1).max(500),
   })
   .strict();
@@ -98,6 +162,82 @@ export const initialProposalSchema = z
   })
   .strict();
 export type InitialTrainingProposal = z.infer<typeof initialProposalSchema>;
+
+/** Canonical weekly layout: ordered exercise/variant ids and set counts per
+ * session pattern. This is the persisted artifact a plan edit installs; the
+ * engine still owns rep ranges, RIR targets and progression at read time. */
+export const planLayoutEntrySchema = z
+  .object({ exerciseId, sets: z.number().int().min(1).max(6) })
+  .strict();
+export const planLayoutSchema = z
+  .object({
+    A: z.array(planLayoutEntrySchema).min(1),
+    B: z.array(planLayoutEntrySchema).min(1),
+  })
+  .strict();
+export type PlanLayout = z.infer<typeof planLayoutSchema>;
+
+export const planEditProposalSchema = z
+  .object({
+    version: z.literal(1),
+    id: uuid,
+    programId: uuid,
+    baseRevision: uuid,
+    context: revisionContextSchema,
+    actor: z.object({ kind: z.literal('self'), subject: z.string().min(1) }),
+    authority: z.literal('self_review_required'),
+    intent: planEditIntentSchema,
+    reason: z.string(),
+    /** Hash of the reviewed layout this edit was proposed against. */
+    priorState: z.string().min(1),
+    proposedDiff: z
+      .array(
+        z
+          .object({ op: planEditOperationSchema, change: z.string().min(1).max(500) })
+          .strict(),
+      )
+      .min(1),
+    policyVersion: z.literal(TRAINING_BASELINE_POLICY),
+    assumptions: z.array(z.string()),
+    inputEvidence: z.object({
+      source: z.literal('canonical_head_revision_and_typed_operations'),
+      observedAt: timestamp,
+    }),
+    reviewPoint: z.literal('before_next_workout'),
+    layout: planLayoutSchema,
+    plan: baselinePlanSchema,
+    createdAt: timestamp,
+  })
+  .strict();
+export type PlanEditProposal = z.infer<typeof planEditProposalSchema>;
+
+export const trainingProposalSchema = z.union([
+  initialProposalSchema,
+  planEditProposalSchema,
+]);
+export type TrainingProposal = z.infer<typeof trainingProposalSchema>;
+
+/** Immutable revision node. Initial revisions carry the enrolled setup; plan
+ * edits carry the resulting layout and repeat the still-current setup. */
+export const storedTrainingRevisionSchema = z
+  .object({
+    version: z.literal(1),
+    id: uuid,
+    proposal: trainingProposalSchema,
+    // Older revision payloads predate these keys; absent means null.
+    baseRevision: uuid.nullable().optional(),
+    layout: planLayoutSchema.nullable().optional(),
+    setup: z.object({
+      id: uuid,
+      sessionsPerWeek: z.union([z.literal(2), z.literal(3)]),
+      equipment: z.enum(['dumbbells', 'full_gym']),
+      startedAt: timestamp,
+    }),
+    activatedAt: timestamp,
+  })
+  .strict();
+export type StoredTrainingRevision = z.infer<typeof storedTrainingRevisionSchema>;
+
 export const appliedSetupSchema = z.object({
   id: uuid,
   consentVersion: z.literal(TRAINING_CONSENT_VERSION),
@@ -117,7 +257,9 @@ export const revisionReceiptSchema = z
     decision: z.enum(['apply', 'reject']),
     status: z.enum(['applied', 'rejected']),
     actor: z.object({ kind: z.literal('self'), subject: z.string().min(1) }),
-    priorState: z.null(),
+    /** The revision this decision replaced: null for enrollment, the previous
+     * head revision id for an applied plan edit. Always null when rejected. */
+    priorState: uuid.nullable(),
     revisionId: uuid.nullable(),
     setup: appliedSetupSchema.nullable(),
     decidedAt: timestamp,
@@ -126,13 +268,18 @@ export const revisionReceiptSchema = z
     r.decision === 'apply'
       ? r.status === 'applied' &&
         r.revisionId !== null &&
-        r.setup?.programRevisionId === r.revisionId
-      : r.status === 'rejected' && r.revisionId === null && r.setup === null,
+        (r.priorState === null
+          ? r.setup?.programRevisionId === r.revisionId
+          : r.setup === null)
+      : r.status === 'rejected' &&
+        r.revisionId === null &&
+        r.setup === null &&
+        r.priorState === null,
   );
 export type TrainingRevisionReceipt = z.infer<typeof revisionReceiptSchema>;
 export const storedProposalSchema = z
   .object({
-    proposal: initialProposalSchema,
+    proposal: trainingProposalSchema,
     status: z.enum(['proposed', 'applied', 'rejected']),
     requestHash: z.string().min(1),
     receipt: revisionReceiptSchema.nullable(),

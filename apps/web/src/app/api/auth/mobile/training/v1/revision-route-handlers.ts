@@ -4,8 +4,8 @@ import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
 import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
 import {
-  createInitialTrainingProposal,
-  decideInitialTrainingProposal,
+  createTrainingProposal,
+  decideTrainingProposal,
 } from '@/lib/training/revisions';
 
 type Dependencies = {
@@ -61,6 +61,9 @@ export function createTrainingRevisionHandlers(deps: Dependencies) {
               headRevision: context.headRevision,
               supportedIntent: 'initial_enrollment',
               supportedBaseline: true,
+              supportedIntents: context.headRevision
+                ? ['plan_edit']
+                : ['initial_enrollment'],
             })
           : error('owner_missing');
       }
@@ -68,8 +71,8 @@ export function createTrainingRevisionHandlers(deps: Dependencies) {
       const input = { revisions: deps.revisions, subject: owner.sub, body, now: deps.now() };
       const result =
         action === 'create'
-          ? await createInitialTrainingProposal(input)
-          : await decideInitialTrainingProposal(input);
+          ? await createTrainingProposal(input)
+          : await decideTrainingProposal(input);
       if (result.kind === 'stored') return json({ stored: result.stored }, 201);
       if (result.kind === 'decided') return json({ receipt: result.receipt });
       return error(result.kind);

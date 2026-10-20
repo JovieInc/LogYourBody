@@ -1,8 +1,10 @@
 import type { TrainingProgramSetup } from '@/lib/training/types';
 import type {
-  InitialTrainingProposal,
+  PlanLayout,
   RevisionContextToken,
   StoredTrainingProposal,
+  StoredTrainingRevision,
+  TrainingProposal,
   TrainingRevisionReceipt,
 } from '@/lib/training/revision-contract';
 
@@ -18,21 +20,26 @@ export type RevisionConflict =
   | 'request_conflict'
   | 'already_decided'
   | 'proposal_not_found'
-  | 'program_already_enrolled';
+  | 'program_already_enrolled'
+  | 'program_not_enrolled';
 export type ProposalWriteResult =
   { kind: 'stored'; stored: StoredTrainingProposal } | { kind: RevisionConflict };
 export type RevisionDecisionResult =
   { kind: 'decided'; receipt: TrainingRevisionReceipt } | { kind: RevisionConflict };
 
-/** Atomic canonical enrollment decisions. Never substitute generic records.push. */
+/** Atomic canonical enrollment and plan-edit decisions. Never substitute
+ * generic records.push. */
 export interface TrainingRevisionsPort {
   readContext(subject: string): Promise<TrainingRevisionContext | null>;
   readProposal(subject: string, id: string): Promise<StoredTrainingProposal | null>;
+  /** The immutable payload of the current head revision, or null before
+   * enrollment. Plan edits build on this, never on a client-supplied plan. */
+  readHeadRevision(subject: string): Promise<StoredTrainingRevision | null>;
   createProposal(input: {
     subject: string;
     requestId: string;
     requestHash: string;
-    proposal: InitialTrainingProposal;
+    proposal: TrainingProposal;
   }): Promise<ProposalWriteResult>;
   decide(input: {
     subject: string;
@@ -43,7 +50,12 @@ export interface TrainingRevisionsPort {
     context: RevisionContextToken;
     now: string;
     revisionId: string;
-    setup: TrainingProgramSetup & { programRevisionId: string };
+    /** null on an applied plan edit (the head it replaces). */
+    baseRevision: string | null;
+    /** Enrolled setup for initial revisions; null for plan edits. */
+    setup: (TrainingProgramSetup & { programRevisionId: string }) | null;
+    /** Canonical layout a plan edit installs; null for initial enrollment. */
+    layout: PlanLayout | null;
   }): Promise<RevisionDecisionResult>;
   storeLegacySetup(
     subject: string,
@@ -55,3 +67,4 @@ export interface TrainingRevisionsPort {
     subject: string,
   ): Promise<{ proposals: StoredTrainingProposal[]; revisions: unknown[] }>;
 }
+

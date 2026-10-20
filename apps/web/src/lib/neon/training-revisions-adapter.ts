@@ -5,6 +5,7 @@ import type { TrainingRevisionsPort, RevisionConflict } from '@/lib/ports/traini
 import {
   revisionContextSchema,
   storedProposalSchema,
+  storedTrainingRevisionSchema,
   revisionReceiptSchema,
 } from '@/lib/training/revision-contract';
 
@@ -22,6 +23,7 @@ const conflictSchema = z.enum([
   'already_decided',
   'proposal_not_found',
   'program_already_enrolled',
+  'program_not_enrolled',
 ]);
 function ownedStored(value: unknown, subject: string) {
   const row = storedProposalSchema.parse(value);
@@ -69,6 +71,20 @@ export function createNeonTrainingRevisions(
         [id, subject],
       )) as Array<{ stored: unknown }>;
       return rows[0]?.stored ? ownedStored(rows[0].stored, subject) : null;
+    },
+    async readHeadRevision(subject) {
+      const rows = (await sql.query(
+        'select public.training_head_revision($1) as revision',
+        [subject],
+      )) as Array<{ revision: unknown }>;
+      if (!rows[0]?.revision) return null;
+      const revision = storedTrainingRevisionSchema.parse(rows[0].revision);
+      if (
+        revision.proposal.actor.subject !== subject ||
+        revision.proposal.programId !== revision.setup.id
+      )
+        throw new Error('training_revision_owner_mismatch');
+      return revision;
     },
     async createProposal(input) {
       const result = await command(input.subject, 'create', input);
@@ -120,6 +136,7 @@ export function createNeonTrainingRevisions(
 export const neonTrainingRevisions: TrainingRevisionsPort = {
   readContext: (subject) => createNeonTrainingRevisions().readContext(subject),
   readProposal: (subject, id) => createNeonTrainingRevisions().readProposal(subject, id),
+  readHeadRevision: (subject) => createNeonTrainingRevisions().readHeadRevision(subject),
   createProposal: (input) => createNeonTrainingRevisions().createProposal(input),
   decide: (input) => createNeonTrainingRevisions().decide(input),
   storeLegacySetup: (subject, setup, context) =>

@@ -2,8 +2,8 @@
 import { createNeonTrainingRevisions } from './training-revisions-adapter';
 import { revisionHarness, proposalBody, decisionBody } from '@/lib/training/revisions.testing';
 import {
-  createInitialTrainingProposal,
-  decideInitialTrainingProposal,
+  createTrainingProposal,
+  decideTrainingProposal,
 } from '@/lib/training/revisions';
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 
@@ -15,7 +15,7 @@ async function fixture() {
     body: proposalBody,
     now: new Date('2026-10-10T12:00:00Z'),
   };
-  const result = await createInitialTrainingProposal(input);
+  const result = await createTrainingProposal(input);
   if (result.kind !== 'stored') throw new Error(result.kind);
   const query = jest.fn();
   const adapter = createNeonTrainingRevisions({ query } as unknown as NeonQueryFunction<
@@ -54,7 +54,7 @@ describe('Neon training revision runtime boundary', () => {
   it('rejects a decision receipt for another request instead of claiming success', async () => {
     const h = await fixture();
     const body = decisionBody(h.stored.proposal.id);
-    await decideInitialTrainingProposal({ ...h.input, body });
+    await decideTrainingProposal({ ...h.input, body });
     const call = jest.mocked(h.port.decide).mock.calls[0][0];
     h.query.mockResolvedValue([
       {
@@ -68,7 +68,7 @@ describe('Neon training revision runtime boundary', () => {
   });
   it('uses exactly one command for durable decision, preserves original PG timestamp and typed conflicts', async () => {
     const h = await fixture();
-    await decideInitialTrainingProposal({ ...h.input, body: decisionBody(h.stored.proposal.id) });
+    await decideTrainingProposal({ ...h.input, body: decisionBody(h.stored.proposal.id) });
     const call = jest.mocked(h.port.decide).mock.calls[0][0];
     const receipt = { ...h.stored.receipt, decidedAt: '2026-10-10T12:00:00+00:00' };
     h.query
@@ -89,7 +89,7 @@ describe('Neon training revision runtime boundary', () => {
   });
   it('passes captured legacy context and fails if atomic admission refuses it', async () => {
     const h = await fixture();
-    await decideInitialTrainingProposal({ ...h.input, body: decisionBody(h.stored.proposal.id) });
+    await decideTrainingProposal({ ...h.input, body: decisionBody(h.stored.proposal.id) });
     const setup = h.stored.receipt!.setup!;
     h.query.mockResolvedValue([{ result: { kind: 'stale_context' } }]);
     await expect(h.adapter.storeLegacySetup('owner', setup, h.context)).rejects.toThrow(
