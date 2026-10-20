@@ -1,3 +1,4 @@
+import { TrainingMutationError } from '@/lib/training/mutation-admission';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
 import type { AccessTokenPrincipal } from './access-token';
 import { bearerChallenge, LYB_MCP_PROTOCOL_VERSIONS, LYB_MCP_SERVER_INFO } from './contract';
@@ -129,7 +130,18 @@ async function callTool(
   }
   try {
     return await tool.run(principal.subject, parsed.data as never, deps);
-  } catch {
+  } catch (error) {
+    if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+      return {
+        isError: true,
+        structuredContent: { code: error.code },
+        content: [
+          {
+            type: 'text',
+            text: 'Training changed while this request was in flight. Read your current workout before retrying.',
+          },
+        ],
+      };
     return {
       content: [
         { type: 'text', text: 'LogYourBody training is unavailable right now. Try again shortly.' },
