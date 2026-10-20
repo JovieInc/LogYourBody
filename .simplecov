@@ -1,10 +1,10 @@
-# Include the two heartbeat scripts despite SimpleCov's default hidden-file filter.
+# Include the routing scripts despite SimpleCov's default hidden-file filter.
 SimpleCov.configure do
   filters.clear
   skip do |file|
-    !file.filename.end_with?('/.github/scripts/await-runner-heartbeat.sh', '/.github/scripts/query-runner-heartbeat.sh')
+    !file.filename.end_with?('/.github/scripts/await-runner-heartbeat.sh', '/.github/scripts/query-runner-heartbeat.sh', '/.github/scripts/mac-lane.sh')
   end
-  cover '.github/scripts/{await,query}-runner-heartbeat.sh'
+  cover '.github/scripts/{await-runner-heartbeat,query-runner-heartbeat,mac-lane}.sh'
   coverage_dir 'coverage/mac-runner-routing'
   coverage(:line) { minimum 80, per: :file }
 end

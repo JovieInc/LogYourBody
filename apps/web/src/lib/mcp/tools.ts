@@ -1,3 +1,4 @@
+import { captureTrainingAdmission } from '@/lib/training/mutation-admission';
 import { z } from 'zod';
 import type { NativeProductRecordsPort } from '@/lib/ports/native-product-records';
 import {
@@ -286,6 +287,8 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
       additionalProperties: false,
     },
     async run(subject, args: z.infer<typeof logSetsInput>, deps) {
+      const admission = await captureTrainingAdmission(deps.records, subject);
+      if (!admission) return failure(ENROLL_IN_APP);
       const now = deps.now();
       // Preview first so a misheard exercise never starts a session.
       const workout = await getOrCreateNextWorkout({
@@ -293,6 +296,7 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         subject,
         now,
         persist: false,
+        admission,
       });
       if (workout.kind === 'not_enrolled') return failure(ENROLL_IN_APP);
       if (workout.kind === 'week_complete')
@@ -306,7 +310,7 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         );
       }
       const { exercise } = match;
-      await getOrCreateNextWorkout({ records: deps.records, subject, now });
+      await getOrCreateNextWorkout({ records: deps.records, subject, now, admission });
       const snapshot = await loadTrainingRecords(deps.records, subject);
       const taken = new Set(
         snapshot.logs
@@ -343,6 +347,7 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
           continue;
         }
         const result = await logTrainingSet({
+          admission,
           records: deps.records,
           subject,
           now,
@@ -540,6 +545,8 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
       additionalProperties: false,
     },
     async run(subject, args: z.infer<typeof feedbackInput>, deps) {
+      const admission = await captureTrainingAdmission(deps.records, subject);
+      if (!admission) return failure(ENROLL_IN_APP);
       const snapshot = await loadTrainingRecords(deps.records, subject);
       if (!snapshot.setup) return failure(ENROLL_IN_APP);
       const latest = snapshot.sessions
@@ -553,6 +560,7 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         )[0];
       if (!latest) return failure('There is no session to check in on yet. Log a workout first.');
       const result = await recordTrainingFeedback({
+        admission,
         records: deps.records,
         subject,
         now: deps.now(),
