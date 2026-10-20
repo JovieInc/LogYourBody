@@ -488,7 +488,11 @@ struct LogYourBodyApp: App {
         } else {
             fixtureSlug = isSubscribed ? "paid_mvp" : "paywall"
         }
-        let userId = "ui_test_\(fixtureSlug)_user_\(UUID().uuidString)"
+        let usesUndoPhotoFixture = arguments.contains("-lybUITestHomeV2UndoPhotoOnlyFixture")
+        let undoFixtureAccount = ProcessInfo.processInfo.environment["LYB_UI_TEST_UNDO_ACCOUNT"]
+            .flatMap(UUID.init(uuidString:))
+        let fixtureAccount = usesUndoPhotoFixture ? undoFixtureAccount ?? UUID() : UUID()
+        let userId = "ui_test_\(fixtureSlug)_user_\(fixtureAccount.uuidString)"
         let profile = UserProfile(
             id: userId,
             email: fixtureEmail,
@@ -527,7 +531,12 @@ struct LogYourBodyApp: App {
             let fixturePhotoURL = arguments.contains(HomeV2Policy.photoFixtureArgument)
                 ? writeHomeV2FixturePhoto()
                 : nil
-            await seedFullDashboardUITestFixtureData(userId: userId, photoURL: fixturePhotoURL)
+            if usesUndoPhotoFixture && arguments.contains("-lybUITestReuseUndoFixtureData") {
+                let persisted = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
+                precondition(!persisted.isEmpty, "Undo relaunch must read persisted rows without reseeding")
+            } else {
+                await seedFullDashboardUITestFixtureData(userId: userId, photoURL: fixturePhotoURL)
+            }
         }
 
         if arguments.contains("-lybUITestGlp1WeeklyCheckInFixture") &&
@@ -607,7 +616,7 @@ struct LogYourBodyApp: App {
 
         let savedMetrics = await CoreDataManager.shared.fetchBodyMetrics(for: userId)
         let savedIds = savedMetrics.compactMap { $0.toBodyMetrics()?.id }
-        let expectedIds = Set(UITestFixtureIsolation.dashboardMetricIDs)
+        let expectedIds = Set(UITestFixtureIsolation.dashboardMetricIDs(userId: userId))
         precondition(
             savedIds.count == expectedIds.count && Set(savedIds) == expectedIds,
             "Dashboard UI fixture expected \(expectedIds.count) saved measurements, found \(savedIds.count)"
@@ -711,10 +720,22 @@ struct LogYourBodyApp: App {
 enum UITestFixtureIsolation {
     static let dashboardMetricIDs = [0, 7, 14, 21, 35].map { "ui_test_full_dashboard_metric_\($0)" }
 
+    static func dashboardMetricIDs(userId: String) -> [String] {
+        [0, 7, 14, 21, 35].map { "\(metricIdPrefix(userId: userId))_\($0)" }
+    }
+
+    private static func metricIdPrefix(userId: String) -> String {
+        ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2UndoPhotoOnlyFixture")
+            ? "\(userId)_metric"
+            : "ui_test_full_dashboard_metric"
+    }
+
     /// UI launches mint a new fixture user but reuse these ids. Remove the previous
     /// fixture rows first. `saveBodyMetrics` must still refuse a different account.
     static func seedDashboardMetrics(userId: String, photoURL: String?, now: Date) async throws {
         let calendar = Calendar.current
+        let usesUndoPhotoFixture = ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2UndoPhotoOnlyFixture")
+        let metricIdPrefix = metricIdPrefix(userId: userId)
         let entries: [
             (daysAgo: Int, weight: Double, bodyFat: Double?, muscle: Double, notes: String, source: String)
         ] = [
@@ -724,12 +745,13 @@ enum UITestFixtureIsolation {
             (21, 84.0, 16.9, 65.7, "DEXA baseline", "bodyspec_dexa"),
             (35, 84.7, 17.4, 65.4, "Manual baseline", "manual")
         ]
-        await removeBodyMetrics(ids: entries.map { "ui_test_full_dashboard_metric_\($0.daysAgo)" })
+        await removeBodyMetrics(ids: entries.map { "\(metricIdPrefix)_\($0.daysAgo)" })
 
         for entry in entries {
             guard let date = calendar.date(byAdding: .day, value: -entry.daysAgo, to: now) else {
                 continue
             }
+            let isPhotoOnly = usesUndoPhotoFixture && entry.daysAgo == 0
             let fixturePhotoURL: String?
             if ProcessInfo.processInfo.arguments.contains("-lybUITestHomeV2SinglePhotoFixture"), entry.daysAgo != 0 {
                 fixturePhotoURL = nil
@@ -740,14 +762,14 @@ enum UITestFixtureIsolation {
                 fixturePhotoURL = photoURL
             }
             let metric = BodyMetrics(
-                id: "ui_test_full_dashboard_metric_\(entry.daysAgo)",
+                id: "\(metricIdPrefix)_\(entry.daysAgo)",
                 userId: userId,
                 date: date,
-                weight: entry.weight,
+                weight: isPhotoOnly ? nil : entry.weight,
                 weightUnit: "kg",
-                bodyFatPercentage: entry.bodyFat,
-                bodyFatMethod: entry.bodyFat == nil ? nil : entry.source,
-                muscleMass: entry.muscle,
+                bodyFatPercentage: isPhotoOnly ? nil : entry.bodyFat,
+                bodyFatMethod: isPhotoOnly || entry.bodyFat == nil ? nil : entry.source,
+                muscleMass: isPhotoOnly ? nil : entry.muscle,
                 boneMass: nil,
                 waistCm: nil,
                 hipCm: nil,
