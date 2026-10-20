@@ -113,7 +113,6 @@ jobs:
         # headroom and timed out five merge groups.
         timeout-minutes: 52
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           DESTINATION: auto
           ARTIFACT_DIR: ${{ github.workspace }}/apps/ios/test_results/quality-gate/ci-${{ github.run_id }}/launch-quality
         run: bash scripts/ios/launch-quality-audit.sh

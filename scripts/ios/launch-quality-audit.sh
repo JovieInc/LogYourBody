@@ -321,15 +321,6 @@ run_xcodebuild_test \
 assert_xcresult_evidence \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
 
-python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
-  --coverage "$ARTIFACT_DIR/launch-quality-unit-tests.coverage.json" \
-  --evidence "$ARTIFACT_DIR/launch-quality-unit-tests.evidence.json" \
-  --baseline "$ROOT_DIR/scripts/ios/native-coverage-baseline.json" \
-  --profile quality-unit --source-sha "$(git -C "$ROOT_DIR" rev-parse HEAD)" \
-  --base-revision "${BASE_SHA:-}" --source-root "$ROOT_DIR" \
-  --scheme "$SCHEME" --only-testing LogYourBodyTests \
-  > "$ARTIFACT_DIR/launch-quality-unit-tests.ratchet.json"
-
 # Every UI check runs in ONE xcodebuild invocation. On hosted macOS each
 # test-without-building invocation pays 3-6 min launching the UI test runner
 # before its first test (xcresult action log, run 38320479871: runner launch

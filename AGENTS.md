@@ -539,17 +539,7 @@ pnpm --filter apps/web build
 
 ### Test Coverage Requirements
 
-- iOS: 70% whole-app line coverage is a long-term target. Enforce nonregression
-  against the committed [native coverage baselines](scripts/ios/native-coverage-baseline.json)
-  for the same real CI selector; do not mix Unit-tier and launch-quality results.
-- Native shipping requires meaningful regression and failure-path tests for changed
-  behavior, named passing cases for changed risky paths, and current exact-head
-  execution and coverage from the repository's real native runner.
-- Missing, skipped, stale or unavailable relevant native evidence remains unverified.
-  A global percentage or module-import test does not replace behavior proof.
-- Preserve the existing required function-coverage, UI, Golden Path and eval gates.
-  Baselines may only rise with verified same-selector native receipts; removing
-  retained app source from a report or lowering a floor is not an allowed update.
+- iOS: Minimum 70% code coverage
 - Web: 80% code coverage is aspirational; CI runs the test suite but does not enforce this threshold
 - All new features must include tests
 

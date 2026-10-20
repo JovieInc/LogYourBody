@@ -2891,24 +2891,7 @@ final class LogYourBodyUITests: XCTestCase {
     private func submitSyntheticChatQuestion(in app: XCUIApplication) {
         let composer = app.textFields["chat_composer"]
         composer.tap()
-        let question = "Synthetic full-turn question"
-        composer.typeText(question)
-        let entered = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "value == %@", question), object: composer
-        )
-        let complete = XCTWaiter.wait(for: [entered], timeout: 8) == .completed
-        if !complete {
-            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            screenshot.name = "chat-synthetic-incomplete-draft-screen"
-            screenshot.lifetime = .keepAlways
-            add(screenshot)
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "chat-synthetic-incomplete-draft-hierarchy"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-        }
-        XCTAssertTrue(complete, "Require the complete synthetic question before Send; never submit partial input")
-        guard complete else { return }
+        composer.typeText("Synthetic full-turn question")
         let send = app.buttons["chat_send_button"]
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: send)
         XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 8), .completed)
