@@ -93,50 +93,6 @@ final class ValidationServiceTests: XCTestCase {
         )
     }
 
-    func testNegativeMeasurementsAreRejectedInsteadOfLosingTheirSign() {
-        let service = ValidationService.shared
-        for value in ["-80.5", "−80.5", "-80,5"] {
-            XCTAssertThrowsError(try service.validateWeight(value, unit: "kg"), value)
-        }
-        for value in ["-18.4", "−18.4", "-18,4"] {
-            XCTAssertThrowsError(try service.validateBodyFat(value), value)
-        }
-        for value in ["-178.5", "−178.5", "-178,5"] {
-            XCTAssertThrowsError(try service.validateHeight(value, unit: "cm"), value)
-        }
-    }
-
-    func testEmbeddedCharactersCannotBecomeADifferentMeasurement() {
-        let service = ValidationService.shared
-        for value in ["80kg", "8 0", "8/0", "weight80"] {
-            XCTAssertThrowsError(try service.validateWeight(value, unit: "kg"), value)
-        }
-        for value in ["18%", "1 8", "1/8", "bodyfat18"] {
-            XCTAssertThrowsError(try service.validateBodyFat(value), value)
-        }
-        for value in ["178cm", "1 78", "1/78", "height178"] {
-            XCTAssertThrowsError(try service.validateHeight(value, unit: "cm"), value)
-        }
-    }
-
-    func testNumericExponentIsParsedAtItsActualValueAndThenRangeChecked() throws {
-        let service = ValidationService.shared
-        XCTAssertEqual(try service.validateWeight("1e2", unit: "kg"), 100)
-        XCTAssertEqual(try service.validateBodyFat("1e1"), 10)
-        XCTAssertEqual(try service.validateHeight("1e2", unit: "cm"), 100)
-        XCTAssertThrowsError(try service.validateBodyFat("1e2"))
-        XCTAssertEqual(try service.validateWeight("  +80,5\n", unit: "kg"), 80.5)
-    }
-
-    func testNonfiniteMeasurementsRemainInvalid() {
-        let service = ValidationService.shared
-        for value in ["nan", "NaN", "inf", "-inf", "1e999"] {
-            XCTAssertThrowsError(try service.validateWeight(value, unit: "kg"), value)
-            XCTAssertThrowsError(try service.validateBodyFat(value), value)
-            XCTAssertThrowsError(try service.validateHeight(value, unit: "cm"), value)
-        }
-    }
-
     private func assertValidationError<T>(
         _ expression: @autoclosure () throws -> T,
         expectedMessage: String,

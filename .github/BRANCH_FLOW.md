@@ -49,7 +49,7 @@ The advisory reviewer should not become a branch-protection requirement.
 
 ## Autonomous Repair
 
-The Jovie lanes harness (its LYB binding) owns repair of every open PR here: red required checks, merge conflicts, a merge group that failed twice at one head, and requested changes. It pushes repair commits to the PR branch on subscription seats, enqueues green PRs the queue dropped, and readies green drafts idle past 48h. It never pushes to `main`. `.github/workflows/codex-auto-fix-ci.yml` is retired to manual dispatch.
+When required CI fails, `.github/workflows/codex-auto-fix-ci.yml` can open a focused repair PR back to the failing branch. It must not push to `main` directly.
 
 Agents should prefer repair PRs and follow-up PRs over expanding an already-landable PR.
 

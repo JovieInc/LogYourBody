@@ -232,10 +232,6 @@ class HealthKitManager: ObservableObject {
     let bodyScoreRecalculationTrigger: (@MainActor () -> Void)?
     let metricImportStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)?
     let rawImportStore: (([HKRawSample]) async -> Void)?
-    /// Priority of the scheduled full-history import. Users get `.background`;
-    /// tests pass a foreground priority because a background-QoS detached task
-    /// can stay unscheduled for 30s+ on a loaded CI simulator.
-    let historicalImportPriority: TaskPriority
 
     init(
         userDefaults: UserDefaults = .standard,
@@ -249,8 +245,7 @@ class HealthKitManager: ObservableObject {
         importCompletion: (@MainActor (String) -> Void)? = nil,
         bodyScoreRecalculationTrigger: (@MainActor () -> Void)? = nil,
         metricImportStore: ((BodyMetrics, @escaping CoreDataManager.WriteAdmission) async throws -> Void)? = nil,
-        rawImportStore: (([HKRawSample]) async -> Void)? = nil,
-        historicalImportPriority: TaskPriority = .background
+        rawImportStore: (([HKRawSample]) async -> Void)? = nil
     ) {
         self.userDefaults = userDefaults
         importAuthManager = authManager
@@ -264,7 +259,6 @@ class HealthKitManager: ObservableObject {
         self.bodyScoreRecalculationTrigger = bodyScoreRecalculationTrigger
         self.metricImportStore = metricImportStore
         self.rawImportStore = rawImportStore
-        self.historicalImportPriority = historicalImportPriority
     }
 
     @Published var isAuthorized = false

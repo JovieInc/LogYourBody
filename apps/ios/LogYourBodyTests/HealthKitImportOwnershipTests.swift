@@ -123,11 +123,7 @@ final class HealthKitImportOwnershipTests: XCTestCase {
             syncTrigger: { self.syncTriggers += 1 },
             importCompletion: { owner in self.completedOwners.append(owner) },
             metricImportStore: metricStore,
-            rawImportStore: rawStore ?? { _ in XCTFail("Injected query cannot create raw SDK samples") },
-            // A background-QoS detached import stayed unscheduled for the full 30s
-            // weight-query wait on a loaded runner (merge group 38341522837). The
-            // ownership assertions do not depend on scheduling priority.
-            historicalImportPriority: .userInitiated
+            rawImportStore: rawStore ?? { _ in XCTFail("Injected query cannot create raw SDK samples") }
         )
         manager.isAuthorized = true
         return manager
@@ -444,10 +440,6 @@ final class HealthKitImportOwnershipTests: XCTestCase {
         }
         XCTAssertEqual(Set(rows), ["synthetic-health-A", "synthetic-health-B"])
         XCTAssertEqual(rows.count, 2)
-    }
-
-    func testScheduledHistoryImportRunsInTheBackgroundForUsers() {
-        XCTAssertEqual(HealthKitManager(userDefaults: defaults).historicalImportPriority, .background)
     }
 
     func testHeldHistoryCannotCompleteOrClearReplacementImport() async throws {

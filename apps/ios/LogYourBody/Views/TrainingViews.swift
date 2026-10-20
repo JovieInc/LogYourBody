@@ -232,6 +232,9 @@ struct TrainingEnrollmentView: View {
             .navigationTitle("Training coach")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSubmitting ? "Starting…" : "Start") {
                         Task { await submit() }
@@ -239,19 +242,6 @@ struct TrainingEnrollmentView: View {
                     .disabled(isSubmitting || !adultConfirmed || !safetyConfirmed)
                     .accessibilityIdentifier("training_enroll_confirm")
                 }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Button {
-                    dismiss()
-                } label: {
-                    Text("Close")
-                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .accessibilityIdentifier("training_enroll_close_button")
-                .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.vertical, JovieTokens.itemGap)
             }
         }
     }
@@ -623,18 +613,10 @@ struct VoiceSetReviewView: View {
             .padding(20)
             .navigationTitle("Review set")
             .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Button {
-                    dismiss()
-                } label: {
-                    Text("Cancel")
-                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .accessibilityIdentifier("voice_set_review_cancel_button")
-                .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.vertical, JovieTokens.itemGap)
             }
             .onChange(of: selectedExerciseID) { _, _ in
                 selectedSetNumber = nil
@@ -675,8 +657,6 @@ struct TrainingLiveSessionFixtureView: View {
     )
     @State private var savedSets: [TrainingSavedSet]
     @State private var presented = false
-    @State private var showEnrollment = false
-    @State private var showVoiceReview = false
     @State private var showStopCard = false
     @State private var stopCount = 0
     @State private var offline = false
@@ -714,10 +694,6 @@ struct TrainingLiveSessionFixtureView: View {
         VStack(spacing: 20) {
             Button("Open fixture session") { presented = true }
                 .accessibilityIdentifier("training_fixture_open")
-            Button("Open enrollment") { showEnrollment = true }
-                .accessibilityIdentifier("training_fixture_enroll")
-            Button("Open voice review") { showVoiceReview = true }
-                .accessibilityIdentifier("training_fixture_voice_review")
             Button("Open stop card") { showStopCard = true }
                 .accessibilityIdentifier("training_fixture_stop_card")
             if showStopCard {
@@ -757,23 +733,6 @@ struct TrainingLiveSessionFixtureView: View {
                 }, onFeedback: { _, _, _, _ in
                     guard !offline else { throw URLError(.notConnectedToInternet) }
                 }
-            )
-        }
-        .sheet(isPresented: $showEnrollment) {
-            TrainingEnrollmentView { _, _ in }
-        }
-        .sheet(isPresented: $showVoiceReview) {
-            VoiceSetReviewView(
-                session: session,
-                heard: VoiceHeardIntent(
-                    setNumber: 1,
-                    reps: 8,
-                    loadValue: 60,
-                    weightUnit: "kg",
-                    loadKg: 60,
-                    rir: 2
-                ),
-                onLogSet: { _ in }
             )
         }
     }

@@ -262,11 +262,9 @@ func triggerFullHealthKitSyncIfNeeded(
         let totalCachedEntries = await (importCoreDataManager ?? .shared).fetchBodyMetrics(for: ownership.subject).count
         guard await ownsImport(ownership) else { return nil }
         guard !hasPerformedFullSync || (totalCachedEntries < 50 && imported > 0) else { return nil }
-        // A full-history import must not compete with the UI, so users get
-        // `.background` (historicalImportPriority). Ownership is re-checked at every
-        // step, so an import admitted late is still superseded safely by a
-        // replacement account; only the CI test needs it admitted promptly.
-        return Task.detached(priority: historicalImportPriority) { [weak self] in
+        // This import is scheduled asynchronously, but it must be admitted promptly so
+        // account replacement can observe and supersede the captured operation safely.
+        return Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let importSucceeded = await self.syncAllHistoricalHealthKitData(ownership: ownership)
             await MainActor.run {

@@ -27,7 +27,7 @@ final class ValidationService {
     private init() {}
 
     func validateWeight(_ value: String, unit: String) throws -> Double {
-        let sanitized = normalizeNumericValue(value)
+        let sanitized = sanitizeNumericValue(value)
 
         guard !sanitized.isEmpty, let weight = Double(sanitized) else {
             throw ValidationError.invalidWeight("Please enter a valid number")
@@ -44,7 +44,7 @@ final class ValidationService {
     }
 
     func validateBodyFat(_ value: String) throws -> Double {
-        let sanitized = normalizeNumericValue(value)
+        let sanitized = sanitizeNumericValue(value)
 
         guard !sanitized.isEmpty, let bodyFat = Double(sanitized) else {
             throw ValidationError.invalidBodyFat("Please enter a valid percentage")
@@ -59,7 +59,7 @@ final class ValidationService {
     }
 
     func validateHeight(_ value: String, unit: String) throws -> Double {
-        let sanitized = normalizeNumericValue(value)
+        let sanitized = sanitizeNumericValue(value)
 
         guard !sanitized.isEmpty, let height = Double(sanitized) else {
             throw ValidationError.invalidHeight("Please enter a valid height")
@@ -75,13 +75,16 @@ final class ValidationService {
 
     // MARK: - Helpers
 
-    private func normalizeNumericValue(_ value: String) -> String {
+    private func sanitizeNumericValue(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         // A decimal pad inserts "," in locales whose decimal separator is a comma.
         let decimalNormalized = trimmed.replacingOccurrences(of: ",", with: ".")
-        // Preserve signs and exponents for numeric parsing. Removing arbitrary
-        // characters can turn a negative or malformed input into a different valid value.
-        return decimalNormalized
+        return decimalNormalized.replacingOccurrences(
+            of: "[^0-9.]",
+            with: "",
+            options: .regularExpression,
+            range: nil
+        )
     }
 
     private func weightRange(for unit: String) -> ClosedRange<Double> {

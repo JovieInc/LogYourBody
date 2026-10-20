@@ -2,7 +2,6 @@
 // BiometricLockPolicyTests.swift
 // LogYourBodyTests
 //
-import SwiftUI
 import XCTest
 @testable import LogYourBody
 
@@ -182,32 +181,5 @@ final class BiometricLockPolicyTests: XCTestCase {
     func testNewAttemptCannotStartWhileOneIsInFlight() {
         XCTAssertFalse(BiometricLockPolicy.canStartAuthentication(isAuthenticating: true))
         XCTAssertTrue(BiometricLockPolicy.canStartAuthentication(isAuthenticating: false))
-    }
-
-    func testRelockHappensOnlyWhenTheLockIsEnabled() {
-        for phase in [ScenePhase.active, .inactive, .background] {
-            XCTAssertFalse(
-                BiometricLockPolicy.shouldRelock(onEntering: phase, lockEnabled: false)
-            )
-        }
-    }
-
-    func testRelockHappensOnBackgroundSoResumeAndAppSwitcherAreHidden() {
-        XCTAssertTrue(
-            BiometricLockPolicy.shouldRelock(onEntering: .background, lockEnabled: true)
-        )
-    }
-
-    func testTransientInterruptionsDoNotRelock() {
-        for phase in [ScenePhase.active, .inactive] {
-            XCTAssertFalse(
-                BiometricLockPolicy.shouldRelock(onEntering: phase, lockEnabled: true)
-            )
-        }
-    }
-
-    func testShakeLocksInstantlyOnlyWhileTheLockIsArmed() {
-        XCTAssertTrue(BiometricLockPolicy.shouldLockOnShake(isLockArmed: true))
-        XCTAssertFalse(BiometricLockPolicy.shouldLockOnShake(isLockArmed: false))
     }
 }

@@ -165,7 +165,7 @@ func scheduleBackgroundSync() {
     func deleteBodyMetric(id: String) async -> Bool {
         guard let userId = authManager.currentUser?.id else { return false }
 
-        let success = await coreDataManager.markBodyMetricDeleted(id: id, userId: userId)
+        let success = await coreDataManager.markBodyMetricDeleted(id: id)
         guard success else { return false }
 
         queueOperation(
