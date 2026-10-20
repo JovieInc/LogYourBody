@@ -9,7 +9,7 @@ This directory supports fast trunk-based shipping. Required checks should prove 
 Primary pull request workflow for `main`.
 
 - Pull requests target `main`; `preview`, `production`, and `dev` are not active development branches. Pull requests and merge groups targeting `production` also run so the active "Production" ruleset's required `CI Summary` check cannot deadlock.
-- `Detect Changes`: path filter for web/package and iOS changes. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`.
+- `Detect Changes`: path filter for web/package and iOS changes (`.github/scripts/detect-changes.sh`, tested by `detect-changes.test.mjs`). A merge group diffs against its own base (the previous group's head), so a web-only group never inherits a queued iOS PR; iOS runs only when a file the iOS jobs read changed, and an unknown diff selects everything. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`.
 - `JavaScript/TypeScript`: runs `pnpm install`, `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` when web, package, or CI harness files change. The job uses no privileged data-provider configuration, so pull request CI can verify buildability without credentials.
 - `iOS`: runs the iOS Fastlane CI lane when iOS files change.
 - `CI Summary`: aggregate required status. Branch protection should depend on this stable aggregate name rather than individual implementation jobs.
@@ -99,7 +99,7 @@ CodeQL analysis on pushes, pull requests, and schedule.
 
 ### `security-scan.yml`
 
-Weekly/manual/main-branch secret, dependency, and SBOM scanning.
+Weekly/manual/main-branch secret, dependency, and SBOM scanning. Gitleaks runs through the shared `JovieInc/ci` `secret-scan.yml` workflow, pinned by commit SHA.
 
 ### `dependabot-auto-merge.yml`
 

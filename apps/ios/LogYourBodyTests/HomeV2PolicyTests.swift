@@ -218,6 +218,67 @@ final class HomeV2PolicyTests: XCTestCase {
         XCTAssertEqual(cropped.size, CGSize(width: 40, height: 50))
     }
 
+    func testAnchoredCropPutsTheTorsoOnTheStageAnchor() {
+        let stage = CGSize(width: 390, height: 487.5)
+        let torso = CGPoint(x: 0.5, y: 0.62)
+
+        let rect = AspectFillCropper.fillRect(
+            imageSize: CGSize(width: 400, height: 800),
+            in: stage,
+            anchor: torso,
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
+
+        XCTAssertGreaterThanOrEqual(rect.width, stage.width - 0.01)
+        XCTAssertGreaterThanOrEqual(rect.height, stage.height - 0.01)
+        XCTAssertLessThanOrEqual(rect.minX, 0)
+        XCTAssertLessThanOrEqual(rect.minY, 0)
+
+        let torsoY = rect.minY + torso.y * rect.height
+        XCTAssertEqual(torsoY, TorsoFocusService.stageAnchor.y * stage.height, accuracy: 0.5)
+
+        let centered = AspectFillCropper.fillRect(imageSize: CGSize(width: 400, height: 800), in: stage)
+        XCTAssertNotEqual(rect.minY, centered.minY, accuracy: 1, "the torso anchor must move the crop off center")
+    }
+
+    func testAnchoredCropClampsAtTheFrameEdges() {
+        let stage = CGSize(width: 390, height: 487.5)
+
+        let top = AspectFillCropper.fillRect(
+            imageSize: CGSize(width: 400, height: 800),
+            in: stage,
+            anchor: CGPoint(x: 0.5, y: 0.02),
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
+        XCTAssertEqual(top.minY, 0, accuracy: 0.01)
+
+        let bottom = AspectFillCropper.fillRect(
+            imageSize: CGSize(width: 400, height: 800),
+            in: stage,
+            anchor: CGPoint(x: 0.5, y: 0.98),
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
+        XCTAssertEqual(bottom.maxY, stage.height, accuracy: 0.01)
+    }
+
+    func testAnchoredCropWithoutAnAnchorIsTheCenteredFill() {
+        let stage = CGSize(width: 390, height: 487.5)
+        let plain = AspectFillCropper.fillRect(imageSize: CGSize(width: 400, height: 800), in: stage)
+        let anchored = AspectFillCropper.fillRect(
+            imageSize: CGSize(width: 400, height: 800),
+            in: stage,
+            anchor: nil,
+            anchorTarget: TorsoFocusService.stageAnchor
+        )
+        XCTAssertEqual(anchored, plain)
+    }
+
+    func testTorsoFocusFallsBackWhenNoBodyIsDetected() async throws {
+        let cgImage = try XCTUnwrap(SyntheticImage.solidCGImage(width: 64, height: 80, red: 30, green: 30, blue: 30))
+        let anchor = await TorsoFocusService.torsoCenter(in: UIImage(cgImage: cgImage))
+        XCTAssertNil(anchor, "a solid frame has no body pose; surfaces keep the centered crop")
+    }
+
     func testStageKeepsFourByFiveWhenItFitsAndGivesUpHeightOnShortScreens() {
         XCTAssertEqual(HomeV2Layout.stageHeight(width: 390, height: 760), 487.5, accuracy: 0.01)
         XCTAssertEqual(HomeV2Layout.stageHeight(width: 390, height: 700), 476, accuracy: 0.01)
