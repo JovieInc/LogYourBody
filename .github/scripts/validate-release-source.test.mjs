@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { selectReleaseRun, validateReleaseRun } from './validate-release-checks.mjs';
+import { runReleaseCheck, selectReleaseRun, validateReleaseRun } from './validate-release-checks.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const sha = '472dd68fb9b3bd9c46cf54a5fa43fc2236dda5a0';
@@ -26,6 +26,17 @@ const jobs = (selected = run()) => [{ jobs: required.split(',').map((name, index
   head_sha: selected.head_sha, status: 'completed', conclusion: 'success',
 })) }];
 const selected = (runs, event = 'workflow_dispatch') => selectReleaseRun(runs, sha, repository, event);
+
+test('command-line contract selects and validates with stable exit codes', () => {
+  const args = (mode) => [mode, sha, repository, 'push', 'runs.json', required];
+  const read = (current) => (path) => JSON.stringify(path === 0 ? jobs(current) : pages(current));
+  const current = run();
+  assert.deepEqual(runReleaseCheck(args('select'), read(current)), { exitCode: 0, output: String(current.id) });
+  for (const [candidate, exitCode] of [[current, 0], [run({ status: 'in_progress', conclusion: null }), 2], [run({ conclusion: 'failure' }), 1]]) {
+    assert.equal(runReleaseCheck(args('validate'), read(candidate)).exitCode, exitCode);
+  }
+  assert.throws(() => runReleaseCheck(args('unknown'), read(current)), /Unknown validator mode/);
+});
 
 test('main run dominates complete same-source queue proof, including pending or failed main', () => {
   for (const override of [{ status: 'in_progress', conclusion: null }, { conclusion: 'failure' }]) {

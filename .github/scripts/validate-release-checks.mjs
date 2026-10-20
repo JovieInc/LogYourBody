@@ -71,19 +71,21 @@ export function validateReleaseRun(run, pages, requiredChecks) {
   return { status: 'passed', detail: `${identity} passed all required checks on ${run.head_sha}` };
 }
 
+export function runReleaseCheck(args, read = readFileSync) {
+  const [mode, sha, repository, releaseEvent, runsPath, requiredChecks] = args;
+  const run = selectReleaseRun(JSON.parse(read(runsPath, 'utf8')), sha, repository, releaseEvent);
+  if (mode === 'select') return { exitCode: 0, output: run ? String(run.id) : '' };
+  if (mode !== 'validate') throw new Error('Unknown validator mode');
+  const result = validateReleaseRun(run, JSON.parse(read(0, 'utf8')), requiredChecks);
+  return { exitCode: result.status === 'passed' ? 0 : result.status === 'pending' ? 2 : 1,
+    output: `${result.detail}\n` };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const [mode, sha, repository, releaseEvent, runsPath, requiredChecks] = process.argv.slice(2);
-    const run = selectReleaseRun(JSON.parse(readFileSync(runsPath, 'utf8')), sha, repository, releaseEvent);
-    if (mode === 'select') {
-      if (run) process.stdout.write(String(run.id));
-    } else if (mode === 'validate') {
-      const result = validateReleaseRun(run, JSON.parse(readFileSync(0, 'utf8')), requiredChecks);
-      console.log(result.detail);
-      process.exitCode = result.status === 'passed' ? 0 : result.status === 'pending' ? 2 : 1;
-    } else {
-      throw new Error('Unknown validator mode');
-    }
+    const result = runReleaseCheck(process.argv.slice(2));
+    process.stdout.write(result.output);
+    process.exitCode = result.exitCode;
   } catch (error) {
     console.error(`Release CI evidence rejected: ${error.message}`);
     process.exitCode = 1;
