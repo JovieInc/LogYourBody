@@ -72,6 +72,7 @@ struct ContentView: View {
     @EnvironmentObject var bugReportManager: BugReportManager
     @StateObject private var loadingManager: LoadingManager
     @StateObject private var notificationManager = NotificationManager.shared
+    @Environment(\.scenePhase) private var scenePhase
     private let onboardingStateManager = OnboardingStateManager.shared
     @State private var currentUserId: String?
     @State private var hasCompletedOnboarding = OnboardingStateManager.shared.hasCompletedCurrentVersion
@@ -81,6 +82,7 @@ struct ContentView: View {
     @State private var isUnlocked = false
     @State private var showLegalConsent = false
     @State private var showWhatsNew = false
+    @State private var showDailyReminderOffer = false
     @State private var releaseReviewItems: [ReleaseReviewItem] = []
     @State private var releaseReviewDestination: ReleaseReviewDestination?
     @State private var pendingDexaPDF: DexaPDFFileSelection?
@@ -97,6 +99,10 @@ struct ContentView: View {
             environment: ProcessInfo.processInfo.environment,
             userId: authManager.currentUser?.id
         )
+    }
+
+    private var isBiometricLockArmed: Bool {
+        authManager.isAuthenticated && biometricLockEnabled && !disableBiometricLockForUITests
     }
 
     init() {
@@ -252,6 +258,7 @@ struct ContentView: View {
                 hasCompletedOnboarding = onboardingStateManager.hasCompletedCurrentVersion(for: currentUserId)
             } else {
                 lastProfileCompletionSync = nil
+                isUnlocked = false
                 if hasCompletedOnboarding {
                     onboardingStateManager.updateCompletionStatus(false)
                     hasCompletedOnboarding = false
@@ -286,8 +293,20 @@ struct ContentView: View {
         .onChange(of: authManager.needsLegalConsent) { _, newValue in
             showLegalConsent = newValue
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            if BiometricLockPolicy.shouldRelock(
+                onEntering: newPhase,
+                lockEnabled: isBiometricLockArmed
+            ) {
+                isUnlocked = false
+            }
+        }
         .onShake {
-            bugReportManager.handleShakeGesture()
+            if BiometricLockPolicy.shouldLockOnShake(isLockArmed: isBiometricLockArmed) {
+                isUnlocked = false
+            } else {
+                bugReportManager.handleShakeGesture()
+            }
         }
         #if DEBUG
         .onAppear {
@@ -313,30 +332,44 @@ struct ContentView: View {
     private var authenticatedContent: some View {
         Group {
             if shouldShowOnboarding {
-                if HomeV2Policy.isOnboardingV2Enabled() {
-                    HomeV2FirstRunView()
-                        .environmentObject(authManager)
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                } else {
-                    BodyScoreOnboardingFlowView()
-                        .onAppear {
-                            AppServicePorts.analyticsTracker.track(event: "onboarding_view")
-                        }
-                }
+                // One first run for everyone: the onboarding_v2_focus gate now
+                // only picks the sign-in screen.
+                BodyScoreOnboardingFlowView()
+                    .onAppear {
+                        AppServicePorts.analyticsTracker.track(event: "onboarding_view")
+                    }
             } else if shouldShowProfileCompletion {
                 ProfileCompletionGateView()
             } else if !subscriptionManager.isSubscribed {
                 PaywallView()
                     .environmentObject(authManager)
                     .environmentObject(subscriptionManager)
-            } else if shouldShowDailyReminderPrompt {
-                DailyWeighInReminderPromptView(notificationManager: notificationManager)
             } else {
                 MainTabView(releaseReviewDestination: $releaseReviewDestination)
                     .onAppear {
                         AppServicePorts.analyticsTracker.track(event: "dashboard_view")
+                        showDailyReminderOffer = shouldShowDailyReminderPrompt
+                    }
+                    .onChange(of: shouldShowDailyReminderPrompt) { _, shouldShow in
+                        guard shouldShow else { return }
+                        // Let the log sheet finish dismissing and the "Logged" line land first.
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(900))
+                            showDailyReminderOffer = shouldShowDailyReminderPrompt
+                        }
+                    }
+                    // Sibling of Today, not a modifier on it. An ancestor sheet drops
+                    // the edit-entry sheet while Context is pushed.
+                    .background {
+                        DailyReminderOfferSheetHost(
+                            isPresented: $showDailyReminderOffer,
+                            notificationManager: notificationManager,
+                            onDismiss: {
+                                if !notificationManager.hasCompletedDailyWeighInPrompt {
+                                    notificationManager.skipDailyWeighInPrompt()
+                                }
+                            }
+                        )
                     }
             }
         }
@@ -355,8 +388,7 @@ struct ContentView: View {
 
     private var biometricLockOverlay: some View {
         Group {
-            if authManager.isAuthenticated && biometricLockEnabled && !isUnlocked
-                && !disableBiometricLockForUITests {
+            if isBiometricLockArmed && !isUnlocked {
                 BiometricLockView(isUnlocked: $isUnlocked)
                     .transition(AnyTransition.opacity)
             }
@@ -366,7 +398,7 @@ struct ContentView: View {
     private var unlockedDexaPDFSelection: Binding<DexaPDFFileSelection?> {
         Binding(
             get: {
-                biometricLockEnabled && !isUnlocked && !disableBiometricLockForUITests
+                isBiometricLockArmed && !isUnlocked
                     ? nil
                     : pendingDexaPDF
             },
@@ -387,6 +419,25 @@ struct ContentView: View {
                 .transition(.opacity)
             }
         }
+    }
+}
+
+/// Offered over Today once a first weigh-in is logged. A swipe-away counts as
+/// "Not now" so it is asked once. The sheet stays on this sibling so it is not
+/// an ancestor of Today's log sheet.
+private struct DailyReminderOfferSheetHost: View {
+    @Binding var isPresented: Bool
+    var notificationManager: NotificationManager
+    var onDismiss: () -> Void
+
+    var body: some View {
+        Color.clear
+            .accessibilityHidden(true)
+            .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
+                DailyWeighInReminderPromptView(notificationManager: notificationManager) {
+                    isPresented = false
+                }
+            }
     }
 }
 

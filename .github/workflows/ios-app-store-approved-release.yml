@@ -1,5 +1,10 @@
 name: iOS App Store Approved Release
 
+# Kept clock (external fact): Apple App Review state changes in App Store
+# Connect, which emits no GitHub event here. Replacement: an App Store Connect
+# webhook (appStoreVersion state) bridged to repository_dispatch. The run only
+# reads ASC state and releases a PENDING_DEVELOPER_RELEASE version; it never
+# holds a PR or the merge queue.
 on:
   schedule:
     - cron: '*/30 * * * *'

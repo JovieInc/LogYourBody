@@ -167,7 +167,7 @@ func saveWeight(userId: String) {
                 defer { isSavingEntry = false }
 
                 do {
-                    let savedMetric = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+                    let savedResult = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
                         for: selectedDate,
                         weight: weightInKg,
                         userId: userId
@@ -184,7 +184,8 @@ func saveWeight(userId: String) {
                         ]
                     )
                     HapticManager.shared.successAction()
-                    onWeightSaved?(savedMetric)
+                    NotificationManager.shared.recordWeighInLogged()
+                    onWeightSaved?(savedResult)
 
                     dismiss()
                 } catch {

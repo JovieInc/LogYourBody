@@ -14,11 +14,11 @@ This is an aesthetics product, not a fitness or health product. The customer car
 
 We do not find these people by asking about goals. We find them by what they already pay for.
 
-| Signal | What it proves | Size and price (sourced in the research note) |
-| --- | --- | --- |
-| Pays for DEXA or InBody scans | Wants the truth about fat versus muscle, not a scale number | Consumer DEXA providers report 300,000+ clients at $40 to $180 per scan, rescanning monthly to quarterly |
-| Uses a GLP-1 for weight loss | Is spending hundreds of dollars a month on appearance and is worried that a quarter to two fifths of the loss is muscle | Roughly 15 million US adults; 12% of adults have used a GLP-1 |
-| Pays for a hypertrophy programming app | Already buys software to build muscle for looks | $72 to $300 per year per user in the leading apps |
+| Signal                                 | What it proves                                                                                                          | Size and price (sourced in the research note)                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Pays for DEXA or InBody scans          | Wants the truth about fat versus muscle, not a scale number                                                             | Consumer DEXA providers report 300,000+ clients at $40 to $180 per scan, rescanning monthly to quarterly |
+| Uses a GLP-1 for weight loss           | Is spending hundreds of dollars a month on appearance and is worried that a quarter to two fifths of the loss is muscle | Roughly 15 million US adults; 12% of adults have used a GLP-1                                            |
+| Pays for a hypertrophy programming app | Already buys software to build muscle for looks                                                                         | $72 to $300 per year per user in the leading apps                                                        |
 
 The strongest customer has the first two signals at once: a GLP-1 user who scans. They already pay more for one scan than for a year of this app, they rescan on a cadence that gives us a natural retention loop, and their daily question is exactly the one the timeline answers.
 

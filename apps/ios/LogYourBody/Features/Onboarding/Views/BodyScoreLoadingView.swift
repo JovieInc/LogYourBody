@@ -17,7 +17,7 @@ struct BodyScoreLoadingView: View {
                     .frame(width: JovieTokens.minimumHitTarget, height: JovieTokens.minimumHitTarget)
                     .accessibilityHidden(true)
 
-                OnboardingTitleText(text: "Splitting fat from muscle", alignment: .center)
+                OnboardingTitleText(text: "Calculating body composition", alignment: .center)
 
                 OnboardingSubtitleText(
                     text: "Working out your fat mass and lean mass.",
