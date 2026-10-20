@@ -28,7 +28,7 @@ These run inside `ios-release-loop.yml`'s `build-release` job and fail the lane 
 - `verify-app-store-subscriptions.rb` — subscription products exist and are in a submittable state
 - `verify_revenuecat_offerings.sh` — RevenueCat "main" offering resolves with monthly + annual packages
 - `ensure-app-store-free-pricing.rb` — base app price tier is Free (subscriptions carry the revenue)
-- `fastlane precheck` — metadata/screenshot compliance
+- `fastlane precheck` — metadata/screenshot compliance (`apps/ios/fastlane/Precheckfile`; in-app purchases excluded because precheck cannot read them with an API key, so IAP/subscription readiness comes from `app-store-connect-readiness.yml` and the build's subscription verification)
 - Metadata present in `apps/ios/fastlane/metadata/en-US/` (name, subtitle, description, keywords, privacy_url, support_url) and screenshots in `apps/ios/fastlane/screenshots/en-US/`
 
 ## The one human step
