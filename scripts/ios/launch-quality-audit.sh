@@ -17,10 +17,11 @@ XCODEBUILD_SETTINGS="${XCODEBUILD_SETTINGS:-CODE_SIGNING_REQUIRED=NO CODE_SIGNIN
 TEST_TIMEOUTS_ENABLED="${TEST_TIMEOUTS_ENABLED:-YES}"
 DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE="${DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE:-90}"
 MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-180}"
-# 720s covers one chaos group: ~2m of xcodebuild startup plus the slowest
-# passing tests (about 100s) without cutting off the last case. A command
-# timeout is not retried; see is_simulator_infra_failure.
-XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-720}"
+# Passing hosted invocations took up to 672s (2026-10-12), and a cold first UI
+# invocation spent ~10m in xcodebuild startup before any test ran, so 720s
+# killed healthy runs. 1020s still stops a hung simulator well inside the step
+# budget. A command timeout is not retried; see is_simulator_infra_failure.
+XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
 BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
@@ -282,6 +283,7 @@ run_ui_test_group \
 # exact-test evidence validator as the existing launch quality checks.
 CHAOS_REGRESSIONS=(
   "ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration"
+  "ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory"
   "ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote"
   "ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies"
   "ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor"

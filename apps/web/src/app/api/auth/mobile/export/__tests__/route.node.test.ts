@@ -6,6 +6,10 @@ import { neonBodyMetrics, neonBodyMetricsExport } from '@/lib/neon/body-metrics-
 import { neonNativeProductRecords } from '@/lib/neon/native-product-records-adapter';
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import { GET, POST } from '../route';
+import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
+jest.mock('@/lib/neon/training-revisions-adapter', () => ({
+  neonTrainingRevisions: { exportForSubject: jest.fn() },
+}));
 
 jest.mock('@/lib/auth/jovie-oauth', () => ({ fetchUserInfo: jest.fn() }));
 jest.mock('@/lib/neon/body-metrics-adapter', () => ({
@@ -33,7 +37,12 @@ function request(method: 'GET' | 'POST', token?: string) {
 }
 
 describe('/api/auth/mobile/export', () => {
-  beforeEach(() => jest.resetAllMocks());
+  beforeEach(() => {
+    jest.resetAllMocks();
+    jest
+      .mocked(neonTrainingRevisions.exportForSubject)
+      .mockResolvedValue({ proposals: [], revisions: [{ id: 'revision-owned' }] });
+  });
 
   it('rejects missing bearer tokens and cookies before reading Neon', async () => {
     expect((await GET(request('GET'))).status).toBe(401);
@@ -90,10 +99,12 @@ describe('/api/auth/mobile/export', () => {
       subject: 'owner-a',
       profile: { subject: 'owner-a' },
       body_metrics: [{ id: 'metric-1' }],
+      training_program_revisions: { proposals: [], revisions: [{ id: 'revision-owned' }] },
       daily_metrics: [{ id: 'daily-1' }],
     });
     expect(mockedMetrics.listAll).toHaveBeenCalledWith('owner-a');
     expect(mockedRecords.listAll).toHaveBeenCalledWith('owner-a');
+    expect(neonTrainingRevisions.exportForSubject).toHaveBeenCalledWith('owner-a');
   });
 
   it.each(['GET', 'POST'] as const)(
