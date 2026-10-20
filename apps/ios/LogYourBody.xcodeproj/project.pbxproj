@@ -300,6 +300,7 @@
 		ADDC47A32E2D89F3003C97E7 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0054F32E2228F70029E0FF /* SettingsComponents.swift */; };
 		ADDC47A72E2D89F3003C97E7 /* Changelog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD85525F2E19DC44003552EE /* Changelog.swift */; };
 		ADDC47A82E2D89F3003C97E7 /* BodyMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AD52E15FA5C002376C6 /* BodyMetrics.swift */; };
+		961BA7A305024F969B23007C /* BodyCompMethod.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1501C14AA65A4FB59FA5AB22 /* BodyCompMethod.swift */; };
 		ADDC47A92E2D89F3003C97E7 /* DailyLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AD62E15FA5C002376C6 /* DailyLog.swift */; };
 		ADDC47AA2E2D89F3003C97E7 /* DailyMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD723AD72E15FA5C002376C6 /* DailyMetrics.swift */; };
 		ADDC47AB2E2D89F3003C97E7 /* LogYourBody.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = AD723AD82E15FA5C002376C6 /* LogYourBody.xcdatamodeld */; };
@@ -685,6 +686,7 @@
 		AD722F122E15FA5A002376C6 /* LogYourBodyUITestsLaunchTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LogYourBodyUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		AD722F162E15FA5A002376C6 /* generate_app_icons.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = generate_app_icons.sh; sourceTree = "<group>"; };
 		AD723AD52E15FA5C002376C6 /* BodyMetrics.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyMetrics.swift; sourceTree = "<group>"; };
+		1501C14AA65A4FB59FA5AB22 /* BodyCompMethod.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BodyCompMethod.swift; sourceTree = "<group>"; };
 		AD723AD62E15FA5C002376C6 /* DailyLog.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DailyLog.swift; sourceTree = "<group>"; };
 		AD723AD72E15FA5C002376C6 /* DailyMetrics.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DailyMetrics.swift; sourceTree = "<group>"; };
 		AD723ADA2E15FA5C002376C6 /* User.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
@@ -1386,6 +1388,7 @@
 				ADDC48642E2D8A33003C97E7 /* LogYourBody.xcdatamodeld */,
 				AD85525F2E19DC44003552EE /* Changelog.swift */,
 				AD723AD52E15FA5C002376C6 /* BodyMetrics.swift */,
+				1501C14AA65A4FB59FA5AB22 /* BodyCompMethod.swift */,
 				ADFC6A2C2E188FD5004FCE40 /* HKRawSample.swift */,
 				ADE146432EBF05E000B64DA0 /* TimelineMode.swift */,
 				AD723AD62E15FA5C002376C6 /* DailyLog.swift */,
@@ -2245,6 +2248,7 @@
 				ADDC47A32E2D89F3003C97E7 /* SettingsComponents.swift in Sources */,
 				ADDC47A72E2D89F3003C97E7 /* Changelog.swift in Sources */,
 				ADDC47A82E2D89F3003C97E7 /* BodyMetrics.swift in Sources */,
+				961BA7A305024F969B23007C /* BodyCompMethod.swift in Sources */,
 				ADFC6A2D2E188FD5004FCE40 /* HKRawSample.swift in Sources */,
 				ADDC47A92E2D89F3003C97E7 /* DailyLog.swift in Sources */,
 				ADDC47AA2E2D89F3003C97E7 /* DailyMetrics.swift in Sources */,
