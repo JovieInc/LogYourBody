@@ -258,16 +258,8 @@ const sessionPrescriptionSchema = z
     safetyStop: z.boolean(),
     explanation: z.string().nullable(),
     evidenceIds: z.array(z.string()),
-    // In-session pain keeps the exercises and records executionPaused. An engine
-    // safety stop still has no exercises.
-    executionRevision: z.number().int().nonnegative().optional(),
-    executionPaused: z.boolean().optional(),
   })
-  .refine(
-    (session) =>
-      session.safetyStop === (session.exercises.length === 0) ||
-      (session.safetyStop && session.executionPaused === true),
-  );
+  .refine((session) => session.safetyStop === (session.exercises.length === 0));
 
 function isSessionPrescription(value: unknown, sessionId: string): value is Session {
   const result = sessionPrescriptionSchema.safeParse(value);
@@ -425,36 +417,6 @@ export async function getOrCreateNextWorkout(input: {
 
   if (activeRecord?.prescription) {
     const existing = activeRecord.prescription;
-    if ((existing.executionRevision ?? 0) > 0) {
-      // Interruption decisions are this session's result. Rebuilding the base
-      // plan would resurrect skipped work or drop a safety pause.
-      const paused = existing.safetyStop || existing.executionPaused;
-      const savedState = `Saved workout, week ${existing.week}${paused ? ', paused' : ''}`;
-      return {
-        kind: 'workout',
-        session: {
-          ...existing,
-          loggedSets: programLogs.filter((log) => log.sessionId === existing.id),
-        },
-        week: existing.week,
-        weekCount: block.weekCount,
-        weeklyFractionalVolume: microcycle.plannedFractionalVolume,
-        decision: {
-          ...decision,
-          decision: { kind: 'hold', optionalBurdenReduction: false },
-          rationale:
-            'Retaining the saved session interruption decisions; no new change was applied.',
-          before: savedState,
-          after: savedState,
-          reviewPoint: paused ? 'Before resuming the saved session' : 'Next session action',
-          nextAction: existing.safetyStop
-            ? 'Training remains paused. Review the reported pain and seek qualified care if it persists or worsens.'
-            : existing.executionPaused
-              ? 'The saved session is paused. Resume when ready.'
-              : 'Continue the saved session from its current exercise.',
-        },
-      };
-    }
     const retained = activeRecord.initialPrescription;
     const initial =
       isSessionPrescription(retained, existing.id) &&

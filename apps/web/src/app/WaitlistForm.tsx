@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@jovie/ui/atoms/button';
-import { Input } from '@jovie/ui/atoms/input';
 import { analytics } from '@/lib/analytics';
 import { waitlistCampaign } from '@/lib/analytics-schema';
 import { cn } from '@/lib/utils';
@@ -109,34 +107,35 @@ export function WaitlistForm() {
   }
 
   return (
-    <div className="lyb-marketing w-full max-w-[640px]">
-      <form className="flex flex-wrap items-center gap-3" onSubmit={handleSubmit} noValidate>
+    <div className="mt-6 w-full max-w-[640px] sm:mt-9">
+      <form
+        className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+        onSubmit={handleSubmit}
+        noValidate
+      >
         <label className="sr-only" htmlFor="waitlist-email">
           {waitlistLandingCopy.emailLabel}
         </label>
-        <div className="min-w-0 flex-1 basis-48">
-          <Input
-            id="waitlist-email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            placeholder={waitlistLandingCopy.emailPlaceholder}
-            value={email}
-            onFocus={trackStart}
-            onChange={(event) => {
-              setEmail(event.target.value);
-              if (fieldError) setFieldError(null);
-              if (submitState === 'error') setSubmitState('idle');
-            }}
-            disabled={submitState === 'submitting' || submitState === 'success'}
-            aria-invalid={Boolean(fieldError)}
-            aria-describedby="waitlist-status"
-            inputSize="lg"
-            className="h-11 text-base"
-          />
-        </div>
-        <div className="pointer-events-none sr-only" aria-hidden="true">
+        <input
+          id="waitlist-email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          placeholder={waitlistLandingCopy.emailPlaceholder}
+          value={email}
+          onFocus={trackStart}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            if (fieldError) setFieldError(null);
+            if (submitState === 'error') setSubmitState('idle');
+          }}
+          disabled={submitState === 'submitting' || submitState === 'success'}
+          aria-invalid={Boolean(fieldError)}
+          aria-describedby="waitlist-status"
+          className="focus:ring-[var(--landing-accent,#11afff)]/50 min-h-11 w-full rounded-full border border-white/20 bg-black/55 px-5 text-sm text-white shadow-[0_18px_60px_rgba(0,0,0,0.22)] outline-none backdrop-blur-xl transition-[border-color,background-color,box-shadow] placeholder:text-white/60 hover:border-white/35 hover:bg-black/65 focus:border-white/60 focus:bg-black/70 focus:ring-2 disabled:opacity-60"
+        />
+        <div className="pointer-events-none absolute -left-[10000px]" aria-hidden="true">
           <label htmlFor="waitlist-website">Website</label>
           <input
             id="waitlist-website"
@@ -146,28 +145,29 @@ export function WaitlistForm() {
             autoComplete="off"
           />
         </div>
-        <Button
+        <button
           type="submit"
-          aria-label={waitlistLandingCopy.submitLabel}
-          size="marketing"
-          loading={submitState === 'submitting'}
           disabled={submitState === 'submitting' || submitState === 'success'}
-          className="my-2 w-full min-w-44 sm:w-auto"
+          className="group inline-flex min-h-11 items-center justify-center rounded-full p-1.5 text-sm font-[510] text-black outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-52"
         >
-          {waitlistLandingCopy.submitLabel}
-        </Button>
+          <span className="inline-flex h-8 w-full items-center justify-center rounded-full bg-white px-6 shadow-[0_18px_55px_rgba(0,0,0,0.24)] transition-[background-color,transform,box-shadow] group-hover:bg-sky-50 group-hover:shadow-[0_22px_65px_rgba(0,0,0,0.34)] group-focus-visible:ring-2 group-focus-visible:ring-[var(--landing-accent,#11afff)] group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-black motion-safe:group-hover:-translate-y-0.5 motion-safe:group-active:translate-y-0 motion-safe:group-active:scale-[0.985]">
+            {submitState === 'submitting' ? 'Joining…' : waitlistLandingCopy.submitLabel}
+          </span>
+        </button>
       </form>
 
-      <div id="waitlist-status" className="mt-2 min-h-16 sm:mt-3" aria-live="polite">
+      <div id="waitlist-status" className="mt-2 min-h-10 sm:mt-3" aria-live="polite">
         {fieldError ? (
-          <p className="text-primary-token text-sm" role="alert">
+          <p className="text-sm text-[var(--landing-error,#ff677d)]" role="alert">
             {fieldError}
           </p>
         ) : submitState === 'success' || submitState === 'error' ? (
           <p
             className={cn(
               'text-sm',
-              submitState === 'error' ? 'text-primary-token' : 'text-secondary-token',
+              submitState === 'error'
+                ? 'text-[var(--landing-error,#ff677d)]'
+                : 'text-[var(--landing-accent,#11afff)]',
             )}
             role="status"
           >

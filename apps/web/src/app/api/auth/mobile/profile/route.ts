@@ -9,9 +9,8 @@ import { deleteOwnedProgressPhotos } from '@/lib/cloudflare/r2-progress-photo-st
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import type { ProductUserRecord } from '@/lib/ports/user-directory';
 
-// Content revisions of the currently published shared legal documents.
-const CURRENT_TERMS_VERSION = '2026-10-14';
-const CURRENT_PRIVACY_VERSION = '2026-10-14';
+const CURRENT_TERMS_VERSION = '2026-07-14';
+const CURRENT_PRIVACY_VERSION = '2026-07-14';
 
 const ProfileUpdateSchema = z
   .object({

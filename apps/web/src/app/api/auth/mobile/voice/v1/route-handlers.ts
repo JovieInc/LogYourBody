@@ -4,19 +4,7 @@ import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
 import type { VoiceCoachAccess } from '@/lib/voice/access';
 import type { VoiceProvider } from '@/lib/voice/provider';
-import { planUtteranceProposal } from '@/lib/training/mesocycle-canvas';
 import { parseVoiceIntent, type VoiceWeightUnit } from '@/lib/voice/intent-parser';
-
-const VoiceSetContextSchema = z
-  .object({
-    exerciseId: z.string().trim().min(1).max(64),
-    exerciseName: z.string().trim().min(1).max(120),
-    setNumber: z.number().int().min(1).max(10),
-    reps: z.number().int().min(1).max(50),
-    loadKg: z.number().finite().min(0).max(500).nullable(),
-    rir: z.number().int().min(0).max(6),
-  })
-  .strict();
 
 const VOICE_API_VERSION = 1;
 const SpeakRequestSchema = z
@@ -43,8 +31,6 @@ const IntentRequestSchema = z
               .strict(),
           )
           .max(32),
-        currentSet: VoiceSetContextSchema.optional(),
-        lastCompletedSet: VoiceSetContextSchema.optional(),
       })
       .strict()
       .optional(),
@@ -133,14 +119,10 @@ export function createVoiceRouteHandlers(dependencies: VoiceRouteDependencies) {
       const result = parseVoiceIntent(input.transcript, {
         sessionId: input.session?.id,
         exercises: input.session?.exercises,
-        currentSet: input.session?.currentSet,
-        lastCompletedSet: input.session?.lastCompletedSet,
         weightUnit,
       });
-      // Plan sentences stay proposals. This route does not write the ledger.
-      const response = result.kind === 'message' ? planUtteranceProposal(input.transcript) : result;
       return NextResponse.json(
-        { version: VOICE_API_VERSION, ...response },
+        { version: VOICE_API_VERSION, ...result },
         { headers: { 'Cache-Control': 'no-store' } },
       );
     },

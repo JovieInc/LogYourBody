@@ -9,7 +9,6 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@jovie/ui'],
   // Enable static export for Capacitor when needed
   output: process.env.BUILD_TARGET === 'capacitor' ? 'export' : undefined,
 
@@ -45,7 +44,7 @@ const nextConfig: NextConfig = {
   },
 
   // Server external packages
-  serverExternalPackages: ['pdf-parse', '@statsig/statsig-node-core'],
+  serverExternalPackages: ['pdf-parse'],
 
   // Don't skip TypeScript checks
   typescript: {
@@ -59,29 +58,16 @@ const nextConfig: NextConfig = {
 
   // RFC 9728 protected-resource metadata for the MCP server (see src/lib/mcp/contract.ts).
   async rewrites() {
-    return {
-      afterFiles: [
-        {
-          source: '/.well-known/oauth-protected-resource/api/mcp',
-          destination: '/api/mcp/oauth-protected-resource',
-        },
-        {
-          source: '/.well-known/oauth-protected-resource',
-          destination: '/api/mcp/oauth-protected-resource',
-        },
-      ],
-      // Only after real files/pages/dynamic routes; ordinary HTML404 is untouched.
-      fallback: [
-        {
-          // Keep the same path exclusions as middleware so a skipped request
-          // cannot forge its gate-decision header.
-          source:
-            '/:path((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-          has: [{ type: 'header', key: 'x-lyb-public-markdown', value: '1' }],
-          destination: '/api/marketing/markdown-not-found',
-        },
-      ],
-    };
+    return [
+      {
+        source: '/.well-known/oauth-protected-resource/api/mcp',
+        destination: '/api/mcp/oauth-protected-resource',
+      },
+      {
+        source: '/.well-known/oauth-protected-resource',
+        destination: '/api/mcp/oauth-protected-resource',
+      },
+    ];
   },
 
   // Headers for apple-app-site-association

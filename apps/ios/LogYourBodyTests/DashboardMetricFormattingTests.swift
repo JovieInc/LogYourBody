@@ -177,49 +177,6 @@ final class DashboardMetricFormattingTests: XCTestCase {
         XCTAssertEqual(TimeRange.all.shortRelativeLabel, "All")
     }
 
-    // MARK: - MetricFormatterCache
-
-    func testMetricFormatterCacheReusesConfiguredFormatterForTheSameKey() {
-        let formatter = MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 3)
-        let reused = MetricFormatterCache.formatter(minFractionDigits: 1, maxFractionDigits: 3)
-        let different = MetricFormatterCache.formatter(minFractionDigits: 0, maxFractionDigits: 2)
-
-        XCTAssertTrue(formatter === reused)
-        XCTAssertFalse(formatter === different)
-        XCTAssertEqual(formatter.numberStyle, .decimal)
-        XCTAssertEqual(formatter.minimumFractionDigits, 1)
-        XCTAssertEqual(formatter.maximumFractionDigits, 3)
-    }
-
-    func testMetricFormatterCacheSerializesConcurrentInsertionsAndReads() {
-        let resultsLock = NSLock()
-        var formattersByKey: [MetricFormatterKey: Set<ObjectIdentifier>] = [:]
-        var invalidConfigurations = 0
-
-        DispatchQueue.concurrentPerform(iterations: 2_048) { iteration in
-            let minimum = 5 + iteration % 8
-            let key = MetricFormatterKey(minFractionDigits: minimum, maxFractionDigits: minimum + 1)
-            let formatter = MetricFormatterCache.formatter(
-                minFractionDigits: key.minFractionDigits,
-                maxFractionDigits: key.maxFractionDigits
-            )
-            let configured = formatter.numberStyle == .decimal &&
-                formatter.minimumFractionDigits == key.minFractionDigits &&
-                formatter.maximumFractionDigits == key.maxFractionDigits
-
-            resultsLock.lock()
-            formattersByKey[key, default: []].insert(ObjectIdentifier(formatter))
-            if !configured { invalidConfigurations += 1 }
-            resultsLock.unlock()
-        }
-
-        XCTAssertEqual(invalidConfigurations, 0)
-        XCTAssertEqual(formattersByKey.count, 8)
-        for (key, formatters) in formattersByKey {
-            XCTAssertEqual(formatters.count, 1, "Concurrent callers must share one formatter for \(key)")
-        }
-    }
-
     // MARK: - Fixture
 
     private func makeMetric(id: String, date: Date, weight: Double?, bodyFat: Double?) -> BodyMetrics {

@@ -2,97 +2,7 @@
 // HomeV2ContextPolicy.swift
 // LogYourBody
 //
-import Combine
 import Foundation
-
-/// Present the editorial editor only after explicit rollout or an authenticated test override.
-enum HomeV2EntryBodyFatPrimaryPolicy {
-    static let gateKey = "home_v2_entry_body_fat_primary_v1"
-    static let fixtureArgument = "-lybUITestEntryBodyFatPrimary"
-    static let disabledFixtureArgument = "-lybUITestEntryBodyFatPrimaryDisabled"
-
-    @MainActor
-    static func isEnabled(
-        arguments: [String] = ProcessInfo.processInfo.arguments,
-        environment: [String: String] = ProcessInfo.processInfo.environment,
-        isGateEnabled: ((String) -> Bool)? = nil
-    ) -> Bool {
-        #if DEBUG
-        let enabled = arguments.filter { $0 == fixtureArgument }.count
-        let disabled = arguments.filter { $0 == disabledFixtureArgument }.count
-        if enabled + disabled == 1,
-           arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
-           arguments.contains(HomeV2Policy.photoFixtureArgument),
-           !arguments.contains(HomeV2Policy.rollbackFixtureArgument),
-           UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil,
-           environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") == true {
-            return enabled == 1
-        }
-        #endif
-        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return check(gateKey)
-    }
-}
-
-/// Editing an imported record must not turn a missing or untouched reading into a new measurement.
-enum HomeV2EntryEditPolicy {
-    static let gateKey = "home_v2_entry_edit_preservation_v1"
-    static let fixtureArgument = "-lybUITestHomeEntryEditPreservation"
-
-    @MainActor
-    static func isEnabled(
-        arguments: [String] = ProcessInfo.processInfo.arguments,
-        environment: [String: String] = ProcessInfo.processInfo.environment,
-        isGateEnabled: ((String) -> Bool)? = nil
-    ) -> Bool {
-        #if DEBUG
-        if arguments.filter({ $0 == fixtureArgument }).count == 1,
-           arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
-           arguments.contains(HomeV2Policy.photoFixtureArgument),
-           !arguments.contains(HomeV2Policy.rollbackFixtureArgument),
-           UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil,
-           environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") == true {
-            return true
-        }
-        #endif
-        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return check(gateKey)
-    }
-
-    static func weight(text: String, initialValue: Double?, unit: String, preserving: Bool) throws -> Double? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if preserving, initialValue == nil, trimmed.isEmpty { return nil }
-        guard let value = HomeV2WeightStepPolicy.parse(trimmed), value.isFinite else {
-            throw ValidationError.invalidWeight(HomeV2Copy.weightRangeError(unit: unit))
-        }
-        if preserving, let initialValue, initialValue.isFinite,
-           value == HomeV2WeightStepPolicy.parse(HomeV2WeightStepPolicy.text(initialValue)) {
-            return value
-        }
-        guard HomeV2WeightStepPolicy.range(unit: unit).contains(value) else {
-            throw ValidationError.invalidWeight(HomeV2Copy.weightRangeError(unit: unit))
-        }
-        return value
-    }
-
-    static func bodyFat(text: String, initialValue: Double?, preserving: Bool) throws -> Double? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        if preserving {
-            if let initialValue, initialValue.isFinite,
-               let value = HomeV2WeightStepPolicy.parse(trimmed),
-               value == HomeV2WeightStepPolicy.parse(String(format: "%.1f", initialValue)) {
-                return value
-            }
-            return try ValidationService.shared.validateBodyFat(trimmed)
-        }
-        guard let value = HomeV2WeightStepPolicy.parse(trimmed),
-              HomeV2WeightStepPolicy.bodyFatRange.contains(value) else {
-            throw ValidationError.invalidBodyFat(HomeV2Copy.bodyFatRangeError)
-        }
-        return value
-    }
-}
 
 /// Copy for Context (Pencil N2), Entries (E0), Edit entry (E1) and the
 /// delete confirmation (E2). Deletion scope is always spelled out.
@@ -178,9 +88,9 @@ enum HomeV2Provenance {
         return formatter
     }()
 
-    static func label(for metric: BodyMetrics, field: BodyMetricField? = nil) -> String {
+    static func label(for metric: BodyMetrics) -> String {
         let named = metric.sourceMetadata?.sourceName?.trimmingCharacters(in: .whitespaces)
-        switch field.map({ metric.measurementSource(for: $0) }) ?? metric.metricSource {
+        switch metric.metricSource {
         case .healthKit:
             return (named?.isEmpty == false ? named : nil) ?? HomeV2ContextCopy.appleHealth
         case .smartScale:
@@ -196,10 +106,7 @@ enum HomeV2Provenance {
         }
     }
 
-    static func detailedLabel(for metric: BodyMetrics, field: BodyMetricField? = nil) -> String {
-        if let field, metric.sourceMetadata?.entrySource(for: field) == .manual {
-            return HomeV2ContextCopy.typed
-        }
+    static func detailedLabel(for metric: BodyMetrics) -> String {
         let named = metric.sourceMetadata?.sourceName?.trimmingCharacters(in: .whitespaces)
         if metric.metricSource == .manual, let named, !named.isEmpty {
             let cameThroughHealth = metric.sourceMetadata?.sourceBundleId != nil ||
@@ -209,7 +116,7 @@ enum HomeV2Provenance {
             return "\(original) · corrected in LogYourBody"
         }
 
-        let label = label(for: metric, field: field)
+        let label = label(for: metric)
         guard metric.metricSource == .healthKit,
               label != HomeV2ContextCopy.appleHealth else { return label }
         return "\(label) via \(HomeV2ContextCopy.appleHealth)"
@@ -223,16 +130,14 @@ enum HomeV2Provenance {
     }
 
     /// "Apple Health, 7:02 AM" or just "Apple Health".
-    static func subline(
-        for metric: BodyMetrics, field: BodyMetricField? = nil, calendar: Calendar = .current
-    ) -> String {
-        let source = detailedLabel(for: metric, field: field)
+    static func subline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
+        let source = detailedLabel(for: metric)
         guard let time = timeText(for: metric.date, calendar: calendar) else { return source }
         return "\(source), \(time)"
     }
 
     static func weightSubline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
-        let provenance = subline(for: metric, field: .weight, calendar: calendar)
+        let provenance = subline(for: metric, calendar: calendar)
         guard !HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight) else { return provenance }
         return "\(provenance). \(HomeV2WeightQuality.reviewMessage)"
     }
@@ -246,10 +151,10 @@ enum HomeV2Provenance {
 
     /// Body fat names its method when that is more specific than the source.
     static func bodyFatSubline(for metric: BodyMetrics, calendar: Calendar = .current) -> String {
-        switch metric.attributedBodyFatMethod {
+        switch metric.bodyFatMethod {
         case "dexa": return "DEXA"
         case "caliper": return "Calipers"
-        default: return subline(for: metric, field: .bodyFat, calendar: calendar)
+        default: return subline(for: metric, calendar: calendar)
         }
     }
 }
@@ -271,11 +176,6 @@ enum HomeV2CorrectionPolicy {
             BodyFatEntryMethod.bioelectrical.rawValue
         }
 
-        var changedFields: Set<BodyMetricField> = []
-        if kilograms != metric.weight { changedFields.insert(.weight) }
-        if bodyFatPercentage != metric.bodyFatPercentage { changedFields.insert(.bodyFat) }
-        let metadata = changedFields.isEmpty ? metric.sourceMetadata :
-            (metric.sourceMetadata ?? BodyMetricSourceMetadata()).settingEntrySource(.manual, fields: changedFields)
         return BodyMetrics(
             id: metric.id,
             userId: metric.userId,
@@ -292,8 +192,8 @@ enum HomeV2CorrectionPolicy {
             waistUnit: metric.waistUnit,
             notes: metric.notes,
             photoUrl: metric.photoUrl,
-            dataSource: metric.dataSource,
-            sourceMetadata: metadata,
+            dataSource: metric.metricSource == .manual ? metric.dataSource : BodyMetricSource.manual.rawValue,
+            sourceMetadata: metric.sourceMetadata,
             createdAt: metric.createdAt,
             updatedAt: updatedAt
         )
@@ -306,17 +206,6 @@ struct HomeV2DayEntryRow: Identifiable, Equatable {
     let label: String
     let subline: String
     let value: String
-
-    /// A recorded zero is a value; absent and invalid counts do not create a row.
-    static func steps(_ value: Int?) -> HomeV2DayEntryRow? {
-        guard let value, value >= 0 else { return nil }
-        return HomeV2DayEntryRow(
-            id: "steps",
-            label: HomeV2ContextCopy.steps,
-            subline: HomeV2ContextCopy.appleHealth,
-            value: FormatterCache.stepsFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
-        )
-    }
 }
 
 /// Everything Context shows for one day.
@@ -383,7 +272,7 @@ enum HomeV2EntriesPolicy {
         }
         return monthsNewestFirst.compactMap { key -> HomeV2EntriesSection? in
             guard let monthMetrics = grouped[key], let newest = monthMetrics.first else { return nil }
-            let chronological: [Double] = monthMetrics.reversed().compactMap { metric -> Double? in
+            let chronological = monthMetrics.reversed().compactMap { metric in
                 guard HomeV2WeightQuality.isWithinSupportedLoggingRange(metric.weight) else { return nil }
                 return weightValue(metric)
             }
@@ -409,132 +298,6 @@ enum HomeV2EntriesPolicy {
                     ? HomeV2ContextCopy.monthDelta(first: chronological.first, last: chronological.last, unit: unit)
                     : nil,
                 rows: rows
-            )
-        }
-    }
-}
-
-/// Reads the selected calendar day independently of the dashboard's recent-history cache.
-@MainActor
-final class HomeV2DailyStepsReader: ObservableObject {
-    struct Key: Hashable {
-        let ownership: AuthManager.ProfileSessionOwnership
-        let day: Date
-    }
-
-    enum State: Equatable {
-        case loading
-        case missing
-        case value(Int)
-    }
-
-    struct Snapshot: Equatable {
-        let key: Key
-        let state: State
-    }
-
-    typealias Fetch = @MainActor (String, Date, Date) async -> [DailyMetrics]
-    typealias OwnsSession = @MainActor (AuthManager.ProfileSessionOwnership) -> Bool
-
-    @Published private(set) var snapshot: Snapshot?
-    private let calendar: Calendar
-    private let fetch: Fetch
-    private var requestID: UUID?
-
-    init(calendar: Calendar = .current, fetch: Fetch? = nil) {
-        self.calendar = calendar
-        self.fetch = fetch ?? { owner, start, end in
-            await Self.readStoredMetrics(for: owner, from: start, to: end)
-        }
-    }
-
-    func key(for metric: BodyMetrics, ownership: AuthManager.ProfileSessionOwnership?) -> Key? {
-        guard let ownership, metric.userId == ownership.subject else { return nil }
-        return key(for: metric.date, ownership: ownership)
-    }
-
-    func key(for date: Date, ownership: AuthManager.ProfileSessionOwnership?) -> Key? {
-        ownership.map { Key(ownership: $0, day: calendar.startOfDay(for: date)) }
-    }
-
-    /// Rechecks ownership at render time, before a replacement task necessarily starts.
-    func state(
-        for metric: BodyMetrics,
-        ownership: AuthManager.ProfileSessionOwnership?,
-        ownsSession: OwnsSession
-    ) -> State {
-        guard key(for: metric, ownership: ownership) != nil else { return .missing }
-        return state(for: metric.date, ownership: ownership, ownsSession: ownsSession)
-    }
-
-    func state(
-        for date: Date,
-        ownership: AuthManager.ProfileSessionOwnership?,
-        ownsSession: OwnsSession
-    ) -> State {
-        guard let key = key(for: date, ownership: ownership), ownsSession(key.ownership) else { return .missing }
-        guard snapshot?.key == key else { return .loading }
-        return snapshot?.state ?? .loading
-    }
-
-    func load(
-        metric: BodyMetrics,
-        ownership: AuthManager.ProfileSessionOwnership,
-        ownsSession: OwnsSession
-    ) async {
-        guard metric.userId == ownership.subject else { return }
-        await load(date: metric.date, ownership: ownership, ownsSession: ownsSession)
-    }
-
-    func load(
-        date: Date,
-        ownership: AuthManager.ProfileSessionOwnership,
-        ownsSession: OwnsSession
-    ) async {
-        guard !Task.isCancelled,
-              let key = key(for: date, ownership: ownership),
-              ownsSession(ownership),
-              let end = calendar.date(byAdding: .day, value: 1, to: key.day) else { return }
-        let request = UUID()
-        requestID = request
-        snapshot = Snapshot(key: key, state: .loading)
-        let rows = await fetch(ownership.subject, key.day, end)
-        guard !Task.isCancelled, requestID == request, ownsSession(ownership) else { return }
-
-        // The range API includes its upper bound; exclude the following day's midnight.
-        let newest = rows.filter {
-            $0.userId == ownership.subject && $0.date >= key.day && $0.date < end
-        }.max {
-            $0.updatedAt == $1.updatedAt ? $0.id < $1.id : $0.updatedAt < $1.updatedAt
-        }
-        let state: State
-        if let steps = newest?.steps, steps >= 0 {
-            state = .value(steps)
-        } else {
-            state = .missing
-        }
-        snapshot = Snapshot(key: key, state: state)
-    }
-
-    static func readStoredMetrics(
-        for owner: String,
-        from start: Date,
-        to end: Date,
-        coreDataManager: CoreDataManager = .shared
-    ) async -> [DailyMetrics] {
-        let rows = await coreDataManager.fetchDailyMetrics(for: owner, from: start, to: end)
-        return rows.compactMap { row in
-            guard let id = row.id, let userId = row.userId, let date = row.date else { return nil }
-            // Legacy writers store both nil and a real zero as 0. Preserve the
-            // canonical missing-value interpretation until storage records presence.
-            return DailyMetrics(
-                id: id,
-                userId: userId,
-                date: date,
-                steps: row.steps > 0 ? Int(row.steps) : nil,
-                notes: row.notes,
-                createdAt: row.createdAt ?? date,
-                updatedAt: row.updatedAt ?? row.createdAt ?? date
             )
         }
     }

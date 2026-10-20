@@ -1,13 +1,5 @@
 # User Journeys → Test Matrix
 
-**October 16, 2026 reconciliation (LYB-179):** The v1 journey/test inventory below
-is historical source context, not a current execution or release receipt.
-LYB-173's automatic-first observation, one credible decision and progressive
-onboarding supersede timeline-first/manual-first product direction; existing
-tests and owners remain. See the [reconciled roadmap](product-development-roadmap.md)
-and [funnel evidence contract](marketing/funnel-evidence-contract.md). Neither a
-render marker nor subscription transition proves coaching activation or cash.
-
 Canonical map of every expected user journey and the test(s) that assert its user-visible outcome.
 The paid core loop is defined in [GOLDEN_PATH.md](GOLDEN_PATH.md) and enforced by `LogYourBodyTests/GoldenPathTests` (hard CI gate via the iOS Launch Quality Gate).
 

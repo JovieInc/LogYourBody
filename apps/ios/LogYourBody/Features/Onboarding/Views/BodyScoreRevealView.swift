@@ -1,7 +1,4 @@
 import SwiftUI
-#if DEBUG
-import OSLog
-#endif
 
 enum BodyScoreRevealPolicy {
     /// Comparison-group copy follows the entered sex at birth, with a neutral
@@ -132,9 +129,7 @@ struct FatVsMuscleSummary: Equatable {
     }
 }
 
-@MainActor
 struct BodyScoreRevealView: View {
-    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.theme)
     private var theme
 
@@ -143,10 +138,7 @@ struct BodyScoreRevealView: View {
 
     @ObservedObject var viewModel: OnboardingFlowViewModel
     @State private var isRevealed = false
-    @State private var revealFinished = false
-    @State private var summaryIsVisible = false
     @AccessibilityFocusState private var summaryFocused: Bool
-    var analyticsTracker: AnalyticsTracking = AppServicePorts.analyticsTracker
 
     var body: some View {
         Group {
@@ -164,10 +156,6 @@ struct BodyScoreRevealView: View {
                             .opacity(isRevealed ? 1 : 0)
                             .animation(reduceMotion ? nil : theme.animation.spring, value: isRevealed)
                             .accessibilityFocused($summaryFocused)
-                            .onScrollVisibilityChange(threshold: 0.5) { visible in
-                                summaryIsVisible = visible
-                                if revealFinished { recordImpression() }
-                            }
 
                         compositionBar(summary: summary)
                             .opacity(isRevealed ? 1 : 0)
@@ -183,25 +171,10 @@ struct BodyScoreRevealView: View {
                             .opacity(isRevealed ? 1 : 0)
                             .animation(reduceMotion ? nil : theme.animation.fast.delay(0.15), value: isRevealed)
                     }
-                    .onAppear {
-                        triggerRevealFeedback()
-                    }
-                    .onDisappear { summaryIsVisible = false }
                 } footer: {
                     VStack(spacing: 12) {
                         Button("Continue") {
-                            #if DEBUG
-                            BodyScoreRevealTransitionDiagnostic.record(
-                                "continue.begin step=\(viewModel.currentStep.rawValue) " +
-                                "authenticatedEmail=\(viewModel.hasAuthenticatedAccountEmail)"
-                            )
-                            #endif
                             viewModel.goToNextStep()
-                            #if DEBUG
-                            BodyScoreRevealTransitionDiagnostic.record(
-                                "continue.return step=\(viewModel.currentStep.rawValue)"
-                            )
-                            #endif
                         }
                         .buttonStyle(OnboardingPrimaryButtonStyle())
                         .accessibilityIdentifier("body_score_reveal_continue_button")
@@ -216,18 +189,9 @@ struct BodyScoreRevealView: View {
             }
         }
         .onAppear {
-            #if DEBUG
-            BodyScoreRevealTransitionDiagnostic.record("reveal.appear step=\(viewModel.currentStep.rawValue)")
-            #endif
+            guard FatVsMuscleSummary(input: viewModel.bodyScoreInput) != nil else { return }
+            triggerRevealFeedback()
         }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active && revealFinished { recordImpression() }
-        }
-        #if DEBUG
-        .onDisappear {
-            BodyScoreRevealTransitionDiagnostic.record("reveal.disappear step=\(viewModel.currentStep.rawValue)")
-        }
-        #endif
     }
 
     private var changeText: String? {
@@ -314,48 +278,15 @@ struct BodyScoreRevealView: View {
     private func triggerRevealFeedback() {
         if reduceMotion {
             isRevealed = true
-            DispatchQueue.main.async {
-                revealFinished = true
-                recordImpression()
-            }
         } else {
-            withAnimation(theme.animation.spring, completionCriteria: .removed) {
+            withAnimation(theme.animation.spring) {
                 isRevealed = true
-            } completion: {
-                revealFinished = true
-                recordImpression()
             }
         }
         DispatchQueue.main.async {
             summaryFocused = true
         }
         HapticManager.shared.successAction()
-    }
-
-    private func recordImpression() {
-        viewModel.firstInsightImpression.recordIfEligible(
-            summaryIsVisible: summaryIsVisible && FatVsMuscleSummary(input: viewModel.bodyScoreInput) != nil,
-            sceneIsActive: scenePhase == .active,
-            tracker: analyticsTracker
-        )
-    }
-}
-
-/// Once per in-memory first-run flow, never per account. Calculation and
-/// navigation cannot invoke this: the revealed summary owns the callback.
-struct FirstInsightImpression {
-    static let gateKey = "growth_first_insight_rendered_v1"
-    private(set) var hasRecorded = false
-
-    mutating func recordIfEligible(
-        summaryIsVisible: Bool,
-        sceneIsActive: Bool,
-        tracker: AnalyticsTracking
-    ) {
-        guard summaryIsVisible, sceneIsActive, !hasRecorded,
-              tracker.isFeatureEnabled(flagKey: Self.gateKey) else { return }
-        hasRecorded = true
-        tracker.track(event: "first_insight_rendered")
     }
 }
 
@@ -374,23 +305,3 @@ struct FirstInsightImpression {
     return BodyScoreRevealView(viewModel: vm)
         .preferredColorScheme(.dark)
 }
-
-#if DEBUG
-/// Observes only the explicitly selected real XCTest onboarding fixture.
-private enum BodyScoreRevealTransitionDiagnostic {
-    private static let logger = Logger(subsystem: "com.logyourbody.reveal-transition-diagnostic", category: "fixture")
-
-    @MainActor
-    static func record(_ message: @autoclosure () -> String) {
-        let process = ProcessInfo.processInfo
-        guard process.arguments.contains("-lybUITestBodyScoreOnboardingFixture"),
-              process.arguments.contains("-lybUITestRevealTransitionDiagnostic"),
-              let session = process.environment["XCTestSessionIdentifier"],
-              UUID(uuidString: session) != nil,
-              let bundle = process.environment["XCTestBundlePath"],
-              bundle.hasSuffix("/LogYourBodyUITests.xctest") else { return }
-        let value = message()
-        logger.notice("\(value, privacy: .public)")
-    }
-}
-#endif

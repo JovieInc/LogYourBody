@@ -16,20 +16,20 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d0d2de40fdcb7ccc15f55e12a69eb6764a5836f4c7d237634f87365af6add522`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f9cf09f9630649ae4b9bf29c44c3a903592a02f7b85d1c1c38083f6c15e864cd`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11d9a680ec4c2c74193f2bd1bc9dd544c6ca3bc397bea165bfc08fd0e15933e0`)
 - `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `edc60551d0911cfbad4778b82a6d7376d2d123ee40be983e8376e1e5b7a2dd16`)
-- `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b43be4748356308f2098e4cf6e44f935a66d842588cb822752f27a4fcff636cb`)
-- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `633608a0352c405b4465253f8497558b0a53ef04b5bc76b5b6d2c03d89f888d1`)
-- `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
-- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `06ee02d964e6aa3f4b01b00a39a0112d2296b0dc2a213ba1873d437bf0b302ae`)
+- `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3b6c5e65f3fc8491ac4dccc17daefaac865808100ce350386a9d8589c00342fa`)
+- `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `8c1c359b59caf6d266cc071752c51f6d6ac5b95fed7809dd209192782090a778`)
+- `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `308eefa5e2f5b371d60eb5142243654503b53b67ba2f36477bf7d389a57e89f3`)
+- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `11956a92eceafb5392139625818d29853dace83bb0d22cf5ccda565c6ffa8aca`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `24015f5812c3157efebc973c6aa0bbd00eae6e1747be4966eb9dff152e46377c`)
-- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
+- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `a6881107567466785007e9db6848cc2aaf5260a1c36f52a48228ed4dec381a35`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b55f50a430bac9255c72fb4849652d48b47a16cc88bf9daaa8210b2908411232`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c3927f763c224c45f43ef1a226740c6cd3334428f1db39a2d63e64a9d11931e4`)
 
 ### `apps/web/package.json`: engines
 
@@ -77,7 +77,6 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@ai-sdk/gateway": "^4.0.96",
   "@headlessui/react": "^2.2.10",
   "@hookform/resolvers": "^5.9.1",
-  "@jovie/ui": "workspace:*",
   "@jovieinc/product-registry": "workspace:*",
   "@neondatabase/serverless": "1.0.2",
   "@radix-ui/react-accordion": "^1.2.20",
@@ -97,7 +96,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-progress": "^1.1.16",
   "@radix-ui/react-radio-group": "^1.4.7",
   "@radix-ui/react-scroll-area": "^1.2.18",
-  "@radix-ui/react-select": "^2.3.8",
+  "@radix-ui/react-select": "^2.3.7",
   "@radix-ui/react-separator": "^1.1.15",
   "@radix-ui/react-slider": "^1.4.7",
   "@radix-ui/react-slot": "^1.3.3",
@@ -106,10 +105,9 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-toast": "^1.2.23",
   "@radix-ui/react-toggle": "^1.1.18",
   "@radix-ui/react-toggle-group": "^1.1.19",
-  "@radix-ui/react-tooltip": "^1.3.0",
+  "@radix-ui/react-tooltip": "^1.2.16",
   "@radix-ui/react-visually-hidden": "^1.2.11",
   "@statsig/js-client": "^3.33.5",
-  "@statsig/statsig-node-core": "0.23.1",
   "@tailwindcss/postcss": "^4.3.3",
   "@tailwindcss/typography": "^0.5.20",
   "@tanstack/react-query": "^5.103.2",
@@ -123,14 +121,14 @@ A changed fingerprint requires review of its related documentation; it does not 
   "date-fns": "^4.4.0",
   "embla-carousel-react": "^8.6.0",
   "exifr": "^7.1.3",
-  "framer-motion": "^14.0.0",
+  "framer-motion": "^12.43.0",
   "glob": "^11.1.0",
   "idb": "^8.0.3",
   "input-otp": "^1.5.0",
   "js-yaml": "5.4.3",
   "lodash": "^4.18.1",
-  "lucide-react": "^1.55.0",
-  "next": "15.5.28",
+  "lucide-react": "^1.48.0",
+  "next": "15.5.27",
   "next-themes": "^0.4.6",
   "openai": "^6.49.0",
   "pdf-lib": "^1.17.1",
@@ -189,7 +187,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ded68620444bed4436636d0c53d0f163726c68de53fd36636225c7ccdb1cc958`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `8d8734ec70ca047c45b9254fd00b5e2c08f9e671a03a0766b322c8d7b49156fb`)
 
 ### `package.json`: packageManager
 
@@ -224,7 +222,6 @@ A changed fingerprint requires review of its related documentation; it does not 
   "eve:info": "bash scripts/eve/run-node24.sh info",
   "eve:smoke": "bash scripts/eve/local-smoke.sh",
   "format": "prettier --write .",
-  "growth:report": "node packages/shared-lib/scripts/growth-report.mjs",
   "ios": "cd apps/ios && open LogYourBody.xcodeproj",
   "ios:bootstrap-local-config": "bash scripts/ios/bootstrap-local-config.sh",
   "ios:ettrace-profile": "bash scripts/ios/ettrace-profile.sh",
@@ -285,7 +282,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/design-tokens/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f6ea52cfe8adbccfb9ce5bb7220d6f670efa7d4e2eca235becf84568f7240f0f`)
+- `packages/design-tokens/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `80ae7dc9ef2d6b212897d208c9799c2e8ba4c7a061acda46a3ea10fde1553dbb`)
 
 ### `packages/design-tokens/package.json`: scripts
 
@@ -307,7 +304,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "style-dictionary": "^5.6.1"
+  "style-dictionary": "^5.5.5"
 }
 ```
 
@@ -349,7 +346,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b859d78a9108275186eb5499d736e7bc3ac8e5eddf1839e0ba3ff897f8001b4b`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f80bc9421299e419438bf514b21aedf5c7f49893a4a8e63bf5b3ec5fb32d8acb`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -357,7 +354,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "build": "tsc -p tsconfig.json",
   "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
-  "test": "vitest run --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs",
+  "test": "vitest run --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs",
   "typecheck": "tsc --noEmit -p tsconfig.json"
 }
 ```
@@ -379,15 +376,12 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3228ca0acd307954a34b4b5518a2b9a51aa9570e96aa4ea99a26ccff503ba140`)
+- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3590f5fc9bca5f30a8eaac908a762e683611a4d4126b8b8d611c1515a38b13ea`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5c4e7893db7cd05bb3312add2b1b5a60bfcba4a68c8f9603043eaccfe75f0d27`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `d31d02f24b901f5eca4ad8dd497b0bc20c136906f29fc73813996bb17f44a8e5`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
-- `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
-- `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
-- `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `c22631ce7c362557c45daf05fabcd3246648a84b1c5cb7735183d3d6360d9bb1`)
-- `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `1e7d727805b3918f54714fbd84407bd30d6441bff56ee89542027b0bc69a0eab`)
+- `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `f92b600361fe9d26b2a4c9a944c8c921d33feb8eafb756a77ab0b285b940a3f6`)
+- `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `cdd99f5f4e4b9f559e4e3e3b6889e00d7fbbe612166e0872f812d0ed23eafd7b`)
 
 ## Pinned shared sources
 
@@ -397,24 +391,3 @@ Updates are independent reviewable consumer changes. Local instructions remain s
 - `scripts/repository_docs.py` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:scripts/repository_docs.py` (SHA-256 `578f1db8842d50b70bc2ec28bffb23cd8620222c8e9f8b896797f4de88f82d43`)
 - `tests/test_repository_docs.py` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:tests/test_repository_docs.py` (SHA-256 `9cb660d8c2fa145b17cc04e522a9e692ff8131f6126e6a584527ccbc3d3fbe80`)
 - `docs/company/CI_TOOL_LICENSE` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:LICENSE` (SHA-256 `c8465c8b9f97966f84ca0ef5f8440f37315a73ef76044b7bdfa74a3fbef4f143`)
-- `apps/ios/Scripts/import-joviekit.mjs` ← `JovieInc/Jovie@1e6c7f11ef1cc4fb64c59c1b1758d823e8c6bc48:apps/ios/scripts/import-joviekit.mjs` (SHA-256 `35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b`)
-- `apps/ios/Vendor/JovieKit.source.json` ← `JovieInc/Jovie@1e6c7f11ef1cc4fb64c59c1b1758d823e8c6bc48:apps/ios/Packages/JovieKit.source.json` (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `apps/ios/Vendor/JovieKit/.jovie-source.json` ← `JovieInc/Jovie@1e6c7f11ef1cc4fb64c59c1b1758d823e8c6bc48:apps/ios/Packages/JovieKit.source.json` (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `apps/ios/Vendor/JovieKit/.gitignore` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/.gitignore` (SHA-256 `acc718146d21aae829cba1761475e05de39d73209d83af2ab8487a74843cead0`)
-- `apps/ios/Vendor/JovieKit/Package.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Package.swift` (SHA-256 `aa88704f7220d98307ea057bc06e052605809218e64b40886c063b429c2521ab`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/AppReviewPolicy.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/AppReviewPolicy.swift` (SHA-256 `1e98c8a910ca08730e5b7ce843cbf22a259b035f6b36abe993b28a70ed379f12`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/EyesFreeCaptureAPI.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/EyesFreeCaptureAPI.swift` (SHA-256 `c2c70a21efa724a313c090fb111c2b4f15aabc957167d4eaf15f5a301bf42feb`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatAuthorizing.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatAuthorizing.swift` (SHA-256 `5580aaf71485ad4b6e88bd7a8ec6433d314b5038768d1fd3e5753081b827e02f`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatNDJSONParser.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatNDJSONParser.swift` (SHA-256 `b4723fff9354d795561020361850fd12a9e917b599581e08206db95f172b3ee8`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatNDJSONReader.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatNDJSONReader.swift` (SHA-256 `3ef2251781c1a7023d20a7d4502d2d83972662132b1e850fcef26f47b4dd1dee`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatStreamCoalescer.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatStreamCoalescer.swift` (SHA-256 `11595b916203e117f721b1eaa8f0253b7957b088d9b45cd1572bcca2071f0ff3`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatStreamEvent.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatStreamEvent.swift` (SHA-256 `6fc3a978e0786fac7abcc9cf979535d4193fce15b5261aeb0c3be054454df58b`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatTransport.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatTransport.swift` (SHA-256 `0f3829a8811b6020f6c872d66cf3f0d5630312fcb73ddf784165f55aab3246ba`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileConversationModels.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileConversationModels.swift` (SHA-256 `532510cc83b1124af92e0ea027da518a9480c4c52e7723603ccaafd615aa7775`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/AppReviewPolicyTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/AppReviewPolicyTests.swift` (SHA-256 `5a6744fac1c654fd769a0e5ca6504ef3db1f47dffdd802a8b1509a793978a79a`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatNDJSONParserTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatNDJSONParserTests.swift` (SHA-256 `4a3508df5567cbaa3d094d65b32826ef9cb170d8395c278bd50ee096198dfc7f`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatNDJSONReaderTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatNDJSONReaderTests.swift` (SHA-256 `247e989555ecbb27ba61121319126ec71feb969ec7061c6916a3247c71df3225`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatStreamCoalescerTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatStreamCoalescerTests.swift` (SHA-256 `1c5e23c756fe04ab422622d862e4b219fcea78ee75e8851dc374c49e0a085cf8`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatTransportTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatTransportTests.swift` (SHA-256 `77f477526edfec88f9a42e506f231c3acc2d000450ac21c7aa060d7ddce47380`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileConversationModelsTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileConversationModelsTests.swift` (SHA-256 `a2823075a5f0de5f9dd691db4fa5f6bdf53e87ae924c337205d52a8d039cceb3`)
-- `apps/ios/Vendor/JovieKit/LICENSE` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:LICENSE` (SHA-256 `b6eb8a4e5f2aa94db96d0ec35126fb88561f162ae3383d82330996ead3361526`)

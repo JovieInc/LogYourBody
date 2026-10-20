@@ -9,12 +9,6 @@ import SwiftUI
 enum HomeV2Tokens {
     typealias Colors = HomeV2Palette
 
-    enum Editor {
-        static func display(size: CGFloat, weight: Font.Weight, relativeTo style: Font.TextStyle) -> Font {
-            .custom("InterTight-Regular", size: size, relativeTo: style).weight(weight)
-        }
-    }
-
     enum Metric {
         static let weight = Colors.ion
         static let bodyFat = Colors.ultra
@@ -25,7 +19,7 @@ enum HomeV2Tokens {
     enum TypeSize {
         static let heroPhoto: CGFloat = 38
         static let heroMetricFirst: CGFloat = 84
-        static let progressValue: CGFloat = 40
+        static let progressValue: CGFloat = 72
         static let lead: CGFloat = 18
         static let sheetValue: CGFloat = 60
         static let sheetTitle: CGFloat = 22

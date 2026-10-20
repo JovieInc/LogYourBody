@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last Updated: October 14, 2026**
+**Last Updated: July 11, 2025**
 
 ## 1. Agreement to Terms
 
@@ -27,7 +27,7 @@ LogYourBody is a fitness tracking application that helps users:
 
 ### 3.2 Account Security
 
-- Protect access to the Apple account you use to sign in
+- Keep your password confidential
 - Notify us immediately of any unauthorized access
 - You are responsible for all activities under your account
 
@@ -93,10 +93,10 @@ Your use of our Service is also governed by our Privacy Policy. Please review ou
 
 ## 9. Subscription and Payments
 
-### 9.1 Access and Pricing
+### 9.1 Free Tier
 
-- LogYourBody Pro is a subscription
-- Your App Store purchase screen shows the price, any trial eligibility, and subscription terms
+- Basic features are available at no cost
+- May include limitations on storage or features
 
 ### 9.2 Premium Subscription
 

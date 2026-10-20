@@ -121,13 +121,6 @@ jobs:
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
 
-      - name: Test agent environment lifecycle with coverage
-        run: >-
-          node --test --experimental-test-coverage
-          --test-coverage-include=scripts/codex-setup.mjs
-          --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=100
-          scripts/codex-setup.test.mjs
-
       - name: Test post-merge Launch Quality
         run: node --test .github/scripts/post-merge-quality.test.mjs
 
@@ -142,8 +135,7 @@ jobs:
 
   js:
     name: JavaScript/TypeScript
-    # Disposable SQL qualification requires this image's PostgreSQL16 binaries.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     needs: detect-changes
     if: needs.detect-changes.outputs.web == 'true'
     steps:
@@ -174,109 +166,6 @@ jobs:
       - name: Neon migration layout checks
         run: pnpm db:schema:check
 
-      - name: Verify training mutations on disposable PostgreSQL16
-        shell: bash
-        timeout-minutes: 5
-        run: |
-          mkdir -p artifacts/training-mutations/coverage
-          git rev-parse HEAD > artifacts/training-mutations/source-revision.txt
-          sha256sum apps/web/db/tests/verify-training-mutations.py apps/web/db/migrations/*.sql apps/web/src/lib/neon/user-directory-adapter.ts apps/web/src/lib/neon/native-account-admission.ts > artifacts/training-mutations/source-sha256.txt
-          python3 -m trace --count --summary --missing \
-            --ignore-dir "$(python3 -c 'import sys; print(sys.prefix)')" \
-            --coverdir artifacts/training-mutations/coverage \
-            apps/web/db/tests/verify-training-mutations.py --postgres-bin /usr/lib/postgresql/16/bin \
-            | tee artifacts/training-mutations/results.log
-
-      - name: Upload training mutation execution evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: training-mutations-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/training-mutations
-          if-no-files-found: warn
-
-      - name: Verify reported measurements on disposable PostgreSQL16
-        shell: bash
-        timeout-minutes: 5
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts/reported-measurements/coverage
-          git rev-parse HEAD > artifacts/reported-measurements/source-revision.txt
-          sha256sum scripts/neon/test-reported-measurements.py apps/web/db/migrations/20260813130000_native_product_records.sql apps/web/src/lib/neon/native-product-records-adapter.ts apps/web/src/lib/ports/reported-measurements.ts > artifacts/reported-measurements/source-sha256.txt
-          python3 -m trace --count --summary --missing \
-            --ignore-dir "$(python3 -c 'import sys; print(sys.prefix)')" \
-            --coverdir artifacts/reported-measurements/coverage \
-            scripts/neon/test-reported-measurements.py --run --postgres-bin /usr/lib/postgresql/16/bin \
-            | tee artifacts/reported-measurements/results.log
-
-      - name: Verify daily step deletions on disposable PostgreSQL16
-        shell: bash
-        timeout-minutes: 5
-        run: |
-          set -euo pipefail
-          evidence=artifacts/reported-measurements/daily-step-deletions
-          mkdir -p "$evidence/coverage"
-          git rev-parse HEAD > "$evidence/source-revision.txt"
-          sha256sum scripts/neon/verify-daily-step-deletions.py apps/web/src/lib/neon/native-product-records-adapter.ts apps/web/src/lib/neon/native-account-admission.ts apps/web/db/migrations/20260714183000_create_app_users.sql apps/web/db/migrations/20260813130000_native_product_records.sql apps/web/db/migrations/20261010120000_native_account_admission.sql > "$evidence/source-sha256.txt"
-          python3 -m trace --count --summary --missing \
-            --ignore-dir "$(python3 -c 'import sys; print(sys.prefix)')" \
-            --coverdir "$evidence/coverage" \
-            scripts/neon/verify-daily-step-deletions.py --run --postgres-bin /usr/lib/postgresql/16/bin \
-            | tee "$evidence/results.log"
-          python3 - <<'PY'
-          import hashlib, json, pathlib, re
-          root = pathlib.Path.cwd()
-          evidence = root / "artifacts/reported-measurements/daily-step-deletions"
-          reports = [json.loads(line) for line in (evidence / "results.log").read_text().splitlines() if line.startswith("{")]
-          assert len(reports) == 1, "Expected one completed deletion report"
-          report = reports[0]
-          expected = [
-              'DELETE then different-ID POST waits on actual account lock and retains unrelated fields',
-              'POST then different-ID DELETE waits on actual account lock and retains unrelated fields',
-              'same-ID stale replay cannot move or erase marker/date/notes/unknown JSON',
-              'different-ID recorded zero and positive imports inherit the owner/day marker',
-              'repeat deletion accepts equivalent offset instants and retains original marker',
-              'half-open end leaves the following day unchanged',
-              "foreign-ID collision cannot change anchor or authorize another owner's day deletion",
-              "different owner completes while first owner's lock remains held",
-              'later transaction failure rolls back marker and every daily write',
-              'captured old account incarnation cannot create a deletion marker',
-          ]
-          assert report["passed"] == 10 and report["checks"] == expected, "Incomplete or changed deletion contracts"
-          assert report["liveDatabase"] is False
-          schedules = [name.split(" waits on")[0] for name in expected[:2]]
-          assert report["lockObservations"] == [
-              {"schedule": name, "waitEventType": "Lock", "actualHolderInBlockingPids": True} for name in schedules
-          ], "Missing actual owner-lock observations"
-          assert set(report["postgresTools"]) == {"initdb", "pg_ctl", "psql"}
-          assert all(re.search(r"\(PostgreSQL\) 16(?:\.|$)", version) for version in report["postgresTools"].values())
-          recorded = {}
-          for line in (evidence / "source-sha256.txt").read_text().splitlines():
-              digest, name = line.split(maxsplit=1)
-              recorded[name] = digest
-          sources = [
-              'scripts/neon/verify-daily-step-deletions.py',
-              'apps/web/src/lib/neon/native-product-records-adapter.ts',
-              'apps/web/src/lib/neon/native-account-admission.ts',
-              'apps/web/db/migrations/20260714183000_create_app_users.sql',
-              'apps/web/db/migrations/20260813130000_native_product_records.sql',
-              'apps/web/db/migrations/20261010120000_native_account_admission.sql',
-          ]
-          assert set(recorded) == set(sources), "Incomplete source inventory"
-          assert re.fullmatch(r"[0-9a-f]{40}", (evidence / "source-revision.txt").read_text().strip())
-          assert all(hashlib.sha256((root / name).read_bytes()).hexdigest() == recorded[name] for name in sources)
-          assert report["sourceSha256"] == {str(root / name): recorded[name] for name in sources[1:]}, "Report source mismatch"
-          print("Verified 10 deletion contracts, 2 owner-lock observations, PostgreSQL16 tools and exact source")
-          PY
-
-      - name: Upload reported measurement execution evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: reported-measurements-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/reported-measurements
-          if-no-files-found: warn
-
       - name: Type check
         run: pnpm typecheck
 
@@ -286,7 +175,6 @@ jobs:
           --test-coverage-include=.github/scripts/validate-release-checks.mjs
           --test-coverage-lines=90 --test-coverage-branches=90 --test-coverage-functions=90
           .github/scripts/validate-release-source.test.mjs
-          .github/scripts/ios-release-tag.test.mjs
 
       - name: Test
         run: pnpm test:ci
@@ -322,44 +210,11 @@ jobs:
       mac-first: false
       supersede-key: ${{ github.head_ref || '' }}
 
-  ios_storekit:
-    name: iOS StoreKit Purchase and Restore
-    needs: detect-changes
-    # Always produce fresh main evidence, even when Unit was deduplicated against a merge group.
-    if: github.event_name == 'push' || needs.detect-changes.outputs.ios_changed == 'true'
-    runs-on: macos-15
-    timeout-minutes: 30
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Setup simulator build environment
-        uses: ./.github/actions/setup-ios-build
-        with:
-          xcode-version: 'latest-stable'
-          working-directory: apps/ios
-          setup-ruby: 'false'
-          create-config-files: 'true'
-
-      - name: StoreKit purchase and restore evidence
-        run: bash scripts/ios/storekit-purchase-restore.sh
-
-      - name: Upload StoreKit execution and coverage receipts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-storekit-${{ github.sha }}-${{ github.run_attempt }}
-          path: apps/ios/test_results/storekit/${{ github.run_id }}-${{ github.run_attempt }}
-          if-no-files-found: error
-
   ci-summary:
     name: CI Summary
     runs-on: ubuntu-latest
     if: always()
-    needs: [detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_storekit]
+    needs: [detect-changes, mac-runner-routing-tests, js, ios, ios_quality]
     steps:
       - name: Check results
         run: |
@@ -379,11 +234,6 @@ jobs:
             fi
           }
 
-          storekit_expected=false
-          if [[ "${{ github.event_name }}" == "push" || "${{ needs.detect-changes.outputs.ios_changed }}" == "true" ]]; then
-            storekit_expected=true
-          fi
-
           {
             echo "## CI Summary"
             echo ""
@@ -392,7 +242,6 @@ jobs:
             echo "- iOS Unit runs here: ${{ needs.detect-changes.outputs.ios_unit }}"
             echo "- iOS Launch Quality runs here: ${{ needs.detect-changes.outputs.ios_quality }} (deferred for draft: ${{ needs.detect-changes.outputs.ios_quality_deferred }})"
             echo "- iOS quality gate: ${{ needs.ios_quality.result }}"
-            echo "- iOS StoreKit purchase and restore: ${{ needs.ios_storekit.result }}"
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -400,7 +249,6 @@ jobs:
              [[ "${{ needs.mac-runner-routing-tests.result }}" != "success" ]] || \
              ! assert_expected_result "JavaScript/TypeScript" "${{ needs.detect-changes.outputs.web }}" "${{ needs.js.result }}" || \
              ! assert_expected_result "iOS" "${{ needs.detect-changes.outputs.ios_unit }}" "${{ needs.ios.result }}" || \
-             ! assert_expected_result "iOS StoreKit" "$storekit_expected" "${{ needs.ios_storekit.result }}" || \
              ! assert_expected_result "iOS Launch Quality Gate" "${{ needs.detect-changes.outputs.ios_quality }}" "${{ needs.ios_quality.result }}"; then
             echo "❌ One or more CI jobs failed" >> "$GITHUB_STEP_SUMMARY"
             exit 1

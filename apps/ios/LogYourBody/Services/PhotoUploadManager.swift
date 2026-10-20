@@ -135,10 +135,8 @@ class PhotoUploadManager: ObservableObject {
         }
     }
 
-    private func authenticatedJWT(for ownership: AuthManager.ProfileSessionOwnership) async throws -> String {
-        guard authManager.ownsAccountSession(ownership),
-              let token = await accessTokenProvider(),
-              authManager.ownsAccountSession(ownership) else {
+    private func authenticatedJWT() async throws -> String {
+        guard let token = await accessTokenProvider() else {
             throw PhotoError.notAuthenticated
         }
 
@@ -148,12 +146,9 @@ class PhotoUploadManager: ObservableObject {
     // MARK: - Public Methods
 
     func uploadProgressPhoto(for metrics: BodyMetrics, image: UIImage) async throws -> String {
-        guard let ownership = authManager.captureAccountSession(),
-              ownership.subject == metrics.userId,
-              authManager.ownsAccountSession(ownership) else {
+        guard let userId = authManager.currentUser?.id else {
             throw PhotoError.notAuthenticated
         }
-        let userId = ownership.subject
 
         ErrorTrackingService.shared.addBreadcrumb(
             message: "Starting photo upload",
@@ -167,7 +162,7 @@ class PhotoUploadManager: ObservableObject {
 
         return try await performProgressPhotoUpload(
             metricsId: metrics.id,
-            ownership: ownership,
+            userId: userId,
             operation: "uploadProgressPhoto"
         ) {
             guard let imageData = self.prepareImageForUpload(image) else {
@@ -179,12 +174,9 @@ class PhotoUploadManager: ObservableObject {
 
     // Support for HEIC/HEIF format conversion
     func uploadProgressPhoto(for metrics: BodyMetrics, imageData: Data) async throws -> String {
-        guard let ownership = authManager.captureAccountSession(),
-              ownership.subject == metrics.userId,
-              authManager.ownsAccountSession(ownership) else {
+        guard let userId = authManager.currentUser?.id else {
             throw PhotoError.notAuthenticated
         }
-        let userId = ownership.subject
 
         ErrorTrackingService.shared.addBreadcrumb(
             message: "Starting photo upload (data)",
@@ -198,7 +190,7 @@ class PhotoUploadManager: ObservableObject {
 
         return try await performProgressPhotoUpload(
             metricsId: metrics.id,
-            ownership: ownership,
+            userId: userId,
             operation: "uploadProgressPhotoData"
         ) {
             try self.jpegDataForUpload(from: imageData)
@@ -209,11 +201,10 @@ class PhotoUploadManager: ObservableObject {
 
     private func performProgressPhotoUpload(
         metricsId: String,
-        ownership: AuthManager.ProfileSessionOwnership,
+        userId: String,
         operation: String,
         prepare: () throws -> Data
     ) async throws -> String {
-        let userId = ownership.subject
         self.isUploading = true
         self.uploadProgress = 0.0
         self.uploadError = nil
@@ -239,14 +230,10 @@ class PhotoUploadManager: ObservableObject {
             updateUploadStatus(.uploading, progress: 0.25)
             let ticket = try await requestRemotePhotoStore(
                 metricsId: metricsId,
-                ownership: ownership,
                 contentType: "image/jpeg",
                 byteSize: imageData.count
             )
 
-            guard authManager.ownsAccountSession(ownership) else {
-                throw PhotoError.notAuthenticated
-            }
             updateUploadStatus(.uploading, progress: 0.45)
             try await putPhotoObject(ticket: ticket, imageData: imageData)
 
@@ -356,11 +343,10 @@ class PhotoUploadManager: ObservableObject {
 
     private func requestRemotePhotoStore(
         metricsId: String,
-        ownership: AuthManager.ProfileSessionOwnership,
         contentType: String,
         byteSize: Int
     ) async throws -> RemotePhotoUploadTicket {
-        let token = try await authenticatedJWT(for: ownership)
+        let token = try await authenticatedJWT()
         let base = apiBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard let url = URL(string: "\(base)/api/auth/mobile/photos") else {
             throw PhotoError.uploadFailed("Photo upload is temporarily unavailable. Please try again.")

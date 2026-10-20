@@ -5,7 +5,6 @@ import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { missingLinearKeyWarning } from './lib/linear-issue-intake.mjs';
 import { runRemediationIntake, skippedFilingMessage } from './remediation-signal.mjs';
-import { runCorrectionRecurrence } from '../../packages/shared-lib/scripts/correction-recurrence.mjs';
 
 function readText(path) {
   if (!path) return '';
@@ -57,15 +56,6 @@ async function main() {
     if (reason && reason !== result.reason) console.warn(reason);
     // A missing key, a missing LYB team, or a Linear error must not fail the job.
     process.exitCode = 0;
-  }
-  const recurrence = await runCorrectionRecurrence({
-    env, eventName: env.GITHUB_EVENT_NAME, event: readGithubEvent(env),
-  });
-  console.log(JSON.stringify({ correctionRecurrence: recurrence }));
-  if (!recurrence.ok) {
-    const line = `Correction recurrence did NOT file: ${recurrence.reason}`;
-    console.warn(`::warning::${line}`);
-    if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, `${line}\n`);
   }
 }
 

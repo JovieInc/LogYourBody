@@ -5,28 +5,24 @@
 import CoreGraphics
 import Foundation
 
-/// Photo-first Home (Pencil H2, picked 2026-09-26). Graduated: ordinary users
-/// open it by default. Evaluated through `FeatureReleaseEvaluator` (shared
-/// lifecycle contract, JOV-8056). Statsig is an emergency kill switch only;
-/// an unavailable or unset gate must not fall back to the legacy Home.
-/// Debug fixtures explicitly choose Home V2 or rollback.
+/// Gate for the photo-first Home (Pencil H2, picked 2026-09-26). Evaluated
+/// through `FeatureReleaseEvaluator` (shared lifecycle contract, JOV-8056):
+/// dogfood-stage, so verified staff/agent principals see it automatically and
+/// ordinary customers need the Statsig enable gate. Debug fixtures force it
+/// on so XCUITest can cover both states without a network.
 enum HomeV2Policy {
     static let gateKey = "home_v2_photo_first"
-    /// Inverse-meaning emergency stop. Only a fresh `true` stops the surface.
+    /// Inverse-meaning emergency stop (shared lifecycle contract, JOV-8056).
+    /// Never a blanket default: only a fresh `true` stops the surface.
     static let killSwitchKey = "home_v2_kill_switch"
-    /// Public baseline. The positive enable gate is recorded on the descriptor
-    /// and is not consulted: a missing or false gate must not hide Home.
+    /// Dogfood stage: verified staff/agent principals are exposed
+    /// automatically; ordinary customers still need the enable gate.
     static let releaseDescriptor = FeatureReleaseDescriptor(
         flagKey: gateKey,
         killSwitchKey: killSwitchKey,
-        stage: .graduated,
+        stage: .dogfood,
         minimumBuild: nil
     )
-    #if DEBUG
-    /// Explicit legacy captures exercise rollback without changing remote gates.
-    /// Rollback wins if a test accidentally supplies both fixture modes.
-    static let rollbackFixtureArgument = "-lybUITestHomeRollbackFixture"
-    #endif
     static let fixtureArgument = "-lybUITestHomeV2Fixture"
     static let photoFixtureArgument = "-lybUITestHomeV2PhotoFixture"
     /// Signed in, nothing logged yet: the H0 day-zero state.
@@ -46,7 +42,6 @@ enum HomeV2Policy {
         isGateEnabled: ((String) -> Bool)? = nil
     ) -> Bool {
         #if DEBUG
-        if arguments.contains(rollbackFixtureArgument) { return false }
         if arguments.contains(fixtureArgument) || arguments.contains(photoFixtureArgument) ||
             arguments.contains(emptyFixtureArgument) ||
             arguments.contains(HomeV2SystemStatePolicy.offlineFixtureArgument) ||
@@ -56,16 +51,17 @@ enum HomeV2Policy {
         }
         #endif
         let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        // Graduated Home does not consult the positive enable gate. Doing so
-        // would record an exposure for a flag that no longer decides the surface.
+        // Query the kill switch first so `flagKey` remains the last gate
+        // consulted, matching the enable-gate call contract.
         let killSwitchEnabled = checkGate(killSwitchKey)
+        let enableGateEnabled = checkGate(gateKey)
         return FeatureReleaseEvaluator.evaluate(
             releaseDescriptor,
             context: FeatureReleaseContext(
                 actor: actor,
                 installedBuild: installedBuild,
                 configState: .fresh,
-                enableGate: false,
+                enableGate: enableGateEnabled,
                 killSwitch: killSwitchEnabled
             )
         ).isEnabled
@@ -93,7 +89,6 @@ enum HomeV2Policy {
 enum HomeV2Copy {
     static let title = "Today"
     static let logWeight = "Log weight"
-    static let logCheckIn = "Log check-in"
     static let done = "Done"
     static let undo = "Undo"
     static let lastThirtyDays = "Last 30 days"
@@ -178,10 +173,6 @@ enum HomeV2Copy {
     /// The editorial plate on a day without a photo.
     static let noPhotoThisDay = "No photo this day"
 
-    /// Shown once, then gone for good.
-    static let timelineCoachHint = "Swipe through your history. Drag the timeline to jump in time."
-    static let coachDismissedDefaultsKey = "home_v2_timeline_coach_dismissed"
-
     /// H1 status line: "Cutting for 9 weeks." Nothing is claimed about pace
     /// without a target, and nothing at all before there is a trend.
     static func phaseSentence(kind: PhaseInsightKind, weeks: Int) -> String? {
@@ -231,11 +222,11 @@ enum HomeV2CompositionPolicy {
             return HomeV2Copy.compositionTrackingPrompt
         }
 
-        let method = methodKey(latest.attributedBodyFatMethod)
+        let method = methodKey(latest.bodyFatMethod)
         let label = measurementLabel(for: method)
         let latestText = String(format: "%.1f", latestValue)
         let earlier = readings
-            .filter { $0.localDate != latest.localDate && methodKey($0.attributedBodyFatMethod) == method }
+            .filter { $0.localDate != latest.localDate && methodKey($0.bodyFatMethod) == method }
             .max(by: { $0.date < $1.date })
 
         guard let earlier, let earlierValue = earlier.bodyFatPercentage else {
@@ -373,23 +364,6 @@ enum HomeV2WeightQuality {
         guard let kilograms, kilograms.isFinite else { return false }
         return supportedKilograms.contains(kilograms)
     }
-
-    /// Exclude flagged source measurements before interpolation and smoothing:
-    /// an average containing an unsupported reading can itself look supported.
-    static func trendContext(
-        for metrics: [BodyMetrics]
-    ) -> MetricsInterpolationService.WeightInterpolationContext? {
-        MetricsInterpolationService.shared.makeWeightInterpolationContext(
-            for: metrics.filter { isWithinSupportedLoggingRange($0.weight) }
-        )
-    }
-
-    static func trendWeight(for metric: BodyMetrics, in metrics: [BodyMetrics]) -> Double? {
-        // Keep the original flagged measurement visible for correction; do not
-        // replace it with a trend from otherwise supported surrounding records.
-        guard metric.weight == nil || isWithinSupportedLoggingRange(metric.weight) else { return nil }
-        return trendContext(for: metrics)?.trendWeight(for: metric.date)?.value
-    }
 }
 
 /// Today never falls back to the latest historical row. Earlier imports stay in
@@ -442,11 +416,6 @@ struct HomeV2LoggedEntry: Equatable {
     let previousMetric: BodyMetrics?
     let valueText: String
     let unit: String
-    var savedMetric: BodyMetrics?
-
-    var confirmationText: String {
-        valueText.isEmpty ? "Entry saved." : HomeV2Copy.loggedSentence(value: valueText, unit: unit)
-    }
 }
 
 /// Geometry that must hold on every iPhone: the photo stays full width at 4:5
@@ -467,29 +436,6 @@ enum HomeV2Layout {
 /// Values for the editorial fallback come from stored readings, never photo
 /// appearance, a target, or interpolated chart caches.
 enum HomeV2EditorialPolicy {
-    /// Recorded values only. Current profile height is canonical centimeters;
-    /// another account's profile or an interpolated BF value cannot supply FFMI.
-    static func ffmi(in metric: BodyMetrics, owner: String?, heightCm: Double?) -> Double? {
-        guard metric.userId == owner, let weight = weight(in: metric),
-              let bodyFat = bodyFat(in: metric), let heightCm,
-              heightCm.isFinite, heightCm > 0,
-              let value = UnitConversion.calculateFFMI(
-                weightKg: weight, bodyFatPercentage: bodyFat.percentage, heightCm: heightCm
-              ), value.isFinite, value > 0 else { return nil }
-        return value
-    }
-
-    static func weight(in metric: BodyMetrics) -> Double? {
-        guard let value = metric.weight, value.isFinite, value > 0 else { return nil }
-        return value
-    }
-
-    static func displayWeight(in metric: BodyMetrics, system: MeasurementSystem) -> Double? {
-        guard let weight = weight(in: metric) else { return nil }
-        let value = system == .imperial ? weight.kgToLbs : weight
-        return value.isFinite ? value : nil
-    }
-
     struct BodyFatReading: Equatable {
         let percentage: Double
         let caption: String
@@ -504,7 +450,7 @@ enum HomeV2EditorialPolicy {
     static func bodyFat(in metric: BodyMetrics?) -> BodyFatReading? {
         guard let metric, let value = metric.bodyFatPercentage,
               value.isFinite, value > 0, value < 100 else { return nil }
-        let method = metric.attributedBodyFatMethod?.lowercased()
+        let method = metric.bodyFatMethod?.lowercased()
             .split(whereSeparator: \.isWhitespace).joined(separator: " ") ?? ""
         // Synthetic estimates must not be presented as recorded body fat.
         guard !method.contains("interpolat"), !method.contains("derived") else { return nil }
@@ -543,189 +489,5 @@ enum HomeV2EditorialPolicy {
                   HomeV2WeightQuality.isWithinSupportedLoggingRange(weight) else { return nil }
             return WeightReading(id: metric.id, date: metric.date, kilograms: weight)
         }.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date < $1.date }
-    }
-}
-
-/// Display-only body fat for one selected moment. A stored reading wins.
-/// Inside two stored readings the value is time-weighted and labeled inferred.
-/// Nothing here is saved, and the slope stops at the outer readings.
-enum HomeV2SelectedMomentPolicy {
-    enum Kind: Equatable { case measured, inferred, lastKnown, unavailable }
-
-    struct Anchor {
-        let metric: BodyMetrics
-        let reading: HomeV2EditorialPolicy.BodyFatReading
-    }
-
-    struct Presentation {
-        let kind: Kind
-        let sentence: String
-        let percentage: Double?
-        let older: BodyMetrics?
-        let newer: BodyMetrics?
-        let olderReading: HomeV2EditorialPolicy.BodyFatReading?
-        let newerReading: HomeV2EditorialPolicy.BodyFatReading?
-    }
-
-    static func sentence(for metric: BodyMetrics, in history: [BodyMetrics]) -> String {
-        presentation(for: metric, in: history).sentence
-    }
-
-    static func presentation(for metric: BodyMetrics, in history: [BodyMetrics]) -> Presentation {
-        if let reading = HomeV2EditorialPolicy.bodyFat(in: metric) {
-            return Presentation(
-                kind: .measured,
-                sentence: HomeV2TimelinePolicy.bodyFatSentence(for: metric),
-                percentage: reading.percentage,
-                older: nil, newer: nil, olderReading: nil, newerReading: nil
-            )
-        }
-        let bracket = anchors(around: metric, in: history)
-        if let older = bracket.older, let newer = bracket.newer,
-           let inferred = inferredPresentation(selected: metric, older: older, newer: newer) {
-            return inferred
-        }
-        if let older = bracket.older, bracket.newer == nil {
-            return lastKnownPresentation(older)
-        }
-        return unavailablePresentation()
-    }
-
-    static func inferredPresentation(selected: BodyMetrics, older: Anchor, newer: Anchor) -> Presentation? {
-        guard let value = interpolatedBodyFat(
-            olderDate: older.metric.date, olderValue: older.reading.percentage,
-            newerDate: newer.metric.date, newerValue: newer.reading.percentage, at: selected.date
-        ) else { return nil }
-        return Presentation(
-            kind: .inferred,
-            sentence: "Inferred body fat \(oneDecimal(value))%.",
-            percentage: value,
-            older: older.metric, newer: newer.metric,
-            olderReading: older.reading, newerReading: newer.reading
-        )
-    }
-
-    static func interpolatedBodyFat(
-        olderDate: Date, olderValue: Double, newerDate: Date, newerValue: Double, at date: Date
-    ) -> Double? {
-        let span = newerDate.timeIntervalSince(olderDate)
-        guard span > 0 else { return nil }
-        let fraction = date.timeIntervalSince(olderDate) / span
-        guard fraction > 0, fraction < 1 else { return nil }
-        let value = olderValue + (newerValue - olderValue) * fraction
-        guard value.isFinite, value > 0, value < 100 else { return nil }
-        return value
-    }
-
-    static func displayFFMI(
-        for metric: BodyMetrics, in history: [BodyMetrics], owner: String?, heightCm: Double?
-    ) -> Double? {
-        if let measured = HomeV2EditorialPolicy.ffmi(in: metric, owner: owner, heightCm: heightCm) {
-            return measured
-        }
-        let moment = presentation(for: metric, in: history)
-        guard metric.userId == owner, moment.kind == .inferred, let percentage = moment.percentage,
-              let weight = HomeV2EditorialPolicy.weight(in: metric),
-              let heightCm, heightCm.isFinite, heightCm > 0 else { return nil }
-        return UnitConversion.calculateFFMI(
-            weightKg: weight, bodyFatPercentage: percentage, heightCm: heightCm
-        )
-    }
-
-    static func displayPhoto(for metric: BodyMetrics, in history: [BodyMetrics]) -> BodyMetrics? {
-        if PhotoTimelineHUDPolicy.hasUsablePhoto(metric) { return metric }
-        let photos = history.filter { candidate in
-            candidate.userId == metric.userId && PhotoTimelineHUDPolicy.hasUsablePhoto(candidate)
-        }
-        return photos.min { lhs, rhs in
-            let left = abs(lhs.date.timeIntervalSince(metric.date))
-            let right = abs(rhs.date.timeIntervalSince(metric.date))
-            if left != right { return left < right }
-            if lhs.date != rhs.date { return lhs.date > rhs.date }
-            return lhs.id < rhs.id
-        }
-    }
-
-    static func provenanceSentence(for presentation: Presentation, heightCm: Double?) -> String {
-        guard presentation.kind == .inferred, let older = presentation.older, let newer = presentation.newer,
-              let olderReading = presentation.olderReading,
-              let newerReading = presentation.newerReading else {
-            return presentation.sentence
-        }
-        let olderText = "\(mediumDate(older.date)) \(anchorPercent(olderReading.percentage)) \(olderReading.caption)"
-        let newerText = "\(mediumDate(newer.date)) \(anchorPercent(newerReading.percentage)) \(newerReading.caption)"
-        return "Inferred from \(olderText) and \(newerText). Height \(heightText(heightCm)) cm."
-    }
-
-    private static func anchors(
-        around metric: BodyMetrics, in history: [BodyMetrics]
-    ) -> (older: Anchor?, newer: Anchor?) {
-        let readings = history.compactMap { candidate -> Anchor? in
-            guard candidate.userId == metric.userId, candidate.id != metric.id,
-                  candidate.date != metric.date,
-                  let reading = HomeV2EditorialPolicy.bodyFat(in: candidate) else { return nil }
-            return Anchor(metric: candidate, reading: reading)
-        }
-        let older = ordered(readings.filter { $0.metric.date < metric.date }, newestFirst: true).first
-        let newer = ordered(readings.filter { $0.metric.date > metric.date }, newestFirst: false).first
-        return (older, newer)
-    }
-
-    private static func ordered(_ readings: [Anchor], newestFirst: Bool) -> [Anchor] {
-        readings.sorted { lhs, rhs in
-            if lhs.metric.date != rhs.metric.date {
-                return newestFirst ? lhs.metric.date > rhs.metric.date : lhs.metric.date < rhs.metric.date
-            }
-            return lhs.metric.id < rhs.metric.id
-        }
-    }
-
-    private static func lastKnownPresentation(_ older: Anchor) -> Presentation {
-        let shown = oneDecimal(older.reading.percentage)
-        return Presentation(
-            kind: .lastKnown,
-            sentence: "Last known body fat \(shown)% on \(mediumDate(older.metric.date)).",
-            percentage: older.reading.percentage,
-            older: older.metric, newer: nil, olderReading: older.reading, newerReading: nil
-        )
-    }
-
-    private static func unavailablePresentation() -> Presentation {
-        Presentation(
-            kind: .unavailable, sentence: "Body fat not logged for this day.",
-            percentage: nil, older: nil, newer: nil, olderReading: nil, newerReading: nil
-        )
-    }
-
-    private static func oneDecimal(_ value: Double) -> String {
-        let handler = NSDecimalNumberHandler(
-            roundingMode: .plain, scale: 1, raiseOnExactness: false,
-            raiseOnOverflow: false, raiseOnUnderflow: false, raiseOnDivideByZero: false
-        )
-        let parsed = NSDecimalNumber(
-            string: String(format: "%.4f", value), locale: Locale(identifier: "en_US_POSIX")
-        )
-        let tenths = parsed.rounding(accordingToBehavior: handler)
-            .multiplying(by: NSDecimalNumber(string: "10", locale: Locale(identifier: "en_US_POSIX")))
-            .intValue
-        return "\(tenths / 10).\(abs(tenths % 10))"
-    }
-
-    private static func anchorPercent(_ value: Double) -> String {
-        String(format: "%.2f %%", value)
-    }
-
-    private static func mediumDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = .current
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
-    }
-
-    private static func heightText(_ heightCm: Double?) -> String {
-        guard let heightCm, heightCm.isFinite, heightCm > 0 else { return "not recorded" }
-        if heightCm == heightCm.rounded() { return String(format: "%.0f", heightCm) }
-        return String(format: "%.1f", heightCm)
     }
 }

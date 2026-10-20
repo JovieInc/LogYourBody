@@ -112,8 +112,8 @@ describe('/api/auth/mobile/profile', () => {
       displayName: 'Mobile User',
       onboardingCompleted: true,
       acceptLegal: true,
-      termsVersion: '2026-10-14',
-      privacyVersion: '2026-10-14',
+      termsVersion: '2026-07-14',
+      privacyVersion: '2026-07-14',
     });
   });
 

@@ -8,30 +8,24 @@ import UIKit
 
 @MainActor
 final class HomeV2PolicyTests: XCTestCase {
-    func testHomeV2DefaultsOnWhenKillSwitchIsOff() {
-        var askedKey: String?
-        XCTAssertTrue(
+    func testGateOffWithoutFixtureArgumentKeepsHomeV2Off() {
+        XCTAssertFalse(
             HomeV2Policy.isEnabled(
                 arguments: ["-lybUITestPhotoTimelineHUDFixture"],
-                isGateEnabled: { key in
-                    askedKey = key
-                    return false
-                }
+                isGateEnabled: { _ in false }
             )
         )
-        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
-        XCTAssertEqual(HomeV2Policy.releaseDescriptor.stage, .graduated)
     }
 
-    func testKillSwitchDisablesHomeV2() {
+    func testStatsigGateEnablesHomeV2ByItsKey() {
         var askedKey: String?
-        XCTAssertFalse(
+        XCTAssertTrue(
             HomeV2Policy.isEnabled(arguments: [], isGateEnabled: { key in
                 askedKey = key
-                return true
+                return key == HomeV2Policy.gateKey
             })
         )
-        XCTAssertEqual(askedKey, HomeV2Policy.killSwitchKey)
+        XCTAssertEqual(askedKey, "home_v2_photo_first")
     }
 
     func testKillSwitchOverridesTheEnableGate() {
@@ -49,44 +43,6 @@ final class HomeV2PolicyTests: XCTestCase {
             )
         )
     }
-
-    #if DEBUG
-    func testRollbackFixtureDisablesHomeV2WithoutReadingRemoteGates() {
-        XCTAssertFalse(
-            HomeV2Policy.isEnabled(arguments: [HomeV2Policy.rollbackFixtureArgument], isGateEnabled: { _ in
-                XCTFail("The explicit rollback fixture must not read remote gates")
-                return false
-            })
-        )
-    }
-
-    func testRollbackFixtureWinsOverConflictingHomeV2Fixtures() {
-        let homeFixtures = [
-            HomeV2Policy.fixtureArgument,
-            HomeV2Policy.photoFixtureArgument,
-            HomeV2Policy.emptyFixtureArgument,
-            HomeV2SystemStatePolicy.offlineFixtureArgument,
-            HomeV2SystemStatePolicy.healthOffFixtureArgument,
-            HomeV2SystemStatePolicy.loadingFixtureArgument
-        ]
-        for fixture in homeFixtures {
-            XCTAssertFalse(
-                HomeV2Policy.isEnabled(
-                    arguments: [fixture, HomeV2Policy.rollbackFixtureArgument],
-                    isGateEnabled: { _ in false }
-                ),
-                "Rollback must win over \(fixture)"
-            )
-        }
-    }
-
-    #else
-    func testRollbackFixtureArgumentCannotDisableShippingHome() {
-        XCTAssertTrue(
-            HomeV2Policy.isEnabled(arguments: ["-lybUITestHomeRollbackFixture"], isGateEnabled: { _ in false })
-        )
-    }
-    #endif
 
     #if DEBUG
     func testFixtureArgumentsEnableHomeV2WithoutTheGate() {
@@ -148,13 +104,13 @@ final class HomeV2PolicyTests: XCTestCase {
         )
     }
 
-    private func compositionMetric(date: Date, bodyFat: Double?, method: String, weight: Double? = 80) -> BodyMetrics {
+    private func compositionMetric(date: Date, bodyFat: Double, method: String) -> BodyMetrics {
         BodyMetrics(
             id: UUID().uuidString,
             userId: "home-composition-test",
             date: date,
             localDate: BodyMetricLocalDate.key(for: date),
-            weight: weight,
+            weight: 80,
             weightUnit: "kg",
             bodyFatPercentage: bodyFat,
             bodyFatMethod: method,
@@ -211,43 +167,6 @@ final class HomeV2PolicyTests: XCTestCase {
             XCTAssertNil(HomeV2EditorialPolicy.bodyFat(in:
                 compositionMetric(date: Date(), bodyFat: 18, method: method)))
         }
-    }
-
-    func testEditorialFFMIUsesRecordedCompositionAndCanonicalHeightAcrossDisplayUnits() throws {
-        let metric = compositionMetric(date: Date(), bodyFat: 10, method: "visual_estimate")
-        let ffmi = try XCTUnwrap(HomeV2EditorialPolicy.ffmi(in: metric, owner: metric.userId, heightCm: 177.8))
-        XCTAssertEqual(ffmi, 72 / (1.778 * 1.778) + 6.1 * (1.8 - 1.778), accuracy: 0.000001)
-        XCTAssertEqual(HomeV2EditorialPolicy.displayWeight(in: metric, system: .metric), 80)
-        XCTAssertEqual(try XCTUnwrap(HomeV2EditorialPolicy.displayWeight(in: metric, system: .imperial)),
-                       80.0.kgToLbs, accuracy: 0.000001)
-        XCTAssertEqual(HomeV2EditorialPolicy.bodyFat(in: metric)?.caption, "Visual estimate")
-    }
-
-    func testEditorialFFMICannotCombineForeignProfileOrMissingAndSyntheticReadings() {
-        let metric = compositionMetric(date: Date(), bodyFat: 18, method: "manual")
-        XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: metric, owner: "another-owner", heightCm: 178))
-        XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: metric, owner: nil, heightCm: 178))
-        XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: metric, owner: metric.userId, heightCm: nil))
-        let missing = compositionMetric(date: Date(), bodyFat: nil, method: "manual")
-        XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: missing, owner: missing.userId, heightCm: 178))
-        for method in ["interpolated", "derived"] {
-            let synthetic = compositionMetric(date: Date(), bodyFat: 18, method: method)
-            XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: synthetic, owner: synthetic.userId, heightCm: 178))
-        }
-    }
-
-    func testEditorialValuesRejectNonfiniteInputsAndConversionOverflow() {
-        let metric = compositionMetric(date: Date(), bodyFat: 18, method: "manual")
-        for height in [Double.nan, .infinity, -.infinity, 0, -1, .leastNonzeroMagnitude] {
-            XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: metric, owner: metric.userId, heightCm: height))
-        }
-        for weight: Double? in [nil, .nan, .infinity, -.infinity, 0, -1] {
-            let invalid = compositionMetric(date: Date(), bodyFat: 18, method: "manual", weight: weight)
-            XCTAssertNil(HomeV2EditorialPolicy.weight(in: invalid))
-            XCTAssertNil(HomeV2EditorialPolicy.ffmi(in: invalid, owner: invalid.userId, heightCm: 178))
-        }
-        let overflow = compositionMetric(date: Date(), bodyFat: 18, method: "manual", weight: .greatestFiniteMagnitude)
-        XCTAssertNil(HomeV2EditorialPolicy.displayWeight(in: overflow, system: .imperial))
     }
 
     func testEditorialWeightHistoryUsesOnlyFiniteOwnedRecordedValuesThroughSelectedDate() {

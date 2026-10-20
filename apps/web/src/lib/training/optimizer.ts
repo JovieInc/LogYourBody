@@ -398,9 +398,6 @@ function asPrescription(exercise: PlanExercise, targetRir: number): ExercisePres
     loadInstruction: null,
     progression: 'hold',
     evidenceIds: [],
-    // This optimizer input has no session-specific execution allowlist.
-    // Reviewing one variant does not authorize further in-session swaps.
-    substitutions: [],
   };
 }
 

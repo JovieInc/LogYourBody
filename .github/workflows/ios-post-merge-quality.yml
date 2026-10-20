@@ -3,8 +3,6 @@ name: iOS Post-Merge Launch Quality
 # Quality gate runs on the PR head (ci.yml). This run checks the integrated tree that landed.
 # A failure is retried once; a second failure opens or updates the post-merge-lq-red issue,
 # which holds iOS merge groups on Launch Quality until a later main SHA passes and closes it.
-# A cancel caused by a newer run in this concurrency group skips Report (neutral). A manual
-# cancel of the newest commit, and a real failure, still fail Report.
 
 on:
   push:
@@ -79,37 +77,10 @@ jobs:
       mac-first: true
       supersede-key: post-merge-main
 
-  supersede:
-    name: Superseded cancel
-    needs: [scope, quality, retry]
-    if: ${{ always() && needs.scope.outputs.ios == 'true' && (needs.quality.result == 'cancelled' || needs.retry.result == 'cancelled') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      superseded: ${{ steps.check.outputs.superseded }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: .github/scripts
-
-      - name: Newer run or newer commit on this ref
-        id: check
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CHECK_SUPERSEDED: '1'
-          QUALITY_RESULT: ${{ needs.quality.result }}
-          RETRY_RESULT: ${{ needs.retry.result }}
-          HEAD_SHA: ${{ github.sha }}
-          REF_NAME: ${{ github.ref_name }}
-          RUN_ID: ${{ github.run_id }}
-        run: bash .github/scripts/post-merge-quality-report.sh
-
   report:
     name: Report
-    needs: [scope, quality, retry, supersede]
-    if: ${{ always() && needs.scope.outputs.ios == 'true' && needs.supersede.outputs.superseded != 'true' }}
+    needs: [scope, quality, retry]
+    if: ${{ always() && needs.scope.outputs.ios == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

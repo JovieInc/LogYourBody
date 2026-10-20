@@ -2,8 +2,7 @@ import SwiftUI
 import Combine
 
 func defaultProfileDateOfBirth() -> Date {
-    let today = ProfileBirthDatePolicy.today()
-    return ProfileBirthDatePolicy.calendar.date(byAdding: .year, value: -25, to: today) ?? today
+    Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
 }
 
 @MainActor
@@ -208,7 +207,6 @@ final class OnboardingFlowViewModel: ObservableObject {
     let calculator: BodyScoreCalculating
     let profileUpdateHandler: @MainActor ([String: Any]) async throws -> Void
     var hasMarkedOnboardingComplete = false
-    var firstInsightImpression = FirstInsightImpression()
     var isOnboardingCompletionInFlight = false
     let progressStore = OnboardingProgressStore.shared
     var isRestoringProgress = false
@@ -433,7 +431,7 @@ struct OnboardingProfileUpdateBuilder {
         }
 
         if let birthYear = bodyScoreInput.birthYear,
-           let dateOfBirth = ProfileBirthDatePolicy.date(year: birthYear) {
+           let dateOfBirth = Calendar.current.date(from: DateComponents(year: birthYear, month: 1, day: 1)) {
             updates["dateOfBirth"] = dateOfBirth
         }
 

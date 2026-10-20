@@ -93,7 +93,7 @@ final class BodyScoreRecalculationService {
 
         let birthYear: Int?
         if let dateOfBirth = profile.dateOfBirth {
-            birthYear = ProfileBirthDatePolicy.year(from: dateOfBirth)
+            birthYear = Calendar.current.component(.year, from: dateOfBirth)
         } else {
             birthYear = nil
         }

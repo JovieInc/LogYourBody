@@ -12,13 +12,11 @@ extension DashboardViewLiquid {
             range: $selectedRange,
             series: { homeV2ProgressSeries(for: $0) },
             formatValue: { homeV2ProgressValueText($0, $1) },
-            onLogWeight: { presentHomeV2LogSheet() },
-            isShareContextVisible: isMetricShareContextVisible && !isMetricDetailActive && !isStatsDestinationActive
+            onLogWeight: { presentHomeV2LogSheet() }
         )
-        .id(authManager.captureAccountSession())
     }
 
-    func openHomeV2Progress(metric: HomeV2ProgressMetric = .bodyFat) {
+    func openHomeV2Progress(metric: HomeV2ProgressMetric = .weight) {
         homeV2ProgressMetric = metric
         if !HomeV2TrendPolicy.visibleRanges.contains(selectedRange) {
             selectedRange = .month3
@@ -30,11 +28,6 @@ extension DashboardViewLiquid {
 
     /// Series come from the prewarmed whole-history caches (display units).
     func homeV2ProgressSeries(for metric: HomeV2ProgressMetric) -> HomeV2ProgressSeries {
-        guard let ownership = authManager.captureAccountSession(), dashboardMetricsBelong(to: ownership) else {
-            return HomeV2ProgressSeries(
-                daily: [], trend: [], unit: "", deltaUnit: "", target: nil,
-                provenance: nil, insightTitle: nil, insightBody: nil)
-        }
         let system = currentMeasurementSystem
         switch metric {
         case .weight:
@@ -55,26 +48,24 @@ extension DashboardViewLiquid {
                 unit: homeV2DisplayUnit,
                 deltaUnit: homeV2DisplayUnit,
                 target: weightGoal.map { convertWeight($0, to: system) ?? $0 },
-                provenance: HomeV2MetricEditorial.progressProvenance(metric: .weight, bodyFatSource: nil),
+                sourceLine: nil,
                 insightTitle: title,
-                insightBody: [insight.message, insight.detail].compactMap { $0 }.joined(separator: " "),
-                shareEntries: cachedMetricEntries(for: .weight)?.entries ?? []
+                insightBody: [insight.message, insight.detail].compactMap { $0 }.joined(separator: " ")
             )
         case .bodyFat:
             let latestSource = bodyMetrics
                 .filter { $0.bodyFatPercentage != nil }
                 .max { $0.date < $1.date }
-                .map { HomeV2Provenance.label(for: $0, field: .bodyFat) }
+                .map { HomeV2Provenance.label(for: $0) }
             return HomeV2ProgressSeries(
                 daily: fullChartCache[.bodyFat] ?? [],
                 trend: [],
                 unit: "%",
                 deltaUnit: "points",
                 target: bodyFatGoal,
-                provenance: HomeV2MetricEditorial.progressProvenance(metric: .bodyFat, bodyFatSource: latestSource),
-                insightTitle: nil,
-                insightBody: nil,
-                shareEntries: cachedMetricEntries(for: .bodyFat)?.entries ?? []
+                sourceLine: latestSource.map { HomeV2ProgressCopy.estimatedBy($0) },
+                insightTitle: HomeV2ProgressCopy.bodyFatInsightTitle,
+                insightBody: HomeV2ProgressCopy.bodyFatInsightBody
             )
         case .ffmi:
             return HomeV2ProgressSeries(
@@ -83,21 +74,20 @@ extension DashboardViewLiquid {
                 unit: "",
                 deltaUnit: "",
                 target: ffmiGoal,
-                provenance: HomeV2MetricEditorial.progressProvenance(metric: .ffmi, bodyFatSource: nil),
-                insightTitle: nil,
-                insightBody: nil
+                sourceLine: HomeV2ProgressCopy.ffmiSource,
+                insightTitle: HomeV2ProgressCopy.ffmiInsightTitle,
+                insightBody: HomeV2ProgressCopy.ffmiInsightBody
             )
         case .steps:
             return HomeV2ProgressSeries(
                 daily: fullChartCache[.steps] ?? [],
                 trend: [],
-                unit: HomeV2MetricEditorial.stepsDisplayUnit,
+                unit: "",
                 deltaUnit: "",
                 target: Double(stepGoal),
-                provenance: HomeV2MetricEditorial.progressProvenance(metric: .steps, bodyFatSource: nil),
-                insightTitle: nil,
-                insightBody: nil,
-                shareEntries: cachedMetricEntries(for: .steps)?.entries ?? []
+                sourceLine: HomeV2ProgressCopy.stepsSource,
+                insightTitle: HomeV2ProgressCopy.stepsInsightTitle,
+                insightBody: HomeV2ProgressCopy.stepsInsightBody
             )
         }
     }

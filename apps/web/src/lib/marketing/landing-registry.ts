@@ -77,7 +77,7 @@ export const LANDING_GOAL_COPY: Record<
 
 export const LANDING_PRODUCT_PROOF = {
   src: productAssets.weightLog.publicUrl,
-  alt: `Real ${logYourBody.identity.name} iPhone app showing a body-metrics timeline`,
+  alt: `Real ${logYourBody.identity.name} iPhone weight log showing the latest synced weight and recent entries`,
   width: productAssets.weightLog.width,
   height: productAssets.weightLog.height,
   sourceKind: productAssets.weightLog.sourceKind,

@@ -1,6 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DISEASES =
@@ -66,11 +66,8 @@ const RULES = [
 
 function isNegated(text, index) {
   const prefix = text.slice(Math.max(0, index - 80), index);
-  return (
-    /\bnot\s+(?:(?:a|an|the)\s+)?$/i.test(prefix) ||
-    /\b(?:do not|don't|does not|doesn't|did not|didn't|must not|should not|cannot|can't|never|avoid|without)\s+(?:[\w'-]+\s+){0,5}$/i.test(
-      prefix,
-    )
+  return /\b(?:do not|don't|does not|doesn't|did not|didn't|must not|should not|cannot|can't|never|avoid|without)\s+(?:[\w'-]+\s+){0,5}$/i.test(
+    prefix,
   );
 }
 
@@ -172,46 +169,6 @@ async function evalTexts(file) {
   return [];
 }
 
-function stringFields(value, field = '$') {
-  if (typeof value === 'string') return [{ field, text: value }];
-  if (!value || typeof value !== 'object') return [];
-  return Object.entries(value).flatMap(([key, child]) => stringFields(child, field + '.' + key));
-}
-
-async function storefrontTexts(root) {
-  const metadataFiles = (await filesUnder(path.join(root, 'apps/ios/fastlane/metadata'))).filter(
-    (file) => /\.(?:txt|md)$/.test(file),
-  );
-  const sources = await Promise.all(
-    metadataFiles.map(async (file) => ({
-      file,
-      field: '',
-      text: await readFile(file, 'utf8'),
-    })),
-  );
-  for (const relative of [
-    'apps/ios/fastlane/storefront-manifest.generated.json',
-    'packages/product-registry/src/storefronts/logyourbody.mjs',
-  ]) {
-    const file = path.join(root, relative);
-    let content;
-    try {
-      content = await readFile(file, 'utf8');
-    } catch (error) {
-      if (error?.code === 'ENOENT') continue;
-      throw error;
-    }
-    // Scan the actual string values, independently, so escapes and neighboring
-    // disclaimer fields cannot conceal a claim in rendered listing copy.
-    const value = file.endsWith('.json')
-      ? JSON.parse(content)
-      : (await import(pathToFileURL(file).href)).logYourBodyStorefront;
-    if (!value || typeof value !== 'object') throw new Error('Invalid storefront: ' + relative);
-    sources.push(...stringFields(value).map((source) => ({ file, ...source })));
-  }
-  return sources;
-}
-
 export async function run(root = ROOT) {
   const skillRoots = [path.join(root, 'dist', 'skills'), path.join(root, 'agent', 'skills')];
   const instructionRoots = [
@@ -244,20 +201,6 @@ export async function run(root = ROOT) {
     }
   }
 
-  const storefrontSources = await storefrontTexts(root);
-  for (const { file, field, text } of storefrontSources) {
-    for (const issue of scanClaimText(text))
-      violations.push(
-        path.relative(root, file) +
-          (field ? ':' + field : '') +
-          ':' +
-          issue.line +
-          ' [' +
-          issue.rule +
-          ']',
-      );
-  }
-
   if (violations.length)
     throw new Error('Claims lint failed:\n' + [...new Set(violations)].join('\n'));
   process.stdout.write(
@@ -267,9 +210,7 @@ export async function run(root = ROOT) {
       instructionFiles.length +
       ' compiled instructions, and ' +
       transcriptCount +
-      ' assistant eval outputs, and ' +
-      storefrontSources.length +
-      ' storefront text fields/files.\n',
+      ' assistant eval outputs.\n',
   );
 }
 

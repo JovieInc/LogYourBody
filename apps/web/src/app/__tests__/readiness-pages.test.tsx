@@ -67,7 +67,7 @@ describe('production-adjacent readiness pages', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/support can help process the request by email/i)).toBeInTheDocument();
 
-    expect(screen.getByRole('link', { name: /explore iphone early access/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /download ios app/i })).toHaveAttribute(
       'href',
       '/download/ios',
     );
@@ -115,7 +115,7 @@ describe('production-adjacent readiness pages', () => {
       'href',
       '/terms',
     );
-    expect(screen.getByRole('link', { name: /explore iphone/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /download apps/i })).toHaveAttribute(
       'href',
       '/download',
     );

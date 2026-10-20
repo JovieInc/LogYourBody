@@ -98,36 +98,34 @@ class BulkImportManager: ObservableObject {
     // MARK: - Public Methods
 
     func importPhotos(_ photos: [ScannedPhoto]) async {
-        // One admission owns the entire selection, including later photos.
-        let ownership = await MainActor.run { () -> AuthManager.ProfileSessionOwnership? in
-            guard !isImporting, let ownership = accountOwner.captureAccountSession() else { return nil }
+        // Prevent multiple concurrent imports
+        guard await MainActor.run(body: { !isImporting }) else {
+            // print("⚠️ Import already in progress")
+            return
+        }
+
+        await MainActor.run {
             isImporting = true
             importTasks = photos.map { ImportTask(photo: $0) }
             overallProgress = 0
-            return ownership
         }
-        guard let ownership else { return }
 
         let task = Task {
             for index in photos.indices {
-                guard !Task.isCancelled,
-                      await MainActor.run(body: { accountOwner.ownsAccountSession(ownership) }) else { break }
+                if Task.isCancelled { break }
 
-                await importPhoto(at: index, ownership: ownership)
+                await importPhoto(at: index)
 
                 // Update overall progress
-                let stillOwned = await MainActor.run {
-                    guard accountOwner.ownsAccountSession(ownership) else { return false }
+                await MainActor.run {
                     overallProgress = Double(completedCount) / Double(totalCount)
-                    return true
                 }
-                guard stillOwned else { break }
 
                 // Small delay between imports to prevent overwhelming the system
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             }
 
-            await deleteImportedAssetsIfNeeded(ownership: ownership)
+            await deleteImportedAssetsIfNeeded()
 
             await MainActor.run {
                 isImporting = false
@@ -143,15 +141,15 @@ class BulkImportManager: ObservableObject {
     /// Deletes camera-roll originals for tasks whose upload completed, batched
     /// into a single request so Photos shows one system confirmation and the
     /// assets land in Recently Deleted. Runs only when the opt-in setting is on.
-    @MainActor
-    private func deleteImportedAssetsIfNeeded(ownership: AuthManager.ProfileSessionOwnership) async {
-        guard shouldDeleteAfterImport(), !Task.isCancelled,
-              accountOwner.ownsAccountSession(ownership) else { return }
+    private func deleteImportedAssetsIfNeeded() async {
+        guard shouldDeleteAfterImport(), !Task.isCancelled else { return }
 
-        let localIdentifiers = importTasks.compactMap { task -> String? in
-            guard task.status == .completed else { return nil }
-            let identifier = task.photo.asset.localIdentifier
-            return identifier.isEmpty ? nil : identifier
+        let localIdentifiers = await MainActor.run {
+            importTasks.compactMap { task -> String? in
+                guard task.status == .completed else { return nil }
+                let identifier = task.photo.asset.localIdentifier
+                return identifier.isEmpty ? nil : identifier
+            }
         }
         guard !localIdentifiers.isEmpty else { return }
 
@@ -190,7 +188,7 @@ class BulkImportManager: ObservableObject {
         mutate(&importTasks[index])
     }
 
-    private func importPhoto(at index: Int, ownership: AuthManager.ProfileSessionOwnership) async {
+    private func importPhoto(at index: Int) async {
         guard index < importTasks.count else { return }
 
         let photo = importTasks[index].photo
@@ -203,11 +201,11 @@ class BulkImportManager: ObservableObject {
         }
 
         do {
-            guard await MainActor.run(body: { accountOwner.ownsAccountSession(ownership) }) else {
+            guard let ownership = await MainActor.run(body: { accountOwner.captureAccountSession() }) else {
                 throw ImportError.noUser
             }
 
-            // Step 1: Extract full resolution image for the session that admitted the batch.
+            // Step 1: Extract full resolution image for the session that started this photo.
             guard let fullImage = await loadFullImage(photo.asset) else {
                 throw ImportError.failedToLoadImage
             }

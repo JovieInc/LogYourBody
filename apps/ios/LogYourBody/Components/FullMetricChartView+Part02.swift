@@ -58,9 +58,7 @@ var historyBlock: some View {
                                 historyRow(for: entry, config: payload.config)
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                         Button(role: .destructive) {
-                                            historyEntryPendingDeletion = MetricHistoryDeletionRequest(
-                                                entry: entry, metricType: payload.config.metricType
-                                            )
+                                            historyEntryPendingDeletion = entry
                                             showingHistoryDeleteConfirmation = true
                                         } label: {
                                             Label("Delete", systemImage: "trash")
@@ -318,32 +316,26 @@ var minSeriesValue: Double? {
         activeSeries.map(\.value).min()
     }
 
-var validatedActivePoint: MetricChartDataPoint? {
-        ContextualMetricDetailPolicy.validatedFocus(
-            activePoint, in: activeSeries, currentFingerprint: chartDataFingerprint, cachedFingerprint: lastFingerprint)
-    }
-
 var headlineValueText: String {
         // Only replace the card's latest/trend headline when the user is
         // actively inspecting a chart point. The stats card and this screen
         // must stay on the same number when metric detail opens at rest.
-        if let point = validatedActivePoint {
-            return formatHeadlineValue(point.value)
+        if let activePoint {
+            return formatHeadlineValue(activePoint.value)
         }
         return currentValue
     }
 
 var headlineDateText: String {
-        if let point = validatedActivePoint {
-            return point.date.formatted(date: .abbreviated, time: isStepsMetric ? .omitted : .shortened)
+        if let point = selectedFocusPoint {
+            return point.date.formatted(.dateTime.month().day().year())
         }
         return currentDate
     }
 
     var selectedFocusPoint: MetricChartDataPoint? {
-        guard lastFingerprint == chartDataFingerprint else { return nil }
-        if let point = validatedActivePoint {
-            return point
+        if let activePoint {
+            return activePoint
         }
 
         guard let selectedTimelineDate else { return nil }
@@ -380,7 +372,37 @@ var headlineDateText: String {
     }
 
 var chartDataFingerprint: String {
-        ContextualMetricDetailPolicy.fingerprint(points: chartData, trend: trendChartData)
+        guard let first = chartData.first, let last = chartData.last else {
+            return "empty-\(chartData.count)-trend-\(trendChartData?.count ?? 0)"
+        }
+        let rawFingerprint = [
+            "\(chartData.count)",
+            "\(first.date.timeIntervalSince1970)",
+            "\(last.date.timeIntervalSince1970)",
+            "\(first.value)",
+            "\(last.value)",
+            first.presence.rawValue,
+            last.presence.rawValue
+        ].joined(separator: "-")
+
+        let trendFingerprint: String
+        if let trendChartData,
+           let trendFirst = trendChartData.first,
+           let trendLast = trendChartData.last {
+            trendFingerprint = [
+                "\(trendChartData.count)",
+                "\(trendFirst.date.timeIntervalSince1970)",
+                "\(trendLast.date.timeIntervalSince1970)",
+                "\(trendFirst.value)",
+                "\(trendLast.value)",
+                trendFirst.presence.rawValue,
+                trendLast.presence.rawValue
+            ].joined(separator: "-")
+        } else {
+            trendFingerprint = "none"
+        }
+
+        return "\(rawFingerprint)|trend-\(trendFingerprint)"
     }
 
 // MARK: - Helpers
@@ -596,18 +618,13 @@ func deltaColor(for delta: Double) -> Color {
     }
 
 @MainActor
-    func deleteHistoryEntry(
-        _ entry: MetricHistoryEntry, metricType: DashboardViewLiquid.MetricType
-    ) async {
+    func deleteHistoryEntry(_ entry: MetricHistoryEntry) async {
         defer {
             historyEntryPendingDeletion = nil
             showingHistoryDeleteConfirmation = false
         }
 
-        let success = await MetricHistoryDeletion.deleteBodyEntry(
-            id: entry.id, metricType: metricType,
-            using: { await RealtimeSyncManager.shared.deleteBodyMetric(id: $0) }
-        )
+        let success = await RealtimeSyncManager.shared.deleteBodyMetric(id: entry.id)
         guard success else { return }
 
         var sections = localHistorySections ?? historySections

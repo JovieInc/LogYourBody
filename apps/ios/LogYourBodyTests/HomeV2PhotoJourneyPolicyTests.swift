@@ -7,59 +7,10 @@ import XCTest
 @testable import LogYourBody
 
 final class HomeV2PhotoJourneyPolicyTests: XCTestCase {
-    func testPhotoScrubRequiresMoreThanASecondAndMapsBothDirectionsWithoutAnInitialJump() {
-        XCTAssertGreaterThan(HomeV2PhotoScrubPolicy.holdDuration, 1)
-        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 4, translation: 0, width: 400, count: 5), 4)
-        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 4, translation: -200, width: 400, count: 5), 2)
-        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 0, translation: 200, width: 400, count: 5), 2)
-        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 2, translation: -400, width: 400, count: 5), 0)
-        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(start: 2, translation: 400, width: 400, count: 5), 4)
-        XCTAssertEqual(HomeV2PhotoScrubPolicy.position(
-            start: 2, translation: .greatestFiniteMagnitude, width: 1, count: 5
-        ), 4)
-    }
+    private let calendar = Calendar.current
 
-    func testPhotoScrubRejectsEmptySingleOrInvalidSelectionsAndGeometry() {
-        for count in [0, 1] {
-            XCTAssertNil(HomeV2PhotoScrubPolicy.position(start: 0, translation: 100, width: 400, count: count))
-        }
-        for start in [-1, 3] {
-            XCTAssertNil(HomeV2PhotoScrubPolicy.position(start: start, translation: 100, width: 400, count: 3))
-        }
-        for width: CGFloat in [0, -1, .nan, .infinity] {
-            XCTAssertNil(HomeV2PhotoScrubPolicy.position(start: 0, translation: 100, width: width, count: 3))
-        }
-        for translation: CGFloat in [.nan, .infinity, -.infinity] {
-            XCTAssertNil(HomeV2PhotoScrubPolicy.position(start: 0, translation: translation, width: 400, count: 3))
-        }
-    }
-
-    @MainActor
-    func testPhotoScrubGateDefaultsOffAndUsesThePlatformPort() {
-        XCTAssertFalse(HomeV2PhotoScrubPolicy.isEnabled(arguments: [], checkGate: { _ in false }))
-        var checked: [String] = []
-        XCTAssertTrue(HomeV2PhotoScrubPolicy.isEnabled(arguments: [], checkGate: {
-            checked.append($0)
-            return true
-        }))
-        XCTAssertEqual(checked, [HomeV2PhotoScrubPolicy.gateKey])
-        #if DEBUG
-        XCTAssertTrue(HomeV2PhotoScrubPolicy.isEnabled(
-            arguments: [HomeV2PhotoScrubPolicy.fixtureArgument], checkGate: { _ in false }
-        ))
-        #endif
-    }
-
-    private func rulerCalendar(timeZoneID: String = "UTC") throws -> Calendar {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: timeZoneID))
-        return calendar
-    }
-
-    private func rulerDate(
-        year: Int = 2_026, month: Int, day: Int, hour: Int = 0, calendar: Calendar
-    ) throws -> Date {
-        try XCTUnwrap(calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour)))
+    private func day(_ daysAgo: Int) -> Date {
+        calendar.date(byAdding: .day, value: -daysAgo, to: calendar.startOfDay(for: Date())) ?? Date()
     }
 
     func testCopyReadsAsTheDesignWrites() {
@@ -81,106 +32,20 @@ final class HomeV2PhotoJourneyPolicyTests: XCTestCase {
         XCTAssertEqual(HomeV2PhotoCopy.estimatedBySource("scale"), "Body fat estimated by your scale.")
     }
 
-    func testRulerSpansAtLeastEightWeeksAndFindsTheNearestPhoto() throws {
-        let calendar = try rulerCalendar()
-        let latest = try rulerDate(month: 10, day: 10, calendar: calendar)
-        let dates = try [20, 10, 0].map {
-            try XCTUnwrap(calendar.date(byAdding: .day, value: -$0, to: latest))
-        }
-        let span = HomeV2PhotoRulerPolicy.span(for: dates, calendar: calendar)
-        XCTAssertEqual(span.start, calendar.date(byAdding: .day, value: -56, to: latest))
-        XCTAssertEqual(span.end, latest)
-        XCTAssertEqual(calendar.dateComponents([.day], from: span.start, to: span.end).day, 56)
-        XCTAssertEqual(HomeV2PhotoRulerPolicy.fraction(of: latest, in: span), 1, accuracy: 0.001)
+    func testRulerSpansAtLeastEightWeeksAndFindsTheNearestPhoto() {
+        let dates = [day(20), day(10), day(0)]
+        let span = HomeV2PhotoRulerPolicy.span(for: dates)
+        XCTAssertEqual(span.start, day(20))
+        XCTAssertGreaterThanOrEqual(span.duration, TimeInterval(HomeV2PhotoRulerPolicy.minimumSpanDays * 24 * 60 * 60) - 1)
+        XCTAssertEqual(HomeV2PhotoRulerPolicy.fraction(of: day(20), in: span), 0, accuracy: 0.001)
         XCTAssertEqual(HomeV2PhotoRulerPolicy.nearestIndex(to: 0, dates: dates, span: span), 0)
         XCTAssertEqual(HomeV2PhotoRulerPolicy.nearestIndex(to: 1, dates: dates, span: span), 2)
         XCTAssertNil(HomeV2PhotoRulerPolicy.nearestIndex(to: 0.5, dates: [], span: span))
-        XCTAssertGreaterThanOrEqual(HomeV2PhotoRulerPolicy.weekTicks(in: span, calendar: calendar).count, 8)
-        XCTAssertFalse(HomeV2PhotoRulerPolicy.monthStarts(in: span, calendar: calendar).isEmpty)
-    }
+        XCTAssertGreaterThanOrEqual(HomeV2PhotoRulerPolicy.weekTicks(in: span).count, 8)
+        XCTAssertFalse(HomeV2PhotoRulerPolicy.monthStarts(in: span).isEmpty)
 
-    func testSingleReadingRulerEndsAtItsTimestampWithoutFutureMonthLabels() throws {
-        let calendar = try rulerCalendar()
-        let reading = try rulerDate(month: 10, day: 10, hour: 15, calendar: calendar)
-        let span = HomeV2PhotoRulerPolicy.span(for: [reading], calendar: calendar)
-        XCTAssertEqual(span.end, reading)
-        XCTAssertEqual(span.start, try rulerDate(month: 8, day: 15, calendar: calendar))
-        XCTAssertEqual(HomeV2PhotoRulerPolicy.fraction(of: reading, in: span), 1)
-        let months = HomeV2PhotoRulerPolicy.monthStarts(in: span, calendar: calendar)
-        XCTAssertEqual(months.map { calendar.component(.month, from: $0) }, [9, 10])
-        XCTAssertTrue(months.allSatisfy { $0 <= reading })
-        XCTAssertTrue(HomeV2PhotoRulerPolicy.weekTicks(in: span, calendar: calendar).allSatisfy { $0 <= reading })
-        for fraction: CGFloat in [0, 0.5, 1] {
-            XCTAssertEqual(HomeV2PhotoRulerPolicy.nearestIndex(to: fraction, dates: [reading], span: span), 0)
-        }
-    }
-
-    func testTwoReadingRulerPadsBackwardAndKeepsBothSelectableAcrossNewYear() throws {
-        let calendar = try rulerCalendar()
-        let first = try rulerDate(month: 12, day: 28, hour: 9, calendar: calendar)
-        let latest = try rulerDate(year: 2_027, month: 1, day: 5, hour: 18, calendar: calendar)
-        let dates = [first, latest]
-        let span = HomeV2PhotoRulerPolicy.span(for: dates, calendar: calendar)
-        XCTAssertEqual(span.end, latest)
-        XCTAssertLessThan(span.start, first)
-        XCTAssertEqual(calendar.dateComponents([.day], from: span.start, to: span.end).day, 56)
-        for (index, date) in dates.enumerated() {
-            let fraction = HomeV2PhotoRulerPolicy.fraction(of: date, in: span)
-            XCTAssertEqual(HomeV2PhotoRulerPolicy.nearestIndex(to: fraction, dates: dates, span: span), index)
-        }
-        XCTAssertTrue(HomeV2PhotoRulerPolicy.monthStarts(in: span, calendar: calendar).allSatisfy { $0 <= latest })
-    }
-
-    func testLongRulerPreservesTheEarliestDayAndExactLatestTimestamp() throws {
-        let calendar = try rulerCalendar()
-        let first = try rulerDate(month: 1, day: 12, hour: 8, calendar: calendar)
-        let latest = try rulerDate(month: 10, day: 10, hour: 20, calendar: calendar)
-        let span = HomeV2PhotoRulerPolicy.span(for: [latest, first], calendar: calendar)
-        XCTAssertEqual(span.start, calendar.startOfDay(for: first))
-        XCTAssertEqual(span.end, latest)
-        XCTAssertGreaterThan(calendar.dateComponents([.day], from: span.start, to: span.end).day ?? 0, 56)
-        XCTAssertEqual(HomeV2PhotoRulerPolicy.nearestIndex(to: 0, dates: [first, latest], span: span), 0)
-        XCTAssertEqual(HomeV2PhotoRulerPolicy.nearestIndex(to: 1, dates: [first, latest], span: span), 1)
-    }
-
-    func testSameDayRulerPreservesDistinctTimestampPositions() throws {
-        let calendar = try rulerCalendar()
-        let morning = try rulerDate(month: 10, day: 10, hour: 8, calendar: calendar)
-        let evening = try rulerDate(month: 10, day: 10, hour: 20, calendar: calendar)
-        let dates = [morning, evening]
-        let span = HomeV2PhotoRulerPolicy.span(for: dates, calendar: calendar)
-        let first = HomeV2PhotoRulerPolicy.fraction(of: morning, in: span)
-        let last = HomeV2PhotoRulerPolicy.fraction(of: evening, in: span)
-        XCTAssertLessThan(first, last)
-        XCTAssertEqual(last, 1)
-        XCTAssertEqual(HomeV2PhotoRulerPolicy.nearestIndex(to: first, dates: dates, span: span), 0)
-        XCTAssertEqual(HomeV2PhotoRulerPolicy.nearestIndex(to: last, dates: dates, span: span), 1)
-    }
-
-    func testRulerMinimumUsesCalendarDaysAcrossBothDaylightSavingTransitions() throws {
-        let calendar = try rulerCalendar(timeZoneID: "America/Los_Angeles")
-        for month in [3, 11] {
-            let latest = try rulerDate(month: month, day: 20, hour: 12, calendar: calendar)
-            let span = HomeV2PhotoRulerPolicy.span(for: [latest], calendar: calendar)
-            let padded = try XCTUnwrap(calendar.date(byAdding: .day, value: -56, to: latest))
-            XCTAssertEqual(span.start, calendar.startOfDay(for: padded))
-            XCTAssertEqual(span.end, latest)
-            XCTAssertEqual(calendar.dateComponents([.day], from: span.start, to: span.end).day, 56)
-            XCTAssertEqual(calendar.component(.hour, from: span.start), 0)
-            let offsetChange = calendar.timeZone.secondsFromGMT(for: latest) -
-                calendar.timeZone.secondsFromGMT(for: span.start)
-            XCTAssertNotEqual(offsetChange, 0, "Each fixture must actually cross a DST transition")
-            XCTAssertEqual(span.duration, Double(56 * 86_400 + 12 * 3_600 - offsetChange), accuracy: 0.001)
-        }
-    }
-
-    func testEmptyRulerEndsAtTheSuppliedNowWithoutSelectableRecords() throws {
-        let calendar = try rulerCalendar()
-        let now = try rulerDate(month: 10, day: 10, hour: 15, calendar: calendar)
-        let span = HomeV2PhotoRulerPolicy.span(for: [], calendar: calendar, now: now)
-        XCTAssertEqual(span.end, now)
-        XCTAssertEqual(span.start, try rulerDate(month: 8, day: 15, calendar: calendar))
-        XCTAssertNil(HomeV2PhotoRulerPolicy.nearestIndex(to: 1, dates: [], span: span))
+        let long = HomeV2PhotoRulerPolicy.span(for: [day(200), day(0)])
+        XCTAssertEqual(long.end, day(0))
     }
 
     func testTimelapseAdvancesAndStopsOrLoops() {

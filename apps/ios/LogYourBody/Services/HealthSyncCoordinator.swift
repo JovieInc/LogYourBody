@@ -42,16 +42,14 @@ protocol HealthKitSyncManaging: AnyObject {
     func claimAutomaticImportAccount() async
     func syncWeightFromHealthKit() async throws
     func syncStepsFromHealthKit() async throws
-    func fetchTodayStepCount() async throws -> Int?
+    func fetchTodayStepCount() async throws -> Int
     func forceFullHealthKitSync() async -> Bool
-    func refreshSmartScaleSamplesIfEnabled() async
 }
 
 extension HealthKitSyncManaging {
     func suspendAutomaticImportAfterSignOut() async {}
     func admitsAutomaticImportForCurrentAccount() -> Bool { true }
     func claimAutomaticImportAccount() async {}
-    func refreshSmartScaleSamplesIfEnabled() async {}
 }
 
 extension HealthKitManager: HealthKitSyncManaging {}
@@ -106,10 +104,6 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
         guard healthKitManager.admitsAutomaticImportForCurrentAccount() else { return }
 
         if hasBootstrappedObservers {
-            healthKitManager.checkAuthorizationStatus()
-            if healthKitManager.isAuthorized {
-                scheduleSmartScaleForegroundRefresh()
-            }
             return
         }
 
@@ -127,12 +121,6 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
             try? await healthKitManager.setupBackgroundDelivery()
             try? await healthKitManager.setupStepCountBackgroundDelivery()
         }
-        scheduleSmartScaleForegroundRefresh()
-    }
-
-    /// Foreground entry. The manager no-ops while `healthkit_smart_scale_sync_v1` is off.
-    private func scheduleSmartScaleForegroundRefresh() {
-        Task { await healthKitManager.refreshSmartScaleSamplesIfEnabled() }
     }
 
     /// Reset all HealthKit-related state for the current user and clear

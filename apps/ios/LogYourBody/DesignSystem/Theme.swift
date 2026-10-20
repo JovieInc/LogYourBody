@@ -73,10 +73,6 @@ enum ChatComposerGeometry {
     static func transitionAnimation(reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : .easeInOut(duration: JovieTokens.subtleDuration)
     }
-
-    static func morphAnimation(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .easeInOut(duration: JovieTokens.cinematicDuration)
-    }
 }
 
 enum WorldClassScreenFlow: String, CaseIterable {

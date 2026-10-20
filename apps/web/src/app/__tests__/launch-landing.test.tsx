@@ -45,8 +45,7 @@ describe('LaunchLanding', () => {
     }
     expect(launchLandingFeatures.length).toBeGreaterThanOrEqual(3);
 
-    expect(screen.getByText(launchLandingCopy.pricingLine)).toHaveTextContent('Reference pricing:');
-    expect(screen.getByText(launchLandingCopy.pricingNote)).toHaveTextContent('trial eligibility');
+    expect(screen.getByText(launchLandingCopy.pricingLine)).toHaveTextContent('3-day free trial');
     expect(screen.getByText(launchLandingCopy.pricingLine)).toHaveTextContent('$9.99');
     expect(screen.getByText(launchLandingCopy.pricingLine)).toHaveTextContent('$69.99');
   });

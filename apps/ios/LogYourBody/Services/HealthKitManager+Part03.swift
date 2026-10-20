@@ -105,11 +105,10 @@ func fetchStepCountHistory(days: Int = 30) async throws -> [(stepCount: Int, dat
 
                 statisticsCollection?.enumerateStatistics(from: startDate, to: endDate) { statistics, stop in
                     do {
-                        if let stepCount = try HealthKitStepCountPolicy.stepCount(
+                        let stepCount = try HealthKitStepCountPolicy.stepCount(
                             from: statistics.sumQuantity()?.doubleValue(for: HKUnit.count())
-                        ) {
-                            results.append((stepCount: stepCount, date: statistics.startDate))
-                        }
+                        )
+                        results.append((stepCount: stepCount, date: statistics.startDate))
                     } catch {
                         conversionError = error
                         stop.pointee = true
@@ -148,7 +147,7 @@ func setupStepCountBackgroundDelivery() async throws {
                   (self.importAuthManager ?? .shared).ownsAccountSession(ownership) else { return nil }
             return self.todayStepCount
         }
-        guard let todaySteps = ownedSteps, todaySteps >= 0 else { return }
+        guard let todaySteps = ownedSteps, todaySteps > 0 else { return }
         guard await ownsImport(ownership) else { return }
 
         // Get or create today's daily metrics

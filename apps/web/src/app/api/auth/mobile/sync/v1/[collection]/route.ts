@@ -1,4 +1,3 @@
-import { stepsHistoryDeleteEnabled } from '@/lib/flags/steps-history-delete';
 import type { NextRequest } from 'next/server';
 import { authCookies } from '@/lib/auth/constants';
 import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
@@ -18,7 +17,6 @@ async function authenticate(request: NextRequest) {
 const handlers = createNativeProductRecordHandlers({
   authenticate,
   records: neonNativeProductRecords,
-  stepsHistoryDeleteEnabled,
 });
 
 export const GET = handlers.GET;

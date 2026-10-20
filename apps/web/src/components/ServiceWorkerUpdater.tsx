@@ -4,14 +4,29 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Button } from './ui/button';
 import { RefreshCw } from 'lucide-react';
-import { isMarketingPath } from '@/data/marketingNavigation';
 
 export function ServiceWorkerUpdater() {
   const [showUpdateBar, setShowUpdateBar] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
   const pathname = usePathname();
 
-  const isExternalPage = isMarketingPath(pathname);
+  // Define external pages where update banner should not show
+  const externalPages = [
+    '/privacy',
+    '/terms',
+    '/health-disclosure',
+    '/security',
+    '/about',
+    '/blog',
+    '/support',
+    '/contact',
+    '/changelog',
+    '/download',
+  ];
+
+  // Check if current page is an external page
+  const isExternalPage =
+    pathname === '/' || externalPages.some((page) => pathname?.startsWith(page));
 
   useEffect(() => {
     // Only run in browser and not on external pages
@@ -78,7 +93,7 @@ export function ServiceWorkerUpdater() {
   if (!showUpdateBar || isExternalPage) return null;
 
   return (
-    <div className="bg-linear-card border-linear-border animate-in slide-in-from-bottom-5 fixed right-0 bottom-0 left-0 z-50 border-t p-4 shadow-lg">
+    <div className="bg-linear-card border-linear-border animate-in slide-in-from-bottom-5 fixed bottom-0 left-0 right-0 z-50 border-t p-4 shadow-lg">
       <div className="container mx-auto flex items-center justify-between">
         <div className="flex items-center gap-3">
           <RefreshCw className="text-linear-purple h-5 w-5 animate-spin" />

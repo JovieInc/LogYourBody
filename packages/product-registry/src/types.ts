@@ -54,7 +54,6 @@ export interface ProductEndpoints {
     };
     readonly statsig: {
       readonly apiHost: string;
-      readonly gateEvaluationUrl: string;
     };
     readonly sentry: {
       readonly ingestHost: string;

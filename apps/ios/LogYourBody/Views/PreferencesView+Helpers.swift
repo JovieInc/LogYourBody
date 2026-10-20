@@ -43,7 +43,9 @@ extension PreferencesView {
         guard let dob = authManager.currentUser?.profile?.dateOfBirth else {
             return "Not set"
         }
-        var text = ProfileBirthDatePolicy.formatted(dob)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        var text = formatter.string(from: dob)
         if let age = authManager.currentUser?.profile?.age {
             text += "  (Age \(age))"
         }

@@ -58,139 +58,23 @@ enum HomeChatChromePolicy {
             return .none
         }
 
-        // Founder IA contract (LYB-88): from Home, right opens Stats and left opens
-        // the sidebar. Stats reverses with a left swipe. Expanded chat keeps the
-        // right-swipe collapse gesture rather than navigating underneath the chat.
+        if translationX > 0, startX <= menuEdgeWidth {
+            return .menu
+        }
+
         if translationX > 0, isChatExpanded {
             return .collapseChat
         }
 
-        if translationX > 0, !isOnStats {
+        if translationX < 0, !isOnStats {
             return .stats
         }
 
-        if translationX < 0, isOnStats {
+        if translationX > 0, isOnStats {
             return .home
         }
 
-        if translationX < 0, !isOnStats {
-            return .menu
-        }
-
         return .none
-    }
-}
-
-enum ComposerLoggingMode: String, CaseIterable, Equatable, Hashable, Identifiable {
-    case weight
-    case bodyFat
-    case photo
-
-    var id: Self { self }
-
-    var title: String {
-        switch self {
-        case .weight:
-            return "Weight"
-        case .bodyFat:
-            return "Body fat"
-        case .photo:
-            return "Photo"
-        }
-    }
-
-    var accessibilityIdentifier: String {
-        switch self {
-        case .weight:
-            return "composer_log_weight"
-        case .bodyFat:
-            return "composer_log_body_fat"
-        case .photo:
-            return "composer_log_photo"
-        }
-    }
-}
-
-enum ComposerLoggingSelectorPhase: Equatable {
-    case composer
-    case tapSelection
-    case dragSelection
-}
-
-struct ComposerLoggingSelectorState: Equatable {
-    private(set) var phase: ComposerLoggingSelectorPhase = .composer
-    private(set) var highlightedMode: ComposerLoggingMode?
-
-    var isPresented: Bool {
-        phase != .composer
-    }
-
-    var isDragging: Bool {
-        phase == .dragSelection
-    }
-
-    mutating func toggleTapSelection() {
-        if isPresented {
-            cancel()
-        } else {
-            phase = .tapSelection
-        }
-    }
-
-    mutating func beginDragSelection() {
-        phase = .dragSelection
-        highlightedMode = nil
-    }
-
-    @discardableResult
-    mutating func updateDragSelection(over mode: ComposerLoggingMode?) -> Bool {
-        guard isDragging, highlightedMode != mode else { return false }
-        highlightedMode = mode
-        return true
-    }
-
-    mutating func finishDragSelection(over mode: ComposerLoggingMode?) -> ComposerLoggingMode? {
-        guard isDragging else {
-            cancel()
-            return nil
-        }
-        cancel()
-        return mode
-    }
-
-    mutating func selectFromTap(_ mode: ComposerLoggingMode) -> ComposerLoggingMode? {
-        guard phase == .tapSelection else { return nil }
-        cancel()
-        return mode
-    }
-
-    mutating func cancel() {
-        phase = .composer
-        highlightedMode = nil
-    }
-}
-
-enum ComposerLoggingPrototypePolicy {
-    static let gateKey = "composer_logging_selector_prototype"
-    static let fixtureArgument = "-lybUITestComposerLoggingPrototype"
-
-    static func allowsHoldDrag(isAccessibilitySize: Bool) -> Bool {
-        !isAccessibilitySize
-    }
-
-    @MainActor
-    static func isEnabled(
-        arguments: [String] = ProcessInfo.processInfo.arguments,
-        isGateEnabled: ((String) -> Bool)? = nil
-    ) -> Bool {
-        #if DEBUG
-        if arguments.contains(fixtureArgument) { return true }
-        #endif
-
-        let checkGate = isGateEnabled ?? {
-            AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0)
-        }
-        return checkGate(gateKey)
     }
 }
 

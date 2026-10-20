@@ -6,30 +6,6 @@ private final class ObserverQueryCounter: @unchecked Sendable {
     var value = 0
 }
 
-private final class ForegroundHealthSyncSpy: HealthKitSyncManaging {
-    var isHealthKitAvailable = true
-    var isAuthorized = true
-    var refreshCount = 0
-    var onRefresh: () -> Void = {}
-
-    func checkAuthorizationStatus() {}
-    func observeWeightChanges() {}
-    func observeBodyFatChanges() {}
-    func observeStepChanges() {}
-    func setupBackgroundDelivery() async throws {}
-    func setupStepCountBackgroundDelivery() async throws {}
-    func resetForCurrentUser() async {}
-    func admitsAutomaticImportForCurrentAccount() -> Bool { true }
-    func syncWeightFromHealthKit() async throws {}
-    func syncStepsFromHealthKit() async throws {}
-    func fetchTodayStepCount() async throws -> Int? { nil }
-    func forceFullHealthKitSync() async -> Bool { false }
-    func refreshSmartScaleSamplesIfEnabled() async {
-        refreshCount += 1
-        onRefresh()
-    }
-}
-
 @MainActor
 final class BodyScoreHealthKitTriggerTests: XCTestCase {
     private var suiteName = ""
@@ -184,58 +160,6 @@ final class BodyScoreHealthKitTriggerTests: XCTestCase {
         let ownerKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userA)
         XCTAssertNotNil(defaults.object(forKey: ownerKey))
         XCTAssertEqual(queries.value, 1)
-    }
-
-    func testSmartScaleObserverReadsInsideTheHourlyCooldown() async throws {
-        let userA = "observer-smart-scale-\(UUID().uuidString)"
-        auth.authSession = .localFixture(subject: userA, email: "observer-scale@example.com")
-        auth.currentUser = makeUser(id: userA, email: "observer-scale@example.com")
-        let weightQueries = ObserverQueryCounter()
-        let scaleQueries = ObserverQueryCounter()
-        let manager = HealthKitManager(
-            userDefaults: defaults, authManager: auth, coreDataManager: coreData,
-            weightImportQuery: { _, _ in
-                weightQueries.value += 1
-                return []
-            },
-            bodyFatImportQuery: { _ in [] },
-            syncTrigger: {}
-        )
-        manager.isAuthorized = true
-        manager.smartScaleSyncEnabled = { true }
-        manager.smartScaleSampleQuery = { anchors in
-            scaleQueries.value += 1
-            return HealthKitSmartScaleQueryResult(samples: [], anchors: anchors)
-        }
-        defer { manager.syncDebounceTimer?.invalidate() }
-        let ownerKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: userA)
-        defaults.set(Date(), forKey: ownerKey)
-
-        manager.scheduleObservedBodyMetricSync(for: userA, debounce: 0.05)
-        try await Task.sleep(nanoseconds: 500_000_000)
-
-        XCTAssertEqual(scaleQueries.value, 1)
-        XCTAssertEqual(weightQueries.value, 0)
-    }
-
-    func testForegroundBootstrapRefreshesSmartScaleWhenAlreadyRunning() async {
-        let spy = ForegroundHealthSyncSpy()
-        let coordinator = HealthSyncCoordinator(healthKitManager: spy)
-        let refreshed = XCTestExpectation(description: "smart scale foreground refresh")
-        refreshed.expectedFulfillmentCount = 2
-        spy.onRefresh = { refreshed.fulfill() }
-
-        coordinator.bootstrapIfNeeded(syncEnabled: true)
-        coordinator.bootstrapIfNeeded(syncEnabled: true)
-        await fulfillment(of: [refreshed], timeout: 5)
-        XCTAssertEqual(spy.refreshCount, 2)
-
-        spy.isAuthorized = false
-        let skipped = XCTestExpectation(description: "denied foreground does not refresh")
-        skipped.isInverted = true
-        spy.onRefresh = { skipped.fulfill() }
-        coordinator.bootstrapIfNeeded(syncEnabled: true)
-        await fulfillment(of: [skipped], timeout: 0.4)
     }
 
     private func makeUser(id: String, email: String) -> LocalUser {

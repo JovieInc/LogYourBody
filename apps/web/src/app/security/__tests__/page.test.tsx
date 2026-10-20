@@ -36,8 +36,6 @@ describe('security reporting handoff', () => {
     const user = userEvent.setup();
     render(<SecurityPage />);
     await user.tab();
-    expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveFocus();
-    await user.tab();
     expect(screen.getByRole('link', { name: 'Report privately on GitHub' })).toHaveFocus();
   });
 

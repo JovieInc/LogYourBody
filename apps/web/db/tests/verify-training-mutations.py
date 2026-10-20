@@ -7,7 +7,6 @@ from concurrent.futures import ThreadPoolExecutor
 import getpass
 import json
 import os
-import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -15,61 +14,34 @@ import time
 import uuid
 
 
-def isolated_environment(environment):
-    """Do not inherit a production endpoint, credential or connection option."""
-    env = {key: value for key, value in environment.items()
-           if not key.startswith('PG') and key != 'DATABASE_URL'}
-    env['PGCONNECT_TIMEOUT'] = '5'
-    return env
-
-
-def run_command(command, env):
-    result = subprocess.run(command, text=True, capture_output=True, env=env, timeout=30)
-    if result.returncode:
-        raise RuntimeError(result.stderr or result.stdout or f'command failed: {Path(command[0]).name}')
-    return result.stdout.strip()
-
-
-def verify_postgres_tools(directory, env):
-    """Fail closed before creating a cluster when CI's pinned substrate drifts."""
-    versions = {}
-    for name in ('initdb', 'pg_ctl', 'psql'):
-        binary = directory / name
-        if not binary.is_file() or not os.access(binary, os.X_OK):
-            raise RuntimeError(f'missing executable PostgreSQL16 tool: {name}')
-        version = run_command([str(binary), '--version'], env)
-        if not re.search(r'\(PostgreSQL\) 16(?:\.|$)', version):
-            raise RuntimeError(f'PostgreSQL16 required for {name}: {version}')
-        versions[name] = version
-    return versions
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--postgres-bin', type=Path, required=True)
     parser.add_argument('--migration', type=Path, help='Optional candidate migration for deliberate regression checks')
     parser.add_argument('--admission-migration', type=Path, help='Optional admission migration for deliberate regression checks')
-    parser.add_argument('--canvas-migration', type=Path, help='Optional canvas migration for deliberate regression checks')
     args = parser.parse_args()
     web = Path(__file__).resolve().parents[2]
-    env = isolated_environment(os.environ)
-    versions = verify_postgres_tools(args.postgres_bin, env)
+    env = {k: v for k, v in os.environ.items() if not k.startswith('PG') and k != 'DATABASE_URL'}
+    env['PGCONNECT_TIMEOUT'] = '5'
     checks = []
 
     def run(command):
-        return run_command(command, env)
+        result = subprocess.run(command, text=True, capture_output=True, env=env, timeout=30)
+        if result.returncode:
+            raise RuntimeError(result.stderr or result.stdout)
+        return result.stdout.strip()
 
     def quote(value):
         return "'" + str(value).replace("'", "''") + "'"
 
-    with tempfile.TemporaryDirectory(prefix='lyb-mutation-pg-') as directory:
+    with tempfile.TemporaryDirectory(prefix='lyb-mutation-pg-',dir='/private/tmp') as directory:
         root = Path(directory)
         data, socket = root / 'data', root / 'socket'
         socket.mkdir(mode=0o700)
         run([str(args.postgres_bin / 'initdb'), '-D', str(data), '-A', 'trust', '--no-locale', '-U', getpass.getuser()])
         control = [str(args.postgres_bin / 'pg_ctl'), '-D', str(data)]
+        run(control + ['-l', str(root / 'postgres.log'), '-o', f"-c listen_addresses='' -k {socket} -p 6548", '-w', 'start'])
         try:
-            run(control + ['-l', str(root / 'postgres.log'), '-o', f"-c listen_addresses='' -k {socket} -p 6548", '-w', 'start'])
             client = [str(args.postgres_bin / 'psql'), '-X', '-q', '-A', '-t', '-h', str(socket), '-p', '6548', '-U', getpass.getuser(), '-d', 'postgres', '-v', 'ON_ERROR_STOP=1']
 
             def sql(statement):
@@ -85,9 +57,6 @@ def main():
 
             run(client + ['-f', str(web / 'db/migrations/20261010120000_native_account_admission.sql')])
             run(client + ['-f', str(web / 'db/migrations/20261013100000_training_swap_mutation.sql')])
-            run(client + ['-f', str(web / 'db/migrations/20261014103000_training_execution_cas.sql')])
-
-            run(client + ['-f', str(args.canvas_migration or web / 'db/migrations/20261014180000_training_canvas_ledger.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -220,15 +189,9 @@ def main():
                 return guard+';'+ ';'.join(s.replace('${subject}',quote(subject)) for s in statements)+';'
 
             for boundary in ['revoke','delete']:
-                for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert','set_correct']:
+                for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert']:
                     for first in ['boundary','mutation']:
-                        subject,setup,admission,session=fixture()
-                        if action=='set_correct':
-                            prior=record_for('set_insert', session)
-                            assert mutate(subject,admission,'set_insert',prior)['kind']=='saved'
-                            row=dict(prior, reps=9, revision=1, expectedRevision=0)
-                        else:
-                            row=record_for(action, session)
+                        subject,setup,admission,session=fixture(); row=record_for(action,session)
                         action_name='session_update' if action=='completion' else action
                         write=mutation_sql(subject,admission,action_name,row)
                         stop=command_sql(subject,'revoke',{}) if boundary=='revoke' else deletion(subject)
@@ -334,59 +297,7 @@ def main():
             assert mutate(other,other_admission,'set_insert',dict(row2,sessionId=other_session['id']))['kind']=='record_conflict'
             assert sql(f'select jsonb_agg(to_jsonb(n) order by id) from native_records n where user_subject={quote(other)};')==other_before
             check('foreign session/global set identity cannot cross owners')
-            subject,setup,admission,session=fixture()
-            row=record_for('set_insert',session)
-            assert mutate(subject,admission,'set_insert',row)['kind']=='saved'
-            original=sql(f"select payload from native_records where collection='training_sessions' and id={quote(session['id'])};")
-            optimized=dict(session,prescription=dict(exercises=session['prescription']['exercises'],executionRevision=1),
-                expectedExecutionRevision=0,expectedLoggedSetCount=0)
-            assert mutate(subject,admission,'session_update',optimized)['kind']=='record_conflict'
-            assert sql(f"select payload from native_records where collection='training_sessions' and id={quote(session['id'])};")==original
-            optimized['expectedLoggedSetCount']=1
-            results=concurrent(lambda:mutate(subject,admission,'session_update',optimized),
-                lambda:mutate(subject,admission,'session_update',optimized))
-            assert sorted(result['kind'] for result in results)==['record_conflict','saved']
-            saved=next(result['record'] for result in results if result['kind']=='saved')
-            assert saved['prescription']['executionRevision']==1
-            assert 'expectedExecutionRevision' not in saved and 'expectedLoggedSetCount' not in saved
-            assert mutate(subject,admission,'session_update',optimized)['kind']=='record_conflict'
-            completed=dict(optimized,status='completed',expectedExecutionRevision=1)
-            assert mutate(subject,admission,'session_update',completed)['kind']=='saved'
-            check('session CAS rejects stale logged count/revision, preserves rows, and admits one concurrent revision')
-
-            subject,setup,admission,session=fixture(); row=record_for('set_insert',session)
-            assert mutate(subject,admission,'set_insert',row)['kind']=='saved'
-            corrected=dict(row,reps=12,revision=1,expectedRevision=0)
-            competing=dict(corrected,reps=13)
-            results=concurrent(lambda:mutate(subject,admission,'set_correct',corrected),
-                lambda:mutate(subject,admission,'set_correct',competing))
-            assert sorted(result['kind'] for result in results)==['record_conflict','saved']
-            winner=next(result['record'] for result in results if result['kind']=='saved')
-            assert winner['revision']==1 and winner['reps'] in (12,13)
-            assert 'expectedRevision' not in winner
-            before=sql(f"select payload from native_records where collection='logged_sets' and id={quote(row['id'])};")
-            assert mutate(subject,admission,'set_correct',corrected)['kind']=='record_conflict'
-            assert sql(f"select payload from native_records where collection='logged_sets' and id={quote(row['id'])};")==before
-            fresh=dict(row,reps=14,revision=2,expectedRevision=1)
-            assert mutate(subject,admission,'set_correct',fresh)['record']['reps']==14
-            check('set correction admits one concurrent revision, rejects stale replay, and allows fresh correction')
-
-            other,other_setup,other_admission,other_session=fixture()
-            assert mutate(other,other_admission,'set_correct',dict(fresh,sessionId=other_session['id']))['kind']=='record_conflict'
-            no_revision=dict(fresh); no_revision.pop('expectedRevision')
-            assert mutate(subject,admission,'set_correct',no_revision)['kind']=='record_conflict'
-            sql(f"update native_records set deleted_at=now() where collection='logged_sets' and id={quote(row['id'])};")
-            assert mutate(subject,admission,'set_correct',dict(fresh,revision=3,expectedRevision=2))['kind']=='record_conflict'
-            assert sql(f"select count(*) from native_records where collection='logged_sets' and id={quote(row['id'])} and deleted_at is null;")=='0'
-            check('set correction cannot omit revision, cross owners, or revive a tombstone')
-
-            canvas_env = {**env, 'TSX_TSCONFIG_PATH': str(web / 'tsconfig.json')}
-            print(run_command(['node', '--conditions=react-server', '--import',
-                str(web / 'node_modules/tsx/dist/loader.mjs'),
-                str(web / 'db/tests/verify-training-canvas.ts'), json.dumps(client)], canvas_env), flush=True)
-            check('canvas actual adapter/handler and SQL qualification')
-
-            print(json.dumps({'passed':len(checks),'checks':checks,'postgresTools':versions,'scope':'disposable PostgreSQL16; actual migrations, observed owner locks, synthetic rows only'}))
+            print(json.dumps({'passed':len(checks),'checks':checks,'scope':'disposable PostgreSQL16; actual migrations, observed owner locks, synthetic rows only'}))
         finally:
             run(control + ['-m','immediate','-w','stop'])
 

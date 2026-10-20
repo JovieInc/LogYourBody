@@ -59,7 +59,7 @@ struct CoreMetricsRow: View {
                     MetricSummaryCard(
                         icon: "percent",
                         accentColor: Color.metricAccentBodyFat,
-                        state: .empty(title: "Body fat", message: "No body fat data", action: nil)
+                        state: .empty(message: "No body fat data", action: nil)
                     )
                 }
             }
@@ -105,7 +105,7 @@ struct CoreMetricsRow: View {
                     MetricSummaryCard(
                         icon: "figure.stand",
                         accentColor: Color.metricAccentWeight,
-                        state: .empty(title: "Weight", message: "No weight data", action: nil)
+                        state: .empty(message: "No weight data", action: nil)
                     )
                 }
             }

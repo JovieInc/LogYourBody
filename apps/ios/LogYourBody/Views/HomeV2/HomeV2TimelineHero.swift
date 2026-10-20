@@ -92,10 +92,6 @@ enum HomeV2TimelinePolicy {
             let position = chronologicalPosition(for: id) + (newer ? 1 : -1)
             return self.id(atChronologicalPosition: position)
         }
-
-        func photoCaptionDate(for metric: BodyMetrics) -> BodyMetrics {
-            HomeV2SelectedMomentPolicy.displayPhoto(for: metric, in: metrics) ?? metric
-        }
     }
 
     static func chronologicalIndices(in bodyMetrics: [BodyMetrics]) -> [Int] {
@@ -128,34 +124,20 @@ struct HomeV2TimelinePager: View {
     let unit: String
     let dateText: (BodyMetrics) -> String
     let onOpenPhoto: () -> Void
-    var isNavigating = false
 
     var body: some View {
-        HomeV2PhotoScrubber(
-            values: snapshot.metrics.reversed().map(HomeV2TimelinePolicy.EntryID.init),
-            selection: $selectedID, width: size.width,
-            canActivate: snapshot.metric(for: selectedID).map(PhotoTimelineHUDPolicy.hasUsablePhoto) ?? false,
-            isNavigating: isNavigating, identifier: "home_v2_photo"
-        ) { isScrubbing in
-            if isScrubbing, let metric = snapshot.metric(for: selectedID) {
+        TabView(selection: $selectedID) {
+            ForEach(snapshot.metrics) { metric in
                 HomeV2TimelinePage(metric: metric, metrics: snapshot.metrics, size: size, unit: unit,
-                                   dateText: dateText(snapshot.photoCaptionDate(for: metric)), onOpenPhoto: {})
-            } else {
-                TabView(selection: $selectedID) {
-                    ForEach(snapshot.metrics) { metric in
-                        HomeV2TimelinePage(metric: metric, metrics: snapshot.metrics, size: size, unit: unit,
-                                           dateText: dateText(snapshot.photoCaptionDate(for: metric)), onOpenPhoto: onOpenPhoto)
-                            .tag(HomeV2TimelinePolicy.EntryID(metric))
-                            .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .frame(width: size.width, height: size.height)
+                                   dateText: dateText(metric), onOpenPhoto: onOpenPhoto)
+                    .tag(HomeV2TimelinePolicy.EntryID(metric))
+                    .accessibilityHidden(HomeV2TimelinePolicy.EntryID(metric) != selectedID)
             }
         }
+        .tabViewStyle(.page(indexDisplayMode: .never))
         .frame(width: size.width, height: size.height)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Body timeline")
+        .accessibilityLabel("Today’s entries")
         .accessibilityValue("Entry \(snapshot.chronologicalPosition(for: selectedID) + 1) of \(snapshot.metrics.count)")
         .accessibilityHint("Adjust up for newer entries or down for older entries")
         .accessibilityIdentifier("home_v2_timeline_pager")
@@ -186,10 +168,10 @@ private struct HomeV2TimelinePage: View {
 
     var body: some View {
         Group {
-            if let photoURL = HomeV2SelectedMomentPolicy.displayPhoto(for: metric, in: metrics)?.photoUrl {
+            if PhotoTimelineHUDPolicy.hasUsablePhoto(metric), let photoURL = metric.photoUrl {
                 photo(url: photoURL)
             } else {
-                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit)
+                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit, emptyTitle: nil)
                     .frame(width: size.width, height: size.height)
                     .accessibilityIdentifier("home_v2_metric_first")
             }
@@ -206,11 +188,8 @@ private struct HomeV2TimelinePage: View {
         return ZStack(alignment: .top) {
             if let snapshot = editorialPhoto, snapshot.key == key, let image = snapshot.image {
                 Image(uiImage: image).resizable().scaledToFill()
-                    .frame(width: size.width, height: size.height)
-                    .clipped()
-                    .overlay(alignment: .bottomLeading) { compositionOverlay }
             } else {
-                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit)
+                HomeV2DataHero(metric: metric, metrics: metrics, unit: unit, emptyTitle: nil)
                 Text(failed ? "Photo unavailable" : "Loading photo…")
                     .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
                     .foregroundStyle(HomeV2Tokens.Colors.ink)
@@ -225,8 +204,7 @@ private struct HomeV2TimelinePage: View {
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(.default, onOpenPhoto)
-        .accessibilityLabel((failed ? "Photo unavailable. Saved measurements shown. " : "Progress photo, ") +
-                            "\(dateText). \(HomeV2SelectedMomentPolicy.sentence(for: metric, in: metrics))")
+        .accessibilityLabel(failed ? "Photo unavailable. Saved measurements shown. \(dateText)" : "Progress photo, \(dateText)")
         .accessibilityHint("Open the photo")
         .accessibilityIdentifier("home_v2_photo_stage")
         .task(id: key) {
@@ -249,30 +227,6 @@ private struct HomeV2TimelinePage: View {
             editorialPhoto = (key, AspectFillCropper.crop(plate, to: size, anchor: focus))
         }
     }
-
-    private var compositionOverlay: some View {
-        VStack(alignment: .leading, spacing: HomeV2Tokens.Space.tight) {
-            if let reading = HomeV2EditorialPolicy.bodyFat(in: metric) {
-                Text("Body fat")
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.title, relativeTo: .headline)
-                Text(String(format: "%.1f%%", reading.percentage))
-                    .scaledSystemFont(size: 60, weight: .semibold, relativeTo: .largeTitle)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                Text(reading.caption)
-                    .scaledSystemFont(size: HomeV2Tokens.TypeSize.caption, relativeTo: .footnote)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .foregroundStyle(.white)
-        .padding(HomeV2Tokens.Space.margin)
-        .padding(.top, 44)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
-        }
-        .allowsHitTesting(false)
-    }
 }
 
 /// A real tap recognizer fails when the finger drags. A plain button can activate
@@ -286,29 +240,5 @@ private struct HomeV2PhotoTap: UIGestureRecognizerRepresentable {
 
     func handleUIGestureRecognizerAction(_ recognizer: UITapGestureRecognizer, context: Context) {
         if recognizer.state == .ended { onTap() }
-    }
-}
-
-/// One-time coach mark for the signature interactions (JOV-6016): it teaches
-/// swipe and scrub once, then leaves the surface permanently. Dismissal is
-/// stored in AppStorage by the surface.
-struct HomeV2TimelineCoachMark: View {
-    let onDismiss: () -> Void
-
-    var body: some View {
-        Button(action: onDismiss) {
-            Text(HomeV2Copy.timelineCoachHint)
-                .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
-                .foregroundStyle(HomeV2Tokens.Colors.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, HomeV2Tokens.Space.margin)
-                .frame(minHeight: JovieTokens.minimumHitTarget)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(HomeV2Copy.timelineCoachHint)
-        .accessibilityHint("Double tap to dismiss")
-        .accessibilityIdentifier("home_v2_timeline_coach")
     }
 }

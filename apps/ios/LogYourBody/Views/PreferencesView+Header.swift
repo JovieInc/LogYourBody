@@ -318,8 +318,7 @@ extension PreferencesView {
             .fill(.quaternary)
             .overlay(
                 Text(userInitials)
-                    // Decorative initials fit the fixed avatar; the adjacent name scales normally.
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(.primary)
             )
     }

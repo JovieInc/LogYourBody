@@ -1,7 +1,3 @@
-import {
-  isValidDailyStepDeletion,
-  type DailyStepDeletionInput,
-} from '@/lib/ports/daily-step-deletions';
 import type { NativeAccountAdmission } from '@/lib/ports/native-account-admission';
 import {
   type NativeMutationQuery,
@@ -76,15 +72,11 @@ function recordId(record: Record<string, unknown>): string | null {
   return typeof record.id === 'string' && record.id ? record.id : null;
 }
 
-function payloadForInsert(
-  record: Record<string, unknown>,
-  collection?: NativeProductRecordCollection,
-): Record<string, unknown> {
+function payloadForInsert(record: Record<string, unknown>): Record<string, unknown> {
   const payload = { ...record };
   delete payload.user_id;
   delete payload.deleted_at;
   delete payload.server_updated_at;
-  if (collection === 'daily_metrics') delete payload.steps_deletion;
   return payload;
 }
 
@@ -108,113 +100,6 @@ export function createNeonNativeProductRecords(
       ),
     ])) as Array<Array<{ id: string }>>;
     return { deleted_ids: (rows ?? []).map((row) => row.id) };
-  }
-
-  async function deleteDailySteps(
-    admission: NativeAccountAdmission,
-    deletions: DailyStepDeletionInput[],
-  ): Promise<{ records: NativeProductRecord[]; rejected_ids: string[] }> {
-    if (
-      !deletions.length ||
-      deletions.length > 100 ||
-      !deletions.every(isValidDailyStepDeletion) ||
-      new Set(deletions.map((item) => item.record.id.toLowerCase())).size !== deletions.length
-    ) {
-      throw new TypeError('invalid_steps_deletion');
-    }
-    const queries: NativeMutationQuery[] = [];
-    for (const deletion of deletions) {
-      const record = payloadForInsert(deletion.record, 'daily_metrics');
-      queries.push(
-        database.query(
-          `insert into public.native_records (
-           collection, id, user_subject, payload, deleted_at, updated_at
-         ) values ('daily_metrics', $1::uuid, $2,
-           $3::jsonb || jsonb_build_object(
-             'steps', null, 'steps_present', false,
-             'steps_deletion', jsonb_build_object(
-               'schema_version', 1, 'deleted_at', now(),
-               'day_start', $4::text, 'day_end', $5::text, 'time_zone', $6::text
-             )
-           ), null, now()
-         )
-         on conflict (collection, id) do update set
-           payload = public.native_records.payload || jsonb_build_object(
-             'steps', null, 'steps_present', false,
-             'steps_deletion', case
-               when public.native_records.payload#>>'{steps_deletion,schema_version}' = '1'
-               then public.native_records.payload->'steps_deletion'
-               else excluded.payload->'steps_deletion' end
-           ), updated_at = now()
-         where public.native_records.user_subject = excluded.user_subject
-           and case when pg_input_is_valid(public.native_records.payload->>'date', 'timestamptz')
-             then (public.native_records.payload->>'date')::timestamptz >= $4::timestamptz
-               and (public.native_records.payload->>'date')::timestamptz < $5::timestamptz
-             else false end
-           and (
-             public.native_records.payload#>>'{steps_deletion,schema_version}' is distinct from '1'
-             or (
-               case when pg_input_is_valid(public.native_records.payload#>>'{steps_deletion,day_start}', 'timestamptz')
-                 and pg_input_is_valid(public.native_records.payload#>>'{steps_deletion,day_end}', 'timestamptz')
-               then (public.native_records.payload#>>'{steps_deletion,day_start}')::timestamptz = $4::timestamptz
-                 and (public.native_records.payload#>>'{steps_deletion,day_end}')::timestamptz = $5::timestamptz
-               else false end
-             )
-           )
-         returning id, payload, deleted_at, updated_at`,
-          [
-            record.id,
-            admission.subject,
-            JSON.stringify(record),
-            deletion.day_start,
-            deletion.day_end,
-            deletion.time_zone,
-          ],
-        ),
-      );
-      // A later statement sees the marker after the owner guard; a rejected
-      // foreign anchor cannot authorize changes to another daily row.
-      queries.push(
-        database.query(
-          `update public.native_records target
-         set payload = target.payload || jsonb_build_object(
-           'steps', null, 'steps_present', false,
-           'steps_deletion', marker.payload->'steps_deletion'
-         ), updated_at = now()
-         from public.native_records marker
-         where marker.collection = 'daily_metrics' and marker.id = $1::uuid
-           and marker.user_subject = $2
-           and marker.payload#>>'{steps_deletion,schema_version}' = '1'
-           and case when pg_input_is_valid(marker.payload#>>'{steps_deletion,day_start}', 'timestamptz')
-             and pg_input_is_valid(marker.payload#>>'{steps_deletion,day_end}', 'timestamptz')
-           then (marker.payload#>>'{steps_deletion,day_start}')::timestamptz = $3::timestamptz
-             and (marker.payload#>>'{steps_deletion,day_end}')::timestamptz = $4::timestamptz
-           else false end
-           and target.collection = 'daily_metrics' and target.user_subject = $2
-           and target.id <> marker.id
-           and target.payload#>>'{steps_deletion,schema_version}' is distinct from '1'
-           and case when pg_input_is_valid(target.payload->>'date', 'timestamptz')
-             then (target.payload->>'date')::timestamptz >= $3::timestamptz
-               and (target.payload->>'date')::timestamptz < $4::timestamptz
-             else false end
-         returning target.id, target.payload, target.deleted_at, target.updated_at`,
-          [record.id, admission.subject, deletion.day_start, deletion.day_end],
-        ),
-      );
-    }
-    // Account admission locks app_users FOR UPDATE before these statements.
-    // Admitted daily POST uses the same lock, including different record IDs.
-    const results = await executeNativeMutationQueries(database, admission, queries);
-    const accepted = new Map<string, NativeProductRecord>();
-    const rejected: string[] = [];
-    for (const [index, deletion] of deletions.entries()) {
-      const anchor = results[index * 2] as NativeRecordRow[];
-      if (!anchor.length) rejected.push(deletion.record.id);
-      for (const row of [...anchor, ...(results[index * 2 + 1] as NativeRecordRow[])]) {
-        accepted.set(row.id, mapRecord(admission.subject, row));
-      }
-    }
-    return { records: [...accepted.values()], rejected_ids: rejected };
   }
 
   async function endActiveGlp1Medications(
@@ -268,44 +153,9 @@ export function createNeonNativeProductRecords(
         database.query(
           `insert into public.native_records (
              collection, id, user_subject, payload, deleted_at, updated_at
-           ) values ($1, $2, $3,
-              $4::jsonb || coalesce((
-                select jsonb_build_object('steps', null, 'steps_present', false,
-                  'steps_deletion', marker.payload->'steps_deletion')
-                from public.native_records marker
-                where $1 = 'daily_metrics' and marker.collection = 'daily_metrics'
-                  and marker.user_subject = $3
-                  and jsonb_typeof(marker.payload->'steps_deletion') = 'object'
-                  and marker.payload#>>'{steps_deletion,schema_version}' = '1'
-                  and (marker.id = $2::uuid or case
-                    when pg_input_is_valid($4::jsonb->>'date', 'timestamptz')
-                      and pg_input_is_valid(marker.payload#>>'{steps_deletion,day_start}', 'timestamptz')
-                      and pg_input_is_valid(marker.payload#>>'{steps_deletion,day_end}', 'timestamptz')
-                    then ($4::jsonb->>'date')::timestamptz
-                      >= (marker.payload#>>'{steps_deletion,day_start}')::timestamptz
-                      and ($4::jsonb->>'date')::timestamptz
-                      < (marker.payload#>>'{steps_deletion,day_end}')::timestamptz
-                    else false end)
-                order by marker.updated_at desc, marker.id limit 1
-              ), '{}'::jsonb), null, now())
+           ) values ($1, $2, $3, $4::jsonb, null, now())
            on conflict (collection, id) do update set
              payload = case
-               when excluded.collection = 'daily_metrics'
-                 and (
-                   public.native_records.payload#>>'{steps_deletion,schema_version}' = '1'
-                   or excluded.payload#>>'{steps_deletion,schema_version}' = '1'
-                 )
-               then public.native_records.payload || excluded.payload || jsonb_build_object(
-                 'steps', null, 'steps_present', false,
-                 'steps_deletion', case
-                   when public.native_records.payload#>>'{steps_deletion,schema_version}' = '1'
-                   then public.native_records.payload->'steps_deletion'
-                   else excluded.payload->'steps_deletion' end,
-                 'date', case
-                   when public.native_records.payload#>>'{steps_deletion,schema_version}' = '1'
-                   then public.native_records.payload->'date'
-                   else excluded.payload->'date' end
-               )
                when excluded.collection = 'daily_metrics'
                  and not (excluded.payload ? 'steps_present')
                  and public.native_records.payload->'steps_present' = 'true'::jsonb
@@ -326,7 +176,7 @@ export function createNeonNativeProductRecords(
              updated_at = now()
            where public.native_records.user_subject = excluded.user_subject
            returning id, payload, deleted_at, updated_at`,
-          [collection, id, subject, JSON.stringify(payloadForInsert(record, collection))],
+          [collection, id, subject, JSON.stringify(payloadForInsert(record))],
         ),
       );
       submittedIds.push(id);
@@ -344,7 +194,6 @@ export function createNeonNativeProductRecords(
   return {
     accountMutations: {
       capture: (subject) => captureNativeAccountAdmission(database, subject),
-      deleteDailySteps,
       push: (admission, collection, records) =>
         push(admission.subject, collection, records, admission),
       remove: (admission, collection, ids) => remove(admission.subject, collection, ids, admission),
@@ -374,32 +223,6 @@ export function createNeonNativeProductRecords(
         [id, subject],
       )) as NativeRecordRow[];
       return existing[0] ? mapRecord(subject, existing[0]) : null;
-    },
-
-    async correctTrainingSet(subject, id, expectedRevision, record) {
-      const mutations = createNeonTrainingMutations(database);
-      const admission = await mutations.captureAdmission(subject);
-      if (!admission) return null;
-      const result = await mutations.commit({
-        subject,
-        admission,
-        action: 'set_correct',
-        record: { ...record, id, expectedRevision },
-      });
-      return result.kind === 'saved' ? result.record : null;
-    },
-
-    async updateTrainingSession(subject, id, expectedRevision, expectedLoggedSetCount, record) {
-      const mutations = createNeonTrainingMutations(database);
-      const admission = await mutations.captureAdmission(subject);
-      if (!admission) return null;
-      const result = await mutations.commit({
-        subject,
-        admission,
-        action: 'session_update',
-        record: { ...record, expectedExecutionRevision: expectedRevision, expectedLoggedSetCount },
-      });
-      return result.kind === 'saved' ? result.record : null;
     },
 
     push,
@@ -471,8 +294,6 @@ export function createNeonNativeProductRecords(
 export const neonNativeProductRecords: NativeProductRecordsPort = {
   accountMutations: {
     capture: (subject) => captureNativeAccountAdmission(getDatabase(), subject),
-    deleteDailySteps: (admission, deletions) =>
-      createNeonNativeProductRecords().accountMutations!.deleteDailySteps!(admission, deletions),
     push: (admission, collection, records) =>
       createNeonNativeProductRecords().accountMutations!.push(admission, collection, records),
     remove: (admission, collection, ids) =>
@@ -490,16 +311,6 @@ export const neonNativeProductRecords: NativeProductRecordsPort = {
   },
   insertTrainingSet: (subject, record) =>
     createNeonNativeProductRecords().insertTrainingSet!(subject, record),
-  correctTrainingSet: (subject, id, expectedRevision, record) =>
-    createNeonNativeProductRecords().correctTrainingSet!(subject, id, expectedRevision, record),
-  updateTrainingSession: (subject, id, expectedRevision, expectedLoggedSetCount, record) =>
-    createNeonNativeProductRecords().updateTrainingSession!(
-      subject,
-      id,
-      expectedRevision,
-      expectedLoggedSetCount,
-      record,
-    ),
   push: (subject, collection, records) =>
     createNeonNativeProductRecords().push(subject, collection, records),
   pull: (subject, collection, input) =>

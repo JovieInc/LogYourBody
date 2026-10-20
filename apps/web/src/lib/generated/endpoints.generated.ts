@@ -80,7 +80,6 @@ export const endpoints = {
     },
     statsig: {
       apiHost: 'statsigapi.net',
-      gateEvaluationUrl: 'https://api.statsig.com/v1/check_gate',
     },
     sentry: {
       ingestHost: '*.ingest.sentry.io',
@@ -100,31 +99,6 @@ export const endpoints = {
     },
   },
   allowlist: [
-    {
-      value: 'https://www.allianceforeatingdisorders.com/find-treatment/',
-      reason:
-        'Verified official U.S. eating-disorder support resource in the health disclosure, checked 2026-10-14.',
-    },
-    {
-      value: 'https://www.crisistextline.org/',
-      reason:
-        'Verified official U.S. crisis support resource in the health disclosure, checked 2026-10-14.',
-    },
-    {
-      value: 'https://design-tokens.github.io/community-group/format/',
-      reason:
-        'Schema identifier in the immutable canonical Jovie color export; not a runtime endpoint.',
-    },
-    {
-      value: 'https://raw.githubusercontent.com',
-      reason:
-        'Immutable JovieKit source import; the canonical downloader validates repository, revision, paths and SHA-256 before materialization.',
-    },
-    {
-      value: 'https://transport.invalid',
-      reason:
-        'Reserved URLProtocol fixture host in canonical JovieKit tests; not a runtime endpoint.',
-    },
     {
       value: 'https://github.com/ChatPRD/lennys-podcast-transcripts',
       reason: 'Podcast transcript citation in docs/research; not a dependency.',
@@ -164,27 +138,6 @@ export const endpoints = {
     {
       value: 'https://docs.developer.apple.com',
       reason: 'Apple developer documentation links in docs/research.',
-    },
-    {
-      value: 'https://support.apple.com/en-in/guide/iphone/iphe3d379c32/ios',
-      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
-    },
-    {
-      value: 'https://happyscale.com',
-      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
-    },
-    {
-      value: 'https://help.macrofactorapp.com/dashboard/weight_trend',
-      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
-    },
-    {
-      value:
-        'https://help.hevyapp.com/hc/en-us/articles/35385479603479-Body-Composition-Tracking-Measurements-and-Progress-Photos',
-      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
-    },
-    {
-      value: 'https://help.bevel.health/en/articles/10437057',
-      reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
     },
     {
       value: 'https://edpb.europa.eu',
@@ -364,10 +317,6 @@ export const endpoints = {
       reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
     },
     {
-      value: 'https://linear.app/jovie/issue/LYB-173',
-      reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
-    },
-    {
       value: 'https://linear.app/jovie/issue/LYB-97',
       reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.',
     },
@@ -431,15 +380,6 @@ export const endpoints = {
       value: 'http://scripts.sil.org/OFL',
       reason:
         'Inter SIL Open Font License FAQ reference bundled with the shared typography assets.',
-    },
-    {
-      value: 'https://github.com/rsms/inter-tight',
-      reason:
-        'Bundled Inter Tight copyright attribution, preserved from the upstream SIL Open Font License.',
-    },
-    {
-      value: 'https://scripts.sil.org/OFL',
-      reason: 'HTTPS SIL Open Font License FAQ included in the bundled Inter Tight license.',
     },
     {
       value: 'https://www.fontshare.com/fonts/satoshi',

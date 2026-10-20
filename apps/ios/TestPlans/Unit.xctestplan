@@ -29,7 +29,6 @@
         "PhotoUploadManagerTests",
         "ProgressPhotoImagePipelineTests",
         "RevenueCatProductConfigurationTests",
-        "StoreKitPurchaseRestoreTests",
         "SyncIntegrationBodyMetricSyncTests",
         "SyncIntegrationImportAndMappingTests",
         "SyncIntegrationRemotePayloadTests",

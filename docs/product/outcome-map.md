@@ -1,16 +1,5 @@
 # LogYourBody product outcome map and IA proposal
 
-**October 16, 2026 supersession (LYB-179):** LYB-173 now governs automatic-first,
-one-decision coaching with steerable native UI and inspectable history. It
-supersedes this proposal's timeline-as-main-product and training-as-secondary
-direction. The September 27 audit, v1 activation definitions, assumptions and
-revenue model below remain dated history, not observed outcomes or live offers.
-The current Pro registry references remain $9.99/month / $69.99/year USD with a
-three-day trial; no older premium/coaching package proposal establishes an offer.
-See the [reconciled roadmap](../product-development-roadmap.md) and
-[funnel evidence contract](../marketing/funnel-evidence-contract.md). Existing
-implementation owners and auth, persistence, privacy and release gates remain.
-
 **Status:** source-level audit and proposal for Tim, 2026-09-27. This is not an approved product decision. It describes the code at branch head 2f2f3b2 and maps it to current product docs; W2 owns the visual/device walk. No build, tests, or simulator were run for this document.
 
 ## Sources and authority

@@ -83,9 +83,7 @@ extension DashboardViewLiquid {
                     showsTranscript: isHomeChatExpanded,
                     onExpandRequest: {
                         isHomeChatExpanded = true
-                    },
-                    loggingPrototypeEnabled: isComposerLoggingPrototypeEnabled,
-                    onLoggingModeSelected: presentComposerLoggingMode
+                    }
                 )
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? .infinity : nil)
                 .layoutPriority(!isHomeChatExpanded && dynamicTypeSize.isAccessibilitySize ? 1 : 0)
@@ -114,21 +112,9 @@ extension DashboardViewLiquid {
         .fullScreenCover(isPresented: $isHomeV2AllPhotosPresented) {
             homeV2AllPhotosFromHome
         }
-        .sheet(item: $homeV2EditingSession) { session in
-            homeV2EditEntrySheet(for: session)
-                #if DEBUG
-                .onAppear { recordHomeEditTransition("sheet.appear") }
-                .onDisappear { recordHomeEditTransition("sheet.disappear") }
-                #endif
+        .sheet(item: $homeV2EditingMetric) { metric in
+            homeV2EditEntrySheet(for: metric)
         }
-        #if DEBUG
-        .onChange(of: homeV2EditingSession?.id) { _, _ in
-            recordHomeEditTransition("item.changed")
-        }
-        .onChange(of: isHomeV2ContextPresented) { _, _ in
-            recordHomeEditTransition("context.changed")
-        }
-        #endif
         .navigationDestination(isPresented: $isHomeV2ContextPresented) {
             homeV2ContextView
         }
@@ -157,22 +143,6 @@ extension DashboardViewLiquid {
             Button("OK", role: .cancel) {}
         } message: {
             Text("Your entry is still saved. Try Undo again.")
-        }
-    }
-
-    private var isComposerLoggingPrototypeEnabled: Bool {
-        _ = featureGateRefreshToken
-        return ComposerLoggingPrototypePolicy.isEnabled()
-    }
-
-    private func presentComposerLoggingMode(_ mode: ComposerLoggingMode) {
-        switch mode {
-        case .weight:
-            presentHomeV2LogSheet()
-        case .bodyFat:
-            presentAddEntrySheet(initialTab: 1)
-        case .photo:
-            presentProgressPhotoAttach(for: progressPhotoAttachMetric)
         }
     }
 
@@ -208,12 +178,14 @@ extension DashboardViewLiquid {
                     )
                     if isHomeV2CheckIn, homeV2SystemState == .loading {
                         HomeV2LoadingHome()
-                    } else if bodyMetrics.isEmpty {
-                        if isHomeV2CheckIn {
-                            homeV2DayZero
+                    } else if isHomeV2CheckIn {
+                        if let today = homeV2SelectedTodayMetric {
+                            homeV2Surface(for: today)
                         } else {
-                            photoTimelineHUDEmptyState
+                            homeV2DayZero
                         }
+                    } else if bodyMetrics.isEmpty {
+                        photoTimelineHUDEmptyState
                     } else {
                         photoTimelineHUD
                     }
@@ -352,6 +324,10 @@ extension DashboardViewLiquid {
         case .menu:
             isShowingPhotoTimelineMenu = true
         case .stats:
+            if isHomeV2CheckIn {
+                openHomeV2Context()
+                return
+            }
             selectedPhotoTimelineRootPage = .analytics
             isHomeChatExpanded = false
             HapticManager.shared.selection()

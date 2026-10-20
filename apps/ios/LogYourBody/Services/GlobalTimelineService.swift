@@ -196,7 +196,7 @@ final class GlobalTimelineService {
         let directMetrics = bucketMetrics.filter { $0.bodyFatPercentage != nil }
         if let directValue = median(directMetrics.compactMap { $0.bodyFatPercentage }) {
             let includesVisualEstimate = directMetrics.contains {
-                $0.attributedBodyFatMethod == "visual_estimate"
+                $0.bodyFatMethod == "visual_estimate"
             }
             return GlobalTimelineMetricValue(
                 value: directValue,

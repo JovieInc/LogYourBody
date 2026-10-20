@@ -6,35 +6,6 @@ final class HomeV2PhotoViewerLayoutUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testPhotoViewerHoldScrubsAndResetsAfterToolsNavigation() {
-        let app = launch(holdScrub: true)
-        let stage = app.descendants(matching: .any)["home_v2_viewer_stage"]
-        let heading = app.staticTexts["home_v2_viewer_date"]
-        let selectedDate = heading.label
-        let mode = app.staticTexts["home_v2_viewer_scrub_mode"]
-        stage.press(forDuration: 1.3)
-        XCTAssertTrue(mode.waitForExistence(timeout: 5))
-        XCTAssertEqual(heading.label, selectedDate, "Activation must not jump to the finger's position")
-        let start = stage.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: stage.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.5)))
-        XCTAssertNotEqual(heading.label, selectedDate)
-        let scrubbedDate = heading.label
-        stage.press(forDuration: 1.3)
-        XCTAssertFalse(mode.exists)
-        XCTAssertEqual(heading.label, scrubbedDate, "Exiting scrub mode must retain the selected photo")
-        stage.press(forDuration: 1.3)
-        XCTAssertTrue(mode.waitForExistence(timeout: 5))
-        app.buttons["home_v2_viewer_tools"].tap()
-        app.buttons["home_v2_photo_tools_done"].tap()
-        XCTAssertFalse(mode.exists)
-        stage.press(forDuration: 1.3)
-        XCTAssertTrue(mode.waitForExistence(timeout: 5))
-        app.buttons["home_v2_viewer_close"].tap()
-        app.buttons["home_v2_photo_stage"].tap()
-        XCTAssertTrue(app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5))
-        XCTAssertFalse(mode.exists, "Reopening the viewer starts in normal photo mode")
-    }
-
     func testExpandedDetailsDisplaysTheFullComparisonDate() throws {
         let app = launch()
         app.buttons["home_v2_viewer_details"].tap()
@@ -134,14 +105,13 @@ final class HomeV2PhotoViewerLayoutUITests: XCTestCase {
         capture(app, named: "viewer-selected-date-after-ruler-and-collapse")
     }
 
-    private func launch(largestText: Bool = false, holdScrub: Bool = false) -> XCUIApplication {
+    private func launch(largestText: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
             "-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture", "-lybUITestSuppressWhatsNew",
             "-UIPreferredContentSizeCategoryName",
             largestText ? "UICTContentSizeCategoryAccessibilityXXXL" : "UICTContentSizeCategoryL"
         ]
-        if holdScrub { app.launchArguments.append("-lybUITestPhotoHoldScrub") }
         app.launch()
         let photo = app.descendants(matching: .any)["home_v2_photo_stage"]
         XCTAssertTrue(photo.waitForExistence(timeout: 30))

@@ -231,9 +231,10 @@ extension DashboardViewLiquid {
             return nil
         }
 
+        let calendar = Calendar.current
         let birthYear: Int?
         if let dateOfBirth = profile.dateOfBirth {
-            birthYear = ProfileBirthDatePolicy.year(from: dateOfBirth)
+            birthYear = calendar.component(.year, from: dateOfBirth)
         } else {
             birthYear = nil
         }

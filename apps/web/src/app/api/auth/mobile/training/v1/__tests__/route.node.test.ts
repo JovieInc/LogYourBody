@@ -177,287 +177,6 @@ describe('authenticated training API', () => {
     expect((await handlers.logSet(request('POST', 'log-set', 'token-b', set))).status).toBe(409);
   });
 
-  it('reorders before substituting and rejects stale current-card actions', async () => {
-    const { handlers } = makeHarness();
-    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
-    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const firstId = session.exercises[0].id;
-    const eventId = '22222222-2222-4222-8222-000000000001';
-    const reordered = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId,
-        expectedRevision: 0,
-        action: { kind: 'equipment_unavailable', exerciseId: firstId },
-      }),
-    );
-    expect(reordered.status).toBe(200);
-    const body = await reordered.json();
-    expect(body.decision).toBe('reordered');
-    expect(body.session.exercises.at(-1).id).toBe(firstId);
-    expect(body.session.executionRevision).toBe(1);
-
-    const retry = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId,
-        expectedRevision: 0,
-        action: { kind: 'equipment_unavailable', exerciseId: firstId },
-      }),
-    );
-    await expect(retry.json()).resolves.toMatchObject({
-      decision: 'reordered',
-      session: { executionRevision: 1 },
-    });
-
-    const stale = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '22222222-2222-4222-8222-000000000002',
-        expectedRevision: 0,
-        action: { kind: 'skip', exerciseId: firstId },
-      }),
-    );
-    expect(stale.status).toBe(409);
-    await expect(stale.json()).resolves.toMatchObject({ error: 'stale_revision' });
-
-    const staleCurrent = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '22222222-2222-4222-8222-000000000004',
-        expectedRevision: 1,
-        action: { kind: 'skip', exerciseId: firstId },
-      }),
-    );
-    expect(staleCurrent.status).toBe(409);
-    await expect(staleCurrent.json()).resolves.toMatchObject({
-      error: 'stale_current_exercise',
-    });
-
-    const ended = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '22222222-2222-4222-8222-000000000003',
-        expectedRevision: 1,
-        action: { kind: 'end' },
-      }),
-    );
-    expect(ended.status).toBe(200);
-    const endedRetry = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '22222222-2222-4222-8222-000000000003',
-        expectedRevision: 1,
-        action: { kind: 'end' },
-      }),
-    );
-    expect(endedRetry.status).toBe(200);
-    await expect(endedRetry.json()).resolves.toMatchObject({
-      decision: 'ended',
-      session: { id: session.id, executionRevision: 2 },
-    });
-    const next = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    expect(next.session.id).not.toBe(session.id);
-    expect(next.session).toMatchObject({ executionRevision: 0, executionEvents: [] });
-  });
-
-  it('uses only engine-eligible substitutions with no invented load after bounded shortening', async () => {
-    const { handlers } = makeHarness();
-    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
-    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const shortened = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '33333333-3333-4333-8333-000000000001',
-        expectedRevision: 0,
-        action: { kind: 'shorten', minutes: 5 },
-      }),
-    );
-    const shortenedBody = await shortened.json();
-    expect(shortenedBody.decision).toBe('shortened');
-    expect(shortenedBody.session.exercises).toHaveLength(1);
-    expect(shortenedBody.session.exercises[0].sets).toBe(1);
-
-    const original = shortenedBody.session.exercises[0];
-    const substituted = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '33333333-3333-4333-8333-000000000002',
-        expectedRevision: 1,
-        action: { kind: 'equipment_unavailable', exerciseId: original.id },
-      }),
-    );
-    expect(substituted.status).toBe(200);
-    const substitutedBody = await substituted.json();
-    expect(substitutedBody.decision).toBe('substituted');
-    expect(substitutedBody.session.exercises[0]).toMatchObject({
-      id: original.substitutions[0].id,
-      primaryMuscle: original.primaryMuscle,
-      targetLoadKg: null,
-      progression: 'hold',
-      sets: 1,
-    });
-    expect(substitutedBody.session.exercises[0].id).not.toBe(original.id);
-  });
-
-  it('fails closed when a persisted session injects an invalid substitution', async () => {
-    const { handlers, records } = makeHarness();
-    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
-    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const shortened = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '33333333-3333-4333-8333-000000000010',
-        expectedRevision: 0,
-        action: { kind: 'shorten', minutes: 5 },
-      }),
-    );
-    expect(shortened.status).toBe(200);
-    const rows = await records.pull('subject-a', 'training_sessions');
-    const row = rows.records.find((candidate) => candidate.id === session.id)!;
-    const prescription = row.prescription as typeof session;
-    const exercise = prescription.exercises[0];
-    await records.push('subject-a', 'training_sessions', [
-      {
-        ...row,
-        prescription: {
-          ...prescription,
-          exercises: [
-            {
-              ...exercise,
-              substitutions: [
-                {
-                  ...exercise.substitutions[0],
-                  id: 'unverified_shoulders_machine',
-                  name: 'Unverified shoulders machine',
-                  primaryMuscle: 'shoulders',
-                  targetLoadKg: 100,
-                },
-              ],
-            },
-          ],
-        },
-      },
-    ]);
-
-    const response = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '33333333-3333-4333-8333-000000000011',
-        expectedRevision: 1,
-        action: { kind: 'equipment_unavailable', exerciseId: exercise.id },
-      }),
-    );
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'no_eligible_substitution',
-    });
-  });
-
-  it('admits only one concurrent action for an execution revision', async () => {
-    const { handlers } = makeHarness();
-    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
-    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const responses = await Promise.all([
-      handlers.action(
-        request('POST', 'action', 'token-a', {
-          sessionId: session.id,
-          eventId: '66666666-6666-4666-8666-000000000001',
-          expectedRevision: 0,
-          action: { kind: 'pause' },
-        }),
-      ),
-      handlers.action(
-        request('POST', 'action', 'token-a', {
-          sessionId: session.id,
-          eventId: '66666666-6666-4666-8666-000000000002',
-          expectedRevision: 0,
-          action: { kind: 'shorten', minutes: 30 },
-        }),
-      ),
-    ]);
-    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
-    const next = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    expect(next.session.executionRevision).toBe(1);
-    expect(next.session.executionEvents).toHaveLength(1);
-  });
-
-  it('rejects an interruption decision if the current set changes before its atomic write', async () => {
-    const { handlers, records } = makeHarness();
-    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
-    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const update = records.updateTrainingSession.bind(records);
-    jest
-      .spyOn(records, 'updateTrainingSession')
-      .mockImplementationOnce(async (subject, id, revision, setCount, row) => {
-        await handlers.logSet(
-          request('POST', 'log-set', 'token-a', {
-            sessionId: session.id,
-            exerciseId: session.exercises[0].id,
-            setNumber: 1,
-            reps: 10,
-            loadKg: 20,
-            rir: 3,
-          }),
-        );
-        return update(subject, id, revision, setCount, row);
-      });
-    const response = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '77777777-7777-4777-8777-000000000001',
-        expectedRevision: 0,
-        action: {
-          kind: 'equipment_unavailable',
-          exerciseId: session.exercises[0].id,
-        },
-      }),
-    );
-    expect(response.status).toBe(409);
-    const next = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    expect(next.session.executionRevision).toBe(0);
-    expect(next.session.loggedSets).toHaveLength(1);
-    expect(next.session.exercises[0].id).toBe(session.exercises[0].id);
-  });
-
-  it('keeps situational events session-scoped and enters the pain safety path', async () => {
-    const { handlers } = makeHarness();
-    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
-    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const pain = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '44444444-4444-4444-8444-000000000001',
-        expectedRevision: 0,
-        action: { kind: 'pain', exerciseId: session.exercises[0].id },
-      }),
-    );
-    expect(pain.status).toBe(200);
-    await expect(pain.json()).resolves.toMatchObject({
-      decision: 'pain',
-      session: {
-        id: session.id,
-        safetyStop: true,
-        executionPaused: true,
-        executionEvents: [{ kind: 'pain', exerciseId: session.exercises[0].id }],
-      },
-    });
-    const resumed = await handlers.next(request('GET', 'next', 'token-a'));
-    await expect(resumed.json()).resolves.toMatchObject({
-      session: { id: session.id, safetyStop: true, executionRevision: 1 },
-    });
-    const ended = await handlers.action(
-      request('POST', 'action', 'token-a', {
-        sessionId: session.id,
-        eventId: '44444444-4444-4444-8444-000000000002',
-        expectedRevision: 1,
-        action: { kind: 'end' },
-      }),
-    );
-    expect(ended.status).toBe(200);
-    await expect(ended.json()).resolves.toMatchObject({ decision: 'ended' });
-  });
-
   it('keeps the first active-session set immutable across conflicts and delayed retries', async () => {
     const { handlers, records, setNow } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
@@ -491,60 +210,6 @@ describe('authenticated training API', () => {
       sessionComplete: false,
     });
     expect((await records.pull('subject-a', 'logged_sets')).records).toEqual([firstBody.log]);
-  });
-
-  it('corrects the same set identity once with an atomic audit trail', async () => {
-    const { handlers, records, setNow } = makeHarness();
-    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
-    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const set = {
-      sessionId: session.id,
-      exerciseId: session.exercises[0].id,
-      setNumber: 1,
-      reps: 10,
-      loadKg: 20,
-      rir: 2,
-    };
-    const logged = await (await handlers.logSet(request('POST', 'log-set', 'token-a', set))).json();
-    expect(logged.log).toMatchObject({ revision: 0, corrections: [] });
-    setNow('2026-01-10T12:01:00.000Z');
-    const correction = {
-      ...set,
-      reps: 9,
-      correctionId: '55555555-5555-4555-8555-000000000001',
-      expectedRevision: 0,
-    };
-    const corrected = await handlers.correctSet(
-      request('POST', 'correct-set', 'token-a', correction),
-    );
-    expect(corrected.status).toBe(200);
-    await expect(corrected.json()).resolves.toMatchObject({
-      log: {
-        id: logged.log.id,
-        reps: 9,
-        revision: 1,
-        corrections: [
-          {
-            id: correction.correctionId,
-            previous: { reps: 10, loadKg: 20, rir: 2 },
-          },
-        ],
-      },
-    });
-    const retry = await handlers.correctSet(request('POST', 'correct-set', 'token-a', correction));
-    expect(retry.status).toBe(200);
-    const stored = (await records.pull('subject-a', 'logged_sets')).records;
-    expect(stored).toHaveLength(1);
-    expect(stored[0].corrections).toHaveLength(1);
-    const stale = await handlers.correctSet(
-      request('POST', 'correct-set', 'token-a', {
-        ...correction,
-        correctionId: '55555555-5555-4555-8555-000000000002',
-        reps: 8,
-      }),
-    );
-    expect(stale.status).toBe(409);
-    expect((await records.pull('subject-a', 'logged_sets')).records[0].reps).toBe(9);
   });
 
   it.each([false, true])(
@@ -777,61 +442,6 @@ describe('authenticated training API', () => {
     expect(reopened.session.exercises[0].sets).toBe(2);
   });
 
-  it('accepts sparse native readiness observations and returns a typed next-set action', async () => {
-    const { handlers, records } = makeHarness();
-    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
-    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const response = await handlers.feedback(
-      request('POST', 'feedback', 'token-a', {
-        sessionId: session.id,
-        sourceObservationId: 'native-set-observation-1',
-        targetMuscle: 'back',
-        targetMuscleReadiness: 'ready',
-        breathingReadiness: 'limited',
-        context: {
-          exerciseId: 'one_arm_dumbbell_row',
-          setNumber: 2,
-          setOrder: 4,
-          loadKg: 25,
-          reps: 10,
-          rir: 2,
-          restSeconds: 120,
-          setFormat: 'straight',
-        },
-      }),
-    );
-    expect(response.status).toBe(201);
-    await expect(response.json()).resolves.toMatchObject({
-      feedback: {
-        source: 'touch',
-        sourceObservationId: 'native-set-observation-1',
-      },
-      nextSetRecommendation: {
-        scope: 'between_set',
-        action: 'extend_rest',
-        weeklyPlanChanged: false,
-        safetyCertified: false,
-      },
-    });
-    const saved = (await records.pull('subject-a', 'training_feedback')).records.find(
-      (row) => row.record_type === 'session_feedback',
-    );
-    expect(saved).toMatchObject({ source: 'touch', context: { setNumber: 2, rir: 2 } });
-    expect(saved).not.toHaveProperty('soreness');
-
-    const manualLog = await handlers.logSet(
-      request('POST', 'log-set', 'token-a', {
-        sessionId: session.id,
-        exerciseId: session.exercises[0].id,
-        setNumber: 1,
-        reps: 10,
-        loadKg: 15,
-        rir: 3,
-      }),
-    );
-    expect(manualLog.status).toBe(201);
-  });
-
   it('counts concurrent duplicate check-ins as one session of recovery evidence', async () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
@@ -1039,11 +649,13 @@ describe('authenticated training API', () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
     const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const update = records.updateTrainingSession.bind(records);
+    const push = records.push.bind(records);
     jest
-      .spyOn(records, 'updateTrainingSession')
-      .mockImplementation(async (subject, id, revision, setCount, row) =>
-        row.status === 'completed' ? null : update(subject, id, revision, setCount, row),
+      .spyOn(records, 'push')
+      .mockImplementation(async (subject, collection, rows) =>
+        rows.some((row) => row.status === 'completed')
+          ? { records: [], rejected_ids: rows.map((row) => String(row.id)) }
+          : push(subject, collection, rows),
       );
     let lastSet;
     let response;
@@ -1128,11 +740,13 @@ describe('authenticated training API', () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
     const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
-    const update = records.updateTrainingSession.bind(records);
+    const push = records.push.bind(records);
     const reject = jest
-      .spyOn(records, 'updateTrainingSession')
-      .mockImplementation(async (subject, id, revision, setCount, row) =>
-        row.status === 'completed' ? null : update(subject, id, revision, setCount, row),
+      .spyOn(records, 'push')
+      .mockImplementation(async (subject, collection, rows) =>
+        rows.some((row) => row.status === 'completed')
+          ? { records: [], rejected_ids: rows.map((row) => String(row.id)) }
+          : push(subject, collection, rows),
       );
     for (const exercise of session.exercises) {
       for (let setNumber = 1; setNumber <= exercise.sets; setNumber++) {

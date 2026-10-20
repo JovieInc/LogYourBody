@@ -1,31 +1,6 @@
 # LogYourBody Product Roadmap And Build Guardrails
 
-Last reconciled: 2026-10-16 (LYB-179)
-
-## October 16 supersession: current product behavior
-
-[LYB-173](https://linear.app/jovie/issue/LYB-173/p0-lyb-north-star-automatic-first-one-decision-coaching-and-living),
-dated October 14 and verified October 16, supersedes the timeline-first home and
-all-at-once first-run direction in the September 26 v1 roadmap preserved below.
-Observe permissioned reliable data automatically; foreground one credible
-goal-relative decision/action or earned win; keep steering, correction and
-historical detail reachable. Ask only for valuable missing information and use
-contextual, skippable onboarding. The deterministic engine still owns training
-prescriptions; privacy and safety constraints still apply.
-
-Existing first-run, ingestion, native design, coaching, release and coverage
-owners implement that staged contract. This reconciliation creates no second
-onboarding/home implementation or web expansion. Golden Path persistence,
-auth/paywall and reliability gates remain required regression coverage.
-
-The old activation and D7/D30 definitions below are **v1 cohort history**, not
-coaching activation. Use the [current funnel evidence contract](marketing/funnel-evidence-contract.md)
-for qualification and missing/mature evidence. A rendered insight is an anonymous
-occurrence, never inferred from calculation or navigation. Pro's current registry
-references are $9.99 monthly / $69.99 annual USD with a three-day trial; earlier
-premium-package proposals are not configured offers. Live terms require receipts.
-
-## September 26 roadmap — preserved v1 history
+Last updated: 2026-09-26
 
 ## Operating Principle
 

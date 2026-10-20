@@ -108,7 +108,7 @@ describe('ExperimentWaitlistLanding', () => {
         }),
       }),
     );
-    expect(await screen.findByText('Your early-access request was received.')).toBeInTheDocument();
+    expect(await screen.findByText(/you're on the list/i)).toBeInTheDocument();
   });
 
   it('shows validation feedback without attempting a request', () => {

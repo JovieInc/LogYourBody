@@ -39,7 +39,7 @@ struct SecondaryMetricsRow: View {
                         )
                     },
                     footnote: nil
-                )) : .empty(title: "Steps", message: "No data", action: nil)
+                )) : .empty(message: "No data", action: nil)
             )
 
             // FFMI - Tappable
@@ -71,7 +71,7 @@ struct SecondaryMetricsRow: View {
                             },
                             footnote: nil
                         ))
-                    } ?? .empty(title: "FFMI", message: "No data", action: nil),
+                    } ?? .empty(message: "No data", action: nil),
                     isButtonContext: true
                 )
                 .scaleEffect(displayMode == .ffmiChart ? 1.05 : 1.0)
@@ -103,7 +103,7 @@ struct SecondaryMetricsRow: View {
                         },
                         footnote: nil
                     ))
-                } ?? .empty(title: "Lean mass", message: "No data", action: nil)
+                } ?? .empty(message: "No data", action: nil)
             )
         }
         .padding(.horizontal, 20)

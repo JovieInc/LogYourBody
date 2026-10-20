@@ -8,29 +8,6 @@
 import SwiftUI
 import Charts
 
-enum MetricCardIdentityPolicy {
-    static let gateKey = "metric_card_identity_v1"
-
-    @MainActor
-    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
-        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
-        return checkGate(gateKey)
-    }
-}
-
-#if DEBUG
-private struct MetricCardIdentityKey: EnvironmentKey {
-    static let defaultValue: Bool? = nil
-}
-
-extension EnvironmentValues {
-    var metricCardIdentity: Bool? {
-        get { self[MetricCardIdentityKey.self] }
-        set { self[MetricCardIdentityKey.self] = newValue }
-    }
-}
-#endif
-
 // MARK: - MetricSummaryCard Organism
 
 /// Apple Health-style metric card with inline chart, states, and accessibility support.
@@ -61,22 +38,6 @@ public struct MetricSummaryCard: View {
             self.direction = direction
             self.valueText = valueText
             self.caption = caption
-        }
-
-        var accessibilityDescription: String {
-            let description: String
-            switch direction {
-            case .up:
-                description = "Up \(valueText)"
-            case .down:
-                description = "Down \(valueText)"
-            case .flat:
-                description = valueText.isEmpty || valueText == "No change"
-                    ? "No change"
-                    : "No change \(valueText)"
-            }
-            guard let caption, !caption.isEmpty else { return description }
-            return "\(description), \(caption)"
         }
     }
 
@@ -125,9 +86,9 @@ public struct MetricSummaryCard: View {
     }
 
     public enum State {
-        case loading(title: String)
-        case empty(title: String, message: String, action: CardAction?)
-        case error(title: String, message: String, action: CardAction?)
+        case loading
+        case empty(message: String, action: CardAction?)
+        case error(message: String, action: CardAction?)
         case data(Content)
     }
 
@@ -147,16 +108,6 @@ public struct MetricSummaryCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.theme) private var theme
-    #if DEBUG
-    @Environment(\.metricCardIdentity) private var identityOverride
-    #endif
-
-    private var identityEnabled: Bool {
-        #if DEBUG
-        if let identityOverride { return identityOverride }
-        #endif
-        return MetricCardIdentityPolicy.isEnabled()
-    }
 
     @ScaledMetric(relativeTo: .largeTitle) private var valueFontSize: CGFloat = 44
     @ScaledMetric(relativeTo: .title3) private var unitFontSize: CGFloat = 18
@@ -203,7 +154,7 @@ public struct MetricSummaryCard: View {
                     .font(.system(size: headerIconSize, weight: .semibold))
                     .foregroundStyle(accentColor)
 
-                Text(titleText(identityEnabled: identityEnabled))
+                Text(titleText)
                     .font(.system(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(primaryTextColor)
                     .lineLimit(1)
@@ -228,7 +179,7 @@ public struct MetricSummaryCard: View {
         switch state {
         case .loading:
             return AnyView(loadingView())
-        case .empty(_, let message, let action):
+        case .empty(let message, let action):
             return AnyView(
                 messageView(
                     message: message,
@@ -236,7 +187,7 @@ public struct MetricSummaryCard: View {
                     iconName: "plus"
                 )
             )
-        case .error(_, let message, let action):
+        case .error(let message, let action):
             return AnyView(
                 messageView(
                     message: message,
@@ -250,12 +201,12 @@ public struct MetricSummaryCard: View {
         }
     }
 
-    func titleText(identityEnabled: Bool) -> String {
+    private var titleText: String {
         switch state {
         case .data(let content):
             return content.title
-        case .loading(let title), .empty(let title, _, _), .error(let title, _, _):
-            return identityEnabled ? title : "Metric"
+        default:
+            return "".isEmpty ? "Metric" : "Metric"
         }
     }
 
@@ -483,7 +434,7 @@ public struct MetricSummaryCard: View {
         switch state {
         case .data:
             return true
-        case .empty(_, _, let action), .error(_, _, let action):
+        case .empty(_, let action), .error(_, let action):
             return action != nil || isButtonContext
         case .loading:
             return false
@@ -556,29 +507,20 @@ public struct MetricSummaryCard: View {
     }
 
     private var accessibilityLabel: String {
-        accessibilityLabel(identityEnabled: identityEnabled)
-    }
-
-    func accessibilityLabel(identityEnabled: Bool) -> String {
         switch state {
-        case .loading(let title):
-            return identityEnabled ? "Loading \(title)" : "Loading metric"
-        case .empty(let title, let message, _):
-            return identityEnabled ? "\(title), \(message)" : "No data"
-        case .error(let title, let message, _):
-            return identityEnabled ? "\(title), \(message)" : "Metric unavailable"
+        case .loading:
+            return "Loading metric"
+        case .empty:
+            return "No data"
+        case .error:
+            return "Metric unavailable"
         case .data(let content):
             var components: [String] = [content.title, content.value + (content.unit.isEmpty ? "" : " " + content.unit)]
             if let trend = content.trend {
-                components.append(trend.accessibilityDescription)
+                components.append(trendAccessibilityText(trend))
             }
             if let timestamp = content.timestamp {
                 components.append("Updated \(timestamp)")
-            }
-            if identityEnabled {
-                for detail in [content.chartAccessibilityLabel, content.chartAccessibilityValue, content.footnote] {
-                    if let detail, !detail.isEmpty, !components.contains(detail) { components.append(detail) }
-                }
             }
             return components.joined(separator: ", ")
         }
@@ -588,12 +530,23 @@ public struct MetricSummaryCard: View {
         switch state {
         case .loading:
             return ""
-        case .empty(_, _, let action):
+        case .empty(_, let action):
             return action == nil ? nil : "Double tap to add data"
-        case .error(_, _, let action):
+        case .error(_, let action):
             return action == nil ? nil : "Double tap to retry"
         case .data:
             return isButtonContext ? "Double tap for details" : nil
+        }
+    }
+
+    private func trendAccessibilityText(_ trend: Trend) -> String {
+        switch trend.direction {
+        case .up:
+            return "Up \(trend.valueText)"
+        case .down:
+            return "Down \(trend.valueText)"
+        case .flat:
+            return "No change \(trend.valueText)"
         }
     }
 }
@@ -640,14 +593,13 @@ struct MetricCardButtonStyle: ButtonStyle {
             MetricSummaryCard(
                 icon: "figure.stand",
                 accentColor: Color.linearPurple,
-                state: .loading(title: "Weight")
+                state: .loading
             )
 
             MetricSummaryCard(
                 icon: "percent",
                 accentColor: Color.appPrimary,
                 state: .empty(
-                    title: "Body fat",
                     message: "Log your body fat to see trends and insights.",
                     action: MetricSummaryCard.CardAction(title: "Add measurement", handler: {})
                 )
@@ -657,7 +609,6 @@ struct MetricCardButtonStyle: ButtonStyle {
                 icon: "figure.arms.open",
                 accentColor: Color.metricAccentBodyFat,
                 state: .error(
-                    title: "FFMI",
                     message: "We couldn’t load FFMI data.",
                     action: MetricSummaryCard.CardAction(title: "Retry", handler: {})
                 )

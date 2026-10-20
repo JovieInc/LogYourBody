@@ -143,11 +143,7 @@ async function filePlan(plan, apiKey) {
     apiKey,
     body: plan.comment,
   });
-  if (!comment.ok) {
-    console.warn(
-      `CODEOWNERS issue upsert succeeded; comment failed: ${comment.reason || 'linear_comment_create_failed'}`,
-    );
-  }
+  if (!comment.ok) return comment;
   return upserted;
 }
 

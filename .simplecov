@@ -2,10 +2,9 @@
 SimpleCov.configure do
   filters.clear
   skip do |file|
-    !file.filename.end_with?('/.github/scripts/await-runner-heartbeat.sh', '/.github/scripts/query-runner-heartbeat.sh', '/.github/scripts/mac-lane.sh', '/coverage/mac-runner-routing/ios-quality-dispatch-guard.sh')
+    !file.filename.end_with?('/.github/scripts/await-runner-heartbeat.sh', '/.github/scripts/query-runner-heartbeat.sh', '/.github/scripts/mac-lane.sh')
   end
-  cover '.github/scripts/{await-runner-heartbeat,query-runner-heartbeat,mac-lane}.sh',
-        'coverage/mac-runner-routing/ios-quality-dispatch-guard.sh'
+  cover '.github/scripts/{await-runner-heartbeat,query-runner-heartbeat,mac-lane}.sh'
   coverage_dir 'coverage/mac-runner-routing'
   coverage(:line) { minimum 80, per: :file }
 end

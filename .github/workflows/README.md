@@ -18,15 +18,13 @@ Primary pull request workflow for `main`.
 
 ## `ios-post-merge-quality.yml`
 
-Launch Quality for `main` after merge, on the latest SHA only (`cancel-in-progress`). It checks iOS inputs changed since the newest SHA this workflow verified (`detect-changes.sh` with that base), so a run cancelled by a newer push is still covered. That supersede skips Report, so the check stays neutral; a manual cancel of the newest commit still fails Report. A failure is retried once. A second failure opens or updates the `post-merge-lq-red` issue (`.github/scripts/post-merge-quality-report.sh`, tested by `post-merge-quality.test.mjs`), and the next passing SHA closes it. There is no auto-revert: Launch Quality failed in 15% of merge groups over 2026-10-06..13, nearly all timeouts and recurring flakes.
-
-A cancelled first attempt with a skipped retry leaves Report green only when the live `main` ref differs from the run's SHA. It leaves the hold issue untouched; the cancelled quality job keeps the workflow cancelled, so the SHA is not selected as a verified base. Cancellation at the current main tip, an unreadable or malformed main ref, and any failure without a passing retry still fail closed.
+Launch Quality for `main` after merge, on the latest SHA only (`cancel-in-progress`). It checks iOS inputs changed since the newest SHA this workflow verified (`detect-changes.sh` with that base), so a run cancelled by a newer push is still covered. A failure is retried once. A second failure opens or updates the `post-merge-lq-red` issue (`.github/scripts/post-merge-quality-report.sh`, tested by `post-merge-quality.test.mjs`), and the next passing SHA closes it. There is no auto-revert: Launch Quality failed in 15% of merge groups over 2026-10-06..13, nearly all timeouts and recurring flakes.
 
 ## Merge Queue Auto-Land
 
 `main` uses GitHub's native merge queue (ruleset "Main - Protect", `ALLGREEN`, `MERGE`, required check `CI Summary`, 60-minute check timeout). Two secret-boundaried workflows make landing hands-off:
 
-1. **`native-merge-queue.yml` — enrollment.** After `CI` completes on a same-repo, non-draft PR (or when a draft is marked ready), it enqueues the PR at its exact green head with `enqueuePullRequest`. When the queue drops a PR (`dequeued`) whose head is unchanged and green, it re-enqueues it if the removal was a check timeout or the head's first failed merge group; a second failed group at one head is a poison and stays out for the lanes repair owner, and manual or merge-conflict removals are left alone. A changes-requested or missing-approval `UNPROCESSABLE` refusal is `NOT_ELIGIBLE` (`::notice`, exit 0). Known merge-conflict or not-mergeable `UNPROCESSABLE` refusals (including combinations with review blockers) record `NOT_MERGEABLE` in a notice and job summary with the CI head and GitHub details, leaving rebase or repair to the PR's lane. Draft, permission, unexpected, and mixed responses containing any unknown error still fail the job. It runs in the pull-request-triggered context, so it must never checkout code or receive secrets (`.github/scripts/verify-merge-queue-policy.mjs` enforces this). The enrollment script is inline; this workflow does not call a helper.
+1. **`native-merge-queue.yml` — enrollment.** After `CI` completes on a same-repo, non-draft PR (or when a draft is marked ready), it enqueues the PR at its exact green head with `enqueuePullRequest`. When the queue drops a PR (`dequeued`) whose head is unchanged and green, it re-enqueues it if the removal was a check timeout or the head's first failed merge group; a second failed group at one head is a poison and stays out for the lanes repair owner, and manual or merge-conflict removals are left alone. It runs in the pull-request-triggered context, so it must never checkout code or receive secrets (`.github/scripts/verify-merge-queue-policy.mjs` enforces this).
 2. **`merge-queue-token-enrollment.yml` — token re-enqueue.** GitHub creates no workflow runs for events caused by `GITHUB_TOKEN`, and the queue only honours checks from the `merge_group` event's own run, so a bot-owned entry never gets merge-group CI and times out. After enrollment completes (`workflow_run`), this job dequeues bot-owned entries and re-enqueues them with the machine-user secret `MERGE_QUEUE_TOKEN` after re-proving `CI Summary` on the exact head. It never checks out code and never runs on pull-request events; without the secret it is a no-op.
 
 `ALLGREEN` batches every queued entry, so one bot-owned entry blocks the batch. Manual recovery while the secret is absent: `gh pr merge <n> --merge --auto` with a user token (a user-token enqueue starts merge-group CI natively); a stuck entry can be removed with the `dequeuePullRequest` mutation first. While the secret is absent the Jovie lanes LYB binding does this automatically: it re-enqueues green bot-owned entries and dropped green PRs with its user token.
@@ -89,14 +87,6 @@ Reusable/manual web release loop. This is no longer the automatic main-branch re
 ### `ios-release-loop.yml`
 
 Reusable/manual iOS release loop for TestFlight/App Store release paths.
-
-### `app-store-metadata-sync.yml`
-
-Uploads committed Fastlane metadata to App Store version 1.2.0 with deliver (`skip_binary_upload`, no screenshots, no submit, no build attach). deliver skips What's New on the first version. The job still tries to write that field from the committed release notes. Apple's rejection of `whatsNew` on the only iOS version is a warning, not a failure. That same rejection fails the job once a second version exists. It runs on a push to `main` that changes this workflow or `apps/ios/fastlane/metadata/**`.
-
-### `app-store-connect-readiness.yml`
-
-Read-only App Store Connect check for version 1.2.0. It runs on a push to `main` that changes this workflow, the readiness script, or Fastlane metadata, daily at 16:00 UTC, on `workflow_dispatch`, and after `app-store-metadata-sync.yml` succeeds. It reports version state, whether the newest TestFlight upload is processed and selectable, whether both pro1 subscriptions are Ready to Submit or already attached, and whether storefront metadata matches the committed manifest. What's New is N/A when no iOS version was previously released, and FAILs when a prior live version's text differs. It does not submit, attach a build, or write metadata.
 
 ### `ios-testflight-deploy.yml`
 

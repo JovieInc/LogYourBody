@@ -64,7 +64,7 @@ on:
           - alpha
           - beta
           - production
-        default: alpha
+        default: production
       build_number:
         description: 'Already-uploaded CFBundleVersion to wait on and distribute'
         required: true
@@ -124,18 +124,15 @@ jobs:
       run: |
         case "${{ inputs.distribution_group }}" in
           alpha)
-            echo "TESTFLIGHT_GROUPS=Alpha" >> $GITHUB_ENV
-            echo "TESTFLIGHT_DISTRIBUTE_EXTERNAL=false" >> $GITHUB_ENV
+            echo "TESTFLIGHT_GROUPS=Internal Testers,Alpha Testers" >> $GITHUB_ENV
             echo "TESTFLIGHT_BETA_APP_REVIEW=false" >> $GITHUB_ENV
             ;;
           beta)
             echo "TESTFLIGHT_GROUPS=Beta Testers" >> $GITHUB_ENV
-            echo "TESTFLIGHT_DISTRIBUTE_EXTERNAL=true" >> $GITHUB_ENV
             echo "TESTFLIGHT_BETA_APP_REVIEW=true" >> $GITHUB_ENV
             ;;
           production)
             echo "TESTFLIGHT_GROUPS=Production Testers" >> $GITHUB_ENV
-            echo "TESTFLIGHT_DISTRIBUTE_EXTERNAL=true" >> $GITHUB_ENV
             echo "TESTFLIGHT_BETA_APP_REVIEW=true" >> $GITHUB_ENV
             echo "SUBMIT_FOR_REVIEW=true" >> $GITHUB_ENV
             ;;
@@ -292,7 +289,6 @@ jobs:
         bundle exec fastlane upload_testflight \
           ipa_path:"$IPA_PATH" \
           groups:"$TESTFLIGHT_GROUPS" \
-          distribute_external:"$TESTFLIGHT_DISTRIBUTE_EXTERNAL" \
           changelog_file:"$CHANGELOG_PATH" \
           skip_waiting_for_build_processing:true
       env:
@@ -325,7 +321,6 @@ jobs:
 
         bundle exec fastlane distribute_testflight \
           groups:"$TESTFLIGHT_GROUPS" \
-          distribute_external:"$TESTFLIGHT_DISTRIBUTE_EXTERNAL" \
           changelog_file:"$CHANGELOG_PATH" \
           version_name:"$VERSION_NAME" \
           build_number:"$BUILD_NUMBER"

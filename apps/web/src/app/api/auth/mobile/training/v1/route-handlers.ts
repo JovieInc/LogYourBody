@@ -10,19 +10,13 @@ import {
   isTrainingRecordCollection,
   type NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import {
-  applyWorkoutAction,
-  correctTrainingSet,
-  logTrainingSet,
-  recordTrainingFeedback,
-  swapExercise,
-} from '@/lib/training/commands';
+import { logTrainingSet, recordTrainingFeedback, swapExercise } from '@/lib/training/commands';
 import {
   getOrCreateNextWorkout,
   pullAllTrainingRecords,
   storeProgramSetup,
 } from '@/lib/training/service';
-import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from '@/lib/training/types';
+import { TRAINING_CONSENT_VERSION } from '@/lib/training/types';
 
 export const TRAINING_API_VERSION = 1;
 
@@ -46,108 +40,13 @@ const LogSetBodySchema = z
   })
   .strict();
 
-const FeedbackScoreSchema = z.number().int().min(0).max(10);
-const ReadinessSchema = z.enum(['ready', 'limited', 'unknown']);
-const MuscleFeedbackSchema = z
-  .object({
-    soreness: FeedbackScoreSchema.optional(),
-    recovery: ReadinessSchema.optional(),
-    pump: FeedbackScoreSchema.optional(),
-    workload: z.enum(['below_expected', 'as_expected', 'above_expected']).optional(),
-    performance: z.enum(['up', 'stable', 'down']).optional(),
-  })
-  .strict()
-  .refine((value) => Object.values(value).some((item) => item !== undefined));
-
-const CorrectSetBodySchema = LogSetBodySchema.extend({
-  correctionId: z.string().uuid(),
-  expectedRevision: z.number().int().min(0),
-}).strict();
-
 const FeedbackBodySchema = z
   .object({
     sessionId: z.string().uuid(),
-    soreness: FeedbackScoreSchema.optional(),
-    pump: FeedbackScoreSchema.optional(),
-    performance: z.enum(['up', 'stable', 'down']).optional(),
-    jointPain: FeedbackScoreSchema.optional(),
-    muscles: z.partialRecord(z.enum(MUSCLE_GROUPS), MuscleFeedbackSchema).optional(),
-    targetMuscle: z.enum(MUSCLE_GROUPS).optional(),
-    targetMuscleReadiness: ReadinessSchema.optional(),
-    breathingReadiness: ReadinessSchema.optional(),
-    generalReadiness: ReadinessSchema.optional(),
-    supportingReadiness: z
-      .object({
-        grip: ReadinessSchema.optional(),
-        trunk: ReadinessSchema.optional(),
-        muscles: z.partialRecord(z.enum(MUSCLE_GROUPS), ReadinessSchema).optional(),
-      })
-      .strict()
-      .optional(),
-    trunkFatigue: FeedbackScoreSchema.optional(),
-    generalExhaustion: FeedbackScoreSchema.optional(),
-    symptomFlags: z
-      .array(z.enum(['pain', 'neurologic', 'other_concerning']))
-      .min(1)
-      .max(3)
-      .optional(),
-    symptomNote: z.string().trim().min(1).max(500).optional(),
-    originalStatement: z.string().trim().min(1).max(1_000).optional(),
-    transcriptionUncertain: z.boolean().optional(),
-    interpretations: z
-      .array(
-        z
-          .object({
-            claim: z.enum([
-              'goal_preference',
-              'self_assessed_development',
-              'performance',
-              'tolerability',
-              'symptom',
-              'recovery',
-              'pump',
-              'causal_hypothesis',
-              'dose_history',
-            ]),
-            timeframe: z.enum(['current', 'historical']),
-            confidence: z.enum(['low', 'moderate', 'high']),
-            corroboratesObservationIds: z
-              .array(z.string().trim().min(1).max(160))
-              .min(1)
-              .max(20)
-              .optional(),
-            conflictsWithObservationIds: z
-              .array(z.string().trim().min(1).max(160))
-              .min(1)
-              .max(20)
-              .optional(),
-            proposedExplanation: z.string().trim().min(1).max(500).optional(),
-          })
-          .strict(),
-      )
-      .min(1)
-      .max(8)
-      .optional(),
-    source: z.enum(['touch', 'voice', 'text', 'import', 'unknown']).optional(),
-    observedAt: z.string().datetime().optional(),
-    sourceObservationId: z.string().trim().min(1).max(160).optional(),
-    correctsObservationId: z.string().trim().min(1).max(160).optional(),
-    context: z
-      .object({
-        exerciseId: z.string().trim().min(1).max(80).optional(),
-        setId: z.string().trim().min(1).max(160).optional(),
-        setNumber: z.number().int().min(1).max(50).optional(),
-        setOrder: z.number().int().min(1).max(50).optional(),
-        reps: z.number().int().min(0).max(100).optional(),
-        loadKg: z.number().finite().min(0).max(500).nullable().optional(),
-        rir: z.number().int().min(0).max(6).optional(),
-        restSeconds: z.number().int().min(0).max(3600).optional(),
-        setup: z.string().trim().min(1).max(160).optional(),
-        rangeOfMotion: z.enum(['full', 'partial', 'unknown']).optional(),
-        setFormat: z.literal('straight').optional(),
-      })
-      .strict()
-      .optional(),
+    soreness: z.number().int().min(0).max(10),
+    pump: z.number().int().min(0).max(10),
+    performance: z.enum(['up', 'stable', 'down']),
+    jointPain: z.number().int().min(0).max(10),
   })
   .strict();
 
@@ -161,25 +60,6 @@ const SwapBodySchema = z
     excludedConcerns: z.array(z.string().trim().min(1).max(48)).max(16).optional(),
     preferTorsoSupport: z.boolean().optional(),
     maxTrunkDemand: z.enum(['low', 'moderate', 'high']).optional(),
-  })
-  .strict();
-
-const WorkoutActionBodySchema = z
-  .object({
-    sessionId: z.string().uuid(),
-    eventId: z.string().uuid(),
-    expectedRevision: z.number().int().min(0),
-    action: z.discriminatedUnion('kind', [
-      z
-        .object({ kind: z.literal('equipment_unavailable'), exerciseId: z.string().min(1).max(64) })
-        .strict(),
-      z.object({ kind: z.literal('shorten'), minutes: z.number().int().min(5).max(180) }).strict(),
-      z.object({ kind: z.literal('skip'), exerciseId: z.string().min(1).max(64) }).strict(),
-      z.object({ kind: z.literal('pain'), exerciseId: z.string().min(1).max(64) }).strict(),
-      z.object({ kind: z.literal('pause') }).strict(),
-      z.object({ kind: z.literal('resume') }).strict(),
-      z.object({ kind: z.literal('end') }).strict(),
-    ]),
   })
   .strict();
 
@@ -468,111 +348,22 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       const parsed = FeedbackBodySchema.safeParse(await request.json().catch(() => null));
       if (!parsed.success) return apiError('invalid_request', 400);
       try {
-        const now = dependencies.now();
         const result = await recordTrainingFeedback({
           records: dependencies.records,
           subject: identity.sub,
-          now,
+          now: dependencies.now(),
           createId: dependencies.createId,
-          feedback: {
-            ...parsed.data,
-            source: parsed.data.source ?? 'touch',
-            observedAt: parsed.data.observedAt ?? now.toISOString(),
-          },
+          feedback: parsed.data,
         });
         switch (result.kind) {
           case 'recorded':
-            return json(
-              withVersion({
-                feedback: result.feedback,
-                nextSetRecommendation: result.recommendation,
-              }),
-              201,
-            );
+            return json(withVersion({ feedback: result.feedback }), 201);
           case 'program_not_enrolled':
             return apiError('program_not_enrolled', 409);
           case 'session_not_found':
             return apiError('session_not_found', 404);
           case 'invalid':
             return apiError('invalid_request', 400);
-          case 'rejected':
-            return apiError('training_unavailable', 503);
-        }
-      } catch (error) {
-        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
-          return apiError(error.code, 409);
-        return apiError('training_unavailable', 503);
-      }
-    },
-
-    async correctSet(request: NextRequest) {
-      const identity = await authorized(request);
-      if (!identity) return apiError('unauthorized', 401);
-      if (!featureEnabled()) return apiError('not_found', 404);
-      const denied = await allowed(identity.sub);
-      if (denied) return denied;
-      const parsed = CorrectSetBodySchema.safeParse(await request.json().catch(() => null));
-      if (!parsed.success) return apiError('invalid_request', 400);
-      try {
-        const result = await correctTrainingSet({
-          records: dependencies.records,
-          subject: identity.sub,
-          now: dependencies.now(),
-          set: { ...parsed.data, loadKg: parsed.data.loadKg ?? null },
-        });
-        switch (result.kind) {
-          case 'corrected':
-            return json(withVersion({ log: result.log }));
-          case 'program_not_enrolled':
-            return apiError('program_not_enrolled', 409);
-          case 'session_not_found':
-            return apiError('session_not_found', 404);
-          case 'set_not_found':
-            return apiError('set_not_found', 404);
-          case 'set_not_in_session':
-            return apiError('set_not_in_session', 400);
-          case 'set_conflict':
-            return apiError('set_conflict', 409);
-          case 'rejected':
-            return apiError('training_unavailable', 503);
-        }
-      } catch (error) {
-        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
-          return apiError(error.code, 409);
-        return apiError('training_unavailable', 503);
-      }
-    },
-
-    async action(request: NextRequest) {
-      const identity = await authorized(request);
-      if (!identity) return apiError('unauthorized', 401);
-      if (!featureEnabled()) return apiError('not_found', 404);
-      const denied = await allowed(identity.sub);
-      if (denied) return denied;
-      const parsed = WorkoutActionBodySchema.safeParse(await request.json().catch(() => null));
-      if (!parsed.success) return apiError('invalid_request', 400);
-      try {
-        const result = await applyWorkoutAction({
-          records: dependencies.records,
-          subject: identity.sub,
-          now: dependencies.now(),
-          ...parsed.data,
-        });
-        switch (result.kind) {
-          case 'updated':
-            return json(withVersion({ decision: result.decision, session: result.session }));
-          case 'program_not_enrolled':
-            return apiError('program_not_enrolled', 409);
-          case 'session_not_found':
-            return apiError('session_not_found', 404);
-          case 'session_not_active':
-            return apiError('session_not_active', 409);
-          case 'stale_revision':
-            return apiError('stale_revision', 409);
-          case 'stale_current_exercise':
-            return apiError('stale_current_exercise', 409);
-          case 'no_eligible_substitution':
-            return apiError('no_eligible_substitution', 409);
           case 'rejected':
             return apiError('training_unavailable', 503);
         }

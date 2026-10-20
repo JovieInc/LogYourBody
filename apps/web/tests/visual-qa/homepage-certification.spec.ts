@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// Exercise the canonical Jovie control geometry and intercepted waitlist responses.
+// Run with NEXT_PUBLIC_LYB_LANDING_ART_DIRECTION_V2=1 to certify the gated
+// public design, and without it to exercise the rollback form.
 test('homepage conversion preserves geometry across response states', async ({ page }) => {
   test.setTimeout(120_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -37,23 +38,11 @@ test('homepage conversion preserves geometry across response states', async ({ p
           page.locator('#waitlist-status').boundingBox(),
         ]);
       const before = await geometry();
-      expect(before[1]!.height).toBeGreaterThanOrEqual(28);
-      expect(
-        await button.evaluate((node) => parseFloat(getComputedStyle(node, '::before').height)),
-      ).toBeGreaterThanOrEqual(44);
-      // Prove the invisible target is interactive outside the compact visible face.
-      const hit = before[1]!;
-      await page.mouse.click(hit.x + hit.width / 2, hit.y - 4);
-      await expect(
-        page.getByRole('alert').filter({ hasText: 'Enter a valid email' }),
-      ).toBeVisible();
+      expect(before[1]!.height).toBeGreaterThanOrEqual(44);
       await expect(button).toHaveCSS('font-weight', '510');
       expect(
-        await button
-          .locator('span')
-          .first()
-          .evaluate((node) => node.getBoundingClientRect().height),
-      ).toBeGreaterThanOrEqual(16);
+        await button.locator('span').evaluate((node) => node.getBoundingClientRect().height),
+      ).toBe(32);
       await email.fill('');
       await button.click();
       await expect(
@@ -64,18 +53,17 @@ test('homepage conversion preserves geometry across response states', async ({ p
       const request = page.waitForRequest('**/api/waitlist');
       await button.click();
       await request;
-      await expect(button).toBeDisabled();
-      await expect(button).toHaveAttribute('data-state', 'loading');
+      await expect(page.getByRole('button', { name: 'Joining…' })).toBeDisabled();
       expect(await geometry()).toEqual(before);
       await expect.poll(() => Boolean(finishResponse)).toBe(true);
       finishResponse!();
       finishResponse = undefined;
       await expect(page.locator('#waitlist-status')).not.toBeEmpty();
-      await expect(button).not.toHaveAttribute('data-state', 'loading');
+      await expect(page.getByRole('button', { name: 'Joining…' })).toHaveCount(0);
       expect(await geometry()).toEqual(before);
       await expect(page.locator('#waitlist-status p')).toHaveCSS(
         'color',
-        outcome === 202 ? 'rgb(215, 220, 232)' : 'rgb(245, 247, 251)',
+        outcome === 202 ? 'rgb(17, 175, 255)' : 'rgb(255, 103, 125)',
       );
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,

@@ -458,28 +458,6 @@ extension CachedDexaResult {
 // MARK: - Model Extensions for Conversion
 
 extension CachedBodyMetrics {
-    /// Keep metadata decoding and Core Data faulting bounded on the view context's queue.
-    @MainActor
-    static func bodyMetricsInBatches(from cachedMetrics: [CachedBodyMetrics]) async -> [BodyMetrics] {
-        let batchSize = 50
-        var metrics: [BodyMetrics] = []
-        metrics.reserveCapacity(cachedMetrics.count)
-
-        for start in stride(from: 0, to: cachedMetrics.count, by: batchSize) {
-            let end = min(start + batchSize, cachedMetrics.count)
-            metrics.append(contentsOf: cachedMetrics[start..<end].compactMap { $0.toBodyMetrics() })
-
-            if end < cachedMetrics.count {
-                // Enqueue the continuation so pending main-queue work can run between batches.
-                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                    DispatchQueue.main.async { continuation.resume() }
-                }
-            }
-        }
-
-        return metrics
-    }
-
     func pendingSyncItem() -> PendingBodyMetricSyncItem {
         let date = date ?? Date()
         return PendingBodyMetricSyncItem(

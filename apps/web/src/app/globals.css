@@ -1,6 +1,5 @@
 @import 'tailwindcss';
 @import '../../../../packages/design-tokens/web/jovie-typography.css';
-@import '../../../../packages/design-tokens/web/jovie-marketing.css';
 
 @config '../../tailwind.config.ts';
 

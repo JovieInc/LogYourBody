@@ -122,8 +122,7 @@ struct HomeV2SidebarView: View {
             .frame(maxHeight: .infinity)
             .background(HomeV2Tokens.Colors.shell)
         }
-        // Observe dismissal swipes without giving the drawer priority over row buttons.
-        .simultaneousGesture(
+        .highPriorityGesture(
             DragGesture(minimumDistance: 30).onEnded { value in
                 if value.translation.width < -60, abs(value.translation.width) > abs(value.translation.height) {
                     onClose()

@@ -20,9 +20,7 @@ protocol ErrorTrackingVendor {
     )
 }
 
-// The vendor reference is immutable; every vendor operation is confined to
-// the main thread by withVendorOnMain, including calls from concurrent reporters.
-final class ErrorTrackingService: @unchecked Sendable {
+final class ErrorTrackingService {
     static let shared = ErrorTrackingService()
 
     enum BreadcrumbLevel {
@@ -41,62 +39,43 @@ final class ErrorTrackingService: @unchecked Sendable {
     }
 
     func start() {
-        withVendorOnMain { $0.start() }
+        vendor.start()
     }
 
     func capture(appError: AppError, context: ErrorContext) {
-        withVendorOnMain { vendor in
-            vendor.setTag(value: context.feature, key: "feature")
-            if let operation = context.operation {
-                vendor.setTag(value: operation, key: "operation")
-            }
-            if let screen = context.screen {
-                vendor.setTag(value: screen, key: "screen")
-            }
-            if context.userId != nil {
-                vendor.setTag(value: ErrorTrackingRedactor.filteredValue, key: "userId")
-            }
-
-            let description = String(describing: appError)
-            vendor.setExtra(value: ErrorTrackingRedactor.sanitize(description), key: "appError")
-
-            vendor.capture(error: appError)
+        vendor.setTag(value: context.feature, key: "feature")
+        if let operation = context.operation {
+            vendor.setTag(value: operation, key: "operation")
         }
+        if let screen = context.screen {
+            vendor.setTag(value: screen, key: "screen")
+        }
+        if context.userId != nil {
+            vendor.setTag(value: ErrorTrackingRedactor.filteredValue, key: "userId")
+        }
+
+        let description = String(describing: appError)
+        vendor.setExtra(value: ErrorTrackingRedactor.sanitize(description), key: "appError")
+
+        vendor.capture(error: appError)
     }
 
     func addBreadcrumb(message: String, category: String, level: BreadcrumbLevel = .info, data: [String: String]? = nil) {
-        withVendorOnMain { vendor in
-            vendor.addBreadcrumb(
-                level: level,
-                category: category,
-                message: ErrorTrackingRedactor.sanitize(message),
-                data: data?.reduce(into: [String: String]()) { result, entry in
-                    result[entry.key] = ErrorTrackingRedactor.sanitize(entry.value, key: entry.key)
-                }
-            )
-        }
+        vendor.addBreadcrumb(
+            level: level,
+            category: category,
+            message: ErrorTrackingRedactor.sanitize(message),
+            data: data?.reduce(into: [String: String]()) { result, entry in
+                result[entry.key] = ErrorTrackingRedactor.sanitize(entry.value, key: entry.key)
+            }
+        )
     }
 
     func updateUserId(_ userId: String?) {
-        withVendorOnMain { vendor in
-            if let userId = userId, !userId.isEmpty {
-                vendor.setTag(value: ErrorTrackingRedactor.filteredValue, key: "userId")
-            } else {
-                vendor.setTag(value: "none", key: "userId")
-            }
-        }
-    }
-
-    private func withVendorOnMain(_ operation: @escaping (ErrorTrackingVendor) -> Void) {
-        // Scope enrichment can read UIKit. Keep each context/event sequence
-        // together while allowing background reporters to return without waiting.
-        if Thread.isMainThread {
-            operation(vendor)
+        if let userId = userId, !userId.isEmpty {
+            vendor.setTag(value: ErrorTrackingRedactor.filteredValue, key: "userId")
         } else {
-            let vendor = vendor
-            DispatchQueue.main.async {
-                operation(vendor)
-            }
+            vendor.setTag(value: "none", key: "userId")
         }
     }
 }

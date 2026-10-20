@@ -101,11 +101,6 @@ struct BodyMetricSource: Codable, Equatable, Hashable {
     }
 }
 
-enum BodyMetricField: String, CaseIterable {
-    case weight
-    case bodyFat = "body_fat"
-}
-
 struct BodyMetricSourceMetadata: Codable, Equatable {
     let vendor: String?
     let sourceName: String?
@@ -123,10 +118,6 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
     let locationName: String?
     let importedAt: String?
     let legacyDataSource: String?
-    private var weightEntrySource: String?
-    private var bodyFatEntrySource: String?
-    private var bodyFatEntryMethod: String?
-    private var extraFields: [String: ReportedMeasurementJSON] = [:]
 
     init(
         vendor: String? = nil,
@@ -162,12 +153,9 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         self.locationName = Self.clean(locationName)
         self.importedAt = Self.clean(importedAt)
         self.legacyDataSource = Self.clean(legacyDataSource)
-        self.weightEntrySource = nil
-        self.bodyFatEntrySource = nil
-        self.bodyFatEntryMethod = nil
     }
 
-    enum CodingKeys: String, CodingKey, CaseIterable {
+    enum CodingKeys: String, CodingKey {
         case vendor
         case sourceName = "source_name"
         case sourceBundleId = "source_bundle_id"
@@ -184,111 +172,14 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         case locationName = "location_name"
         case importedAt = "imported_at"
         case legacyDataSource = "legacy_data_source"
-        case weightEntrySource = "weight_entry_source"
-        case bodyFatEntrySource = "body_fat_entry_source"
-        case bodyFatEntryMethod = "body_fat_entry_method"
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        vendor = try container.decodeIfPresent(String.self, forKey: .vendor)
-        sourceName = try container.decodeIfPresent(String.self, forKey: .sourceName)
-        sourceBundleId = try container.decodeIfPresent(String.self, forKey: .sourceBundleId)
-        deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
-        deviceManufacturer = try container.decodeIfPresent(String.self, forKey: .deviceManufacturer)
-        deviceModel = try container.decodeIfPresent(String.self, forKey: .deviceModel)
-        sampleId = try container.decodeIfPresent(String.self, forKey: .sampleId)
-        quantityType = try container.decodeIfPresent(String.self, forKey: .quantityType)
-        bodyFatSampleId = try container.decodeIfPresent(String.self, forKey: .bodyFatSampleId)
-        externalId = try container.decodeIfPresent(String.self, forKey: .externalId)
-        externalResultId = try container.decodeIfPresent(String.self, forKey: .externalResultId)
-        scannerModel = try container.decodeIfPresent(String.self, forKey: .scannerModel)
-        locationId = try container.decodeIfPresent(String.self, forKey: .locationId)
-        locationName = try container.decodeIfPresent(String.self, forKey: .locationName)
-        importedAt = try container.decodeIfPresent(String.self, forKey: .importedAt)
-        legacyDataSource = try container.decodeIfPresent(String.self, forKey: .legacyDataSource)
-        weightEntrySource = try container.decodeIfPresent(String.self, forKey: .weightEntrySource)
-        bodyFatEntrySource = try container.decodeIfPresent(String.self, forKey: .bodyFatEntrySource)
-        bodyFatEntryMethod = try container.decodeIfPresent(String.self, forKey: .bodyFatEntryMethod)
-        var budget = 4_096
-        let fields = try ReportedMeasurementJSON.decode(from: decoder, depth: 0, budget: &budget).object ?? [:]
-        let knownKeys = Set(CodingKeys.allCases.map(\.rawValue))
-        extraFields = fields.filter { !knownKeys.contains($0.key) }
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(vendor, forKey: .vendor)
-        try container.encodeIfPresent(sourceName, forKey: .sourceName)
-        try container.encodeIfPresent(sourceBundleId, forKey: .sourceBundleId)
-        try container.encodeIfPresent(deviceId, forKey: .deviceId)
-        try container.encodeIfPresent(deviceManufacturer, forKey: .deviceManufacturer)
-        try container.encodeIfPresent(deviceModel, forKey: .deviceModel)
-        try container.encodeIfPresent(sampleId, forKey: .sampleId)
-        try container.encodeIfPresent(quantityType, forKey: .quantityType)
-        try container.encodeIfPresent(bodyFatSampleId, forKey: .bodyFatSampleId)
-        try container.encodeIfPresent(externalId, forKey: .externalId)
-        try container.encodeIfPresent(externalResultId, forKey: .externalResultId)
-        try container.encodeIfPresent(scannerModel, forKey: .scannerModel)
-        try container.encodeIfPresent(locationId, forKey: .locationId)
-        try container.encodeIfPresent(locationName, forKey: .locationName)
-        try container.encodeIfPresent(importedAt, forKey: .importedAt)
-        try container.encodeIfPresent(legacyDataSource, forKey: .legacyDataSource)
-        try container.encodeIfPresent(weightEntrySource, forKey: .weightEntrySource)
-        try container.encodeIfPresent(bodyFatEntrySource, forKey: .bodyFatEntrySource)
-        try container.encodeIfPresent(bodyFatEntryMethod, forKey: .bodyFatEntryMethod)
-        var extra = encoder.container(keyedBy: MetadataKey.self)
-        for (key, value) in extraFields {
-            try extra.encode(value, forKey: MetadataKey(key))
-        }
-    }
-
-    /// Only an explicit field override changes the displayed attribution.
-    func entrySource(for field: BodyMetricField) -> BodyMetricSource? {
-        let raw = field == .weight ? weightEntrySource : bodyFatEntrySource
-        guard let raw, BodyMetricSource.allowedRawValues.contains(raw) else { return nil }
-        return BodyMetricSource(rawValue: raw)
-    }
-
-    var enteredBodyFatMethod: String? { bodyFatEntryMethod }
-
-    func settingEntrySource(
-        _ source: BodyMetricSource?, fields: Set<BodyMetricField>, bodyFatMethod: String? = nil
-    ) -> Self {
-        var updated = self
-        if fields.contains(.weight) { updated.weightEntrySource = source?.rawValue }
-        if fields.contains(.bodyFat) {
-            updated.bodyFatEntrySource = source?.rawValue
-            updated.bodyFatEntryMethod = source == .manual ? Self.clean(bodyFatMethod) : nil
-        }
-        return updated
-    }
-
-    /// Undo owns the replaced measurements, not newer import or photo metadata.
-    func restoringEntrySources(from previous: Self?, fields: Set<BodyMetricField>) -> Self {
-        var updated = self
-        if fields.contains(.weight) { updated.weightEntrySource = previous?.weightEntrySource }
-        if fields.contains(.bodyFat) {
-            updated.bodyFatEntrySource = previous?.bodyFatEntrySource
-            updated.bodyFatEntryMethod = previous?.bodyFatEntryMethod
-        }
-        return updated
-    }
-
-    private struct MetadataKey: CodingKey {
-        let stringValue: String
-        let intValue: Int? = nil
-        init(_ value: String) { stringValue = value }
-        init?(stringValue: String) { self.stringValue = stringValue }
-        init?(intValue: Int) { return nil }
     }
 
     var isEmpty: Bool {
         jsonObject.isEmpty
     }
 
-    var jsonObject: [String: Any] {
-        var object = extraFields.mapValues(\.foundationValue)
+    var jsonObject: [String: String] {
+        var object: [String: String] = [:]
         object["vendor"] = vendor
         object["source_name"] = sourceName
         object["source_bundle_id"] = sourceBundleId
@@ -305,9 +196,6 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         object["location_name"] = locationName
         object["imported_at"] = importedAt
         object["legacy_data_source"] = legacyDataSource
-        object["weight_entry_source"] = weightEntrySource
-        object["body_fat_entry_source"] = bodyFatEntrySource
-        object["body_fat_entry_method"] = bodyFatEntryMethod
         return object
     }
 
@@ -451,16 +339,6 @@ struct BodyMetricLocalDate: Equatable {
 }
 
 struct BodyMetrics: Identifiable, Codable, Equatable {
-    func measurementSource(for field: BodyMetricField) -> BodyMetricSource {
-        sourceMetadata?.entrySource(for: field) ?? metricSource
-    }
-
-    /// Keep the imported method in storage; a typed replacement cannot claim it.
-    var attributedBodyFatMethod: String? {
-        sourceMetadata?.entrySource(for: .bodyFat) == .manual
-            ? sourceMetadata?.enteredBodyFatMethod ?? "manual" : bodyFatMethod
-    }
-
     let id: String
     let userId: String
     let date: Date
