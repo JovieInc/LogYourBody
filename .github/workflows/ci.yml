@@ -118,6 +118,11 @@ jobs:
       - name: Verify URL registry covers the whole repo
         run: node packages/product-registry/scripts/url-drift.test.mjs
 
+      # Bot-only refs (backup/**, archive/**, ...) must never queue Vercel builds
+      # or run workflows: 150 backup pushes starved the shared build queue on 2026-10-20.
+      - name: Verify Vercel and Actions ignore bot-only refs
+        run: node --test .github/scripts/verify-vercel-branch-exclusions.test.mjs
+
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
 
