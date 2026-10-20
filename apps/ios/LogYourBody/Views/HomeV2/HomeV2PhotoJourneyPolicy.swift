@@ -222,6 +222,35 @@ enum HomeV2PhotoRulerPolicy {
     }
 }
 
+/// Visual sampling for the Apple Photos-style strip. Selection and date
+/// resolution stay in `HomeV2PhotoRulerPolicy`; this policy only limits image
+/// work for dense histories while keeping the endpoints and selected day.
+enum HomeV2PhotoStripPolicy {
+    static let maximumVisibleThumbnails = 9
+    static let thumbnailSize = CGSize(width: 28, height: 35)
+    static let selectedThumbnailSize = CGSize(width: 32, height: 40)
+
+    static func visibleIndices(count: Int, selected: Int) -> [Int] {
+        guard count > 0 else { return [] }
+        guard count > maximumVisibleThumbnails else { return Array(0..<count) }
+
+        let last = count - 1
+        let clampedSelection = min(max(selected, 0), last)
+        var visible = Set([0, last, clampedSelection])
+        for offset in 1...2 {
+            visible.insert(max(0, clampedSelection - offset))
+            visible.insert(min(last, clampedSelection + offset))
+        }
+
+        let denominator = Double(maximumVisibleThumbnails - 1)
+        for position in 0..<maximumVisibleThumbnails where visible.count < maximumVisibleThumbnails {
+            visible.insert(Int((Double(position) * Double(last) / denominator).rounded()))
+        }
+
+        return visible.sorted()
+    }
+}
+
 enum HomeV2TimelapsePolicy {
     static let speeds: [Double] = [0.5, 1, 2]
     static let baseFrameSeconds = 0.6

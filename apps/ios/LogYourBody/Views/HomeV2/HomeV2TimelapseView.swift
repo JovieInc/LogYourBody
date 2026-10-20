@@ -23,6 +23,7 @@ struct HomeV2TimelapseView: View {
 
     private var chronological: [Int] { HomeV2PhotoIndex.chronologicalPhotoIndices(in: bodyMetrics) }
     private var dates: [Date] { chronological.map { bodyMetrics[$0].date } }
+    private var photoURLs: [String?] { chronological.map { bodyMetrics[$0].photoUrl } }
     private var current: BodyMetrics? {
         chronological.indices.contains(frame) ? bodyMetrics[chronological[frame]] : nil
     }
@@ -47,7 +48,7 @@ struct HomeV2TimelapseView: View {
                 }
 
                 transport
-                HomeV2PhotoTimelineRuler(dates: dates, selected: frame) { selected in
+                HomeV2PhotoTimelineRuler(dates: dates, thumbnailURLs: photoURLs, selected: frame) { selected in
                     frame = selected
                     isPlaying = false
                 }

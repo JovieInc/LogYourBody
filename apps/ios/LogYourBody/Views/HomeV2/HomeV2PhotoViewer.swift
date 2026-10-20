@@ -53,6 +53,7 @@ struct HomeV2PhotoViewer: View {
     private var photoIndices: [Int] { HomeV2PhotoIndex.photoIndices(in: bodyMetrics) }
     private var chronological: [Int] { HomeV2PhotoIndex.chronologicalPhotoIndices(in: bodyMetrics) }
     private var photoDates: [Date] { chronological.map { bodyMetrics[$0].date } }
+    private var photoURLs: [String?] { chronological.map { bodyMetrics[$0].photoUrl } }
 
     private var current: BodyMetrics? {
         bodyMetrics.indices.contains(selectedIndex) ? bodyMetrics[selectedIndex] : nil
@@ -217,6 +218,7 @@ struct HomeV2PhotoViewer: View {
 
             HomeV2PhotoTimelineRuler(
                 dates: photoDates,
+                thumbnailURLs: photoURLs,
                 selected: max(position(of: selectedIndex) - 1, 0),
                 onSelect: { position in
                     guard chronological.indices.contains(position) else { return }

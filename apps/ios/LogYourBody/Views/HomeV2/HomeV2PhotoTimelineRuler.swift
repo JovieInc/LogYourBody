@@ -4,16 +4,19 @@
 //
 import SwiftUI
 
-/// The scrubbable ruler under a photo (Pencil P3): months, weekly ticks,
-/// a tick per photo, the selected photo tallest. Dragging selects the
-/// nearest photo.
+/// The scrubbable ruler under a photo (Pencil P3): a liquid-glass filmstrip
+/// when thumbnails are available, with the time ruler as its no-photo fallback.
+/// Dragging either appearance selects the nearest dated entry.
 struct HomeV2PhotoTimelineRuler: View {
     let dates: [Date]
+    var thumbnailURLs: [String?] = []
     let selected: Int
     let onSelect: (Int) -> Void
     var showsMonthLabels = true
     var allowsVerticalScrolling = false
     var calendar = Calendar.current
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let monthFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -28,7 +31,7 @@ struct HomeV2PhotoTimelineRuler: View {
             if showsMonthLabels {
                 monthLabels
             }
-            ticks
+            timelineStrip
         }
         .padding(.horizontal, HomeV2Tokens.Space.inset)
         .accessibilityElement(children: .ignore)
@@ -58,11 +61,11 @@ struct HomeV2PhotoTimelineRuler: View {
         .frame(height: 16)
     }
 
-    private var ticks: some View {
+    private var timelineStrip: some View {
         GeometryReader { geometry in
             let width = geometry.size.width
             if allowsVerticalScrolling {
-                tickMarks(width: width)
+                stripContent(width: width)
                     .gesture(HomeV2HorizontalPhotoScrub { position in
                         select(at: position, width: width)
                     })
@@ -70,13 +73,68 @@ struct HomeV2PhotoTimelineRuler: View {
                         SpatialTapGesture().onEnded { value in select(at: value.location.x, width: width) }
                     )
             } else {
-                tickMarks(width: width)
+                stripContent(width: width)
                     .gesture(DragGesture(minimumDistance: 0).onChanged { value in
                         select(at: value.location.x, width: width)
                     })
             }
         }
-        .frame(height: JovieTokens.minimumHitTarget)
+        .frame(height: showsFilmstrip ? 48 : JovieTokens.minimumHitTarget)
+    }
+
+    @ViewBuilder
+    private func stripContent(width: CGFloat) -> some View {
+        if showsFilmstrip {
+            filmstrip(width: width)
+        } else {
+            tickMarks(width: width)
+        }
+    }
+
+    private var showsFilmstrip: Bool {
+        thumbnailURLs.count == dates.count && thumbnailURLs.contains { url in
+            guard let url else { return false }
+            return !url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+
+    private func filmstrip(width: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: HomeV2Tokens.photoSlotRadius, style: .continuous)
+                .fill(HomeV2Tokens.Colors.card.opacity(0.24))
+                .dashboardChromeGlass(
+                    in: RoundedRectangle(cornerRadius: HomeV2Tokens.photoSlotRadius, style: .continuous),
+                    cornerRadius: HomeV2Tokens.photoSlotRadius,
+                    tintOpacity: 0.08
+                )
+
+            ForEach(
+                HomeV2PhotoStripPolicy.visibleIndices(count: dates.count, selected: selected),
+                id: \.self
+            ) { index in
+                let isSelected = index == selected
+                let size = isSelected
+                    ? HomeV2PhotoStripPolicy.selectedThumbnailSize
+                    : HomeV2PhotoStripPolicy.thumbnailSize
+                let rawX = HomeV2PhotoRulerPolicy.fraction(of: dates[index], in: span) * width
+                let x = min(max(rawX, size.width / 2 + 4), width - size.width / 2 - 4)
+
+                HomeV2PhotoStripThumbnail(
+                    urlString: thumbnailURLs[index],
+                    isSelected: isSelected,
+                    size: size
+                )
+                .id(thumbnailURLs[index] ?? "missing-\(index)")
+                .position(x: x, y: 24)
+                .zIndex(isSelected ? 2 : 1)
+                .animation(
+                    reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.82),
+                    value: selected
+                )
+            }
+        }
+        .frame(width: width, height: 48)
+        .contentShape(Rectangle())
     }
 
     private func tickMarks(width: CGFloat) -> some View {
@@ -120,6 +178,39 @@ struct HomeV2PhotoTimelineRuler: View {
             .fill(color)
             .frame(width: 2, height: height)
             .position(x: x, y: JovieTokens.minimumHitTarget / 2)
+    }
+}
+
+private struct HomeV2PhotoStripThumbnail: View {
+    let urlString: String?
+    let isSelected: Bool
+    let size: CGSize
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: HomeV2Tokens.thumbRadius, style: .continuous)
+    }
+
+    var body: some View {
+        CachedAsyncImage(urlString: urlString) { image in
+            image
+                .resizable()
+                .scaledToFill()
+        } placeholder: {
+            LinearGradient(
+                colors: [HomeV2Tokens.Colors.card, HomeV2Tokens.Colors.shell],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(shape)
+        .overlay {
+            shape.stroke(
+                isSelected ? HomeV2Tokens.Colors.ink : Color.white.opacity(0.18),
+                lineWidth: isSelected ? 2 : 0.5
+            )
+        }
+        .shadow(color: Color.black.opacity(isSelected ? 0.35 : 0.18), radius: isSelected ? 5 : 2, y: 2)
     }
 }
 

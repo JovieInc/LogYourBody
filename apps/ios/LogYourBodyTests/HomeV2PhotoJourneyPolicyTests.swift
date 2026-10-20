@@ -48,6 +48,32 @@ final class HomeV2PhotoJourneyPolicyTests: XCTestCase {
         XCTAssertEqual(long.end, day(0))
     }
 
+    func testFilmstripKeepsFourByFiveGeometryAndSelectedDateVisibleInDenseHistory() {
+        XCTAssertEqual(HomeV2PhotoStripPolicy.thumbnailSize.width, 28)
+        XCTAssertEqual(
+            HomeV2PhotoStripPolicy.thumbnailSize.width / HomeV2PhotoStripPolicy.thumbnailSize.height,
+            HomeV2Tokens.photoAspectRatio,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            HomeV2PhotoStripPolicy.selectedThumbnailSize.width /
+                HomeV2PhotoStripPolicy.selectedThumbnailSize.height,
+            HomeV2Tokens.photoAspectRatio,
+            accuracy: 0.001
+        )
+
+        XCTAssertEqual(HomeV2PhotoStripPolicy.visibleIndices(count: 5, selected: 2), [0, 1, 2, 3, 4])
+
+        let dense = HomeV2PhotoStripPolicy.visibleIndices(count: 40, selected: 17)
+        XCTAssertEqual(dense.count, HomeV2PhotoStripPolicy.maximumVisibleThumbnails)
+        XCTAssertEqual(dense, dense.sorted())
+        XCTAssertEqual(dense.first, 0)
+        XCTAssertEqual(dense.last, 39)
+        XCTAssertTrue(dense.contains(17), "The selected photo cannot disappear when a long history is sampled")
+        XCTAssertTrue(dense.contains(16))
+        XCTAssertTrue(dense.contains(18), "Adjacent photos should be prewarmed around the selected date")
+    }
+
     func testTimelapseAdvancesAndStopsOrLoops() {
         XCTAssertEqual(HomeV2TimelapsePolicy.next(after: 0, count: 3, loops: false), 1)
         XCTAssertNil(HomeV2TimelapsePolicy.next(after: 2, count: 3, loops: false))
