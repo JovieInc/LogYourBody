@@ -172,7 +172,8 @@ struct HomeV2Surface: View {
                 numberRow(size: HomeV2Tokens.TypeSize.heroPhoto, weight: .semibold, kerning: -1.2)
             }
 
-            Text(changeSentence)
+            Text(HomeV2EditorialPolicy.supportsWeightComparison(in: bodyMetrics, selected: metric)
+                 ? changeSentence : "No 30-day trend yet")
                 .scaledSystemFont(size: HomeV2Tokens.TypeSize.secondary, relativeTo: .subheadline)
                 .foregroundStyle(HomeV2Tokens.Colors.secondary)
                 .accessibilityIdentifier("home_v2_change_sentence")

@@ -1560,10 +1560,12 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 5), "Critical chat prompt must be available")
         XCTAssertTrue(prompt.isHittable, "Critical chat prompt must be tappable")
         prompt.tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8),
-            "Critical chat prompt must open the chat root"
-        )
+        let openedChatRoot = app.descendants(matching: .any)["chat_tab_root"].waitForExistence(timeout: 8)
+        // Diagnostic only: the app's send/load trail if the tap did not open chat.
+        let sendProbe = openedChatRoot
+            ? ""
+            : String(describing: app.descendants(matching: .any)["home_chat_composer_dock"].value ?? "unavailable")
+        XCTAssertTrue(openedChatRoot, "Critical chat prompt must open the chat root (send probe: \(sendProbe))")
         attachScreenshot(named: "launch-quality-chat-tab", from: app)
         collapseHomeChat(in: app)
         XCTAssertTrue(app.descendants(matching: .any)["launch_timeline_surface"].waitForExistence(timeout: 12))
@@ -2680,6 +2682,42 @@ final class LogYourBodyUITests: XCTestCase {
             "The quiet composer is there"
         )
         attachScreenshot(named: "home-v2-ask", from: app)
+    }
+
+    func testDailyReminderIsOfferedAfterTheFirstLoggedWeighInNotBeforeToday() throws {
+        let app = XCUIApplication()
+        launch(app, with: [
+            "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestHomeV2Fixture",
+            "-lybUITestDailyReminderPromptFixture"
+        ])
+
+        // Home's dock appears once the fixture has seeded.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home_v2_metric_first"].waitForExistence(timeout: 45),
+            "A new subscriber lands on Today"
+        )
+        let logWeight = app.buttons["home_v2_log_weight"]
+        XCTAssertTrue(logWeight.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].exists, "No reminder ask before Today")
+
+        logWeight.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_log_sheet"].waitForExistence(timeout: 8))
+        let plus = app.buttons["home_v2_log_sheet_plus"]
+        XCTAssertTrue(plus.waitForExistence(timeout: 5))
+        plus.tap()
+        app.buttons["home_v2_log_sheet_save"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 10),
+            "The first logged weigh-in is when a reminder has a job"
+        )
+        attachScreenshot(named: "daily-reminder-after-first-weigh-in", from: app)
+        let notNow = app.buttons["daily_reminder_skip_button"]
+        XCTAssertTrue(notNow.waitForExistence(timeout: 3))
+        notNow.tap()
+        XCTAssertFalse(app.staticTexts["Want a quiet reminder?"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_logged_sentence"].waitForExistence(timeout: 5))
     }
 
     func testHomeV2AskOpensFromProgressAndReturnsToProgress() throws {

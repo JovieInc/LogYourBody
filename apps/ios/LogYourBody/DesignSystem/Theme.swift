@@ -31,6 +31,8 @@ enum JoviePalette {
     static let surfaceHex = "#0F1011"
     static let elevatedHex = "#17171A"
     static let raisedHex = "#1C1C1E"
+    /// Launch mark only. The night field stays on the current canvas step.
+    static let creamHex = "#F5F4F0"
 }
 
 /// Jovie design-system palette for the v2 surfaces (mirrors the LogYourBody
@@ -430,7 +432,8 @@ struct DefaultTheme: Theme {
         primarySubtle: .jovieAction.opacity(0.12),
 
         // Accents — must clear WCAG 4.5:1 against `surface`/`background` for
-        // metric label text (JOV-6093); guarded by MetricAccentContrastTests.
+        // metric label text (JOV-6093); guarded by MetricAccentContrastTests
+        // and SemanticContrastTests.
         accentViolet: Color(hex: "#BF5AF2"),
         accentPink: Color(hex: "#F45A9E"),
         accentTeal: Color(hex: "#0f9b8e"),
@@ -440,7 +443,7 @@ struct DefaultTheme: Theme {
         // Text
         text: Color(hex: "#F7F8F8"),
         textSecondary: Color(hex: "#9CA0A8"),
-        textTertiary: Color(hex: "#6E7178"),
+        textTertiary: Color(hex: "#8B909B"),
         textQuaternary: Color(hex: "#4A4D52"),
 
         // Borders
@@ -451,7 +454,7 @@ struct DefaultTheme: Theme {
         // States
         success: Color(hex: "#2F9E44"),
         warning: Color(hex: "#ff9800"),
-        error: Color(hex: "#F3122D"),
+        error: Color(hex: "#FF4556"),
         info: .jovieMetricAccent,
 
         // Interactive

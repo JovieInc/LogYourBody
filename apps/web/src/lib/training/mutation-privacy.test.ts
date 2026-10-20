@@ -1,4 +1,4 @@
-import { logTrainingSet, recordTrainingFeedback } from './commands';
+import { logTrainingSet, recordTrainingFeedback, swapExercise } from './commands';
 import { MemoryTrainingRecords } from './memory-records.testing';
 import { getOrCreateNextWorkout, stableTrainingUuid, storeProgramSetup } from './service';
 import type { Session } from './types';
@@ -66,60 +66,75 @@ function setInput(session: Session, exercise = session.exercises[0]!, setNumber 
 }
 
 describe('training mutation privacy admission', () => {
-  it.each(['new session', 'existing session', 'feedback', 'new set', 'completion'] as const)(
-    '%s cannot write after revoke returns',
-    async (kind) => {
-      const records = await fixture();
-      const session = kind === 'new session' ? null : await workout(records);
-      let finalSet = session ? setInput(session) : null;
-      if (kind === 'completion' && session) {
-        const pairs = session.exercises.flatMap((e) =>
-          Array.from({ length: e.sets }, (_, n) => setInput(session, e, n + 1)),
-        );
-        finalSet = pairs.pop()!;
-        for (const set of pairs)
-          await records.insertTrainingSet(subject, {
-            ...set,
-            id: stableTrainingUuid(subject, session.id, set.exerciseId, String(set.setNumber)),
-            record_type: 'set_log',
-            completedAt: now.toISOString(),
-          });
+  it.each([
+    'new session',
+    'existing session',
+    'feedback',
+    'new set',
+    'completion',
+    'swap',
+  ] as const)('%s cannot write after revoke returns', async (kind) => {
+    const records = await fixture();
+    const session = kind === 'new session' ? null : await workout(records);
+    let finalSet = session ? setInput(session) : null;
+    if (kind === 'completion' && session) {
+      const pairs = session.exercises.flatMap((e) =>
+        Array.from({ length: e.sets }, (_, n) => setInput(session, e, n + 1)),
+      );
+      finalSet = pairs.pop()!;
+      for (const set of pairs)
+        await records.insertTrainingSet(subject, {
+          ...set,
+          id: stableTrainingUuid(subject, session.id, set.exerciseId, String(set.setNumber)),
+          record_type: 'set_log',
+          completedAt: now.toISOString(),
+        });
+    }
+    const held = barrier();
+    const commit = records.trainingMutations.commit.bind(records.trainingMutations);
+    records.trainingMutations.commit = async (input) => {
+      if (kind !== 'completion' || input.action === 'session_update') {
+        held.enter();
+        await held.released;
       }
-      const held = barrier();
-      const commit = records.trainingMutations.commit.bind(records.trainingMutations);
-      records.trainingMutations.commit = async (input) => {
-        if (kind !== 'completion' || input.action === 'session_update') {
-          held.enter();
-          await held.released;
-        }
-        return commit(input);
-      };
-      const operation =
-        kind === 'feedback'
-          ? recordTrainingFeedback({
-              records,
-              subject,
-              now,
-              createId: () => '22222222-2222-4222-8222-000000000001',
-              feedback: {
-                sessionId: session!.id,
-                soreness: 2,
-                pump: 2,
-                performance: 'stable',
-                jointPain: 0,
-              },
-            })
-          : kind === 'new set' || kind === 'completion'
-            ? logTrainingSet({ records, subject, now, set: finalSet! })
+      return commit(input);
+    };
+    const operation =
+      kind === 'feedback'
+        ? recordTrainingFeedback({
+            records,
+            subject,
+            now,
+            createId: () => '22222222-2222-4222-8222-000000000001',
+            feedback: {
+              sessionId: session!.id,
+              soreness: 2,
+              pump: 2,
+              performance: 'stable',
+              jointPain: 0,
+            },
+          })
+        : kind === 'new set' || kind === 'completion'
+          ? logTrainingSet({ records, subject, now, set: finalSet! })
+          : kind === 'swap'
+            ? swapExercise({
+                records,
+                subject,
+                now,
+                swap: {
+                  sessionId: session!.id,
+                  exerciseId: 'dumbbell_curl',
+                  toVariantId: 'lying_dumbbell_curl',
+                },
+              })
             : getOrCreateNextWorkout({ records, subject, now });
-      await held.entered;
-      await revoke(records);
-      expect(await live(records)).toEqual([]);
-      held.release();
-      await operation.catch(() => undefined);
-      expect(await live(records)).toEqual([]);
-    },
-  );
+    await held.entered;
+    await revoke(records);
+    expect(await live(records)).toEqual([]);
+    held.release();
+    await operation.catch(() => undefined);
+    expect(await live(records)).toEqual([]);
+  });
 });
 
 describe('training immutable request admission', () => {

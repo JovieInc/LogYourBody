@@ -511,6 +511,8 @@ struct LogYourBodyApp: App {
         )
         if isSubscribed && !usesDailyReminderPromptFixture {
             NotificationManager.shared.skipDailyWeighInPrompt()
+        } else if usesDailyReminderPromptFixture {
+            NotificationManager.shared.resetDailyWeighInPromptForUITests()
         }
 
         UserDefaults.standard.set(
@@ -656,9 +658,8 @@ struct LogYourBodyApp: App {
                 date: date,
                 weight: isPhotoOnly ? nil : entry.weight,
                 weightUnit: "kg",
-                bodyFatPercentage: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly
-                    ? nil : entry.bodyFat,
-                bodyFatMethod: usesWeightOnlyHero || usesSingleWeightHero || isPhotoOnly || entry.bodyFat == nil
+                bodyFatPercentage: isPhotoOnly || usesWeightOnlyHero || usesSingleWeightHero ? nil : entry.bodyFat,
+                bodyFatMethod: isPhotoOnly || usesWeightOnlyHero || usesSingleWeightHero || entry.bodyFat == nil
                     ? nil : (usesVisualEstimateHero ? "visual_estimate" : entry.source),
                 muscleMass: isPhotoOnly ? nil : entry.muscle,
                 boneMass: nil,
@@ -685,7 +686,7 @@ struct LogYourBodyApp: App {
             .map { "\(metricIdPrefix)_\($0.daysAgo)" })
         precondition(
             savedIds.count == expectedIds.count && Set(savedIds) == expectedIds,
-            "Dashboard UI fixture expected \(entries.count) saved measurements, found \(savedIds.count)"
+            "Dashboard UI fixture expected \(expectedIds.count) saved measurements, found \(savedIds.count)"
         )
     }
 

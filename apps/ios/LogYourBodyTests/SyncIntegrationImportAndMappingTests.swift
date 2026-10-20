@@ -172,6 +172,9 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         let authManager = AuthManager()
 
         let userId = "bodyspec_import_user_\(UUID().uuidString)"
+        authManager.authSession = .localFixture(
+            subject: userId, email: "bodyspec@example.invalid", accessToken: "synthetic"
+        )
         let user = LocalUser(
             id: userId,
             email: "bodyspec@example.com",
@@ -260,7 +263,7 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         XCTAssertEqual(dexa.bodyFatMethod, "DEXA (BodySpec)")
         XCTAssertEqual(try XCTUnwrap(dexa.weight), 79.2, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(dexa.bodyFatPercentage), 17.7, accuracy: 0.001)
-        XCTAssertEqual(try XCTUnwrap(dexa.muscleMass), 62.0, accuracy: 0.001)
+        XCTAssertNil(dexa.muscleMass, "BodySpec reports lean mass, not muscle mass")
         XCTAssertEqual(try XCTUnwrap(dexa.boneMass), 3.2, accuracy: 0.001)
 
         let sourceMetadata = try XCTUnwrap(dexa.sourceMetadata)
@@ -278,6 +281,13 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         XCTAssertEqual(dexaResults.first?.bodyMetricsId, dexa.id)
         XCTAssertEqual(dexaResults.first?.externalSource, "bodyspec")
         XCTAssertEqual(dexaResults.first?.externalResultId, resultId)
+        XCTAssertNil(dexaResults.first?.muscleMass)
+        let lean = try XCTUnwrap(dexaResults.first?.reportedMeasurements?.knownMeasurements.first)
+        XCTAssertEqual(lean.kind, .leanMass)
+        XCTAssertEqual(lean.value, 62)
+        XCTAssertEqual(lean.unit, .kilograms)
+        XCTAssertEqual(lean.reportedLabel, "lean_mass_kg")
+        XCTAssertEqual(lean.reportedUnit, "kg")
     }
 
     func testBodySpecDexaImporter_SkipsExistingExternalResultId() async throws {
@@ -285,6 +295,9 @@ final class SyncIntegrationImportAndMappingTests: XCTestCase {
         let authManager = AuthManager()
 
         let userId = "bodyspec_duplicate_user_\(UUID().uuidString)"
+        authManager.authSession = .localFixture(
+            subject: userId, email: "bodyspec@example.invalid", accessToken: "synthetic"
+        )
         authManager.currentUser = LocalUser(
             id: userId,
             email: "bodyspec-duplicate@example.com",

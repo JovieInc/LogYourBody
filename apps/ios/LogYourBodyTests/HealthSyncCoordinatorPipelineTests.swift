@@ -61,13 +61,12 @@ final class HealthSyncCoordinatorPipelineTests: XCTestCase {
         let coordinator = HealthSyncCoordinator(healthKitManager: manager)
 
         coordinator.bootstrapIfNeeded(syncEnabled: true)
-        await Task.yield()
-        try await Task.sleep(nanoseconds: 50_000_000)
 
         XCTAssertTrue(manager.didCallCheckAuthorizationStatus)
         XCTAssertTrue(manager.didCallObserveWeightChanges)
         XCTAssertTrue(manager.didCallObserveBodyFatChanges)
         XCTAssertTrue(manager.didCallObserveStepChanges)
+        await waitForBackgroundDelivery(manager)
         XCTAssertEqual(manager.setupBackgroundDeliveryCallCount, 1)
         XCTAssertEqual(manager.setupStepCountBackgroundDeliveryCallCount, 1)
     }
@@ -77,13 +76,27 @@ final class HealthSyncCoordinatorPipelineTests: XCTestCase {
         let coordinator = HealthSyncCoordinator(healthKitManager: manager)
 
         await coordinator.runDeferredOnboardingWeightSync()
-        await Task.yield()
 
         XCTAssertTrue(manager.didCallObserveWeightChanges)
         XCTAssertTrue(manager.didCallObserveBodyFatChanges)
         XCTAssertTrue(manager.didCallObserveStepChanges)
+        await waitForBackgroundDelivery(manager)
         XCTAssertEqual(manager.setupBackgroundDeliveryCallCount, 1)
         XCTAssertEqual(manager.syncWeightFromHealthKitCallCount, 1)
+    }
+
+    /// Background delivery starts on an unstructured main-actor task. One yield
+    /// drops that task when CI is busy. Wait for the call; the equality check
+    /// still fails if delivery is never configured.
+    private func waitForBackgroundDelivery(_ manager: MockHealthKitSyncManager) async {
+        let deadline = Date().addingTimeInterval(2)
+        while Date() < deadline {
+            let bodyMetricsReady = manager.setupBackgroundDeliveryCallCount >= 1
+            let stepsReady = manager.setupStepCountBackgroundDeliveryCallCount >= 1
+            if bodyMetricsReady, stepsReady { return }
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
     }
 
     func testInitialConnectSyncBootstrapsObserversAndRunsInitialImports() async throws {
