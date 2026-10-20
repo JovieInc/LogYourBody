@@ -8,7 +8,7 @@ describe('Vercel Git deployment configuration', () => {
     ['repository root', resolve(repositoryRoot, 'vercel.json')],
     ['web project root', resolve(repositoryRoot, 'apps/web/vercel.json')],
   ])(
-    '%s keeps Production on Actions and builds the web workspace with its dependencies',
+    '%s keeps Production on Actions, skips bot-only refs, and builds the web workspace with its dependencies',
     (scope, configPath) => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       const isWebProjectRoot = scope === 'web project root';
@@ -19,7 +19,15 @@ describe('Vercel Git deployment configuration', () => {
         ? 'cd ../.. && corepack pnpm turbo run build --filter=logyourbody...'
         : 'corepack pnpm turbo run build --filter=logyourbody...';
 
-      expect(config.git.deploymentEnabled).toEqual({ main: false });
+      // main ships through deploy.yml; bot-only refs never queue preview builds
+      // (.github/scripts/verify-vercel-branch-exclusions.test.mjs, 2026-10-20).
+      expect(config.git.deploymentEnabled).toEqual({
+        main: false,
+        'backup/**': false,
+        'archive/**': false,
+        'stash/**': false,
+        'gh-readonly-queue/**': false,
+      });
       expect(config.github.silent).toBe(true);
       expect(config.installCommand).toContain(installCommand);
       expect(config.buildCommand).toBe(buildCommand);
