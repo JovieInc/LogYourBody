@@ -404,14 +404,13 @@ jobs:
       - name: Run Fastlane Precheck
         run: |
           cd apps/ios
-          bundle exec fastlane precheck 2>&1 | tee precheck.log
-
-          # Check for errors and surface them in the summary
-          if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" precheck.log; then
-            echo "::error::Precheck errors detected - see highlighted lines above"
-            exit 1
-          fi
+          # The App Store Connect API key cannot check in-app purchases.
+          # build-release already verifies subscription state.
+          bash "$GITHUB_WORKSPACE/.github/scripts/run-fastlane-step.sh" precheck.log \
+            bundle exec fastlane precheck include_in_app_purchases:false
         env:
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
 
@@ -438,19 +437,15 @@ jobs:
 
           echo "Submitting IPA: $IPA_PATH"
 
-          # Submit for review
-          bundle exec fastlane submit_app_store \
+          bash "$GITHUB_WORKSPACE/.github/scripts/run-fastlane-step.sh" submit.log \
+            bundle exec fastlane submit_app_store \
             ipa_path:"$IPA_PATH" \
             submit_for_review:$SUBMIT_FOR_REVIEW \
             automatic_release:$AUTOMATIC_RELEASE \
-            phased_release:$PHASED_RELEASE 2>&1 | tee submit.log
-
-          # Check for errors and surface them in the summary
-          if grep -E "error:|duplicate|signing|Error:|ERROR:|Failed|FAILED" submit.log; then
-            echo "::error::Submission errors detected - see highlighted lines above"
-            exit 1
-          fi
+            phased_release:$PHASED_RELEASE
         env:
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_STORE_APP_ID: ${{ env.LOGYOURBODY_APP_STORE_APP_ID }}
           APP_REVIEW_FIRST_NAME: ${{ vars.APP_REVIEW_FIRST_NAME }}
