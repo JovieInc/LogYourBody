@@ -49,9 +49,15 @@ runs:
         SWIFTLINT_VERSION="0.63.3"
         if ! command -v swiftlint &> /dev/null || [[ "$(swiftlint version)" != "$SWIFTLINT_VERSION" ]]; then
           echo "Installing SwiftLint ${SWIFTLINT_VERSION}..."
+          INSTALL_DIR="/usr/local/bin"
+          if [[ ! -w "$INSTALL_DIR" ]]; then
+            INSTALL_DIR="${RUNNER_TEMP}/swiftlint-bin"
+            mkdir -p "$INSTALL_DIR"
+            echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+          fi
           curl -L "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" -o swiftlint.zip
-          unzip -o swiftlint.zip -d /usr/local/bin
-          chmod +x /usr/local/bin/swiftlint
+          unzip -o swiftlint.zip -d "$INSTALL_DIR"
+          chmod +x "$INSTALL_DIR/swiftlint"
         else
           echo "SwiftLint already installed: $(swiftlint version)"
         fi

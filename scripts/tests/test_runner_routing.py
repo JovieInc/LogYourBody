@@ -13,6 +13,9 @@ from typing import Any, Optional
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _WORKFLOWS = _REPO_ROOT / ".github" / "workflows"
+_SETUP_IOS_ACTION = (
+    _REPO_ROOT / ".github" / "actions" / "setup-ios-build" / "action.yml"
+)
 _QUERY_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "query-runner-heartbeat.sh"
 _AWAIT_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "await-runner-heartbeat.sh"
 _FIXTURE_GH = (
@@ -633,6 +636,15 @@ def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
     assert 'uses: ./.github/actions/setup-ios-build' in canary
     assert 'bundle check' in canary
     assert "create-config-files: 'false'" in canary
+
+
+def test_setup_ios_build_uses_writable_swiftlint_destination() -> None:
+    action = _SETUP_IOS_ACTION.read_text(encoding="utf-8")
+    assert 'if [[ ! -w "$INSTALL_DIR" ]]; then' in action
+    assert 'INSTALL_DIR="${RUNNER_TEMP}/swiftlint-bin"' in action
+    assert 'echo "$INSTALL_DIR" >> "$GITHUB_PATH"' in action
+    assert 'unzip -o swiftlint.zip -d "$INSTALL_DIR"' in action
+    assert 'unzip -o swiftlint.zip -d /usr/local/bin' not in action
 
 
 def test_invalid_awaiter_bounds_and_missing_helper_fall_back(tmp_path: Path) -> None:
