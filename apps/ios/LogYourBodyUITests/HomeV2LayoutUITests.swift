@@ -74,11 +74,9 @@ final class HomeV2LayoutUITests: XCTestCase {
 
         let unit = app.buttons["home_v2_log_sheet_unit"]
         XCTAssertTrue(unit.isHittable)
-        unit.tap()
-        app.buttons["kg"].tap()
+        selectMenuOption("kg", from: unit, in: app)
         XCTAssertEqual(unit.value as? String, "kg")
-        unit.tap()
-        app.buttons["lbs"].tap()
+        selectMenuOption("lbs", from: unit, in: app)
         XCTAssertEqual(unit.value as? String, "lbs")
 
         field.tap()
@@ -335,10 +333,7 @@ final class HomeV2LayoutUITests: XCTestCase {
             assertSheetControlReachable(method, in: app, screenshot: "body-fat-ax5-method-before-\(value)")
             XCTAssertEqual(method.value as? String, "Entered by you")
             if changesMethod {
-                method.tap()
-                let dexa = app.buttons["DEXA"]
-                XCTAssertTrue(dexa.waitForExistence(timeout: 5))
-                dexa.tap()
+                selectMenuOption("DEXA", from: method, in: app)
                 XCTAssertEqual(method.value as? String, "DEXA")
             }
             let field = app.textFields["Body fat percentage value"]
@@ -416,6 +411,63 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertTrue(segment.waitForExistence(timeout: 8))
         segment.tap()
         XCTAssertTrue(segment.isSelected)
+    }
+
+    private func selectMenuOption(_ label: String, from control: XCUIElement, in app: XCUIApplication) {
+        XCTAssertTrue(control.isHittable)
+        control.tap()
+        let menu = app.collectionViews.containing(.button, identifier: label).firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        let option = menu.buttons[label]
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        // Native menus can extend below the window at large text sizes. Scroll
+        // inside their visible bounds before acting on the complete option.
+        let viewport = menu.frame.intersection(app.windows.firstMatch.frame).insetBy(dx: 0, dy: 8)
+        XCTAssertGreaterThan(viewport.height, 88)
+        let attempts = scrollToContain(option, in: viewport, app: app)
+        XCTAssertTrue(option.isEnabled)
+        XCTAssertGreaterThan(option.frame.width, 0)
+        XCTAssertGreaterThan(option.frame.height, 0)
+        XCTAssertTrue(viewport.contains(option.frame), attempts.joined(separator: "\n"))
+        // iOS 26 can vend an invalid activation point for a visible menu item.
+        // Use its verified native frame; the caller still checks the selection.
+        option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(menu.waitForNonExistence(timeout: 5))
+    }
+
+    func testEditorialUnsupportedWeightKeepsRawValueAndReviewVisible() {
+        for largestText in [false, true] {
+            let app = launchEditorial(extra: ["-lybUITestHomeV2HistoricalOnlyFixture"], largestText: largestText)
+            let review = app.descendants(matching: .any)["home_v2_weight_review_graphic"]
+            XCTAssertTrue(review.waitForExistence(timeout: 30))
+            XCTAssertTrue(review.label.contains("17.99"), review.label)
+            XCTAssertTrue(review.label.contains("kg"), review.label)
+            XCTAssertTrue(review.label.contains(
+                "Outside the supported logging range. Source value kept unchanged."
+            ), review.label)
+            XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_graphic"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_plot"].exists,
+                           "An unsupported source value must not be rendered as a supported trend")
+            assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "weight-review-dock-\(largestText)")
+            // Today's details is empty for this historical import. Open the
+            // exact saved entry to inspect its original value and provenance.
+            app.buttons["photo_timeline_root_menu"].tap()
+            app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
+            let rows = app.buttons.matching(identifier: "home_v2_entries_row")
+            let imported = rows.matching(NSPredicate(format: "label CONTAINS %@", "17.99 kg")).firstMatch
+            XCTAssertTrue(imported.waitForExistence(timeout: 8))
+            imported.tap()
+            let rawWeight = app.descendants(matching: .any).matching(identifier: "home_v2_context_row_weight")
+            XCTAssertTrue(rawWeight.element.waitForExistence(timeout: 8))
+            XCTAssertEqual(rawWeight.count, 1)
+            XCTAssertTrue(rawWeight.element.label.contains("17.99 kg"), rawWeight.element.label)
+            XCTAssertTrue(rawWeight.element.label.contains("Withings via Apple Health"), rawWeight.element.label)
+            XCTAssertTrue(rawWeight.element.label.contains(
+                "Outside the supported logging range. Source value kept unchanged."
+            ), rawWeight.element.label)
+            capture(app, named: "weight-review-context-\(largestText)")
+            app.terminate()
+        }
     }
 
     func testHistoricalOnlyDataKeepsSourceReadingsReachableAtLargestText() {

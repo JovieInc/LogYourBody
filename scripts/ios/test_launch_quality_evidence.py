@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,22 @@ spec.loader.exec_module(evidence)
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_fixed_diagnostic_selectors_have_native_test_implementations(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / 'scripts/ios/launch-quality-audit.sh').read_text()
+        block = source.split('DIAGNOSTIC_SEVEN_TESTS=(', 1)[1].split('\n)', 1)[0]
+        selectors = re.findall(r'"(\w+/\w+)"', block)
+        self.assertEqual(len(selectors), 7)
+        self.assertEqual(len(set(selectors)), 7)
+        for selector in selectors:
+            suite, method = selector.split('/')
+            with self.subTest(selector=selector):
+                native_source = (root / f'apps/ios/LogYourBodyUITests/{suite}.swift').read_text()
+                self.assertIsNotNone(
+                    re.search(rf'\bfunc\s+{re.escape(method)}\s*\(\s*\)', native_source),
+                    f'Missing native diagnostic implementation: {selector}',
+                )
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
