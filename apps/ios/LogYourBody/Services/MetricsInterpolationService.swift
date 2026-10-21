@@ -49,9 +49,9 @@ class MetricsInterpolationService {
         private let maxGapDays: Int
         private let calendar: Calendar
 
-        // Cached trend-weight series for efficiency when querying multiple dates
-        private var trendWeightCache: [Date: InterpolatedMetric] = [:]
-        private var trendRawValues: [Date: Double] = [:]
+        // Completed days are appended chronologically. Binary search keeps
+        // chart traversal from scanning the entire cache for every query.
+        private var trendCheckpoints: [(day: Date, value: Double)] = []
         // Smoothing factor for exponential moving average (EMA).
         // Higher values react more quickly to new weigh-ins.
         private let trendAlpha: Double = 0.25
@@ -90,12 +90,10 @@ class MetricsInterpolationService {
 
             // Only completed earlier days are reusable EMA checkpoints. The
             // target day's eligible weigh-in depends on the query timestamp.
-            let cachedAnchor = trendRawValues
-                .filter { $0.key < targetDay }
-                .max { $0.key < $1.key }
+            let cachedAnchor = trendCheckpoint(before: targetDay)
             var ema = cachedAnchor?.value
             let nextDay = cachedAnchor.flatMap {
-                calendar.date(byAdding: .day, value: 1, to: $0.key)
+                calendar.date(byAdding: .day, value: 1, to: $0.day)
             }
             var currentDay = nextDay ?? firstDay
 
@@ -107,7 +105,9 @@ class MetricsInterpolationService {
                     // A gap larger than the interpolation limit cannot yield a
                     // result on any intervening day. Jump to the next known
                     // measurement instead of scanning every calendar day.
-                    if let nextMetric = metrics.first(where: { $0.date > sampleDate }) {
+                    let nextIndex = (indexOfLastMetric(onOrBefore: sampleDate) ?? -1) + 1
+                    if nextIndex < metrics.count {
+                        let nextMetric = metrics[nextIndex]
                         let nextDay = calendar.startOfDay(for: nextMetric.date)
                         if nextDay > currentDay {
                             currentDay = nextDay
@@ -142,8 +142,7 @@ class MetricsInterpolationService {
                     return trendMetric
                 }
 
-                trendWeightCache[currentDay] = trendMetric
-                trendRawValues[currentDay] = emaValue
+                trendCheckpoints.append((day: currentDay, value: emaValue))
 
                 guard let nextDay = calendar.date(byAdding: .day, value: 1, to: currentDay) else {
                     break
@@ -152,18 +151,18 @@ class MetricsInterpolationService {
             }
 
             if targetDay > processingEndDay,
-               let lastKnown = trendWeightCache[processingEndDay],
-               let anchorValue = trendRawValues[processingEndDay],
+               let anchor = trendCheckpoints.last,
+               anchor.day == processingEndDay,
                let days = calendar.dateComponents([.day], from: processingEndDay, to: targetDay).day,
                days > 0 {
                 // Match the established estimate path for the final known
                 // value. It rounds measurements to one decimal before the
-                // analytical tail continues the EMA, while anchorValue stays
-                // unrounded for numerical continuity.
-                let finalWeight = estimate(for: metrics[metrics.count - 1].date)?.value ?? anchorValue
+                // analytical tail continues the EMA, while the checkpoint
+                // stays unrounded for numerical continuity.
+                let finalWeight = estimate(for: metrics[metrics.count - 1].date)?.value ?? anchor.value
                 let decay = pow(1 - trendAlpha, Double(days))
                 return InterpolatedMetric(
-                    value: round((finalWeight + (anchorValue - finalWeight) * decay) * 10) / 10,
+                    value: round((finalWeight + (anchor.value - finalWeight) * decay) * 10) / 10,
                     isInterpolated: false,
                     isLastKnown: true,
                     confidenceLevel: nil
@@ -173,6 +172,20 @@ class MetricsInterpolationService {
             // No eligible sample was produced for this query. A completed
             // checkpoint from a later query cannot fill this unresolved day.
             return nil
+        }
+
+        private func trendCheckpoint(before day: Date) -> (day: Date, value: Double)? {
+            var low = 0
+            var high = trendCheckpoints.count
+            while low < high {
+                let middle = (low + high) / 2
+                if trendCheckpoints[middle].day < day {
+                    low = middle + 1
+                } else {
+                    high = middle
+                }
+            }
+            return low > 0 ? trendCheckpoints[low - 1] : nil
         }
 
         /// Latest weigh-in on `day` that does not look ahead of `query`.
