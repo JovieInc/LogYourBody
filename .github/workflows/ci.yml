@@ -131,6 +131,16 @@ jobs:
       - name: Test post-merge Launch Quality
         run: node --test .github/scripts/post-merge-quality.test.mjs
 
+      - name: Verify LYB correction coverage against the base revision
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          node packages/shared-lib/scripts/correction-coverage.mjs --base-ref "$BASE_SHA"
+
       - name: Detect changed surfaces locally
         id: filter
         env:
