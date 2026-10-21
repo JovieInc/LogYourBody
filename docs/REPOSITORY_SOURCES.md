@@ -285,7 +285,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/design-tokens/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f6ea52cfe8adbccfb9ce5bb7220d6f670efa7d4e2eca235becf84568f7240f0f`)
+- `packages/design-tokens/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `965a94e22b318151f22024f5972245fc614291fad99aab69fcfbc0db7fe2deb8`)
 
 ### `packages/design-tokens/package.json`: scripts
 
@@ -296,7 +296,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "build:ios": "node scripts/build-ios.js",
   "build:web": "node scripts/build-web.js",
   "clean": "rm -rf build",
-  "test": "pnpm run validate && node scripts/check-token-drift.mjs",
+  "test": "pnpm run validate && node --test scripts/check-token-drift.test.mjs && node scripts/check-token-drift.mjs",
   "validate": "node scripts/validate-tokens.js",
   "watch": "nodemon --watch tokens --exec \"pnpm run build\""
 }
