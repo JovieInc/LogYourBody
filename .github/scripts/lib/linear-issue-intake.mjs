@@ -249,7 +249,7 @@ async function readResponse(response) {
   }
 }
 
-async function linearGraphql({ query, variables, apiKey, fetchImpl = fetch }, caller) {
+export async function linearGraphql({ query, variables, apiKey, fetchImpl = fetch }, caller) {
   try {
     const response = await fetchImpl(LINEAR_API, {
       method: 'POST',
