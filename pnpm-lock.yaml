@@ -258,8 +258,8 @@ importers:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       openai:
-        specifier: ^7.32.0
-        version: 7.32.0(undici@8.11.2)(ws@8.21.0)(zod@4.6.5)
+        specifier: ^7.38.0
+        version: 7.38.0(undici@8.11.2)(ws@8.21.0)(zod@4.6.5)
       pdf-lib:
         specifier: ^1.17.1
         version: 1.17.1
@@ -6133,8 +6133,8 @@ packages:
     resolution: {integrity: sha512-VXJjc87FScF88uafS3JllDgvAm+c/Slfz06lorj2uAY34rlUu0Nt+v8wreiImcrgAjjIHp1rXpTDlLOGw29WwQ==}
     engines: {node: '>=18'}
 
-  openai@7.32.0:
-    resolution: {integrity: sha512-avqxu/jl1gsVBCBgFNPr9sTh+wZppQphuhhFy1zEvAJxEaJ4t0ery6hZdOT9kws/EcNTARoQcZs2IT3bliE1SA==}
+  openai@7.38.0:
+    resolution: {integrity: sha512-Ef+YyIeoiisZLP/tV4F4/RieJAl4OEJTyJg6gV0AXOb0T9CDkvYJoU224OY5CTmQ4zDJeku4jEHjz2b3/6Ndhw==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
@@ -13471,7 +13471,7 @@ snapshots:
     dependencies:
       mimic-function: 5.0.1
 
-  openai@7.32.0(undici@8.11.2)(ws@8.21.0)(zod@4.6.5):
+  openai@7.38.0(undici@8.11.2)(ws@8.21.0)(zod@4.6.5):
     optionalDependencies:
       undici: 8.11.2
       ws: 8.21.0

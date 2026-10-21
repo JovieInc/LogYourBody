@@ -29,7 +29,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.github/workflows/web-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `4649e062d7e213ded66b6a31b9ceae1920378f3432ff58409d68717128906653`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `dd3a6afc4d5308d025dc4c2c20a39440dc2c0e461397a3b093ac496c422619c8`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b13c1011a1ba0c906df4662854b2eca6840e0ac2bbf39c778b4dc9d37460c61b`)
 
 ### `apps/web/package.json`: engines
 
@@ -83,7 +83,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-accordion": "^1.2.20",
   "@radix-ui/react-alert-dialog": "^1.1.23",
   "@radix-ui/react-aspect-ratio": "^1.1.15",
-  "@radix-ui/react-avatar": "^1.2.6",
+  "@radix-ui/react-avatar": "^1.3.1",
   "@radix-ui/react-checkbox": "^1.3.11",
   "@radix-ui/react-collapsible": "^1.1.20",
   "@radix-ui/react-context-menu": "^2.3.7",
@@ -91,10 +91,10 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-dropdown-menu": "^2.1.24",
   "@radix-ui/react-hover-card": "^1.1.23",
   "@radix-ui/react-label": "^2.1.15",
-  "@radix-ui/react-menubar": "^1.1.24",
+  "@radix-ui/react-menubar": "^1.2.1",
   "@radix-ui/react-navigation-menu": "^1.2.22",
   "@radix-ui/react-popover": "^1.1.23",
-  "@radix-ui/react-progress": "^1.1.16",
+  "@radix-ui/react-progress": "^1.2.1",
   "@radix-ui/react-radio-group": "^1.4.7",
   "@radix-ui/react-scroll-area": "^1.2.18",
   "@radix-ui/react-select": "^2.3.8",
@@ -112,7 +112,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@statsig/statsig-node-core": "0.23.1",
   "@tailwindcss/postcss": "^4.3.3",
   "@tailwindcss/typography": "^0.5.20",
-  "@tanstack/react-query": "^5.103.2",
+  "@tanstack/react-query": "^5.104.4",
   "@types/react-syntax-highlighter": "^15.5.13",
   "@vercel/analytics": "^1.6.1",
   "@vercel/speed-insights": "^1.3.1",
@@ -132,7 +132,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "lucide-react": "^1.55.0",
   "next": "15.5.28",
   "next-themes": "^0.4.6",
-  "openai": "^6.49.0",
+  "openai": "^7.38.0",
   "pdf-lib": "^1.17.1",
   "pdf-parse": "^1.1.4",
   "pdfjs-dist": "^6.3.289",
@@ -167,7 +167,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@testing-library/jest-dom": "^6.9.1",
   "@testing-library/react": "^16.3.3",
   "@testing-library/user-event": "^14.6.7",
-  "@types/jest": "^29.5.14",
+  "@types/jest": "^30.0.0",
   "@types/js-yaml": "4.0.9",
   "@types/lodash": "^4.17.25",
   "@types/node": "^20.19.43",
@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `ded68620444bed4436636d0c53d0f163726c68de53fd36636225c7ccdb1cc958`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f89c820b230eeb9d1669081ba15ec8b71bbe2e196c9faee4114fef3ec731375b`)
 
 ### `package.json`: packageManager
 
@@ -267,8 +267,8 @@ A changed fingerprint requires review of its related documentation; it does not 
 ```json
 {
   "@commitlint/cli": "^19.8.1",
-  "@commitlint/config-conventional": "^19.8.1",
-  "@typescript-eslint/eslint-plugin": "^8.70.1",
+  "@commitlint/config-conventional": "^21.2.3",
+  "@typescript-eslint/eslint-plugin": "^8.71.0",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
   "eslint-config-prettier": "^9.1.2",
@@ -321,7 +321,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1ec9aadb1f1e7a2a873ae8f68c7def111953ea33c262534e9c0da2f1932d2fdd`)
+- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `448b9e01989f3921ac984d6a2c7bf04fca3763f4ba0bd756408127c3a51c64e1`)
 
 ### `packages/product-registry/package.json`: scripts
 
@@ -341,7 +341,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@typescript-eslint/eslint-plugin": "^8.70.1",
+  "@typescript-eslint/eslint-plugin": "^8.71.0",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
   "prettier": "^3.9.9",
@@ -349,7 +349,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b859d78a9108275186eb5499d736e7bc3ac8e5eddf1839e0ba3ff897f8001b4b`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `782cb6fdcfb14559766807165e3ceafc2fe93af9c50f9faa79558426908ee1c1`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -367,7 +367,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 ```json
 {
-  "@typescript-eslint/eslint-plugin": "^8.70.1",
+  "@typescript-eslint/eslint-plugin": "^8.71.0",
   "@typescript-eslint/parser": "^8.71.0",
   "eslint": "^9.39.5",
   "eslint-config-prettier": "^9.1.2",
