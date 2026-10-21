@@ -145,6 +145,13 @@ final class HomeV2PhotoViewerLayoutUITests: XCTestCase {
         app.launch()
         let photo = app.descendants(matching: .any)["home_v2_photo_stage"]
         XCTAssertTrue(photo.waitForExistence(timeout: 30))
+        // The first photo appears before history loads and rebuilds the pager.
+        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
+        let loaded = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [loaded], timeout: 8), .completed,
+            "Wait for the full photo fixture before tapping its pager"
+        )
         photo.tap()
         XCTAssertTrue(app.buttons["home_v2_viewer_tools"].waitForExistence(timeout: 8))
         return app
