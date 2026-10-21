@@ -167,6 +167,61 @@ final class BodyCompositionMathGoldenTests: XCTestCase {
         XCTAssertLessThan(elapsed, 2, "A cold chart trend must not cross the two-second app-hang threshold")
     }
 
+    func testTrendHistoryTraversalStaysBelowHangThreshold() throws {
+        let metrics = (0..<6_000).map { day in
+            makeMetric(
+                date: date(daysAfterStart: day).addingTimeInterval(12 * 60 * 60),
+                weight: 80 + Double(day % 7)
+            )
+        }
+        let context = try XCTUnwrap(MetricsInterpolationService.shared.makeWeightInterpolationContext(for: metrics))
+        let started = ProcessInfo.processInfo.systemUptime
+        let forward = metrics.map { context.trendWeight(for: $0.date) }
+        let backward = metrics.reversed().map { context.trendWeight(for: $0.date) }
+        let elapsed = ProcessInfo.processInfo.systemUptime - started
+        let timing = XCTAttachment(string: "Trend traversal, 6000 observations in both orders: \(elapsed) seconds")
+        timing.lifetime = .keepAlways
+        add(timing)
+
+        var ema = 80.0
+        for day in metrics.indices {
+            if day > 0 {
+                ema = 0.25 * (80 + Double(day % 7)) + 0.75 * ema
+            }
+            for candidate in [forward[day], backward[metrics.count - 1 - day]] {
+                let result = try XCTUnwrap(candidate)
+                XCTAssertEqual(result.value, (ema * 10).rounded() / 10, accuracy: 0.001)
+                XCTAssertFalse(result.isInterpolated)
+                XCTAssertFalse(result.isLastKnown)
+                XCTAssertNil(result.confidenceLevel)
+            }
+        }
+        XCTAssertLessThan(elapsed, 2, "Reusing a trend context across chart points must not hang the app")
+    }
+
+    func testSparseTrendCheckpointsPreserveGapsAndQueryOrder() throws {
+        let context = try makeWeightContext([
+            (dayOffset: 0, weight: 80),
+            (dayOffset: 40, weight: 100),
+            (dayOffset: 80, weight: 120)
+        ])
+
+        for (day, expected) in [(80, 93.8), (40, 85.0), (0, 80.0), (80, 93.8), (40, 85.0)] {
+            let result = try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: day)))
+            XCTAssertEqual(result.value, expected, accuracy: 0.001)
+            XCTAssertFalse(result.isInterpolated)
+            XCTAssertFalse(result.isLastKnown)
+            XCTAssertNil(result.confidenceLevel)
+        }
+        for day in [1, 39, 41, 79] {
+            XCTAssertNil(context.trendWeight(for: date(daysAfterStart: day)))
+        }
+        let future = try XCTUnwrap(context.trendWeight(for: date(daysAfterStart: 365 * 10)))
+        XCTAssertEqual(future.value, 120, accuracy: 0.001)
+        XCTAssertTrue(future.isLastKnown)
+        XCTAssertNil(context.trendWeight(for: date(daysAfterStart: 79)))
+    }
+
 
     func testTrendSamplingKeepsDSTMidnightExclusiveAndQueryInclusive() throws {
         for (zone, month, day, hours) in [
