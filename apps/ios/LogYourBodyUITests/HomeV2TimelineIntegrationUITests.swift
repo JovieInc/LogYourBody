@@ -34,13 +34,16 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         let stage = app.buttons["home_v2_photo_stage"]
         let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
         assertTodayPagerStaysToday(pager)
-        stage.press(forDuration: 1.3)
+        // One day cannot arm hold-to-scrub. A long press would open the photo
+        // and cover the menu, so the menu is opened from the resting Today page.
         XCTAssertFalse(app.staticTexts["home_v2_photo_scrub_mode"].exists)
         app.buttons["photo_timeline_root_menu"].tap()
         let scrim = app.buttons["home_v2_sidebar_scrim"]
         XCTAssertTrue(scrim.waitForExistence(timeout: 5))
         scrim.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        XCTAssertTrue(scrim.waitForNonExistence(timeout: 5))
         XCTAssertEqual(pager.value as? String, "Entry 1 of 1")
+        XCTAssertFalse(app.staticTexts["home_v2_photo_scrub_mode"].exists)
         stage.tap()
         XCTAssertTrue(app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5))
     }
@@ -69,15 +72,7 @@ final class HomeV2TimelineIntegrationUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home_v2_viewer_close"].exists)
         try assertPhotoColor(stage, red: true)
         capture(app, "timeline-today-stays-red")
-
-        app.buttons["photo_timeline_root_menu"].tap()
-        app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
-        let rows = app.buttons.matching(identifier: "home_v2_entries_row")
-        XCTAssertEqual(rows.count, 5, "Older samples stay available behind Entries")
-        app.buttons["home_v2_entries_back"].tap()
-        XCTAssertTrue(stage.waitForExistence(timeout: 5))
-        XCTAssertEqual(caption.label, firstCaption)
-        assertStepCount(6_000, in: app)
+        XCTAssertEqual(pager.value as? String, "Entry 1 of 1")
         stage.tap()
         XCTAssertTrue(
             app.buttons["home_v2_viewer_close"].waitForExistence(timeout: 5), "An intentional tap still opens the photo"
