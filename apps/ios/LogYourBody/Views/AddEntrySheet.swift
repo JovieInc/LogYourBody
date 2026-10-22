@@ -33,6 +33,30 @@ enum BodyFatEntryMethod: String, CaseIterable {
         raw.flatMap(Self.init(rawValue:)) == nil
     }
 
+    struct AccessibleChoice: Equatable, Identifiable {
+        let title: String
+        let value: String?
+        var id: String { title }
+    }
+
+    /// Choices shown in the sheet at accessibility sizes. A preserved reading
+    /// stays available, and every known method, including DEXA, stays selectable.
+    static func accessibleChoices(selected raw: String?) -> [AccessibleChoice] {
+        var choices: [AccessibleChoice] = []
+        var seen = Set<String>()
+        func append(title: String, value: String?) {
+            guard seen.insert(title).inserted else { return }
+            choices.append(AccessibleChoice(title: title, value: value))
+        }
+        if needsPreservedOption(raw) {
+            append(title: selectionTitle(raw), value: raw)
+        }
+        for method in allCases {
+            append(title: method.title, value: method.rawValue)
+        }
+        return choices
+    }
+
     var title: String {
         switch self {
         case .visualEstimate: "Visual Estimate"
