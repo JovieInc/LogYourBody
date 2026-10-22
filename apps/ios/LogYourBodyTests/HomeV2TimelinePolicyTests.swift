@@ -173,9 +173,9 @@ final class HomeV2TimelinePolicyTests: XCTestCase {
     func testTodayScopeKeepsImportedSamplesAndDropsOtherDays() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let importedDate = calendar.date(from: DateComponents(year: 2018, month: 11, day: 2, hour: 19, minute: 4))!
-        let today = calendar.date(from: DateComponents(year: 2026, month: 10, day: 22, hour: 8))!
-        let morning = calendar.date(from: DateComponents(year: 2026, month: 10, day: 22, hour: 7, minute: 2))!
+        let importedDate = calendar.date(from: DateComponents(year: 2_018, month: 11, day: 2, hour: 19, minute: 4))!
+        let today = calendar.date(from: DateComponents(year: 2_026, month: 10, day: 22, hour: 8))!
+        let morning = calendar.date(from: DateComponents(year: 2_026, month: 10, day: 22, hour: 7, minute: 2))!
         let imported = storedSample("historical", date: importedDate, weight: 17.99)
         let todaySample = storedSample("today", date: today, weight: 80)
         let earlierToday = storedSample("morning", date: morning, weight: 80.4)
