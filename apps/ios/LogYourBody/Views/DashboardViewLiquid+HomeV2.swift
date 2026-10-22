@@ -25,15 +25,34 @@ extension DashboardViewLiquid {
         }
     }
 
+    /// A retained selection is used only when it is still one of today's stored
+    /// samples. An older selection never becomes Today.
+    func homeV2DisplayedTodayMetric() -> BodyMetrics? {
+        let owner = authManager.currentUser?.id
+        let today = HomeV2TimelinePolicy.metrics(
+            onSameDayAs: Date(), in: bodyMetrics, owner: owner
+        )
+        if let selection = homeV2TimelineSelection,
+           let retained = today.first(where: { $0.userId == selection.id.owner && $0.id == selection.id.record }) {
+            return retained
+        }
+        return today.max { $0.date < $1.date }
+    }
+
     /// Photo-first Home behind `HomeV2Policy`; the legacy `LaunchTimelineSurface`
-    /// keeps serving when the gate is off.
+    /// keeps serving when the gate is off. The pager is this metric's calendar day.
     func homeV2Surface(for metric: BodyMetrics) -> some View {
         let unit = homeV2DisplayUnit
+        let owner = authManager.currentUser?.id
+        let todayTimeline = HomeV2TimelinePolicy.Snapshot(
+            metrics: HomeV2TimelinePolicy.metrics(onSameDayAs: metric.date, in: bodyMetrics, owner: owner),
+            owner: owner
+        )
 
         return HomeV2Surface(
             metric: metric,
-            bodyMetrics: homeV2Timeline.metrics,
-            timeline: homeV2Timeline,
+            bodyMetrics: todayTimeline.metrics,
+            timeline: todayTimeline,
             hasAnyPhotoInHistory: bodyMetrics.contains { PhotoTimelineHUDPolicy.hasUsablePhoto($0) },
             selectedID: Binding(get: { HomeV2TimelinePolicy.EntryID(metric) }, set: selectHomeV2TimelineEntry),
             weightValue: HomeV2EditorialPolicy.displayWeight(in: metric, system: currentMeasurementSystem)
