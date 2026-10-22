@@ -6,7 +6,8 @@ the fingerprint for the same underlying mistake, even when the wording changes.
 Retain receipts so recurrence survives worktrees, workflow reruns, and time gaps.
 
 Each receipt has four required evidence fields, plus the reviewed
-[classification assessments](correction-coverage.md) required by LYB-205:
+[classification and guard or prose-only annotations](correction-coverage.md)
+required by CI:
 
 ```json
 {
@@ -14,6 +15,10 @@ Each receipt has four required evidence fields, plus the reviewed
   "correction": "Keep the required check enabled when fixing its failure.",
   "source": "https://github.com/JovieInc/LogYourBody/pull/123#discussion_r456",
   "mechanization": "Add a policy regression test that rejects removal of the check.",
+  "guard": {
+    "path": "packages/shared-lib/src/example.test.ts",
+    "anchor": "rejects removal of the required check"
+  },
   "classification": {
     "codebase": {
       "feasible": false,

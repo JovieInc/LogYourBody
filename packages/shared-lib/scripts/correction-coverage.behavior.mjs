@@ -266,7 +266,8 @@ test('CLI compares real Git snapshots; deleting a guard in head cannot lower its
   );
   assert.match(readFileSync(summary, 'utf8'), /LYB owner loop/);
   rmSync(join(root, guard.path));
-  assert.throws(() => runCoverage(['--base-ref', ref], { root, env: {} }), /regression/i);
+  assert.throws(() => runCoverage(['--base-ref', ref], { root, env: {} }), /guard coverage/i);
+  writeFileSync(join(root, guard.path), anchor);
   assert.throws(() => runCoverage(['--base-ref', 'f'.repeat(40)], { root, env: {} }));
   assert.throws(
     () => runCoverage(['--base-ref', 'HEAD;echo unsafe'], { root, env: {} }),
@@ -284,6 +285,42 @@ test('CLI compares real Git snapshots; deleting a guard in head cannot lower its
   });
   assert.equal(success.status, 0, success.stderr);
   assert.equal(JSON.parse(success.stdout).repository, 'JovieInc/LogYourBody');
+});
+
+test('CI rejects lessons without a retained guard or an explicit prose-only reason', (t) => {
+  for (const row of [
+    receipt('unclassified', undefined),
+    receipt('pending', 'static'),
+    receipt('pending-code', 'codebase'),
+    receipt('unexplained', 'prose'),
+    receipt('blank-reason', 'human', { proseOnlyReason: '  ' }),
+    receipt('stale-anchor', 'static', { guard: { ...guard, anchor: 'a deleted guard anchor' } }),
+    receipt('missing-file', 'codebase', { guard: { ...guard, path: 'missing.mjs' } }),
+    receipt('mechanized-excuse', 'static', { guard, proseOnlyReason: 'Use human review.' }),
+  ]) {
+    const { root } = fixtureRepo(t, [
+      { ...row, classification: classification(row.level ?? 'static') },
+    ]);
+    assert.throws(() => runCoverage([], { root, env: {} }), /guard coverage/i, row.fingerprint);
+  }
+});
+
+test('CI accepts guarded lessons and justified prose/human lessons without inflating coverage', (t) => {
+  const rows = [
+    receipt('code', 'codebase', { guard }),
+    receipt('lint', 'static', { guard }),
+    receipt('judgment', 'human', { proseOnlyReason: 'Requires account-owner legal attestation.' }),
+    receipt('writing', 'prose', { proseOnlyReason: 'Copy tone requires editorial judgment.' }),
+  ];
+  const { root } = fixtureRepo(
+    t,
+    rows.map(({ level, ...row }) => ({ ...row, classification: classification(level) })),
+  );
+  assert.equal(runCoverage([], { root, env: {} }).percent, 50);
+  assert.throws(
+    () => report([rows[3], { ...rows[3], proseOnlyReason: 'A different explanation.' }]),
+    /conflicting/,
+  );
 });
 
 const revision = 'a'.repeat(40);
@@ -469,6 +506,11 @@ test('real CI and intake entrypoints retain coverage checking and publication wi
   assert.match(workflow, /git fetch --no-tags --depth=1 origin "\$BASE_SHA"/);
   assert.match(workflow, /correction-coverage.mjs --base-ref "\$BASE_SHA"/);
   assert.match(workflow, /github.event.merge_group.base_sha/);
+  assert.match(
+    workflow,
+    /node --test packages\/shared-lib\/scripts\/jovie-separation.behavior.mjs/,
+  );
+  assert.match(workflow, /node packages\/shared-lib\/scripts\/jovie-separation.mjs/);
   assert.match(
     readFileSync(join(root, '.github/scripts/remediation-signal-intake.mjs'), 'utf8'),
     /await runCoverageOwnerLoop\(/,

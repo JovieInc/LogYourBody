@@ -146,6 +146,11 @@ jobs:
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           node packages/shared-lib/scripts/correction-coverage.mjs --base-ref "$BASE_SHA"
 
+      - name: Verify LYB and Jovie product separation
+        run: |
+          node --test packages/shared-lib/scripts/jovie-separation.behavior.mjs
+          node packages/shared-lib/scripts/jovie-separation.mjs
+
       - name: Detect changed surfaces locally
         id: filter
         env:
