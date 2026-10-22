@@ -1289,7 +1289,10 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
     guard = module['validate_tooling']
-    assert module['REVIEWED_AUDIT_SHA256'] == '63d78b82d9cffcce75fc7c329cdb3d9d4ceb14d2534574a6e1191dc1efe80392'  # exact reviewed candidate, never the main control audit
+    live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
+    assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
+        '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
+    )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
     expected = hashlib.sha256(script.read_bytes()).hexdigest()
@@ -1713,13 +1716,16 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '63d78b82d9cffcce75fc7c329cdb3d9d4ceb14d2534574a6e1191dc1efe80392'
+    expected = '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
-    reviewed = _reviewed_diagnostic_candidate_bytes()
+    # The previous pin was the unlanded candidate. It stays a rejected fixture.
+    unlanded = _reviewed_diagnostic_candidate_bytes()
+    reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
+    assert hashlib.sha256(reviewed).hexdigest() == expected
     # Recover exact old V16 only as inert bytes, to prove real CLI refusal of it.
-    legacy = reviewed.decode()
+    legacy = unlanded.decode()
     start = legacy.index('# An unknown mode must fail')
     end = legacy.index('ROOT_DIR=', start)
     legacy = legacy[:start] + legacy[end:]
@@ -1753,7 +1759,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink']
     for scenario in fixtures:
@@ -1770,7 +1776,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'legacy-v16':
+        if scenario == 'unlanded-candidate':
+            audit.write_bytes(unlanded)
+        elif scenario == 'legacy-v16':
             audit.write_bytes(legacy_bytes)
         elif scenario == 'marker-only':
             audit.write_text('# diagnostic-seven capability marker is insufficient\n')
