@@ -3688,7 +3688,7 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["home_v2_log_weight"].waitForExistence(timeout: 5), "Done returns Home to the check-in")
     }
 
-    func testHomeV2SwipeMovesPhotoDateAndMetricsTogether() throws {
+    func testHomeV2SwipeStaysOnTodayAndPhotoHistoryPagesInTheViewer() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
 
@@ -3697,63 +3697,56 @@ final class LogYourBodyUITests: XCTestCase {
 
         let caption = app.descendants(matching: .any)["home_v2_photo_caption"]
         let value = app.descendants(matching: .any)["home_v2_weight_value"]
+        let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
         XCTAssertTrue(caption.waitForExistence(timeout: 5))
         XCTAssertTrue(value.waitForExistence(timeout: 5))
         let beforeCaption = caption.label
         let beforeValue = value.label
+        let today = expectation(for: NSPredicate(format: "value == %@", "Entry 1 of 1"), evaluatedWith: pager)
+        XCTAssertEqual(XCTWaiter.wait(for: [today], timeout: 8), .completed, "Today shows today's entry only")
 
         stage.swipeLeft()
+        XCTAssertEqual(caption.label, beforeCaption, "Swiping Today does not open an older day")
+        XCTAssertEqual(value.label, beforeValue, "Today's metric stays with today's photo")
+        attachScreenshot(named: "home-v2-swipe-stays-today", from: app)
 
-        let moved = expectation(
-            for: NSPredicate(format: "label != %@", beforeCaption),
-            evaluatedWith: caption
-        )
+        stage.tap()
+        let viewer = app.descendants(matching: .any)["home_v2_viewer_stage"]
+        XCTAssertTrue(viewer.waitForExistence(timeout: 8), "The photo discloses the rest of the history")
+        let heading = app.staticTexts["home_v2_viewer_date"]
+        XCTAssertTrue(heading.waitForExistence(timeout: 5))
+        let firstDate = heading.label
+        viewer.swipeLeft()
+        let moved = expectation(for: NSPredicate(format: "label != %@", firstDate), evaluatedWith: heading)
         XCTAssertEqual(
             XCTWaiter.wait(for: [moved], timeout: 5),
             .completed,
-            "Swiping left moves one day back through body history"
-        )
-        XCTAssertNotEqual(value.label, beforeValue, "The metric follows the selected day")
-        attachScreenshot(named: "home-v2-swipe-back", from: app)
-
-        stage.swipeRight()
-        let returned = expectation(
-            for: NSPredicate(format: "label == %@", beforeCaption),
-            evaluatedWith: caption
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [returned], timeout: 5),
-            .completed,
-            "Swiping right returns to the latest day"
+            "Paging inside the photo still moves through older days"
         )
     }
 
-    func testHomeV2ScrubberJumpsThroughBodyHistory() throws {
+    func testHomeV2ScrubberStaysOnTodayWhileEntriesKeepHistory() throws {
         let app = XCUIApplication()
         launch(app, with: ["-lybUITestPhotoTimelineHUDFixture", "-lybUITestHomeV2PhotoFixture"])
 
         let scrubber = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
-        XCTAssertTrue(scrubber.waitForExistence(timeout: 30), "The bottom scrubber travels through time")
+        XCTAssertTrue(scrubber.waitForExistence(timeout: 30), "Today still has its ruler")
 
         let caption = app.descendants(matching: .any)["home_v2_photo_caption"]
         XCTAssertTrue(caption.waitForExistence(timeout: 5))
         let beforeCaption = caption.label
 
-        // Drag from the right edge to the left: fast scrub toward the oldest day.
         let start = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.7))
         let end = scrubber.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.7))
         start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertEqual(caption.label, beforeCaption, "Today's ruler has no older day to select")
+        attachScreenshot(named: "home-v2-scrubbed-stays-today", from: app)
 
-        let moved = expectation(
-            for: NSPredicate(format: "label != %@", beforeCaption),
-            evaluatedWith: caption
-        )
-        XCTAssertEqual(
-            XCTWaiter.wait(for: [moved], timeout: 5),
-            .completed,
-            "Scrubbing resolves to the same selected day a swipe would reach"
-        )
-        attachScreenshot(named: "home-v2-scrubbed", from: app)
+        app.buttons["photo_timeline_root_menu"].tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
+        let rows = app.buttons.matching(identifier: "home_v2_entries_row")
+        let loaded = expectation(for: NSPredicate(format: "count == 5"), evaluatedWith: rows)
+        XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 8), .completed, "Older days stay in Entries")
     }
 
     func testHomeV2TimelineCoachMarkDismissesPermanently() throws {

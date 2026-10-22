@@ -51,6 +51,7 @@ extension DashboardViewLiquid {
 
     var currentMetric: BodyMetrics? {
         if layoutMode == .photoTimelineHUD, HomeV2Policy.isEnabled() {
+            if isHomeV2CheckIn { return homeV2DisplayedTodayMetric() }
             guard let selection = homeV2TimelineSelection,
                   selection.id.owner == authManager.currentUser?.id else { return nil }
             return homeV2Timeline.metric(for: selection.id)

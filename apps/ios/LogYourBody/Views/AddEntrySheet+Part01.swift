@@ -83,6 +83,7 @@ var body: some View {
                         }
                     }
                     .accessibilityIdentifier(isHomeV2WeightEntry ? "home_v2_log_sheet_content" : "add_entry_content")
+                    .clipped()
                 }
 
                 entrySaveButton
@@ -194,10 +195,14 @@ var body: some View {
     private var entryDatePicker: some View {
         Group {
             if isHomeV2WeightEntry {
+                // Compact only. A graphical calendar draws over the value.
                 DatePicker("Date", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
                     .font(.appBodySmall)
                     .foregroundStyle(Color.jovieTextSecondary)
                     .tint(.jovieText)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
                     .accessibilityIdentifier("home_v2_log_sheet_date")
             } else if usesAccessibleBodyFatLayout {
                 VStack(alignment: .leading, spacing: 8) {
@@ -240,6 +245,9 @@ var body: some View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .fixedSize(horizontal: false, vertical: true)
+        } else if isHomeV2WeightEntry {
+            BaseButton(saveButtonText, configuration: configuration, action: saveEntry)
+                .keyboardShortcut(.defaultAction)
         } else {
             BaseButton(saveButtonText, configuration: configuration, action: saveEntry)
         }
@@ -602,18 +610,19 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
 
     private var homeV2WeightEntryView: some View {
         VStack(spacing: 24) {
-            VStack(spacing: 8) {
+            // Value and unit share one row so the reading cannot paint over the unit.
+            HStack(alignment: .center, spacing: 12) {
                 TextField("0.0", text: $weight)
                     .keyboardType(.decimalPad)
-                    .scaledSystemFont(size: 64, weight: .semibold, relativeTo: .largeTitle)
+                    .font(.system(.largeTitle, design: .rounded, weight: .semibold))
                     .monospacedDigit()
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(.trailing)
                     .textFieldStyle(.plain)
                     .foregroundStyle(Color.jovieText)
                     .tint(.jovieText)
-                    .frame(maxWidth: .infinity)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     .accessibilityLabel("Weight value")
                     .accessibilityHint("Enter your weight")
                     .accessibilityIdentifier("home_v2_log_sheet_value")
@@ -628,7 +637,8 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                 }
                 .pickerStyle(.menu)
                 .tint(.jovieTextSecondary)
-                .frame(minWidth: 64, minHeight: JovieTokens.minimumHitTarget)
+                .frame(minWidth: 72, minHeight: JovieTokens.minimumHitTarget)
+                .layoutPriority(1)
                 .accessibilityValue(weightUnit)
                 .accessibilityIdentifier("home_v2_log_sheet_unit")
                 .onChange(of: weightUnit) { previous, current in

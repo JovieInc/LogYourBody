@@ -170,6 +170,30 @@ final class HomeV2TimelinePolicyTests: XCTestCase {
         }
     }
 
+    func testTodayScopeKeepsImportedSamplesAndDropsOtherDays() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let importedDate = calendar.date(from: DateComponents(year: 2_018, month: 11, day: 2, hour: 19, minute: 4))!
+        let today = calendar.date(from: DateComponents(year: 2_026, month: 10, day: 22, hour: 8))!
+        let morning = calendar.date(from: DateComponents(year: 2_026, month: 10, day: 22, hour: 7, minute: 2))!
+        let imported = storedSample("historical", date: importedDate, weight: 17.99)
+        let todaySample = storedSample("today", date: today, weight: 80)
+        let earlierToday = storedSample("morning", date: morning, weight: 80.4)
+        let foreign = storedSample("foreign", date: today, weight: 90, owner: "other")
+        let stored = [imported, todaySample, earlierToday, foreign]
+
+        let visible = HomeV2TimelinePolicy.metrics(
+            onSameDayAs: today, in: stored, owner: "owner", calendar: calendar
+        )
+
+        XCTAssertEqual(visible.map(\.id), ["today", "morning"])
+        XCTAssertEqual(stored.map(\.id), ["historical", "today", "morning", "foreign"])
+        XCTAssertEqual(stored.map(\.weight), [17.99, 80, 80.4, 90])
+        XCTAssertEqual(stored.map(\.date), [importedDate, today, morning, today])
+        XCTAssertEqual(imported.notes, "Imported from Apple Health")
+        XCTAssertEqual(imported.dataSource, "healthkit")
+    }
+
     func testUnsupportedWeightsUseMissingTrendCopy() {
         let first = entry("first", day: 0, weight: 1)
         let latest = entry("latest", day: 1, weight: Double.greatestFiniteMagnitude)
@@ -177,6 +201,17 @@ final class HomeV2TimelinePolicyTests: XCTestCase {
         let id = HomeV2TimelinePolicy.EntryID(latest)
         XCTAssertNil(snapshot.weightDeltaKilograms30d(for: id))
         XCTAssertEqual(snapshot.weightChangeSentence(for: id, system: .imperial), "No 30-day trend yet")
+    }
+
+    private func storedSample(
+        _ id: String, date: Date, weight: Double, owner: String = "owner"
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id, userId: owner, date: date, weight: weight, weightUnit: "kg",
+            bodyFatPercentage: nil, bodyFatMethod: nil, muscleMass: nil, boneMass: nil,
+            notes: "Imported from Apple Health", photoUrl: nil, dataSource: "healthkit",
+            createdAt: date, updatedAt: date
+        )
     }
 
     private func entry(
