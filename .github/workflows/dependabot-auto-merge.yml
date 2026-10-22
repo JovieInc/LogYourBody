@@ -9,6 +9,9 @@ permissions: {}
 
 jobs:
   call:
+    permissions:
+      contents: write
+      pull-requests: write
     uses: JovieInc/ci/.github/workflows/dependabot-auto-merge.yml@main
     with:
       # Enrollment itself is exact-head and does not read this label.
