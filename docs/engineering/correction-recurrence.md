@@ -5,14 +5,20 @@ Record each engineering or agent correction in
 the fingerprint for the same underlying mistake, even when the wording changes.
 Retain receipts so recurrence survives worktrees, workflow reruns, and time gaps.
 
-Each receipt has four required fields:
+Each receipt has four required evidence fields plus the
+[guard or prose-only coverage annotation](correction-coverage.md) required by CI:
 
 ```json
 {
   "fingerprint": "preserve-required-checks",
   "correction": "Keep the required check enabled when fixing its failure.",
   "source": "https://github.com/JovieInc/LogYourBody/pull/123#discussion_r456",
-  "mechanization": "Add a policy regression test that rejects removal of the check."
+  "mechanization": "Add a policy regression test that rejects removal of the check.",
+  "level": "static",
+  "guard": {
+    "path": "packages/shared-lib/src/example.test.ts",
+    "anchor": "rejects removal of the required check"
+  }
 }
 ```
 

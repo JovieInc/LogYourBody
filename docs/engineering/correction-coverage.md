@@ -12,7 +12,9 @@ service, account or credential is introduced.
 The metric reads `packages/shared-lib/corrections.json`, retaining the receipt
 contract and recurrence behavior from [LYB-209](correction-recurrence.md). Count
 one rule per normalized fingerprint, regardless of how many correction receipts
-it has. Coverage annotations are optional on existing receipts:
+it has. This ledger is also the LYB lesson inventory; do not copy Jovie's lesson
+ledger into it. LYB-206 requires every receipt to have a retained guard or an
+explicit prose-only reason:
 
 ```json
 {
@@ -30,12 +32,15 @@ it has. Coverage annotations are optional on existing receipts:
 
 This is an illustrative receipt, not an assertion that the example guard exists.
 Use the current rule's intended enforcement level: `codebase`, `static`, `prose`,
-or `human`, as defined by LYB-203. Unannotated receipts stay `unclassified` and
-remain in the overall denominator. A codebase/static rule is mechanized only
+or `human`, as defined by LYB-203. A codebase/static rule must have a guard and is mechanized only
 when its local guard file contains the specified anchor (at least 16 characters).
-Proposed guards, absent files, missing anchors, prose and human review earn no
-mechanization credit. All receipts for one fingerprint must carry identical
-coverage annotations; classification and guard selection remain separate work.
+Proposed guards, absent files and missing anchors fail CI. Prose and human review
+must instead supply a nonblank `proseOnlyReason` explaining why deterministic
+enforcement is unsuitable, for example `"Requires account-owner legal attestation."`.
+They earn no mechanization credit. A guarded receipt cannot also be prose-only.
+Unclassified receipts fail CI. All receipts for one fingerprint must carry identical
+coverage annotations, including their prose-only reason. Historical baseline
+reports still retain unclassified or unguarded rules in the denominator.
 
 Every row reports `mechanized / total distinct rules` and its percentage; the
 overall row includes every level. Zero rules is **N/A**, never 100%. The committed
@@ -48,6 +53,7 @@ Run from the repository root:
 ```sh
 node packages/shared-lib/scripts/correction-coverage.mjs
 node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/jovie-separation.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
 
@@ -64,6 +70,22 @@ level by promoting them is allowed; an empty level has no percentage to compare.
 New unmechanized rules can lower coverage and must be addressed in the same PR.
 Empty baselines establish no percentage floor. Existing quality gates remain in
 place.
+
+The same required change-detection job runs the Jovie separation grep on every
+diff, including docs-only PRs. It scans tracked and new nonignored code under
+`apps/`, `agent/`, `packages/`, `scripts/` and `.github/`, skipping symlinks and
+non-code assets. It rejects Jovie-specific environment/constant identifiers
+(`JOVIE_*`), the Jovie Linear team UUID, Jovie OAuth client IDs (`jovie-web` /
+`jovie-ios`), and Jovie feedback/correction schema namespaces. Matching is case
+insensitive and failures name the file and line without dumping source contents.
+Shared Jovie auth, JovieKit, design tokens, packages and provenance references
+remain supported. The six existing auth, GitHub App and Mac runner environment
+keys are explicitly allowed. The existing vendored Linear adapter, its compatibility
+tests and the required GBrain Doppler configuration have reasoned, per-identifier
+occurrence limits; extra occurrences or copies into another file fail.
+Exceptions live in `jovie-separation.mjs` and
+require review alongside any integration change. The behavioral suite runs both
+directly in CI and through the normal shared-lib test task.
 
 Publication uses the existing `LINEAR_API_KEY` and honors
 `REMEDIATION_INTAKE_DISABLED=1`. Missing credentials, the wrong owner team, invalid

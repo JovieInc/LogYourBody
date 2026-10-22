@@ -54,6 +54,7 @@ export function coverageReport(receipts, readGuard = readSource) {
     const annotation = JSON.stringify({
       level,
       guard: guard && { path: guard.path, anchor: guard.anchor },
+      proseOnlyReason: receipt.proseOnlyReason ?? null,
     });
     const previous = rules.get(fingerprint);
     assert.ok(
@@ -85,6 +86,29 @@ export function coverageReport(receipts, readGuard = readSource) {
     ),
     rules: entries.map(({ annotation: _annotation, ...rule }) => rule),
   };
+}
+
+export function guardCoverageReport(receipts, readGuard = readSource) {
+  const report = coverageReport(receipts, readGuard);
+  for (const receipt of receipts) {
+    const fingerprint = receipt.fingerprint.trim().toLowerCase().replace(/\s+/g, '-');
+    const rule = report.rules.find((entry) => entry.fingerprint === fingerprint);
+    if (receipt.guard) {
+      assert.ok(rule.mechanized, `guard coverage: missing guard anchor for ${fingerprint}`);
+      assert.ok(
+        receipt.proseOnlyReason == null,
+        `guard coverage: guarded lesson cannot be prose-only: ${fingerprint}`,
+      );
+    } else {
+      assert.ok(
+        ['prose', 'human'].includes(rule.level) &&
+          typeof receipt.proseOnlyReason === 'string' &&
+          receipt.proseOnlyReason.trim(),
+        `guard coverage: guard or prose-only reason required for ${fingerprint}`,
+      );
+    }
+  }
+  return report;
 }
 
 export function assertNoRegression(current, baseline) {
@@ -134,7 +158,7 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     argv.length === 0 || (argv.length === 2 && argv[0] === '--base-ref'),
     'usage: correction-coverage.mjs [--base-ref <sha|origin/main>]',
   );
-  const current = coverageReport(JSON.parse(readSource(LEDGER_PATH, { root })), (path) =>
+  const current = guardCoverageReport(JSON.parse(readSource(LEDGER_PATH, { root })), (path) =>
     readSource(path, { root }),
   );
   if (argv.length) {
