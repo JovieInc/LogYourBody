@@ -59,7 +59,7 @@
     "prettier-plugin-tailwindcss": "^0.8.1",
     "turbo": "^2.11.7",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.5"
   },
   "packageManager": "pnpm@10.34.1",
   "engines": {
@@ -73,7 +73,7 @@
       "@xmldom/xmldom": ">=0.8.15",
       "fflate": ">=0.8.3",
       "postcss": ">=8.5.23",
-      "vite": "7.3.6",
+      "vite": "7.3.7",
       "undici": "^8.10.2",
       "source-map-js": "1.2.2",
       "postcss-selector-parser": "7.1.6"
