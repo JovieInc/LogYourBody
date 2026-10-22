@@ -74,6 +74,11 @@ final class HomeV2LayoutUITests: XCTestCase {
 
         let unit = app.buttons["home_v2_log_sheet_unit"]
         XCTAssertTrue(unit.isHittable)
+        XCTAssertLessThanOrEqual(
+            field.frame.maxX, unit.frame.minX + 1,
+            "The value and unit must sit side by side without drawing over each other"
+        )
+        XCTAssertEqual(app.buttons["home_v2_log_sheet_save"].label, "Save")
         selectMenuOption("kg", from: unit, in: app)
         XCTAssertEqual(unit.value as? String, "kg")
         selectMenuOption("lbs", from: unit, in: app)
