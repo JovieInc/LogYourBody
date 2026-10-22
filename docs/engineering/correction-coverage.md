@@ -12,7 +12,7 @@ service, account or credential is introduced.
 The metric reads `packages/shared-lib/corrections.json`, retaining the receipt
 contract and recurrence behavior from [LYB-209](correction-recurrence.md). Count
 one rule per normalized fingerprint, regardless of how many correction receipts
-it has. Coverage annotations are optional on existing receipts:
+it has. Each current receipt must include a reviewed classification (LYB-205):
 
 ```json
 {
@@ -20,6 +20,16 @@ it has. Coverage annotations are optional on existing receipts:
   "correction": "Keep the required check enabled when fixing its failure.",
   "source": "https://github.com/JovieInc/LogYourBody/pull/123#discussion_r456",
   "mechanization": "Add a policy regression test rejecting removal of the check.",
+  "classification": {
+    "codebase": {
+      "feasible": false,
+      "rationale": "The correction governs repository checks rather than an application runtime path."
+    },
+    "static": {
+      "feasible": true,
+      "rationale": "A policy regression test can deterministically reject removal of the required check."
+    }
+  },
   "level": "static",
   "guard": {
     "path": "packages/shared-lib/src/example.test.ts",
@@ -29,13 +39,42 @@ it has. Coverage annotations are optional on existing receipts:
 ```
 
 This is an illustrative receipt, not an assertion that the example guard exists.
-Use the current rule's intended enforcement level: `codebase`, `static`, `prose`,
-or `human`, as defined by LYB-203. Unannotated receipts stay `unclassified` and
-remain in the overall denominator. A codebase/static rule is mechanized only
+The classifier evaluates feasibility in LYB-203 priority order and selects the
+first feasible level. Assessments must describe the correction's full invariant,
+not just a convenient partial check:
+
+| Level      | When it is enforceable here                                                                                                                                                 |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `codebase` | Runtime logic, types, schema constraints, or API design can prevent the mistake by construction. Prefer this even when a lint or review could also catch it.                |
+| `static`   | A deterministic lint, typecheck, test, or CI check can detect the violation when prevention by construction is not feasible.                                                |
+| `prose`    | A precise repository instruction or runbook can guide the action, but no reliable code or static guard can express the full rule.                                           |
+| `human`    | Contextual judgment, an external decision, or account-owner authority is unavoidable, and prose alone cannot enforce the correction. Name that dependency in the rationale. |
+
+Provide a boolean `feasible` and a nonblank `rationale` for every level up to and
+including the selected level. For each rejected level, explain why it cannot
+enforce this correction; for the selected level, describe the concrete mechanism.
+Later levels may be omitted and do not affect selection. There is no implicit
+human fallback. Empty assessments, missing reasons, unknown levels, and a
+redundant `level` that disagrees with the result fail validation. The `level`
+field is optional when classification is present.
+
+These are reviewed feasibility decisions, not keyword guesses or proof that a
+guard has shipped. Reviewers must check the rationale against the correction's
+source and code surface. Lack of an implemented guard does not justify choosing
+a higher level. JSON output includes the selected level, rationale, and ordered
+assessments; the existing owner report includes the same routing explanation.
+
+The current ledger is validated by the existing coverage CLI and CI invocation;
+every receipt, including duplicate receipts, must be classified. Immutable base
+revisions remain readable: old level-only or unannotated receipts retain their
+historical level or `unclassified` denominator when comparing coverage.
+
+A codebase/static rule is mechanized only
 when its local guard file contains the specified anchor (at least 16 characters).
 Proposed guards, absent files, missing anchors, prose and human review earn no
 mechanization credit. All receipts for one fingerprint must carry identical
-coverage annotations; classification and guard selection remain separate work.
+classification and guard annotations; selecting a route earns no mechanization
+credit by itself.
 
 Every row reports `mechanized / total distinct rules` and its percentage; the
 overall row includes every level. Zero rules is **N/A**, never 100%. The committed

@@ -32,13 +32,55 @@ function fraction(mechanized, total) {
   return { mechanized, total, percent: total ? (100 * mechanized) / total : null };
 }
 
-export function coverageReport(receipts, readGuard = readSource) {
+function classifyCorrection(receipt, required) {
+  const assessments = receipt.classification;
+  if (assessments === undefined) {
+    assert.ok(!required, `classification required: ${receipt.fingerprint}`);
+    // Retain old annotations when reading immutable coverage baselines.
+    return { level: receipt.level ?? 'unclassified', rationale: null, considered: [] };
+  }
+  const levels = LEVELS.slice(0, -1);
+  assert.ok(
+    assessments &&
+      typeof assessments === 'object' &&
+      !Array.isArray(assessments) &&
+      Object.keys(assessments).every((level) => levels.includes(level)),
+    'invalid correction classification',
+  );
+  const considered = [];
+  for (const level of levels) {
+    const assessment = assessments[level];
+    assert.ok(
+      typeof assessment?.feasible === 'boolean' &&
+        typeof assessment.rationale === 'string' &&
+        assessment.rationale.trim(),
+      `classification assessment required for ${level}: ${receipt.fingerprint}`,
+    );
+    const rationale = assessment.rationale.trim();
+    considered.push({ level, feasible: assessment.feasible, rationale });
+    if (assessment.feasible) {
+      assert.ok(
+        receipt.level === undefined || receipt.level === level,
+        `correction level conflicts with lowest enforceable level: ${receipt.fingerprint}`,
+      );
+      return { level, rationale, considered };
+    }
+  }
+  throw new Error(`no enforceable correction level: ${receipt.fingerprint}`);
+}
+
+export function coverageReport(
+  receipts,
+  readGuard = readSource,
+  { requireClassification = false } = {},
+) {
   // Share the existing receipt contract and recurrence fingerprint identity.
   planCorrectionIssues(receipts);
   const rules = new Map();
   for (const receipt of receipts) {
     const fingerprint = receipt.fingerprint.trim().toLowerCase().replace(/\s+/g, '-');
-    const level = receipt.level ?? 'unclassified';
+    const classification = classifyCorrection(receipt, requireClassification);
+    const { level } = classification;
     assert.ok(LEVELS.includes(level), 'invalid correction level');
     const guard = receipt.guard ?? null;
     if (guard) {
@@ -52,7 +94,7 @@ export function coverageReport(receipts, readGuard = readSource) {
       );
     }
     const annotation = JSON.stringify({
-      level,
+      ...classification,
       guard: guard && { path: guard.path, anchor: guard.anchor },
     });
     const previous = rules.get(fingerprint);
@@ -69,7 +111,7 @@ export function coverageReport(receipts, readGuard = readSource) {
         mechanized = false;
       }
     }
-    rules.set(fingerprint, { fingerprint, level, mechanized, annotation });
+    rules.set(fingerprint, { fingerprint, ...classification, mechanized, annotation });
   }
   const entries = [...rules.values()].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
   return {
@@ -112,6 +154,13 @@ export function assertNoRegression(current, baseline) {
 }
 
 export function renderCoverage(report) {
+  const cell = (value) =>
+    value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('|', '&#124;')
+      .replace(/\s+/g, ' ');
   const row = (name, value) =>
     `| ${name} | ${value.mechanized}/${value.total} | ${value.percent === null ? 'N/A (no rules)' : `${value.percent.toFixed(2)}%`} |`;
   return [
@@ -126,6 +175,22 @@ export function renderCoverage(report) {
     'Only codebase/static rules with a retained source anchor count as mechanized.',
     'Source linkage is not proof of guard execution. An empty ledger is N/A.',
     '',
+    '| Fingerprint | Route | Assessment in priority order |',
+    '| --- | --- | --- |',
+    ...report.rules.map(
+      (rule) =>
+        `| ${rule.fingerprint} | ${rule.level} | ${cell(
+          rule.considered.length
+            ? rule.considered
+                .map(
+                  ({ level, feasible, rationale }) =>
+                    `${level} (${feasible ? 'feasible' : 'not feasible'}): ${rationale}`,
+                )
+                .join('; ')
+            : 'Historical annotation; no feasibility assessment.',
+        )} |`,
+    ),
+    '',
   ].join('\n');
 }
 
@@ -134,8 +199,10 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     argv.length === 0 || (argv.length === 2 && argv[0] === '--base-ref'),
     'usage: correction-coverage.mjs [--base-ref <sha|origin/main>]',
   );
-  const current = coverageReport(JSON.parse(readSource(LEDGER_PATH, { root })), (path) =>
-    readSource(path, { root }),
+  const current = coverageReport(
+    JSON.parse(readSource(LEDGER_PATH, { root })),
+    (path) => readSource(path, { root }),
+    { requireClassification: true },
   );
   if (argv.length) {
     const ref = argv[1];
