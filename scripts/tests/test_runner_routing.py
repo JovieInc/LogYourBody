@@ -1289,7 +1289,10 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
     guard = module['validate_tooling']
-    assert module['REVIEWED_AUDIT_SHA256'] == '63d78b82d9cffcce75fc7c329cdb3d9d4ceb14d2534574a6e1191dc1efe80392'  # exact reviewed candidate, never the main control audit
+    live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
+    assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
+        '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
+    )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
     expected = hashlib.sha256(script.read_bytes()).hexdigest()
@@ -1350,15 +1353,29 @@ def test_focused_diagnostic_actual_actor_guard_fails_before_checkout(tmp_path: P
     for permission in ['write', 'admin']:
         assert run({'PERMISSION': permission}).returncode == 0
     for overrides in [{'GITHUB_REPOSITORY': 'other/repo'}, {'GITHUB_REF': 'refs/heads/topic'},
-                      {'GITHUB_EVENT_NAME': 'push'}, {'CHECKOUT_REF': 'main'}, {'CHECKOUT_REF': 'A' * 40},
-                      {'GITHUB_RUN_ATTEMPT': '2'}, {'GITHUB_WORKFLOW_SHA': 'c' * 40},
-                      {'GITHUB_WORKFLOW_REF': 'candidate-workflow'}, {'PERMISSION': 'read'},
-                      {'API_FAIL': 'true'}, {'HEAD_PROVEN': 'false'}]:
+                      {'GITHUB_EVENT_NAME': 'push'}, {'CHECKOUT_REF': ''}, {'CHECKOUT_REF': 'main'},
+                      {'CHECKOUT_REF': 'A' * 40}, {'GITHUB_RUN_ATTEMPT': '2'},
+                      {'GITHUB_WORKFLOW_SHA': 'c' * 40}, {'GITHUB_WORKFLOW_REF': 'candidate-workflow'},
+                      {'PERMISSION': 'read'}, {'API_FAIL': 'true'}, {'HEAD_PROVEN': 'false'},
+                      {'GITHUB_EVENT_NAME': 'pull_request'}, {'GITHUB_EVENT_NAME': 'workflow_call'}]:
         assert run(overrides).returncode != 0
     # Distinct triggering actor gets its own permission check.
     assert run({'GITHUB_TRIGGERING_ACTOR': 'second-writer'}).returncode == 0
     calls = (tmp_path / 'calls').read_text()
     assert '/collaborators/second-writer/permission' in calls
+    # Push and schedule checkout github.sha only. A caller ref is refused, and gh is not consulted.
+    for event in ('push', 'schedule'):
+        assert run({'GITHUB_EVENT_NAME': event, 'CHECKOUT_REF': 'a' * 40}).returncode != 0
+        before = (tmp_path / 'calls').read_text()
+        result = run({'GITHUB_EVENT_NAME': event, 'CHECKOUT_REF': ''})
+        assert result.returncode == 0, result.stderr
+        assert (tmp_path / 'calls').read_text() == before
+    for overrides in [{'GITHUB_EVENT_NAME': 'push', 'CHECKOUT_REF': '', 'GITHUB_REF': 'refs/heads/topic'},
+                      {'GITHUB_EVENT_NAME': 'schedule', 'CHECKOUT_REF': '', 'GITHUB_WORKFLOW_SHA': 'c' * 40},
+                      {'GITHUB_EVENT_NAME': 'push', 'CHECKOUT_REF': '', 'GITHUB_RUN_ATTEMPT': '2'},
+                      {'GITHUB_EVENT_NAME': 'schedule', 'CHECKOUT_REF': '', 'GITHUB_SHA': 'main'},
+                      {'GITHUB_EVENT_NAME': 'pull_request', 'CHECKOUT_REF': ''}]:
+        assert run(overrides).returncode != 0
 
 
 def _run_diagnostic_dispatch(tmp_path: Path, *, mode: str = '--diagnostic-seven', **overrides: str):
@@ -1475,9 +1492,16 @@ def test_focused_diagnostic_one_ui_command_even_for_infrastructure_failure_and_d
 def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_preserves_pending_runs() -> None:
     source = (_WORKFLOWS / 'ios-ui-diagnostics.yml').read_text()
     assert '  queue: max\n' in source and '  cancel-in-progress: false\n' in source
+    assert source.count('concurrency:') == 1 and source.count('  group: lyb-ui-diagnostics-seven\n') == 1
+    assert source.index('concurrency:') < source.index('jobs:')
     assert source.count('      checkout-ref:\n') == 1
-    for forbidden in ['  push:', '  pull_request:', '  schedule:', '  workflow_call:', 'uses: ./', 'mac-lane', 'secrets.']:
+    for forbidden in ['  pull_request:', '  pull_request_target:', '  workflow_call:', '  workflow_run:', 'uses: ./', 'mac-lane', 'secrets.']:
         assert forbidden not in source
+    assert '  push:\n    branches: [main]\n    paths:\n      - .github/workflows/ios-ui-diagnostics.yml\n      - scripts/ios/launch-quality-audit.sh\n' in source
+    assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
+    assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
+    assert 'push and schedule refuse a caller checkout ref.' in source
+    assert "REVIEWED_AUDIT_SHA256 = '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -1713,13 +1737,16 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '63d78b82d9cffcce75fc7c329cdb3d9d4ceb14d2534574a6e1191dc1efe80392'
+    expected = '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
-    reviewed = _reviewed_diagnostic_candidate_bytes()
+    # The previous pin was the unlanded candidate. It stays a rejected fixture.
+    unlanded = _reviewed_diagnostic_candidate_bytes()
+    reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
+    assert hashlib.sha256(reviewed).hexdigest() == expected
     # Recover exact old V16 only as inert bytes, to prove real CLI refusal of it.
-    legacy = reviewed.decode()
+    legacy = unlanded.decode()
     start = legacy.index('# An unknown mode must fail')
     end = legacy.index('ROOT_DIR=', start)
     legacy = legacy[:start] + legacy[end:]
@@ -1753,7 +1780,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink']
     for scenario in fixtures:
@@ -1770,7 +1797,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'legacy-v16':
+        if scenario == 'unlanded-candidate':
+            audit.write_bytes(unlanded)
+        elif scenario == 'legacy-v16':
             audit.write_bytes(legacy_bytes)
         elif scenario == 'marker-only':
             audit.write_text('# diagnostic-seven capability marker is insufficient\n')
