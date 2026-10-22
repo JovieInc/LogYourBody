@@ -27,6 +27,116 @@ const receipt = (fingerprint, level, extra = {}) => ({
   ...extra,
 });
 const report = (receipts) => coverageReport(receipts, () => anchor);
+const pyramid = ['codebase', 'static', 'prose', 'human'];
+const classification = (chosen) =>
+  Object.fromEntries(
+    pyramid.map((level) => [
+      level,
+      {
+        feasible: pyramid.indexOf(level) >= pyramid.indexOf(chosen),
+        rationale: `Reason for ${level}`,
+      },
+    ]),
+  );
+
+test('classifier chooses the first feasible level and retains reasons for every lower level', () => {
+  for (const level of pyramid) {
+    const value = report([receipt('route', undefined, { classification: classification(level) })]);
+    const [rule] = value.rules;
+    assert.equal(rule.level, level);
+    assert.equal(rule.rationale, `Reason for ${level}`);
+    assert.deepEqual(
+      rule.considered.map((item) => item.level),
+      pyramid.slice(0, pyramid.indexOf(level) + 1),
+    );
+    assert.equal(rule.mechanized, false);
+    assert.equal(value.levels[level].total, 1);
+    assert.match(renderCoverage(value), new RegExp(`Reason for ${level}`));
+  }
+  // Wording and an attached check cannot overrule the feasibility assessment.
+  const [rule] = report([
+    receipt('route', undefined, {
+      correction: 'Ask a human to review the prose and lint result.',
+      classification: classification('codebase'),
+      guard,
+    }),
+  ]).rules;
+  assert.equal(rule.level, 'codebase');
+  assert.equal(rule.mechanized, true);
+});
+
+test('classifier rejects missing assessments, unsupported fallbacks and conflicting annotations', () => {
+  const valid = classification('human');
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { ...valid, codebase: undefined },
+    { ...valid, codebase: { feasible: 'false', rationale: 'Not possible' } },
+    { ...valid, codebase: { feasible: false, rationale: ' ' } },
+    { ...valid, human: { feasible: false, rationale: 'No suitable reviewer' } },
+    { ...valid, typo: { feasible: true, rationale: 'Unknown level' } },
+  ]) {
+    assert.throws(
+      () => report([receipt('invalid', undefined, { classification: invalid })]),
+      /classification|assessment|enforceable/,
+    );
+  }
+  assert.throws(
+    () => report([receipt('conflict', 'human', { classification: classification('static') })]),
+    /lowest enforceable/,
+  );
+  assert.throws(
+    () =>
+      report([
+        receipt(' Same Rule ', undefined, { classification: valid }),
+        receipt('same-rule', undefined, { classification: classification('prose') }),
+      ]),
+    /conflicting/,
+  );
+  const revised = structuredClone(valid);
+  revised.codebase.rationale = 'A different reason';
+  assert.throws(
+    () =>
+      report([
+        receipt('same-rule', undefined, { classification: valid }),
+        receipt('same-rule', undefined, { classification: revised }),
+      ]),
+    /conflicting/,
+  );
+});
+
+test('current ledger requires classification while historical baselines remain readable', (t) => {
+  const legacy = receipt('retained', 'static', { guard });
+  const { root, ref } = fixtureRepo(t, [legacy]);
+  assert.throws(() => runCoverage([], { root, env: {} }), /classification required/);
+  writeFileSync(
+    join(root, LEDGER_PATH),
+    JSON.stringify([{ ...legacy, classification: classification('static') }]),
+  );
+  const value = runCoverage(['--base-ref', ref], { root, env: {} });
+  assert.equal(value.percent, 100);
+  assert.equal(value.rules[0].rationale, 'Reason for static');
+  // One unclassified receipt must fail even if an earlier receipt was classified.
+  writeFileSync(
+    join(root, LEDGER_PATH),
+    JSON.stringify([{ ...legacy, classification: classification('static') }, legacy]),
+  );
+  assert.throws(() => runCoverage([], { root, env: {} }), /classification required/);
+});
+
+test('route explanations are safe to render in the owner report table', () => {
+  const assessed = classification('static');
+  assessed.codebase.rationale = 'Needs <owner> | code\nchange';
+  assessed.static.rationale = '  Reject the invalid config  ';
+  const value = report([receipt('route', undefined, { classification: assessed })]);
+  assert.equal(value.rules[0].rationale, 'Reject the invalid config');
+  assert.match(
+    renderCoverage(value),
+    /codebase \(not feasible\): Needs &lt;owner&gt; &#124; code change/,
+  );
+  assert.match(renderCoverage(value), /static \(feasible\): Reject the invalid config/);
+});
 
 function fixtureRepo(t, receipts) {
   const root = mkdtempSync(join(tmpdir(), 'lyb-coverage-'));
@@ -146,7 +256,9 @@ test('compares exact ratios overall and per level, allowing improvements and emp
 });
 
 test('CLI compares real Git snapshots; deleting a guard in head cannot lower its baseline', (t) => {
-  const { root, ref } = fixtureRepo(t, [receipt('kept', 'static', { guard })]);
+  const { root, ref } = fixtureRepo(t, [
+    receipt('kept', 'static', { guard, classification: classification('static') }),
+  ]);
   const summary = join(root, 'summary.md');
   assert.equal(
     runCoverage(['--base-ref', ref], { root, env: { GITHUB_STEP_SUMMARY: summary } }).percent,
@@ -186,7 +298,9 @@ test('CI rejects lessons without a retained guard or an explicit prose-only reas
     receipt('missing-file', 'codebase', { guard: { ...guard, path: 'missing.mjs' } }),
     receipt('mechanized-excuse', 'static', { guard, proseOnlyReason: 'Use human review.' }),
   ]) {
-    const { root } = fixtureRepo(t, [row]);
+    const { root } = fixtureRepo(t, [
+      { ...row, classification: classification(row.level ?? 'static') },
+    ]);
     assert.throws(() => runCoverage([], { root, env: {} }), /guard coverage/i, row.fingerprint);
   }
 });
@@ -198,7 +312,10 @@ test('CI accepts guarded lessons and justified prose/human lessons without infla
     receipt('judgment', 'human', { proseOnlyReason: 'Requires account-owner legal attestation.' }),
     receipt('writing', 'prose', { proseOnlyReason: 'Copy tone requires editorial judgment.' }),
   ];
-  const { root } = fixtureRepo(t, rows);
+  const { root } = fixtureRepo(
+    t,
+    rows.map(({ level, ...row }) => ({ ...row, classification: classification(level) })),
+  );
   assert.equal(runCoverage([], { root, env: {} }).percent, 50);
   assert.throws(
     () => report([rows[3], { ...rows[3], proseOnlyReason: 'A different explanation.' }]),
