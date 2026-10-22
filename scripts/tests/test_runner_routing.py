@@ -1353,15 +1353,29 @@ def test_focused_diagnostic_actual_actor_guard_fails_before_checkout(tmp_path: P
     for permission in ['write', 'admin']:
         assert run({'PERMISSION': permission}).returncode == 0
     for overrides in [{'GITHUB_REPOSITORY': 'other/repo'}, {'GITHUB_REF': 'refs/heads/topic'},
-                      {'GITHUB_EVENT_NAME': 'push'}, {'CHECKOUT_REF': 'main'}, {'CHECKOUT_REF': 'A' * 40},
-                      {'GITHUB_RUN_ATTEMPT': '2'}, {'GITHUB_WORKFLOW_SHA': 'c' * 40},
-                      {'GITHUB_WORKFLOW_REF': 'candidate-workflow'}, {'PERMISSION': 'read'},
-                      {'API_FAIL': 'true'}, {'HEAD_PROVEN': 'false'}]:
+                      {'GITHUB_EVENT_NAME': 'push'}, {'CHECKOUT_REF': ''}, {'CHECKOUT_REF': 'main'},
+                      {'CHECKOUT_REF': 'A' * 40}, {'GITHUB_RUN_ATTEMPT': '2'},
+                      {'GITHUB_WORKFLOW_SHA': 'c' * 40}, {'GITHUB_WORKFLOW_REF': 'candidate-workflow'},
+                      {'PERMISSION': 'read'}, {'API_FAIL': 'true'}, {'HEAD_PROVEN': 'false'},
+                      {'GITHUB_EVENT_NAME': 'pull_request'}, {'GITHUB_EVENT_NAME': 'workflow_call'}]:
         assert run(overrides).returncode != 0
     # Distinct triggering actor gets its own permission check.
     assert run({'GITHUB_TRIGGERING_ACTOR': 'second-writer'}).returncode == 0
     calls = (tmp_path / 'calls').read_text()
     assert '/collaborators/second-writer/permission' in calls
+    # Push and schedule checkout github.sha only. A caller ref is refused, and gh is not consulted.
+    for event in ('push', 'schedule'):
+        assert run({'GITHUB_EVENT_NAME': event, 'CHECKOUT_REF': 'a' * 40}).returncode != 0
+        before = (tmp_path / 'calls').read_text()
+        result = run({'GITHUB_EVENT_NAME': event, 'CHECKOUT_REF': ''})
+        assert result.returncode == 0, result.stderr
+        assert (tmp_path / 'calls').read_text() == before
+    for overrides in [{'GITHUB_EVENT_NAME': 'push', 'CHECKOUT_REF': '', 'GITHUB_REF': 'refs/heads/topic'},
+                      {'GITHUB_EVENT_NAME': 'schedule', 'CHECKOUT_REF': '', 'GITHUB_WORKFLOW_SHA': 'c' * 40},
+                      {'GITHUB_EVENT_NAME': 'push', 'CHECKOUT_REF': '', 'GITHUB_RUN_ATTEMPT': '2'},
+                      {'GITHUB_EVENT_NAME': 'schedule', 'CHECKOUT_REF': '', 'GITHUB_SHA': 'main'},
+                      {'GITHUB_EVENT_NAME': 'pull_request', 'CHECKOUT_REF': ''}]:
+        assert run(overrides).returncode != 0
 
 
 def _run_diagnostic_dispatch(tmp_path: Path, *, mode: str = '--diagnostic-seven', **overrides: str):
@@ -1478,9 +1492,16 @@ def test_focused_diagnostic_one_ui_command_even_for_infrastructure_failure_and_d
 def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_preserves_pending_runs() -> None:
     source = (_WORKFLOWS / 'ios-ui-diagnostics.yml').read_text()
     assert '  queue: max\n' in source and '  cancel-in-progress: false\n' in source
+    assert source.count('concurrency:') == 1 and source.count('  group: lyb-ui-diagnostics-seven\n') == 1
+    assert source.index('concurrency:') < source.index('jobs:')
     assert source.count('      checkout-ref:\n') == 1
-    for forbidden in ['  push:', '  pull_request:', '  schedule:', '  workflow_call:', 'uses: ./', 'mac-lane', 'secrets.']:
+    for forbidden in ['  pull_request:', '  pull_request_target:', '  workflow_call:', '  workflow_run:', 'uses: ./', 'mac-lane', 'secrets.']:
         assert forbidden not in source
+    assert '  push:\n    branches: [main]\n    paths:\n      - .github/workflows/ios-ui-diagnostics.yml\n      - scripts/ios/launch-quality-audit.sh\n' in source
+    assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
+    assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
+    assert 'push and schedule refuse a caller checkout ref.' in source
+    assert "REVIEWED_AUDIT_SHA256 = '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source

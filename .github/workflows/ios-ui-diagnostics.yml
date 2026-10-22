@@ -1,5 +1,8 @@
 name: iOS UI Diagnostics (NONQUALIFYING)
 
+# workflow_dispatch remains for a token that has actions:write. A main push of
+# this file or the pinned audit script, and the daily schedule, start the same
+# job (LYB-200 / #1458). Those events checkout github.sha only.
 on:
   workflow_dispatch:
     inputs:
@@ -7,15 +10,27 @@ on:
         description: Full current repository branch-head SHA for the fixed seven-case diagnostic.
         required: true
         type: string
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/ios-ui-diagnostics.yml
+      - scripts/ios/launch-quality-audit.sh
+  schedule:
+    - cron: '0 16 * * *'
 
 permissions:
   contents: read
 
-# Preserve both running and pending diagnostic work; a full queue rejects new work.
+# Dispatch, the main push, and the daily schedule share this group, so only
+# one diagnostic runs. Pending runs stay queued; a full queue rejects the rest.
 concurrency:
   group: lyb-ui-diagnostics-seven
   cancel-in-progress: false
   queue: max
+
+env:
+  # Dispatch may name a current branch head. Push and schedule cannot.
+  DIAGNOSTIC_SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha }}
 
 jobs:
   diagnostic:
@@ -32,22 +47,33 @@ jobs:
           set -euo pipefail
           reject() { printf '::error::%s\n' "$1"; exit 1; }
           [[ "$GITHUB_REPOSITORY" == 'JovieInc/LogYourBody' && "$GITHUB_REF" == 'refs/heads/main' &&
-             "$GITHUB_EVENT_NAME" == 'workflow_dispatch' &&
              "$GITHUB_WORKFLOW_REF" == 'JovieInc/LogYourBody/.github/workflows/ios-ui-diagnostics.yml@refs/heads/main' &&
-             "$GITHUB_WORKFLOW_SHA" == "$GITHUB_SHA" ]] || reject 'Dispatch only the trusted main diagnostic workflow.'
-          [[ "$CHECKOUT_REF" =~ ^[0-9a-f]{40}$ ]] || reject 'checkout-ref must be a full lowercase SHA.'
+             "$GITHUB_WORKFLOW_SHA" == "$GITHUB_SHA" ]] || reject 'Only the trusted main diagnostic workflow may run.'
           [[ "$GITHUB_RUN_ATTEMPT" == 1 ]] || reject 'A diagnostic rerun needs a separately reviewed new execution disposition.'
-          for actor in "$GITHUB_ACTOR" "${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}"; do
-            permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$actor/permission" --jq '.permission')" || reject 'Cannot verify actor permission.'
-            [[ "$permission" == write || "$permission" == admin ]] || reject 'Dispatch and rerun actors require write access.'
-          done
-          head_proven="$(gh api "repos/$GITHUB_REPOSITORY/commits/$CHECKOUT_REF/branches-where-head" --jq 'type == "array" and any(.[]; (.name | type == "string" and length > 0) and .commit.sha == env.CHECKOUT_REF)')" || reject 'Cannot verify current repository branch head.'
-          [[ "$head_proven" == true ]] || reject 'checkout-ref must be a current repository branch head.'
-          printf 'Diagnostic source (NONQUALIFYING): %s@%s\n' "$GITHUB_REPOSITORY" "$CHECKOUT_REF"
+          case "$GITHUB_EVENT_NAME" in
+            workflow_dispatch)
+              [[ "$CHECKOUT_REF" =~ ^[0-9a-f]{40}$ ]] || reject 'checkout-ref must be a full lowercase SHA.'
+              for actor in "$GITHUB_ACTOR" "${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}"; do
+                permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$actor/permission" --jq '.permission')" || reject 'Cannot verify actor permission.'
+                [[ "$permission" == write || "$permission" == admin ]] || reject 'Dispatch and rerun actors require write access.'
+              done
+              head_proven="$(gh api "repos/$GITHUB_REPOSITORY/commits/$CHECKOUT_REF/branches-where-head" --jq 'type == "array" and any(.[]; (.name | type == "string" and length > 0) and .commit.sha == env.CHECKOUT_REF)')" || reject 'Cannot verify current repository branch head.'
+              [[ "$head_proven" == true ]] || reject 'checkout-ref must be a current repository branch head.'
+              ;;
+            push|schedule)
+              # No caller SHA. github.sha is the only checkout, and the digest pin still gates execution.
+              [[ -z "${CHECKOUT_REF:-}" ]] || reject 'push and schedule refuse a caller checkout ref.'
+              [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || reject 'The main event SHA must be a full lowercase SHA.'
+              ;;
+            *)
+              reject 'Only a reviewed main dispatch, main push, or the daily schedule may start diagnostics.'
+              ;;
+          esac
+          printf 'Diagnostic source (NONQUALIFYING): %s@%s\n' "$GITHUB_REPOSITORY" "${CHECKOUT_REF:-$GITHUB_SHA}"
 
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ inputs.checkout-ref }}
+          ref: ${{ env.DIAGNOSTIC_SOURCE_SHA }}
           fetch-depth: 0
           persist-credentials: false
           submodules: false
@@ -58,7 +84,7 @@ jobs:
       - name: Validate reviewed composed tooling before candidate execution
         shell: bash
         env:
-          CHECKOUT_REF: ${{ inputs.checkout-ref }}
+          CHECKOUT_REF: ${{ env.DIAGNOSTIC_SOURCE_SHA }}
         run: |
           python3 -I - <<'DIAGNOSTIC_TOOLING_PY'
           import hashlib
@@ -120,7 +146,7 @@ jobs:
         timeout-minutes: 43
         shell: bash
         env:
-          DIAGNOSTIC_EXPECTED_SOURCE_SHA: ${{ inputs.checkout-ref }}
+          DIAGNOSTIC_EXPECTED_SOURCE_SHA: ${{ env.DIAGNOSTIC_SOURCE_SHA }}
           DIAGNOSTIC_TRUSTED_TOOLING_FILE: ${{ runner.temp }}/diagnostic-trusted-tooling.json
           ARTIFACT_DIR: ${{ runner.temp }}/quality-diagnostics/${{ github.run_id }}-${{ github.run_attempt }}
         run: bash scripts/ios/launch-quality-audit.sh --diagnostic-seven
