@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `f89c820b230eeb9d1669081ba15ec8b71bbe2e196c9faee4114fef3ec731375b`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9fc006bdac5e56469e4297ac9cc829151bdbf57dfc678f782ec12ae846a0add0`)
 
 ### `package.json`: packageManager
 
@@ -281,7 +281,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "prettier-plugin-tailwindcss": "^0.8.1",
   "turbo": "^2.11.7",
   "typescript": "^5.9.3",
-  "vitest": "^5.0.2"
+  "vitest": "^5.0.5"
 }
 ```
 
@@ -349,7 +349,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `782cb6fdcfb14559766807165e3ceafc2fe93af9c50f9faa79558426908ee1c1`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `734295a2a2b1970bc26873a0a9b0dfa913b1a8609fc038e2aadc8be284ce10a9`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -375,11 +375,11 @@ A changed fingerprint requires review of its related documentation; it does not 
   "eslint-plugin-react": "^7.37.5",
   "eslint-plugin-react-hooks": "^5.2.0",
   "typescript": "^5.9.3",
-  "vitest": "^5.0.2"
+  "vitest": "^5.0.5"
 }
 ```
 
-- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3228ca0acd307954a34b4b5518a2b9a51aa9570e96aa4ea99a26ccff503ba140`)
+- `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b6c1c70e1101fa4006fb4633a5bf7af087ad403b642323061461adbfdac1a299`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
 - `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5c4e7893db7cd05bb3312add2b1b5a60bfcba4a68c8f9603043eaccfe75f0d27`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
