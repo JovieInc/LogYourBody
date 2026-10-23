@@ -2,6 +2,7 @@
 
 import { createStatsigAnalytics, type StatsigAnalyticsConfig } from './statsigAnalyticsAdapter';
 import { createVercelAnalytics } from './vercelAnalyticsAdapter';
+import { analyticsTierFromEnv } from './analytics-tier';
 import {
   isAnalyticsEvent,
   sanitizeAnalyticsProperties,
@@ -22,7 +23,7 @@ export interface AnalyticsPort {
 
 const config: StatsigAnalyticsConfig = {
   clientKey: process.env.NEXT_PUBLIC_STATSIG_CLIENT_KEY ?? '',
-  environmentTier: process.env.NEXT_PUBLIC_STATSIG_ENV_TIER ?? 'development',
+  environmentTier: analyticsTierFromEnv(),
 };
 
 const statsig = createStatsigAnalytics(config);

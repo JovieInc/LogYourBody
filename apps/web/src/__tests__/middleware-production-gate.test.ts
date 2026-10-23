@@ -220,41 +220,18 @@ describe('middleware production debug/test gate', () => {
     },
   );
 
-  it('assigns an explicit campaign audience through an internal rewrite and sticky cookie', async () => {
+  it('does not assign an audience, rewrite the homepage or set a cookie (LYB-226)', async () => {
     process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 = '1';
     const { default: middleware } = await import('../middleware');
-    const request = new NextRequest('https://logyourbody.com/?audience=women&goal=fat-loss');
 
-    const response = await middleware(request);
-    const rewrite = response?.headers.get('x-middleware-rewrite');
+    for (const url of [
+      'https://logyourbody.com/',
+      'https://logyourbody.com/?audience=women&goal=fat-loss',
+    ]) {
+      const response = await middleware(new NextRequest(url), {} as never);
 
-    expect(rewrite).toContain('_lyb_audience=women');
-    expect(rewrite).toContain('_lyb_assignment_source=campaign');
-    expect(response?.cookies.get('lyb_landing_audience_v1')?.value).toBe('women');
-  });
-
-  it('reuses a returning audience assignment instead of randomizing again', async () => {
-    process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 = '1';
-    const { default: middleware } = await import('../middleware');
-    const request = new NextRequest('https://logyourbody.com/', {
-      headers: { cookie: 'lyb_landing_audience_v1=men' },
-    });
-
-    const response = await middleware(request);
-    const rewrite = response?.headers.get('x-middleware-rewrite');
-
-    expect(rewrite).toContain('_lyb_audience=men');
-    expect(rewrite).toContain('_lyb_assignment_source=returning');
-  });
-
-  it('allocates an unassigned visitor to one of the two registered experiment arms', async () => {
-    process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 = '1';
-    jest.spyOn(Math, 'random').mockReturnValueOnce(0.75);
-    const { default: middleware } = await import('../middleware');
-    const response = await middleware(new NextRequest('https://logyourbody.com/'), {} as never);
-    const rewrite = response?.headers.get('x-middleware-rewrite');
-
-    expect(rewrite).toContain('_lyb_audience=women');
-    expect(rewrite).toContain('_lyb_assignment_source=experiment');
+      expect(response?.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(response?.headers.get('set-cookie')).toBeNull();
+    }
   });
 });

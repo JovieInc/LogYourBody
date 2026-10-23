@@ -20,6 +20,22 @@
     }
   },
   {
+    "fingerprint": "waitlist-public-write-rate-limit",
+    "correction": "Enforce a shared per-IP limit before waitlist inserts, return the existing form-compatible 429 response, and count rejections without contact data.",
+    "source": "https://linear.app/jovie/issue/LYB-225",
+    "mechanization": "The route reserves an atomic shared Neon counter before reading input. Required web tests cover the reachable 429 body, Retry-After, no extra waitlist insert, privacy-safe rejection counts and fail-closed behavior.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The public write route can enforce throttling before every input and persistence path; a shared counter prevents per-instance bypass."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/api/waitlist/route.ts",
+      "anchor": "const limit = await reserveWaitlistRequest(request.headers);"
+    }
+  },
+  {
     "fingerprint": "web-production-deploy-requires-smoke",
     "correction": "LYB-229: Production web deployment must check both the deployment URL and public host, including metadata and the non-persisting waitlist honeypot, and route failures to Linear instead of GitHub issues.",
     "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/.github/workflows/deploy.yml#L93-L103",
@@ -33,6 +49,58 @@
     "guard": {
       "path": ".github/scripts/web-production-smoke.mjs",
       "anchor": "export async function runWebProductionSmoke"
+    }
+  },
+  {
+    "fingerprint": "retire-placeholder-store-redirect-and-route-logs",
+    "correction": "LYB-228: Remove the unused app-store redirect and unpublished Play Store URL, and prohibit console.log in public route handlers.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/apps/web/src/app/api/app-store-redirect/route.ts#L5-L20",
+    "mechanization": "Delete the placeholder route and its obsolete test plus the unused Android URL helper; existing required lint rejects console.log in route handlers, and shared-lib tests enforce retirement and exercise forbidden logs and permitted diagnostics against the real ESLint configuration.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Removing the route and URL fixes current behavior, but runtime types cannot prevent future filesystem routes or direct console calls from reintroducing this public surface."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "Required ESLint checks reject console.log in route handlers; regression tests enforce route and Android URL removal and verify the actual lint policy rejects dot and computed log calls while allowing warning, error, and stream diagnostics."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/web-surface-cleanup.test.ts",
+      "anchor": "retires the unused store redirect and unpublished Android listing"
+    }
+  },
+  {
+    "fingerprint": "web-deploy-rejects-sensitive-public-env-placeholder",
+    "correction": "LYB-226: A Vercel sensitive NEXT_PUBLIC_* variable is pulled as the literal [SENSITIVE] and inlined into browser code, so production shipped it as the Statsig client key; the deploy must fail when any public variable or the Statsig client key is a placeholder.",
+    "source": "https://linear.app/jovie/issue/LYB-226",
+    "mechanization": "Deploy runs verify-public-build-env.mjs right after vercel pull and again over the built client output before deploying; shared-lib required tests cover placeholders, missing keys, bundle scans and the workflow step order.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The production deploy workflow can reject placeholder public variables and placeholder-bearing client output by construction, without reading or printing values."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/verify-public-build-env.mjs",
+      "anchor": "export function checkPulledEnv"
+    }
+  },
+  {
+    "fingerprint": "web-deploy-injects-validated-statsig-client-key",
+    "correction": "LYB-232: The production Statsig key was a Vercel sensitive-variable placeholder, causing initialize and event delivery to return 401. Supply the browser client key from GitHub without printing it and keep both deployment guards blocking.",
+    "source": "https://linear.app/jovie/issue/LYB-232",
+    "mechanization": "Deploy passes the NEXT_PUBLIC_STATSIG_CLIENT_KEY Actions secret to the existing environment guard, which validates the effective environment before replacing the pulled Statsig definitions. Required shared-lib tests exercise injection, invalid keys, unchanged files on failure, redaction, and workflow wiring.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing deploy guard can inject and validate the key in the actual file consumed by vercel build, preventing the pulled placeholder from overriding it while rejecting server and console credentials."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/verify-public-build-env.mjs",
+      "anchor": "if (failures.length === 0 && contents !== original) writeFileSync(paths[0], contents);"
     }
   }
 ]

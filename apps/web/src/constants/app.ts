@@ -14,7 +14,6 @@ export const APP_CONFIG = {
 
   // App Store Links
   appStoreUrl: logYourBody.links.appStore,
-  playStoreUrl: 'https://play.google.com/store/apps/details?id=com.logyourbody.app', // Coming soon
 
   // Trial & Subscription
   trialLengthDays: proPlan.trialDays,
@@ -93,10 +92,6 @@ export const APP_CONFIG = {
 } as const;
 
 // Helper functions
-export const getAppStoreUrl = (platform: 'ios' | 'android' = 'ios') => {
-  return platform === 'ios' ? APP_CONFIG.appStoreUrl : APP_CONFIG.playStoreUrl;
-};
-
 export const getSocialUrl = (platform: keyof typeof APP_CONFIG.social) => {
   return APP_CONFIG.social[platform];
 };

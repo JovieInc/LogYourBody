@@ -17,6 +17,7 @@ jest.mock('@/lib/flags/landing', () => ({
 }));
 
 import { LANDING_FLAGS } from '@/lib/flags/landing';
+import { analytics } from '@/lib/analytics';
 import { LaunchLanding } from '../LaunchLanding';
 
 const flags = LANDING_FLAGS as { APP_STORE_LIVE: boolean };
@@ -60,6 +61,15 @@ describe('LaunchLanding', () => {
       '#early-access',
     );
     expect(screen.queryByRole('link', { name: launchLandingCopy.appStoreCta })).toBeNull();
+  });
+
+  it('records the homepage launch landing id and variant', async () => {
+    await renderLanding(false);
+
+    expect(analytics.track).toHaveBeenCalledWith(
+      'web_landing_viewed',
+      expect.objectContaining({ landing_id: 'launch_waitlist_v1', variant: 'waitlist_launch' }),
+    );
   });
 
   it('switches every primary action to the App Store once the listing is live', async () => {

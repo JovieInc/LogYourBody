@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { acceptWaitlistEntry } from '@/lib/waitlist/store';
+import { reserveWaitlistRequest } from '@/lib/waitlist/rate-limit';
+import { logYourBody } from '@jovieinc/product-registry';
 
 export const runtime = 'nodejs';
 
@@ -7,12 +9,26 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const MAX_BODY_BYTES = 4_096;
 const SOURCE_PATTERN = /^[a-z0-9:_-]{1,64}$/i;
 
-function response(body: Record<string, unknown>, status: number) {
-  return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
+function response(
+  body: Record<string, unknown>,
+  status: number,
+  headers: Record<string, string> = {},
+) {
+  if (status >= 400) {
+    console.info('[api/waitlist] rejected', { count: 1, status });
+  }
+  return NextResponse.json(body, { status, headers: { ...NO_STORE_HEADERS, ...headers } });
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const limit = await reserveWaitlistRequest(request.headers);
+    if (!limit.allowed) {
+      return response({ success: false, error: logYourBody.messages.waitlist.error }, 429, {
+        'Retry-After': String(limit.retryAfterSeconds),
+      });
+    }
+
     if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {
       return response({ success: false, error: 'Content-Type must be application/json' }, 415);
     }
@@ -37,6 +53,7 @@ export async function POST(request: NextRequest) {
     // Bots commonly fill visually hidden fields. Return the same accepted
     // response without writing so they cannot tune around the trap.
     if (typeof body.website === 'string' && body.website.trim()) {
+      console.info('[api/waitlist] rejected', { count: 1, status: 202, reason: 'honeypot' });
       return response({ success: true }, 202);
     }
 

@@ -7,6 +7,7 @@ jest.mock('@/lib/analytics', () => ({
   analytics: { track: jest.fn() },
 }));
 
+const landing = { landingId: 'launch_waitlist_v1', variant: 'waitlist_launch' } as const;
 const track = analytics.track as jest.MockedFunction<typeof analytics.track>;
 const fetchMock = jest.fn();
 
@@ -27,7 +28,7 @@ describe('WaitlistForm', () => {
       status: 202,
       json: async () => ({ success: true }),
     });
-    render(<WaitlistForm />);
+    render(<WaitlistForm {...landing} />);
 
     const email = screen.getByRole('textbox', { name: 'Email' });
     fireEvent.focus(email);
@@ -50,12 +51,28 @@ describe('WaitlistForm', () => {
       'web_waitlist_submit_result',
       expect.objectContaining({ outcome: 'accepted' }),
     );
+    for (const event of [
+      'web_landing_viewed',
+      'web_waitlist_started',
+      'web_waitlist_submit_attempted',
+      'web_waitlist_submitted',
+    ]) {
+      expect(track).toHaveBeenCalledWith(
+        event,
+        expect.objectContaining({
+          landing_id: 'launch_waitlist_v1',
+          variant: 'waitlist_launch',
+          campaign: 'other',
+        }),
+      );
+    }
+    expect(JSON.stringify(track.mock.calls)).not.toContain('minimal_waitlist_v1');
     expect(JSON.stringify(track.mock.calls)).not.toContain('person@example.com');
     expect(JSON.stringify(track.mock.calls)).not.toContain('test_campaign');
   });
 
   it('announces invalid email without making a request', async () => {
-    render(<WaitlistForm />);
+    render(<WaitlistForm {...landing} />);
     fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address.');
@@ -71,7 +88,7 @@ describe('WaitlistForm', () => {
       status: 400,
       json: async () => ({ success: false }),
     });
-    render(<WaitlistForm />);
+    render(<WaitlistForm {...landing} />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
       target: { value: 'invalid@example.com' },
@@ -89,7 +106,7 @@ describe('WaitlistForm', () => {
       status: 429,
       json: async () => ({ success: false }),
     });
-    render(<WaitlistForm />);
+    render(<WaitlistForm {...landing} />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
       target: { value: 'person@example.com' },
@@ -107,7 +124,7 @@ describe('WaitlistForm', () => {
 
   it('announces a recoverable error when the request fails', async () => {
     fetchMock.mockRejectedValueOnce(new Error('offline'));
-    render(<WaitlistForm />);
+    render(<WaitlistForm {...landing} />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
       target: { value: 'person@example.com' },
@@ -121,5 +138,15 @@ describe('WaitlistForm', () => {
     expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
       outcome: 'server_error',
     });
+  });
+
+  it('reports the landing that renders the form instead of a shared default', () => {
+    render(<WaitlistForm landingId="ios_download_v1" variant="waitlist_editorial" />);
+
+    expect(track).toHaveBeenCalledWith(
+      'web_landing_viewed',
+      expect.objectContaining({ landing_id: 'ios_download_v1', variant: 'waitlist_editorial' }),
+    );
+    expect(JSON.stringify(track.mock.calls)).not.toContain('minimal_waitlist_v1');
   });
 });

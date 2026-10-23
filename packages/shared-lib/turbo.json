@@ -12,6 +12,7 @@
         "$TURBO_ROOT$/.github/workflows/deploy.yml",
         "$TURBO_ROOT$/.github/workflows/web-release-loop.yml",
         "$TURBO_ROOT$/.github/scripts/web-production-smoke*.mjs",
+        "$TURBO_ROOT$/.github/scripts/verify-public-build-env*.mjs",
         "$TURBO_ROOT$/packages/product-registry/src/products/logyourbody.mjs",
         "$TURBO_ROOT$/.github/workflows/dependabot-auto-merge.yml",
         "$TURBO_ROOT$/apps/ios/fastlane/Fastfile",
