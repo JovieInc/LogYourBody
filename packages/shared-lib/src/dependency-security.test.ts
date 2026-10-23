@@ -16,6 +16,49 @@ function expectAtLeast(version: string, minimum: string) {
 }
 
 describe('Dependabot security update resolution', () => {
+  it.each([
+    ['fast-uri', '3.1.9'],
+    ['undici', '8.12.2'],
+  ])('%s has no vulnerable locked copies below %s', (dependency, minimum) => {
+    const lockfile = readFileSync(new URL('pnpm-lock.yaml', root), 'utf8');
+    const versions = [...lockfile.matchAll(new RegExp(`^ {2}${dependency}@([^:\\s]+):`, 'gm'))];
+
+    expect(versions.length).toBeGreaterThan(0);
+    for (const [, version] of versions) expectAtLeast(version, minimum);
+  });
+
+  it.each([
+    ['fast-uri', '3.1.9'],
+    ['undici', '8.12.2'],
+  ])('%s keeps manifest, workspace and lockfile overrides consistent', (dependency, minimum) => {
+    const manifest = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
+    const workspace = readFileSync(new URL('pnpm-workspace.yaml', root), 'utf8');
+    const lockfile = readFileSync(new URL('pnpm-lock.yaml', root), 'utf8');
+    const overridePattern = new RegExp(`^ {2}${dependency}: ["']?(\\^?[\\d.]+)`, 'm');
+    const workspaceOverride = workspace.match(overridePattern)?.[1];
+
+    expect(workspaceOverride).toBe(manifest.pnpm.overrides[dependency]);
+    expect(lockfile.match(overridePattern)?.[1]).toBe(workspaceOverride);
+    expectAtLeast(workspaceOverride!.replace(/^\^/, ''), minimum);
+  });
+
+  it.each([
+    [
+      'fast-uri',
+      '3.1.9',
+      ['@commitlint/cli', '@commitlint/load', '@commitlint/config-validator', 'ajv'],
+    ],
+    ['undici', '8.12.2', ['eve']],
+  ])(
+    '%s resolves to a patched version through its installed parent',
+    (dependency, minimum, parents) => {
+      let parentRequire = createRequire(new URL('package.json', root));
+      for (const parent of parents) parentRequire = createRequire(parentRequire.resolve(parent));
+
+      expectAtLeast(parentRequire(`${dependency}/package.json`).version, minimum);
+    },
+  );
+
   describe.each(['package.json', 'packages/shared-lib/package.json'])(
     '%s installed dependencies',
     (manifest) => {

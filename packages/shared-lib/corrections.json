@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "dependabot-transitive-security-floors",
+    "correction": "LYB-236: Dependabot's pnpm update commands exited successfully while retaining vulnerable fast-uri 3.1.8 and undici 8.11.2. Enforce patched transitive floors without weakening maturity settings or Dependency Review.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40035673426",
+    "mechanization": "Both pnpm override declarations require fast-uri ^3.1.9 and undici ^8.12.2. The existing required shared-lib dependency-security tests reject vulnerable lockfile copies, inconsistent overrides and vulnerable versions resolved through the installed AJV and Eve parents.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Package-manager overrides enforce the patched minimum for every transitive parent during resolution, without a parent major upgrade or an age-gate exception."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/dependency-security.test.ts",
+      "anchor": "%s has no vulnerable locked copies below %s"
+    }
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1521: The Zod 4.6.6 manifest update left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary, and shadow parity. Regenerate the source projection with the existing tool.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40019693238/job/120640721225",
