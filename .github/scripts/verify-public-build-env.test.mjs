@@ -13,8 +13,11 @@ const workflow = readFileSync(join(root, '.github/workflows/deploy.yml'), 'utf8'
 const GOOD_KEY = 'client-unit-test-not-a-real-key';
 const goodEnv = `DATABASE_URL="postgres://example"\nNEXT_PUBLIC_STATSIG_CLIENT_KEY="${GOOD_KEY}"\nNEXT_PUBLIC_OTHER="ok"\n`;
 
-function cli(args) {
-  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+function cli(args, statsigClientKey = '') {
+  return spawnSync(process.execPath, [script, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, NEXT_PUBLIC_STATSIG_CLIENT_KEY: statsigClientKey },
+  });
 }
 
 function tempDir(t) {
@@ -61,6 +64,51 @@ test('fails on placeholder Statsig client keys', () => {
 test('the last duplicate definition of the Statsig key wins, like dotenv', () => {
   assert.deepEqual(checkPulledEnv(`NEXT_PUBLIC_STATSIG_CLIENT_KEY="changeme"\nNEXT_PUBLIC_STATSIG_CLIENT_KEY="${GOOD_KEY}"\n`), []);
   assert.equal(checkPulledEnv(`NEXT_PUBLIC_STATSIG_CLIENT_KEY="${GOOD_KEY}"\nNEXT_PUBLIC_STATSIG_CLIENT_KEY="changeme"\n`).length, 1);
+});
+
+test('rejects server, console and malformed keys before they can enter browser output', () => {
+  for (const key of ['secret-synthetic-server-key', 'console-synthetic-admin-key', 'client-', 'client-synthetic key', 'client-synthetic\nNEXT_PUBLIC_OTHER=bad']) {
+    assert.ok(checkPulledEnv(`NEXT_PUBLIC_STATSIG_CLIENT_KEY="${key}"\n`).length > 0);
+  }
+});
+
+test('CLI injects the GitHub client key into the pulled env before checking or building', (t) => {
+  const directory = tempDir(t);
+  const envFile = join(directory, '.env.production.local');
+  const serverConfig = 'DATABASE_URL="postgres://example"\nSECRET_TOKEN="[SENSITIVE]"\n';
+  for (const pulledKey of ['', 'NEXT_PUBLIC_STATSIG_CLIENT_KEY="[SENSITIVE]"\n', 'export NEXT_PUBLIC_STATSIG_CLIENT_KEY="client-old"\nNEXT_PUBLIC_STATSIG_CLIENT_KEY="[SENSITIVE]"\n']) {
+    writeFileSync(envFile, `${serverConfig}${pulledKey}`);
+    const result = cli(['env', envFile], GOOD_KEY);
+    assert.equal(result.status, 0, result.stderr);
+    const prepared = readFileSync(envFile, 'utf8');
+    assert.ok(prepared.startsWith(serverConfig), 'unrelated server configuration is preserved');
+    assert.deepEqual(parseEnv(prepared).filter(([name]) => name === 'NEXT_PUBLIC_STATSIG_CLIENT_KEY'), [['NEXT_PUBLIC_STATSIG_CLIENT_KEY', GOOD_KEY]]);
+    assert.deepEqual(checkPulledEnv(prepared), []);
+    assert.ok(!`${result.stdout}${result.stderr}`.includes(GOOD_KEY));
+  }
+});
+
+test('invalid injected keys fail without changing the file or disclosing the value', (t) => {
+  const envFile = join(tempDir(t), '.env.production.local');
+  const original = goodEnv;
+  for (const key of ['  ', '[SENSITIVE]', 'changeme', 'secret-synthetic-server-key', 'console-synthetic-admin-key', 'client-synthetic\nNEXT_PUBLIC_OTHER=bad']) {
+    writeFileSync(envFile, original);
+    const result = cli(['env', envFile], key);
+    assert.equal(result.status, 1);
+    assert.equal(readFileSync(envFile, 'utf8'), original);
+    if (key.trim()) assert.ok(!`${result.stdout}${result.stderr}`.includes(key));
+  }
+});
+
+test('injection keeps the guard blocking other redacted public variables', (t) => {
+  const envFile = join(tempDir(t), '.env.production.local');
+  const original = 'NEXT_PUBLIC_STATSIG_CLIENT_KEY="[SENSITIVE]"\nNEXT_PUBLIC_API_URL="[SENSITIVE]"\n';
+  writeFileSync(envFile, original);
+  const result = cli(['env', envFile], GOOD_KEY);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /::error::NEXT_PUBLIC_API_URL/);
+  assert.equal(readFileSync(envFile, 'utf8'), original);
+  assert.ok(!`${result.stdout}${result.stderr}`.includes(GOOD_KEY));
 });
 
 test('parses quoted, unquoted, exported and commented lines', () => {
@@ -127,6 +175,7 @@ test('deploy.yml runs the guard after vercel pull and before build, then scans b
   const deploy = index('vercel@latest deploy --prebuilt');
   assert.ok(pull < envGuard && envGuard < migrations && migrations < vercelBuild);
   assert.ok(vercelBuild < bundleGuard && bundleGuard < deploy);
+  assert.match(workflow, /- name: Verify public build environment is not a placeholder\n\s+env:\n\s+NEXT_PUBLIC_STATSIG_CLIENT_KEY: \$\{\{ secrets\.NEXT_PUBLIC_STATSIG_CLIENT_KEY \}\}/);
   assert.match(workflow, /verify-public-build-env\.mjs bundle \.vercel\/output\/static/);
   const guardSteps = workflow.split('\n').filter((line) => line.includes('verify-public-build-env.mjs'));
   assert.ok(guardSteps.every((line) => !/continue-on-error|\|\|\s*true/.test(line)));
