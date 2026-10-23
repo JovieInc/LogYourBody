@@ -5,6 +5,7 @@ import { Button } from '@jovie/ui/atoms/button';
 import { APP_CONFIG } from '@/constants/app';
 import { LANDING_PRODUCT_PROOF } from '@/lib/marketing/landing-registry';
 import { launchLandingCopy } from './launch-landing-copy';
+import type { WaitlistLandingId, WaitlistVariant } from '@/lib/analytics-schema';
 import { WaitlistForm } from './WaitlistForm';
 import styles from './EditorialLanding.module.css';
 import foundation from './LaunchLanding.module.css';
@@ -82,7 +83,15 @@ function TrendIllustration() {
   );
 }
 
-export function EditorialLanding({ appStoreLive }: { appStoreLive: boolean }) {
+export function EditorialLanding({
+  appStoreLive,
+  landingId,
+  variant,
+}: {
+  appStoreLive: boolean;
+  landingId: WaitlistLandingId;
+  variant: WaitlistVariant;
+}) {
   return (
     <div className={`${foundation.page} ${styles.page} lyb-marketing`}>
       <a href="#main-content" className={styles.skip}>
@@ -270,7 +279,7 @@ export function EditorialLanding({ appStoreLive }: { appStoreLive: boolean }) {
                 <PrimaryAction appStoreLive />
               ) : (
                 <div className={styles.form}>
-                  <WaitlistForm />
+                  <WaitlistForm landingId={landingId} variant={variant} />
                   <p className={styles.terms}>
                     We’ll email you when access opens.{' '}
                     <Link href="/privacy">Read our Privacy Policy.</Link>

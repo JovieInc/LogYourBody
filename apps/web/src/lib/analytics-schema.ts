@@ -10,9 +10,24 @@ export const WAITLIST_CAMPAIGNS = [
   'other',
 ] as const;
 
+// The rendering landing identifies itself; nothing is a shared default.
+export const WAITLIST_LANDING_IDS = [
+  'launch_waitlist_v1',
+  'ios_download_v1',
+  'minimal_waitlist_v1',
+] as const;
+export const WAITLIST_VARIANTS = [
+  'waitlist_launch',
+  'waitlist_editorial',
+  'waitlist_minimal',
+  'waitlist_editorial_v2',
+] as const;
+export type WaitlistLandingId = (typeof WAITLIST_LANDING_IDS)[number];
+export type WaitlistVariant = (typeof WAITLIST_VARIANTS)[number];
+
 const landingProperties = {
-  landing_id: ['minimal_waitlist_v1'],
-  variant: ['waitlist_minimal', 'waitlist_editorial_v2'],
+  landing_id: WAITLIST_LANDING_IDS,
+  variant: WAITLIST_VARIANTS,
   campaign: WAITLIST_CAMPAIGNS,
   audience: ['men', 'women'],
   goal: ['recomposition', 'fat-loss', 'muscle-gain'],
@@ -37,8 +52,8 @@ const eventProperties = {
 
 export type AnalyticsEvent = keyof typeof eventProperties;
 export type AnalyticsProperties = Partial<{
-  landing_id: 'minimal_waitlist_v1';
-  variant: 'waitlist_minimal' | 'waitlist_editorial_v2';
+  landing_id: WaitlistLandingId;
+  variant: WaitlistVariant;
   campaign: (typeof WAITLIST_CAMPAIGNS)[number];
   audience: 'men' | 'women';
   goal: 'recomposition' | 'fat-loss' | 'muscle-gain';

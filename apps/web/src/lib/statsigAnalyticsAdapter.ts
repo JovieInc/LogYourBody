@@ -7,6 +7,7 @@ import {
   sanitizeAnalyticsProperties,
   sanitizeAnalyticsTraits,
 } from './analytics-schema';
+import { analyticsTierFromEnv } from './analytics-tier';
 
 export interface StatsigAnalyticsConfig {
   clientKey: string;
@@ -32,7 +33,7 @@ function getOrInitClient(config: StatsigAnalyticsConfig): StatsigClient | null {
       {},
       {
         environment: {
-          tier: config.environmentTier ?? 'development',
+          tier: config.environmentTier ?? analyticsTierFromEnv(),
         },
       },
     );
@@ -58,7 +59,7 @@ function getOrInitClient(config: StatsigAnalyticsConfig): StatsigClient | null {
 export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
   const safeConfig: StatsigAnalyticsConfig = {
     clientKey: config.clientKey,
-    environmentTier: config.environmentTier ?? 'development',
+    environmentTier: config.environmentTier ?? analyticsTierFromEnv(),
   };
 
   return {
