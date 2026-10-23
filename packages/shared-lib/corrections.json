@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "storekit-tests-share-one-session-and-wait-for-clean-state",
+    "correction": "LYB-231: StoreKit purchase-and-restore tests created and released a new SKTestSession per test, so a previous session's asynchronous teardown could erase the next test's purchase (run 40011070495: purchase verified, then restore found no subscriptions). Use one process-wide session and wait for a verifiably clean StoreKit state before each test.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40011070495",
+    "mechanization": "StoreKitPurchaseRestoreTests creates the SKTestSession once through a single accessor and resets it in setUp behind a bounded clean-state gate (no transactions, no entitlements), without changing any lifecycle assertion. The required iOS StoreKit job runs it on every iOS change and on main, and the job script names the failure signature on any recurrence.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One private accessor owns the only SKTestSession and every lifecycle test obtains it through that accessor, so the per-test create-and-release pattern that raced StoreKit teardown no longer exists in the test target."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
+      "anchor": "private static func session() throws -> SKTestSession"
+    }
+  },
+  {
     "fingerprint": "storekit-warmup-diagnostics-respect-swiftlint",
     "correction": "LYB-231: Retain visible bounded StoreKit warm-up diagnostics without print calls, which fail the required strict SwiftLint launch-quality gate.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/39981178977/job/120508725000",
