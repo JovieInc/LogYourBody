@@ -82,9 +82,9 @@ Historically it opened a repair pull request when the primary `CI` workflow fail
 
 Runs after changes land on `main`. The web job installs, validates, builds, and deploys a prebuilt Vercel production artifact from GitHub Actions. Vercel Git deployments stay disabled on `main`, while non-main branches can produce the required Preview deployments through the existing GitHub integration.
 
-### `web-release-loop.yml`
+After deployment, `.github/scripts/web-production-smoke.mjs` checks the Vercel deployment URL and the production host from the product registry, following redirects. Both must return 200 for `/`, `/privacy`, `/terms`, `/health-disclosure`, `/support`, `/download/ios`, `/robots.txt`, and `/sitemap.xml`. Public pages must have a product title and a production canonical URL. The waitlist POST sends only a filled `website` honeypot (no email) and requires 202 with `success: true`, without persisting a registration. Each check has three attempts with bounded backoff and a 10-second request timeout; results appear in the run summary.
 
-Reusable/manual web release loop. This is no longer the automatic main-branch release path.
+Smoke failure fails Deploy and is filed to Linear as `remediation:web-deploy` by the existing `remediation-signal.yml` router, subject to its intake switch and credential availability. The unused `web-release-loop.yml` was removed; `deploy.yml` owns the production path. To rerun the smoke locally: `DEPLOYMENT_URL=https://your-deployment.vercel.app node .github/scripts/web-production-smoke.mjs`.
 
 ### `ios-release-loop.yml`
 
