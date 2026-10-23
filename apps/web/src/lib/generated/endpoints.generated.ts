@@ -368,6 +368,11 @@ export const endpoints = {
       reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',
+      reason:
+        'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-97',
       reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.',
     },

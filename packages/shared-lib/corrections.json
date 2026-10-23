@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "fingerprint": "correction-baselines-only-shrink",
+    "correction": "Warn on existing violations while rejecting new violations and baseline growth.",
+    "source": "https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet",
+    "mechanization": "Execute correction-ratchet.mjs against the exact Git base in required CI, with behavioral tests rejecting changed values, new findings, and baseline growth.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This invariant governs repository correction guards and edits to their baselines, outside an application runtime path."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required CI runner compares complete findings with immutable base evidence, and regression tests exercise the real scanner and Git snapshots."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-ratchet.behavior.mjs",
+      "anchor": "baseline edits cannot grandfather new violations"
+    }
+  }
+]

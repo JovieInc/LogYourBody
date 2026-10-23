@@ -95,7 +95,7 @@ export function coverageReport(
     }
     const annotation = JSON.stringify({
       ...classification,
-      guard: guard && { path: guard.path, anchor: guard.anchor },
+      guard: guard && { path: guard.path, anchor: guard.anchor, ratchet: guard.ratchet },
       proseOnlyReason: receipt.proseOnlyReason ?? null,
     });
     const previous = rules.get(fingerprint);

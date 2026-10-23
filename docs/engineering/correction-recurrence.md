@@ -32,8 +32,8 @@ required by CI:
 }
 ```
 
-The example is illustrative; the ledger starts empty rather than inventing past
-corrections. Use sanitized evidence links and concise descriptions; never store
+The example is illustrative; record actual sourced corrections rather than
+inventing past receipts. Use sanitized evidence links and concise descriptions; never store
 secrets, private transcripts, or customer data. A source must be an HTTPS URL
 identifying a distinct correction (for example, a review comment permalink).
 Replaying the same URL counts once per fingerprint. Separate corrections within
@@ -46,12 +46,16 @@ probe runs on `main`. This includes successful CI runs: filing does not depend o
 a red check or on the homepage's two-red guard. No additional clock, workflow,
 account, or credential is needed.
 
-One receipt does nothing. Two different source URLs with the same fingerprint
+The first receipt requires a same-PR guard when feasible under
+[LYB-208](correction-mechanization.md); it does not create a recurrence issue.
+Two different source URLs with the same fingerprint
 automatically upsert one Linear issue on team **LYB**, in **Todo**, labeled
 **agent-ready** and with an exact `remediation:correction-<hash>` deduplication
 label. Its description includes the correction receipts, proposed guards, repo,
 and acceptance criteria requiring deterministic prevention and a failing-then-
-passing regression test. Further receipts update that issue. Completed or canceled
+passing regression test, warn-then-ratchet handling for existing debt, and the
+existing automatic merge queue path after CI passes. Further receipts update
+that issue. Completed or canceled
 issues retain their state when old evidence is replayed; the intake never treats
 a green build as proof the mechanization task is complete.
 

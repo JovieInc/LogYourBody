@@ -82,7 +82,8 @@ prose-only annotations; selecting a route earns no mechanization credit by itsel
 
 Every row reports `mechanized / total distinct rules` and its percentage; the
 overall row includes every level. Zero rules is **N/A**, never 100%. The committed
-ledger currently contains no receipts, so initial coverage is N/A. These are
+ledger includes LYB-208's baseline nonregression correction and its executable
+regression guard. These are
 reviewed source-linkage metrics, not proof that the guards executed or that every
 historical correction has been captured.
 
@@ -108,6 +109,11 @@ level by promoting them is allowed; an empty level has no percentage to compare.
 New unmechanized rules can lower coverage and must be addressed in the same PR.
 Empty baselines establish no percentage floor. Existing quality gates remain in
 place.
+
+[LYB-208](correction-mechanization.md) also runs registered executable source
+guards on this same every-diff path. Their existing violations warn against
+finding baselines that can only shrink; this is separate from, and does not
+relax, the coverage ratio or retained-guard requirements above.
 
 The same required change-detection job runs the Jovie separation grep on every
 diff, including docs-only PRs. It scans tracked and new nonignored code under
