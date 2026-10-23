@@ -146,9 +146,9 @@ final class HomeV2PhotoViewerLayoutUITests: XCTestCase {
         let photo = app.descendants(matching: .any)["home_v2_photo_stage"]
         XCTAssertTrue(photo.waitForExistence(timeout: 30))
         let pager = app.descendants(matching: .any)["home_v2_timeline_pager"]
-        let today = expectation(for: NSPredicate(format: "value == %@", "Entry 1 of 1"), evaluatedWith: pager)
-        XCTAssertEqual(XCTWaiter.wait(for: [today], timeout: 8), .completed, "Today shows today's photo only")
-        // History still has to finish loading before the viewer can scrub it.
+        let today = expectation(for: NSPredicate(format: "value == %@", "Entry 5 of 5"), evaluatedWith: pager)
+        XCTAssertEqual(XCTWaiter.wait(for: [today], timeout: 8), .completed, "Home exposes the complete owned photo history")
+        // Entries and the viewer must expose that same owned history.
         app.buttons["photo_timeline_root_menu"].tap()
         app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["home_v2_entries"].waitForExistence(timeout: 8))

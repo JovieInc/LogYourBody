@@ -186,6 +186,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-74', reason: 'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.' },
       { value: 'https://linear.app/jovie/issue/LYB-95', reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.' },
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
+      { value: 'https://linear.app/jovie/issue/LYB-169/p0-repair-weight-logger-overdraw-simplify-single-value-flow-and', reason: 'LYB-169 founder-confirmed October14 Home-history amendment; correction-ledger source citation only, not a runtime endpoint.' },
       { value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet', reason: 'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.' },
       { value: 'https://linear.app/jovie/issue/LYB-225', reason: 'LYB-225 source evidence for the public waitlist rate-limit correction.' },
       { value: 'https://linear.app/jovie/issue/LYB-226', reason: 'LYB-226 source evidence for the public build environment placeholder correction.' },

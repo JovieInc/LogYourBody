@@ -170,7 +170,7 @@ final class HomeV2TimelinePolicyTests: XCTestCase {
         }
     }
 
-    func testTodayScopeKeepsImportedSamplesAndDropsOtherDays() {
+    func testExplicitDayScopeDoesNotReplaceOwnedHomeHistory() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let importedDate = calendar.date(from: DateComponents(year: 2_018, month: 11, day: 2, hour: 19, minute: 4))!
@@ -187,6 +187,18 @@ final class HomeV2TimelinePolicyTests: XCTestCase {
         )
 
         XCTAssertEqual(visible.map(\.id), ["today", "morning"])
+
+        // A logger/check-in may request one day; Home still owns the complete
+        // account history and retains the selected historical record by ID.
+        let home = HomeV2TimelinePolicy.Snapshot(metrics: stored, owner: "owner")
+        XCTAssertEqual(home.metrics.map(\.id), ["today", "morning", "historical"])
+        let historical = try XCTUnwrap(home.reconcile(.init(imported)))
+        XCTAssertEqual(historical.id, HomeV2TimelinePolicy.EntryID(imported))
+        XCTAssertEqual(home.metric(for: historical.id)?.date, importedDate)
+        XCTAssertNil(home.metric(for: HomeV2TimelinePolicy.EntryID(foreign)))
+        let historicalOnly = HomeV2TimelinePolicy.Snapshot(metrics: [foreign, imported], owner: "owner")
+        XCTAssertEqual(historicalOnly.metrics, [imported])
+        XCTAssertEqual(historicalOnly.reconcile(nil)?.id, HomeV2TimelinePolicy.EntryID(imported))
         XCTAssertEqual(stored.map(\.id), ["historical", "today", "morning", "foreign"])
         XCTAssertEqual(stored.map(\.weight), [17.99, 80, 80.4, 90])
         XCTAssertEqual(stored.map(\.date), [importedDate, today, morning, today])

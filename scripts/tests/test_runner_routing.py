@@ -1291,7 +1291,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
+        'be87e25de39833edb2519601a54d145b4998a7e268d9829c99aec323bfd0266c'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1501,7 +1501,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'be87e25de39833edb2519601a54d145b4998a7e268d9829c99aec323bfd0266c'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -1737,13 +1737,18 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
+    expected = 'be87e25de39833edb2519601a54d145b4998a7e268d9829c99aec323bfd0266c'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
     # The previous pin was the unlanded candidate. It stays a rejected fixture.
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
+    previous_prefix, previous_selection = reviewed.decode().split('LAUNCH_QUALITY_UI_TESTS=(', 1)
+    for identifier in _HOME_HISTORY_AFFECTED_ADDITIONS:
+        previous_selection = previous_selection.replace('  \"' + identifier + '\"\n', '', 1)
+    previous_full_bytes = (previous_prefix + 'LAUNCH_QUALITY_UI_TESTS=(' + previous_selection).encode()
+    assert hashlib.sha256(previous_full_bytes).hexdigest() == '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
     assert hashlib.sha256(reviewed).hexdigest() == expected
     # Recover exact old V16 only as inert bytes, to prove real CLI refusal of it.
     legacy = unlanded.decode()
@@ -1780,7 +1785,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'previous-full-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink']
     for scenario in fixtures:
@@ -1797,7 +1802,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'unlanded-candidate':
+        if scenario == 'previous-full-audit':
+            audit.write_bytes(previous_full_bytes)
+        elif scenario == 'unlanded-candidate':
             audit.write_bytes(unlanded)
         elif scenario == 'legacy-v16':
             audit.write_bytes(legacy_bytes)
@@ -1849,3 +1856,98 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
             assert not _diagnostic_git(root, 'ls-files', '--others', '--exclude-standard')
         else:
             assert result.returncode != 0 and not output.exists(), scenario
+
+
+_HOME_HISTORY_INHERITED_UI = (
+    'HomeV2TimelineIntegrationUITests/testPhotoHoldScrubsBothDirectionsThenAnotherHoldRestoresTap',
+    'HomeV2TimelineIntegrationUITests/testPhotoScrubResetsWhenNavigatingToTheMenuAndBack',
+    'HomeV2TimelineIntegrationUITests/testHorizontalPhotoDragPagesPixelsAndMetricsWithoutOpeningViewer',
+    'HomeV2PhotoViewerLayoutUITests/testPhotoViewerHoldScrubsAndResetsAfterToolsNavigation',
+    'LogYourBodyUITests/testProgressShareKeepsSelectedMetricAndVisibleValue',
+    'LogYourBodyUITests/testHomeV2AskSyntheticFullTurnRestoresAfterRelaunch',
+    'LogYourBodyUITests/testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity',
+    'LogYourBodyUITests/testHomeV2AskSyntheticCancelledTurnRecovers',
+    'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces',
+    'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFixedCTA',
+    'LogYourBodyUITests/testLaunchQualityGateCapturesOnboardingFirstPhotoCTA',
+    'LogYourBodyUITests/testLaunchQualityGateCapturesTimelineSurfaces',
+    'LogYourBodyUITests/testProfileLogoutSignsOutFromPushedDetail',
+    'OnboardingGoldenPathUITests/testBodyScoreOnboardingGoldenPathReachesReveal',
+    'MesocycleCanvasUITests/testReducedMotionUsesStackedDayCards',
+    'MesocycleCanvasUITests/testGoalThroughUndoKeepsTheCanvasAndReadbackTogether',
+    'ChaosEdgeCaseUITests/testChaosLaunchForwardsActualXCTestConfiguration',
+    'ChaosEdgeCaseUITests/testIntegrationDirectorySeparatesHealthAccessAndScanHistory',
+    'ChaosEdgeCaseUITests/testAddEntryAccepts300CharacterNote',
+    'ChaosEdgeCaseUITests/testAccessibilityXXXLHomeSettingsProfileHasNoLayoutAnomalies',
+    'ChaosMonkeyUITests/testNativeScrollClippingRequiresActualScrollAncestor',
+    'ChaosMonkeyUITests/testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates',
+    'ChaosMonkeyUITests/testSystemAlertsRequireKnownDenyOnlyAction',
+    'ChaosMonkeyUITests/testKeyboardDismissalPreservesDraftWithoutSending',
+    'ChaosMonkeyUITests/testProfilePhotoImportIsExcludedFromMonkeyCandidates',
+    'ChaosMonkeyUITests/testMissingActionTargetsDoNotCompleteMonkeySteps',
+    'ChaosMonkeyUITests/testExecutedNativeActionsCompleteOnlyTheirOwnBudget',
+    'ChaosMonkeyUITests/testFailedActionsExhaustAttemptsWithoutCompletion',
+)
+
+_HOME_HISTORY_AFFECTED_ADDITIONS = (
+    'HomeV2LayoutUITests/testEditorialUnsupportedWeightKeepsRawValueAndReviewVisible',
+    'HomeV2LayoutUITests/testHistoricalOnlyDataKeepsSourceReadingsReachableAtLargestText',
+    'HomeV2TimelineIntegrationUITests/testSelectedWeightOnlyDayNeverBorrowsTodaysBodyFat',
+    'HomeV2TimelineIntegrationUITests/testVerticalRulerDragDoesNotSelectOrNavigateAndHorizontalScrubStillWorks',
+    'HomeV2TimelineIntegrationUITests/testBodyFatCheckInUpdatesSelectedHistoricalPhotoWithoutChangingWeight',
+    'HomeV2TimelineIntegrationUITests/testSelectedDayStepsAtLargestTextFollowThePhotoAndRemainReachable',
+    'HomeV2TimelineIntegrationUITests/testHistoricalWeightOnlyDayInEntriesNeverBorrowsTodaysBodyFat',
+    'HomeV2PhotoViewerLayoutUITests/testExpandedDetailsDisplaysTheFullComparisonDate',
+    'HomeV2PhotoViewerLayoutUITests/testLargestTextDetailsScrollWithoutChangingThePhotoAndCanCollapse',
+    'HomeV2PhotoViewerLayoutUITests/testVerticalRulerDragScrollsWithoutSelectingAndTapStillSelects',
+    'HomeV2PhotoViewerLayoutUITests/testPhotoPagingAndRulerRemainIndependentOfDetailsScrolling',
+    'LogYourBodyUITests/testHomeV2ScrubberJumpsThroughBodyHistory',
+    'LogYourBodyUITests/testHomeV2SwipeMovesPhotoDateAndMetricsTogether',
+)
+
+
+def test_home_history_full_audit_preserves_inherited_cases_and_requires_affected_passes() -> None:
+    import copy
+    import importlib.util
+    import re
+    import pytest
+
+    source = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_text()
+    selection = 'LAUNCH_QUALITY_UI_TESTS=(' + source.split('LAUNCH_QUALITY_UI_TESTS=(', 1)[1].split('UI_RESULT_BUNDLE=', 1)[0]
+    result = subprocess.run(
+        ['bash', '-e', '-u', '-c', selection +
+         '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
+         'printf "evidence:%s\\n" "${UI_EVIDENCE_ARGS[@]}"\n'],
+        text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+    )
+    assert result.returncode == 0, result.stderr
+    selectors = [line.removeprefix('selector:') for line in result.stdout.splitlines() if line.startswith('selector:')]
+    arguments = [line.removeprefix('evidence:') for line in result.stdout.splitlines() if line.startswith('evidence:')]
+    expected = (*_HOME_HISTORY_INHERITED_UI[:16], *_HOME_HISTORY_AFFECTED_ADDITIONS, *_HOME_HISTORY_INHERITED_UI[16:])
+    assert len(_HOME_HISTORY_INHERITED_UI) == 28
+    assert len(_HOME_HISTORY_AFFECTED_ADDITIONS) == 13
+    assert len(expected) == len(set(expected)) == 41
+    assert selectors == ['-only-testing:LogYourBodyUITests/' + identifier for identifier in expected]
+    assert arguments == [part for identifier in expected for part in ('--expected-test', identifier + '()')]
+    # Bind the additions to actual registered Swift case names, including the
+    # two renamed history regressions, rather than permitting orphan selectors.
+    for identifier in _HOME_HISTORY_AFFECTED_ADDITIONS:
+        suite, method = identifier.split('/')
+        swift = (_REPO_ROOT / 'apps/ios/LogYourBodyUITests' / (suite + '.swift')).read_text()
+        assert len(re.findall(r'func\s+' + re.escape(method) + r'\s*\(', swift)) == 1, identifier
+    spec = importlib.util.spec_from_file_location('home_history_launch_evidence', _REPO_ROOT / 'scripts/ios/launch-quality-evidence.py')
+    evidence = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evidence)
+    passed = [{'nodeType': 'Test Case', 'nodeIdentifier': identifier + '()', 'result': 'Passed'} for identifier in expected]
+    assert len(evidence.validate_cases({'testNodes': passed}, [identifier + '()' for identifier in expected])) == 41
+    for index in range(len(expected)):
+        for state in ('Failed', 'Skipped', 'missing', 'duplicate'):
+            invalid = copy.deepcopy(passed)
+            if state == 'missing':
+                invalid.pop(index)
+            elif state == 'duplicate':
+                invalid.append(copy.deepcopy(invalid[index]))
+            else:
+                invalid[index]['result'] = state
+            with pytest.raises(ValueError):
+                evidence.validate_cases({'testNodes': invalid}, [identifier + '()' for identifier in expected])

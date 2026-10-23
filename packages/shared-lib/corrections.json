@@ -40,6 +40,26 @@
     }
   },
   {
+    "fingerprint": "home-history-keeps-owned-selected-moment",
+    "correction": "LYB-169 October14 amendment: Home browses owned camera-roll history with one selected moment; Today-only scope belongs to logging and check-in.",
+    "source": "https://linear.app/jovie/issue/LYB-169/p0-repair-weight-logger-overdraw-simplify-single-value-flow-and",
+    "mechanization": "Restore existing owned Home snapshot and selection lookup; preserve historical-only content. Native history regressions remain required through the existing full audit; portable routing control retains all28 cases, adds13 affected cases, and rejects missing, failed, skipped or duplicate evidence for all41. Native RED/GREEN is not yet executed.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Existing Home snapshot and owner-bound selected-moment lookup can preserve history without narrowing the Home pager to Today."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "Existing required routing tests can check exact complete selector/evidence correspondence, including inherited coverage and actual Swift case names."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "test_home_history_full_audit_preserves_inherited_cases_and_requires_affected_passes"
+    }
+  },
+  {
     "fingerprint": "waitlist-public-write-rate-limit",
     "correction": "Enforce a shared per-IP limit before waitlist inserts, return the existing form-compatible 429 response, and count rejections without contact data.",
     "source": "https://linear.app/jovie/issue/LYB-225",

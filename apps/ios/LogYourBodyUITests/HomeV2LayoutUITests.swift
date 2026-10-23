@@ -503,13 +503,16 @@ final class HomeV2LayoutUITests: XCTestCase {
     func testEditorialUnsupportedWeightKeepsRawValueAndReviewVisible() {
         for largestText in [false, true] {
             let app = launchEditorial(extra: ["-lybUITestHomeV2HistoricalOnlyFixture"], largestText: largestText)
-            XCTAssertTrue(app.descendants(matching: .any)["home_v2_day_zero"].waitForExistence(timeout: 30))
-            XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_review_graphic"].exists,
-                           "A 2018 import must not be drawn as Today")
+            let review = app.descendants(matching: .any)["home_v2_weight_review_graphic"]
+            XCTAssertTrue(review.waitForExistence(timeout: 30))
+            XCTAssertTrue(review.label.contains("17.99"), review.label)
+            XCTAssertTrue(review.label.contains("kg"), review.label)
+            XCTAssertTrue(review.label.contains(
+                "Outside the supported logging range. Source value kept unchanged."
+            ), review.label)
             XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_graphic"].exists)
             XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_plot"].exists,
                            "An unsupported source value must not be rendered as a supported trend")
-            XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
             assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "weight-review-dock-\(largestText)")
             // Today's details is empty for this historical import. Open the
             // exact saved entry to inspect its original value and provenance.
@@ -535,10 +538,12 @@ final class HomeV2LayoutUITests: XCTestCase {
     func testHistoricalOnlyDataKeepsSourceReadingsReachableAtLargestText() {
         let app = launchEditorial(extra: ["-lybUITestHomeV2HistoricalOnlyFixture"], largestText: true)
 
-        XCTAssertTrue(app.descendants(matching: .any)["home_v2_day_zero"].waitForExistence(timeout: 30))
-        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists,
-                       "Today does not scrub 2018 samples")
-        assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "historical-only-today-empty")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_day_zero"].exists)
+        let ruler = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
+        XCTAssertTrue(ruler.waitForExistence(timeout: 8))
+        XCTAssertTrue(app.windows.firstMatch.frame.contains(ruler.frame))
+        assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "historical-only-selected-day")
 
         app.buttons["photo_timeline_root_menu"].tap()
         app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
