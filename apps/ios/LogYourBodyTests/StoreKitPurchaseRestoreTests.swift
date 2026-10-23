@@ -60,10 +60,10 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
             session.resetToDefaultState()
             session.disableDialogs = true
             let attempts = Self.warmUpMaxRetries + 1
-            print("::warning::STOREKIT_WARMUP_RETRY attempt \(attempt + 1)/\(attempts): \(failure)")
+            NSLog("%@", "::warning::STOREKIT_WARMUP_RETRY attempt \(attempt + 1)/\(attempts): \(failure)")
             try? await Task.sleep(nanoseconds: 2_000_000_000)
         }
-        print("::warning title=StoreKit warm-up exhausted::STOREKIT_WARMUP_RETRY not verified; assertions decide")
+        NSLog("%@", "::warning title=StoreKit warm-up exhausted::STOREKIT_WARMUP_RETRY not verified; assertions decide")
     }
 
     func testAnnualTrialPurchaseRestoreExpiration() async throws {
