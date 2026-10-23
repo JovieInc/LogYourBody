@@ -21,9 +21,24 @@ emit_warmup_warnings() {
     echo "::warning title=StoreKit warm-up retried::StoreKit test-session warm-up logged $n retry/exhaustion event(s); see storekit.log"
   fi
 }
+# On failure, name the known StoreKit failure signature (LYB-231) so a recurrence is diagnosable from the job
+# annotations alone. Annotation only: it never changes the exit status or retries anything.
+classify_failure() {
+  local log="$RESULTS/storekit.log"
+  [[ -f "$log" ]] || return 0
+  if grep -q -- '-67818' "$log"; then
+    echo "::error title=StoreKit failure signature::certificate-expired (-67818 present in log; a warm-up-absorbed one also matches, check STOREKIT_WARMUP_RETRY)"
+  fi
+  if grep -q 'No active subscriptions found' "$log"; then
+    echo "::error title=StoreKit failure signature::restore-found-no-entitlement: purchase succeeded but StoreKit state was empty at restore (see STOREKIT_STATE_DIAG)"
+  fi
+  grep -h 'STOREKIT_STATE_DIAG' "$log" | sed 's/^.*STOREKIT_STATE_DIAG/::notice::STOREKIT_STATE_DIAG/' || true
+}
 finish() {
+  local status=$?
   git -C "$ROOT_DIR" diff HEAD --binary > "$RESULTS/source-working-tree.patch"
   emit_warmup_warnings
+  if [[ "$status" -ne 0 ]]; then classify_failure; fi
 }
 trap finish EXIT
 
