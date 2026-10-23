@@ -47,6 +47,7 @@ export const endpoints = {
     'chat_messages',
     'chat_usage_limits',
     'waitlist_entries',
+    'waitlist_rate_limits',
     'native_records',
     'training_revision_proposals',
     'training_program_revisions',
@@ -371,6 +372,10 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',
       reason:
         'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-225',
+      reason: 'LYB-225 source evidence for the public waitlist rate-limit correction.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-97',

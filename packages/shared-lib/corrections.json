@@ -20,6 +20,22 @@
     }
   },
   {
+    "fingerprint": "waitlist-public-write-rate-limit",
+    "correction": "Enforce a shared per-IP limit before waitlist inserts, return the existing form-compatible 429 response, and count rejections without contact data.",
+    "source": "https://linear.app/jovie/issue/LYB-225",
+    "mechanization": "The route reserves an atomic shared Neon counter before reading input. Required web tests cover the reachable 429 body, Retry-After, no extra waitlist insert, privacy-safe rejection counts and fail-closed behavior.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The public write route can enforce throttling before every input and persistence path; a shared counter prevents per-instance bypass."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/api/waitlist/route.ts",
+      "anchor": "const limit = await reserveWaitlistRequest(request.headers);"
+    }
+  },
+  {
     "fingerprint": "web-production-deploy-requires-smoke",
     "correction": "LYB-229: Production web deployment must check both the deployment URL and public host, including metadata and the non-persisting waitlist honeypot, and route failures to Linear instead of GitHub issues.",
     "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/.github/workflows/deploy.yml#L93-L103",
