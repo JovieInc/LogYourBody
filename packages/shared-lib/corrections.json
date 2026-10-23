@@ -70,5 +70,21 @@
       "path": "packages/shared-lib/src/web-surface-cleanup.test.ts",
       "anchor": "retires the unused store redirect and unpublished Android listing"
     }
+  },
+  {
+    "fingerprint": "web-deploy-rejects-sensitive-public-env-placeholder",
+    "correction": "LYB-226: A Vercel sensitive NEXT_PUBLIC_* variable is pulled as the literal [SENSITIVE] and inlined into browser code, so production shipped it as the Statsig client key; the deploy must fail when any public variable or the Statsig client key is a placeholder.",
+    "source": "https://linear.app/jovie/issue/LYB-226",
+    "mechanization": "Deploy runs verify-public-build-env.mjs right after vercel pull and again over the built client output before deploying; shared-lib required tests cover placeholders, missing keys, bundle scans and the workflow step order.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The production deploy workflow can reject placeholder public variables and placeholder-bearing client output by construction, without reading or printing values."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/verify-public-build-env.mjs",
+      "anchor": "export function checkPulledEnv"
+    }
   }
 ]
