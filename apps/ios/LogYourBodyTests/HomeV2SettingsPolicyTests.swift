@@ -3,6 +3,7 @@
 // LogYourBodyTests
 //
 import XCTest
+import UIKit
 @testable import LogYourBody
 
 final class HomeV2SettingsPolicyTests: XCTestCase {
@@ -33,5 +34,21 @@ final class HomeV2SettingsPolicyTests: XCTestCase {
         }
         XCTAssertEqual(HomeV2SidebarDestination.today.title, "Today")
         XCTAssertEqual(HomeV2SettingsRoute.allRoutes.count, 8)
+    }
+
+    @MainActor
+    func testSidebarDismissSwipePreservesImmediateRowTouches() {
+        let coordinator = HomeV2SidebarDismissSwipe.Coordinator()
+        let recognizer = HomeV2SidebarDismissSwipe.makeRecognizer(delegate: coordinator)
+        XCTAssertEqual(recognizer.direction, .left, "Only a left swipe dismisses the drawer")
+        XCTAssertEqual(recognizer.numberOfTouchesRequired, 1)
+        XCTAssertFalse(recognizer.cancelsTouchesInView, "Swipe observation must not cancel row buttons")
+        XCTAssertFalse(recognizer.delaysTouchesBegan, "A row press must begin immediately")
+        XCTAssertFalse(recognizer.delaysTouchesEnded, "A single row tap must not wait for swipe recognition")
+        XCTAssertEqual(
+            recognizer.delegate?.gestureRecognizer?(recognizer, shouldRecognizeSimultaneouslyWith: UITapGestureRecognizer()),
+            true,
+            "Swipe observation must coexist with the row's tap recognizer"
+        )
     }
 }

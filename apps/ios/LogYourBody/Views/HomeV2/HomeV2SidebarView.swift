@@ -3,6 +3,7 @@
 // LogYourBody
 //
 import SwiftUI
+import UIKit
 
 /// Where the sidebar goes (Pencil N1).
 enum HomeV2SidebarDestination: String, CaseIterable, Identifiable {
@@ -122,14 +123,7 @@ struct HomeV2SidebarView: View {
             .frame(maxHeight: .infinity)
             .background(HomeV2Tokens.Colors.shell)
         }
-        // Observe dismissal swipes without giving the drawer priority over row buttons.
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 30).onEnded { value in
-                if value.translation.width < -60, abs(value.translation.width) > abs(value.translation.height) {
-                    onClose()
-                }
-            }
-        )
+        .gesture(HomeV2SidebarDismissSwipe(onClose: onClose))
     }
 
     private var profile: some View {
@@ -240,5 +234,40 @@ struct HomeV2SidebarView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
+    }
+}
+
+/// Observe only left swipes, delivering row touches immediately while the
+/// recognizer decides. A parent SwiftUI drag can consume the first row tap.
+struct HomeV2SidebarDismissSwipe: UIGestureRecognizerRepresentable {
+    let onClose: () -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    static func makeRecognizer(delegate: UIGestureRecognizerDelegate) -> UISwipeGestureRecognizer {
+        let recognizer = UISwipeGestureRecognizer()
+        recognizer.direction = .left
+        recognizer.cancelsTouchesInView = false
+        recognizer.delaysTouchesBegan = false
+        recognizer.delaysTouchesEnded = false
+        recognizer.delegate = delegate
+        return recognizer
+    }
+
+    func makeUIGestureRecognizer(context: Context) -> UISwipeGestureRecognizer {
+        Self.makeRecognizer(delegate: context.coordinator)
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UISwipeGestureRecognizer, context: Context) {
+        if recognizer.state == .ended { onClose() }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            true
+        }
     }
 }

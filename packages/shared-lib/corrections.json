@@ -122,5 +122,41 @@
       "path": ".github/scripts/verify-public-build-env.mjs",
       "anchor": "if (failures.length === 0 && contents !== original) writeFileSync(paths[0], contents);"
     }
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "LYB-234: Regenerating docs/REPOSITORY_SOURCES.md is required when a tracked source changes. The shadow parity job does not block merge, so the stale projection reached main after #1518 and twice before.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/39991497517/job/120544108468",
+    "mechanization": "Detect Changes runs python3 scripts/repository_docs.py with no continue-on-error on every pull request, merge group, and main push. CI Summary fails when that job fails. The regression test executes the checker and rejects a missing or skippable step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    }
+  },
+  {
+    "fingerprint": "sidebar-swipe-preserves-first-row-tap",
+    "correction": "PR #1519 Launch Quality failed because a single centered Ask tap left the visible sidebar open before the synthetic full-turn replay started. Preserve immediate row taps while retaining left-swipe dismissal.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/39996215360/job/120560469526",
+    "mechanization": "The sidebar uses a native left-swipe recognizer that neither cancels nor delays row touches. HomeV2SettingsPolicyTests checks its actual touch-delivery configuration; the existing full-turn replay still requires one Ask tap to dismiss the drawer, and the sidebar UI regression retains swipe-then-tap coverage.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The parent gesture can explicitly preserve delivery of row-button touches while observing a directional swipe, preventing gesture arbitration from consuming a single tap. Native runtime proof remains required from Launch Quality."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Views/HomeV2/HomeV2SidebarView.swift",
+      "anchor": "recognizer.delaysTouchesEnded = false"
+    }
   }
 ]

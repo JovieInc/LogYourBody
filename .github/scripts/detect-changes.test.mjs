@@ -267,6 +267,25 @@ test('ci.yml wires detection, the iOS jobs and the CI Summary dependencies', () 
   assert.match(jobBlock('ci-summary'), /if: always\(\)[\s\S]*needs: \[detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_storekit\]/);
 });
 
+test('required CI rejects a stale repository source projection', () => {
+  assert.match(ciWorkflow, /pull_request:\n {4}branches: \[main, production\]/);
+  assert.match(ciWorkflow, /merge_group:\n {4}branches: \[main, production\]/);
+  const detection = jobBlock('detect-changes');
+  assert.doesNotMatch(detection.slice(0, detection.indexOf('\n    steps:\n')), /\n    if:/);
+  const marker = '      - name: Verify repository source projection\n';
+  const start = detection.indexOf(marker);
+  assert.notEqual(start, -1, 'detect-changes must run the repository source projection check');
+  const step = detection.slice(start + marker.length).split('\n      - ')[0];
+  assert.equal(step, '        run: python3 scripts/repository_docs.py\n');
+  assert.doesNotMatch(step, /continue-on-error|\bif:/);
+  assert.match(jobBlock('ci-summary'), /needs\.detect-changes\.result.*!= "success"/);
+  const check = spawnSync('python3', ['scripts/repository_docs.py'], {
+    cwd: path.resolve(scriptDir, '../..'),
+    encoding: 'utf8',
+  });
+  assert.equal(check.status, 0, `${check.stdout}${check.stderr}`);
+});
+
 function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult, event = 'pull_request', storekitResult }) {
   const block = jobBlock('ci-summary');
   const script = block
