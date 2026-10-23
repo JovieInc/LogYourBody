@@ -34,7 +34,7 @@ export function resolveAnalyticsTier({
   return nodeEnv === 'production' ? 'production' : 'development';
 }
 
-// Literal `process.env.NEXT_PUBLIC_*` reads so the client bundler inlines them.
+// Direct property reads (not dynamic lookups) so the client bundler inlines them.
 export function analyticsTierFromEnv(): AnalyticsTier {
   return resolveAnalyticsTier({
     explicit: process.env.NEXT_PUBLIC_STATSIG_ENV_TIER,
