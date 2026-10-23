@@ -264,6 +264,7 @@ struct AddEntrySheet: View {
     @State var bodyFatMethod: String?
     @State var bodyFatError: String?
     @State var isBodyFatFieldEditing = false
+    @State var accessibleBodyFatDateExpanded = false
 
     // Photo entry
     @State var selectedPhotos: [AppPhotoAsset] = []
