@@ -31,6 +31,7 @@ jobs:
               - 'apps/web/vercel.json'
               - '.github/workflows/deploy.yml'
               - '.github/scripts/web-production-smoke*.mjs'
+              - '.github/scripts/verify-public-build-env*.mjs'
             ios:
               - 'apps/ios/**'
 
@@ -85,6 +86,12 @@ jobs:
           done
           test "$missing_variables" -eq 0
 
+      # `vercel pull` writes the literal "[SENSITIVE]" for sensitive variables and
+      # NEXT_PUBLIC_* values are inlined into browser code (LYB-226: Statsig
+      # clientKey shipped as "[SENSITIVE]"). Fail before migrations or build.
+      - name: Verify public build environment is not a placeholder
+        run: node .github/scripts/verify-public-build-env.mjs env .vercel/.env.production.local
+
       - name: Apply product database migrations
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
@@ -94,6 +101,9 @@ jobs:
 
       - name: Build Vercel output
         run: pnpm dlx vercel@latest build --prod --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
+
+      - name: Verify built client output has no sensitive-variable placeholder
+        run: node .github/scripts/verify-public-build-env.mjs bundle .vercel/output/static apps/web/.next/static
 
       - name: Deploy to Vercel
         id: vercel-deploy

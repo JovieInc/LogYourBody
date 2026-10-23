@@ -188,6 +188,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
       { value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet', reason: 'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.' },
       { value: 'https://linear.app/jovie/issue/LYB-225', reason: 'LYB-225 source evidence for the public waitlist rate-limit correction.' },
+      { value: 'https://linear.app/jovie/issue/LYB-226', reason: 'LYB-226 source evidence for the public build environment placeholder correction.' },
       { value: 'https://linear.app/jovie/issue/LYB-97', reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.' },
       { value: 'https://linear.app/jovie/issue/LYB-33', reason: 'LYB-33, related issue cited by the LYB-97 trial audit.' },
       { value: 'https://linear.app/jovie/issue/JOV-7237', reason: 'JOV-7237, Doppler to GitHub sync capacity work cited by the secrets policy.' },
