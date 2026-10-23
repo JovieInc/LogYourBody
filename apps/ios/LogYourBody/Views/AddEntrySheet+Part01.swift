@@ -205,11 +205,15 @@ var body: some View {
                     .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
                     .accessibilityIdentifier("home_v2_log_sheet_date")
             } else if usesAccessibleBodyFatLayout {
+                // Compact only. At the largest text size an automatic picker
+                // stays inline after the title tap, covers the sheet, and no
+                // longer fits above Save.
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Date")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextSecondary)
                     DatePicker("Date", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+                        .datePickerStyle(.compact)
                         .labelsHidden()
                 }
             } else {

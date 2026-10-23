@@ -370,6 +370,8 @@ final class HomeV2LayoutUITests: XCTestCase {
     }
 
     private func assertBodyFatDateCanOpenWithoutChangingValue(in app: XCUIApplication) {
+        // The accessible sheet keeps this control compact. The opened calendar
+        // must dismiss, and the control must again fit above Save.
         let picker = app.datePickers.firstMatch
         assertSheetControlReachable(picker, in: app, screenshot: "body-fat-ax5-date-before")
         let originalValue = picker.value as? String
