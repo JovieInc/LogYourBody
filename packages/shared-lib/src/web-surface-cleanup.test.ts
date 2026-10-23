@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = new URL('../../..', import.meta.url);
@@ -23,6 +24,35 @@ function listFiles(dir: string): string[] {
 }
 
 describe('web surface cleanup', () => {
+  it('retires the unused store redirect and unpublished Android listing', () => {
+    expect(existsSync(new URL('api/app-store-redirect/route.ts', webAppRouteDir))).toBe(false);
+    expect(
+      readFileSync(new URL('../../../apps/web/src/constants/app.ts', import.meta.url), 'utf8'),
+    ).not.toContain('playStoreUrl');
+  });
+
+  it.each(['src/app/api/example/route.ts', 'src/app/example/route.ts'])(
+    'rejects console.log in public route handler %s',
+    async (filePath) => {
+      const eslint = new ESLint({
+        cwd: fileURLToPath(new URL('../../../apps/web/', import.meta.url)),
+      });
+
+      for (const source of ["console.log('hit');", "console['log']('hit');"]) {
+        const [result] = await eslint.lintText(source, { filePath });
+        expect(result.messages).toEqual(
+          expect.arrayContaining([expect.objectContaining({ ruleId: 'no-console', severity: 2 })]),
+        );
+      }
+
+      const [result] = await eslint.lintText(
+        "console.warn('warning'); console.error('failure'); console.info('stream outcome');",
+        { filePath },
+      );
+      expect(result.errorCount).toBe(0);
+    },
+  );
+
   it('uses the ESLint CLI instead of next lint', () => {
     const packageJson = JSON.parse(
       readFileSync(new URL('../../../apps/web/package.json', import.meta.url), 'utf8'),

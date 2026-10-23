@@ -50,5 +50,25 @@
       "path": ".github/scripts/web-production-smoke.mjs",
       "anchor": "export async function runWebProductionSmoke"
     }
+  },
+  {
+    "fingerprint": "retire-placeholder-store-redirect-and-route-logs",
+    "correction": "LYB-228: Remove the unused app-store redirect and unpublished Play Store URL, and prohibit console.log in public route handlers.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/apps/web/src/app/api/app-store-redirect/route.ts#L5-L20",
+    "mechanization": "Delete the placeholder route and its obsolete test plus the unused Android URL helper; existing required lint rejects console.log in route handlers, and shared-lib tests enforce retirement and exercise forbidden logs and permitted diagnostics against the real ESLint configuration.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Removing the route and URL fixes current behavior, but runtime types cannot prevent future filesystem routes or direct console calls from reintroducing this public surface."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "Required ESLint checks reject console.log in route handlers; regression tests enforce route and Android URL removal and verify the actual lint policy rejects dot and computed log calls while allowing warning, error, and stream diagnostics."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/web-surface-cleanup.test.ts",
+      "anchor": "retires the unused store redirect and unpublished Android listing"
+    }
   }
 ]
