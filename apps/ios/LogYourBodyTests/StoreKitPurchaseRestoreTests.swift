@@ -11,10 +11,60 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
     /// Number of times the warm-up may retry after a signature-verification failure (bounded; never the assertions).
     private static let warmUpMaxRetries = 2
     private static var storeKitWarmedUp = false
+    /// One StoreKit test session for the whole test process (LYB-231). Creating and releasing a new `SKTestSession`
+    /// per test let the previous session's asynchronous teardown race the next test: in CI run 40011070495 a
+    /// purchase verified, then the transaction vanished before restore ("No active subscriptions found").
+    private static var sharedSession: SKTestSession?
+
+    private enum SetUpError: Error {
+        case storeKitConfigurationMissing
+    }
+
+    private static func session() throws -> SKTestSession {
+        if let sharedSession { return sharedSession }
+        guard let configuration = Bundle.main.url(forResource: "LogYourBody", withExtension: "storekit") else {
+            throw SetUpError.storeKitConfigurationMissing
+        }
+        let session = try SKTestSession(contentsOf: configuration)
+        sharedSession = session
+        return session
+    }
 
     override func setUp() async throws {
         try await super.setUp()
-        await warmUpStoreKitTestSession()
+        let session = try Self.session()
+        await warmUpStoreKitTestSession(session)
+        try await resetToCleanStoreKitState(session)
+    }
+
+    override func tearDown() async throws {
+        if let session = Self.sharedSession {
+            session.clearTransactions()
+            session.resetToDefaultState()
+        }
+        try await super.tearDown()
+    }
+
+    /// Reset the shared session, then wait (bounded) until StoreKit really reports no transactions or entitlements
+    /// before the test starts, so one test's cleanup can never land inside the next test. This is a readiness
+    /// gate, not an assertion: a state that never settles fails the test with a clear message.
+    private func resetToCleanStoreKitState(_ session: SKTestSession) async throws {
+        for _ in 0..<50 {
+            session.resetToDefaultState()
+            session.clearTransactions()
+            if session.allTransactions().isEmpty, !(await hasStoreKitEntitlement()) {
+                session.disableDialogs = true
+                session.timeRate = .realTime
+                return
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        XCTFail("StoreKit test session did not reach a clean state within 5 seconds")
+    }
+
+    private func hasStoreKitEntitlement() async -> Bool {
+        for await _ in StoreKit.Transaction.currentEntitlements { return true }
+        return false
     }
 
     /// The first transaction in a fresh simulator can fail JWS verification with
@@ -23,10 +73,8 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
     /// purchase before the real lifecycle checks, retrying only this warm-up (at most `warmUpMaxRetries` times)
     /// and surfacing every retry as a warning. It asserts nothing, so a real StoreKit failure still fails the
     /// lifecycle tests below, which are unchanged.
-    private func warmUpStoreKitTestSession() async {
+    private func warmUpStoreKitTestSession(_ session: SKTestSession) async {
         guard !Self.storeKitWarmedUp else { return }
-        guard let configuration = Bundle.main.url(forResource: "LogYourBody", withExtension: "storekit"),
-              let session = try? SKTestSession(contentsOf: configuration) else { return }
         session.resetToDefaultState()
         session.clearTransactions()
         session.disableDialogs = true
@@ -83,16 +131,7 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
     }
 
     private func checkLifecycle(productID: String, refund: Bool) async throws {
-        let configuration = try XCTUnwrap(Bundle.main.url(forResource: "LogYourBody", withExtension: "storekit"))
-        let session = try SKTestSession(contentsOf: configuration)
-        session.resetToDefaultState()
-        session.clearTransactions()
-        session.disableDialogs = true
-        session.timeRate = .realTime
-        defer {
-            session.clearTransactions()
-            session.resetToDefaultState()
-        }
+        let session = try Self.session()
 
         let suite = "StoreKitPurchaseRestoreTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -123,6 +162,8 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
         XCTAssertFalse(manager.hasActiveSubscription)
         XCTAssertFalse(manager.cachedIsSubscribed)
         XCTAssertNil(manager.currentEntitlementSnapshot)
+        // Diagnostic only (LYB-231): lets a recurrence show whether StoreKit lost the transaction before restore.
+        NSLog("%@", "STOREKIT_STATE_DIAG before restore: transactions=\(session.allTransactions().count)")
         let restored = await manager.restorePurchases()
         XCTAssertTrue(restored, manager.errorMessage ?? "Restore failed")
         XCTAssertEqual(client.restoreCount, 1)
