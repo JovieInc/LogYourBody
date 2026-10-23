@@ -102,6 +102,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Tracked sources such as iOS manifests and deploy.yml change outside a
+      # single lane. The shadow workflow does not fail CI Summary.
+      - name: Verify repository source projection
+        run: python3 scripts/repository_docs.py
+
       - name: Verify workflow concurrency policy
         run: node .github/scripts/verify-workflow-concurrency.mjs
 

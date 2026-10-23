@@ -33,9 +33,13 @@ exact upstream bytes. Only listed imports and generated output are written;
 README/AGENTS remain local. Review changes in a separate PR per repository.
 Revert the consumer commit to restore its previous pin; siblings remain usable.
 
-CI runs the same deterministic parity tests and coverage as shared tooling, then
-checks the local projection in shadow. No new required gate or branch protection
-is added. Existing required checks remain enforced. JOV-6607 tracks qualification;
+CI runs the same deterministic parity tests and coverage as shared tooling in
+the nonblocking shadow workflow. Detect Changes also runs
+`python3 scripts/repository_docs.py` with no `continue-on-error` on every pull
+request, merge group, and main push. CI Summary fails when that job fails, so a
+stale projection cannot merge. CI Summary remains the only required status
+check; this adds no branch-protection context. The shadow check is unchanged.
+JOV-6607 tracks qualification;
 JOV-6555 owns shared-CI release distribution and updater integration. Promote only
 with representative ship samples, correctness/pass rate, p95, throughput/cost,
 failure isolation, an accountable owner and tested rollback. No approved numeric
