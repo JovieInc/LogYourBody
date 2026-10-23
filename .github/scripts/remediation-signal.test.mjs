@@ -660,6 +660,46 @@ test('a red main CI check files remediation:red-checks on the LYB team', async (
   assert.match(calls[1].variables.filter.labels.some.name.eq, /remediation:red-checks/);
 });
 
+test('a production smoke failure files web-deploy in Linear and later smoke recovery resolves it', async () => {
+  const { runWebProductionSmoke } = await import('./web-production-smoke.mjs');
+  const store = linearStore();
+  const html = '<title>LogYourBody</title><link rel="canonical" href="https://logyourbody.com/">';
+  const results = await runWebProductionSmoke({
+    deploymentUrl: 'https://deployment.example.com', sleep: async () => {},
+    fetchImpl: async (url) => {
+      const path = new URL(url).pathname;
+      if (path === '/api/waitlist') return Response.json({ success: true }, { status: 202 });
+      return new Response(html, { status: path === '/support' ? 500 : 200 });
+    },
+  });
+  assert.equal(results.filter((result) => !result.ok).length, 2);
+  const conclusion = results.some((result) => !result.ok) ? 'failure' : 'success';
+  const red = await runRemediationIntake({
+    env: { LINEAR_API_KEY: 'key' }, eventName: 'workflow_run',
+    event: mainRun('Deploy', conclusion), fetchImpl: store.fetchImpl,
+  });
+  assert.equal(red.action, 'created');
+  assert.equal(red.state, 'red');
+  assert.equal(red.label, 'remediation:web-deploy');
+  const create = store.calls.find((body) => body.query.includes('CreateDedupedLinearIssue'));
+  assert.equal(create.variables.teamId, 'lyb-team');
+  assert.match(create.variables.description, /Source-workflow: Deploy/);
+  assert.match(create.variables.description, /actions\/runs\/1001/);
+
+  const repeated = await runRemediationIntake({
+    env: { LINEAR_API_KEY: 'key' }, eventName: 'workflow_run', previous: 'red',
+    event: mainRun('Deploy', 'failure', { id: 1002, run_number: 101 }), fetchImpl: store.fetchImpl,
+  });
+  assert.equal(repeated.action, 'updated');
+  assert.equal(store.issues.length, 1, 'repeat smoke failures must deduplicate');
+  const recovered = await runRemediationIntake({
+    env: { LINEAR_API_KEY: 'key' }, eventName: 'workflow_run', previous: 'red',
+    event: mainRun('Deploy', 'success', { id: 1003, run_number: 102 }), fetchImpl: store.fetchImpl,
+  });
+  assert.equal(recovered.action, 'resolved');
+  assert.equal(recovered.state, 'green');
+});
+
 test('the first green after red resolves and a Linear failure does not record state', async () => {
   const { fetchImpl } = linearStore([boundIssue('issue-1')]);
   const resolved = await runRemediationIntake({

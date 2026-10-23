@@ -54,6 +54,14 @@ describe('POST /api/waitlist', () => {
     expect(mockedAccept).not.toHaveBeenCalled();
   });
 
+  it('accepts the production smoke honeypot without an email or database write', async () => {
+    const response = await POST(makeRequest({ website: 'production-smoke' }));
+
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ success: true });
+    expect(mockedAccept).not.toHaveBeenCalled();
+  });
+
   it('returns the same public response for a duplicate or suppressed registration', async () => {
     mockedAccept.mockResolvedValueOnce({ created: false });
     const response = await POST(makeRequest({ email: 'existing@example.com' }));
