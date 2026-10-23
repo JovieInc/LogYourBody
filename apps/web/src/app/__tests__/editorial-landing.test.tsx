@@ -43,7 +43,13 @@ describe('EditorialLanding', () => {
   });
 
   it('distinguishes illustrative data from a real app capture and preserves source and price caveats', () => {
-    render(<EditorialLanding appStoreLive={false} />);
+    render(
+      <EditorialLanding
+        appStoreLive={false}
+        landingId="launch_waitlist_v1"
+        variant="waitlist_editorial"
+      />,
+    );
     expect(
       screen.getByRole('figure', { name: /Illustrative weight timeline/ }),
     ).toBeInTheDocument();
@@ -69,7 +75,13 @@ describe('EditorialLanding', () => {
     global.fetch = jest
       .fn()
       .mockResolvedValue({ ok: true, status: 202, json: async () => ({ success: true }) });
-    render(<EditorialLanding appStoreLive={false} />);
+    render(
+      <EditorialLanding
+        appStoreLive={false}
+        landingId="launch_waitlist_v1"
+        variant="waitlist_editorial"
+      />,
+    );
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
       target: { value: 'reader@example.com' },
     });
@@ -83,7 +95,9 @@ describe('EditorialLanding', () => {
   });
 
   it('sends every primary action to the App Store when the listing is live, without an email field', () => {
-    render(<EditorialLanding appStoreLive />);
+    render(
+      <EditorialLanding appStoreLive landingId="launch_waitlist_v1" variant="waitlist_editorial" />,
+    );
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     const links = screen.getAllByRole('link', { name: launchLandingCopy.appStoreCta });
     expect(links).toHaveLength(4);

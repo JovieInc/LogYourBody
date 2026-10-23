@@ -55,6 +55,8 @@ const nextConfig: NextConfig = {
   // Environment variables
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
+    // Lets browser analytics derive its tier from the Vercel environment.
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? '',
   },
 
   // RFC 9728 protected-resource metadata for the MCP server (see src/lib/mcp/contract.ts).

@@ -11,5 +11,5 @@ export const metadata: Metadata = {
 
 // Share the canonical product proof and existing App Store/waitlist gate.
 export default function IOSDownloadPage() {
-  return <LaunchLanding />;
+  return <LaunchLanding landingId="ios_download_v1" />;
 }

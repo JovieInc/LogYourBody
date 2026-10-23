@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@jovie/ui/atoms/button';
 import { Input } from '@jovie/ui/atoms/input';
 import { analytics } from '@/lib/analytics';
-import { waitlistCampaign } from '@/lib/analytics-schema';
+import {
+  waitlistCampaign,
+  type WaitlistLandingId,
+  type WaitlistVariant,
+} from '@/lib/analytics-schema';
 import { cn } from '@/lib/utils';
 import { waitlistLandingCopy } from './waitlist-copy';
 
@@ -24,7 +28,13 @@ function landingAttribution() {
   };
 }
 
-export function WaitlistForm() {
+export interface WaitlistFormProps {
+  /** The landing that renders this form; recorded on every funnel event. */
+  landingId: WaitlistLandingId;
+  variant: WaitlistVariant;
+}
+
+export function WaitlistForm({ landingId, variant }: WaitlistFormProps) {
   const [email, setEmail] = useState('');
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -33,18 +43,18 @@ export function WaitlistForm() {
   useEffect(() => {
     const { campaign } = landingAttribution();
     analytics.track('web_landing_viewed', {
-      landing_id: 'minimal_waitlist_v1',
-      variant: 'waitlist_minimal',
+      landing_id: landingId,
+      variant,
       campaign,
     });
-  }, []);
+  }, [landingId, variant]);
 
   function trackStart() {
     if (started.current) return;
     started.current = true;
     analytics.track('web_waitlist_started', {
-      landing_id: 'minimal_waitlist_v1',
-      variant: 'waitlist_minimal',
+      landing_id: landingId,
+      variant,
       campaign: landingAttribution().campaign,
     });
   }
@@ -63,8 +73,8 @@ export function WaitlistForm() {
     setSubmitState('submitting');
     const attribution = landingAttribution();
     analytics.track('web_waitlist_submit_attempted', {
-      landing_id: 'minimal_waitlist_v1',
-      variant: 'waitlist_minimal',
+      landing_id: landingId,
+      variant,
       campaign: attribution.campaign,
     });
 
@@ -96,8 +106,8 @@ export function WaitlistForm() {
       // Acceptance intentionally includes duplicates and honeypots. Durable
       // registration counts come only from the server-owned waitlist store.
       analytics.track('web_waitlist_submitted', {
-        landing_id: 'minimal_waitlist_v1',
-        variant: 'waitlist_minimal',
+        landing_id: landingId,
+        variant,
         campaign: attribution.campaign,
       });
       analytics.track('web_waitlist_submit_result', { outcome: 'accepted' });
