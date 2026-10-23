@@ -1114,7 +1114,10 @@ private final class AccessibleBodyFatDateController: UIViewController, UIGesture
         let wantsGuard = picker.preferredDatePickerStyle == .compact
         if wantsGuard {
             guard compactTapRecognizer == nil else { return }
-            let tap = UITapGestureRecognizer(target: tapProxy, action: #selector(AccessibleBodyFatDateTapProxy.compactControlTapped))
+            let tap = UITapGestureRecognizer(
+                target: tapProxy,
+                action: #selector(AccessibleBodyFatDateTapProxy.compactControlTapped)
+            )
             tap.cancelsTouchesInView = false
             tap.delaysTouchesBegan = false
             tap.delaysTouchesEnded = false
