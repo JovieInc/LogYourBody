@@ -18,5 +18,53 @@
       "path": "packages/shared-lib/scripts/correction-ratchet.behavior.mjs",
       "anchor": "baseline edits cannot grandfather new violations"
     }
+  },
+  {
+    "fingerprint": "web-analytics-production-tier",
+    "correction": "Production web analytics must not default to the development tier when the public tier variable is absent.",
+    "source": "https://linear.app/jovie/issue/LYB-226",
+    "mechanization": "Bake an explicit or deployment-derived Statsig tier into the public Next.js build and retain a production-safe client fallback; Jest checks both configuration and SDK initialization.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Build-time configuration exposes the resolved deployment tier to browser code, and the client fallback prevents a production build from silently using development."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/__tests__/analytics-environment.test.ts",
+      "anchor": "never defaults a production browser client to development"
+    }
+  },
+  {
+    "fingerprint": "web-funnel-rendered-landing-identity",
+    "correction": "Every web waitlist funnel event must identify the rendering landing using required props while excluding contact and health values.",
+    "source": "https://linear.app/jovie/issue/LYB-226",
+    "mechanization": "Require typed landing identity props on WaitlistForm and allowlist the rendered IDs; Jest drives every rendering landing through its full funnel and checks schema retention and privacy.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Required closed-value props replace shared hard-coded identity, every shared-form event includes the same identity, and the analytics schema rejects contact and health metadata."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/landing-funnel-analytics.test.tsx",
+      "anchor": "attributes the complete %s funnel to the rendered landing"
+    }
+  },
+  {
+    "fingerprint": "web-no-unused-audience-assignment",
+    "correction": "Do not assign homepage visitors an audience or set an experiment cookie when the rendering page does not consume the split.",
+    "source": "https://linear.app/jovie/issue/LYB-226",
+    "mechanization": "Remove audience allocation, cookie creation and internal rewrites from homepage middleware; Jest verifies fresh, campaign, returning and internal-query visits with the legacy flag enabled.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Removing the unused audience-routing branch prevents allocation and cookie writes at the request entry point without changing the independent editorial rollout."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/__tests__/middleware-production-gate.test.ts",
+      "anchor": "does not split or cookie homepage traffic"
+    }
   }
 ]

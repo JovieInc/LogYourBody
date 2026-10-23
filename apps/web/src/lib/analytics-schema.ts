@@ -11,8 +11,14 @@ export const WAITLIST_CAMPAIGNS = [
 ] as const;
 
 const landingProperties = {
-  landing_id: ['minimal_waitlist_v1'],
-  variant: ['waitlist_minimal', 'waitlist_editorial_v2'],
+  landing_id: [
+    'minimal_waitlist_v1',
+    'legacy_minimal_waitlist_v1',
+    'launch_landing_v1',
+    'ios_download_v1',
+    'editorial_landing_v1',
+  ],
+  variant: ['waitlist_minimal', 'waitlist_launch', 'waitlist_editorial_v2'],
   campaign: WAITLIST_CAMPAIGNS,
   audience: ['men', 'women'],
   goal: ['recomposition', 'fat-loss', 'muscle-gain'],
@@ -25,6 +31,7 @@ const eventProperties = {
   web_waitlist_started: landingProperties,
   web_waitlist_submit_attempted: landingProperties,
   web_waitlist_submit_result: {
+    ...landingProperties,
     outcome: ['invalid', 'accepted', 'rate_limited', 'server_error'],
   },
   // Legacy name means browser acceptance, including duplicates/honeypots.
@@ -37,8 +44,8 @@ const eventProperties = {
 
 export type AnalyticsEvent = keyof typeof eventProperties;
 export type AnalyticsProperties = Partial<{
-  landing_id: 'minimal_waitlist_v1';
-  variant: 'waitlist_minimal' | 'waitlist_editorial_v2';
+  landing_id: (typeof landingProperties.landing_id)[number];
+  variant: (typeof landingProperties.variant)[number];
   campaign: (typeof WAITLIST_CAMPAIGNS)[number];
   audience: 'men' | 'women';
   goal: 'recomposition' | 'fat-loss' | 'muscle-gain';

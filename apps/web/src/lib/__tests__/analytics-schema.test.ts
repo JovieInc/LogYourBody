@@ -7,8 +7,15 @@ import {
 } from '../analytics-schema';
 
 describe('closed analytics schema', () => {
-  it('rejects health values, contact data, content, identifiers, URLs, raw errors and unknown keys', () => {
+  it.each([
+    'web_landing_viewed',
+    'web_waitlist_started',
+    'web_waitlist_submit_attempted',
+    'web_waitlist_submit_result',
+    'web_waitlist_submitted',
+  ] as const)('rejects health values, contact data and unregistered metadata for %s', (event) => {
     const unsafe = {
+      landing_id: 'synthetic@example.com',
       campaign: 'weight_80kg',
       email: 'synthetic@example.com',
       name: 'Synthetic Person',
@@ -23,7 +30,7 @@ describe('closed analytics schema', () => {
       variant: 'waitlist_minimal',
       omitted: undefined,
     };
-    expect(sanitizeAnalyticsProperties('web_waitlist_submitted', unsafe)).toEqual({
+    expect(sanitizeAnalyticsProperties(event, unsafe)).toEqual({
       variant: 'waitlist_minimal',
     });
     expect(sanitizeAnalyticsTraits({ ...unsafe, platform: 'web' })).toEqual({ platform: 'web' });
@@ -35,7 +42,7 @@ describe('closed analytics schema', () => {
         outcome: 'accepted',
         variant: 'waitlist_minimal',
       }),
-    ).toEqual({ outcome: 'accepted' });
+    ).toEqual({ outcome: 'accepted', variant: 'waitlist_minimal' });
     expect(
       sanitizeAnalyticsProperties('web_waitlist_submit_result', { outcome: 'private error' }),
     ).toEqual({});

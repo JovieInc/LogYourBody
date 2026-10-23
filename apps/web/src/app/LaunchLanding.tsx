@@ -8,7 +8,7 @@ import { LANDING_FLAGS } from '@/lib/flags/landing';
 import { LANDING_PRODUCT_PROOF } from '@/lib/marketing/landing-registry';
 import styles from './LaunchLanding.module.css';
 import { launchLandingCopy, launchLandingFeatures } from './launch-landing-copy';
-import { WaitlistForm } from './WaitlistForm';
+import { WaitlistForm, type WaitlistFormProps } from './WaitlistForm';
 import { EditorialLanding } from './EditorialLanding';
 
 const HERO_ACTION_ID = 'early-access';
@@ -17,7 +17,13 @@ const HERO_ACTION_ID = 'early-access';
  * One form on the page. The pricing section links back to it so the email
  * field is never duplicated (ids and autofill stay unique).
  */
-function PrimaryAction({ id }: { id: string }) {
+function PrimaryAction({
+  id,
+  landingId,
+}: {
+  id: string;
+  landingId: WaitlistFormProps['landingId'];
+}) {
   if (LANDING_FLAGS.APP_STORE_LIVE) {
     return (
       <Button asChild size="marketing" className="my-2">
@@ -40,12 +46,18 @@ function PrimaryAction({ id }: { id: string }) {
 
   return (
     <div id={HERO_ACTION_ID} data-testid={id} className="max-w-[440px] scroll-mt-24">
-      <WaitlistForm />
+      <WaitlistForm landingId={landingId} variant="waitlist_launch" />
     </div>
   );
 }
 
-export function LaunchLanding({ editorialEnabled = false }: { editorialEnabled?: boolean } = {}) {
+export function LaunchLanding({
+  editorialEnabled = false,
+  landingId = 'launch_landing_v1',
+}: {
+  editorialEnabled?: boolean;
+  landingId?: 'launch_landing_v1' | 'ios_download_v1';
+} = {}) {
   if (editorialEnabled) {
     return <EditorialLanding appStoreLive={LANDING_FLAGS.APP_STORE_LIVE} />;
   }
@@ -84,7 +96,7 @@ export function LaunchLanding({ editorialEnabled = false }: { editorialEnabled?:
               {launchLandingCopy.subheading}
             </p>
             <div className="mt-9">
-              <PrimaryAction id={HERO_ACTION_ID} />
+              <PrimaryAction id={HERO_ACTION_ID} landingId={landingId} />
             </div>
           </div>
 
@@ -156,7 +168,7 @@ export function LaunchLanding({ editorialEnabled = false }: { editorialEnabled?:
             </p>
             <p className={`${styles.quiet} mt-2 text-[15px]`}>{launchLandingCopy.pricingNote}</p>
             <div className="mt-8">
-              <PrimaryAction id="pricing-action" />
+              <PrimaryAction id="pricing-action" landingId={landingId} />
             </div>
           </div>
         </section>

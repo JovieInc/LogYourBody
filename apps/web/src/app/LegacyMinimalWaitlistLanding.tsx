@@ -12,7 +12,7 @@ export function LegacyMinimalWaitlistLanding() {
     <div className="min-h-screen overflow-x-hidden bg-[#06070a] text-[#f7f8f8]">
       <a
         href="#main-content"
-        className="sr-only z-50 rounded bg-white px-4 py-2 text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        className="sr-only z-50 rounded bg-white px-4 py-2 text-black focus:not-sr-only focus:fixed focus:top-4 focus:left-4"
       >
         Skip to content
       </a>
@@ -20,7 +20,7 @@ export function LegacyMinimalWaitlistLanding() {
       <header className="mx-auto flex h-20 w-full max-w-7xl items-center px-5 sm:px-8">
         <Link
           href="/"
-          className="inline-flex items-center gap-3 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
+          className="inline-flex items-center gap-3 rounded-full focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:outline-none"
         >
           <Image
             src={LANDING_BRAND_ASSET.src}
@@ -40,21 +40,21 @@ export function LegacyMinimalWaitlistLanding() {
           aria-labelledby="legacy-landing-heading"
         >
           <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_72%_45%,rgba(48,91,167,0.14),transparent_36%)]" />
-          <div className="mx-auto grid min-h-[calc(100svh-5rem)] w-full max-w-7xl items-center gap-12 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1.06fr)_minmax(340px,0.62fr)] lg:gap-20 lg:pb-20 lg:pt-12">
+          <div className="mx-auto grid min-h-[calc(100svh-5rem)] w-full max-w-7xl items-center gap-12 px-5 pt-8 pb-16 sm:px-8 lg:grid-cols-[minmax(0,1.06fr)_minmax(340px,0.62fr)] lg:gap-20 lg:pt-12 lg:pb-20">
             <div className="max-w-3xl">
               <p className="mb-5 text-sm font-medium tracking-[-0.01em] text-sky-300">
                 Private iPhone beta
               </p>
               <h1
                 id="legacy-landing-heading"
-                className="max-w-[11ch] text-balance text-[clamp(3.15rem,8vw,6.4rem)] font-semibold leading-[0.94] tracking-[-0.06em]"
+                className="max-w-[11ch] text-[clamp(3.15rem,8vw,6.4rem)] leading-[0.94] font-semibold tracking-[-0.06em] text-balance"
               >
                 {waitlistLandingCopy.headline}
               </h1>
-              <p className="mt-7 max-w-2xl text-pretty text-lg leading-8 tracking-[-0.015em] text-white/60 sm:text-xl sm:leading-9">
+              <p className="mt-7 max-w-2xl text-lg leading-8 tracking-[-0.015em] text-pretty text-white/60 sm:text-xl sm:leading-9">
                 {waitlistLandingCopy.subheading}
               </p>
-              <WaitlistForm />
+              <WaitlistForm landingId="legacy_minimal_waitlist_v1" variant="waitlist_minimal" />
             </div>
 
             <div

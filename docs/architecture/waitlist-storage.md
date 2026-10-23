@@ -46,6 +46,25 @@ where id = any ($1::uuid[])
 Do not send email addresses to product analytics. Conversion events remain
 free of contact traits; Neon is the system of record for invitation eligibility.
 
+## Web funnel attribution (LYB-226)
+
+`WaitlistForm` requires the rendering landing's `landingId` and `variant` props.
+Landing views and every waitlist event, including submit outcomes, carry that
+closed identity and an allowlisted campaign code. The launch homepage,
+`/download/ios`, editorial homepage, minimal landing and legacy minimal landing
+have distinct IDs. Raw URL values, email and health values remain excluded by
+the analytics schema.
+
+The browser's Statsig tier is resolved in `next.config.ts`: an explicit
+`NEXT_PUBLIC_STATSIG_ENV_TIER` takes precedence, otherwise Vercel production uses
+`production` and preview uses `staging`. A production build outside Vercel also
+defaults to `production`. The resolved value is baked into the public bundle.
+
+Homepage middleware no longer assigns audiences, rewrites `_lyb_audience`, or
+sets `lyb_landing_audience_v1`, including when `NEXT_PUBLIC_LYB_WAITLIST_V2=1`.
+Existing audience cookies are ignored and expire on their original schedule.
+The global editorial rollout remains independent of audience assignment.
+
 ## Registration evidence
 
 `accept` returns an internal `{ created: boolean }` receipt only after the

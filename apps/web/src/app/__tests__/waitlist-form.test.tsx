@@ -27,7 +27,7 @@ describe('WaitlistForm', () => {
       status: 202,
       json: async () => ({ success: true }),
     });
-    render(<WaitlistForm />);
+    render(<WaitlistForm landingId="minimal_waitlist_v1" variant="waitlist_minimal" />);
 
     const email = screen.getByRole('textbox', { name: 'Email' });
     fireEvent.focus(email);
@@ -55,13 +55,20 @@ describe('WaitlistForm', () => {
   });
 
   it('announces invalid email without making a request', async () => {
-    render(<WaitlistForm />);
+    render(<WaitlistForm landingId="minimal_waitlist_v1" variant="waitlist_minimal" />);
     fireEvent.click(screen.getByRole('button', { name: 'Request early access' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address.');
     expect(fetchMock).not.toHaveBeenCalled();
     await waitFor(() =>
-      expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', { outcome: 'invalid' }),
+      expect(track).toHaveBeenCalledWith(
+        'web_waitlist_submit_result',
+        expect.objectContaining({
+          outcome: 'invalid',
+          landing_id: 'minimal_waitlist_v1',
+          variant: 'waitlist_minimal',
+        }),
+      ),
     );
   });
 
@@ -71,7 +78,7 @@ describe('WaitlistForm', () => {
       status: 400,
       json: async () => ({ success: false }),
     });
-    render(<WaitlistForm />);
+    render(<WaitlistForm landingId="minimal_waitlist_v1" variant="waitlist_minimal" />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
       target: { value: 'invalid@example.com' },
@@ -80,7 +87,14 @@ describe('WaitlistForm', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address.');
     expect(screen.getByRole('button', { name: 'Request early access' })).toBeEnabled();
-    expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', { outcome: 'invalid' });
+    expect(track).toHaveBeenCalledWith(
+      'web_waitlist_submit_result',
+      expect.objectContaining({
+        outcome: 'invalid',
+        landing_id: 'minimal_waitlist_v1',
+        variant: 'waitlist_minimal',
+      }),
+    );
   });
 
   it('announces a rate limit without exposing implementation details', async () => {
@@ -89,7 +103,7 @@ describe('WaitlistForm', () => {
       status: 429,
       json: async () => ({ success: false }),
     });
-    render(<WaitlistForm />);
+    render(<WaitlistForm landingId="minimal_waitlist_v1" variant="waitlist_minimal" />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
       target: { value: 'person@example.com' },
@@ -100,14 +114,19 @@ describe('WaitlistForm', () => {
       'role',
       'status',
     );
-    expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
-      outcome: 'rate_limited',
-    });
+    expect(track).toHaveBeenCalledWith(
+      'web_waitlist_submit_result',
+      expect.objectContaining({
+        outcome: 'rate_limited',
+        landing_id: 'minimal_waitlist_v1',
+        variant: 'waitlist_minimal',
+      }),
+    );
   });
 
   it('announces a recoverable error when the request fails', async () => {
     fetchMock.mockRejectedValueOnce(new Error('offline'));
-    render(<WaitlistForm />);
+    render(<WaitlistForm landingId="minimal_waitlist_v1" variant="waitlist_minimal" />);
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
       target: { value: 'person@example.com' },
@@ -118,8 +137,13 @@ describe('WaitlistForm', () => {
       'role',
       'status',
     );
-    expect(track).toHaveBeenCalledWith('web_waitlist_submit_result', {
-      outcome: 'server_error',
-    });
+    expect(track).toHaveBeenCalledWith(
+      'web_waitlist_submit_result',
+      expect.objectContaining({
+        outcome: 'server_error',
+        landing_id: 'minimal_waitlist_v1',
+        variant: 'waitlist_minimal',
+      }),
+    );
   });
 });

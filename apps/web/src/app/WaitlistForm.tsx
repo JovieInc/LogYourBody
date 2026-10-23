@@ -1,14 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@jovie/ui/atoms/button';
 import { Input } from '@jovie/ui/atoms/input';
-import { analytics } from '@/lib/analytics';
+import { analytics, type AnalyticsEvent, type AnalyticsProperties } from '@/lib/analytics';
 import { waitlistCampaign } from '@/lib/analytics-schema';
 import { cn } from '@/lib/utils';
 import { waitlistLandingCopy } from './waitlist-copy';
 
 type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
+
+export interface WaitlistFormProps {
+  landingId: NonNullable<AnalyticsProperties['landing_id']>;
+  variant: NonNullable<AnalyticsProperties['variant']>;
+}
 
 function landingAttribution() {
   if (typeof window === 'undefined') {
@@ -24,29 +29,32 @@ function landingAttribution() {
   };
 }
 
-export function WaitlistForm() {
+export function WaitlistForm({ landingId, variant }: WaitlistFormProps) {
   const [email, setEmail] = useState('');
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const started = useRef(false);
 
+  const trackFunnelEvent = useCallback(
+    (event: AnalyticsEvent, properties?: AnalyticsProperties) => {
+      analytics.track(event, {
+        landing_id: landingId,
+        variant,
+        campaign: landingAttribution().campaign,
+        ...properties,
+      });
+    },
+    [landingId, variant],
+  );
+
   useEffect(() => {
-    const { campaign } = landingAttribution();
-    analytics.track('web_landing_viewed', {
-      landing_id: 'minimal_waitlist_v1',
-      variant: 'waitlist_minimal',
-      campaign,
-    });
-  }, []);
+    trackFunnelEvent('web_landing_viewed');
+  }, [trackFunnelEvent]);
 
   function trackStart() {
     if (started.current) return;
     started.current = true;
-    analytics.track('web_waitlist_started', {
-      landing_id: 'minimal_waitlist_v1',
-      variant: 'waitlist_minimal',
-      campaign: landingAttribution().campaign,
-    });
+    trackFunnelEvent('web_waitlist_started');
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -56,17 +64,13 @@ export function WaitlistForm() {
     const trimmed = email.trim();
     if (!trimmed) {
       setFieldError(waitlistLandingCopy.invalidEmailMessage);
-      analytics.track('web_waitlist_submit_result', { outcome: 'invalid' });
+      trackFunnelEvent('web_waitlist_submit_result', { outcome: 'invalid' });
       return;
     }
 
     setSubmitState('submitting');
     const attribution = landingAttribution();
-    analytics.track('web_waitlist_submit_attempted', {
-      landing_id: 'minimal_waitlist_v1',
-      variant: 'waitlist_minimal',
-      campaign: attribution.campaign,
-    });
+    trackFunnelEvent('web_waitlist_submit_attempted');
 
     const form = event.currentTarget;
     const website = new FormData(form).get('website');
@@ -83,11 +87,11 @@ export function WaitlistForm() {
         if (response.status === 400) {
           setFieldError(waitlistLandingCopy.invalidEmailMessage);
           setSubmitState('idle');
-          analytics.track('web_waitlist_submit_result', { outcome: 'invalid' });
+          trackFunnelEvent('web_waitlist_submit_result', { outcome: 'invalid' });
           return;
         }
         setSubmitState('error');
-        analytics.track('web_waitlist_submit_result', {
+        trackFunnelEvent('web_waitlist_submit_result', {
           outcome: response.status === 429 ? 'rate_limited' : 'server_error',
         });
         return;
@@ -95,16 +99,12 @@ export function WaitlistForm() {
 
       // Acceptance intentionally includes duplicates and honeypots. Durable
       // registration counts come only from the server-owned waitlist store.
-      analytics.track('web_waitlist_submitted', {
-        landing_id: 'minimal_waitlist_v1',
-        variant: 'waitlist_minimal',
-        campaign: attribution.campaign,
-      });
-      analytics.track('web_waitlist_submit_result', { outcome: 'accepted' });
+      trackFunnelEvent('web_waitlist_submitted');
+      trackFunnelEvent('web_waitlist_submit_result', { outcome: 'accepted' });
       setSubmitState('success');
     } catch {
       setSubmitState('error');
-      analytics.track('web_waitlist_submit_result', { outcome: 'server_error' });
+      trackFunnelEvent('web_waitlist_submit_result', { outcome: 'server_error' });
     }
   }
 

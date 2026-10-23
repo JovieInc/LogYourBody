@@ -55,6 +55,16 @@ const nextConfig: NextConfig = {
   // Environment variables
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
+    // VERCEL_ENV is server-only. Resolve the tier while building the browser bundle.
+    NEXT_PUBLIC_STATSIG_ENV_TIER:
+      process.env.NEXT_PUBLIC_STATSIG_ENV_TIER?.trim() ||
+      (process.env.VERCEL_ENV === 'production'
+        ? 'production'
+        : process.env.VERCEL_ENV === 'preview'
+          ? 'staging'
+          : process.env.NODE_ENV === 'production'
+            ? 'production'
+            : 'development'),
   },
 
   // RFC 9728 protected-resource metadata for the MCP server (see src/lib/mcp/contract.ts).

@@ -22,7 +22,9 @@ export interface AnalyticsPort {
 
 const config: StatsigAnalyticsConfig = {
   clientKey: process.env.NEXT_PUBLIC_STATSIG_CLIENT_KEY ?? '',
-  environmentTier: process.env.NEXT_PUBLIC_STATSIG_ENV_TIER ?? 'development',
+  environmentTier:
+    process.env.NEXT_PUBLIC_STATSIG_ENV_TIER?.trim() ||
+    (process.env.NODE_ENV === 'production' ? 'production' : 'development'),
 };
 
 const statsig = createStatsigAnalytics(config);

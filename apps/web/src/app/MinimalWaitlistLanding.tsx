@@ -23,7 +23,7 @@ function BrandMark() {
     <Link
       href="/"
       aria-label={`${APP_CONFIG.appName} home`}
-      className="inline-flex items-center gap-3 rounded-full text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+      className="inline-flex items-center gap-3 rounded-full text-white focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
     >
       <Image
         src={LANDING_BRAND_ASSET.src}
@@ -45,7 +45,7 @@ export function MinimalWaitlistLanding() {
     <div className="lyb-landing min-h-screen overflow-x-hidden bg-[#050608] text-[#f5f7f7]">
       <a
         href="#main-content"
-        className="sr-only z-50 rounded-full bg-white px-4 py-2 text-black focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        className="sr-only z-50 rounded-full bg-white px-4 py-2 text-black focus:not-sr-only focus:fixed focus:top-4 focus:left-4"
       >
         Skip to content
       </a>
@@ -55,7 +55,7 @@ export function MinimalWaitlistLanding() {
           <div className="pointer-events-auto">
             <BrandMark />
           </div>
-          <span className="hidden text-[11px] font-medium uppercase tracking-[0.18em] text-white/55 sm:block">
+          <span className="hidden text-[11px] font-medium tracking-[0.18em] text-white/55 uppercase sm:block">
             Private iPhone beta
           </span>
         </div>
@@ -79,33 +79,33 @@ export function MinimalWaitlistLanding() {
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(3,4,6,0.98)_0%,rgba(3,4,6,0.9)_35%,rgba(3,4,6,0.34)_67%,rgba(3,4,6,0.14)_100%)] max-lg:bg-[linear-gradient(180deg,rgba(3,4,6,0.42)_0%,rgba(3,4,6,0.22)_26%,rgba(3,4,6,0.93)_72%,#030406_100%)]" />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-[#050608] to-transparent" />
 
-          <div className="mx-auto w-full max-w-[1480px] px-5 pb-6 pt-24 sm:px-8 sm:pb-16 sm:pt-32 lg:px-12 lg:pb-[8vh]">
+          <div className="mx-auto w-full max-w-[1480px] px-5 pt-24 pb-6 sm:px-8 sm:pt-32 sm:pb-16 lg:px-12 lg:pb-[8vh]">
             <div className="max-w-[760px]">
               <p
-                className={`${styles.heroEyebrow} text-xs font-medium uppercase tracking-[0.2em] text-white/65`}
+                className={`${styles.heroEyebrow} text-xs font-medium tracking-[0.2em] text-white/65 uppercase`}
               >
                 Body composition, in context
               </p>
               <h1
                 id="landing-heading"
-                className={`${styles.heroTitle} mt-4 max-w-[10.5ch] text-balance text-[clamp(3.25rem,9.5vw,8.5rem)] font-semibold leading-[0.88] tracking-[-0.07em] sm:mt-5`}
+                className={`${styles.heroTitle} mt-4 max-w-[10.5ch] text-[clamp(3.25rem,9.5vw,8.5rem)] leading-[0.88] font-semibold tracking-[-0.07em] text-balance sm:mt-5`}
               >
                 {waitlistLandingCopy.headline}
               </h1>
               <p
-                className={`${styles.heroBody} text-white/66 mt-5 max-w-[620px] text-pretty text-base leading-7 tracking-[-0.02em] sm:mt-7 sm:text-xl sm:leading-9`}
+                className={`${styles.heroBody} mt-5 max-w-[620px] text-base leading-7 tracking-[-0.02em] text-pretty text-white/66 sm:mt-7 sm:text-xl sm:leading-9`}
               >
                 {waitlistLandingCopy.subheading}
               </p>
               <div id="early-access" className={styles.heroForm}>
-                <WaitlistForm />
+                <WaitlistForm landingId="minimal_waitlist_v1" variant="waitlist_minimal" />
               </div>
             </div>
           </div>
 
           <div
             aria-hidden="true"
-            className="absolute bottom-8 right-8 hidden items-center gap-3 text-[10px] font-medium uppercase tracking-[0.18em] text-white/45 lg:flex"
+            className="absolute right-8 bottom-8 hidden items-center gap-3 text-[10px] font-medium tracking-[0.18em] text-white/45 uppercase lg:flex"
           >
             <span className="h-px w-10 bg-white/25" />
             Scroll to see the signal
@@ -116,14 +116,14 @@ export function MinimalWaitlistLanding() {
           <div aria-hidden="true" className={styles.ambientOrb} />
           <div className="mx-auto w-full max-w-[1380px]">
             <div className={`${styles.reveal} grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-24`}>
-              <p className="pt-2 text-xs font-medium uppercase tracking-[0.2em] text-[var(--landing-accent)]">
+              <p className="pt-2 text-xs font-medium tracking-[0.2em] text-[var(--landing-accent)] uppercase">
                 The whole picture
               </p>
               <div>
-                <h2 className="max-w-[13ch] text-balance text-[clamp(3rem,7vw,7rem)] font-medium leading-[0.94] tracking-[-0.065em]">
+                <h2 className="max-w-[13ch] text-[clamp(3rem,7vw,7rem)] leading-[0.94] font-medium tracking-[-0.065em] text-balance">
                   One number is a moment. The trend is the answer.
                 </h2>
-                <p className="mt-8 max-w-2xl text-pretty text-lg leading-8 text-white/55 sm:text-xl sm:leading-9">
+                <p className="mt-8 max-w-2xl text-lg leading-8 text-pretty text-white/55 sm:text-xl sm:leading-9">
                   See the measures you already care about on one timeline, so today never has to
                   explain everything.
                 </p>
@@ -136,7 +136,7 @@ export function MinimalWaitlistLanding() {
                   key={signal.label}
                   className="group grid gap-2 border-b border-white/[0.12] py-6 transition-colors hover:border-white/30 sm:grid-cols-[64px_1fr_auto] sm:items-baseline sm:gap-6 sm:py-7"
                 >
-                  <span className="text-xs tabular-nums text-white/60">{signal.index}</span>
+                  <span className="text-xs text-white/60 tabular-nums">{signal.index}</span>
                   <span className="text-[clamp(1.75rem,4vw,3.6rem)] font-medium tracking-[-0.045em] text-white/90 transition-transform duration-300 motion-safe:group-hover:translate-x-2">
                     {signal.label}
                   </span>
@@ -150,13 +150,13 @@ export function MinimalWaitlistLanding() {
         <section className="relative border-b border-white/[0.08] bg-[#08090c] px-5 py-24 sm:px-8 sm:py-32 lg:px-12 lg:py-44">
           <div className="mx-auto grid w-full max-w-[1380px] gap-16 lg:grid-cols-[0.76fr_1.24fr] lg:items-start lg:gap-24">
             <div className="lg:sticky lg:top-28">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--landing-accent)]">
+              <p className="text-xs font-medium tracking-[0.2em] text-[var(--landing-accent)] uppercase">
                 Built for the check-in
               </p>
-              <h2 className="mt-6 max-w-[10ch] text-balance text-[clamp(3rem,6vw,6.5rem)] font-medium leading-[0.92] tracking-[-0.065em]">
+              <h2 className="mt-6 max-w-[10ch] text-[clamp(3rem,6vw,6.5rem)] leading-[0.92] font-medium tracking-[-0.065em] text-balance">
                 Your progress, in context.
               </h2>
-              <p className="text-white/52 mt-7 max-w-md text-lg leading-8">
+              <p className="mt-7 max-w-md text-lg leading-8 text-white/52">
                 Log a measurement. Keep the record. Come back to the trend—not the noise around a
                 single day.
               </p>
@@ -209,10 +209,10 @@ export function MinimalWaitlistLanding() {
             ))}
           </svg>
           <div className={`${styles.reveal} mx-auto max-w-4xl`}>
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-[var(--landing-accent)]">
+            <p className="text-xs font-medium tracking-[0.2em] text-[var(--landing-accent)] uppercase">
               TestFlight access
             </p>
-            <h2 className="mt-6 text-balance text-[clamp(3.25rem,8vw,8rem)] font-medium leading-[0.9] tracking-[-0.07em]">
+            <h2 className="mt-6 text-[clamp(3.25rem,8vw,8rem)] leading-[0.9] font-medium tracking-[-0.07em] text-balance">
               See what the work is doing.
             </h2>
             <p className="mx-auto mt-7 max-w-xl text-lg leading-8 text-white/55 sm:text-xl">
@@ -220,7 +220,7 @@ export function MinimalWaitlistLanding() {
             </p>
             <a
               href="#early-access"
-              className="mt-9 inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--landing-accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-[#050608]"
+              className="mt-9 inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm font-medium text-white/70 underline decoration-white/25 underline-offset-4 transition-colors hover:text-white hover:decoration-white/60 focus-visible:ring-2 focus-visible:ring-[var(--landing-accent)] focus-visible:ring-offset-4 focus-visible:ring-offset-[#050608] focus-visible:outline-none"
             >
               Back to email <span aria-hidden="true">&#8593;</span>
             </a>

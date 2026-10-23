@@ -270,7 +270,7 @@ export function EditorialLanding({ appStoreLive }: { appStoreLive: boolean }) {
                 <PrimaryAction appStoreLive />
               ) : (
                 <div className={styles.form}>
-                  <WaitlistForm />
+                  <WaitlistForm landingId="editorial_landing_v1" variant="waitlist_editorial_v2" />
                   <p className={styles.terms}>
                     We’ll email you when access opens.{' '}
                     <Link href="/privacy">Read our Privacy Policy.</Link>
