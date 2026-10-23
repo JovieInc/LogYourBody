@@ -1497,7 +1497,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert source.count('      checkout-ref:\n') == 1
     for forbidden in ['  pull_request:', '  pull_request_target:', '  workflow_call:', '  workflow_run:', 'uses: ./', 'mac-lane', 'secrets.']:
         assert forbidden not in source
-    assert '  push:\n    branches: [main]\n    paths:\n      - .github/workflows/ios-ui-diagnostics.yml\n      - scripts/ios/launch-quality-audit.sh\n' in source
+    assert '  push:\n    branches: [main]\n    paths:\n      - .github/workflows/ios-ui-diagnostics.yml\n      - scripts/ios/launch-quality-audit.sh\n      - apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift\n' in source
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source

@@ -132,6 +132,16 @@ final class EditEntrySavePolicyTests: XCTestCase {
         }
     }
 
+    func testAccessibleBodyFatChoicesKeepTheRecordedMethodAndStillOfferDEXA() {
+        let choices = BodyFatEntryMethod.accessibleChoices(selected: "manual")
+        XCTAssertEqual(choices.map(\.title), [
+            "Entered by you", "Visual Estimate", "Body Scan", "Calipers", "Bioelectrical", "DEXA"
+        ])
+        XCTAssertEqual(choices.first?.value, "manual")
+        XCTAssertEqual(choices.last?.value, "dexa")
+        XCTAssertEqual(Set(choices.map(\.title)).count, choices.count)
+    }
+
     @MainActor
     func testBlankBodyFatEntryKeepsTheExistingVisualEstimateDefault() {
         let sheet = AddEntrySheet(

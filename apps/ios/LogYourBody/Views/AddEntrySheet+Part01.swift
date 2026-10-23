@@ -806,35 +806,69 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
 
                 Group {
                     if usesAccessibleBodyFatLayout {
-                        Menu {
-                            bodyFatMethodPicker
-                        } label: {
-                            HStack(spacing: 16) {
-                                Text(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .multilineTextAlignment(.leading)
-                                Spacer(minLength: 0)
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .accessibilityHidden(true)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
-                        }
-                        .fixedSize(horizontal: false, vertical: true)
+                        accessibleBodyFatMethodSummary
                     } else {
                         bodyFatMethodPicker
                             .pickerStyle(MenuPickerStyle())
+                            .accessibilityLabel("Body fat measurement method")
+                            .accessibilityValue(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
+                            .accessibilityIdentifier("home_v2_body_fat_method")
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Body fat measurement method")
-                .accessibilityValue(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
-                .accessibilityIdentifier("home_v2_body_fat_method")
+
+                // A Menu around the picker draws only the current value at the
+                // largest text size, so DEXA is not a visible choice. List every
+                // method in the sheet, which already scrolls above Save.
+                if usesAccessibleBodyFatLayout {
+                    accessibleBodyFatMethodChoices
+                }
             }
 
             Spacer()
         }
         .padding(.horizontal)
+    }
+
+    private var accessibleBodyFatMethodSummary: some View {
+        Button {
+            // The rows below change the method. This row reports the current one.
+        } label: {
+            Text(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityLabel("Body fat measurement method")
+        .accessibilityValue(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
+        .accessibilityHint("Measurement choices are listed below")
+        .accessibilityIdentifier("home_v2_body_fat_method")
+    }
+
+    private var accessibleBodyFatMethodChoices: some View {
+        ForEach(BodyFatEntryMethod.accessibleChoices(selected: bodyFatMethod)) { choice in
+            Button {
+                bodyFatMethod = choice.value
+            } label: {
+                HStack(spacing: 12) {
+                    Text(choice.title)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    if BodyFatEntryMethod.selectionTitle(bodyFatMethod) == choice.title {
+                        Image(systemName: "checkmark")
+                            .accessibilityHidden(true)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(choice.title)
+        }
     }
 
     private var bodyFatMethodPicker: some View {

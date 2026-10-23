@@ -1,8 +1,9 @@
 name: iOS UI Diagnostics (NONQUALIFYING)
 
 # workflow_dispatch remains for a token that has actions:write. A main push of
-# this file or the pinned audit script, and the daily schedule, start the same
-# job (LYB-200 / #1458). Those events checkout github.sha only.
+# this file, the pinned audit script, or the seven-case HomeV2 layout UI test,
+# and the daily schedule, start the same job (LYB-200 / #1458). Those events
+# checkout github.sha only.
 on:
   workflow_dispatch:
     inputs:
@@ -15,6 +16,7 @@ on:
     paths:
       - .github/workflows/ios-ui-diagnostics.yml
       - scripts/ios/launch-quality-audit.sh
+      - apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift
   schedule:
     - cron: '0 16 * * *'
 
