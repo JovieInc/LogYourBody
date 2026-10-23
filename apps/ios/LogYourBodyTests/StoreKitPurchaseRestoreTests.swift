@@ -8,6 +8,64 @@ import RevenueCat
 /// RevenueCat's hosted receipt validation is a separate, live-provider check.
 @MainActor
 final class StoreKitPurchaseRestoreTests: XCTestCase {
+    /// Number of times the warm-up may retry after a signature-verification failure (bounded; never the assertions).
+    private static let warmUpMaxRetries = 2
+    private static var storeKitWarmedUp = false
+
+    override func setUp() async throws {
+        try await super.setUp()
+        await warmUpStoreKitTestSession()
+    }
+
+    /// The first transaction in a fresh simulator can fail JWS verification with
+    /// "StoreKit Testing in Xcode certificate is expired" (-67818, LYB-231) while the StoreKit test agent is still
+    /// refreshing its signing certificate; later transactions in the same run verify fine. Make one throwaway
+    /// purchase before the real lifecycle checks, retrying only this warm-up (at most `warmUpMaxRetries` times)
+    /// and surfacing every retry as a warning. It asserts nothing, so a real StoreKit failure still fails the
+    /// lifecycle tests below, which are unchanged.
+    private func warmUpStoreKitTestSession() async {
+        guard !Self.storeKitWarmedUp else { return }
+        guard let configuration = Bundle.main.url(forResource: "LogYourBody", withExtension: "storekit"),
+              let session = try? SKTestSession(contentsOf: configuration) else { return }
+        session.resetToDefaultState()
+        session.clearTransactions()
+        session.disableDialogs = true
+        defer {
+            session.clearTransactions()
+            session.resetToDefaultState()
+        }
+        for attempt in 0...Self.warmUpMaxRetries {
+            var failure = "no purchase result"
+            do {
+                let products = try await Product.products(for: [ProductRegistry.Paywall.annualProductID])
+                if let product = products.first {
+                    if case .success(let verification) = try await product.purchase() {
+                        switch verification {
+                        case .verified(let transaction):
+                            await transaction.finish()
+                            Self.storeKitWarmedUp = true
+                            return
+                        case .unverified(let transaction, let error):
+                            await transaction.finish()
+                            failure = "verification failed: \(error)"
+                        }
+                    }
+                } else {
+                    failure = "product not loaded"
+                }
+            } catch {
+                failure = "purchase threw: \(error)"
+            }
+            session.clearTransactions()
+            session.resetToDefaultState()
+            session.disableDialogs = true
+            let attempts = Self.warmUpMaxRetries + 1
+            print("::warning::STOREKIT_WARMUP_RETRY attempt \(attempt + 1)/\(attempts): \(failure)")
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+        }
+        print("::warning title=StoreKit warm-up exhausted::STOREKIT_WARMUP_RETRY not verified; assertions decide")
+    }
+
     func testAnnualTrialPurchaseRestoreExpiration() async throws {
         try await checkLifecycle(productID: ProductRegistry.Paywall.annualProductID, refund: false)
     }

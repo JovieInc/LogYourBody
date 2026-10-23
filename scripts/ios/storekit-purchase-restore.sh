@@ -13,7 +13,19 @@ git diff HEAD --binary > "$RESULTS/source-before-tests.patch"
 [[ ! -s "$RESULTS/source-before-tests.patch" ]] || { echo "Refusing dirty StoreKit input" >&2; exit 65; }
 STARTED_AT="$(date +%s)"
 # Capture source changes on success and failure, including build-time generators.
-trap 'git -C "$ROOT_DIR" diff HEAD --binary > "$RESULTS/source-working-tree.patch"' EXIT
+# Surface any bounded StoreKit warm-up retries (LYB-231) as visible warnings; never hides a test failure.
+emit_warmup_warnings() {
+  local n
+  n="$(grep -c 'STOREKIT_WARMUP_RETRY' "$RESULTS/storekit.log" 2>/dev/null || true)"
+  if [[ "${n:-0}" -gt 0 ]]; then
+    echo "::warning title=StoreKit warm-up retried::StoreKit test-session warm-up logged $n retry/exhaustion event(s); see storekit.log"
+  fi
+}
+finish() {
+  git -C "$ROOT_DIR" diff HEAD --binary > "$RESULTS/source-working-tree.patch"
+  emit_warmup_warnings
+}
+trap finish EXIT
 
 (
   cd apps/ios
