@@ -5,11 +5,11 @@
 // a sensitive NEXT_PUBLIC_* variable silently ships the placeholder (LYB-226:
 // Statsig clientKey was "[SENSITIVE]" and every analytics request returned 401).
 //
-//   env <file>      checks the pulled env file (run after `vercel pull`)
+//   env <file>      injects a GitHub client key when supplied, then checks the pulled env
 //   bundle <dir>... scans built client output (run after `vercel build`)
 //
 // Failure messages name variables and files, never values.
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -68,6 +68,8 @@ export function checkPulledEnv(contents) {
     failures.push(`${STATSIG_CLIENT_KEY} is missing or empty in the pulled production environment.`);
   } else if (isPlaceholder(keyEntries.at(-1)[1]) && !flagged.has(STATSIG_CLIENT_KEY)) {
     failures.push(`${STATSIG_CLIENT_KEY} is a placeholder value, not a Statsig client key.`);
+  } else if (!flagged.has(STATSIG_CLIENT_KEY) && !/^client-[A-Za-z0-9_-]+$/.test(keyEntries.at(-1)[1])) {
+    failures.push(`${STATSIG_CLIENT_KEY} must be a client SDK key (client- prefix), never a server or console secret.`);
   }
   return failures;
 }
@@ -107,12 +109,25 @@ export function checkBundle(directories, { cwd = process.cwd() } = {}) {
   return failures;
 }
 
-export function run(argv, { cwd = process.cwd(), log = console } = {}) {
+export function run(argv, { cwd = process.cwd(), env = process.env, log = console } = {}) {
   const [mode, ...paths] = argv;
   let failures;
   if (mode === 'env' && paths.length === 1) {
     if (!existsSync(paths[0])) failures = [`Pulled environment file ${paths[0]} does not exist.`];
-    else failures = checkPulledEnv(readFileSync(paths[0], 'utf8'));
+    else {
+      const original = readFileSync(paths[0], 'utf8');
+      const injectedKey = env[STATSIG_CLIENT_KEY];
+      // Replace all pulled definitions so Vercel's dotenv loader receives the
+      // actual key. An empty GitHub secret leaves the pulled value in force.
+      const contents = injectedKey
+        ? original.split(/\r?\n/)
+          .filter((line) => !/^\s*(?:export\s+)?NEXT_PUBLIC_STATSIG_CLIENT_KEY\s*=/.test(line))
+          .join('\n') + `\n${STATSIG_CLIENT_KEY}=${JSON.stringify(injectedKey)}\n`
+        : original;
+      failures = checkPulledEnv(contents);
+      // Validate the complete effective environment before changing any file.
+      if (failures.length === 0 && contents !== original) writeFileSync(paths[0], contents);
+    }
   } else if (mode === 'bundle' && paths.length > 0) {
     failures = checkBundle(paths, { cwd });
   } else {

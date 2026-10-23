@@ -86,5 +86,21 @@
       "path": ".github/scripts/verify-public-build-env.mjs",
       "anchor": "export function checkPulledEnv"
     }
+  },
+  {
+    "fingerprint": "web-deploy-injects-validated-statsig-client-key",
+    "correction": "LYB-232: The production Statsig key was a Vercel sensitive-variable placeholder, causing initialize and event delivery to return 401. Supply the browser client key from GitHub without printing it and keep both deployment guards blocking.",
+    "source": "https://linear.app/jovie/issue/LYB-232",
+    "mechanization": "Deploy passes the NEXT_PUBLIC_STATSIG_CLIENT_KEY Actions secret to the existing environment guard, which validates the effective environment before replacing the pulled Statsig definitions. Required shared-lib tests exercise injection, invalid keys, unchanged files on failure, redaction, and workflow wiring.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing deploy guard can inject and validate the key in the actual file consumed by vercel build, preventing the pulled placeholder from overriding it while rejecting server and console credentials."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/verify-public-build-env.mjs",
+      "anchor": "if (failures.length === 0 && contents !== original) writeFileSync(paths[0], contents);"
+    }
   }
 ]

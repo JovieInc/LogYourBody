@@ -378,6 +378,15 @@ export const endpoints = {
       reason: 'LYB-225 source evidence for the public waitlist rate-limit correction.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-226',
+      reason: 'LYB-226 source evidence for the public build environment placeholder correction.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-232',
+      reason:
+        'LYB-232 source evidence for Statsig client-key injection into the production web build.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-97',
       reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.',
     },

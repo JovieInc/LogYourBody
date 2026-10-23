@@ -90,6 +90,8 @@ jobs:
       # NEXT_PUBLIC_* values are inlined into browser code (LYB-226: Statsig
       # clientKey shipped as "[SENSITIVE]"). Fail before migrations or build.
       - name: Verify public build environment is not a placeholder
+        env:
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
         run: node .github/scripts/verify-public-build-env.mjs env .vercel/.env.production.local
 
       - name: Apply product database migrations
