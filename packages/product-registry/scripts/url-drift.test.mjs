@@ -385,12 +385,12 @@ const consistencyTargets = [
     ],
   },
   {
-    file: '.github/workflows/web-release-loop.yml',
+    file: '.github/scripts/web-production-smoke.mjs',
     checks: [
       {
-        name: 'NEXT_PUBLIC_API_URL fallback',
-        pattern: /NEXT_PUBLIC_API_URL: \$\{\{ vars\.NEXT_PUBLIC_API_URL \|\| '([^']+)' \}\}/,
-        expected: endpoints.hosts.api.url,
+        name: 'production smoke host default',
+        pattern: /productionUrl = ([^,\n]+),/,
+        expected: 'logYourBody.endpoints.hosts.marketing.url',
       },
     ],
   },

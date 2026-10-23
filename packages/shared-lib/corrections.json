@@ -18,5 +18,21 @@
       "path": "packages/shared-lib/scripts/correction-ratchet.behavior.mjs",
       "anchor": "baseline edits cannot grandfather new violations"
     }
+  },
+  {
+    "fingerprint": "web-production-deploy-requires-smoke",
+    "correction": "LYB-229: Production web deployment must check both the deployment URL and public host, including metadata and the non-persisting waitlist honeypot, and route failures to Linear instead of GitHub issues.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/.github/workflows/deploy.yml#L93-L103",
+    "mechanization": "Deploy runs blocking web production smoke before success; shared-lib required tests exercise redirects, both hosts, failure paths, CLI failure propagation, and the existing Linear router.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The production deployment workflow can execute deterministic HTTP smoke checks and fail the existing remediation-monitored Deploy run by construction."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/web-production-smoke.mjs",
+      "anchor": "export async function runWebProductionSmoke"
+    }
   }
 ]

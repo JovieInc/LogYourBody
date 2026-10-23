@@ -29,6 +29,8 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'vercel.json'
               - 'apps/web/vercel.json'
+              - '.github/workflows/deploy.yml'
+              - '.github/scripts/web-production-smoke*.mjs'
             ios:
               - 'apps/ios/**'
 
@@ -100,12 +102,20 @@ jobs:
           echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
           echo "Deployed to $DEPLOYMENT_URL"
 
+      # A failure fails Deploy; remediation-signal.yml routes it to Linear
+      # as remediation:web-deploy with this run's smoke logs and summary.
+      - name: Smoke production deployment
+        timeout-minutes: 3
+        env:
+          DEPLOYMENT_URL: ${{ steps.vercel-deploy.outputs.url }}
+        run: node .github/scripts/web-production-smoke.mjs
+
       - name: Deploy info
         run: |
           {
             echo "## Web Deployment"
             echo ""
-            echo "✅ Build and production deploy completed successfully"
+            echo "✅ Build, production deploy, and smoke checks completed successfully"
             echo ""
             echo "URL: ${{ steps.vercel-deploy.outputs.url }}"
           } >> "$GITHUB_STEP_SUMMARY"

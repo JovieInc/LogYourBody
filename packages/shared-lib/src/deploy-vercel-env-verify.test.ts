@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 const deployWorkflow = readFileSync(`${repoRoot}/.github/workflows/deploy.yml`, 'utf8');
-const webReleaseLoop = readFileSync(`${repoRoot}/.github/workflows/web-release-loop.yml`, 'utf8');
 const neonMigrateCliPath = join(repoRoot, 'apps/web/scripts/apply-neon-migrations.ts');
 
 const serverOnlyImport =
@@ -73,7 +72,6 @@ describe('deploy Vercel env verify uses POSIX grep', () => {
     expect(deployWorkflow).toContain('grep -qE');
     expect(deployWorkflow).not.toContain('rg --quiet');
     expect(deployWorkflow).not.toMatch(ripgrepInvocation);
-    expect(webReleaseLoop).not.toMatch(ripgrepInvocation);
 
     expect(deployWorkflow).toContain(`for required_variable in ${requiredVariables.join(' ')}`);
     for (const requiredVariable of requiredVariables) {
@@ -82,12 +80,10 @@ describe('deploy Vercel env verify uses POSIX grep', () => {
   });
 
   it('targets the canonical Vercel team and project in noninteractive CI', () => {
-    for (const workflow of [deployWorkflow, webReleaseLoop]) {
-      expect(workflow).toContain(`VERCEL_ORG_ID: ${vercelOrgId}`);
-      expect(workflow).toContain(`VERCEL_PROJECT_ID: ${vercelProjectId}`);
-      expect(workflow).toContain('--scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"');
-      expect(workflow).not.toContain('--token="$VERCEL_TOKEN"');
-    }
+    expect(deployWorkflow).toContain(`VERCEL_ORG_ID: ${vercelOrgId}`);
+    expect(deployWorkflow).toContain(`VERCEL_PROJECT_ID: ${vercelProjectId}`);
+    expect(deployWorkflow).toContain('--scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"');
+    expect(deployWorkflow).not.toContain('--token="$VERCEL_TOKEN"');
   });
 
   it('detects required keys without printing env values', () => {
