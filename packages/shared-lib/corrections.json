@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1521: The Zod 4.6.6 manifest update left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary, and shadow parity. Regenerate the source projection with the existing tool.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40019693238/job/120640721225",
+    "mechanization": "Detect Changes runs python3 scripts/repository_docs.py with no continue-on-error on every pull request, merge group, and main push. CI Summary fails when that job fails. The regression test executes the checker and rejects a missing or skippable step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    }
+  },
+  {
     "fingerprint": "storekit-tests-share-one-session-and-wait-for-clean-state",
     "correction": "LYB-231: StoreKit purchase-and-restore tests created and released a new SKTestSession per test, so a previous session's asynchronous teardown could erase the next test's purchase (run 40011070495: purchase verified, then restore found no subscriptions). Use one process-wide session and wait for a verifiably clean StoreKit state before each test.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40011070495",
