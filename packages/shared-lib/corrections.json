@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "storekit-warmup-diagnostics-respect-swiftlint",
+    "correction": "LYB-231: Retain visible bounded StoreKit warm-up diagnostics without print calls, which fail the required strict SwiftLint launch-quality gate.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/39981178977/job/120508725000",
+    "mechanization": "Use fixed-format NSLog for retry and exhaustion diagnostics, retaining STOREKIT_WARMUP_RETRY in storekit.log. The existing required launch-quality SwiftLint check rejects print calls through no_print_statements; its failed run reports both original diagnostics.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Replacing the current calls fixes the failure, but runtime types cannot prevent future Swift test code from calling the global print function."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing no_print_statements custom rule, executed by required strict SwiftLint, rejects the offending calls without changing test assertions or gate configuration."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/.swiftlint.yml",
+      "anchor": "no_print_statements:"
+    }
+  },
+  {
     "fingerprint": "correction-baselines-only-shrink",
     "correction": "Warn on existing violations while rejecting new violations and baseline growth.",
     "source": "https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet",
