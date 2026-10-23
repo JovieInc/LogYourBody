@@ -146,6 +146,11 @@ test('only two distinct correction receipts for the same normalized fingerprint 
   assert.match(plan.description, /discussion_r2/);
   assert.match(plan.description, /Proposed guard: Add a policy check/);
   assert.match(plan.description, /fails without the guard and passes with it/);
+  assert.match(
+    plan.description,
+    /warn on existing violations with a shrink-only baseline; fail new violations immediately/,
+  );
+  assert.match(plan.description, /existing automatic merge queue after exact-head CI passes/);
   assert.equal(
     planCorrectionIssues([receipt(1), receipt(2), receipt(3, 'other'), receipt(4, 'other')]).length,
     2,

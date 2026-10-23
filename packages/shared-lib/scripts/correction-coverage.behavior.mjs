@@ -214,6 +214,21 @@ test('rejects malformed receipts, unknown levels and conflicting duplicate annot
   );
 });
 
+test('duplicate receipts cannot disagree on a guard violation baseline', () => {
+  assert.throws(
+    () =>
+      report([
+        receipt('same-rule', 'static', {
+          guard: { ...guard, ratchet: { baseline: 'first.json' } },
+        }),
+        receipt('same-rule', 'static', {
+          guard: { ...guard, ratchet: { baseline: 'second.json' } },
+        }),
+      ]),
+    /conflicting coverage annotations/,
+  );
+});
+
 test('rejects lost guards, rule removal and level downgrades even if aggregate coverage improves', () => {
   const baseline = report([
     receipt('retained', 'codebase', { guard }),
@@ -505,6 +520,11 @@ test('real CI and intake entrypoints retain coverage checking and publication wi
   );
   assert.match(workflow, /git fetch --no-tags --depth=1 origin "\$BASE_SHA"/);
   assert.match(workflow, /correction-coverage.mjs --base-ref "\$BASE_SHA"/);
+  assert.match(
+    workflow,
+    /node --test packages\/shared-lib\/scripts\/correction-ratchet.behavior.mjs/,
+  );
+  assert.match(workflow, /correction-ratchet.mjs --base-ref "\$BASE_SHA"/);
   assert.match(workflow, /github.event.merge_group.base_sha/);
   assert.match(
     workflow,
