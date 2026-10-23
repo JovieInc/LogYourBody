@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `24015f5812c3157efebc973c6aa0bbd00eae6e1747be4966eb9dff152e46377c`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b13c1011a1ba0c906df4662854b2eca6840e0ac2bbf39c778b4dc9d37460c61b`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `45da91743d6d4d6db4d9ab5bd4d5ad9676a4e768e1c24bd372a4416f52be5b8c`)
 
 ### `apps/web/package.json`: engines
 
@@ -150,7 +150,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "tailwindcss-animate": "^1.0.7",
   "vaul": "^1.1.2",
   "ws": "8.21.0",
-  "zod": "^4.6.5"
+  "zod": "^4.6.6"
 }
 ```
 
@@ -188,7 +188,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9fc006bdac5e56469e4297ac9cc829151bdbf57dfc678f782ec12ae846a0add0`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `04d266ce9080815fe2e47f4e57d66b4356f944ffa42903bdf0cc6e772ca37ee5`)
 
 ### `package.json`: packageManager
 
@@ -256,7 +256,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "ai": "^7.0.114",
   "eve": "0.27.13",
-  "zod": "^4.6.5"
+  "zod": "^4.6.6"
 }
 ```
 
