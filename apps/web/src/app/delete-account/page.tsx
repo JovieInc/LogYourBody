@@ -17,7 +17,8 @@ const deletionRequestHref =
   );
 
 export const metadata: Metadata = {
-  title: 'Delete Account - LogYourBody',
+  alternates: { canonical: '/delete-account' },
+  title: 'Delete Account',
   description: 'How to permanently delete your LogYourBody account and request help from support.',
 };
 

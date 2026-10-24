@@ -11,7 +11,12 @@ export async function generateStaticParams() {
 }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const post = await getPostBySlug((await params).slug);
-  return post ? { title: post.title, description: post.excerpt } : { title: 'Article unavailable' };
+  if (!post) notFound();
+  return {
+    title: post.title,
+    description: post.excerpt,
+    alternates: { canonical: `/blog/${encodeURIComponent(post.slug)}` },
+  };
 }
 export default async function BlogPostPage({ params }: Props) {
   const post = await getPostBySlug((await params).slug);

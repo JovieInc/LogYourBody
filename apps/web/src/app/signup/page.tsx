@@ -1,5 +1,11 @@
+import type { Metadata } from 'next';
 import { BarChart3 } from 'lucide-react';
 import { AuthSignUp } from '@/lib/ports/auth-ui';
+
+export const metadata: Metadata = {
+  title: 'Create your account',
+  alternates: { canonical: '/signup' },
+};
 
 export default function SignupPage() {
   return (

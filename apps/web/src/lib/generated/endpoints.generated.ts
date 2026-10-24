@@ -6,9 +6,9 @@ export const endpoints = {
       url: 'https://www.logyourbody.com',
     },
     marketing: {
-      host: 'logyourbody.com',
-      url: 'https://logyourbody.com',
-      note: 'Apex domain 307-redirects to www; never use it for API or auth traffic.',
+      host: 'www.logyourbody.com',
+      url: 'https://www.logyourbody.com',
+      note: 'Canonical serving host for public pages; the apex redirects here.',
     },
     status: {
       host: 'status.logyourbody.com',
