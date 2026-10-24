@@ -1,5 +1,28 @@
 [
   {
+    "fingerprint": "claims-lint-covers-public-web-copy",
+    "correction": "LYB-230: The claims lint added storefront coverage in LYB-188 but omitted public web copy and page metadata, leaving the 2026-10-14 marketing audit vulnerable to regressions.",
+    "source": "https://linear.app/jovie/issue/LYB-230",
+    "mechanization": "The existing required CI knowledge-lint command scans web routes, components, copy constants, registry copy, published blog posts, and shared legal sources. Fixtures reject removed trial, genetic-potential and numeric-outcome claims. Existing findings warn with a copy-owner handoff; the required correction ratchet rejects baseline growth against the exact Git base.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Public copy and metadata are authored in source files and shared documents. Runtime types cannot prevent unsupported natural-language claims from being committed."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "Extend the existing blocking claims scanner and its regression fixtures without changing copy or weakening the installed agent and storefront gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/lint-claims.mjs",
+      "anchor": "const WEB_RULES = [",
+      "ratchet": {
+        "baseline": "scripts/knowledge/web-claims-baseline.json"
+      }
+    }
+  },
+  {
     "fingerprint": "dependabot-transitive-security-floors",
     "correction": "LYB-236: Dependabot's pnpm update commands exited successfully while retaining vulnerable fast-uri 3.1.8 and undici 8.11.2. Enforce patched transitive floors without weakening maturity settings or Dependency Review.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40035673426",

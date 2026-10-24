@@ -382,6 +382,10 @@ export const endpoints = {
       reason: 'LYB-226 source evidence for the public build environment placeholder correction.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-230',
+      reason: 'LYB-230 source evidence for public web claims lint coverage.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-232',
       reason:
         'LYB-232 source evidence for Statsig client-key injection into the production web build.',
