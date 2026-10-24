@@ -51,9 +51,6 @@ export const metadata: Metadata = {
     telephone: false,
   },
   metadataBase: new URL(logYourBody.links.home),
-  alternates: {
-    canonical: '/',
-  },
   openGraph: {
     type: 'website',
     locale: 'en_US',

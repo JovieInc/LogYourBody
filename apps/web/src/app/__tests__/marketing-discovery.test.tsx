@@ -26,18 +26,18 @@ jest.mock('../LegacyMinimalWaitlistLanding', () => ({
 describe('marketing discovery routes', () => {
   it('publishes a nonempty robots policy and sitemap URL', () => {
     const value = robots();
-    expect(value.sitemap).toBe('https://logyourbody.com/sitemap.xml');
+    expect(value.sitemap).toBe('https://www.logyourbody.com/sitemap.xml');
     expect(value.rules).toEqual(expect.objectContaining({ userAgent: '*', allow: '/' }));
   });
 
   it('lists only intentional public launch surfaces', () => {
     const urls = sitemap().map((entry) => entry.url);
     expect(urls).toEqual([
-      'https://logyourbody.com',
-      'https://logyourbody.com/privacy',
-      'https://logyourbody.com/terms',
-      'https://logyourbody.com/health-disclosure',
-      'https://logyourbody.com/support',
+      'https://www.logyourbody.com',
+      'https://www.logyourbody.com/privacy',
+      'https://www.logyourbody.com/terms',
+      'https://www.logyourbody.com/health-disclosure',
+      'https://www.logyourbody.com/support',
     ]);
     expect(urls.some((url) => url.includes('/dashboard'))).toBe(false);
   });

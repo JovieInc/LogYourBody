@@ -6,7 +6,8 @@ import { loadLegalDocument } from '@/lib/load-legal-docs';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: 'Terms of Service - LogYourBody',
+  alternates: { canonical: '/terms' },
+  title: 'Terms of Service',
   description: 'LogYourBody terms of service and user agreement.',
 };
 

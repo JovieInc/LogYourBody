@@ -6,7 +6,8 @@ import { loadLegalDocument } from '@/lib/load-legal-docs';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: 'Health Disclosure - LogYourBody',
+  alternates: { canonical: '/health-disclosure' },
+  title: 'Health Disclosure',
   description: 'Important health and medical information about using LogYourBody.',
 };
 

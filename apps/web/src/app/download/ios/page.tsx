@@ -5,7 +5,8 @@ import { LaunchLanding } from '../../LaunchLanding';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `${logYourBody.identity.name} for iPhone`,
+  alternates: { canonical: '/' },
+  title: 'iPhone download',
   description: logYourBody.messages.landing.subheading,
 };
 

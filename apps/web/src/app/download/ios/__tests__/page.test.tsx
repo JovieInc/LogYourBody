@@ -18,7 +18,7 @@ const flags = LANDING_FLAGS as { APP_STORE_LIVE: boolean };
 
 describe('iOS download acquisition surface', () => {
   it('describes the iOS product without inherited superiority or Android availability claims', () => {
-    expect(metadata.title).toBe('LogYourBody for iPhone');
+    expect(metadata.title).toBe('iPhone download');
     expect(metadata.description).toBe(logYourBody.messages.landing.subheading);
     expect(JSON.stringify(metadata)).not.toMatch(/most advanced|Android/i);
   });

@@ -3,7 +3,12 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { logYourBody } from '../../packages/product-registry/src/products/logyourbody.mjs';
 
-const PUBLIC_ROUTES = ['/', '/privacy', '/terms', '/health-disclosure', '/support', '/download/ios'];
+const PUBLIC_ROUTES = [
+  '/', '/about', '/brand', '/careers', '/security', '/privacy', '/terms',
+  '/health-disclosure', '/support', '/delete-account', '/changelog', '/blog',
+  '/signin', '/signup', '/download/ios', '/download/android',
+];
+const CANONICAL_ALIASES = { '/download/ios': '/' };
 const BACKOFF_MS = [0, 2_000, 5_000];
 
 // No email: even a regressed honeypot cannot turn this probe into a registration.
@@ -23,6 +28,10 @@ function assertMetadata(html, path) {
   if (!title?.includes(logYourBody.identity.name) || /\b404\b|not found|internal server error/i.test(title)) {
     throw new Error('Missing or invalid product title');
   }
+  if (title.split(logYourBody.identity.name).length !== 2 ||
+      (path !== '/' && title === `${logYourBody.identity.name} — ${logYourBody.brand.slogan}`)) {
+    throw new Error('Public page needs its own title with one brand suffix');
+  }
   const canonicalTags = [...html.matchAll(/<link\b[^>]*>/gi)].map(([tag]) => {
     const attributes = Object.fromEntries([...tag.matchAll(/([\w-]+)\s*=\s*["']([^"']*)["']/g)]
       .map(([, key, value]) => [key.toLowerCase(), value]));
@@ -30,9 +39,8 @@ function assertMetadata(html, path) {
   }).filter((attributes) => attributes.rel?.toLowerCase().split(/\s+/).includes('canonical'));
   if (canonicalTags.length !== 1 || !canonicalTags[0].href) throw new Error('Missing or ambiguous canonical URL');
   const canonical = new URL(canonicalTags[0].href);
-  // Public pages currently inherit the root canonical from the Next.js layout.
   if (canonical.origin !== new URL(logYourBody.links.home).origin ||
-      !['/', path].includes(canonical.pathname) || canonical.search || canonical.hash ||
+      canonical.pathname !== (CANONICAL_ALIASES[path] ?? path) || canonical.search || canonical.hash ||
       canonical.username || canonical.password) {
     throw new Error('Canonical URL does not identify the production site');
   }
