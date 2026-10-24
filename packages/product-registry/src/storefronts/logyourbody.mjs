@@ -39,9 +39,9 @@ LogYourBody is built for consistent body-composition tracking without noisy coac
 LogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.`,
         releaseNotes:
           'LogYourBody Pro is a monthly or annual subscription, and each plan includes a 3-day free trial. This update also fixes a crash that could happen when sign-in resumed more than once.',
-        supportUrl: 'https://logyourbody.com/support',
-        marketingUrl: 'https://logyourbody.com',
-        privacyUrl: 'https://logyourbody.com/privacy',
+        supportUrl: 'https://www.logyourbody.com/support',
+        marketingUrl: 'https://www.logyourbody.com',
+        privacyUrl: 'https://www.logyourbody.com/privacy',
       },
     },
   ],

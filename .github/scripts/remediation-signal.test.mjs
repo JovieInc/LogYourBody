@@ -663,12 +663,14 @@ test('a red main CI check files remediation:red-checks on the LYB team', async (
 test('a production smoke failure files web-deploy in Linear and later smoke recovery resolves it', async () => {
   const { runWebProductionSmoke } = await import('./web-production-smoke.mjs');
   const store = linearStore();
-  const html = '<title>LogYourBody</title><link rel="canonical" href="https://logyourbody.com/">';
+  const { logYourBody } = await import('../../packages/product-registry/src/products/logyourbody.mjs');
   const results = await runWebProductionSmoke({
     deploymentUrl: 'https://deployment.example.com', sleep: async () => {},
     fetchImpl: async (url) => {
       const path = new URL(url).pathname;
       if (path === '/api/waitlist') return Response.json({ success: true }, { status: 202 });
+      const canonical = new URL(path === '/download/ios' ? '/' : path, logYourBody.links.home).href;
+      const html = `<title>Public page | ${logYourBody.identity.name}</title><link rel="canonical" href="${canonical}">`;
       return new Response(html, { status: path === '/support' ? 500 : 200 });
     },
   });

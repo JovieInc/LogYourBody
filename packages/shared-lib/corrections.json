@@ -210,5 +210,25 @@
       "path": "apps/ios/LogYourBody/Views/HomeV2/HomeV2SidebarView.swift",
       "anchor": "recognizer.delaysTouchesEnded = false"
     }
+  },
+  {
+    "fingerprint": "public-page-self-referencing-canonicals",
+    "correction": "LYB-223: Public pages must canonicalize to their own paths on the serving www host, with only the iOS landing page explicitly aliasing the homepage; page titles must not inherit the homepage or duplicate the brand.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/apps/web/src/app/layout.tsx#L53-L56",
+    "mechanization": "Remove the inherited root canonical and define metadata at the route. Required web tests discover public pages, execute their metadata exports and dynamic generators, and check the real Next redirect matcher. Existing deployment smoke rejects homepage canonicals on non-alias routes and duplicate or inherited titles.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Route-local metadata fixes existing pages, but Next.js permits any future route to omit metadata or override its canonical; runtime types cannot enforce a filesystem route identity."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required web test suite can discover every public page and compare its executed canonical with its filesystem route, including an explicit alias allowlist and dedicated dynamic route cases."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
+      "anchor": "public route metadata contract (LYB-223)"
+    }
   }
 ]
