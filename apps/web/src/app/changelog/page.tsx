@@ -5,6 +5,7 @@ import { logYourBody } from '@jovieinc/product-registry';
 export const revalidate = false;
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/changelog' },
   title: 'Development history',
   description: 'View LogYourBody source changes on GitHub.',
 };

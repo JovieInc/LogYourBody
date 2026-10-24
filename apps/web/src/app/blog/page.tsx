@@ -3,7 +3,11 @@ import Link from 'next/link';
 import { getAllPosts } from '@/lib/blog';
 import { MarketingPage } from '@/components/MarketingPage';
 export const revalidate = false;
-export const metadata: Metadata = { title: 'Articles', description: 'Articles from LogYourBody.' };
+export const metadata: Metadata = {
+  alternates: { canonical: '/blog' },
+  title: 'Articles',
+  description: 'Articles from LogYourBody.',
+};
 export default async function BlogPage() {
   const posts = await getAllPosts();
   return (

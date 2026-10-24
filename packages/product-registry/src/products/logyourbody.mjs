@@ -25,21 +25,21 @@ export const logYourBody = {
     },
   },
   links: {
-    home: 'https://logyourbody.com',
+    home: 'https://www.logyourbody.com',
     appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876',
     github: 'https://github.com/JovieInc/LogYourBody',
-    privacy: 'https://logyourbody.com/privacy',
-    terms: 'https://logyourbody.com/terms',
-    support: 'https://logyourbody.com/support',
+    privacy: 'https://www.logyourbody.com/privacy',
+    terms: 'https://www.logyourbody.com/terms',
+    support: 'https://www.logyourbody.com/support',
     status: 'https://status.logyourbody.com',
   },
   endpoints: {
     hosts: {
       api: { host: 'www.logyourbody.com', url: 'https://www.logyourbody.com' },
       marketing: {
-        host: 'logyourbody.com',
-        url: 'https://logyourbody.com',
-        note: 'Apex domain 307-redirects to www; never use it for API or auth traffic.',
+        host: 'www.logyourbody.com',
+        url: 'https://www.logyourbody.com',
+        note: 'Canonical serving host for public pages; the apex redirects here.',
       },
       status: { host: 'status.logyourbody.com', url: 'https://status.logyourbody.com' },
       dev: { host: 'localhost:3000', url: 'http://localhost:3000' },

@@ -50,7 +50,7 @@ Canonical source: packages/product-registry/src/products/logyourbody.mjs. Web an
 ## Endpoints
 
 | api | `https://www.logyourbody.com` | `www.logyourbody.com` | |
-| marketing | `https://logyourbody.com` | `logyourbody.com` | Apex domain 307-redirects to www; never use it for API or auth traffic. |
+| marketing | `https://www.logyourbody.com` | `www.logyourbody.com` | Canonical serving host for public pages; the apex redirects here. |
 | status | `https://status.logyourbody.com` | `status.logyourbody.com` | |
 | dev | `http://localhost:3000` | `localhost:3000` | |
 

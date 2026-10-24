@@ -5,7 +5,9 @@ import { LaunchLanding } from '../../LaunchLanding';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `${logYourBody.identity.name} for iPhone`,
+  alternates: { canonical: '/' },
+  // Absolute so the root title template does not append a second brand.
+  title: { absolute: `${logYourBody.identity.name} for iPhone` },
   description: logYourBody.messages.landing.subheading,
 };
 

@@ -10,15 +10,23 @@ import { logYourBody } from '../../packages/product-registry/src/products/logyou
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const workflow = readFileSync(join(root, '.github/workflows/deploy.yml'), 'utf8');
-const pages = ['/', '/privacy', '/terms', '/health-disclosure', '/support', '/download/ios'];
+const pages = [
+  '/', '/about', '/brand', '/careers', '/security', '/privacy', '/terms',
+  '/health-disclosure', '/support', '/delete-account', '/changelog', '/blog',
+  '/signin', '/signup', '/download/ios', '/download/android',
+];
 const paths = [...pages, '/robots.txt', '/sitemap.xml', '/api/waitlist'];
 const html = `<html><head><title>${logYourBody.identity.name} | Public page</title>
   <link href='${logYourBody.links.home}/' rel='canonical'/></head><body>Public page</body></html>`;
 
+function pageHtml(path) {
+  return html.replace("/' rel=", `${path === '/download/ios' ? '/' : path}' rel=`);
+}
+
 function healthyResponse(url) {
   const path = new URL(url).pathname;
   if (path === '/api/waitlist') return Response.json({ success: true }, { status: 202 });
-  return new Response(html, { headers: { 'content-type': 'text/html' } });
+  return new Response(pageHtml(path), { headers: { 'content-type': 'text/html' } });
 }
 
 async function smoke(options = {}) {
@@ -49,7 +57,7 @@ test('production deploy runs blocking smoke on its URL before reporting success'
   assert.match(router, /workflow_run:[\s\S]*- Deploy/);
 });
 
-test('both origins get every check; 307 redirects preserve the honeypot POST', async (t) => {
+test('both origins get every check; 308 redirects preserve the honeypot POST', async (t) => {
   const { WAITLIST_HONEYPOT } = await import('./web-production-smoke.mjs');
   const requests = [];
   async function server(handler) {
@@ -71,14 +79,14 @@ test('both origins get every check; 307 redirects preserve the honeypot POST', a
       } else {
         assert.equal(request.headers.accept, 'text/html');
         response.writeHead(200, { 'content-type': 'text/html' });
-        response.end(html);
+        response.end(pageHtml(request.url));
       }
     };
   }
   const deploymentUrl = await server(publicSurface('deployment'));
   const www = await server(publicSurface('production'));
   const productionUrl = await server((request, response) => {
-    response.writeHead(307, { location: `${www}${request.url}` });
+    response.writeHead(308, { location: `${www}${request.url}` });
     response.end();
   });
   const results = await smoke({ deploymentUrl, productionUrl, fetchImpl: fetch });
@@ -105,6 +113,10 @@ for (const [name, path, response] of [
   ['missing canonical', '/', () => new Response(html.replace(/<link[^>]+>/, ''))],
   ['wrong canonical origin', '/', () => new Response(html.replace(logYourBody.links.home, 'https://deployment.example.com'))],
   ['wrong canonical path', '/', () => new Response(html.replace("/' rel=", "/signin' rel="))],
+  ['non-home canonical points to homepage', '/privacy', () => new Response(html)],
+  ['alias canonical points to unrelated page', '/download/ios', () => new Response(pageHtml('/support'))],
+  ['doubled brand suffix', '/terms', () => new Response(pageHtml('/terms').replace('Public page', 'Terms | LogYourBody'))],
+  ['inherited homepage title', '/security', () => new Response(pageHtml('/security').replace(`${logYourBody.identity.name} | Public page`, `${logYourBody.identity.name} — ${logYourBody.brand.slogan}`))],
   ['robots failure', '/robots.txt', () => new Response('', { status: 500 })],
   ['sitemap failure', '/sitemap.xml', () => new Response('', { status: 404 })],
   ['waitlist failure', '/api/waitlist', () => Response.json({ success: false }, { status: 500 })],
@@ -178,7 +190,7 @@ test('the exact workflow command exits nonzero and writes smoke failures to the 
     const preload = join(directory, 'fetch.mjs');
     writeFileSync(preload, `globalThis.fetch = async (url) => {
       if (new URL(url).pathname === '/api/waitlist') return Response.json({success:true}, {status:202});
-      return new Response(${JSON.stringify(html)}, {status: new URL(url).pathname === '/support' ? 500 : 200});
+      return new Response(${JSON.stringify(html)}.replace("/' rel=", (new URL(url).pathname === '/download/ios' ? '/' : new URL(url).pathname) + "' rel="), {status: new URL(url).pathname === '/support' ? 500 : 200});
     };`);
     const command = workflow.match(/run: (node \.github\/scripts\/web-production-smoke\.mjs)/)?.[1];
     assert.ok(command);
