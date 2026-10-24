@@ -1,9 +1,14 @@
+import type { Metadata } from 'next';
 import { LaunchLanding } from './LaunchLanding';
 import { endpoints } from '@/lib/generated/endpoints.generated';
 import { LANDING_FLAGS } from '@/lib/flags/landing';
 import { readEditorialHomepageRollout } from '@/lib/flags/publicLanding.server';
 
 const marketingUrl = endpoints.hosts.marketing.url;
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
 
 const landingStructuredData = {
   '@context': 'https://schema.org',

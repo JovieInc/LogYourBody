@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "public-page-canonical-host-and-title",
+    "correction": "LYB-223: Public pages inherited a homepage canonical on the redirecting apex host and some inherited the homepage title or doubled the brand suffix.",
+    "source": "https://linear.app/jovie/issue/LYB-223",
+    "mechanization": "Remove the shared root canonical, set route-level metadata including dynamic article/tag paths, and align the product registry with the serving www host. The required web Jest suite discovers public pages and resolves their actual metadata through Next.js inheritance, rejecting missing or wrong canonicals except the explicit /download/ios alias, inherited homepage titles, repeated brands, and a missing permanent apex redirect. The existing blocking deployment smoke also rejects homepage canonicals outside the explicit iOS alias.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Per-route exports fix current metadata, but Next.js permits future routes or layouts to inherit or override it. Application types cannot guarantee that every future public route exports the correct canonical and title."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic test discovers every public page, resolves its metadata using Next.js, checks route identity and title inheritance, and runs in the existing required web test suite."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
+      "anchor": "resolves to its own canonical and a distinct title"
+    }
+  },
+  {
     "fingerprint": "dependabot-transitive-security-floors",
     "correction": "LYB-236: Dependabot's pnpm update commands exited successfully while retaining vulnerable fast-uri 3.1.8 and undici 8.11.2. Enforce patched transitive floors without weakening maturity settings or Dependency Review.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40035673426",

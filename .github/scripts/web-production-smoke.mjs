@@ -30,9 +30,10 @@ function assertMetadata(html, path) {
   }).filter((attributes) => attributes.rel?.toLowerCase().split(/\s+/).includes('canonical'));
   if (canonicalTags.length !== 1 || !canonicalTags[0].href) throw new Error('Missing or ambiguous canonical URL');
   const canonical = new URL(canonicalTags[0].href);
-  // Public pages currently inherit the root canonical from the Next.js layout.
+  // The iOS download route deliberately renders the homepage landing content.
+  const canonicalPath = path === '/download/ios' ? '/' : path;
   if (canonical.origin !== new URL(logYourBody.links.home).origin ||
-      !['/', path].includes(canonical.pathname) || canonical.search || canonical.hash ||
+      canonical.pathname !== canonicalPath || canonical.search || canonical.hash ||
       canonical.username || canonical.password) {
     throw new Error('Canonical URL does not identify the production site');
   }

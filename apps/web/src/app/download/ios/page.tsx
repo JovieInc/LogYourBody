@@ -5,8 +5,10 @@ import { LaunchLanding } from '../../LaunchLanding';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `${logYourBody.identity.name} for iPhone`,
+  title: { absolute: `${logYourBody.identity.name} for iPhone` },
   description: logYourBody.messages.landing.subheading,
+  // This route renders the same landing page as the homepage.
+  alternates: { canonical: '/' },
 };
 
 // Share the canonical product proof and existing App Store/waitlist gate.

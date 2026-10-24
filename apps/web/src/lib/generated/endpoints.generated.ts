@@ -6,9 +6,9 @@ export const endpoints = {
       url: 'https://www.logyourbody.com',
     },
     marketing: {
-      host: 'logyourbody.com',
-      url: 'https://logyourbody.com',
-      note: 'Apex domain 307-redirects to www; never use it for API or auth traffic.',
+      host: 'www.logyourbody.com',
+      url: 'https://www.logyourbody.com',
+      note: 'Canonical serving host for public pages, API, and auth traffic.',
     },
     status: {
       host: 'status.logyourbody.com',
@@ -372,6 +372,10 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',
       reason:
         'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-223',
+      reason: 'LYB-223 source evidence for public-page canonical and title regression coverage.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-225',

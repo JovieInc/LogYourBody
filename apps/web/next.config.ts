@@ -2,6 +2,7 @@ import type { NextConfig } from 'next';
 import bundleAnalyzer from '@next/bundle-analyzer';
 import { version } from './package.json';
 import { cspReportOnlyDirectives } from './src/lib/generated/csp.generated';
+import { logYourBody } from '@jovieinc/product-registry';
 
 // Bundle analyzer configuration
 const withBundleAnalyzer = bundleAnalyzer({
@@ -57,6 +58,18 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: version,
     // Lets browser analytics derive its tier from the Vercel environment.
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? '',
+  },
+
+  // Keep the Vercel apex domain redirect on 308 as well; it runs before application routing.
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: logYourBody.identity.domain }],
+        destination: `${logYourBody.links.home}/:path*`,
+        permanent: true,
+      },
+    ];
   },
 
   // RFC 9728 protected-resource metadata for the MCP server (see src/lib/mcp/contract.ts).

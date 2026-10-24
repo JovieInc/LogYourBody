@@ -26,7 +26,7 @@ const originalEnvironment = {
 };
 const fetchMock = jest.fn();
 function request(path = '/', accept = 'text/markdown', extra: HeadersInit = {}) {
-  return new NextRequest('https://logyourbody.com' + path, {
+  return new NextRequest(logYourBody.links.home + path, {
     headers: { Accept: accept, ...extra },
   });
 }
@@ -223,11 +223,11 @@ it.each([
   expect(
     unstable_doesMiddlewareMatch({
       config: middlewareConfig,
-      url: 'https://logyourbody.com' + path,
+      url: logYourBody.links.home + path,
     }),
   ).toBe(false);
   const response = await unstable_getResponseFromNextConfig({
-    url: 'https://logyourbody.com' + path,
+    url: logYourBody.links.home + path,
     nextConfig,
     headers: { [PUBLIC_MARKDOWN_HEADER]: '1' },
   });
@@ -236,7 +236,7 @@ it.each([
 
 it('keeps HEAD bodyless and denies direct calls to the internal 404 handler', async () => {
   const head = await middleware(
-    new NextRequest('https://logyourbody.com/', {
+    new NextRequest(logYourBody.links.home + '/', {
       method: 'HEAD',
       headers: { Accept: 'text/markdown' },
     }),
@@ -244,7 +244,7 @@ it('keeps HEAD bodyless and denies direct calls to the internal 404 handler', as
   expect(head.status).toBe(200);
   expect(await head.text()).toBe('');
   const missing = HEAD(
-    new Request('https://logyourbody.com/api/marketing/markdown-not-found', {
+    new Request(logYourBody.links.home + '/api/marketing/markdown-not-found', {
       method: 'HEAD',
       headers: { [PUBLIC_MARKDOWN_HEADER]: '1' },
     }),
@@ -264,7 +264,7 @@ it('does not negotiate an RSC/prefetch or unsafe-method request', async () => {
   for (const req of [
     request('/', 'text/markdown', { RSC: '1' }),
     request('/', 'text/markdown', { 'next-router-prefetch': '1' }),
-    new NextRequest('https://logyourbody.com/', {
+    new NextRequest(logYourBody.links.home + '/', {
       method: 'POST',
       headers: { Accept: 'text/markdown' },
     }),

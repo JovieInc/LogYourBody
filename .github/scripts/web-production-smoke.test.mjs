@@ -12,13 +12,13 @@ const root = fileURLToPath(new URL('../..', import.meta.url));
 const workflow = readFileSync(join(root, '.github/workflows/deploy.yml'), 'utf8');
 const pages = ['/', '/privacy', '/terms', '/health-disclosure', '/support', '/download/ios'];
 const paths = [...pages, '/robots.txt', '/sitemap.xml', '/api/waitlist'];
-const html = `<html><head><title>${logYourBody.identity.name} | Public page</title>
-  <link href='${logYourBody.links.home}/' rel='canonical'/></head><body>Public page</body></html>`;
+const html = (path = '/') => `<html><head><title>${logYourBody.identity.name} | Public page</title>
+  <link href='${new URL(path === '/download/ios' ? '/' : path, logYourBody.links.home).href}' rel='canonical'/></head><body>Public page</body></html>`;
 
 function healthyResponse(url) {
   const path = new URL(url).pathname;
   if (path === '/api/waitlist') return Response.json({ success: true }, { status: 202 });
-  return new Response(html, { headers: { 'content-type': 'text/html' } });
+  return new Response(html(path), { headers: { 'content-type': 'text/html' } });
 }
 
 async function smoke(options = {}) {
@@ -71,7 +71,7 @@ test('both origins get every check; 307 redirects preserve the honeypot POST', a
       } else {
         assert.equal(request.headers.accept, 'text/html');
         response.writeHead(200, { 'content-type': 'text/html' });
-        response.end(html);
+        response.end(html(request.url));
       }
     };
   }
@@ -96,15 +96,16 @@ for (const [name, path, response] of [
   ['homepage 500', '/', () => new Response('', { status: 500 })],
   ['non-home route 404', '/privacy', () => new Response('', { status: 404 })],
   ['redirect to homepage', '/support', () => {
-    const response = new Response(html);
+    const response = new Response(html('/support'));
     Object.defineProperty(response, 'url', { value: logYourBody.links.home });
     return response;
   }],
-  ['missing title', '/support', () => new Response(html.replace(/<title>.*?<\/title>/, ''))],
-  ['soft 404 title', '/terms', () => new Response(html.replace('Public page', '404: Not found'))],
-  ['missing canonical', '/', () => new Response(html.replace(/<link[^>]+>/, ''))],
-  ['wrong canonical origin', '/', () => new Response(html.replace(logYourBody.links.home, 'https://deployment.example.com'))],
-  ['wrong canonical path', '/', () => new Response(html.replace("/' rel=", "/signin' rel="))],
+  ['missing title', '/support', () => new Response(html('/support').replace(/<title>.*?<\/title>/, ''))],
+  ['soft 404 title', '/terms', () => new Response(html('/terms').replace('Public page', '404: Not found'))],
+  ['missing canonical', '/', () => new Response(html().replace(/<link[^>]+>/, ''))],
+  ['wrong canonical origin', '/', () => new Response(html().replace(logYourBody.links.home, 'https://deployment.example.com'))],
+  ['wrong canonical path', '/', () => new Response(html().replace("/' rel=", "/signin' rel="))],
+  ['inherited homepage canonical', '/privacy', () => new Response(html('/'))],
   ['robots failure', '/robots.txt', () => new Response('', { status: 500 })],
   ['sitemap failure', '/sitemap.xml', () => new Response('', { status: 404 })],
   ['waitlist failure', '/api/waitlist', () => Response.json({ success: false }, { status: 500 })],
@@ -176,9 +177,10 @@ test('the exact workflow command exits nonzero and writes smoke failures to the 
   const directory = mkdtempSync(join(tmpdir(), 'lyb-web-smoke-'));
   try {
     const preload = join(directory, 'fetch.mjs');
-    writeFileSync(preload, `globalThis.fetch = async (url) => {
+    writeFileSync(preload, `const pages = ${JSON.stringify(Object.fromEntries(pages.map((path) => [path, html(path)])))};
+    globalThis.fetch = async (url) => {
       if (new URL(url).pathname === '/api/waitlist') return Response.json({success:true}, {status:202});
-      return new Response(${JSON.stringify(html)}, {status: new URL(url).pathname === '/support' ? 500 : 200});
+      return new Response(pages[new URL(url).pathname] ?? '', {status: new URL(url).pathname === '/support' ? 500 : 200});
     };`);
     const command = workflow.match(/run: (node \.github\/scripts\/web-production-smoke\.mjs)/)?.[1];
     assert.ok(command);

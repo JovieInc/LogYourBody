@@ -2,6 +2,7 @@ import { render } from '@testing-library/react';
 import HomePage from '../page';
 import robots from '../robots';
 import sitemap from '../sitemap';
+import { logYourBody } from '@jovieinc/product-registry';
 import { LANDING_FLAGS } from '@/lib/flags/landing';
 
 jest.mock('@/lib/flags/landing', () => ({
@@ -26,18 +27,18 @@ jest.mock('../LegacyMinimalWaitlistLanding', () => ({
 describe('marketing discovery routes', () => {
   it('publishes a nonempty robots policy and sitemap URL', () => {
     const value = robots();
-    expect(value.sitemap).toBe('https://logyourbody.com/sitemap.xml');
+    expect(value.sitemap).toBe(`${logYourBody.links.home}/sitemap.xml`);
     expect(value.rules).toEqual(expect.objectContaining({ userAgent: '*', allow: '/' }));
   });
 
   it('lists only intentional public launch surfaces', () => {
     const urls = sitemap().map((entry) => entry.url);
     expect(urls).toEqual([
-      'https://logyourbody.com',
-      'https://logyourbody.com/privacy',
-      'https://logyourbody.com/terms',
-      'https://logyourbody.com/health-disclosure',
-      'https://logyourbody.com/support',
+      logYourBody.links.home,
+      `${logYourBody.links.home}/privacy`,
+      `${logYourBody.links.home}/terms`,
+      `${logYourBody.links.home}/health-disclosure`,
+      `${logYourBody.links.home}/support`,
     ]);
     expect(urls.some((url) => url.includes('/dashboard'))).toBe(false);
   });

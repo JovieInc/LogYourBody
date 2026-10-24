@@ -1,7 +1,14 @@
+import type { Metadata } from 'next';
 import { MarketingPage } from '@/components/MarketingPage';
 import { Button } from '@jovie/ui/atoms/button';
 import { logYourBody } from '@jovieinc/product-registry';
 export const revalidate = false;
+
+export const metadata: Metadata = {
+  title: 'Security',
+  description: 'Report a security vulnerability in LogYourBody privately.',
+  alternates: { canonical: '/security' },
+};
 
 export default function SecurityPage() {
   return (
