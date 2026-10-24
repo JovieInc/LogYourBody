@@ -40,6 +40,26 @@ Approved escalation language:
 
 `pnpm lint:knowledge` scans every installed `agent/skills/` artifact, the always-loaded compliance instructions, and assistant-response fields in evaluation transcripts. It also scans text and Markdown files recursively under `apps/ios/fastlane/metadata/`, every string field in `apps/ios/fastlane/storefront-manifest.generated.json`, and the resolved `logYourBodyStorefront` definition in `packages/product-registry/src/storefronts/logyourbody.mjs`, including descriptions, subtitles, promotional text, and screenshot copy. Structured storefront fields are decoded and checked independently so a disclaimer in one field cannot suppress a claim in another. `pnpm test:knowledge-lint` exercises both the privacy and claims scanners, including prohibited storefront claims and allowed disclaimers. The claims scanner rejects positive clinical-action and disease assertions, medication direction and amounts, titration language, guaranteed outcomes, and unsupported FDA-status claims. It ignores user prompts because they are not assistant output. Static lint is a guardrail, not a substitute for evidence review or qualified legal and clinical review.
 
+The same blocking CI command scans source text under `apps/web/src/app/`,
+`apps/web/src/components/`, and `apps/web/src/constants/`, including copy modules,
+JSX, page/layout metadata, and JSON-LD. It also scans the canonical product
+registry, the shared privacy/terms/health Markdown and legal-loader fallback
+copy, and published blog Markdown. API handlers, test/fixture/example files,
+build outputs, and blog posts marked `draft: true` are excluded. Web rules also
+flag trial offers, genetic-potential claims, and quantified weight/appearance
+outcomes removed by the 2026-10-14 marketing audit. Qualified reference pricing,
+trial eligibility language, and negated legal disclaimers remain allowed.
+
+Existing web findings are recorded in
+[`web-claims-baseline.json`](../../scripts/knowledge/web-claims-baseline.json)
+and warn with a [copy-owner handoff](web-claims-owner-handoff.md). This baseline
+is limited to the exact source statements and occurrence counts present at the
+Git base. The required correction ratchet rejects baseline growth on every CI
+diff; new or changed claims fail `pnpm lint:knowledge` immediately. Remove
+resolved findings in the same copy-owner change. Do not rewrite flagged copy as
+part of lint maintenance. Fixtures cover removed claims in copy, metadata and
+JSON-LD, permitted disclaimers, and duplicate/changed baseline violations.
+
 ## Primary sources
 
 - Apple App Review Guidelines, sections 1.4.1, 5.1.1, and 5.1.3; Apple Human Interface Guidelines, HealthKit; Apple Developer documentation on protecting HealthKit user privacy and authorizing access to health data. Reviewed 2026-09-27.

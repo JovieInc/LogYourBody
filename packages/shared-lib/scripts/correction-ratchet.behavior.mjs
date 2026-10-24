@@ -263,6 +263,8 @@ test('CLI reports failures, empty success and summary evidence without changing 
   const summary = join(f.root, 'summary.md');
   await runRatchets([], { root: f.root, env: { GITHUB_STEP_SUMMARY: summary }, warn: () => {} });
   assert.match(readFileSync(summary, 'utf8'), /preserve-invariant: 1 accepted existing/);
+  f.json(LEDGER_PATH, []);
+  assert.deepEqual(await f.run(), []);
   const failure = spawnSync(process.execPath, [cli, '--unknown'], { encoding: 'utf8' });
   assert.equal(failure.status, 1);
   assert.match(failure.stderr, /Correction ratchet failed: usage/);
@@ -271,5 +273,7 @@ test('CLI reports failures, empty success and summary evidence without changing 
     env: { ...process.env, GITHUB_STEP_SUMMARY: '' },
   });
   assert.equal(success.status, 0, success.stderr);
-  assert.deepEqual(JSON.parse(success.stdout), []);
+  // The real checkout can have installed ratchets; CLI serialization must
+  // preserve their reports as well as the empty fixture case above.
+  assert.deepEqual(JSON.parse(success.stdout), await runRatchets([], { env: {}, warn: () => {} }));
 });
