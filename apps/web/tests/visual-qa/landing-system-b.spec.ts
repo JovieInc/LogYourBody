@@ -1,21 +1,5 @@
 import { expect, test } from '@playwright/test';
-
-const routes = [
-  '/',
-  '/download/ios',
-  '/download/android',
-  '/about',
-  '/careers',
-  '/brand',
-  '/support',
-  '/security',
-  '/privacy',
-  '/terms',
-  '/health-disclosure',
-  '/blog',
-  '/changelog',
-  '/delete-account',
-];
+import { PUBLIC_MARKETING_ROUTES } from '../../src/data/publicMarketingRoutes';
 
 test('all marketing routes reflow with one main, one heading, real controls and no runtime errors', async ({
   page,
@@ -23,7 +7,7 @@ test('all marketing routes reflow with one main, one heading, real controls and 
   test.setTimeout(90000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  for (const route of routes) {
+  for (const route of PUBLIC_MARKETING_ROUTES) {
     const response = await page.goto(route);
     expect(response?.status()).toBe(200);
     await page.evaluate(() => document.fonts.ready);

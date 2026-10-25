@@ -40,6 +40,26 @@
     }
   },
   {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "LYB-204: Retain LYB correction lessons and guards with their sources, enforcement levels and recurrence across repository revisions.",
+    "source": "https://linear.app/jovie/issue/LYB-204",
+    "mechanization": "The existing required correction coverage check reports each lesson, source, guard and distinct receipt count, and compares source identities with the exact Git base. Behavioral regressions reject deleted, replaced or reassigned receipts even when rule coverage and receipt counts remain unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",
@@ -60,6 +80,22 @@
       "ratchet": {
         "baseline": "packages/shared-lib/app-privacy-baseline.json"
       }
+    }
+  },
+  {
+    "fingerprint": "chart-playhead-preparation-and-label-mapping",
+    "correction": "LYB-44: The chart responsiveness and line/playhead tooltip request in audited session bg_092003_cba358 was missed. Establish budgets, retain correct selected-series labels, and prevent history preparation on every scrub.",
+    "source": "https://linear.app/jovie/issue/LYB-44",
+    "mechanization": "The view-owned input-keyed PreparationCache prepares selection samples once, retains daily/average provenance and reading times, and uses binary nearest-day lookup. Native HomeV2MetricEditorialTests cover latest daily selection, duplicate timestamps, gaps, invalid values, all cache inputs, gate rollback and policy latency budgets. The existing required shared-lib chart regression also prevents removing the gated cache from the actual SwiftUI path. Device frame and display-latency receipts remain separate required release evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Cache chart geometry by render inputs rather than playhead state and construct the date-to-reading mapping alongside the plotted series, retaining provenance by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/HomeV2MetricEditorialTests.swift",
+      "anchor": "func testPlayheadSelectsLatestDailyReadingRegardlessOfValueOrInputOrder()"
     }
   },
   {
@@ -331,6 +367,22 @@
     "guard": {
       "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
       "anchor": "public route metadata contract (LYB-223)"
+    }
+  },
+  {
+    "fingerprint": "marketing-sitemap-shares-public-route-inventory",
+    "correction": "LYB-224: The sitemap must match the public marketing route tests on the canonical host, omit request-time modification dates, and block legacy sign-in and sign-up routes from crawling.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/apps/web/src/app/sitemap.ts#L4",
+    "mechanization": "Generate the sitemap from the same public route inventory used by marketing browser tests. Required web tests compare the complete sitemap with that inventory, verify inventory completeness against public page files, and reject fabricated modification dates and missing auth exclusions in robots.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The sitemap maps the shared marketing inventory directly using the registry's canonical origin, omits unverified timestamps, and robots explicitly excludes the retained auth routes."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/sitemap.ts",
+      "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
     }
   },
   {
