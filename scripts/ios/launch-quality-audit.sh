@@ -548,13 +548,17 @@ for test_id in "${CHAT_QUALIFICATION_UNIT_TESTS[@]}"; do
   CHAT_UNIT_EVIDENCE_ARGS+=(--expected-test "${test_id}()")
 done
 
-# The whole unit target is the gate: every journey test in docs/USER_JOURNEYS.md
+# StoreKitPurchaseRestoreTests is skipped here: it shares one StoreKit test environment, is gated by the
+# dedicated StoreKit job (ci.yml ios_storekit, test plan StoreKit, merge queue and main) and failed 2 of 13
+# Launch Quality runs on 2026-10-25 with the LYB-231 signature (empty StoreKit state at restore).
+# The rest of the unit target is the gate: every journey test in docs/USER_JOURNEYS.md
 # runs on every PR (all 67 files are registered in the target as of the orphan rescue).
 run_xcodebuild_test \
   "launch-quality-unit-tests" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
-  -only-testing:LogYourBodyTests
+  -only-testing:LogYourBodyTests \
+  -skip-testing:LogYourBodyTests/StoreKitPurchaseRestoreTests
 assert_xcresult_evidence \
   "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
 

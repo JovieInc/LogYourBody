@@ -195,6 +195,13 @@ test('every input the iOS jobs read selects iOS; JS-only roots do not', () => {
   }
 });
 
+test('iOS release and diagnostic workflows are not inputs of the PR iOS jobs', () => {
+  for (const file of ['.github/workflows/ios-ui-diagnostics.yml', '.github/workflows/ios-release-loop.yml', '.github/workflows/ios-testflight-deploy.yml', '.github/workflows/ios-post-merge-quality.yml']) {
+    const fx = queueFixture({ [file]: 'changed' });
+    assert.equal(detect(fx.workspace, mergeGroup(fx), noHold).outputs.ios_unit, 'false', file);
+  }
+});
+
 test('an unfetchable base selects every surface', () => {
   const fx = queueFixture({ 'README.md': 'v2' });
   const { outputs } = detect(fx.workspace, { ...mergeGroup(fx), BASE_SHA: 'f'.repeat(40) }, noHold);
@@ -592,4 +599,11 @@ test("daily-step verifier rejects execution without explicit disposable opt-in",
     result.stderr,
     /Pass --run to create an isolated socket-only cluster/,
   );
+});
+
+test('Launch Quality leaves StoreKit lifecycle tests to the dedicated StoreKit job', () => {
+  const audit = fs.readFileSync(new URL('../../scripts/ios/launch-quality-audit.sh', import.meta.url), 'utf8');
+  assert.match(audit, /-only-testing:LogYourBodyTests \\\n\s+-skip-testing:LogYourBodyTests\/StoreKitPurchaseRestoreTests/);
+  // The skip is only safe while the dedicated job still runs the suite in the queue and on main.
+  assert.match(jobBlock('ios_storekit'), /storekit-purchase-restore\.sh/);
 });
