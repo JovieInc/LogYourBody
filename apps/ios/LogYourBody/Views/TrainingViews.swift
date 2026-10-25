@@ -339,6 +339,9 @@ enum TrainingCompletionMotionPolicy {
 struct TrainingLiveSessionView: View {
     let voiceEnabled: Bool
     let readinessEnabled: Bool
+    let progressEnabled: Bool
+    let progressDecision: TrainingProgressDecision?
+    let onLoadProgress: (() async throws -> TrainingProgressResponse)?
     let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
     let onCorrectSet: (TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
     let onWorkoutAction: (TrainingWorkoutActionRequest) async throws -> TrainingSession
@@ -349,6 +352,7 @@ struct TrainingLiveSessionView: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var draft: TrainingSessionDraft
+    @StateObject private var progress: TrainingProgressModel
     @State private var voiceCapture = VoiceCaptureService()
     @State private var soreness = 0
     @State private var pump = 0
@@ -373,6 +377,8 @@ struct TrainingLiveSessionView: View {
         ownerId: String,
         voiceEnabled: Bool,
         readinessEnabled: Bool = false,
+        progressEnabled: Bool = false,
+        progressDecision: TrainingProgressDecision? = nil,
         draftStore: TrainingDraftStore = .shared,
         isCurrent: @escaping () -> Bool,
         onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
@@ -381,10 +387,14 @@ struct TrainingLiveSessionView: View {
         onVoiceIntent: @escaping (
             TrainingSession, String, VoiceSetContext?, VoiceSetContext?
         ) async throws -> VoiceIntentResponse,
-        onFeedback: @escaping (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
+        onFeedback: @escaping (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse,
+        onLoadProgress: (() async throws -> TrainingProgressResponse)? = nil
     ) {
         self.voiceEnabled = voiceEnabled
         self.readinessEnabled = readinessEnabled
+        self.progressEnabled = progressEnabled
+        self.progressDecision = progressDecision
+        self.onLoadProgress = onLoadProgress
         self.onLogSet = onLogSet
         self.onCorrectSet = onCorrectSet
         self.onWorkoutAction = onWorkoutAction
@@ -393,6 +403,7 @@ struct TrainingLiveSessionView: View {
         _draft = StateObject(wrappedValue: TrainingSessionDraft(
             session: session, ownerId: ownerId, store: draftStore, isCurrent: isCurrent
         ))
+        _progress = StateObject(wrappedValue: TrainingProgressModel(isCurrent: isCurrent))
     }
 
     var body: some View {
@@ -406,7 +417,14 @@ struct TrainingLiveSessionView: View {
                         pausedCard
                     } else if let current = draft.currentPosition {
                         currentCard(current)
+                        if progressEnabled {
+                            TrainingExerciseHistoryRow(exerciseId: current.exercise.id, model: progress)
+                        }
                         upNextCard
+                        if progressEnabled, let next = draft.upNextPosition {
+                            TrainingExerciseHistoryRow(exerciseId: next.exercise.id, model: progress)
+                                .accessibilityIdentifier("training_history_up_next_\(next.exercise.id)")
+                        }
                         restState
                     } else {
                         completeCard
@@ -426,6 +444,11 @@ struct TrainingLiveSessionView: View {
                         commandControl
                     }
                     feedbackCard
+                    if progressEnabled {
+                        TrainingProgressReviewSection(model: progress, decision: progressDecision) {
+                            Task { await refreshProgress() }
+                        }
+                    }
                     if let message = errorMessage ?? draft.errorMessage {
                         Text(message)
                             .font(.footnote)
@@ -459,6 +482,7 @@ struct TrainingLiveSessionView: View {
             }
         }
         .interactiveDismissDisabled(isSaving || draft.isSaving)
+        .task(id: progressRefreshKey) { await refreshProgress() }
         .onDisappear { voiceCapture.cancel() }
         .onChange(of: draft.lastSaveReceipt) { _, receipt in
             guard let receipt else { return }
@@ -487,6 +511,16 @@ struct TrainingLiveSessionView: View {
         .sheet(item: $correctionPosition, onDismiss: cancelOpenCorrection) { position in
             correctionSheet(position)
         }
+    }
+
+    private var progressRefreshKey: String {
+        "\(progressEnabled)-\(draft.session.executionRevision ?? 0)-" +
+            "\(draft.lastSaveReceipt?.id ?? "")-\(draft.feedback?.response?.feedback.id ?? "")"
+    }
+
+    private func refreshProgress() async {
+        guard progressEnabled, let onLoadProgress else { return }
+        await progress.load(using: onLoadProgress)
     }
 
     private var sessionHeader: some View {
@@ -1360,6 +1394,21 @@ struct TrainingLiveSessionFixtureView: View {
         )
     }
 
+    private var progressFixture: TrainingProgressResponse {
+        let recorded = TrainingProgress.RecordedSet(
+            id: "history-set", sessionId: "history-session", exerciseId: "fixture_press",
+            setNumber: 1, reps: 8, loadKg: 12.5, rir: 2,
+            completedAt: "2026-10-24T12:00:00.000Z", revision: 0, corrections: nil
+        )
+        return TrainingProgressResponse(version: 1, progress: TrainingProgress(
+            enrolled: true, completedSessions: 1, setsLast7Days: 1,
+            exercises: [.init(
+                exerciseId: "fixture_press", name: "Fixture press", lastPerformedAt: recorded.completedAt,
+                lastSession: [recorded], heaviestSet: recorded, totalSets: 1
+            )], latestCheckIn: nil, sessions: []
+        ))
+    }
+
     var body: some View {
         VStack(spacing: 20) {
             Button("Open fixture session") { presented = true }
@@ -1395,6 +1444,7 @@ struct TrainingLiveSessionFixtureView: View {
             TrainingLiveSessionView(
                 session: session, ownerId: "fixture-training-owner", voiceEnabled: true,
                 readinessEnabled: true,
+                progressEnabled: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingProgress"),
                 draftStore: Self.draftStore,
                 isCurrent: { true }, onLogSet: { exercise, number, reps, load, rir in
                     submissionCount += 1
@@ -1454,6 +1504,11 @@ struct TrainingLiveSessionFixtureView: View {
                             weeklyPlanChanged: false, safetyCertified: false
                         )
                     )
+                }, onLoadProgress: {
+                    if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingHistoryUnavailable") {
+                        throw URLError(.notConnectedToInternet)
+                    }
+                    return progressFixture
                 }
             )
         }
