@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "share-export-stale-inputs-and-unconfirmed-photo-save",
+    "correction": "LYB-40: A synchronous MainActor renderer cannot display its transient busy state, cached pixels survive payload refresh, and submitting a Photos write is not confirmed success. Freeze all export inputs, serialize work, suppress invalidated completions, and await the Photos transaction.",
+    "source": "https://linear.app/jovie/issue/LYB-40",
+    "mechanization": "BodyScoreShareExport owns one task and one file, snapshots payload/aspect/options/renderer revision, checks operation and account ownership around suspensions, and retains bounded successful-save receipts. Native BodyScoreShareExportTests is included in the existing required Unit test plan through the normal test target. Linux cannot execute its fail/pass regression or native coverage; those receipts remain required from the real runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A single export coordinator prevents concurrent submissions and stale cache reuse by construction, while the Photos adapter returns success only after a confirmed transaction. Existing native Unit CI executes delayed/failing-adapter and privacy regressions without changing gates."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BodyScoreShareExport.swift",
+      "anchor": "guard !isBusy, isCurrent() else { return }"
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",

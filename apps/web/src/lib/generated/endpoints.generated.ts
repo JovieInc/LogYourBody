@@ -360,6 +360,10 @@ export const endpoints = {
       reason: 'Linear GraphQL API used by CI remediation intake.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-40',
+      reason: 'LYB-40 source evidence for share export lifecycle and confirmed Photos writes.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-74',
       reason:
         'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.',
