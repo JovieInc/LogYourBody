@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `45da91743d6d4d6db4d9ab5bd4d5ad9676a4e768e1c24bd372a4416f52be5b8c`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `dd323f3ea0204109819f935290edeb15d73ccb20d8c04ca3ad234cbbee51aad7`)
 
 ### `apps/web/package.json`: engines
 
@@ -107,6 +107,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-toggle-group": "^1.1.19",
   "@radix-ui/react-tooltip": "^1.3.0",
   "@radix-ui/react-visually-hidden": "^1.2.11",
+  "@sentry/nextjs": "^11.9.0",
   "@statsig/js-client": "^3.33.5",
   "@statsig/statsig-node-core": "0.23.1",
   "@tailwindcss/postcss": "^4.3.3",
@@ -380,7 +381,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `20607bbc13e8980c10505ef9a781cac117da83d3d5f3441f5e143562c3d415e9`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5ecaca52c8447cb1af53c8a662b61e0551c311aa9716d25801e2fd01e2ed306d`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `2cb70e28c2d3f69a7ded26939e5bae4269958b5ab596750a941b2ad237821457`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)

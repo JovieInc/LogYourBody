@@ -18,6 +18,16 @@ enum TrainingReadinessPolicy {
     static let featureGate = "workout_readiness_v1"
 }
 
+enum TrainingRecoveryCopy {
+    /// Matches `APPLIED_RECOVERY_NEXT_ACTION_PREFIX` in the training service.
+    static let appliedPrefix = "Applied recovery trial:"
+
+    static func appliedNextAction(_ explanation: String?) -> String? {
+        guard let explanation, explanation.hasPrefix(appliedPrefix) else { return nil }
+        return explanation
+    }
+}
+
 struct TrainingExercisePrescription: Decodable, Equatable, Identifiable, Sendable {
     let id: String
     let name: String
@@ -110,6 +120,7 @@ struct TrainingNextResponse: Decodable, Equatable, Sendable {
     let week: Int?
     let weekCount: Int?
     let weeklyFractionalVolume: [String: Double]?
+    var decision: TrainingProgressDecision?
     var nextBlock: TrainingPlanStoredProposal?
 }
 
@@ -362,6 +373,7 @@ enum TrainingServiceError: LocalizedError, Equatable {
 
 protocol TrainingServicing {
     func loadNext(accessToken: String) async throws -> TrainingNextResponse
+    func loadProgress(accessToken: String) async throws -> TrainingProgressResponse
     func enroll(accessToken: String, sessionsPerWeek: Int, equipment: String) async throws -> TrainingProgramResponse
     func logSet(accessToken: String, request: TrainingSetLogRequest) async throws
     func correctSet(accessToken: String, request: TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
@@ -381,6 +393,10 @@ final class URLSessionTrainingService: TrainingServicing {
 
     func loadNext(accessToken: String) async throws -> TrainingNextResponse {
         try await send(path: "next", method: "GET", accessToken: accessToken)
+    }
+
+    func loadProgress(accessToken: String) async throws -> TrainingProgressResponse {
+        try await send(path: "progress", method: "GET", accessToken: accessToken)
     }
 
     func enroll(
@@ -556,6 +572,7 @@ private protocol VersionedTrainingResponse {
 }
 
 extension TrainingNextResponse: VersionedTrainingResponse {}
+extension TrainingProgressResponse: VersionedTrainingResponse {}
 extension TrainingProgramResponse: VersionedTrainingResponse {}
 extension TrainingRevokeResponse: VersionedTrainingResponse {}
 extension TrainingFeedbackResponse: VersionedTrainingResponse {}
