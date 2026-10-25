@@ -125,7 +125,7 @@ private final class PlanningServiceFixture: DelegatedTrainingServicing {
         "assumptions":["Conservative baseline"],"plan":{"revision":1,"sessions":[{"id":"monday",
         "day":"monday","slot":"single","title":"Monday","exercises":[{"instanceId":"curl",
         "variantId":"cable_curl","name":"Cable curl","sets":2,"targetReps":10,"priority":"standard"}]}]}}}}
-        """#.replacingOccurrences(of: "\"proposal\"", with: "\"\(proposalId)\"").utf8))
+        """#.replacingOccurrences(of: "\"id\":\"proposal\"", with: "\"id\":\"\(proposalId)\"").utf8))
     }
 
     func planningContext(accessToken: String) async throws -> TrainingPlanContext {
