@@ -158,7 +158,7 @@ private final class SentryErrorTrackingVendor: ErrorTrackingVendor {
 
     func setUser(id: String) {
         #if canImport(Sentry)
-        SentrySDK.setUser(User(userId: id))
+        SentrySDK.setUser(Sentry.User(userId: id))
         #endif
     }
 
@@ -263,7 +263,7 @@ enum ErrorTrackingRedactor {
         event.message = event.message.map { SentryMessage(formatted: sanitize($0.formatted)) }
         // Keep only the opaque id so affected-user counts work; drop everything else.
         if let id = event.user?.userId, !id.isEmpty {
-            event.user = User(userId: id)
+            event.user = Sentry.User(userId: id)
         } else {
             event.user = nil
         }

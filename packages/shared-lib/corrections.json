@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "sentry-user-type-is-module-qualified",
+    "correction": "PR #1537: Both native CI jobs failed because User(userId:) resolved to LogYourBody.User instead of Sentry.User. The ErrorReporter test vendor also lacked the new setUser(id:) protocol requirement.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40157276257",
+    "mechanization": "Qualify both SDK user constructors with Sentry and complete the test vendor conformance. The existing required native build checks enforce the SDK argument type and every ErrorTrackingVendor conformance. ErrorTrackingServiceTests additionally exercises account and install identity preservation, personal-field removal, and missing or empty identity removal through the real SDK redactor. The original CI logs prove the unqualified build fails; native execution of the repaired head remains required on macOS.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Module-qualified SDK types prevent the app model from shadowing either constructor by construction. Swift protocol conformance requires every vendor implementation, including test fakes, to implement setUser(id:)."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/ErrorTrackingService.swift",
+      "anchor": "SentrySDK.setUser(Sentry.User(userId: id))"
+    }
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1531: Adding the delegated training view and tests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151037308/job/121042459915",

@@ -11,6 +11,10 @@ import SwiftUI
 import UIKit
 @testable import LogYourBody
 
+#if canImport(Sentry)
+import Sentry
+#endif
+
 
 final class ErrorTrackingServiceTests: XCTestCase {
     private final class FakeErrorTrackingVendor: ErrorTrackingVendor {
@@ -280,6 +284,47 @@ final class ErrorTrackingServiceTests: XCTestCase {
             }
         }
     }
+
+    #if canImport(Sentry)
+    func testRedactorPreservesOpaqueUserIdentityAndRemovesPersonalFields() throws {
+        let accountID = try XCTUnwrap(ErrorTrackingIdentity.anonymousID(for: "user-9"))
+        for id in [accountID, "i_12345678-1234-4234-8234-123456789abc"] {
+            let event = Sentry.Event(level: .error)
+            let user = Sentry.User(userId: id)
+            user.email = "person@example.com"
+            user.username = "private-username"
+            user.name = "Private Name"
+            user.ipAddress = "192.0.2.1"
+            user.data = ["account_id": "user-9"]
+            event.user = user
+
+            let redacted = try XCTUnwrap(ErrorTrackingRedactor.redact(event: event))
+            let redactedUser = try XCTUnwrap(redacted.user)
+
+            XCTAssertEqual(redactedUser.userId, id)
+            XCTAssertNil(redactedUser.email)
+            XCTAssertNil(redactedUser.username)
+            XCTAssertNil(redactedUser.name)
+            XCTAssertNil(redactedUser.ipAddress)
+            XCTAssertNil(redactedUser.data)
+        }
+    }
+
+    func testRedactorDropsUsersWithoutAnIdentity() throws {
+        let missingIDs: [String?] = [nil, ""]
+        for id in missingIDs {
+            let event = Sentry.Event(level: .error)
+            let user = Sentry.User()
+            user.userId = id
+            user.email = "person@example.com"
+            event.user = user
+
+            let redacted = try XCTUnwrap(ErrorTrackingRedactor.redact(event: event))
+
+            XCTAssertNil(redacted.user)
+        }
+    }
+    #endif
 
     func testRedactorFiltersEmailHealthValuesAndIdentifiers() {
         XCTAssertEqual(
