@@ -365,6 +365,10 @@ export const endpoints = {
       reason: 'Linear GraphQL API used by CI remediation intake.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-44',
+      reason: 'LYB-44 source evidence for chart responsiveness and playhead label mapping.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-74',
       reason:
         'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.',
@@ -389,6 +393,11 @@ export const endpoints = {
     {
       value: 'https://linear.app/jovie/issue/LYB-194',
       reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-204',
+      reason:
+        'LYB-204 source evidence for the correction ledger, retained receipts and recurrence contract.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',

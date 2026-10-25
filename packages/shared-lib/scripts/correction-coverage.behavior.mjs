@@ -181,6 +181,72 @@ test('counts distinct rules, all four pyramid levels and unclassified receipts h
   assert.match(renderCoverage(value), /Overall \| 2\/6 \| 33.33%/);
 });
 
+test('ledger reports lessons, guards and recurrence from chat, review, Linear and revert receipts', () => {
+  const sources = [
+    'https://example.com/memory/tim-correction',
+    'https://github.com/JovieInc/LogYourBody/pull/42#discussion_r123',
+    'https://linear.app/jovie/issue/LYB-204#comment-123',
+    `https://github.com/JovieInc/LogYourBody/commit/${'a'.repeat(40)}`,
+  ];
+  const rows = sources.map((source) =>
+    receipt(' Retain Evidence ', 'static', {
+      source,
+      correction: 'Keep <lesson> | evidence\nintact.',
+      guard,
+    }),
+  );
+  const value = report([...rows, { ...rows[0], fingerprint: 'retain-evidence' }]);
+  const [rule] = value.rules;
+  assert.equal(value.total, 1);
+  assert.equal(rule.level, 'static');
+  assert.deepEqual(rule.guard, guard);
+  assert.deepEqual(rule.recurrence, { receiptCount: 4, repeatCount: 3 });
+  assert.deepEqual(
+    rule.receipts,
+    rows
+      .map(({ source, correction, mechanization }) => ({ source, correction, mechanization }))
+      .sort((a, b) => a.source.localeCompare(b.source)),
+  );
+  assert.deepEqual(report([...rows].reverse()), value);
+  const rendered = renderCoverage(value);
+  for (const source of sources) assert.ok(rendered.includes(source));
+  assert.match(rendered, /Keep &lt;lesson&gt; &#124; evidence intact\./);
+  assert.match(rendered, /guard.mjs/);
+  assert.match(rendered, /enforce the retained invariant/);
+  assert.match(rendered, /4 receipts; 3 repeats/);
+  assert.deepEqual(report([rows[0]]).rules[0].recurrence, { receiptCount: 1, repeatCount: 0 });
+});
+
+test('ledger CI retains each source against Git even when rule coverage and receipt count stay equal', (t) => {
+  const first = receipt('retained', 'static', {
+    guard,
+    classification: classification('static'),
+  });
+  const second = { ...first, source: 'https://example.com/second-receipt' };
+  const extra = { ...first, source: 'https://example.com/third-receipt' };
+  const { root, ref } = fixtureRepo(t, [first, second]);
+  for (const rows of [
+    [first],
+    [first, extra],
+    [first, { ...second, fingerprint: 'different-rule' }],
+  ]) {
+    writeFileSync(join(root, LEDGER_PATH), JSON.stringify(rows));
+    assert.throws(() => runCoverage(['--base-ref', ref], { root, env: {} }), /removed receipt/);
+  }
+  // Duplicate replays, canonical URL spelling, new receipts and guard promotions are allowed.
+  const revised = [second, first, first, extra].map((row) => ({
+    ...row,
+    fingerprint: ' RETAINED ',
+    level: 'codebase',
+    classification: classification('codebase'),
+    correction: 'Clarified lesson without losing the original evidence.',
+    source: row.source.replace('https://example.com/', 'https://EXAMPLE.com:443/'),
+  }));
+  writeFileSync(join(root, LEDGER_PATH), JSON.stringify(revised));
+  const value = runCoverage(['--base-ref', ref], { root, env: {} });
+  assert.deepEqual(value.rules[0].recurrence, { receiptCount: 3, repeatCount: 2 });
+});
+
 test('empty ledger is N/A and proposed or absent guards earn no credit', () => {
   assert.equal(report([]).percent, null);
   assert.match(renderCoverage(report([])), /N\/A \(no rules\)/);
