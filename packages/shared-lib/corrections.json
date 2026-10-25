@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "training-cycle-delegation-merge-parity",
+    "correction": "PR #1541 conflicts with the delegated programming implementation merged in PR #1531. Preserve both proposal versions, owner-locked database admission and native entry points when merging origin/main.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1541",
+    "mechanization": "Separate the cycle schema from revision/delegation dependencies to prevent the engine import cycle. Route cycle intents through version 1 while retaining version 2 dispatch, and extend the additive migration with both admission paths. The required web suite exercises cycle review/apply with the delegated gate both off and on and rejects replacement of an accepted delegated plan. The combined disposable PostgreSQL verifier retains all cycle and delegated transaction cases; the original cycle migration fails the delegated cases.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Independent cycle schema dependencies prevent module initialization failures; explicit intent/version dispatch and one owner-locked SQL command retain both implementations by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/api/auth/mobile/training/v1/__tests__/revisions.node.test.ts",
+      "anchor": "keeps cycle revisions reachable with delegated programming enabled=%s"
+    }
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1566 / LYB-238: Adding HealthAnchorStore, the anchored HealthKit extension and anchor-store tests to their Xcode targets changed the project manifest without refreshing its diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40201461595/job/121193328303",
