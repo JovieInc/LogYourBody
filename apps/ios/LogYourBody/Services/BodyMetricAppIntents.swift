@@ -50,9 +50,9 @@ struct LogWeightIntent: AppIntent {
     let operationId: String
 
     init() {
-        unit = MeasurementSystem.preferredFromDefaults == .metric ? .kilograms : .pounds
         recordId = UUID().uuidString
         operationId = UUID().uuidString
+        unit = MeasurementSystem.preferredFromDefaults == .metric ? .kilograms : .pounds
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {

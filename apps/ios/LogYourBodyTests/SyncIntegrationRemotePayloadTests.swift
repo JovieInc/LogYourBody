@@ -443,7 +443,8 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
             "created_at": formatter.string(from: date.addingTimeInterval(-60))
         ])
 
-        let row = try XCTUnwrap(await cachedBodyMetric(id: id))
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
         XCTAssertTrue(row.isMarkedDeleted)
         XCTAssertTrue(row.isSynced)
         XCTAssertEqual(row.syncStatus, "synced")
@@ -488,7 +489,8 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
             "created_at": formatter.string(from: older)
         ])
 
-        let row = try XCTUnwrap(await cachedBodyMetric(id: id))
+        let cached = await cachedBodyMetric(id: id)
+        let row = try XCTUnwrap(cached)
         XCTAssertFalse(row.isMarkedDeleted)
         XCTAssertEqual(row.notes, "offline-edit")
         XCTAssertEqual(row.weight, 82.0, accuracy: 0.001)

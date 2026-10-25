@@ -854,7 +854,8 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
             for: date.addingTimeInterval(86_400),
             userId: userId
         )
-        XCTAssertTrue(await coreData.markPhotoPlaceholderUploadInFlight(id: photo.metrics.id, userId: userId))
+        let markedInFlight = await coreData.markPhotoPlaceholderUploadInFlight(id: photo.metrics.id, userId: userId)
+        XCTAssertTrue(markedInFlight)
 
         let stubProductAPI = StubProductAPIClient()
         stubProductAPI.bodyMetricConflicts = [BodyMetricPushConflict(id: id, code: "tombstone")]
