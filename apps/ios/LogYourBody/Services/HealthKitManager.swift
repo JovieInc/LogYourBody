@@ -496,6 +496,19 @@ enum HealthKitSmartScaleSyncPolicy {
         let value: Double
         let date: Date
         let sourceName: String?
+        let sourceBundleId: String?
+
+        init(
+            sampleId: String, kind: Kind, value: Double, date: Date,
+            sourceName: String?, sourceBundleId: String? = nil
+        ) {
+            self.sampleId = sampleId
+            self.kind = kind
+            self.value = value
+            self.date = date
+            self.sourceName = sourceName
+            self.sourceBundleId = sourceBundleId
+        }
     }
 
     struct Existing: Equatable {
@@ -529,13 +542,15 @@ enum HealthKitSmartScaleSyncPolicy {
     }
 
     static func makeSample(
-        sampleId: String, kind: Kind, value: Double, date: Date, sourceName: String?
+        sampleId: String, kind: Kind, value: Double, date: Date, sourceName: String?, sourceBundleId: String? = nil
     ) -> Sample? {
         let id = sampleId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !id.isEmpty, value.isFinite, value > 0 else { return nil }
         let name = sourceName?.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleaned = (name?.isEmpty == false) ? name : nil
-        return Sample(sampleId: id, kind: kind, value: value, date: date, sourceName: cleaned)
+        return Sample(
+            sampleId: id, kind: kind, value: value, date: date, sourceName: cleaned, sourceBundleId: sourceBundleId
+        )
     }
 
     static func attribution(sourceName: String?) -> String {

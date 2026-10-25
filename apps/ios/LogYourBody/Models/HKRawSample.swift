@@ -1,6 +1,15 @@
 import Foundation
 
 struct HKRawSample: Identifiable, Equatable {
+    var effectiveDate: Date { startDate }
+
+    var provenance: BodyMetricProvenance {
+        BodyMetricProvenance(
+            sourceName: sourceName, sourceBundleId: sourceBundleId,
+            effectiveDate: effectiveDate, importedAt: createdAt
+        )
+    }
+
     let id: String
     let userId: String
     let hkUUID: String

@@ -108,14 +108,14 @@ func historyRow(for entry: MetricHistoryEntry, config: MetricEntriesConfiguratio
 
         return HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.date.formatted(.dateTime.month().day().year()))
+                Text(DashboardMetricFormatting.readingDateLabel(effectiveDate: entry.date))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
 
                 HStack(spacing: 8) {
                     historySourceIcon(for: entry.source)
 
-                    Text(sourceLabel(for: entry.source))
+                    Text(entry.sourceName ?? sourceLabel(for: entry.source))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.metricTextTertiary)
                 }

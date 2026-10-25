@@ -192,7 +192,8 @@ func sourceMetadata(from sample: HKQuantitySample) -> BodyMetricSourceMetadata {
             deviceManufacturer: sample.device?.manufacturer,
             deviceModel: sample.device?.model,
             sampleId: sample.uuid.uuidString,
-            quantityType: sample.quantityType.identifier
+            quantityType: sample.quantityType.identifier,
+            importedAt: ISO8601DateFormatter().string(from: Date())
         )
     }
 
@@ -213,7 +214,8 @@ func combinedHealthKitMetadata(
             deviceModel: primary?.deviceModel ?? bodyFatMetadata?.deviceModel,
             sampleId: primary?.sampleId ?? bodyFatMetadata?.sampleId,
             quantityType: primary?.quantityType ?? bodyFatMetadata?.quantityType,
-            bodyFatSampleId: bodyFatMetadata?.sampleId
+            bodyFatSampleId: bodyFatMetadata?.sampleId,
+            importedAt: primary?.importedAt ?? bodyFatMetadata?.importedAt
         )
     }
 

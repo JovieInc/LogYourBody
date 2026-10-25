@@ -492,5 +492,21 @@
       "path": "apps/web/src/app/sitemap.ts",
       "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
     }
+  },
+  {
+    "fingerprint": "imported-weight-uses-effective-date-and-provenance",
+    "correction": "LYB-240: A historical reading imported today must keep its measurement date and source, and must not displace a newer reading or become current outside the existing recency window.",
+    "source": "https://linear.app/jovie/issue/LYB-240",
+    "mechanization": "BodyMetrics and HKRawSample expose required provenance independent of import time. DashboardMetricFormatting centralizes date labels and selects current weight only by eligible effective dates. Existing Unit XCTest suites cover historical, same-day, future, missing-source and manual entries; native CI execution remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One shared date formatter and a current-weight selector enforce measurement-date labeling and the existing 30-day recency window in the dashboard, while typed provenance prevents UI consumers from falling back to import time."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Helpers/DashboardMetricFormatting.swift",
+      "anchor": "return metric.effectiveDate >= start && metric.effectiveDate <= now"
+    }
   }
 ]
