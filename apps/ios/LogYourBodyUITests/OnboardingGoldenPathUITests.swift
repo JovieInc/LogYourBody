@@ -16,6 +16,10 @@ final class OnboardingGoldenPathUITests: XCTestCase {
     /// `onboardingCompleted: false`, so the app lands on the hook step with a
     /// fresh progress store (unique userId per launch).
     func testBodyScoreOnboardingGoldenPathReachesReveal() throws {
+        // XCTest rounds the 90s default up to 2 minutes. One 60s quiescence
+        // stall then kills the test, and that kill retries the whole UI suite
+        // until the launch-quality step times out. 180s is the audit maximum.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestBodyScoreOnboardingFixture", "-lybUITestRevealTransitionDiagnostic"]
         app.forwardActualXCTestContext()
