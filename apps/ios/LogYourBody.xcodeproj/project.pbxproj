@@ -428,10 +428,13 @@
 		E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C001 /* TrainingService.swift */; };
 		F00720261007000100000002 /* TrainingDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000001 /* TrainingDraftStore.swift */; };
 		F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000003 /* TrainingSessionDraft.swift */; };
+		153A00000000000000000004 /* TrainingNumericScrubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153A00000000000000000003 /* TrainingNumericScrubTests.swift */; };
 		F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000005 /* TrainingSessionDraftTests.swift */; };
+		153A00000000000000000002 /* TrainingNumericScrub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153A00000000000000000001 /* TrainingNumericScrub.swift */; };
 		E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C003 /* TrainingViews.swift */; };
 		E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000001 /* MesocycleCanvas.swift */; };
 		E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */; };
+		153A00000000000000000006 /* TrainingNumericScrubUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153A00000000000000000005 /* TrainingNumericScrubUITests.swift */; };
 		E4C0A5110000000000000006 /* MesocycleCanvasUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */; };
 		E4C0A5110000000000000008 /* MesocycleCanvasSequence.json in Resources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */; };
 		E6CBDEE0211741843DCF52AA /* CoreDataManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF02BFDD936CBA59B3704AA3 /* CoreDataManager+Part01.swift */; };
@@ -1002,10 +1005,13 @@
 		E4172D019C9F4A30A881C001 /* TrainingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingService.swift; sourceTree = "<group>"; };
 		F00720261007000100000001 /* TrainingDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDraftStore.swift; sourceTree = "<group>"; };
 		F00720261007000100000003 /* TrainingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraft.swift; sourceTree = "<group>"; };
+		153A00000000000000000003 /* TrainingNumericScrubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrubTests.swift; sourceTree = "<group>"; };
 		F00720261007000100000005 /* TrainingSessionDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraftTests.swift; sourceTree = "<group>"; };
+		153A00000000000000000001 /* TrainingNumericScrub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrub.swift; sourceTree = "<group>"; };
 		E4172D019C9F4A30A881C003 /* TrainingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingViews.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000001 /* MesocycleCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvas.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasTests.swift; sourceTree = "<group>"; };
+		153A00000000000000000005 /* TrainingNumericScrubUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrubUITests.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasUITests.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MesocycleCanvasSequence.json; sourceTree = "<group>"; };
 		E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2Policy.swift; sourceTree = "<group>"; };
@@ -1631,6 +1637,7 @@
 				AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */,
 				AD723B032E15FA5C002376C6 /* LoginView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
+				153A00000000000000000001 /* TrainingNumericScrub.swift */,
 				E4172D019C9F4A30A881C003 /* TrainingViews.swift */,
 				E4C0A5110000000000000001 /* MesocycleCanvas.swift */,
 				8E3A26E632164AACAA5D77FD /* MainTabViewPolicies.swift */,
@@ -1738,6 +1745,7 @@
 				A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */,
 				C7A700032F20000000C0A703 /* ChatServiceTests.swift */,
 				E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */,
+				153A00000000000000000003 /* TrainingNumericScrubTests.swift */,
 				F00720261007000100000005 /* TrainingSessionDraftTests.swift */,
 				FE06A6A600000000000000F6 /* Glp1CardAndCatalogTests.swift */,
 				FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */,
@@ -1761,6 +1769,7 @@
 			isa = PBXGroup;
 			children = (
 				AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */,
+				153A00000000000000000005 /* TrainingNumericScrubUITests.swift */,
 				E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */,
 				B39A732AA4894B1DB77C9902 /* HomeV2PhotoViewerLayoutUITests.swift */,
 				AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */,
@@ -2178,6 +2187,7 @@
 			files = (
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
+				153A00000000000000000004 /* TrainingNumericScrubTests.swift in Sources */,
 				F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */,
 				FE06A6A600000000000000B6 /* Glp1CardAndCatalogTests.swift in Sources */,
 				FE04A4A400000000000000B4 /* SyncIntervalAndChunkingTests.swift in Sources */,
@@ -2340,6 +2350,7 @@
 				F1179AAA0000000000000001 /* HomeV2TimelineIntegrationUITests.swift in Sources */,
 				DB6F742008744039AA49CA01 /* HomeV2ShareRecoveryUITests.swift in Sources */,
 				AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */,
+				153A00000000000000000006 /* TrainingNumericScrubUITests.swift in Sources */,
 				E4C0A5110000000000000006 /* MesocycleCanvasUITests.swift in Sources */,
 				B39A732AA4894B1DB77C9901 /* HomeV2PhotoViewerLayoutUITests.swift in Sources */,
 				401055DB589E0EF494FCBB1E /* OnboardingGoldenPathUITests.swift in Sources */,
@@ -2378,6 +2389,7 @@
 				E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */,
 				F00720261007000100000002 /* TrainingDraftStore.swift in Sources */,
 				F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */,
+				153A00000000000000000002 /* TrainingNumericScrub.swift in Sources */,
 				E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */,
 				E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
