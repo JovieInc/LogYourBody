@@ -222,6 +222,7 @@ export async function decideInitialTrainingProposal(input: {
   const stored = await input.revisions.readProposal(input.subject, body.proposalId);
   if (!stored) return { kind: 'proposal_not_found' as const };
   const proposal = stored.proposal;
+  if (proposal.version !== 1) return { kind: 'unsupported_or_invalid_intent' as const };
   const revisionId = stableTrainingUuid(input.subject, 'training-revision', proposal.id);
   const setup = setupFor(proposal, input.now, revisionId);
   if (stored.status === 'proposed' && body.decision === 'apply') {
@@ -310,7 +311,8 @@ function prepareCycleProposal(
   const intent = body.intent;
   if (intent.kind === 'initial_enrollment') throw new Error('training_cycle_intent_required');
   const current = snapshot.setup;
-  if (!current || !context.trainingFingerprint) return { kind: 'program_not_enrolled' as const };
+  if (!current || current.delegated || !context.trainingFingerprint)
+    return { kind: 'program_not_enrolled' as const };
   const active = snapshot.sessions.filter(
     (row) =>
       row.programSetupId === current.id &&

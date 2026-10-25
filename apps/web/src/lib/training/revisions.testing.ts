@@ -56,10 +56,14 @@ export function revisionHarness() {
         await records.push(input.subject, 'training_feedback', [
           { ...input.setup, record_type: 'program_setup' },
         ]);
-        if (stored.proposal.intent.kind === 'repeat_cycle' && stored.proposal.priorState) {
+        if (
+          stored.proposal.version === 1 &&
+          stored.proposal.intent.kind === 'repeat_cycle' &&
+          stored.proposal.priorState
+        ) {
           await records.remove('owner', 'training_feedback', [stored.proposal.priorState.setup.id]);
         }
-        if (stored.proposal.intent.kind === 'revise_cycle') {
+        if (stored.proposal.version === 1 && stored.proposal.intent.kind === 'revise_cycle') {
           const rows = (await records.pull('owner', 'training_sessions')).records;
           await records.push(
             'owner',

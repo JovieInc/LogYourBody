@@ -188,7 +188,7 @@ export type TrainingProgramSetup = {
   consentVersion: typeof TRAINING_CONSENT_VERSION;
   adultConfirmed: true;
   safetyConfirmed: true;
-  sessionsPerWeek: 2 | 3;
+  sessionsPerWeek: 2 | 3 | 4 | 5 | 6;
   equipment: Equipment;
   startedAt: string;
   programRevisionId?: string;
@@ -197,6 +197,7 @@ export type TrainingProgramSetup = {
   /** Enduring exclusions are independent of a block's temporary goals. */
   excludedVariantIds?: string[];
   declaredEquipment?: string[];
+  delegated?: import('./delegation-contract').DelegatedProgram;
 };
 
 export type TrainingFeedback = {

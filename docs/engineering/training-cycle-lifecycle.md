@@ -69,6 +69,17 @@ an interrupted response from becoming a second decision or crossing accounts.
 The previous setup is retained in the revision ledger; repeat retires its current
 setup row while preserving sessions, logs and feedback.
 
+## Compatibility with delegated programming
+
+Cycle intents remain version 1 proposals on the shared route, including when the
+separate delegated-programming gate is enabled. Version 2 proposals retain their
+existing trainer authority, evidence freshness, delayed-workout decisions and
+receipt behavior. A cycle revision cannot replace an accepted delegated plan.
+The additive cycle migration extends the delegated transaction from main, retaining
+both admission paths and their shared owner lock. The cycle schema lives in
+`cycle-contract.ts` so the engine does not import the revision/delegation/canvas
+module chain during initialization.
+
 ## Verification and release handoff
 
 Deterministic engine/service and authenticated route tests cover every length,
@@ -92,21 +103,23 @@ idempotent decisions and preserved next-block history:
 python3 apps/web/db/tests/verify-training-revisions.py --postgres-bin /path/to/postgresql/bin
 ```
 
-Local qualification on the final source diff:
+PR #1541 merge-repair qualification (Node 22.23.2, pnpm 10.34.1):
 
-- `pnpm lint` and `pnpm typecheck`: passed.
-- Focused engine/service/revision/route Jest run: 115 tests passed.
-- `pnpm --filter logyourbody test:ci`: 124 Jest suites / 1,160 tests and three voice adapter tests passed.
-- `VITEST_MAX_WORKERS=1 pnpm --filter @logyourbody/shared-lib test`: 156 Vitest tests and 122 Node tests passed.
-- Root `pnpm test` was attempted, including `--concurrency=1`; two shared tests hit their existing five-second limits with default parallel workers. The complete shared suite passed with one worker and unchanged limits/assertions.
-- `pnpm check:neon-migrations`: passed.
-- Disposable PostgreSQL 16.15 verifier: all 20 cases passed. Ubuntu PostgreSQL packages were extracted into `/tmp`; nothing was installed system-wide and no external database was contacted.
-- Strict SwiftLint with `--no-cache`: no violations in the five changed Swift files. Five SourceKit-dependent rules were unavailable on this Linux host.
+- `corepack pnpm lint` and `corepack pnpm typecheck`: passed.
+- `corepack pnpm --filter logyourbody exec jest --runInBand src/lib/training src/app/api/auth/mobile/training/v1`: 17 suites / 212 tests passed.
+- `corepack pnpm --filter logyourbody test:ci`: 126 Jest suites / 1,185 tests and three voice adapter tests passed.
+- `PATH=/tmp/pnpm10-shim:$PATH VITEST_MAX_WORKERS=1 corepack pnpm test --concurrency=1`: all eight Turbo tasks passed, including the web production build; shared-lib ran 156 Vitest tests and 122 Node tests. The temporary shim selects the source-pinned Corepack pnpm for child processes.
+- `corepack pnpm check:neon-migrations`, `python3 scripts/repository_docs.py`, and the existing correction coverage and ratchet commands against `origin/main`: passed. The ratchet retained its 11 existing public-copy warnings without baseline changes.
+- Disposable PostgreSQL 16.15 verifier: all 28 combined cycle/delegation cases passed. With `--cycle-migration` pointing at the original PR migration, the same verifier fails delegated enrollment as expected.
+- Restoring the pre-repair route dispatch makes both gate-setting cycle regressions fail with HTTP 400; the repaired dispatch passes both.
+- Strict SwiftLint with `--no-cache`: no violations in the five changed Swift files. Five SourceKit-dependent rules were unavailable on Linux.
 
-This host has no Xcode, simulator or Swift compiler. Native execution/coverage and
-installed-build evidence remain unverified. Required repository checks and
-governed admission remain intact; no approval labels, migration deployment,
-feature rollout, push or PR operation are part of this local handoff.
+The sandbox initially blocked test subprocesses and local Unix sockets. The root,
+web CI and PostgreSQL checks passed on rerun with normal process/socket access;
+no assertions, timeouts or gates were relaxed. This host has no Xcode or simulator.
+Native execution/coverage and installed-build evidence remain unverified. Required
+repository checks and governed admission remain intact; migration deployment,
+feature rollout, push and PR edits are outside this local harness handoff.
 
 GitHub readback confirmed PR #1210 (`feat/chatgpt-mcp-training`) and the related
 LYB-109 load-prefill PR #1212 are merged. Their MCP, OAuth, voice and load-input

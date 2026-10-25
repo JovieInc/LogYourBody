@@ -28,7 +28,7 @@ import {
 import {
   buildMicrocycle,
   buildSession,
-  createMesoBlock,
+  createProgramBlock,
   completedTrainingSession,
   sessionWorkLogged,
   isProgramSetup,
@@ -44,6 +44,8 @@ import {
   type TrainingFeedback,
   type TrainingProgramSetup,
 } from './types';
+import { DELEGATED_POLICY, delegatedSetupSchema } from './delegation-contract';
+import { eligibleForProgram, validateProgram } from './delegated-planning';
 
 const EPOCH = '1970-01-01T00:00:00.000Z';
 
@@ -62,6 +64,12 @@ export type TrainingRecordsSnapshot = {
   logs: SetLog[];
   feedback: TrainingFeedback[];
 };
+
+/** A schedule edit never reinterprets weeks already completed under an older
+ * revision. Open weeks use the newly accepted schedule. */
+export function plannedSessionCount(setup: TrainingProgramSetup, week: number): number {
+  return setup.delegated?.completedWeeks[String(week)] ?? setup.sessionsPerWeek;
+}
 
 /** Persists one exercise substitution for the rest of a mesocycle block. The
  * original exercise keeps its history; the variant starts from its own. */
@@ -269,6 +277,7 @@ export async function loadTrainingRecords(
 
 export type NextWorkoutResult =
   | { kind: 'not_enrolled' }
+  | { kind: 'block_complete'; setup: TrainingProgramSetup }
   | {
       kind: 'week_complete';
       week: number;
@@ -364,13 +373,45 @@ export async function getOrCreateNextWorkout(input: {
   if (
     setup.programRevisionId &&
     setup.programPolicyVersion !== TRAINING_BASELINE_POLICY &&
-    setup.programPolicyVersion !== TRAINING_CYCLE_POLICY
+    setup.programPolicyVersion !== TRAINING_CYCLE_POLICY &&
+    setup.programPolicyVersion !== DELEGATED_POLICY
+  )
+    throw new Error('training_program_policy_requires_review');
+  if (
+    setup.programPolicyVersion === DELEGATED_POLICY &&
+    (!delegatedSetupSchema.safeParse(setup).success ||
+      !setup.delegated ||
+      validateProgram(setup.delegated))
   )
     throw new Error('training_program_policy_requires_review');
 
   let block = cycleBlock(setup, snapshot.sessions, snapshot.logs, input.now);
+  if (setup.delegated) {
+    const completed = (week: number, slot: number) =>
+      snapshot.sessions.some(
+        (s) =>
+          s.programSetupId === setup.id &&
+          s.blockId === block.id &&
+          s.weekNumber === week &&
+          s.slot === slot &&
+          s.status === 'completed' &&
+          snapshot.logs.some((l) => l.sessionId === s.id),
+      );
+    const firstIncomplete = Array.from({ length: block.weekCount }, (_, index) => index + 1).find(
+      (week) =>
+        Array.from({ length: plannedSessionCount(setup, week) }, (_, slot) => slot).some(
+          (slot) => !completed(week, slot),
+        ),
+    );
+    if (firstIncomplete === undefined) return { kind: 'block_complete', setup };
+    block.currentWeek = Math.min(block.currentWeek, firstIncomplete);
+    block.targetRir = block.currentWeek === block.weekCount ? 4 : 3;
+  }
   const blockSwaps = snapshot.swaps.filter(
-    (swap) => swap.programSetupId === setup.id && swap.blockId === block.id,
+    (swap) =>
+      swap.programSetupId === setup.id &&
+      swap.blockId === block.id &&
+      (!setup.delegated || eligibleForProgram(swap.toVariantId, setup.delegated.inputs)),
   );
   let periodSessions = snapshot.sessions as SessionRecord[];
   const historyIds = new Set([setup.id, ...(setup.cycle?.historyProgramIds ?? [])]);
@@ -422,7 +463,7 @@ export async function getOrCreateNextWorkout(input: {
     );
     activeRecord = undefined;
   }
-  block = cycleBlock(setup, periodSessions, programLogs, input.now);
+  if (!setup.delegated) block = cycleBlock(setup, periodSessions, programLogs, input.now);
   const completedThisWeek = setup.cycle
     ? completedCycleSessions(setup, periodSessions, programLogs).slice(
         (block.currentWeek - 1) * setup.sessionsPerWeek,
@@ -433,7 +474,8 @@ export async function getOrCreateNextWorkout(input: {
           record.programSetupId === setup.id &&
           record.blockId === block.id &&
           record.weekNumber === block.currentWeek &&
-          record.status === 'completed',
+          record.status === 'completed' &&
+          (!setup.delegated || snapshot.logs.some((log) => log.sessionId === record.id)),
       );
 
   // Progression for a new session uses completed workouts, never its own unfinished sets.
@@ -473,15 +515,28 @@ export async function getOrCreateNextWorkout(input: {
         String(block.currentWeek),
         String(slot),
         ...(setup.cycle ? [setup.programRevisionId ?? setup.id] : []),
-        ...((attempt) => (attempt > 0 ? [`attempt-${attempt}`] : []))(
-          periodSessions.filter(
-            (row) =>
-              row.programSetupId === setup.id &&
-              row.blockId === block.id &&
-              row.weekNumber === block.currentWeek &&
-              row.slot === slot,
-          ).length,
-        ),
+        ...(setup.delegated
+          ? [
+              String(
+                periodSessions.filter(
+                  (row) =>
+                    row.blockId === block.id &&
+                    row.weekNumber === block.currentWeek &&
+                    row.slot === slot &&
+                    row.status === 'completed' &&
+                    !programLogs.some((log) => log.sessionId === row.id),
+                ).length,
+              ),
+            ]
+          : ((attempt) => (attempt > 0 ? [`attempt-${attempt}`] : []))(
+              periodSessions.filter(
+                (row) =>
+                  row.programSetupId === setup.id &&
+                  row.blockId === block.id &&
+                  row.weekNumber === block.currentWeek &&
+                  row.slot === slot,
+              ).length,
+            )),
       ),
     ),
     logs: completedLogs,
@@ -553,7 +608,7 @@ export async function getOrCreateNextWorkout(input: {
         : input.now.toISOString();
     const originalBlock = setup.cycle
       ? { ...block, currentWeek: existing.week }
-      : createMesoBlock(setup.startedAt, startedAt);
+      : createProgramBlock(setup, startedAt);
     const adjusted = buildSession({
       setup,
       block: {
@@ -581,7 +636,10 @@ export async function getOrCreateNextWorkout(input: {
       applyExerciseSwaps(
         adjusted,
         snapshot.swaps.filter(
-          (swap) => swap.programSetupId === setup.id && swap.blockId === activeRecord!.blockId,
+          (swap) =>
+            swap.programSetupId === setup.id &&
+            swap.blockId === activeRecord!.blockId &&
+            (!setup.delegated || eligibleForProgram(swap.toVariantId, setup.delegated.inputs)),
         ),
         completedLogs,
       ),
@@ -610,7 +668,8 @@ export async function getOrCreateNextWorkout(input: {
     };
   }
 
-  if (completedThisWeek.length >= setup.sessionsPerWeek) {
+  const sessionsThisWeek = plannedSessionCount(setup, block.currentWeek);
+  if (completedThisWeek.length >= sessionsThisWeek) {
     return {
       kind: 'week_complete',
       week: block.currentWeek,
@@ -619,7 +678,11 @@ export async function getOrCreateNextWorkout(input: {
     };
   }
 
-  const slot = completedThisWeek.length;
+  const slot = setup.delegated
+    ? (Array.from({ length: setup.sessionsPerWeek }, (_, slot) => slot).find(
+        (slot) => !completedThisWeek.some((s) => s.slot === slot),
+      ) ?? completedThisWeek.length)
+    : completedThisWeek.length;
   const planned = microcycle.sessions[slot];
   if (!planned)
     return {
@@ -640,6 +703,7 @@ export async function getOrCreateNextWorkout(input: {
     ...(setup.programRevisionId ? { programRevisionId: setup.programRevisionId } : {}),
     blockId: block.id,
     weekNumber: block.currentWeek,
+    ...(setup.delegated ? { plannedSessionsPerWeek: sessionsThisWeek } : {}),
     slot,
     status: session.safetyStop ? 'paused' : 'in_progress',
     prescription: session,

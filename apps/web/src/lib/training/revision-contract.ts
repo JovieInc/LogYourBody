@@ -1,6 +1,13 @@
+import { cycleConfigurationSchema } from './cycle-contract';
+export { cycleConfigurationSchema } from './cycle-contract';
 import { z } from 'zod';
 import { CATALOG_EQUIPMENT } from './catalog';
 import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from './types';
+import {
+  delegatedProposalSchema,
+  delegatedReceiptSchema,
+  revisionActorSchema,
+} from './delegation-contract';
 
 export const TRAINING_BASELINE_POLICY = 'hypertrophy-baseline-v1';
 export const TRAINING_CYCLE_POLICY = 'hypertrophy-cycle-v1';
@@ -17,32 +24,6 @@ export const revisionContextSchema = z.object({
 });
 export type RevisionContextToken = z.infer<typeof revisionContextSchema>;
 
-export const cycleConfigurationSchema = z
-  .object({
-    blockId: z.string().min(1).optional(),
-    weekCount: z.union([z.literal(4), z.literal(5), z.literal(6)]),
-    temporaryPriorities: z.array(z.enum(MUSCLE_GROUPS)).max(10),
-    temporaryConstraints: z
-      .array(
-        z
-          .object({ muscle: z.enum(MUSCLE_GROUPS), reason: z.string().trim().min(1).max(500) })
-          .strict(),
-      )
-      .max(10),
-    retainedVariants: z
-      .array(
-        z
-          .object({
-            fromExerciseId: z.string().min(1),
-            toVariantId: z.string().min(1),
-            reason: z.string().trim().min(1).max(500),
-          })
-          .strict(),
-      )
-      .max(24),
-    historyProgramIds: z.array(uuid).max(100),
-  })
-  .strict();
 const programSetupSchema = z.object({
   id: uuid,
   consentVersion: z.literal(TRAINING_CONSENT_VERSION),
@@ -177,7 +158,7 @@ export const appliedSetupSchema = programSetupSchema.extend({
   programRevisionId: uuid,
   programPolicyVersion: policyVersionSchema,
 });
-export const revisionReceiptSchema = z
+const initialReceiptSchema = z
   .object({
     version: z.literal(1),
     proposalId: uuid,
@@ -197,20 +178,34 @@ export const revisionReceiptSchema = z
         r.setup?.programRevisionId === r.revisionId
       : r.status === 'rejected' && r.revisionId === null && r.setup === null,
   );
+export const revisionReceiptSchema = z.union([initialReceiptSchema, delegatedReceiptSchema]);
 export type TrainingRevisionReceipt = z.infer<typeof revisionReceiptSchema>;
 export const storedProposalSchema = z
   .object({
-    proposal: initialProposalSchema,
+    proposal: z.union([initialProposalSchema, delegatedProposalSchema]),
     status: z.enum(['proposed', 'applied', 'rejected']),
     requestHash: z.string().min(1),
     receipt: revisionReceiptSchema.nullable(),
+    attempts: z
+      .array(
+        z.object({
+          requestId: uuid,
+          requestHash: z.string(),
+          actor: revisionActorSchema,
+          status: z.literal('delayed'),
+          reason: z.literal('active_workout'),
+          attemptedAt: timestamp,
+          reviewPoint: z.literal('after_current_workout'),
+        }),
+      )
+      .optional(),
   })
   .refine((r) =>
     r.status === 'proposed'
       ? r.receipt === null
       : r.receipt?.status === r.status &&
         r.receipt.proposalId === r.proposal.id &&
-        r.receipt.actor.subject === r.proposal.actor.subject &&
+        (r.proposal.version === 2 || r.receipt.actor.subject === r.proposal.actor.subject) &&
         (r.receipt.setup === null || r.receipt.setup.id === r.proposal.programId),
   );
 export type StoredTrainingProposal = z.infer<typeof storedProposalSchema>;

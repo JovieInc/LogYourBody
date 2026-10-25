@@ -3,7 +3,7 @@ import type { NativeProductRecord } from '@/lib/ports/native-product-records';
 import {
   completedTrainingSession,
   configuredMesoBlock,
-  createMesoBlock,
+  createProgramBlock,
   evaluateDeload,
 } from './engine';
 import type {
@@ -48,7 +48,7 @@ export function cycleBlock(
         ),
         id: setup.cycle.blockId ?? 'block-1',
       }
-    : createMesoBlock(setup.startedAt, now.toISOString());
+    : createProgramBlock(setup, now.toISOString());
 }
 
 export function cyclePhase(block: MesoBlock, feedback: TrainingFeedback[]): CyclePhase | undefined {
