@@ -1,5 +1,41 @@
 [
   {
+    "fingerprint": "share-preview-chrome-preserves-card-accessibility",
+    "correction": "LYB-39 / PR #1533: The preview chrome replaced body_score_share_card with its own unused accessibility identifier, so the required launch-quality timeline UI test could not discover the card inside the share overlay.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40157965320/job/121063372261",
+    "mechanization": "Remove the identifier from the decorative preview modifier chain so BodyScoreShareCardView owns the card identifier. The existing required testLaunchQualityGateCapturesTimelineSurfaces regression requires the card, validates its on-screen geometry, opts into FFMI and reads the metric from its descendants. The reported run fails the card-discovery assertion before this fix; current native execution remains required in CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The decorative preview has no separate accessibility identity to expose. Removing its unused identifier prevents the outer modifier chain from overriding the card identifier while preserving the artwork geometry and accessible children."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "Share card must remain accessibility-discoverable inside the overlay"
+    }
+  },
+  {
+    "fingerprint": "share-avatar-probe-matches-rendered-blue",
+    "correction": "LYB-39 / PR #1533: The square avatar render failed a bright-cyan pixel assertion even though the retained PNG contains the opted-in blue avatar. Detect the rendered avatar without counting the logo, white copy or a non-avatar photo as proof.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40152580750/job/121047155644",
+    "mechanization": "The existing required launch-quality opt-in fixture matrix checks blue channel dominance at the unchanged brightness floor and sample-count threshold in every export aspect. The score-only baseline accounts for the logo, and the magenta photo is an explicit negative control. Failed-run PNG replay rejects the old square probe and accepts the blue probe while rejecting the non-avatar controls; current native execution remains required in CI.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This correction concerns pixel evidence in a rendered regression test. Application runtime types cannot establish that a sampled color identifies the avatar rather than the logo or another visual."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing native render test can inspect actual exported pixels and assert positive and negative visual controls through the unchanged required launch-quality runner."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift",
+      "anchor": "The logo and a non-avatar photo must not satisfy the avatar probe"
+    }
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1531: Adding the delegated training view and tests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151037308/job/121042459915",
