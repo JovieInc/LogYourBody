@@ -972,8 +972,9 @@ func scheduleObservedBodyMetricSync() {
         }
     }
 
-    func refreshSmartScaleSamplesIfEnabled() async {
-        _ = await performSmartScaleRefresh()
+    @discardableResult
+    func refreshSmartScaleSamplesIfEnabled() async -> HealthKitSmartScaleRefreshResult {
+        await performSmartScaleRefresh()
     }
 
     /// Reads new weight and body-fat samples, including ones dated before today.

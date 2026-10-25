@@ -496,6 +496,8 @@
 		3C8D01B01A2EBFA3C3EB73CD /* InterTight.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E0666550EE3D136A64FEB833 /* InterTight.ttf */; };
 		AB92EB88BB101CE4C08FF99D /* InterTight-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = C804289887C0B000A09DC147 /* InterTight-OFL.txt */; };
 		BFED20261016000100000001 /* HomeV2EntryEditorLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */; };
+		F1B241000000000000000002 /* HealthSyncState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B241000000000000000001 /* HealthSyncState.swift */; };
+		F1B241000000000000000004 /* HealthSyncStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1B241000000000000000003 /* HealthSyncStateTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1082,6 +1084,8 @@
 		E0666550EE3D136A64FEB833 /* InterTight.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "InterTight.ttf"; sourceTree = "<group>"; };
 		C804289887C0B000A09DC147 /* InterTight-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "InterTight-OFL.txt"; sourceTree = "<group>"; };
 		BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2EntryEditorLayout.swift; sourceTree = "<group>"; };
+		F1B241000000000000000001 /* HealthSyncState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncState.swift; sourceTree = "<group>"; };
+		F1B241000000000000000003 /* HealthSyncStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSyncStateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1351,6 +1355,7 @@
 				A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */,
 				18FA96B2F0B80609BBBC0DE1 /* HealthKitFullSyncCompletionPolicyTests.swift */,
 				DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */,
+				F1B241000000000000000003 /* HealthSyncStateTests.swift */,
 				1C662CF613D4755CA2B93A43 /* HealthSyncPipelineTests.swift */,
 				A4A1C6C2438CB1EDCEC43C67 /* HealthSyncTestDoubles.swift */,
 				5D15E6A333FABD14CA6405A4 /* LaunchAndBodyCompositionTests.swift */,
@@ -1456,6 +1461,7 @@
 		AD723ADC2E15FA5C002376C6 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				F1B241000000000000000001 /* HealthSyncState.swift */,
 				ADA600452ED375EE00088042 /* GlobalTimelineModels.swift */,
 				ADA600462ED375EE00088042 /* Glp1Medication.swift */,
 				ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */,
@@ -2250,6 +2256,7 @@
 				A62E114302EC00A5A0070201 /* HealthKitImportOwnershipTests.swift in Sources */,
 				6200622347BFBBB809890E19 /* HealthKitFullSyncCompletionPolicyTests.swift in Sources */,
 				9BCEB21BE7B69676BCA5C211 /* HealthSyncCoordinatorPipelineTests.swift in Sources */,
+				F1B241000000000000000004 /* HealthSyncStateTests.swift in Sources */,
 				8FB91216C622624E0F7815CC /* HealthSyncPipelineTests.swift in Sources */,
 				C2465BE618C74154F47B1E1F /* HealthSyncTestDoubles.swift in Sources */,
 				7E01D015B886A36E2EB5F3E1 /* LaunchAndBodyCompositionTests.swift in Sources */,
@@ -2472,6 +2479,7 @@
 				ADA600482ED375EE00088042 /* Glp1Medication.swift in Sources */,
 				ADDC47DE2E2D89F3003C97E7 /* IntegrationsView.swift in Sources */,
 				ADF1F6BE2ED58E3F00745F33 /* HealthSyncCoordinator.swift in Sources */,
+				F1B241000000000000000002 /* HealthSyncState.swift in Sources */,
 				ADDC47E02E2D89F3003C97E7 /* BulkPhotoImportView.swift in Sources */,
 				ADDC47E12E2D89F3003C97E7 /* DeleteAccountView.swift in Sources */,
 				ADF1F6BC2ED4C69F00745F33 /* UnitConversion.swift in Sources */,

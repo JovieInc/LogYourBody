@@ -24,9 +24,10 @@ private final class ForegroundHealthSyncSpy: HealthKitSyncManaging {
     func syncStepsFromHealthKit() async throws {}
     func fetchTodayStepCount() async throws -> Int? { nil }
     func forceFullHealthKitSync() async -> Bool { false }
-    func refreshSmartScaleSamplesIfEnabled() async {
+    func refreshSmartScaleSamplesIfEnabled() async -> HealthKitSmartScaleRefreshResult {
         refreshCount += 1
         onRefresh()
+        return .inactive
     }
 }
 

@@ -304,7 +304,7 @@ class HealthKitManager: ObservableObject {
 
     // Health types - using computed properties to avoid crashes if HealthKit types fail to initialize
 
-    // Sync management
+    // Import serialization only. HealthSyncCoordinator owns status through HealthSyncState.
     let syncStateQueue = DispatchQueue(label: "com.logyourbody.healthkit.sync.state")
     var isSyncingWeight = false
     var syncDebounceTimer: Timer?

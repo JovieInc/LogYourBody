@@ -100,6 +100,13 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
     private(set) var fetchTodayStepCountCallCount = 0
     private(set) var didCallForceFullHealthKitSync = false
     var forceFullHealthKitSyncResult = true
+    var syncWeightError: Error?
+    var syncStepsError: Error?
+    var todayStepCount: Int? = 123
+    var onSyncWeight: (() async throws -> Void)?
+    var backgroundDeliveryError: Error?
+    var smartScaleRefreshResult = HealthKitSmartScaleRefreshResult.inactive
+    private(set) var smartScaleRefreshCallCount = 0
 
     func checkAuthorizationStatus() {
         didCallCheckAuthorizationStatus = true
@@ -124,6 +131,7 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
 
     func setupBackgroundDelivery() async throws {
         setupBackgroundDeliveryCallCount += 1
+        if let backgroundDeliveryError { throw backgroundDeliveryError }
     }
 
     func setupStepCountBackgroundDelivery() async throws {
@@ -136,19 +144,27 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
 
     func syncWeightFromHealthKit() async throws {
         syncWeightFromHealthKitCallCount += 1
+        try await onSyncWeight?()
+        if let syncWeightError { throw syncWeightError }
     }
 
     func syncStepsFromHealthKit() async throws {
         syncStepsFromHealthKitCallCount += 1
+        if let syncStepsError { throw syncStepsError }
     }
 
     func fetchTodayStepCount() async throws -> Int? {
         fetchTodayStepCountCallCount += 1
-        return 123
+        return todayStepCount
     }
 
     func forceFullHealthKitSync() async -> Bool {
         didCallForceFullHealthKitSync = true
         return forceFullHealthKitSyncResult
+    }
+
+    func refreshSmartScaleSamplesIfEnabled() async -> HealthKitSmartScaleRefreshResult {
+        smartScaleRefreshCallCount += 1
+        return smartScaleRefreshResult
     }
 }
