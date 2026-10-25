@@ -508,5 +508,25 @@
       "path": "apps/web/src/app/sitemap.ts",
       "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
     }
+  },
+  {
+    "fingerprint": "release-validation-encloses-main-ci",
+    "correction": "LYB-127: Validate Release must wait long enough for the exact main SHA's required CI, including the measured macOS runner queue plus the StoreKit and iOS Unit job caps. Do not raise per-interaction native allowances, drop required checks, or skip MARKETING_VERSION binding to the pinned tag.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169457518/job/121097203525",
+    "mechanization": "Poll required CI on ubuntu for at least that enclosing floor, then bind the pinned version on macOS. The required Detect Changes job rejects a shorter wait, a macOS poller, a raised native allowance, or a missing version bind.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime cannot keep a release workflow's wait aligned with separate CI job caps and a measured runner queue."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The workflow and release-source script expose the wait, runner, required checks, native allowances, and version bind. A deterministic test compares them on every CI run."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/release-check-budget.test.mjs",
+      "anchor": "enclosing release budget preserves native caps"
+    }
   }
 ]
