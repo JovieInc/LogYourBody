@@ -247,6 +247,45 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.buttons["training_log_set_fixture_press_2"].isEnabled)
     }
 
+    func testTrainingReadinessAfterTimerExpiryRetriesOfflineWithoutAdvancing() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingExpiredRest"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.switches["training_fixture_offline"].tap()
+        app.buttons["training_fixture_open"].tap()
+        let timer = app.staticTexts["training_rest_timer"]
+        XCTAssertTrue(timer.waitForExistence(timeout: 5))
+        XCTAssertEqual(timer.label, "Timer elapsed · readiness not assessed")
+        app.swipeUp()
+        app.buttons["training_readiness_menu"].tap()
+        app.buttons["Still out of breath"].tap()
+        XCTAssertTrue(app.staticTexts["training_feedback_pending"].waitForExistence(timeout: 5))
+        app.buttons["training_live_session_close_button"].tap()
+        app.terminate()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestTrainingExpiredRest"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["training_feedback_retry"].waitForExistence(timeout: 5))
+        app.buttons["training_feedback_retry"].tap()
+        let action = app.staticTexts["training_next_set_action"]
+        XCTAssertTrue(action.waitForExistence(timeout: 5))
+        XCTAssertEqual(action.label, "Continue resting")
+        app.swipeDown()
+        XCTAssertEqual(app.staticTexts["training_progress"].label, "1 of 2 sets")
+        let log = app.buttons["training_log_set_fixture_press_2"]
+        XCTAssertTrue(log.isEnabled)
+        log.tap()
+        XCTAssertTrue(app.staticTexts["Workout complete"].waitForExistence(timeout: 5))
+        app.buttons["training_live_session_close_button"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_count"].label, "Acknowledged sets: 2")
+        XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 1")
+    }
+
     func testTrainingCurrentNumericRowAcceptsFocusWithoutHidingUpNext() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
