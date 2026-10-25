@@ -75,6 +75,22 @@
     }
   },
   {
+    "fingerprint": "workout-readiness-uses-canonical-durable-feedback",
+    "correction": "LYB-129 October 14 addendum: Make saved recovery observations change the live workout; timer expiry is advisory, and conversational acknowledgments are not state-change receipts.",
+    "source": "https://linear.app/jovie/issue/LYB-129",
+    "mechanization": "The native training service returns and validates the existing LYB-114 recommendation. TrainingSessionDraft journals observation IDs and acknowledged responses with the existing sets, fences account and set identity, and retains pending feedback for exact retry. The required web suite covers normalized commands; native runner cases cover timer expiry, offline replay, wrong-set receipts, stale controllers, symptom priority, and prescription preservation. Native execution and installed-device acceptance remain required and are not claimed by source tests.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A typed canonical response and the existing atomic workout journal prevent the client from treating elapsed time or conversational text as a readiness receipt."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/TrainingSessionDraft.swift",
+      "anchor": "guard response.matches(pending.request) else { throw TrainingServiceError.invalidResponse }"
+    }
+  },
+  {
     "fingerprint": "claims-lint-covers-public-web-copy",
     "correction": "LYB-230: The claims lint added storefront coverage in LYB-188 but omitted public web copy and page metadata, leaving the 2026-10-14 marketing audit vulnerable to regressions.",
     "source": "https://linear.app/jovie/issue/LYB-230",

@@ -187,6 +187,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-40', reason: 'LYB-40 source evidence for share export lifecycle and confirmed Photos writes.' },
       { value: 'https://linear.app/jovie/issue/LYB-74', reason: 'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.' },
       { value: 'https://linear.app/jovie/issue/LYB-95', reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.' },
+      { value: 'https://linear.app/jovie/issue/LYB-129', reason: 'LYB-129 source evidence for canonical durable workout readiness integration.' },
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
       { value: 'https://linear.app/jovie/issue/LYB-194', reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.' },
       { value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet', reason: 'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.' },
