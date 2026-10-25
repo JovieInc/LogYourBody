@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Metadata } from 'next';
 import { logYourBody } from '@jovieinc/product-registry';
+import { PUBLIC_MARKETING_ROUTES } from '@/data/publicMarketingRoutes';
 import { getAllTags, getPostBySlug } from '@/lib/blog';
 import {
   getRedirectUrl,
@@ -104,6 +105,14 @@ describe('public route metadata contract (LYB-223)', () => {
     expect(base.origin).toBe('https://www.logyourbody.com');
     expect(logYourBody.endpoints.hosts.marketing.url).toBe(base.origin);
     expect(rootMetadata.alternates?.canonical).toBeUndefined();
+  });
+
+  it('keeps the shared marketing inventory complete without legacy auth routes', () => {
+    const routes = publicPages()
+      .filter((file) => !file.includes('['))
+      .map((file) => '/' + path.dirname(file).replace(/^\.$/, '').split(path.sep).join('/'))
+      .filter((route) => !['/signin', '/signup'].includes(route));
+    expect([...PUBLIC_MARKETING_ROUTES].sort()).toEqual(routes.sort());
   });
 
   it.each(publicPages().filter((file) => !file.includes('[')))(
