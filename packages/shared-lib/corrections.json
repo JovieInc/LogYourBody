@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "adaptive-recovery-proposals-are-bounded-and-reviewed",
+    "correction": "LYB-112: Recovery learning must change reviewed future prescriptions, preserve trial and correction history, and never escalate from missing feedback or invent numerical caps. Existing specialization approval does not approve an exact dose or automatic weekly increases.",
+    "source": "https://linear.app/jovie/issue/LYB-112",
+    "mechanization": "The canonical training service consumes only applied current-block recovery trials. The recovery policy exposes missing escalation bounds without enabling increases. The existing web test suite covers pure evaluation, apply/reject/revert/replay and context corrections. The required disposable PostgreSQL training verifier executes trial source CAS, immutable history, single-active-trial and consent/deletion races.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Typed deterministic proposals, immutable baseline snapshots and an atomic source-and-revision check prevent silent or stale plan changes through the existing training record port. Missing numerical escalation policy is represented explicitly rather than supplied by conversation."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/recovery.test.ts",
+      "anchor": "applies a persisted proposal to the next prescription, survives session replay, and restores future work on revert"
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",

@@ -12,6 +12,8 @@ import { neonChatConversations } from '@/lib/neon/chat-conversations-adapter';
 import { neonNativeProductRecords } from '@/lib/neon/native-product-records-adapter';
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import { createTrainingRouteHandlers } from './route-handlers';
+import { createRecoveryRouteHandlers } from './recovery-route-handlers';
+import { adaptiveRecoveryEnabled } from '@/lib/flags/adaptive-recovery';
 
 async function authenticate(request: NextRequest) {
   const token = request.headers.get('authorization')?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
@@ -27,6 +29,14 @@ export const trainingHandlers = createTrainingRouteHandlers({
   createId: randomUUID,
   now: () => new Date(),
   enabled: () => process.env.LYB_HYPERTROPHY_COACH_API_ENABLED === 'true',
+});
+
+export const recoveryHandlers = createRecoveryRouteHandlers({
+  authenticate,
+  records: neonNativeProductRecords,
+  reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
+  now: () => new Date(),
+  enabled: adaptiveRecoveryEnabled,
 });
 
 export const trainingRevisionHandlers = createTrainingRevisionHandlers({
