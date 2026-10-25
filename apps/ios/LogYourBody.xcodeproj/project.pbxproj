@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A24420261025000000000002 /* MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000001 /* MetricSourceAdapter.swift */; };
+		A24420261025000000000004 /* HealthKitManager+MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */; };
+		A24420261025000000000006 /* MetricSourceAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000005 /* MetricSourceAdapterTests.swift */; };
 		A19900000000000000000001 /* StoreKitPurchaseRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */; };
 		A16800000000000000000001 /* ContextualMetricShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16800000000000000000002 /* ContextualMetricShare.swift */; };
 		5AAEA63151156B8F114A0B83 /* BodyRecordReviewConsumerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */; };
@@ -516,6 +519,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A24420261025000000000001 /* MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapter.swift; sourceTree = "<group>"; };
+		A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitManager+MetricSourceAdapter.swift"; sourceTree = "<group>"; };
+		A24420261025000000000005 /* MetricSourceAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapterTests.swift; sourceTree = "<group>"; };
 		A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitPurchaseRestoreTests.swift; sourceTree = "<group>"; };
 		A16800000000000000000002 /* ContextualMetricShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContextualMetricShare.swift; path = Components/ContextualMetricShare.swift; sourceTree = "<group>"; };
 		533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyRecordReviewConsumerTests.swift; sourceTree = "<group>"; };
@@ -1374,6 +1380,7 @@
 				8EA82A71E77423D56A70AA46 /* ProductAPIProfilePayloadTests.swift */,
 				C0AE830DA0CFDB1735F6894C /* SyncIntegrationBodyMetricSyncTests.swift */,
 				435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */,
+				A24420261025000000000005 /* MetricSourceAdapterTests.swift */,
 				CA338579090538FBCCA21785 /* SyncIntegrationImportAndMappingTests.swift */,
 				128B0622423D7E7711DCD94D /* SyncIntegrationRemotePayloadTests.swift */,
 				245B5601A048FDB45C7F4042 /* SyncIntegrationSupplementalSyncTests.swift */,
@@ -1513,6 +1520,8 @@
 				ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */,
 				BAA76179221F4B5C885A1140 /* BodySpecConnection.swift */,
 				ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */,
+				A24420261025000000000001 /* MetricSourceAdapter.swift */,
+				A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */,
 				ADA600362ED2602F00088042 /* ErrorTrackingService.swift */,
 				ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */,
 				ADA4B74C2ED00F1500F4262A /* KeychainManager.swift */,
@@ -2274,6 +2283,7 @@
 				0922CA98E79021C4CB2595A5 /* ProductAPIProfilePayloadTests.swift in Sources */,
 				F5BBD3CA8052B53CA70ADDA1 /* SyncIntegrationBodyMetricSyncTests.swift in Sources */,
 				D7B509EA4FE543A7A3E32A1F /* BodySpecAtomicImportTests.swift in Sources */,
+				A24420261025000000000006 /* MetricSourceAdapterTests.swift in Sources */,
 				DB19A6EC4AA997A0EF4C5791 /* SyncIntegrationImportAndMappingTests.swift in Sources */,
 				C5C96F424F3D65A1180A3EA7 /* SyncIntegrationRemotePayloadTests.swift in Sources */,
 				FE090848E956D28A4C72FAD1 /* SyncIntegrationSupplementalSyncTests.swift in Sources */,
@@ -2510,6 +2520,8 @@
 				0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */,
 				ADA4B7532ED0E61600F4262A /* ErrorReporter.swift in Sources */,
 				ADA600372ED2602F00088042 /* BodySpecDexaImporter.swift in Sources */,
+				A24420261025000000000002 /* MetricSourceAdapter.swift in Sources */,
+				A24420261025000000000004 /* HealthKitManager+MetricSourceAdapter.swift in Sources */,
 				ADA600382ED2602F00088042 /* BodySpecAPI.swift in Sources */,
 				ADA600392ED2602F00088042 /* ErrorTrackingService.swift in Sources */,
 				ADA6003A2ED2602F00088042 /* BodySpecAuthManager.swift in Sources */,
