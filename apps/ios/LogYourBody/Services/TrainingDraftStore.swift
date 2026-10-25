@@ -16,6 +16,28 @@ struct TrainingSetDraft: Codable, Equatable {
     var key: String { "\(exerciseId)-\(setNumber)" }
 }
 
+struct TrainingFeedbackDraft: Codable, Equatable {
+    let request: TrainingFeedbackRequest
+    var response: TrainingFeedbackResponse?
+    var readinessHold: TrainingFeedbackResponse?
+
+    var recommendationReceipt: TrainingFeedbackResponse? {
+        guard let response else { return readinessHold }
+        if response.nextSetRecommendation.action == .symptomSafety ||
+            response.nextSetRecommendation.observationIds.contains(response.feedback.id) {
+            return response
+        }
+        // Performance-only feedback may return a decision based on an earlier readiness observation.
+        guard let readinessHold,
+              response.nextSetRecommendation.observationIds.contains(readinessHold.feedback.id)
+        else { return nil }
+        return TrainingFeedbackResponse(
+            version: response.version, feedback: readinessHold.feedback,
+            nextSetRecommendation: response.nextSetRecommendation
+        )
+    }
+}
+
 enum TrainingDraftError: LocalizedError {
     case unavailable
     case changed
@@ -40,6 +62,7 @@ final class TrainingDraftStore {
         let ownerId: String
         let sessionId: String
         var rows: [String: TrainingSetDraft]
+        var feedback: TrainingFeedbackDraft?
     }
 
     private let rootURL: URL
@@ -53,18 +76,48 @@ final class TrainingDraftStore {
     }
 
     func load(ownerId: String, sessionId: String) throws -> [String: TrainingSetDraft] {
+        try loadJournal(ownerId: ownerId, sessionId: sessionId).rows
+    }
+
+    func loadFeedback(ownerId: String, sessionId: String) throws -> TrainingFeedbackDraft? {
+        try loadJournal(ownerId: ownerId, sessionId: sessionId).feedback
+    }
+
+    func replaceFeedback(
+        _ feedback: TrainingFeedbackDraft,
+        expecting previous: TrainingFeedbackDraft?,
+        ownerId: String,
+        sessionId: String
+    ) throws -> Bool {
+        var journal = try loadJournal(ownerId: ownerId, sessionId: sessionId)
+        guard journal.feedback == previous else { return false }
+        journal.feedback = feedback
+        try persist(journal)
+        return true
+    }
+
+    private func loadJournal(ownerId: String, sessionId: String) throws -> Journal {
         let url = journalURL(ownerId: ownerId, sessionId: sessionId)
         let data: Data
         do {
             data = try Data(contentsOf: url)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            return [:]
+            return Journal(version: 1, ownerId: ownerId, sessionId: sessionId, rows: [:])
         }
         let journal = try JSONDecoder().decode(Journal.self, from: data)
         guard journal.version == 1, journal.ownerId == ownerId, journal.sessionId == sessionId,
               journal.rows.allSatisfy({ $0.key == $0.value.key && validStoredRow($0.value, sessionId: sessionId) })
         else { throw TrainingDraftError.unavailable }
-        return journal.rows
+        if let feedback = journal.feedback {
+            guard feedback.request.sessionId == sessionId, feedback.request.sourceObservationId != nil,
+                  feedback.response.map({ $0.matches(feedback.request) }) ?? true,
+                  feedback.readinessHold.map({
+                      $0.feedback.observation.sessionId == sessionId &&
+                          $0.matches($0.feedback.observation) && $0.nextSetRecommendation.action != .proceed
+                  }) ?? true
+            else { throw TrainingDraftError.unavailable }
+        }
+        return journal
     }
 
     func put(_ row: TrainingSetDraft, ownerId: String, sessionId: String) throws {
@@ -105,6 +158,14 @@ final class TrainingDraftStore {
     }
 
     private func persist(_ rows: [String: TrainingSetDraft], ownerId: String, sessionId: String) throws {
+        var journal = try loadJournal(ownerId: ownerId, sessionId: sessionId)
+        journal.rows = rows
+        try persist(journal)
+    }
+
+    private func persist(_ journal: Journal) throws {
+        let ownerId = journal.ownerId
+        let sessionId = journal.sessionId
         let ownerURL = ownerURL(ownerId)
         try FileManager.default.createDirectory(
             at: ownerURL, withIntermediateDirectories: true,
@@ -114,7 +175,7 @@ final class TrainingDraftStore {
         var resources = URLResourceValues()
         resources.isExcludedFromBackup = true
         try excludedURL.setResourceValues(resources)
-        let data = try JSONEncoder().encode(Journal(version: 1, ownerId: ownerId, sessionId: sessionId, rows: rows))
+        let data = try JSONEncoder().encode(journal)
         try writeData(
             data, journalURL(ownerId: ownerId, sessionId: sessionId),
             [.atomic, .completeFileProtectionUntilFirstUserAuthentication]

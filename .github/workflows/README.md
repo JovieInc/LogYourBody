@@ -124,9 +124,13 @@ Main-branch push and manual secret, dependency, and SBOM scanning. No clock. Git
 
 Attempts to auto-merge Dependabot patch/minor updates after CI passes.
 
+### `signing-expiry.yml`
+
+Daily read-only check (13:17 UTC) for the Apple Distribution certificate, active App Store profiles, and the App Store Connect API key. Under 30 days it files or reopens one LYB issue, `remediation:signing-expiry`. Under 7 days that issue is Urgent. It never creates, revokes, or nukes signing material. Renew before nuke: `docs/engineering/signing-expiry.md`. Manual dispatch supports `dry_run`.
+
 ### `regenerate-certificates.yml`
 
-Manual iOS certificate regeneration. No schedule. The job fails immediately unless the dispatch confirm is `NUKE-AND-REGENERATE` (LYB-74). Slack runs only when repository variable `CERT_REGEN_SLACK_ENABLED` is `true`.
+Manual iOS certificate regeneration. No schedule. The job fails immediately unless the dispatch confirm is `NUKE-AND-REGENERATE` (LYB-74). Prefer the match refresh in `docs/engineering/signing-expiry.md` (LYB-141). Slack runs only when repository variable `CERT_REGEN_SLACK_ENABLED` is `true`.
 
 ## Blocking vs Advisory
 
