@@ -200,6 +200,12 @@ func syncWeightFromHealthKit() async throws {
             return
         }
 
+        if hasBodyMetricAnchors(userId: ownership.subject) {
+            defer { endWeightSync() }
+            try await importAnchoredBodyMetricsUnlocked(ownership)
+            return
+        }
+
         // print("📊 Starting comprehensive weight sync from HealthKit...")
         defer {
             endWeightSync()
@@ -226,16 +232,20 @@ func syncWeightFromHealthKit() async throws {
         }
 
         // Process recent data for immediate UI update
-        let (imported, _) = await processBatchHealthKitData(
+        let recentBatch = await processBatchHealthKitData(
             weightHistory: recentWeightHistory,
             bodyFatHistory: recentBodyFatHistory, ownership: ownership
         )
+        let imported = recentBatch.imported
 
         // print("📊 Recent sync: \(imported) imported, \(skipped) skipped")
 
         // Only trigger full historical sync if this is truly the first time and we have very little data
         try await requireImportOwnership(ownership)
-        await triggerFullHealthKitSyncIfNeeded(imported: imported, ownership: ownership)
+        let fullHistory = await triggerFullHealthKitSyncIfNeeded(imported: imported, ownership: ownership)
+        if fullHistory == nil {
+            await seedBodyMetricAnchors(ownership: ownership)
+        }
     }
 
 func fetchRecentWeightAndBodyFatHistory(ownership: AuthManager.ProfileSessionOwnership? = nil) async throws
@@ -399,6 +409,9 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
                 return true
             }
             if !completed { await clearHistoricalImport(ownership, operation: operation) }
+            if completed {
+                await seedBodyMetricAnchors(ownership: ownership)
+            }
             return completed
         } catch {
             // Cancellation must release its own UI, but never an import that started later.
@@ -492,11 +505,13 @@ func processHistoricalHealthKitBatches(
                 .filter { $0.date < actualBatchEndDate }
 
             // Process this batch
-            let (imported, skipped) = await processBatchHealthKitData(
+            let batch = await processBatchHealthKitData(
                 weightHistory: weightBatch,
                 bodyFatHistory: bodyFatBatch, ownership: ownership,
                 bodyFatOnlyPolicy: importsBodyFatOnly
             )
+            let imported = batch.imported
+            let skipped = batch.skipped
 
             try await requireImportOwnership(ownership)
             totalImported += imported
@@ -580,7 +595,7 @@ func processBatchHealthKitData(
         weightHistory: [(weight: Double, date: Date)],
         bodyFatHistory: [(percentage: Double, date: Date)]
     ) async -> (imported: Int, skipped: Int) {
-        await processBatchHealthKitData(
+        let result = await processBatchHealthKitData(
             weightHistory: weightHistory.map {
                 HealthKitWeightImportSample(weight: $0.weight, date: $0.date)
             },
@@ -588,18 +603,20 @@ func processBatchHealthKitData(
                 HealthKitBodyFatImportSample(percentage: $0.percentage, date: $0.date)
             }
         )
+        return (result.imported, result.skipped)
     }
 
 func processBatchHealthKitData(
         weightHistory: [HealthKitWeightImportSample],
         bodyFatHistory: [HealthKitBodyFatImportSample],
         ownership: AuthManager.ProfileSessionOwnership? = nil, bodyFatOnlyPolicy: Bool? = nil
-    ) async -> (imported: Int, skipped: Int) {
+    ) async -> (imported: Int, skipped: Int, failed: Int) {
         guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else {
-            return (0, 0)
+            return (0, 0, 0)
         }
         var imported = 0
         var skipped = 0
+        var failed = 0
 
         // Create a dictionary of body fat data by logged local day
         var bodyFatByDate: [String: HealthKitBodyFatImportSample] = [:]
@@ -622,7 +639,7 @@ func processBatchHealthKitData(
             from: fetchStartDate,
             to: fetchEndDate
         )
-        guard await ownsImport(ownership) else { return (0, 0) }
+        guard await ownsImport(ownership) else { return (0, 0, 0) }
 
         // A standalone BF sample must not suppress a later weight, including
         // after rollout is disabled. Only this identified HealthKit row type is exempt.
@@ -649,7 +666,7 @@ func processBatchHealthKitData(
         }
         var newlyCombinedSampleIDs = Set<String>()
         for sample in weightHistory {
-            guard await ownsImport(ownership) else { return (imported, skipped) }
+            guard await ownsImport(ownership) else { return (imported, skipped, failed) }
             // Check if entry exists within the same hour
             let localDate = BodyMetricLocalDate.key(for: sample.date)
             let hourKey = "\(localDate)-\(BodyMetricLocalDate.hourKey(for: sample.date))"
@@ -668,7 +685,8 @@ func processBatchHealthKitData(
                     }
                     existingEntriesByHour.insert(hourKey) // Add to set to prevent duplicates in same batch
                 } catch {
-                    guard await ownsImport(ownership) else { return (imported, skipped) }
+                    guard await ownsImport(ownership) else { return (imported, skipped, failed) }
+                    failed += 1
                     await captureHealthKitError(
                         error,
                         operation: "processBatchHealthKitData",
@@ -692,6 +710,7 @@ func processBatchHealthKitData(
             let result = await importBodyFatOnlySamples(unpaired, ownership: ownership)
             imported += result.imported
             skipped += result.skipped
+            failed += result.failed
         }
 
         if imported > 0 {
@@ -711,7 +730,7 @@ func processBatchHealthKitData(
             }
         }
 
-        return (imported, skipped)
+        return (imported, skipped, failed)
     }
 
 func saveBodyMetrics(
@@ -799,9 +818,10 @@ func saveBodyMetrics(
 
     private func importBodyFatOnlySamples(
         _ samples: [HealthKitBodyFatImportSample], ownership: AuthManager.ProfileSessionOwnership
-    ) async -> (imported: Int, skipped: Int) {
+    ) async -> (imported: Int, skipped: Int, failed: Int) {
         var imported = 0
         var skipped = 0
+        var failed = 0
         for sample in samples {
             guard await ownsImport(ownership) else { break }
             // SDK samples always carry their HealthKit UUID and quantity type.
@@ -826,13 +846,14 @@ func saveBodyMetrics(
                 skipped += 1
             } catch {
                 guard await ownsImport(ownership) else { break }
+                failed += 1
                 await captureHealthKitError(
                     error, operation: "importBodyFatOnlySamples",
                     contextDescription: "importBodyFatOnlySamples.saveBodyMetrics", userIdOverride: ownership.subject
                 )
             }
         }
-        return (imported, skipped)
+        return (imported, skipped, failed)
     }
 
     /// Runs in the existing synchronous viewContext write admission. Including
@@ -858,12 +879,17 @@ func syncStepsFromHealthKit() async throws {
         guard let ownership = await captureImportOwnership() else {
             throw HealthKitError.notAuthorized
         }
+        if let anchor = anchorStore().anchor(for: .steps, userId: ownership.subject) {
+            try await importAnchoredSteps(anchor, ownership: ownership)
+            return
+        }
         let stepHistory = try await fetchStepCountHistory(days: 365)
         try await requireImportOwnership(ownership)
 
         for (stepCount, date) in stepHistory {
             try await syncSingleStepFromHistory(stepCount: stepCount, date: date, ownership: ownership)
         }
+        await seedStepAnchor(ownership: ownership)
     }
 
 func syncSingleStepFromHistory(
@@ -964,9 +990,16 @@ func scheduleObservedBodyMetricSync() {
                     return
                 }
                 self?.userDefaults.set(Date(), forKey: lastSyncKey)
+                let anchored = MainActor.assumeIsolated {
+                    self?.hasBodyMetricAnchors(userId: currentUserId) ?? false
+                }
                 Task { [weak self] in
-                    // Weight sync imports both weight and body fat for the recent window.
-                    try? await self?.syncWeightFromHealthKitIncremental(days: 7)
+                    if anchored {
+                        try? await self?.importAnchoredBodyMetrics()
+                    } else {
+                        // No cursor yet, including after an anchor reset: the existing full import.
+                        try? await self?.syncWeightFromHealthKit()
+                    }
                 }
             }
         }

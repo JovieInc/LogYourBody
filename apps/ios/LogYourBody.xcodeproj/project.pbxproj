@@ -99,6 +99,9 @@
 		6BA8148A3E9FDCC11517BE7F /* MobileProfileNamePayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492B105B3BA25B5B5864B9BA /* MobileProfileNamePayloadTests.swift */; };
 		6CD79FAE1B8BE0D48DB90DB5 /* HomeV2PhotoJourneyPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2FAA8408CBA2168F58B80D9 /* HomeV2PhotoJourneyPolicyTests.swift */; };
 		73AAD5D6EADA5C5A7BEB0D4B /* HealthKitManager+Part03.swift in Sources */ = {isa = PBXBuildFile; fileRef = 656A7105DE085AFF17E796C8 /* HealthKitManager+Part03.swift */; };
+		A23800022F23800100ABCDE1 /* HealthAnchorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A23800012F23800100ABCDE1 /* HealthAnchorStore.swift */; };
+		A23800042F23800100ABCDE2 /* HealthKitManager+Anchors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A23800032F23800100ABCDE2 /* HealthKitManager+Anchors.swift */; };
+		A23800062F23800100ABCDE3 /* HealthAnchorStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A23800052F23800100ABCDE3 /* HealthAnchorStoreTests.swift */; };
 		75A151025036A3D85388BD19 /* ValidationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3BCDDCDB314367722653A8 /* ValidationServiceTests.swift */; };
 		75A53A0D54A438DDC9F12B2E /* HomeV2SettingsCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFCF003F85B6FCE7D15EE6B6 /* HomeV2SettingsCopy.swift */; };
 		773F3C5B9FF015B9A66418D1 /* AnalyticsServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC41129661E6DC33C6C4877 /* AnalyticsServiceTests.swift */; };
@@ -551,6 +554,7 @@
 		1C1C56EE58FC0F4BEFDA1345 /* DashboardViewModelHealthSyncWiringTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardViewModelHealthSyncWiringTests.swift; sourceTree = "<group>"; };
 		B7E4D91A06C34815F02A6C31 /* DashboardStepPersistenceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardStepPersistenceTests.swift; sourceTree = "<group>"; };
 		1C662CF613D4755CA2B93A43 /* HealthSyncPipelineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthSyncPipelineTests.swift; sourceTree = "<group>"; };
+		A23800052F23800100ABCDE3 /* HealthAnchorStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthAnchorStoreTests.swift; sourceTree = "<group>"; };
 		1CE7640AD9F476ABF4DC7366 /* ErrorReporterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorReporterTests.swift; sourceTree = "<group>"; };
 		1D7568984229530B712D2F70 /* ProfileSettingsPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileSettingsPolicyTests.swift; sourceTree = "<group>"; };
 		22BF10E43507028B75EE0B6B /* OTPField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OTPField.swift; path = DesignSystem/Molecules/OTPField.swift; sourceTree = "<group>"; };
@@ -737,6 +741,8 @@
 		AD723AE42E15FA5C002376C6 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		AD723AE62E15FA5C002376C6 /* CoreDataManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CoreDataManager.swift; sourceTree = "<group>"; };
 		AD723AE72E15FA5C002376C6 /* HealthKitManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
+		A23800012F23800100ABCDE1 /* HealthAnchorStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthAnchorStore.swift; sourceTree = "<group>"; };
+		A23800032F23800100ABCDE2 /* HealthKitManager+Anchors.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "HealthKitManager+Anchors.swift"; path = "HealthKitManager+Anchors.swift"; sourceTree = "<group>"; };
 		AD723AE82E15FA5C002376C6 /* LoadingManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoadingManager.swift; sourceTree = "<group>"; };
 		AD723AEE2E15FA5C002376C6 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		AD723AEF2E15FA5C002376C6 /* Constants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
@@ -1352,6 +1358,7 @@
 				18FA96B2F0B80609BBBC0DE1 /* HealthKitFullSyncCompletionPolicyTests.swift */,
 				DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */,
 				1C662CF613D4755CA2B93A43 /* HealthSyncPipelineTests.swift */,
+				A23800052F23800100ABCDE3 /* HealthAnchorStoreTests.swift */,
 				A4A1C6C2438CB1EDCEC43C67 /* HealthSyncTestDoubles.swift */,
 				5D15E6A333FABD14CA6405A4 /* LaunchAndBodyCompositionTests.swift */,
 				E47A7741CF9BBCD0F5DC0D5C /* LaunchSurfacePolicyTests.swift */,
@@ -1559,6 +1566,8 @@
 				3B8B5B2EBD6BD4427633C2F5 /* HealthKitManager+Part01.swift */,
 				7A1DE682AE51BF7A3EFF75FF /* HealthKitManager+Part02.swift */,
 				656A7105DE085AFF17E796C8 /* HealthKitManager+Part03.swift */,
+				A23800012F23800100ABCDE1 /* HealthAnchorStore.swift */,
+				A23800032F23800100ABCDE2 /* HealthKitManager+Anchors.swift */,
 				D557A5B9E670DD0A6A8BA893 /* RealtimeSyncManager+Part01.swift */,
 				83531C42434F71BA31C75D89 /* RealtimeSyncManager+Part02.swift */,
 				29553DC6811B06CAE2621869 /* RevenueCatManager+Part01.swift */,
@@ -2251,6 +2260,7 @@
 				6200622347BFBBB809890E19 /* HealthKitFullSyncCompletionPolicyTests.swift in Sources */,
 				9BCEB21BE7B69676BCA5C211 /* HealthSyncCoordinatorPipelineTests.swift in Sources */,
 				8FB91216C622624E0F7815CC /* HealthSyncPipelineTests.swift in Sources */,
+				A23800062F23800100ABCDE3 /* HealthAnchorStoreTests.swift in Sources */,
 				C2465BE618C74154F47B1E1F /* HealthSyncTestDoubles.swift in Sources */,
 				7E01D015B886A36E2EB5F3E1 /* LaunchAndBodyCompositionTests.swift in Sources */,
 				3892032426C339D69DEF73EE /* LaunchSurfacePolicyTests.swift in Sources */,
@@ -2619,6 +2629,8 @@
 				841527E772D0CA94BE0D3F96 /* HealthKitManager+Part01.swift in Sources */,
 				CB4A7A11426D64B74959C447 /* HealthKitManager+Part02.swift in Sources */,
 				73AAD5D6EADA5C5A7BEB0D4B /* HealthKitManager+Part03.swift in Sources */,
+				A23800022F23800100ABCDE1 /* HealthAnchorStore.swift in Sources */,
+				A23800042F23800100ABCDE2 /* HealthKitManager+Anchors.swift in Sources */,
 				E389C2EFF4E7B92EE0A9A997 /* RealtimeSyncManager+Part01.swift in Sources */,
 				F5374395372D2C41AF05F233 /* RealtimeSyncManager+Part02.swift in Sources */,
 				929DE2322E275AEB79624023 /* RevenueCatManager+Part01.swift in Sources */,
