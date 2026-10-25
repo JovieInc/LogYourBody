@@ -292,5 +292,21 @@
       "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
       "anchor": "public route metadata contract (LYB-223)"
     }
+  },
+  {
+    "fingerprint": "marketing-sitemap-shares-public-route-inventory",
+    "correction": "LYB-224: The sitemap must match the public marketing route tests on the canonical host, omit request-time modification dates, and block legacy sign-in and sign-up routes from crawling.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/apps/web/src/app/sitemap.ts#L4",
+    "mechanization": "Generate the sitemap from the same public route inventory used by marketing browser tests. Required web tests compare the complete sitemap with that inventory, verify inventory completeness against public page files, and reject fabricated modification dates and missing auth exclusions in robots.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The sitemap maps the shared marketing inventory directly using the registry's canonical origin, omits unverified timestamps, and robots explicitly excludes the retained auth routes."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/sitemap.ts",
+      "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
+    }
   }
 ]
