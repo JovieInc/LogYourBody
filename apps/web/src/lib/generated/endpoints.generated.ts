@@ -384,6 +384,10 @@ export const endpoints = {
       reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-129',
+      reason: 'LYB-129 source evidence for canonical durable workout readiness integration.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-173',
       reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
     },
