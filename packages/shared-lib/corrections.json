@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "native-training-card-result-failure-conforms-to-error",
+    "correction": "LYB-124 / PR #1553: NativeTrainingCardRejection must conform to Error when used as Result's failure type. The missing conformance broke both required native builds and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40185165445/job/121144391741",
+    "mechanization": "Declare Error conformance on the existing rejection enum. The retained Result return type makes Swift compilation reject removal of that conformance. The existing native contract suite now also checks unsupported actions after an approved action, stale plan revisions and a valid revision. The reported native builds prove failure before the fix; current native compilation and XCTest execution require the macOS runner and remain unverified on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Swift's Result generic constraint requires its failure type to conform to Error, preventing a non-error rejection type from compiling in the required native builds."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/NativeTrainingCardContract.swift",
+      "anchor": "Result<ApprovedNativeTrainingAction, NativeTrainingCardRejection>"
+    }
+  },
+  {
     "fingerprint": "web-sentry-runtime-env-declarations",
     "correction": "PR #1542: Declare every consumed public Sentry runtime variable in apps/web/.env.example. Missing DSN, environment and release declarations fail the required environment surface guard.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169587476/job/121097641374",

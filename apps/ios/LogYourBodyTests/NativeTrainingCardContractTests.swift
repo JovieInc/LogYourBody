@@ -68,6 +68,29 @@ final class NativeTrainingCardContractTests: XCTestCase {
         XCTAssertEqual(injected.reason, .unauthorized)
     }
 
+    func testActionValidationRejectsUnsupportedAndStaleWrites() throws {
+        var input = planChange()
+        var actions = try XCTUnwrap(input["actions"] as? [[String: Any]])
+        actions.append(["kind": "execute", "operation": "saved_revision"])
+        input["actions"] = actions
+        let unsupported = NativeTrainingCardContract.validate(input, ownerSubject: owner)
+        XCTAssertEqual(unsupported.reason, .unsupportedAction)
+        XCTAssertNil(unsupported.card, "A rejected action must also discard preceding approved actions")
+
+        actions.removeLast()
+        actions[0]["expectedRevision"] = "6"
+        input["actions"] = actions
+        let stale = NativeTrainingCardContract.validate(input, ownerSubject: owner)
+        XCTAssertEqual(stale.reason, .unauthorized)
+        XCTAssertNil(stale.card)
+
+        actions[0]["expectedRevision"] = "7"
+        input["actions"] = actions
+        let approved = NativeTrainingCardContract.validate(input, ownerSubject: owner)
+        XCTAssertNil(approved.reason)
+        XCTAssertEqual(approved.card?.actions.first?.kind, "apply_saved_revision")
+    }
+
     func testSnapshotSurvivesRelaunchForTheOwningAccountOnly() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let store = NativeTrainingCardStore(rootURL: root)

@@ -29,7 +29,7 @@ enum NativeTrainingCardInteractionPolicy {
     }
 }
 
-enum NativeTrainingCardRejection: String, Equatable {
+enum NativeTrainingCardRejection: String, Error, Equatable {
     case unknownComponent = "unknown_component"
     case invalidId = "invalid_id"
     case unauthorized
