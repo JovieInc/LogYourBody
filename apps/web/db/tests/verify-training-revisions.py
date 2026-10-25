@@ -17,6 +17,7 @@ import uuid
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--postgres-bin', type=Path, required=True)
+    parser.add_argument('--cycle-migration', type=Path, help='Optional LYB-115 migration candidate')
     parser.add_argument('--migration', type=Path, help='Optional candidate migration for deliberate regression checks')
     parser.add_argument('--delegated-migration', type=Path, help='Optional delegated candidate for deliberate regression checks')
     args = parser.parse_args()
@@ -64,6 +65,7 @@ def main():
             run(client + ['-f', str(web / 'db/migrations/20261010120000_native_account_admission.sql')])
             run(client + ['-f', str(web / 'db/migrations/20261014180000_training_canvas_ledger.sql')])
             run(client + ['-f', str(args.delegated_migration or web / 'db/migrations/20261025010000_delegated_training_revisions.sql')])
+            run(client + ['-f', str(args.cycle_migration or web / 'db/migrations/20261025040000_training_cycle_lifecycle.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -283,6 +285,52 @@ def main():
             assert command(subject,'apply',decision(a))['kind']=='decided'
             assert command(subject,'legacy_enroll',{'setup':legacy,'context':{k:v for k,v in context(subject).items() if k in ['ownerId','generation','profileFingerprint','legacyFingerprint']}})['kind']=='program_already_enrolled'
             check('legacy enrollment invalidates proposals; existing legacy replacement retained; canonical head cannot be bypassed')
+            # Cycle revisions share exactly the same owner lock, head CAS and receipt ledger.
+            subject=owner(); initial=new_proposal(subject); initial_apply=decision(initial)
+            assert command(subject,'apply',initial_apply)['kind']=='decided'
+            program=initial_apply['setup']['id']
+
+            def cycle_proposal(repeat=False):
+                ctx=context(subject)
+                prior=json.loads(sql(f"select payload - 'record_type' from native_records where user_subject={quote(subject)} and collection='training_feedback' and id='{program}';"))
+                proposed=dict(prior)
+                proposed['cycle']=dict(weekCount=5,temporaryPriorities=[],temporaryConstraints=[],retainedVariants=[],historyProgramIds=[program] if repeat else [])
+                proposed['id']=str(uuid.uuid4()) if repeat else program
+                proposal=dict(id=str(uuid.uuid4()),programId=proposed['id'],baseRevision=ctx['headRevision'],
+                    context={k:ctx[k] for k in ['ownerId','generation','profileFingerprint','legacyFingerprint']},
+                    actor=dict(kind='self',subject=subject),createdAt='2026-10-25T12:00:00Z',
+                    intent=dict(kind='repeat_cycle' if repeat else 'revise_cycle',weekCount=5),
+                    priorState=dict(setup=prior,trainingFingerprint=ctx['trainingFingerprint']),proposedSetup=proposed)
+                body=dict(requestId=str(uuid.uuid4()),requestHash='cycle-'+proposal['id'],proposal=proposal)
+                assert command(subject,'create',body)['kind']=='stored'
+                apply=decision(body); apply['setup']=dict(proposed,programRevisionId=apply['revisionId'])
+                return body,apply
+
+            stale,stale_apply=cycle_proposal()
+            session=str(uuid.uuid4()); prescription=dict(id=session,week=1,exercises=[dict(id='goblet_squat',sets=2)])
+            session_payload=dict(record_type='workout_session',programSetupId=program,
+                programRevisionId=initial_apply['revisionId'],status='in_progress',prescription=prescription)
+            sql(f"insert into native_records(collection,id,user_subject,payload) values('training_sessions','{session}',{quote(subject)},{quote(json.dumps(session_payload))}::jsonb);")
+            assert command(subject,'apply',stale_apply)['kind']=='stale_context'
+            check('new session invalidates an already reviewed cycle draft under the owner lock')
+
+            first,first_apply=cycle_proposal(); competing,competing_apply=cycle_proposal()
+            assert command(subject,'apply',first_apply)['kind']=='decided'
+            assert command(subject,'apply',first_apply)['receipt']['revisionId']==first_apply['revisionId']
+            assert command(subject,'apply',competing_apply)['kind']=='revision_conflict'
+            saved=json.loads(sql(f"select payload from native_records where id='{session}' and collection='training_sessions';"))
+            assert saved['prescription']==prescription and saved['status']=='in_progress'
+            assert saved['programRevisionId']==first_apply['revisionId']
+            assert context(subject)['headRevision']==first_apply['revisionId']
+            check('length revision preserves unfinished prescription, atomically rebinds authority, and excludes competing applies')
+
+            sql(f"update native_records set payload=jsonb_set(payload,'{{status}}','\"ended\"'::jsonb) where id='{session}';")
+            repeated,repeat_apply=cycle_proposal(True)
+            assert command(subject,'apply',repeat_apply)['kind']=='decided'
+            assert sql(f"select count(*) from native_records where user_subject={quote(subject)} and collection='training_feedback' and deleted_at is null;")=='1'
+            assert json.loads(sql(f"select payload->'prescription' from native_records where id='{session}';"))==prescription
+            assert sql(f"select count(*) from training_program_revisions where user_subject={quote(subject)};")=='3'
+            check('next-block revision preserves session and revision history while leaving one current setup')
             def delegated_proposal(subject, changes=None):
                 ctx=context(subject)
                 current=sql(f"select payload - 'record_type' from native_records where user_subject={quote(subject)} and collection='training_feedback' and deleted_at is null and coalesce(payload->>'programRevisionId','')={quote(ctx['headRevision'] or '')} order by payload->>'startedAt' desc limit 1;")
