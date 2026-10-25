@@ -629,6 +629,7 @@ export async function correctTrainingSet(input: {
 
 export type WorkoutActionInput =
   | { kind: 'equipment_unavailable'; exerciseId: string }
+  | { kind: 'swap'; exerciseId: string; replacementExerciseId: string }
   | { kind: 'shorten'; minutes: number }
   | { kind: 'skip'; exerciseId: string }
   | { kind: 'pain'; exerciseId: string }
@@ -750,6 +751,44 @@ export async function applyWorkoutAction(input: {
   let event: WorkoutSessionEvent;
 
   switch (input.action.kind) {
+    case 'swap': {
+      if (!current || current.id !== input.action.exerciseId)
+        return { kind: 'stale_current_exercise' };
+      if (sessionLogs.some((log) => log.exerciseId === current.id))
+        return { kind: 'no_eligible_substitution' };
+      const replacementId = input.action.replacementExerciseId;
+      const replacement = (current.substitutions ?? []).find(
+        (candidate) =>
+          candidate.id === replacementId &&
+          !exercises.some((exercise) => exercise.id === candidate.id) &&
+          isEligibleExerciseSubstitution({
+            exercise: current,
+            candidate,
+            equipment: setup.equipment,
+            constraints: setup.delegated?.inputs,
+          }),
+      );
+      if (!replacement) return { kind: 'no_eligible_substitution' };
+      exercises = exercises.map((exercise) =>
+        exercise.id === current.id
+          ? {
+              ...replacement,
+              sets: current.sets,
+              substitutions: current.substitutions.filter(
+                (candidate) => candidate.id !== replacement.id,
+              ),
+            }
+          : exercise,
+      );
+      event = {
+        id: input.eventId,
+        kind: 'substituted',
+        exerciseId: current.id,
+        replacementExerciseId: replacement.id,
+        createdAt: input.now.toISOString(),
+      };
+      break;
+    }
     case 'equipment_unavailable': {
       if (!current || current.id !== input.action.exerciseId)
         return { kind: 'stale_current_exercise' };

@@ -214,6 +214,45 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "training-response-loss-relaunch-exact-retry", from: app)
     }
 
+    func testApprovedCardsNavigateOfflineAndRetainPendingIdentityAfterRelaunch() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingCards",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.switches["training_fixture_offline"].tap()
+        app.buttons["training_fixture_open"].tap()
+        let navigation = app.descendants(matching: .any)["training_workout_navigation"]
+        XCTAssertTrue(navigation.waitForExistence(timeout: 5))
+        navigation.tap()
+        let second = app.buttons["training_navigate_fixture_press-2"]
+        XCTAssertTrue(second.waitForExistence(timeout: 5))
+        second.tap()
+        let log = app.buttons["training_log_set_fixture_press_2"]
+        for _ in 0..<8 where !log.isHittable { app.swipeUp() }
+        XCTAssertTrue(log.isHittable)
+        XCTAssertGreaterThanOrEqual(log.frame.height, 44)
+        log.tap()
+        XCTAssertTrue(app.staticTexts["training_pending_sync"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "approved-card-offline-pending-large-type", from: app)
+        app.buttons["training_live_session_close_button"].tap()
+        app.terminate()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestTrainingCards"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        app.descendants(matching: .any)["training_workout_navigation"].tap()
+        app.buttons["training_navigate_fixture_press-2"].tap()
+        XCTAssertTrue(app.staticTexts["training_pending_sync"].waitForExistence(timeout: 5))
+        app.buttons["training_log_set_fixture_press_2"].tap()
+        app.buttons["training_live_session_close_button"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_count"].label, "Acknowledged sets: 1")
+        XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 2")
+        attachScreenshot(named: "approved-card-relaunch-exact-pending-retry", from: app)
+    }
+
     func testTrainingHistoryShowsRecordedPerformanceAtAccessibilityTextSize() throws {
         let app = XCUIApplication()
         app.launchArguments = [

@@ -137,6 +137,7 @@ final class TrainingSessionDraft: ObservableObject {
                 reps: request.reps, loadKg: request.loadKg, rir: request.rir,
                 completedAt: ISO8601DateFormatter().string(from: now()), revision: 0, corrections: []
             )
+            persistCachedReceipt()
             lastSaveReceipt = TrainingSetSaveReceipt(
                 id: "\(row.key)-\(row.revision.uuidString)",
                 position: TrainingSetPosition(exercise: exercise, setNumber: setNumber),
@@ -293,6 +294,7 @@ final class TrainingSessionDraft: ObservableObject {
         }
         reconcileSavedSets()
         restoreRestTimer()
+        persistCachedReceipt()
     }
 
     func beginCorrection(_ position: TrainingSetPosition) {
@@ -370,6 +372,7 @@ final class TrainingSessionDraft: ObservableObject {
             rows.removeValue(forKey: row.key)
             persistedRows.removeValue(forKey: row.key)
             loggedSets[row.key] = corrected
+            persistCachedReceipt()
             lastSaveReceipt = TrainingSetSaveReceipt(
                 id: request.correctionId,
                 position: position,
@@ -379,6 +382,16 @@ final class TrainingSessionDraft: ObservableObject {
             if isCurrent() { errorMessage = error.errorDescription ?? "The correction could not be saved." }
         } catch {
             if isCurrent() { errorMessage = "The correction could not be saved." }
+        }
+    }
+
+    private func persistCachedReceipt() {
+        var snapshot = session
+        snapshot.loggedSets = loggedSets.values.sorted { "\($0.exerciseId)-\($0.setNumber)" < "\($1.exerciseId)-\($1.setNumber)" }
+        do {
+            try store.updateCachedSession(snapshot, ownerId: ownerId)
+        } catch {
+            errorMessage = TrainingDraftError.unavailable.localizedDescription
         }
     }
 

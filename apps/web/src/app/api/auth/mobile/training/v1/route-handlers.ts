@@ -25,9 +25,41 @@ import {
   storeProgramSetup,
 } from '@/lib/training/service';
 import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from '@/lib/training/types';
+import { catalogVariantById } from '@/lib/training/catalog';
+import type { Session } from '@/lib/training/types';
 import { summarizeTrainingProgress } from '@/lib/training/progress';
 
 export const TRAINING_API_VERSION = 1;
+
+// Setup descriptions come from the reviewed catalog, independently of model text.
+function nativeSession<T extends Session>(session: T) {
+  const describe = (
+    exercise: Session['exercises'][number] | Session['exercises'][number]['substitutions'][number],
+  ) => {
+    const variant = catalogVariantById(exercise.id);
+    return {
+      ...exercise,
+      setup: variant
+        ? {
+            requires: variant.requires,
+            bodyPosition: variant.bodyPosition,
+            torsoSupport: variant.torsoSupport,
+            trunkDemand: variant.trunkDemand,
+            benchAngleDeg: variant.benchAngleDeg,
+            pulley: variant.pulley,
+            cues: variant.cues,
+          }
+        : null,
+    };
+  };
+  return {
+    ...session,
+    exercises: session.exercises.map((exercise) => ({
+      ...describe(exercise),
+      substitutions: (exercise.substitutions ?? []).map(describe),
+    })),
+  };
+}
 
 const EnrollBodySchema = z
   .object({
@@ -174,6 +206,13 @@ const WorkoutActionBodySchema = z
     expectedRevision: z.number().int().min(0),
     action: z.discriminatedUnion('kind', [
       z
+        .object({
+          kind: z.literal('swap'),
+          exerciseId: z.string().min(1).max(64),
+          replacementExerciseId: z.string().min(1).max(64),
+        })
+        .strict(),
+      z
         .object({ kind: z.literal('equipment_unavailable'), exerciseId: z.string().min(1).max(64) })
         .strict(),
       z.object({ kind: z.literal('shorten'), minutes: z.number().int().min(5).max(180) }).strict(),
@@ -297,7 +336,7 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
         }
         return json(
           withVersion({
-            session: result.session,
+            session: nativeSession(result.session),
             week: result.week,
             weekCount: result.weekCount,
             weeklyFractionalVolume: result.weeklyFractionalVolume,
@@ -592,7 +631,9 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
         });
         switch (result.kind) {
           case 'updated':
-            return json(withVersion({ decision: result.decision, session: result.session }));
+            return json(
+              withVersion({ decision: result.decision, session: nativeSession(result.session) }),
+            );
           case 'program_not_enrolled':
             return apiError('program_not_enrolled', 409);
           case 'session_not_found':

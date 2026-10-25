@@ -381,6 +381,66 @@ describe('authenticated training API', () => {
     expect(substitutedBody.session.exercises[0].id).not.toBe(original.id);
   });
 
+  it('applies the exact reviewed card alternative once without rebuilding the workout', async () => {
+    const { handlers } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const original = session.exercises[0];
+    const alternative = original.substitutions.at(-1);
+    expect(alternative).toBeDefined();
+    const action = {
+      sessionId: session.id,
+      eventId: '33333333-3333-4333-8333-000000000010',
+      expectedRevision: 0,
+      action: { kind: 'swap', exerciseId: original.id, replacementExerciseId: alternative.id },
+    };
+    expect((await handlers.action(request('POST', 'action', 'token-b', action))).status).toBe(409);
+    const response = await handlers.action(request('POST', 'action', 'token-a', action));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.session.exercises[0]).toMatchObject({
+      id: alternative.id,
+      sets: original.sets,
+      targetLoadKg: null,
+    });
+    expect(body.session.exercises[0].setup).toMatchObject({
+      requires: expect.any(Array),
+      bodyPosition: expect.any(String),
+      trunkDemand: { basis: 'reviewed', level: expect.any(String), note: expect.any(String) },
+    });
+    expect(body.session.exercises.slice(1)).toEqual(session.exercises.slice(1));
+    expect(body.session.executionRevision).toBe(1);
+    const retry = await handlers.action(request('POST', 'action', 'token-a', action));
+    expect((await retry.json()).session.executionEvents).toHaveLength(1);
+    const persisted = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    expect(persisted.session.exercises[0].id).toBe(alternative.id);
+    const stale = { ...action, eventId: '33333333-3333-4333-8333-000000000011' };
+    expect((await handlers.action(request('POST', 'action', 'token-a', stale))).status).toBe(409);
+  });
+
+  it('rejects unapproved card alternatives, unknown actions and generated code without writing', async () => {
+    const { handlers, records } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const push = jest.spyOn(records.trainingMutations, 'commit');
+    for (const action of [
+      { kind: 'swap', exerciseId: session.exercises[0].id, replacementExerciseId: 'invented' },
+      { kind: 'run_code', code: 'return true' },
+      { kind: 'pause', code: 'return true' },
+    ]) {
+      const result = await handlers.action(
+        request('POST', 'action', 'token-a', {
+          sessionId: session.id,
+          eventId: '33333333-3333-4333-8333-000000000012',
+          expectedRevision: 0,
+          action,
+        }),
+      );
+      expect(result.status).toBeGreaterThanOrEqual(400);
+    }
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it('fails closed when a persisted session injects an invalid substitution', async () => {
     const { handlers, records } = makeHarness();
     await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
