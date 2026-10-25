@@ -282,6 +282,7 @@ export type CanvasReadback = {
 };
 
 export type CanvasFailure =
+  | 'canonical_revision_required'
   | 'stale_context'
   | 'request_conflict'
   | 'already_decided'
@@ -323,7 +324,12 @@ export interface CanvasLedgerPort {
     subject: string,
     expectedWrite: number | null,
     ledger: CanvasLedger,
-  ): Promise<{ kind: 'saved' } | { kind: 'stale' } | { kind: 'missed_update' }>;
+  ): Promise<
+    | { kind: 'saved' }
+    | { kind: 'stale' }
+    | { kind: 'missed_update' }
+    | { kind: 'canonical_revision_required' }
+  >;
 }
 
 export function emptyCanvasLedger(): CanvasLedger {
@@ -1102,7 +1108,7 @@ function guardPreview(base: CanvasPlan | null, preview: CanvasPlan): CanvasFailu
   return null;
 }
 
-function buildOperation(plan: CanvasPlan | null, operation: PlanOperation): Built {
+export function buildOperation(plan: CanvasPlan | null, operation: PlanOperation): Built {
   if (operation.kind === 'draft') {
     if (plan) return { ok: false, kind: 'unsupported_or_invalid_intent' };
     return buildDraft(operation);
@@ -1315,6 +1321,7 @@ async function commit(
   const parsed = canvasLedgerSchema.safeParse(ledger);
   if (!parsed.success) return fail('ledger_invalid', null);
   const saved = await port.save(subject, expectedWrite, parsed.data);
+  if (saved.kind === 'canonical_revision_required') return fail(saved.kind, null);
   if (saved.kind === 'missed_update') return fail('missed_update', await port.load(subject));
   if (saved.kind === 'stale') return fail('stale_context', await port.load(subject));
   return result(readCanvasLedger(parsed.data, narration));
