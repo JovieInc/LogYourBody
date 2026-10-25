@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "share-avatar-probe-matches-rendered-blue",
+    "correction": "LYB-39 / PR #1533: The square avatar render failed a bright-cyan pixel assertion even though the retained PNG contains the opted-in blue avatar. Detect the rendered avatar without counting the logo, white copy or a non-avatar photo as proof.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40152580750/job/121047155644",
+    "mechanization": "The existing required launch-quality opt-in fixture matrix checks blue channel dominance at the unchanged brightness floor and sample-count threshold in every export aspect. The score-only baseline accounts for the logo, and the magenta photo is an explicit negative control. Failed-run PNG replay rejects the old square probe and accepts the blue probe while rejecting the non-avatar controls; current native execution remains required in CI.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This correction concerns pixel evidence in a rendered regression test. Application runtime types cannot establish that a sampled color identifies the avatar rather than the logo or another visual."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing native render test can inspect actual exported pixels and assert positive and negative visual controls through the unchanged required launch-quality runner."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift",
+      "anchor": "The logo and a non-avatar photo must not satisfy the avatar probe"
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",

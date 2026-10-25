@@ -344,14 +344,15 @@ final class BodyScoreShareCardTests: XCTestCase {
             XCTAssertTrue(avatarText.lowercased().contains("male"))
             XCTAssertTrue(avatarText.filter(\.isNumber).contains("15"))
             XCTAssertFalse(avatarText.lowercased().contains("private"))
+            let minimumAvatarSamples = blueSampleCount(try renderFixture(
+                makeScorePayload(),
+                BodyScoreShareOptions(),
+                aspect: aspect,
+                name: "score-only-blue-baseline-\(aspect.rawValue)"
+            )) * 5 + 200
             XCTAssertGreaterThan(
-                cyanSampleCount(avatarImage),
-                cyanSampleCount(try renderFixture(
-                    makeScorePayload(),
-                    BodyScoreShareOptions(),
-                    aspect: aspect,
-                    name: "score-only-cyan-baseline-\(aspect.rawValue)"
-                )) * 5 + 200,
+                blueSampleCount(avatarImage),
+                minimumAvatarSamples,
                 "Avatar opt-in should draw the body visual on \(aspect.rawValue)"
             )
 
@@ -365,6 +366,11 @@ final class BodyScoreShareCardTests: XCTestCase {
             XCTAssertFalse(photoText.contains("181"))
             XCTAssertGreaterThan(magentaSampleCount(photoImage), 500, "Photo pixels missing on \(aspect.rawValue)")
             XCTAssertLessThan(magentaSampleCount(avatarImage), 30)
+            XCTAssertLessThanOrEqual(
+                blueSampleCount(photoImage),
+                minimumAvatarSamples,
+                "The logo and a non-avatar photo must not satisfy the avatar probe on \(aspect.rawValue)"
+            )
         }
     }
 
@@ -1600,9 +1606,11 @@ final class BodyScoreShareCardTests: XCTestCase {
         return tallest
     }
 
-    private func cyanSampleCount(_ image: UIImage) -> Int {
+    /// The avatar stays blue under the scrims, even when it is no longer bright cyan.
+    /// Channel dominance excludes white copy and magenta photos from the avatar probe.
+    private func blueSampleCount(_ image: UIImage) -> Int {
         sampleCount(image) { red, green, blue in
-            blue > 160 && green > 140 && red < 90
+            blue > 160 && Int(blue) - Int(green) > 40 && Int(blue) - Int(red) > 80
         }
     }
 
