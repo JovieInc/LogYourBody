@@ -1,6 +1,10 @@
 /** @jest-environment node */
 
 import { NextRequest } from 'next/server';
+import { neonGymRegistry } from '@/lib/neon/gym-registry-adapter';
+jest.mock('@/lib/neon/gym-registry-adapter', () => ({
+  neonGymRegistry: { list: jest.fn() },
+}));
 import { fetchUserInfo } from '@/lib/auth/jovie-oauth';
 import { neonBodyMetrics, neonBodyMetricsExport } from '@/lib/neon/body-metrics-adapter';
 import { neonNativeProductRecords } from '@/lib/neon/native-product-records-adapter';
@@ -39,6 +43,7 @@ function request(method: 'GET' | 'POST', token?: string) {
 describe('/api/auth/mobile/export', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(neonGymRegistry.list).mockResolvedValue([]);
     jest
       .mocked(neonTrainingRevisions.exportForSubject)
       .mockResolvedValue({ proposals: [], revisions: [{ id: 'revision-owned' }] });
@@ -103,6 +108,7 @@ describe('/api/auth/mobile/export', () => {
       daily_metrics: [{ id: 'daily-1' }],
     });
     expect(mockedMetrics.listAll).toHaveBeenCalledWith('owner-a');
+    expect(neonGymRegistry.list).toHaveBeenCalledWith('owner-a');
     expect(mockedRecords.listAll).toHaveBeenCalledWith('owner-a');
     expect(neonTrainingRevisions.exportForSubject).toHaveBeenCalledWith('owner-a');
   });

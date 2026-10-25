@@ -679,6 +679,15 @@ export function missingEquipment(
   return variant.requires.filter((item) => !available.has(item));
 }
 
+/** No selected gym means no inventory restriction; an explicit empty set allows none. */
+export function queryExerciseLibrary(
+  equipment: ReadonlySet<CatalogEquipment> | null = null,
+): CatalogVariant[] {
+  return EXERCISE_CATALOG.filter(
+    (variant) => equipment === null || missingEquipment(variant, equipment).length === 0,
+  );
+}
+
 export function isEligibleVariant(
   variant: CatalogVariant,
   input: { available: ReadonlySet<CatalogEquipment>; excludedConcerns?: readonly string[] },

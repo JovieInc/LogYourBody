@@ -49,6 +49,7 @@ export const endpoints = {
     'waitlist_entries',
     'waitlist_rate_limits',
     'native_records',
+    'gyms',
     'training_revision_proposals',
     'training_program_revisions',
     'training_revision_state',
@@ -319,6 +320,10 @@ export const endpoints = {
     {
       value: 'https://rubygems.org',
       reason: 'Ruby dependency host referenced by iOS tooling docs.',
+    },
+    {
+      value: 'https://api.vercel.com',
+      reason: 'CI-only Vercel env-type guard and public-env sync; not a runtime endpoint.',
     },
     {
       value: 'https://openapi.vercel.sh',

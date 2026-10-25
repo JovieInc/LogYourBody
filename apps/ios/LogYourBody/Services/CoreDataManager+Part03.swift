@@ -560,6 +560,10 @@ func fetchOrCreateSyncMetadata(entityName: String, entityId: String) -> SyncMeta
         context.perform {
             do {
                 self.syncAcknowledgementVersions.removeAll()
+                let gymRequest = NSFetchRequest<NSManagedObject>(entityName: "CachedGymRegistry")
+                for registry in try context.fetch(gymRequest) {
+                    context.delete(registry)
+                }
                 // Delete all body metrics
                 let bodyMetricsRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
                 let bodyMetrics = try context.fetch(bodyMetricsRequest)

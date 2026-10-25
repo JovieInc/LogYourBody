@@ -88,6 +88,10 @@ def main():
             run(client + ['-f', str(web / 'db/migrations/20261014103000_training_execution_cas.sql')])
 
             run(client + ['-f', str(args.canvas_migration or web / 'db/migrations/20261014180000_training_canvas_ledger.sql')])
+
+            run(client + ['-f', str(web / 'db/migrations/20261025160000_gym_registry.sql')])
+            run(client + ['-f', str(web / 'db/tests/gym-registry-rls.sql')])
+            checks.append('gym_registry_two_owner_rls_and_account_delete')
             run(client + ['-f', str(web / 'db/migrations/20261025030000_adaptive_recovery_trials.sql')])
 
             def owner():

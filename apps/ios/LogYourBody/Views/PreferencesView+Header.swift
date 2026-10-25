@@ -68,6 +68,17 @@ extension PreferencesView {
         SettingsSection(header: "Data") {
             integrationsLauncherRow
 
+            if AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: GymRegistryService.featureGate),
+               let ownership = authManager.captureAccountSession() {
+                SettingsNavigationLink(
+                    icon: "dumbbell", title: "Gyms", subtitle: "Equipment and active gym",
+                    accessibilityIdentifier: "settings_gyms_link"
+                ) {
+                    GymRegistryView(ownership: ownership, authManager: authManager)
+                        .id(ownership)
+                }
+            }
+
             SettingsNavigationLink(
                 icon: "target",
                 title: "Tracking",
