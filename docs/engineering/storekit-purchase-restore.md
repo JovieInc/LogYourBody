@@ -2,7 +2,8 @@
 
 CI's **iOS StoreKit Purchase and Restore** job runs on every `main` push,
 including commits for which Unit was already verified by the merge queue. It
-also gates pull requests and merge groups that change iOS inputs. CI Summary
+also gates merge groups that change iOS inputs (not the pull request run: the
+queue reruns it on the exact tree that lands). CI Summary
 requires this job to succeed when selected. No release, submission or App Store
 Connect operation runs in this job, and it requires no credentials.
 

@@ -248,7 +248,7 @@ function jobBlock(name) {
 
 test('StoreKit evidence runs on every main push and gates native changes', () => {
   const storekit = jobBlock('ios_storekit');
-  assert.match(storekit, /if: github\.event_name == 'push' \|\| needs\.detect-changes\.outputs\.ios_changed == 'true'/);
+  assert.match(storekit, /if: github\.event_name == 'push' \|\| \(github\.event_name == 'merge_group' && needs\.detect-changes\.outputs\.ios_changed == 'true'\)/);
   assert.match(storekit, /runs-on: macos-15/);
   assert.match(storekit, /run: bash scripts\/ios\/storekit-purchase-restore\.sh/);
   assert.match(storekit, /if: always\(\)[\s\S]*actions\/upload-artifact/);
@@ -305,7 +305,7 @@ function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult,
     'needs.js.result': js,
     'needs.ios.result': iosResult,
     'needs.ios_quality.result': qualityResult,
-    'needs.ios_storekit.result': storekitResult ?? (event === 'push' || ios === 'true' || quality === 'true' ? 'success' : 'skipped'),
+    'needs.ios_storekit.result': storekitResult ?? (event === 'push' || (event === 'merge_group' && (ios === 'true' || quality === 'true')) ? 'success' : 'skipped'),
   };
   const rendered = script.replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_, expr) => {
     assert.ok(expr in values, `unrendered expression ${expr}`);
@@ -321,7 +321,7 @@ test('CI Summary passes a web-only change with iOS skipped', () => {
 
 test('CI Summary rejects missing or failing StoreKit evidence on native PRs and every main commit', () => {
   const web = { web: 'true', ios: 'false', js: 'success', iosResult: 'skipped', qualityResult: 'skipped', event: 'push' };
-  const native = { web: 'false', ios: 'false', quality: 'true', js: 'skipped', iosResult: 'skipped', qualityResult: 'success' };
+  const native = { web: 'false', ios: 'true', js: 'skipped', iosResult: 'success', qualityResult: 'success', event: 'merge_group' };
   for (const change of [web, native]) {
     assert.equal(runSummaryGate({ ...change, storekitResult: 'success' }), 0);
     for (const storekitResult of ['skipped', 'failure', 'cancelled']) {
@@ -592,4 +592,10 @@ test("daily-step verifier rejects execution without explicit disposable opt-in",
     result.stderr,
     /Pass --run to create an isolated socket-only cluster/,
   );
+});
+
+test('CI Summary does not require StoreKit on a native pull_request (the merge group runs it)', () => {
+  const pr = { web: 'false', ios: 'false', quality: 'true', js: 'skipped', iosResult: 'skipped', qualityResult: 'success', event: 'pull_request' };
+  assert.equal(runSummaryGate({ ...pr, storekitResult: 'skipped' }), 0);
+  assert.notEqual(runSummaryGate({ ...pr, storekitResult: 'success' }), 0);
 });

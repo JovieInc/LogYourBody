@@ -357,7 +357,9 @@ jobs:
     name: iOS StoreKit Purchase and Restore
     needs: detect-changes
     # Always produce fresh main evidence, even when Unit was deduplicated against a merge group.
-    if: github.event_name == 'push' || needs.detect-changes.outputs.ios_changed == 'true'
+    # Not on pull_request: the merge group reruns it on the exact tree that lands, so a PR run was a
+    # third hosted-macOS pass (13 min p50) over the same change. CI Summary still requires it in the queue.
+    if: github.event_name == 'push' || (github.event_name == 'merge_group' && needs.detect-changes.outputs.ios_changed == 'true')
     runs-on: macos-15
     timeout-minutes: 30
     permissions:
@@ -411,7 +413,8 @@ jobs:
           }
 
           storekit_expected=false
-          if [[ "${{ github.event_name }}" == "push" || "${{ needs.detect-changes.outputs.ios_changed }}" == "true" ]]; then
+          if [[ "${{ github.event_name }}" == "push" ]] || \
+             [[ "${{ github.event_name }}" == "merge_group" && "${{ needs.detect-changes.outputs.ios_changed }}" == "true" ]]; then
             storekit_expected=true
           fi
 
