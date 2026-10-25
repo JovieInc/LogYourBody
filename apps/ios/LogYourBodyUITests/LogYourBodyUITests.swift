@@ -3266,6 +3266,10 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     func testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity() throws {
+        // XCTest rounds the 90s default up to 2 minutes. Send on the error
+        // fixture can spend one 60s quiescence stall before Retry is tappable,
+        // and that kill retries the whole UI suite. 180s is the audit maximum.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launchSyntheticChatReplay(app, extra: ["-lybUITestChatErrorFixture"])
         submitSyntheticChatQuestion(in: app)
