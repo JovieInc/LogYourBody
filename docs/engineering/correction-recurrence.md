@@ -1,6 +1,6 @@
 # Repeated corrections require mechanization (LYB-209)
 
-Record each engineering or agent correction in
+Follow the [ledger capture guide](correction-ledger.md) to record each engineering or agent correction in
 `packages/shared-lib/corrections.json` as part of the PR that addresses it. Reuse
 the fingerprint for the same underlying mistake, even when the wording changes.
 Retain receipts so recurrence survives worktrees, workflow reruns, and time gaps.
