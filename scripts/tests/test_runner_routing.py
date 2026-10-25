@@ -1743,7 +1743,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
     project_name = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj'
-    # Frozen bytes from 45d5dd3384b907a40352028c0a1b5404f27e03fd, where the policy was pinned.
+    # Frozen bytes from 203aecb854b8e256c7115ab4ae7b77e3f2b8f67e, where the project pin was reviewed.
     # Ordinary target additions may change the live project without authorizing new diagnostic tooling.
     # Keep this offline fixture so shallow CI checkouts can still exercise the real trusted CLI.
     reviewed_project = gzip.decompress(

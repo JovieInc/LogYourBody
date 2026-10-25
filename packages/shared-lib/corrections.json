@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "diagnostic-pin-tests-use-frozen-project-fixture",
+    "correction": "PR #1532 conflict repair: main updated the reviewed diagnostic project pin in 203aecb854b8e256c7115ab4ae7b77e3f2b8f67e, leaving the frozen positive fixture at the prior policy revision. Refresh its bytes from the reviewed pin commit.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1532",
+    "mechanization": "The existing required runner-routing regression failed at the frozen project digest assertion after merging main (40 passed, 1 failed) and passed all 41 cases after refreshing only the offline fixture from the reviewed pin commit. Retain the digest assertion, all seven dependency pins, and every trusted CLI admission/refusal scenario. No workflow or gate changes.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This is a test-fixture lifetime mismatch; product code cannot make a mutable project remain byte-identical to a frozen diagnostic policy."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required routing suite can exercise frozen accepted bytes and changed rejected bytes through the actual trusted CLI without repinning or changing CI policy."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]"
+    }
+  },
+  {
     "fingerprint": "share-export-thumbnail-fits-both-pixel-bounds",
     "correction": "PR #1532 Launch Quality still returned a 1280x1920 story thumbnail for a 1080x1920 export after point conversion. Request the source image's aspect-fitted dimensions rather than the export rectangle.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40154055343/job/121051559437",

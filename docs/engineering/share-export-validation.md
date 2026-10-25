@@ -176,3 +176,82 @@ unverified until the harness runs the required checks.
 
 GBrain search, write to `lyb-40-pr1532-aspect-fit`, and readback failed with
 connection refused at `127.0.0.1:7801`. No durable write/readback occurred.
+
+## PR #1532 main-conflict repair
+
+Merged `origin/main` at `1572e8e991d480f768510a6eb8ecb727a530e2c5` in
+`42ad0ad312d5407b8ad69e018e3558dbbc04e315` before follow-up repairs. Resolved the
+correction ledger by retaining every receipt from both branches, and regenerated
+the repository source map from the merged Xcode project. Both share-export and
+delegated-training target memberships are present. The share implementation and
+its native tests retain their prior contents.
+
+Main refreshed the reviewed diagnostic project pin in
+`203aecb854b8e256c7115ab4ae7b77e3f2b8f67e`. The existing routing regression then
+failed with 40 passes and one fixture-digest failure. Refreshed the compressed
+offline fixture from that exact commit and updated its provenance comment.
+Its decompressed SHA-256 is
+`5ecaca52c8447cb1af53c8a662b61e0551c311aa9716d25801e2fd01e2ed306d`, matching
+the inherited policy. The merged live project has a different digest, so it
+cannot substitute for the reviewed fixture. All seven pins, the digest assertion,
+and every admission/refusal case remain enforced. The correction ledger records
+the regression. No workflow changes were made beyond merging main.
+
+On Node 22.23.2/pnpm 10.34.1, these commands passed:
+
+```sh
+bash scripts/codex-setup.sh --run lint
+bash scripts/codex-setup.sh --run typecheck
+python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
+python3 scripts/repository_docs.py
+git diff --check
+```
+
+Routing passed all 41 cases. The same pytest command under bashcov 4.0.0 followed
+by `python3 scripts/tests/test_runner_routing.py` passed all four 80% floors:
+93.48%, 82.50%, 90.62%, 90.91%. Ruby was 3.2.3; CI uses Ruby 4.0.
+Correction coverage reported 20/20 mechanized rules; existing ratchet allowances
+were preserved. The initial ratchet attempt needed subprocess access after
+`spawnSync git EPERM` in the sandbox.
+
+Broader validation attempted `bash scripts/codex-setup.sh --run test` and
+`bash scripts/codex-setup.sh --run test --filter=@logyourbody/shared-lib`.
+The sandbox denied subprocess creation. Unrestricted retries hit unrelated
+timeouts. Retried the root test with `taskset -c 0,1` and the filtered test with
+`taskset -c 0-3`, each prefixing the same command above. The last filtered run
+passed 154/156 tests; `correction-coverage.test.ts` and
+`web-surface-cleanup.test.ts` exceeded the unchanged 5-second outer timeout.
+The full root suite is therefore **not verified green** on this host.
+The correction suite itself passed all 33 cases with 100% line, branch and
+function coverage using its normal inner command:
+
+```sh
+node --test --experimental-test-coverage \
+  --test-coverage-include=packages/shared-lib/scripts/correction-coverage.mjs \
+  --test-coverage-include=packages/shared-lib/scripts/correction-coverage-owner.mjs \
+  --test-coverage-include=packages/shared-lib/scripts/correction-ratchet.mjs \
+  --test-coverage-include=packages/shared-lib/scripts/jovie-separation.mjs \
+  --test-coverage-include=.github/scripts/lib/linear-correction-coverage.mjs \
+  --test-coverage-lines=90 --test-coverage-branches=85 --test-coverage-functions=100 \
+  packages/shared-lib/scripts/correction-coverage.behavior.mjs \
+  packages/shared-lib/scripts/correction-ratchet.behavior.mjs \
+  packages/shared-lib/scripts/jovie-separation.behavior.mjs
+```
+
+No assertion, timeout or coverage gate was changed. Discarded only the web
+build's generated marketing-asset timestamp changes.
+
+`gh run view 40158507283 --repo JovieInc/LogYourBody --log-failed` reported that
+the current-head run was still in progress. GitHub reported no failed checks;
+Launch Quality was pending. Read the last completed failure with
+`gh run view 40154055343 --repo JovieInc/LogYourBody --log-failed`; its thumbnail
+assertion failures are the prior aspect-fit repair described above.
+`xcodebuild -version` returned command not found. Native execution, coverage and
+physical-device acceptance remain unverified on this Linux host.
+
+The checkout was detached, so the repair uses local branch
+`fix/pr1532-main-conflict-20261025`. The harness owns pushing and PR updates.
+GBrain search, write to `lyb-40-pr1532-main-conflict-20261025`, and readback all
+failed with connection refused at `127.0.0.1:7801`; nothing was persisted.
