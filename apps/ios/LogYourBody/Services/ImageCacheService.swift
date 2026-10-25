@@ -8,6 +8,7 @@
 
 import SwiftUI
 import UIKit
+import ImageIO
 
 protocol ProgressPhotoImageLoading {
     func loadImage(urlString: String) async throws -> UIImage
@@ -104,6 +105,25 @@ class ImageCacheService: ObservableObject {
         return image
     }
 
+    /// A distinct variant avoids decoding hero-sized images for the filmstrip.
+    func loadThumbnail(from urlString: String) async -> UIImage? {
+        let key = "thumbnail:\(urlString)"
+        let cacheKey = NSString(string: key)
+        if let cached = cache.object(forKey: cacheKey) { return cached }
+        if let task = loadingTasks[key] { return await task.value }
+        let task = Task<UIImage?, Never> {
+            guard let image = try? await ProgressPhotoImagePipeline.loadImage(
+                urlString: urlString, maxPixelSize: 160
+            ) else { return nil }
+            cache.setObject(image, forKey: cacheKey, cost: ProgressPhotoImagePipeline.cacheCost(for: image))
+            return image
+        }
+        loadingTasks[key] = task
+        let image = await task.value
+        loadingTasks.removeValue(forKey: key)
+        return image
+    }
+
     /// Preload images in the background with bounded concurrency.
     ///
     /// Adjacent photos decode in parallel — so timeline scrubbing lands on an
@@ -134,6 +154,8 @@ class ImageCacheService: ObservableObject {
         let cacheKey = NSString(string: urlString)
         cache.removeObject(forKey: cacheKey)
         loadingTasks.removeValue(forKey: urlString)
+        cache.removeObject(forKey: NSString(string: "thumbnail:\(urlString)"))
+        loadingTasks.removeValue(forKey: "thumbnail:\(urlString)")
     }
 
     /// Clear all cached images
@@ -162,7 +184,7 @@ enum ProgressPhotoImagePipeline {
         case decodeFailed
     }
 
-    static func loadImage(urlString: String) async throws -> UIImage {
+    static func loadImage(urlString: String, maxPixelSize: Int? = nil) async throws -> UIImage {
         guard let url = URL(string: urlString) else {
             throw ImageLoadError.invalidURL
         }
@@ -181,16 +203,27 @@ enum ProgressPhotoImagePipeline {
             data = responseData
         }
 
-        guard let image = await decodeAndOptimizeImage(from: data) else {
+        guard let image = await decodeAndOptimizeImage(from: data, maxPixelSize: maxPixelSize) else {
             throw ImageLoadError.decodeFailed
         }
 
         return image
     }
 
-    static func decodeAndOptimizeImage(from data: Data) async -> UIImage? {
+    static func decodeAndOptimizeImage(from data: Data, maxPixelSize: Int? = nil) async -> UIImage? {
         await Task.detached(priority: .userInitiated) {
             autoreleasepool {
+                if let maxPixelSize {
+                    guard maxPixelSize > 0,
+                          let source = CGImageSourceCreateWithData(data as CFData, nil),
+                          let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                            kCGImageSourceCreateThumbnailFromImageAlways: true,
+                            kCGImageSourceCreateThumbnailWithTransform: true,
+                            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+                            kCGImageSourceShouldCacheImmediately: true
+                          ] as CFDictionary) else { return nil }
+                    return UIImage(cgImage: thumbnail)
+                }
                 guard let image = UIImage(data: data) else {
                     return nil
                 }
@@ -230,6 +263,7 @@ enum ProgressPhotoImagePipeline {
 
 struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     let urlString: String?
+    var usesThumbnail = false
     @ViewBuilder let content: (Image) -> Content
     @ViewBuilder let placeholder: () -> Placeholder
 
@@ -250,13 +284,18 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     }
 
     private func loadImage() async {
+        if usesThumbnail { loadedImage = nil }
         guard let urlString = urlString, !urlString.isEmpty else {
             loadedImage = nil
             return
         }
 
         isLoading = true
-        loadedImage = await ImageCacheService.shared.loadImage(from: urlString)
+        let image = usesThumbnail
+            ? await ImageCacheService.shared.loadThumbnail(from: urlString)
+            : await ImageCacheService.shared.loadImage(from: urlString)
+        guard !Task.isCancelled else { return }
+        loadedImage = image
         isLoading = false
     }
 }
