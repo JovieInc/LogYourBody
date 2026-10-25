@@ -28,6 +28,16 @@ enum MetricCardActionPolicy {
     }
 }
 
+enum MetricCardMotionPolicy {
+    static func reducesMotion(systemValue: Bool, arguments: [String] = ProcessInfo.processInfo.arguments) -> Bool {
+        #if DEBUG
+        systemValue || arguments.contains("-lybUITestReduceMotion")
+        #else
+        systemValue
+        #endif
+    }
+}
+
 #if DEBUG
 private struct MetricCardIdentityKey: EnvironmentKey {
     static let defaultValue: Bool? = nil
@@ -166,13 +176,17 @@ public struct MetricSummaryCard: View {
     }
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.theme) private var theme
     #if DEBUG
     @Environment(\.metricCardIdentity) private var identityOverride
     @Environment(\.metricCardActions) private var actionsOverride
     #endif
+
+    private var reduceMotion: Bool {
+        MetricCardMotionPolicy.reducesMotion(systemValue: systemReduceMotion)
+    }
 
     private var identityEnabled: Bool {
         #if DEBUG
@@ -692,7 +706,11 @@ private struct MetricCardShimmer: ViewModifier {
 }
 
 struct MetricCardButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+
+    private var reduceMotion: Bool {
+        MetricCardMotionPolicy.reducesMotion(systemValue: systemReduceMotion)
+    }
 
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         configuration.label
@@ -769,7 +787,6 @@ struct MetricCardFixtureView: View {
         .environment(\.metricCardIdentity, !arguments.contains("-lybUITestMetricCardLegacy"))
         .environment(\.metricCardActions, !arguments.contains("-lybUITestMetricCardLegacy"))
         .environment(\.dynamicTypeSize, arguments.contains("-lybUITestMetricCardAX3") ? .accessibility3 : .large)
-        .environment(\.accessibilityReduceMotion, arguments.contains("-lybUITestReduceMotion"))
         .accessibilityIdentifier("metric_fixture_\(title)")
     }
 

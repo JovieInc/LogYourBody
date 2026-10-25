@@ -158,6 +158,20 @@ enum UIAccessibilityContract {
 }
 
 extension UIAccessibilityContractTests {
+    func testMetricReducedMotionPreservesSystemSettingAndHonorsDebugFixtureArgument() {
+        XCTAssertFalse(MetricCardMotionPolicy.reducesMotion(systemValue: false, arguments: []))
+        XCTAssertTrue(MetricCardMotionPolicy.reducesMotion(systemValue: true, arguments: []))
+        XCTAssertTrue(MetricCardMotionPolicy.reducesMotion(
+            systemValue: false, arguments: ["-lybUITestReduceMotion"]
+        ))
+        XCTAssertTrue(MetricCardMotionPolicy.reducesMotion(
+            systemValue: true, arguments: ["-lybUITestReduceMotion"]
+        ))
+        XCTAssertFalse(MetricCardMotionPolicy.reducesMotion(
+            systemValue: false, arguments: ["-lybUITestMetricCardFixture"]
+        ))
+    }
+
     @MainActor
     func testMetricActionRolloutRequiresItsSpecificGate() {
         XCTAssertFalse(MetricCardActionPolicy.isEnabled { _ in false })

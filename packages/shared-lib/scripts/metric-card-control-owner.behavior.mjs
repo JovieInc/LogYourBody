@@ -24,3 +24,8 @@ test('metric cards own their native buttons in every production caller (LYB-43)'
   ]));
   assert.deepEqual(scan({ files: [...sources.keys()], readSource: (file) => sources.get(file) }), []);
 });
+
+test('metric fixture does not write the read-only SwiftUI Reduce Motion environment', () => {
+  const source = readFileSync(new URL('DesignSystem/Organisms/MetricSummaryCard.swift', app), 'utf8');
+  assert.doesNotMatch(source, /\.environment\s*\(\s*\\\.accessibilityReduceMotion\b/);
+});
