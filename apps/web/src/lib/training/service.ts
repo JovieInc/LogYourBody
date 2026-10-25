@@ -14,6 +14,9 @@ import type {
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
 import { catalogVariantById } from './catalog';
+import { appliedRecoveryNextAction, applyRecoveryTrials } from './recovery-application';
+import { readRecoveryTrials } from './recovery-contract';
+import { adaptiveRecoveryEnabled } from '@/lib/flags/adaptive-recovery';
 import {
   evaluateTrajectory,
   type ControllerReceipt,
@@ -50,6 +53,7 @@ export function stableTrainingUuid(...parts: string[]): string {
 }
 
 export type TrainingRecordsSnapshot = {
+  sourceRecords: NativeProductRecord[];
   setup: TrainingProgramSetup | null;
   sessions: NativeProductRecord[];
   swaps: ExerciseSwapRecord[];
@@ -207,6 +211,11 @@ export async function loadTrainingRecords(
     .filter((record) => recordType(record) === 'program_setup' && isProgramSetup(record))
     .sort((a, b) => Date.parse(String(b.startedAt)) - Date.parse(String(a.startedAt)))[0];
   return {
+    sourceRecords: [
+      ...sessions.map((row) => ({ ...row, collection: 'training_sessions' })),
+      ...sets.map((row) => ({ ...row, collection: 'logged_sets' })),
+      ...feedbackRows.map((row) => ({ ...row, collection: 'training_feedback' })),
+    ].filter(active),
     setup: setupRecord ? (setupRecord as unknown as TrainingProgramSetup) : null,
     sessions: sessions.filter(active).filter((record) => recordType(record) === 'workout_session'),
     swaps: sessions
@@ -293,6 +302,8 @@ type SessionRecord = NativeProductRecord & {
   prescription?: Session;
   initialPrescription?: unknown;
   startedAt?: string;
+  recoveryTrialIds?: string[];
+  recoveryExerciseIds?: string[];
 };
 
 export async function getOrCreateNextWorkout(input: {
@@ -305,6 +316,7 @@ export async function getOrCreateNextWorkout(input: {
   trajectory?: GoalTrajectory | null;
   constraints?: SituationalConstraint[];
   admission?: TrainingMutationAdmission;
+  recoveryEnabled?: boolean;
 }): Promise<NextWorkoutResult> {
   const persist = input.persist ?? true;
   const admission =
@@ -351,6 +363,32 @@ export async function getOrCreateNextWorkout(input: {
     block.currentWeek = Math.min(block.currentWeek, firstIncomplete);
     block.targetRir = block.currentWeek === block.weekCount ? 4 : 3;
   }
+  const recoveryEnabled = input.recoveryEnabled ?? adaptiveRecoveryEnabled();
+  const recoveryTrials = recoveryEnabled ? readRecoveryTrials(snapshot.sourceRecords) : [];
+  const applyRecovery = (session: Session) => {
+    const substituted = applyExerciseSwaps(session, blockSwaps, completedLogs);
+    const reviewed = applyRecoveryTrials(substituted, recoveryTrials, {
+      setupId: setup.id,
+      blockId: block.id,
+      now: input.now,
+    });
+    if (reviewed === substituted) return session;
+    // Retain engine ids in the initial snapshot. Only the set allocation is
+    // projected back from the actual reviewed variant; its load history stays separate.
+    return {
+      ...session,
+      explanation: reviewed.explanation,
+      evidenceIds: reviewed.evidenceIds,
+      exercises: session.exercises.map((exercise, index) => {
+        const sets = reviewed.exercises[index]?.sets ?? exercise.sets;
+        return {
+          ...exercise,
+          sets,
+          substitutions: exercise.substitutions.map((item) => ({ ...item, sets })),
+        };
+      }),
+    };
+  };
   const blockSwaps = snapshot.swaps.filter(
     (swap) =>
       swap.programSetupId === setup.id &&
@@ -481,6 +519,24 @@ export async function getOrCreateNextWorkout(input: {
     logs: completedLogs,
     feedback: programFeedback,
   });
+  microcycle.sessions = microcycle.sessions.map(applyRecovery);
+  // Report fractional work from the actual prescriptions, including compound overlap.
+  if (recoveryTrials.some((trial) => trial.state === 'applied')) {
+    microcycle.plannedFractionalVolume = Object.fromEntries(
+      MUSCLE_GROUPS.map((muscle) => [
+        muscle,
+        microcycle.sessions.reduce(
+          (total, session) =>
+            total +
+            session.exercises.reduce(
+              (sum, exercise) => sum + exercise.sets * (exercise.muscleContribution[muscle] ?? 0),
+              0,
+            ),
+          0,
+        ),
+      ]),
+    ) as Record<(typeof MUSCLE_GROUPS)[number], number>;
+  }
 
   if (activeRecord?.prescription) {
     const existing = activeRecord.prescription;
@@ -549,9 +605,16 @@ export async function getOrCreateNextWorkout(input: {
       // Keep the prescribed targets; only the engine's current recovery set count changes.
       adjusted.exercises = initial.exercises.map((exercise) => ({
         ...exercise,
-        sets:
+        sets: Math.min(
           adjusted.exercises.find((current) => current.id === exercise.id)?.sets ?? exercise.sets,
+          activeRecord.recoveryExerciseIds?.includes(exercise.id) ? exercise.sets : Infinity,
+        ),
       }));
+      const recoveryAction = appliedRecoveryNextAction(initial);
+      if (recoveryAction) {
+        adjusted.explanation = recoveryAction;
+        adjusted.evidenceIds = [...new Set([...adjusted.evidenceIds, ...initial.evidenceIds])];
+      }
     }
     // The retained snapshot stays on engine exercise ids so set counts still match.
     // Block swaps are applied after that and own the variant's progression.
@@ -574,7 +637,7 @@ export async function getOrCreateNextWorkout(input: {
       week: existing.week,
       weekCount: block.weekCount,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
-      decision,
+      decision: withRecoveryNextAction(decision, prescribed),
     };
   }
 
@@ -616,6 +679,31 @@ export async function getOrCreateNextWorkout(input: {
     // Engine ids stay in the snapshot; swaps are reapplied on the next read.
     ...(!planned.safetyStop ? { initialPrescription: planned } : {}),
     startedAt: input.now.toISOString(),
+    ...(recoveryEnabled
+      ? {
+          recoveryTrialIds: recoveryTrials
+            .filter(
+              (trial) =>
+                trial.state === 'applied' &&
+                trial.blockId === block.id &&
+                trial.programSetupId === setup.id,
+            )
+            .map((trial) => trial.id),
+          recoveryExerciseIds: recoveryTrials
+            .filter(
+              (trial) =>
+                trial.state === 'applied' &&
+                trial.blockId === block.id &&
+                trial.programSetupId === setup.id,
+            )
+            .flatMap((trial) => [
+              trial.exerciseId,
+              ...blockSwaps
+                .filter((swap) => swap.toVariantId === trial.exerciseId)
+                .map((swap) => swap.fromExerciseId),
+            ]),
+        }
+      : {}),
   };
   if (persist) {
     await commitTrainingMutation(
@@ -632,8 +720,13 @@ export async function getOrCreateNextWorkout(input: {
     week: block.currentWeek,
     weekCount: block.weekCount,
     weeklyFractionalVolume: microcycle.plannedFractionalVolume,
-    decision,
+    decision: withRecoveryNextAction(decision, session),
   };
+}
+
+function withRecoveryNextAction(decision: ControllerReceipt, session: Session): ControllerReceipt {
+  const nextAction = appliedRecoveryNextAction(session);
+  return nextAction ? { ...decision, nextAction } : decision;
 }
 
 export async function storeProgramSetup(input: {
