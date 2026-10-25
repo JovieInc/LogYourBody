@@ -546,4 +546,112 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(restored.loggedSets[position.id]?.revision, 1)
         XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: "fixture-session").isEmpty)
     }
+
+    func testExerciseHistoryRowReportsCorrectedSetsAndSkipsWithoutInferringGrowth() {
+        let progress = TrainingProgressResponse(
+            version: 1,
+            enrolled: true,
+            completedSessions: 1,
+            setsLast7Days: 1,
+            exercises: [
+                TrainingExerciseProgress(
+                    exerciseId: "goblet_squat",
+                    name: "Goblet squat",
+                    lastPerformedAt: "2026-01-19T00:20:00.000Z",
+                    lastSession: [TrainingLoggedSetSummary(setNumber: 1, reps: 9, loadKg: 20, rir: 2)],
+                    heaviestSet: TrainingHeaviestSet(
+                        setNumber: 1, reps: 9, loadKg: 20, rir: 2, completedAt: "2026-01-19T00:20:00.000Z"
+                    ),
+                    totalSets: 1
+                )
+            ],
+            evidence: TrainingProgressEvidence(
+                sessions: [
+                    TrainingProgressSessionEvidence(
+                        sessionId: "session-1",
+                        prescriptionId: "prescription-1",
+                        status: "completed",
+                        exercises: [
+                            TrainingProgressExerciseEvidence(
+                                exerciseId: "goblet_squat",
+                                variantId: "goblet_squat",
+                                name: "Goblet squat",
+                                status: "completed",
+                                sets: [
+                                    TrainingProgressSetEvidence(
+                                        id: "set-1",
+                                        sessionId: "session-1",
+                                        exerciseId: "goblet_squat",
+                                        variantId: "goblet_squat",
+                                        setNumber: 1,
+                                        reps: 9,
+                                        loadKg: 20,
+                                        rir: 2,
+                                        completedAt: "2026-01-19T00:20:00.000Z",
+                                        status: "completed",
+                                        corrections: [
+                                            TrainingSetCorrectionAudit(
+                                                id: "corr-1",
+                                                correctedAt: "2026-01-19T00:21:00.000Z",
+                                                previous: .init(reps: 10, loadKg: 20, rir: 2)
+                                            )
+                                        ]
+                                    )
+                                ]
+                            ),
+                            TrainingProgressExerciseEvidence(
+                                exerciseId: "one_arm_dumbbell_row",
+                                variantId: "one_arm_dumbbell_row",
+                                name: "One-arm dumbbell row",
+                                status: "skipped",
+                                sets: []
+                            )
+                        ],
+                        events: []
+                    )
+                ],
+                feedback: []
+            ),
+            review: TrainingProgressReview(
+                explanations: [
+                    "High soreness supports holding the load.",
+                    "The pump shows hypertrophy and lower back fatigue means the back grew."
+                ],
+                repeatBlock: TrainingRepeatBlockReview(
+                    reuseVariantIds: ["goblet_squat"],
+                    expiredPriorities: ["upper chest"],
+                    renewedPriorities: ["triceps"]
+                )
+            )
+        )
+
+        XCTAssertEqual(
+            TrainingExerciseHistoryRow.text(exerciseId: "goblet_squat", progress: progress),
+            "Last time 9 x 20 kg · Heaviest 20 kg for 9 · Corrected"
+        )
+        XCTAssertEqual(
+            TrainingExerciseHistoryRow.text(exerciseId: "one_arm_dumbbell_row", progress: progress),
+            "Skipped."
+        )
+        XCTAssertEqual(
+            TrainingExerciseHistoryRow.text(exerciseId: "missing", progress: progress),
+            "No sets logged yet."
+        )
+        XCTAssertNil(TrainingExerciseHistoryRow.text(exerciseId: "goblet_squat", progress: nil))
+        let lines = TrainingProgressReviewPolicy.visibleLines(progress.review?.explanations ?? [])
+        XCTAssertEqual(lines, ["High soreness supports holding the load."])
+        XCTAssertFalse(lines.joined(separator: " ").localizedCaseInsensitiveContains("hypertrophy"))
+        let repeatBlock = try XCTUnwrap(progress.review).repeatBlock
+        XCTAssertEqual(
+            TrainingProgressReviewPolicy.repeatLines(
+                repeatBlock,
+                names: ["goblet_squat": "Goblet squat"]
+            ),
+            [
+                "Next block can reuse Goblet squat.",
+                "upper chest priority expired.",
+                "triceps priority stays for the next block."
+            ]
+        )
+    }
 }

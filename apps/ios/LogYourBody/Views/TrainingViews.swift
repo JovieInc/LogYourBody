@@ -18,6 +18,7 @@ enum TrainingPresentation: Identifiable {
 
 struct TrainingCoachCard: View {
     let session: TrainingSession
+    var progress: TrainingProgressResponse?
     let onStart: () -> Void
     let onStop: () -> Void
 
@@ -81,6 +82,9 @@ struct TrainingCoachCard: View {
                 .accessibilityIdentifier("training_start_session")
             }
 
+            exerciseHistory
+            progressReview
+
             Button("Stop coaching and delete training data", role: .destructive) {
                 isStopConfirmationPresented = true
             }
@@ -107,6 +111,80 @@ struct TrainingCoachCard: View {
                 .accessibilityIdentifier("training_revoke_cancel")
         } message: {
             Text("This removes training records from your account. It does not delete your body-composition data or chat.")
+        }
+    }
+
+    @ViewBuilder private var exerciseHistory: some View {
+        if let progress, progress.enrolled, !session.exercises.isEmpty {
+            Text("\(progress.completedSessions) sessions logged · \(progress.setsLast7Days) sets in the last 7 days")
+                .font(.system(size: 13))
+                .foregroundStyle(theme.colors.textSecondary)
+                .accessibilityIdentifier("training_history_summary")
+            ForEach(session.exercises) { exercise in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(exercise.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(theme.colors.text)
+                    Text("\(exercise.sets) sets · \(exercise.targetReps) reps · \(exercise.targetRir) RIR")
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.colors.textSecondary)
+                    if let history = TrainingExerciseHistoryRow.text(exerciseId: exercise.id, progress: progress) {
+                        Text(history)
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.colors.textSecondary)
+                            .accessibilityIdentifier("training_history_\(exercise.id)")
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(theme.colors.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .accessibilityIdentifier("training_exercise_card_\(exercise.id)")
+            }
+        }
+    }
+
+    @ViewBuilder private var progressReview: some View {
+        if let progress {
+            ProgressReviewCard(session: session, progress: progress)
+        }
+    }
+}
+
+struct ProgressReviewCard: View {
+    let session: TrainingSession
+    let progress: TrainingProgressResponse
+
+    @Environment(\.theme) private var theme
+
+    private var lines: [String] {
+        let names = session.exercises.reduce(into: [String: String]()) { names, exercise in
+            names[exercise.id] = exercise.name
+        }
+        let explanations = TrainingProgressReviewPolicy.visibleLines(progress.review?.explanations ?? [])
+        let repeated = progress.review.map {
+            TrainingProgressReviewPolicy.repeatLines($0.repeatBlock, names: names)
+        } ?? []
+        return explanations + repeated
+    }
+
+    var body: some View {
+        if !lines.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("PROGRESS")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .tracking(0.7)
+                    .foregroundStyle(theme.colors.textSecondary)
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.colors.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.colors.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .accessibilityIdentifier("training_progress_review")
         }
     }
 }
@@ -333,6 +411,7 @@ enum TrainingCompletionMotionPolicy {
 
 struct TrainingLiveSessionView: View {
     let voiceEnabled: Bool
+    let progress: TrainingProgressResponse?
     let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
     let onCorrectSet: (TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
     let onWorkoutAction: (TrainingWorkoutActionRequest) async throws -> TrainingSession
@@ -366,6 +445,7 @@ struct TrainingLiveSessionView: View {
         session: TrainingSession,
         ownerId: String,
         voiceEnabled: Bool,
+        progress: TrainingProgressResponse? = nil,
         draftStore: TrainingDraftStore = .shared,
         isCurrent: @escaping () -> Bool,
         onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
@@ -377,6 +457,7 @@ struct TrainingLiveSessionView: View {
         onFeedback: @escaping (TrainingFeedbackRequest) async throws -> Void
     ) {
         self.voiceEnabled = voiceEnabled
+        self.progress = progress
         self.onLogSet = onLogSet
         self.onCorrectSet = onCorrectSet
         self.onWorkoutAction = onWorkoutAction
@@ -507,6 +588,12 @@ struct TrainingLiveSessionView: View {
                     Text("Set \(position.setNumber) of \(exercise.sets) · \(exercise.repRange.min)–\(exercise.repRange.max) reps · \(exercise.targetRir) RIR")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(theme.colors.textSecondary)
+                    if let history = TrainingExerciseHistoryRow.text(exerciseId: exercise.id, progress: progress) {
+                        Text(history)
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.colors.textSecondary)
+                            .accessibilityIdentifier("training_history_\(exercise.id)")
+                    }
                 }
                 Spacer(minLength: 8)
                 if completionReceipt?.corrected == false {

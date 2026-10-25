@@ -774,6 +774,7 @@ struct ChatTabView: View {
     @State private var isConversationLoadRetryAvailable = false
     @State private var isDeleteConfirmationPresented = false
     @State private var trainingResponse: TrainingNextResponse?
+    @State private var trainingProgress: TrainingProgressResponse?
     @State private var trainingOwner: AuthManager.ProfileSessionOwnership?
     @State private var trainingLoadId: UUID?
     @State private var isTrainingLoading = false
@@ -815,6 +816,7 @@ struct ChatTabView: View {
         }
         .task(id: authManager.captureAccountSession()) {
             trainingResponse = nil
+            trainingProgress = nil
             trainingOwner = nil
             trainingPresentation = nil
             await loadTrainingNext()
@@ -867,6 +869,7 @@ struct ChatTabView: View {
                     session: session,
                     ownerId: ownership.subject,
                     voiceEnabled: voiceCoachEnabled,
+                    progress: trainingProgress,
                     isCurrent: { authManager.ownsAccountSession(ownership) },
                     onLogSet: { exercise, setNumber, reps, loadKg, rir in
                         try await logTrainingSet(
@@ -1205,6 +1208,7 @@ struct ChatTabView: View {
                   authManager.ownsAccountSession(ownership) {
             TrainingCoachCard(
                 session: session,
+                progress: trainingProgress,
                 onStart: {
                     guard authManager.ownsAccountSession(ownership) else { return }
                     trainingPresentation = .session(session, ownership)
@@ -1241,6 +1245,7 @@ struct ChatTabView: View {
               let ownership = authManager.captureAccountSession() else {
             isTrainingLoading = false
             trainingResponse = nil
+            trainingProgress = nil
             trainingOwner = nil
             trainingEnrollmentRequired = false
             trainingErrorMessage = nil
@@ -1261,8 +1266,12 @@ struct ChatTabView: View {
             trainingOwner = ownership
             trainingEnrollmentRequired = false
             trainingErrorMessage = nil
+            let progress = try? await trainingService.loadProgress(accessToken: accessToken)
+            guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
+            trainingProgress = progress
         } catch let error as TrainingServiceError {
             guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
+            trainingProgress = nil
             if error == .server(code: "program_not_enrolled") {
                 trainingResponse = nil
                 trainingEnrollmentRequired = true
@@ -1272,6 +1281,7 @@ struct ChatTabView: View {
             }
         } catch {
             guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
+            trainingProgress = nil
             trainingErrorMessage = "Training is temporarily unavailable. Please try again."
         }
     }
@@ -1437,6 +1447,7 @@ struct ChatTabView: View {
             )
             try TrainingDraftStore.shared.purge(ownerId: ownership.subject)
             trainingResponse = nil
+            trainingProgress = nil
             trainingOwner = nil
             trainingPresentation = nil
             trainingEnrollmentRequired = true

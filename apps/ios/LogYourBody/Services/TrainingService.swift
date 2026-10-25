@@ -126,6 +126,205 @@ struct TrainingRevokeResponse: Decodable, Equatable, Sendable {
     let deletedRecords: Int
 }
 
+struct TrainingLoggedSetSummary: Decodable, Equatable, Sendable {
+    let setNumber: Int
+    let reps: Int
+    let loadKg: Double?
+    let rir: Int
+}
+
+struct TrainingHeaviestSet: Decodable, Equatable, Sendable {
+    let setNumber: Int
+    let reps: Int
+    let loadKg: Double?
+    let rir: Int
+    let completedAt: String
+}
+
+struct TrainingExerciseProgress: Decodable, Equatable, Sendable, Identifiable {
+    var id: String { exerciseId }
+    let exerciseId: String
+    let name: String
+    let lastPerformedAt: String
+    let lastSession: [TrainingLoggedSetSummary]
+    let heaviestSet: TrainingHeaviestSet?
+    let totalSets: Int
+}
+
+struct TrainingLatestCheckIn: Decodable, Equatable, Sendable {
+    let soreness: Int?
+    let pump: Int?
+    let performance: String?
+    let jointPain: Int?
+    let createdAt: String
+}
+
+struct TrainingProgressSetEvidence: Decodable, Equatable, Sendable {
+    let id: String
+    let sessionId: String
+    let exerciseId: String
+    let variantId: String
+    let setNumber: Int
+    let reps: Int
+    let loadKg: Double?
+    let rir: Int
+    let completedAt: String
+    let status: String
+    let corrections: [TrainingSetCorrectionAudit]
+}
+
+struct TrainingProgressExerciseEvidence: Decodable, Equatable, Sendable {
+    let exerciseId: String
+    let variantId: String
+    let name: String
+    let status: String
+    let sets: [TrainingProgressSetEvidence]
+}
+
+struct TrainingProgressSessionEvidence: Decodable, Equatable, Sendable {
+    let sessionId: String
+    let prescriptionId: String?
+    let status: String
+    let exercises: [TrainingProgressExerciseEvidence]
+    let events: [TrainingProgressEventEvidence]
+}
+
+struct TrainingProgressEventEvidence: Decodable, Equatable, Sendable {
+    let id: String
+    let kind: String
+    let exerciseId: String?
+    let replacementExerciseId: String?
+}
+
+struct TrainingProgressFeedbackEvidence: Decodable, Equatable, Sendable {
+    let id: String
+    let sessionId: String
+    let source: String?
+    let sourceObservationId: String?
+    let correctsObservationId: String?
+    let createdAt: String
+}
+
+struct TrainingProgressEvidence: Decodable, Equatable, Sendable {
+    let sessions: [TrainingProgressSessionEvidence]
+    let feedback: [TrainingProgressFeedbackEvidence]
+}
+
+struct TrainingRepeatBlockReview: Decodable, Equatable, Sendable {
+    let reuseVariantIds: [String]
+    let expiredPriorities: [String]
+    let renewedPriorities: [String]
+}
+
+struct TrainingProgressReview: Decodable, Equatable, Sendable {
+    let explanations: [String]
+    let repeatBlock: TrainingRepeatBlockReview
+}
+
+struct TrainingProgressResponse: Decodable, Equatable, Sendable {
+    let version: Int
+    let enrolled: Bool
+    let completedSessions: Int
+    let setsLast7Days: Int
+    let exercises: [TrainingExerciseProgress]
+    let latestCheckIn: TrainingLatestCheckIn?
+    let evidence: TrainingProgressEvidence?
+    let review: TrainingProgressReview?
+
+    init(
+        version: Int,
+        enrolled: Bool,
+        completedSessions: Int,
+        setsLast7Days: Int,
+        exercises: [TrainingExerciseProgress],
+        latestCheckIn: TrainingLatestCheckIn? = nil,
+        evidence: TrainingProgressEvidence? = nil,
+        review: TrainingProgressReview? = nil
+    ) {
+        self.version = version
+        self.enrolled = enrolled
+        self.completedSessions = completedSessions
+        self.setsLast7Days = setsLast7Days
+        self.exercises = exercises
+        self.latestCheckIn = latestCheckIn
+        self.evidence = evidence
+        self.review = review
+    }
+}
+
+enum TrainingExerciseHistoryRow {
+    static func text(exerciseId: String, progress: TrainingProgressResponse?) -> String? {
+        guard let progress, progress.enrolled else { return nil }
+        if let exercise = progress.exercises.first(where: { $0.exerciseId == exerciseId }) {
+            return logged(exercise, evidence: progress.evidence)
+        }
+        let skipped = progress.evidence?.sessions.contains { session in
+            session.exercises.contains { $0.exerciseId == exerciseId && $0.status == "skipped" }
+        } == true
+        return skipped ? "Skipped." : "No sets logged yet."
+    }
+
+    private static func logged(
+        _ exercise: TrainingExerciseProgress,
+        evidence: TrainingProgressEvidence?
+    ) -> String {
+        let last = exercise.lastSession.map { set in
+            guard let load = set.loadKg else { return "\(set.reps) reps" }
+            return "\(set.reps) x \(loadText(load)) kg"
+        }.joined(separator: ", ")
+        var parts = ["Last time \(last)"]
+        if let heaviest = exercise.heaviestSet, let load = heaviest.loadKg {
+            parts.append("Heaviest \(loadText(load)) kg for \(heaviest.reps)")
+        }
+        if corrected(exercise, evidence: evidence) {
+            parts.append("Corrected")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private static func corrected(
+        _ exercise: TrainingExerciseProgress,
+        evidence: TrainingProgressEvidence?
+    ) -> Bool {
+        let sets = evidence?.sessions
+            .flatMap(\.exercises)
+            .filter { $0.exerciseId == exercise.exerciseId }
+            .flatMap(\.sets) ?? []
+        guard let latest = sets.first(where: { $0.completedAt == exercise.lastPerformedAt }) else { return false }
+        return sets.contains { $0.sessionId == latest.sessionId && !$0.corrections.isEmpty }
+    }
+
+    static func loadText(_ value: Double) -> String {
+        let rounded = String(format: "%.2f", value)
+        return rounded.replacingOccurrences(
+            of: #"\.?0+$"#,
+            with: "",
+            options: .regularExpression
+        )
+    }
+}
+
+enum TrainingProgressReviewPolicy {
+    static func visibleLines(_ lines: [String]) -> [String] {
+        lines.filter { line in
+            let text = line.lowercased()
+            let growth = text.contains("hypertrophy") || text.contains("muscle growth") || text.contains("grew")
+            let pumpOrBack = text.contains("pump") || text.contains("back fatigue") || text.contains("trunk fatigue")
+            return !(growth && pumpOrBack)
+        }
+    }
+
+    static func repeatLines(_ review: TrainingRepeatBlockReview, names: [String: String]) -> [String] {
+        review.reuseVariantIds.map { id in
+            "Next block can reuse \(names[id] ?? id)."
+        } + review.expiredPriorities.map { priority in
+            "\(priority) priority expired."
+        } + review.renewedPriorities.map { priority in
+            "\(priority) priority stays for the next block."
+        }
+    }
+}
+
 struct TrainingSetLogRequest: Codable, Equatable, Sendable {
     let sessionId: String
     let exerciseId: String
@@ -239,6 +438,7 @@ enum TrainingServiceError: LocalizedError, Equatable {
 
 protocol TrainingServicing {
     func loadNext(accessToken: String) async throws -> TrainingNextResponse
+    func loadProgress(accessToken: String) async throws -> TrainingProgressResponse
     func enroll(accessToken: String, sessionsPerWeek: Int, equipment: String) async throws -> TrainingProgramResponse
     func logSet(accessToken: String, request: TrainingSetLogRequest) async throws
     func correctSet(accessToken: String, request: TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
@@ -258,6 +458,10 @@ final class URLSessionTrainingService: TrainingServicing {
 
     func loadNext(accessToken: String) async throws -> TrainingNextResponse {
         try await send(path: "next", method: "GET", accessToken: accessToken)
+    }
+
+    func loadProgress(accessToken: String) async throws -> TrainingProgressResponse {
+        try await send(path: "progress", method: "GET", accessToken: accessToken)
     }
 
     func enroll(
@@ -433,6 +637,7 @@ private protocol VersionedTrainingResponse {
 extension TrainingNextResponse: VersionedTrainingResponse {}
 extension TrainingProgramResponse: VersionedTrainingResponse {}
 extension TrainingRevokeResponse: VersionedTrainingResponse {}
+extension TrainingProgressResponse: VersionedTrainingResponse {}
 
 private struct EnrollmentRequest: Encodable {
     let adultConfirmed = true

@@ -1215,6 +1215,35 @@ final class ChatServiceTests: XCTestCase {
         )
     }
 
+    func testTrainingProgressReadsTheHistoryRoute() async throws {
+        let session = makeSession()
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/progress")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access-token")
+            let body = """
+            {"version":1,"enrolled":true,"completedSessions":1,"setsLast7Days":1,"exercises":[{
+              "exerciseId":"goblet_squat","name":"Goblet squat","lastPerformedAt":"2026-01-19T00:20:00.000Z",
+              "lastSession":[{"setNumber":1,"reps":9,"loadKg":20,"rir":2}],
+              "heaviestSet":{"setNumber":1,"reps":9,"loadKg":20,"rir":2,"completedAt":"2026-01-19T00:20:00.000Z"},
+              "totalSets":1
+            }],"latestCheckIn":null,"evidence":{"sessions":[],"feedback":[]},
+            "review":{"explanations":["High soreness supports holding the load."],
+              "repeatBlock":{"reuseVariantIds":["goblet_squat"],"expiredPriorities":[],"renewedPriorities":[]}}}
+            """
+            return (200, ["Content-Type": "application/json"], Data(body.utf8))
+        }
+
+        let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        let output = try await service.loadProgress(accessToken: "access-token")
+        XCTAssertEqual(output.exercises.first?.exerciseId, "goblet_squat")
+        XCTAssertEqual(output.review?.repeatBlock.reuseVariantIds, ["goblet_squat"])
+        XCTAssertEqual(
+            TrainingExerciseHistoryRow.text(exerciseId: "goblet_squat", progress: output),
+            "Last time 9 x 20 kg · Heaviest 20 kg for 9"
+        )
+    }
+
     private func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ChatURLProtocol.self]

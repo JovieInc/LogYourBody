@@ -17,8 +17,12 @@ import {
   recordTrainingFeedback,
   swapExercise,
 } from '@/lib/training/commands';
+import type { ControllerReceipt } from '@/lib/training/controller';
+import { readTrainingProgress } from '@/lib/training/progress';
+import type { ExercisePrescription, Session } from '@/lib/training/types';
 import {
   getOrCreateNextWorkout,
+  loadTrainingRecords,
   pullAllTrainingRecords,
   storeProgramSetup,
 } from '@/lib/training/service';
@@ -275,6 +279,46 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
       } catch (error) {
         if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
           return apiError(error.code, 409);
+        return apiError('training_unavailable', 503);
+      }
+    },
+
+    async progress(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      try {
+        const snapshot = await loadTrainingRecords(dependencies.records, identity.sub);
+        let decision: ControllerReceipt | null = null;
+        let proposed: {
+          pattern: Session['pattern'];
+          exercises: ExercisePrescription[];
+        } | null = null;
+        if (snapshot.setup) {
+          try {
+            const next = await getOrCreateNextWorkout({
+              records: dependencies.records,
+              subject: identity.sub,
+              now: dependencies.now(),
+              persist: false,
+            });
+            if (next.kind !== 'not_enrolled') {
+              decision = next.decision;
+              if (next.kind === 'workout') {
+                proposed = { pattern: next.session.pattern, exercises: next.session.exercises };
+              }
+            }
+          } catch {
+            decision = null;
+            proposed = null;
+          }
+        }
+        return json(
+          withVersion(readTrainingProgress(snapshot, dependencies.now(), { decision, proposed })),
+        );
+      } catch {
         return apiError('training_unavailable', 503);
       }
     },
