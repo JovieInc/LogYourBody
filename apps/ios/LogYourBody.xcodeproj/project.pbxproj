@@ -427,6 +427,8 @@
 		E389C2EFF4E7B92EE0A9A997 /* RealtimeSyncManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = D557A5B9E670DD0A6A8BA893 /* RealtimeSyncManager+Part01.swift */; };
 		E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C001 /* TrainingService.swift */; };
 		E11020261025000100000002 /* TrainingProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11020261025000100000001 /* TrainingProgress.swift */; };
+		A24720261025000100000002 /* WorkoutAttendancePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24720261025000100000001 /* WorkoutAttendancePolicy.swift */; };
+		A24720261025000100000004 /* WorkoutAttendancePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24720261025000100000003 /* WorkoutAttendancePolicyTests.swift */; };
 		F00720261007000100000002 /* TrainingDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000001 /* TrainingDraftStore.swift */; };
 		F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000003 /* TrainingSessionDraft.swift */; };
 		F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000005 /* TrainingSessionDraftTests.swift */; };
@@ -1006,6 +1008,8 @@
 		E2AC3C23E6923176F103B414 /* StepsIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StepsIndicator.swift; path = DesignSystem/Molecules/StepsIndicator.swift; sourceTree = "<group>"; };
 		E4172D019C9F4A30A881C001 /* TrainingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingService.swift; sourceTree = "<group>"; };
 		E11020261025000100000001 /* TrainingProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgress.swift; sourceTree = "<group>"; };
+		A24720261025000100000001 /* WorkoutAttendancePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutAttendancePolicy.swift; sourceTree = "<group>"; };
+		A24720261025000100000003 /* WorkoutAttendancePolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutAttendancePolicyTests.swift; sourceTree = "<group>"; };
 		F00720261007000100000001 /* TrainingDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDraftStore.swift; sourceTree = "<group>"; };
 		F00720261007000100000003 /* TrainingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraft.swift; sourceTree = "<group>"; };
 		F00720261007000100000005 /* TrainingSessionDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraftTests.swift; sourceTree = "<group>"; };
@@ -1503,6 +1507,7 @@
 				D0C0DE000000000000000002 /* VoiceCaptureService.swift */,
 				E4172D019C9F4A30A881C001 /* TrainingService.swift */,
 				E11020261025000100000001 /* TrainingProgress.swift */,
+				A24720261025000100000001 /* WorkoutAttendancePolicy.swift */,
 				F00720261007000100000001 /* TrainingDraftStore.swift */,
 				F00720261007000100000003 /* TrainingSessionDraft.swift */,
 				AD8F12F42ED7C987003C4559 /* BugReportManager.swift */,
@@ -1753,6 +1758,7 @@
 				E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */,
 				F00720261007000100000005 /* TrainingSessionDraftTests.swift */,
 				E11020261025000100000005 /* TrainingProgressTests.swift */,
+				A24720261025000100000003 /* WorkoutAttendancePolicyTests.swift */,
 				E41302026025000000000003 /* DelegatedTrainingTests.swift */,
 				FE06A6A600000000000000F6 /* Glp1CardAndCatalogTests.swift */,
 				FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */,
@@ -2195,6 +2201,7 @@
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
 				F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */,
 				E11020261025000100000006 /* TrainingProgressTests.swift in Sources */,
+				A24720261025000100000004 /* WorkoutAttendancePolicyTests.swift in Sources */,
 				E41302026025000000000004 /* DelegatedTrainingTests.swift in Sources */,
 				FE06A6A600000000000000B6 /* Glp1CardAndCatalogTests.swift in Sources */,
 				FE04A4A400000000000000B4 /* SyncIntervalAndChunkingTests.swift in Sources */,
@@ -2394,6 +2401,7 @@
 				D0C0DE000000000000000001 /* VoiceCaptureService.swift in Sources */,
 				E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */,
 				E11020261025000100000002 /* TrainingProgress.swift in Sources */,
+				A24720261025000100000002 /* WorkoutAttendancePolicy.swift in Sources */,
 				F00720261007000100000002 /* TrainingDraftStore.swift in Sources */,
 				F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */,
 				E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */,
