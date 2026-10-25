@@ -1,5 +1,8 @@
 # Initial training enrollment revision foundation
 
+The [LYB-115 cycle lifecycle extension](training-cycle-lifecycle.md) adds configured
+blocks and existing-program revisions through this same admission path. The
+foundation scope and original verification below describe the initial slice.
 This document describes version 1. [Delegated programming](delegated-programming.md)
 extends this same ledger and transaction with version 2 proposals, existing-plan
 steering and automatic next-block preparation.
