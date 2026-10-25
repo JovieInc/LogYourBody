@@ -117,6 +117,12 @@ func computeRangeStats(
 
 typealias MetricSeriesStats = MetricRangeStats
 
+/// File-scoped so Stats truth tests can lock the chart calculator without a view instance.
+func computeSeriesStats(for series: [MetricChartDataPoint]) -> MetricSeriesStats? {
+    guard series.count >= 2 else { return nil }
+    return computeRangeStats(points: series, requiresComparison: false, includesInferredValues: true)
+}
+
 /// Presentation uses the unthinned observation series; plotting never changes the calculation.
 struct MetricObservationSummary {
     let point: MetricChartDataPoint?
