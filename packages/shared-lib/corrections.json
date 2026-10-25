@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "sitemap-shares-complete-public-marketing-inventory",
+    "correction": "LYB-224: Use the same complete public route list for the sitemap and marketing route tests on the canonical serving host, omit request-time modification dates, and disallow legacy auth routes.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/apps/web/src/app/sitemap.ts#L4",
+    "mechanization": "The sitemap and marketing browser matrix import PUBLIC_MARKETING_ROUTES. Required web tests assert sitemap equality, canonical hosts, absent modification dates and auth exclusions; filesystem discovery rejects an incomplete inventory or inclusion of auth and redirect routes.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Generating sitemap entries and browser route cases from one inventory prevents list drift by construction; the registry supplies the host, omission removes fabricated timestamps, and robots declares auth exclusions. Required regression tests verify these outputs and inventory completeness."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/sitemap.ts",
+      "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",

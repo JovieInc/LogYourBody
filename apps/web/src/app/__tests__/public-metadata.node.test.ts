@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Metadata } from 'next';
 import { logYourBody } from '@jovieinc/product-registry';
 import { getAllTags, getPostBySlug } from '@/lib/blog';
+import { PUBLIC_MARKETING_ROUTES } from '@/data/publicMarketingRoutes';
 import {
   getRedirectUrl,
   unstable_getResponseFromNextConfig,
@@ -83,6 +84,14 @@ async function assertMetadata(metadata: Metadata, route: string) {
 }
 
 describe('public route metadata contract (LYB-223)', () => {
+  it('keeps the marketing inventory complete without auth or redirect routes', () => {
+    const routes = publicPages()
+      .filter((file) => !file.includes('['))
+      .map((file) => '/' + path.dirname(file).replace(/^\.$/, '').split(path.sep).join('/'))
+      .filter((route) => !['/signin', '/signup'].includes(route));
+    expect([...PUBLIC_MARKETING_ROUTES].sort()).toEqual(routes.sort());
+  });
+
   it.each(['/', '/security', '/blog/progress?source=search'])(
     'permanently redirects the apex while preserving %s',
     async (route) => {

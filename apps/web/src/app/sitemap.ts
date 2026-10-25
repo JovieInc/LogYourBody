@@ -1,13 +1,11 @@
 import type { MetadataRoute } from 'next';
+import { PUBLIC_MARKETING_ROUTES } from '@/data/publicMarketingRoutes';
 import { endpoints } from '@/lib/generated/endpoints.generated';
 
-const publicRoutes = ['', '/privacy', '/terms', '/health-disclosure', '/support'] as const;
-
 export default function sitemap(): MetadataRoute.Sitemap {
-  return publicRoutes.map((path, index) => ({
-    url: `${endpoints.hosts.marketing.url}${path}`,
-    lastModified: new Date(),
-    changeFrequency: index === 0 ? 'weekly' : 'monthly',
-    priority: index === 0 ? 1 : 0.5,
+  return PUBLIC_MARKETING_ROUTES.map((path) => ({
+    url: `${endpoints.hosts.marketing.url}${path === '/' ? '' : path}`,
+    changeFrequency: path === '/' ? 'weekly' : 'monthly',
+    priority: path === '/' ? 1 : 0.5,
   }));
 }

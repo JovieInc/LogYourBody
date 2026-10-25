@@ -69,6 +69,14 @@ The route matrix covers `/`, `/download/ios`, `/download/android`, `/about`,
 `/health-disclosure`, `/blog`, `/changelog` and `/delete-account`.
 Alias and retired-article recovery are exercised separately.
 
+Discovery follow-up (LYB-224): the sitemap and marketing browser route matrix
+share [`PUBLIC_MARKETING_ROUTES`](../../../apps/web/src/data/publicMarketingRoutes.ts).
+All 14 routes use the registry's canonical `www` host. Modification dates are
+omitted until content revisions are available; robots excludes legacy auth pages.
+**Open Tim decision:** should `/blog` remain in navigation while there are zero
+published posts? LYB-224 leaves its navigation links and draft publication policy
+unchanged; this is a flag for product judgment, not an instruction to publish drafts.
+
 Additional boundary coverage: 320, 390/393, 768, 1024, 1440 and 1920px; 720px
 with 200% text growth, RTL and reduced motion. Checks include document overflow,
 loaded images, landmarks, controls, runtime errors, keyboard and unchanged hover
