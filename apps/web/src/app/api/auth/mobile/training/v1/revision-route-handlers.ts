@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
+import type { NativeProductRecordsPort } from '@/lib/ports/native-product-records';
+import { loadTrainingRecords } from '@/lib/training/service';
+import { cycleBlock, cycleReuseOptions } from '@/lib/training/cycle-lifecycle';
 import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
 import {
   createInitialTrainingProposal,
@@ -11,6 +14,7 @@ import {
 type Dependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   revisions: TrainingRevisionsPort;
+  records?: NativeProductRecordsPort;
   reserveRequest: (subject: string) => Promise<ChatRateLimitResult>;
   now: () => Date;
   enabled: () => boolean;
@@ -55,17 +59,34 @@ export function createTrainingRevisionHandlers(deps: Dependencies) {
           return stored ? json({ stored }) : error('proposal_not_found');
         }
         const context = await deps.revisions.readContext(owner.sub);
+        const snapshot = deps.records ? await loadTrainingRecords(deps.records, owner.sub) : null;
         return context
           ? json({
               generation: context.generation,
               headRevision: context.headRevision,
               supportedIntent: 'initial_enrollment',
+              ...(deps.records
+                ? {
+                    supportedIntents: ['initial_enrollment', 'revise_cycle', 'repeat_cycle'],
+                    setup: snapshot?.setup ?? null,
+                    cycle: snapshot?.setup
+                      ? cycleBlock(snapshot.setup, snapshot.sessions, snapshot.logs, deps.now())
+                      : null,
+                    reuseOptions: snapshot ? cycleReuseOptions(snapshot) : [],
+                  }
+                : {}),
               supportedBaseline: true,
             })
           : error('owner_missing');
       }
       const body = await request.json().catch(() => null);
-      const input = { revisions: deps.revisions, subject: owner.sub, body, now: deps.now() };
+      const input = {
+        records: deps.records,
+        revisions: deps.revisions,
+        subject: owner.sub,
+        body,
+        now: deps.now(),
+      };
       const result =
         action === 'create'
           ? await createInitialTrainingProposal(input)

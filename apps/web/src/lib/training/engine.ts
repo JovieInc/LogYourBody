@@ -1,7 +1,9 @@
+import { cycleConfigurationSchema } from './revision-contract';
 import {
   MESOCYCLE_WEEKS,
   MUSCLE_GROUPS,
   type DeloadState,
+  type CycleLength,
   type Equipment,
   type ExercisePattern,
   type ExercisePrescription,
@@ -223,6 +225,70 @@ const EXERCISES: Record<Equipment, Record<ExercisePattern, ExerciseSeed[]>> = {
 };
 
 const RIR_LADDER = [4, 3, 3, 2] as const;
+// Bounded engine policy, not a claim that one block length is optimal for everyone.
+export const CYCLE_RIR_LADDERS: Record<CycleLength, readonly number[]> = {
+  4: [4, 3, 2, 5],
+  5: [4, 3, 3, 2, 5],
+  6: [4, 4, 3, 3, 2, 5],
+};
+
+export function configuredMesoBlock(
+  startDate: string,
+  weekCount: CycleLength,
+  completedSessions: number,
+  sessionsPerWeek: number,
+): MesoBlock {
+  const currentWeek = Math.min(weekCount, Math.floor(completedSessions / sessionsPerWeek) + 1);
+  return {
+    id: 'block-1',
+    startDate,
+    weekCount,
+    currentWeek,
+    targetRir: CYCLE_RIR_LADDERS[weekCount][currentWeek - 1]!,
+    phase:
+      completedSessions >= weekCount * sessionsPerWeek
+        ? 'review'
+        : currentWeek === weekCount
+          ? 'planned_deload'
+          : currentWeek === 1
+            ? 'accumulation'
+            : 'adjustment',
+  };
+}
+
+/** Completion of the remaining execution work is distinct from completed training. */
+export function sessionWorkLogged(
+  session: Session,
+  logs: Array<Pick<SetLog, 'sessionId' | 'exerciseId' | 'setNumber'>>,
+): boolean {
+  return (
+    !session.safetyStop &&
+    session.exercises.length > 0 &&
+    session.exercises.every((exercise) =>
+      Array.from({ length: exercise.sets }, (_, i) => i + 1).every((setNumber) =>
+        logs.some(
+          (log) =>
+            log.sessionId === session.id &&
+            log.exerciseId === exercise.id &&
+            log.setNumber === setNumber,
+        ),
+      ),
+    )
+  );
+}
+
+/** A terminal action, empty prescription or skipped work is never completed training. */
+export function completedTrainingSession(
+  session: Session,
+  logs: Array<Pick<SetLog, 'sessionId' | 'exerciseId' | 'setNumber'>>,
+): boolean {
+  return (
+    sessionWorkLogged(session, logs) &&
+    !session.executionEvents?.some(
+      (event) => event.kind === 'skipped' || event.kind === 'shortened',
+    )
+  );
+}
 const REP_RANGE = { min: 8, max: 12 } as const;
 
 function eligibleSubstitutions(input: {
@@ -750,7 +816,8 @@ export function buildSession(input: {
   const pattern: ExercisePattern = input.slot % 2 === 0 ? 'A' : 'B';
   const sessionDeload = evaluateDeload(input.feedback);
   const safetyStop = sessionDeload.action === 'pause_session';
-  const targetRir = input.block.targetRir;
+  const plannedDeload = input.block.phase === 'planned_deload';
+  const targetRir = plannedDeload ? 5 : input.block.targetRir;
   const muscleDeloads = new Map(
     MUSCLE_GROUPS.map((muscle) => [muscle, evaluateDeload(input.feedback, muscle)]),
   );
@@ -758,7 +825,7 @@ export function buildSession(input: {
     ? []
     : EXERCISES[input.setup.equipment][pattern].map((seed) => {
         const muscleDeload = muscleDeloads.get(seed.primaryMuscle);
-        const sets = muscleDeload?.action === 'reduce_volume' ? 1 : 2;
+        const sets = plannedDeload || muscleDeload?.action === 'reduce_volume' ? 1 : 2;
         const progression = progressionForExercise(
           seed.id,
           input.logs,
@@ -773,11 +840,16 @@ export function buildSession(input: {
           muscleContribution: seed.muscleContribution,
           sets,
           repRange: REP_RANGE,
-          targetReps: progression.targetReps,
+          targetReps: plannedDeload ? REP_RANGE.min : progression.targetReps,
           targetRir,
-          targetLoadKg: progression.targetLoadKg,
-          loadInstruction: progression.loadInstruction,
-          progression: progression.action,
+          targetLoadKg: plannedDeload
+            ? ([...input.logs]
+                .filter((log) => log.exerciseId === seed.id)
+                .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))[0]?.loadKg ??
+              null)
+            : progression.targetLoadKg,
+          loadInstruction: plannedDeload ? null : progression.loadInstruction,
+          progression: plannedDeload ? ('hold' as const) : progression.action,
           evidenceIds: progression.action === 'increase_load' ? LOAD_EVIDENCE : EFFORT_EVIDENCE,
           substitutions: eligibleSubstitutions({
             seed,
@@ -793,9 +865,11 @@ export function buildSession(input: {
   );
   const explanation = safetyStop
     ? sessionDeload.explanation
-    : reducedMuscles.length > 0 && sessionDeload.action !== 'reduce_volume'
-      ? `Repeated muscle-specific recovery signals reduced only ${reducedMuscles.join(', ')} work; the rest of the session stays unchanged.`
-      : sessionDeload.explanation;
+    : plannedDeload
+      ? 'Planned final deload: half the baseline sets and more repetitions in reserve. Reactive safety checks still apply.'
+      : reducedMuscles.length > 0 && sessionDeload.action !== 'reduce_volume'
+        ? `Repeated muscle-specific recovery signals reduced only ${reducedMuscles.join(', ')} work; the rest of the session stays unchanged.`
+        : sessionDeload.explanation;
   return {
     id: input.sessionId,
     week: input.block.currentWeek,
@@ -849,6 +923,7 @@ export function isProgramSetup(value: unknown): value is TrainingProgramSetup {
     setup.safetyConfirmed === true &&
     (setup.sessionsPerWeek === 2 || setup.sessionsPerWeek === 3) &&
     (setup.equipment === 'dumbbells' || setup.equipment === 'full_gym') &&
+    (setup.cycle === undefined || cycleConfigurationSchema.safeParse(setup.cycle).success) &&
     typeof setup.startedAt === 'string' &&
     Number.isFinite(Date.parse(setup.startedAt))
   );

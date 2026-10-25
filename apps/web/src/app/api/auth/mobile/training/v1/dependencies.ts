@@ -32,6 +32,7 @@ export const trainingHandlers = createTrainingRouteHandlers({
 export const trainingRevisionHandlers = createTrainingRevisionHandlers({
   authenticate,
   revisions: neonTrainingRevisions,
+  records: neonNativeProductRecords,
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   now: () => new Date(),
   enabled: () => process.env.LYB_HYPERTROPHY_COACH_API_ENABLED === 'true',
