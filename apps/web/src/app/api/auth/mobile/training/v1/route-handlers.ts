@@ -1,4 +1,5 @@
 import { TrainingMutationError } from '@/lib/training/mutation-admission';
+import { prepareNextBlock } from '@/lib/training/delegated-revisions';
 import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
 import { profileConfirmsAdult } from '@/lib/training/eligibility';
 import { NextRequest, NextResponse } from 'next/server';
@@ -186,6 +187,7 @@ const WorkoutActionBodySchema = z
   .strict();
 
 type RouteDependencies = {
+  delegatedEnabled?: () => boolean;
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   records: NativeProductRecordsPort;
   revisions?: TrainingRevisionsPort;
@@ -271,6 +273,18 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
         });
         if (result.kind === 'not_enrolled')
           return json(withVersion({ error: 'program_not_enrolled' }), 409);
+        if (result.kind === 'block_complete') {
+          if (!dependencies.delegatedEnabled?.() || !dependencies.revisions)
+            return apiError('training_program_requires_review', 409);
+          const next = await prepareNextBlock({
+            revisions: dependencies.revisions,
+            records: dependencies.records,
+            subject: identity.sub,
+            now: dependencies.now(),
+          });
+          if (next.kind !== 'stored') return apiError(next.kind, 409);
+          return json(withVersion({ session: null, nextBlock: next.stored }));
+        }
         if (result.kind === 'week_complete') {
           return json(
             withVersion({
