@@ -31,6 +31,23 @@ export type VoiceIntentResult =
   | { kind: 'message' }
   | { kind: 'clarify'; missingFields: string[] }
   | {
+      kind: 'workout_feedback';
+      requiresConfirmation: true;
+      feedback: {
+        sessionId: string;
+        exerciseId: string;
+        setNumber: number;
+        intent:
+          | 'breathing_limited'
+          | 'grip_limited'
+          | 'more_rest'
+          | 'ready'
+          | 'unusually_weak'
+          | 'unknown';
+        originalStatement: string;
+      };
+    }
+  | {
       kind: 'log_set';
       requiresConfirmation: true;
       missingFields: string[];
@@ -144,8 +161,42 @@ export function parseVoiceIntent(
 ): VoiceIntentResult {
   const original = transcript.trim();
   const normalized = normalizeSpokenNumbers(original);
-  if (/\b(?:hurts?|pain|painful)\b/i.test(normalized))
+  if (/\b(?:hurts?|pain|painful|dizzy|faint|numb|tingling)\b/i.test(normalized))
     return contextualAction('pain', context, normalized);
+  // Normalize controls only. LYB-114 evaluates the saved observation, not this parser.
+  const readinessIntent = (
+    [
+      [/^(?:i(?:'m| am)\s+)?still out of breath[.!]?$/i, 'breathing_limited'],
+      [/^my grip is limiting me[.!]?$/i, 'grip_limited'],
+      [/^(?:i\s+)?need more rest[.!]?$/i, 'more_rest'],
+      [/^(?:actually\s+)?(?:i am\s+|i'm\s+)?ready now[.!]?$/i, 'ready'],
+      [/^that set was unusually weak[.!]?$/i, 'unusually_weak'],
+      [/^(?:i don't know if i'm ready|not ready now)[.!]?$/i, 'unknown'],
+    ] as const
+  ).find(([pattern]) => pattern.test(original))?.[1];
+  if (readinessIntent) {
+    const set =
+      readinessIntent === 'unusually_weak' ? context.lastCompletedSet : context.currentSet;
+    if (!context.sessionId || !set) {
+      return {
+        kind: 'clarify',
+        missingFields: [
+          readinessIntent === 'unusually_weak' ? 'last_completed_set' : 'current_set',
+        ],
+      };
+    }
+    return {
+      kind: 'workout_feedback',
+      requiresConfirmation: true,
+      feedback: {
+        sessionId: context.sessionId,
+        exerciseId: set.exerciseId,
+        setNumber: set.setNumber,
+        intent: readinessIntent,
+        originalStatement: original,
+      },
+    };
+  }
   if (/\b(?:taken|occupied|unavailable|in use|not available)\b/i.test(normalized))
     return contextualAction('equipment_unavailable', context, normalized);
   const minutes = Number(/\b(\d{1,3})\s*(?:minutes?|mins?)\b/i.exec(normalized)?.[1]);
