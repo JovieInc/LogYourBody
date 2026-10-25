@@ -102,6 +102,11 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://pubmed.ncbi.nlm.nih.gov/28965198/',
+      reason:
+        'Morán-Navarro et al. (2017) primary recovery evidence cited in the LYB-112 engineering policy; not a runtime endpoint or personal numerical bound.',
+    },
+    {
       value: 'https://www.allianceforeatingdisorders.com/find-treatment/',
       reason:
         'Verified official U.S. eating-disorder support resource in the health disclosure, checked 2026-10-14.',
@@ -376,6 +381,11 @@ export const endpoints = {
     {
       value: 'https://linear.app/jovie/issue/LYB-95',
       reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-112',
+      reason:
+        'LYB-112 source evidence for bounded adaptive recovery learning and the correction ledger.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-129',
