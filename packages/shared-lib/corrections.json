@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "healthkit-import-sample-source-identity",
+    "correction": "LYB-239: Repeated HealthKit imports must use sample UUID plus source bundle, retain separate sources, normalize units and preserve sample-local dates. A new UUID with the same sync identifier and metadata version replaces its prior sample.",
+    "source": "https://linear.app/jovie/issue/LYB-239",
+    "mechanization": "Behind healthkit_sample_identity_v1, serialize canonical identity admission with persistence, retain edit lineage and tombstones, and derive stable account-scoped cloud IDs. Register HealthImportIdempotencyTests in the existing native Unit target. Native failing/passing execution and coverage remain required in CI because this Linux host has no Xcode; local SwiftLint cannot establish behavior proof.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Matching source-scoped UUIDs and sync identifiers in the same Core Data context turn as admission and mutation prevents retry/concurrency duplicates while preserving edits, source provenance and user exclusions."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/HealthImportIdempotencyTests.swift",
+      "anchor": "func testDoubleImportTableKeepsRowsAndTimestampsUnchanged()"
+    }
+  },
+  {
     "fingerprint": "web-sentry-runtime-env-declarations",
     "correction": "PR #1542: Declare every consumed public Sentry runtime variable in apps/web/.env.example. Missing DSN, environment and release declarations fail the required environment surface guard.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169587476/job/121097641374",
