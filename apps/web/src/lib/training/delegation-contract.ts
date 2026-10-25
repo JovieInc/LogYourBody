@@ -42,6 +42,8 @@ export const delegatedProgramSchema = z
         expiresAfterBlock: z.number().int().positive(),
       })
       .nullable(),
+    // Opaque reviewed steering constraint; interpretation belongs to health policy.
+    constraintId: z.string().trim().min(1).max(200).nullable().optional(),
     completedWeeks: z.record(z.string(), z.number().int().min(2).max(6)).default({}),
     authority: z
       .object({

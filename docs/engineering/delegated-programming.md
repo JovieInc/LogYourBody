@@ -87,6 +87,38 @@ admit one winner. Setup, revision, head and receipt commit together or roll back
 Restoration creates a new revision, revalidates current safety constraints, and
 never rewinds completed history or trainer authority.
 
+## Structured steering writer (LYB-278)
+
+`persistSteeringRevision` accepts an already reviewed structured record containing
+`revisionId`, `priorityFocus` (muscles and optional upper-chest emphasis via the
+explicit `upperChest` boolean), opaque nullable `constraintId`, `actor`, and
+`rationale`. The authenticated actor must match the record and current program
+authority. The caller supplies the existing rollout gate and a resolved
+health-policy decision; unresolved decisions fail closed. This internal writer
+adds no HTTP, MCP, chat, or native entry point.
+
+The saved focus uses the existing block-scoped `temporaryPriority`; the constraint
+ID is additive program metadata. The existing `TrainingRevisionsPort` stores a
+version 2 proposal and atomically applies the saved setup and immutable revision.
+The record's revision ID identifies the proposal, decision and revision; changed
+content under that identity conflicts, and an identical retry reuses its receipt.
+The immutable proposal retains actor and rationale as `actor` and `reason`.
+Storage refusal or failure cannot claim success, and pending retries retain the
+existing context, active-workout and consent checks.
+
+Only a `movement_constraint` health decision requests a restriction through the
+request-only LYB-113 `SteeringSubstitutionsPort`, using LYB-113's existing
+`maxTrunkDemand` / `excludedConcerns` types. That boundary must deduplicate requests
+by revision ID, including retries after interrupted persistence. An unavailable
+or refused request prevents the steering write. The writer defines no health
+policy or clinical wording. It saves intent without computing loads/volume or
+changing the prescription; implementing a movement change remains with LYB-113.
+
+`steering-revision.test.ts` uses an in-memory saved program and fake LYB-37
+boundary, with planner and prescription functions configured to throw if called.
+It covers audit persistence, duplicate/conflicting IDs, conditional restriction
+requests, unchanged prescriptions and storage/authority/policy failures.
+
 ## Verification
 
 `delegated-revisions.test.ts` exercises all eight issue fixtures through proposal,
