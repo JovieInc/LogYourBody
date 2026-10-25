@@ -385,6 +385,11 @@ export const endpoints = {
       reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-204',
+      reason:
+        'LYB-204 source evidence for the correction ledger, retained receipts and recurrence contract.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',
       reason:
         'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.',

@@ -40,6 +40,26 @@
     }
   },
   {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "LYB-204: Retain LYB correction lessons and guards with their sources, enforcement levels and recurrence across repository revisions.",
+    "source": "https://linear.app/jovie/issue/LYB-204",
+    "mechanization": "The existing required correction coverage check reports each lesson, source, guard and distinct receipt count, and compares source identities with the exact Git base. Behavioral regressions reject deleted, replaced or reassigned receipts even when rule coverage and receipt counts remain unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",

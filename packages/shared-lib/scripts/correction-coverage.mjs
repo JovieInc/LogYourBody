@@ -112,9 +112,30 @@ export function coverageReport(
         mechanized = false;
       }
     }
-    rules.set(fingerprint, { fingerprint, ...classification, mechanized, annotation });
+    const receipts = previous?.receipts ?? new Map();
+    const source = new URL(receipt.source).href;
+    receipts.set(source, {
+      source,
+      correction: receipt.correction.trim(),
+      mechanization: receipt.mechanization.trim(),
+    });
+    rules.set(fingerprint, {
+      fingerprint,
+      ...classification,
+      mechanized,
+      annotation,
+      guard,
+      proseOnlyReason: receipt.proseOnlyReason ?? null,
+      receipts,
+    });
   }
-  const entries = [...rules.values()].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
+  const entries = [...rules.values()]
+    .sort((a, b) => a.fingerprint.localeCompare(b.fingerprint))
+    .map(({ annotation: _annotation, receipts, ...rule }) => ({
+      ...rule,
+      receipts: [...receipts.values()].sort((a, b) => a.source.localeCompare(b.source)),
+      recurrence: { receiptCount: receipts.size, repeatCount: receipts.size - 1 },
+    }));
   return {
     schema: 'lyb.correction-coverage/v1',
     repository: 'JovieInc/LogYourBody',
@@ -126,7 +147,7 @@ export function coverageReport(
         return [level, fraction(members.filter((rule) => rule.mechanized).length, members.length)];
       }),
     ),
-    rules: entries.map(({ annotation: _annotation, ...rule }) => rule),
+    rules: entries,
   };
 }
 
@@ -169,6 +190,12 @@ export function assertNoRegression(current, baseline) {
   for (const before of baseline.rules) {
     const after = current.rules.find((rule) => rule.fingerprint === before.fingerprint);
     assert.ok(after, `correction coverage regression: removed rule ${before.fingerprint}`);
+    for (const receipt of before.receipts) {
+      assert.ok(
+        after.receipts.some(({ source }) => source === receipt.source),
+        `correction ledger regression: removed receipt for ${before.fingerprint}`,
+      );
+    }
     if (before.mechanized)
       assert.ok(
         after.mechanized && LEVELS.indexOf(after.level) <= LEVELS.indexOf(before.level),
@@ -199,8 +226,8 @@ export function renderCoverage(report) {
     'Only codebase/static rules with a retained source anchor count as mechanized.',
     'Source linkage is not proof of guard execution. An empty ledger is N/A.',
     '',
-    '| Fingerprint | Route | Assessment in priority order |',
-    '| --- | --- | --- |',
+    '| Fingerprint | Route | Assessment in priority order | Guard or prose-only reason | Recurrence |',
+    '| --- | --- | --- | --- | --- |',
     ...report.rules.map(
       (rule) =>
         `| ${rule.fingerprint} | ${rule.level} | ${cell(
@@ -212,7 +239,16 @@ export function renderCoverage(report) {
                 )
                 .join('; ')
             : 'Historical annotation; no feasibility assessment.',
-        )} |`,
+        )} | ${cell(rule.guard ? `${rule.guard.path}: ${rule.guard.anchor}` : (rule.proseOnlyReason ?? 'No retained guard.'))} | ${rule.recurrence.receiptCount} receipts; ${rule.recurrence.repeatCount} repeats |`,
+    ),
+    '',
+    '| Fingerprint | Lesson | Source |',
+    '| --- | --- | --- |',
+    ...report.rules.flatMap((rule) =>
+      rule.receipts.map(
+        (receipt) =>
+          `| ${rule.fingerprint} | ${cell(receipt.correction)} | ${cell(receipt.source)} |`,
+      ),
     ),
     '',
   ].join('\n');
