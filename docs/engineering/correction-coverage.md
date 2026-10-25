@@ -101,6 +101,8 @@ Run from the repository root:
 node packages/shared-lib/scripts/correction-coverage.mjs
 node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
 node packages/shared-lib/scripts/correction-coverage.mjs --output coverage/corrections/coverage.json
+node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
+node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
 node packages/shared-lib/scripts/jovie-separation.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
@@ -138,6 +140,16 @@ place.
 guards on this same every-diff path. Their existing violations warn against
 finding baselines that can only shrink; this is separate from, and does not
 relax, the coverage ratio or retained-guard requirements above.
+
+LYB-254 checks claimed guard paths on that same step. A receipt that names a
+guard fails when its test, lint-rule, or CI file is missing, and the failure
+names the ledger entry id and path. Receipts with no guard reference warn.
+Their ids are the sorted `unguarded` list in
+`packages/shared-lib/guard-reference-baseline.json`
+(`lyb.guard-reference/v1`). That list must match the ledger. Against the exact
+Git base it can only shrink; adding an id fails CI. A missing base file is an
+empty allowance, so the first baseline cannot grandfather unguarded entries.
+This is not a coverage-percentage baseline and does not relax retained anchors.
 
 The same required change-detection job runs the Jovie separation grep on every
 diff, including docs-only PRs. It scans tracked and new nonignored code under
