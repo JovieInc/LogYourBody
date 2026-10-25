@@ -174,6 +174,7 @@ export const logYourBody = {
       { value: 'https://github.com/prettier/prettier', reason: 'OSS attribution in open-source-licenses.md.' },
       { value: 'https://schema.org', reason: 'JSON-LD structured-data vocabulary.' },
       { value: 'https://rubygems.org', reason: 'Ruby dependency host referenced by iOS tooling docs.' },
+      { value: 'https://api.vercel.com', reason: 'CI-only Vercel env-type guard and public-env sync; not a runtime endpoint.' },
       { value: 'https://openapi.vercel.sh', reason: 'Vercel OpenAPI schema referenced by tooling.' },
       { value: 'https://api.cloudinary.com', reason: 'Cloudinary upload/delete API used by edge functions.' },
       { value: 'https://res.cloudinary.com', reason: 'Cloudinary delivery host for processed photos.' },
