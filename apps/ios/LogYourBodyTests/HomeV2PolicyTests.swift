@@ -514,4 +514,119 @@ final class HomeV2PolicyTests: XCTestCase {
         XCTAssertEqual(HomeV2PhasePolicy.weeks(kind: .cutting, metrics: []), 0)
         XCTAssertEqual(HomeV2PhasePolicy.weeks(kind: .cutting, metrics: [metric(daysAgo: 0, weight: 80)]), 1)
     }
+
+    func testPhaseRefreshIdentityIgnoresMetadataThatFullEqualityCompares() {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let plain = phaseMetric(id: "day", user: "owner", date: date, weight: 80, bodyFat: 18)
+        let noisy = phaseMetric(
+            id: "day",
+            user: "owner",
+            date: date,
+            weight: 80,
+            bodyFat: 18,
+            notes: "imported on a scale with a long note",
+            photoUrl: "progress-photo",
+            metadata: BodyMetricSourceMetadata(
+                vendor: "apple_health",
+                sourceName: String(repeating: "scale", count: 40),
+                sampleId: "sample-noisy",
+                externalResultId: "result-noisy"
+            )
+        )
+
+        XCTAssertNotEqual(plain, noisy)
+        XCTAssertEqual(
+            HomeV2PhaseRefreshID(metrics: [plain]),
+            HomeV2PhaseRefreshID(metrics: [noisy])
+        )
+        XCTAssertNotEqual(
+            HomeV2PhaseRefreshID(metrics: [plain]),
+            HomeV2PhaseRefreshID(metrics: [phaseMetric(id: "day", user: "owner", date: date, weight: 81, bodyFat: 18)])
+        )
+        XCTAssertNotEqual(
+            HomeV2PhaseRefreshID(metrics: [plain]),
+            HomeV2PhaseRefreshID(metrics: [phaseMetric(id: "day", user: "owner", date: date, weight: 80, bodyFat: 19)])
+        )
+        XCTAssertNotEqual(
+            HomeV2PhaseRefreshID(metrics: [plain]),
+            HomeV2PhaseRefreshID(metrics: [
+                phaseMetric(id: "day", user: "owner", date: date.addingTimeInterval(3_600), weight: 80, bodyFat: 18)
+            ])
+        )
+        XCTAssertNotEqual(
+            HomeV2PhaseRefreshID(metrics: [plain]),
+            HomeV2PhaseRefreshID(metrics: [phaseMetric(id: "day", user: "other", date: date, weight: 80, bodyFat: 18)])
+        )
+        XCTAssertNotEqual(
+            HomeV2PhaseRefreshID(metrics: [plain]),
+            HomeV2PhaseRefreshID(metrics: [
+                plain,
+                phaseMetric(id: "next", user: "owner", date: date.addingTimeInterval(86_400), weight: 80, bodyFat: 18)
+            ])
+        )
+        XCTAssertNotEqual(
+            HomeV2PhaseRefreshID(metrics: [phaseMetric(id: "empty", user: "owner", date: date, weight: nil, bodyFat: nil)]),
+            HomeV2PhaseRefreshID(metrics: [phaseMetric(id: "empty", user: "owner", date: date, weight: 0, bodyFat: nil)])
+        )
+    }
+
+    func testPhaseRefreshIdentityStaysBelowHangThreshold() {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let metadata = BodyMetricSourceMetadata(
+            vendor: "apple_health",
+            sourceName: String(repeating: "connected-scale", count: 12),
+            sampleId: "sample",
+            externalResultId: "result"
+        )
+        let metrics = (0..<6_000).map { index in
+            phaseMetric(
+                id: "metric-\(index)",
+                user: "owner",
+                date: date.addingTimeInterval(Double(index) * 3_600),
+                weight: 80 + Double(index % 7),
+                bodyFat: 18 + Double(index % 3),
+                notes: "note-\(index)",
+                metadata: metadata
+            )
+        }
+
+        let started = ProcessInfo.processInfo.systemUptime
+        let forward = HomeV2PhaseRefreshID(metrics: metrics)
+        let repeated = HomeV2PhaseRefreshID(metrics: metrics)
+        let elapsed = ProcessInfo.processInfo.systemUptime - started
+
+        XCTAssertEqual(forward, repeated)
+        XCTAssertEqual(forward.count, 6_000)
+        XCTAssertNotEqual(forward, HomeV2PhaseRefreshID(metrics: Array(metrics.dropLast())))
+        XCTAssertLessThan(elapsed, 2, "Phase refresh identity must not cross the two-second app-hang threshold")
+    }
+
+    private func phaseMetric(
+        id: String,
+        user: String,
+        date: Date,
+        weight: Double?,
+        bodyFat: Double?,
+        notes: String? = nil,
+        photoUrl: String? = nil,
+        metadata: BodyMetricSourceMetadata? = nil
+    ) -> BodyMetrics {
+        BodyMetrics(
+            id: id,
+            userId: user,
+            date: date,
+            weight: weight,
+            weightUnit: "kg",
+            bodyFatPercentage: bodyFat,
+            bodyFatMethod: bodyFat == nil ? nil : "dexa",
+            muscleMass: nil,
+            boneMass: nil,
+            notes: notes,
+            photoUrl: photoUrl,
+            dataSource: "healthkit",
+            sourceMetadata: metadata,
+            createdAt: date,
+            updatedAt: date
+        )
+    }
 }
