@@ -379,8 +379,11 @@ struct DelegatedTrainingView: View {
                 .font(.footnote)
             Button("Review changes") {
                 Task {
-                    if cardsEnabled { await model.adjustCard(utterance: steering) }
-                    else { await model.propose(utterance: steering) }
+                    if cardsEnabled {
+                        await model.adjustCard(utterance: steering)
+                    } else {
+                        await model.propose(utterance: steering)
+                    }
                 }
             }
                 .disabled(steering.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

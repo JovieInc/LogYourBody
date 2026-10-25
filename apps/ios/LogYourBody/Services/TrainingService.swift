@@ -942,12 +942,19 @@ indirect enum TrainingPlanDiffValue: Decodable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let value = try decoder.singleValueContainer()
-        if value.decodeNil() { self = .null }
-        else if let bool = try? value.decode(Bool.self) { self = .bool(bool) }
-        else if let number = try? value.decode(Double.self) { self = .number(number) }
-        else if let text = try? value.decode(String.self) { self = .text(text) }
-        else if let array = try? value.decode([Self].self) { self = .array(array) }
-        else { self = .object(try value.decode([String: Self].self)) }
+        if value.decodeNil() {
+            self = .null
+        } else if let bool = try? value.decode(Bool.self) {
+            self = .bool(bool)
+        } else if let number = try? value.decode(Double.self) {
+            self = .number(number)
+        } else if let text = try? value.decode(String.self) {
+            self = .text(text)
+        } else if let array = try? value.decode([Self].self) {
+            self = .array(array)
+        } else {
+            self = .object(try value.decode([String: Self].self))
+        }
     }
 
     var displayText: String {

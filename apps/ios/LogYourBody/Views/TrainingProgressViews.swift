@@ -210,8 +210,12 @@ struct ApprovedTrainingCard<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     private var isValid: Bool {
-        do { try reference.validate(); return true }
-        catch { return false }
+        do {
+            try reference.validate()
+            return true
+        } catch {
+            return false
+        }
     }
 
     var body: some View {
