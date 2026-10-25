@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "xctest-await-outside-assertion-autoclosures",
+    "correction": "PR #1566 / LYB-238: Launch Quality could not compile HealthSyncPipelineTests because three XCTAssertEqual autoclosures contained async Core Data reads. Await the results before asserting, preserving all regression assertions.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40202309384/job/121195979947",
+    "mechanization": "Await each fetch into a local value before passing it to XCTest. Retain the required Launch Quality build-for-testing of the entire test target, whose Swift compiler rejected all three original expressions. The failed CI log is the regression receipt; corrected native compilation and execution remain for CI because the repair host has no Xcode.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Changing application runtime logic cannot prevent test authors from passing async expressions to XCTest assertion autoclosures."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Launch Quality build-for-testing compiles the whole unit test target and the Swift compiler rejects async calls inside synchronous assertion autoclosures."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "build_for_testing_once() {"
+    }
+  },
+  {
     "fingerprint": "training-cycle-delegation-merge-parity",
     "correction": "PR #1541 conflicts with the delegated programming implementation merged in PR #1531. Preserve both proposal versions, owner-locked database admission and native entry points when merging origin/main.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1541",

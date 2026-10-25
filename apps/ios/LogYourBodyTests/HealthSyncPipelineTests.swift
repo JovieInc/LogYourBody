@@ -109,7 +109,8 @@ final class HealthSyncPipelineAnchoredFetchTests: XCTestCase {
         XCTAssertGreaterThan(queriesAfterFullImport, 0)
         try await manager.syncWeightFromHealthKit()
         XCTAssertEqual(weightQueries, queriesAfterFullImport)
-        XCTAssertEqual(await coreData.fetchBodyMetrics(for: userId).count, 1)
+        let rowsAfterIncrementalSync = await coreData.fetchBodyMetrics(for: userId)
+        XCTAssertEqual(rowsAfterIncrementalSync.count, 1)
         XCTAssertEqual(HealthAnchorStore(defaults: defaults).anchor(for: .weight, userId: userId), Data([4]))
     }
 
@@ -134,7 +135,8 @@ final class HealthSyncPipelineAnchoredFetchTests: XCTestCase {
 
         XCTAssertGreaterThan(weightQueries, 0)
         XCTAssertFalse(probe.recorded().contains { $0.1 == Data([3]) })
-        XCTAssertEqual(await coreData.fetchBodyMetrics(for: userId).count, 1)
+        let rowsAfterReset = await coreData.fetchBodyMetrics(for: userId)
+        XCTAssertEqual(rowsAfterReset.count, 1)
     }
 
     func testDeletedHealthKitSampleMarksTheImportedRow() async throws {
@@ -200,7 +202,8 @@ final class HealthSyncPipelineAnchoredFetchTests: XCTestCase {
         XCTAssertTrue(applied)
         let visible = await coreData.fetchBodyMetrics(for: userId)
         XCTAssertTrue(visible.isEmpty)
-        XCTAssertEqual(try await deletionFlags(userId: userId), [true])
+        let flagged = try await deletionFlags(userId: userId)
+        XCTAssertEqual(flagged, [true])
     }
 
     func testStepSyncFetchesOnlySamplesSinceTheStoredAnchor() async throws {
