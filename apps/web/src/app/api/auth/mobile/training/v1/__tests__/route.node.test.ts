@@ -547,6 +547,168 @@ describe('authenticated training API', () => {
     expect((await records.pull('subject-a', 'logged_sets')).records[0].reps).toBe(9);
   });
 
+  it('undoes one correction idempotently and refuses stale, foreign, or uncorrected sets', async () => {
+    const { handlers, records, setNow } = makeHarness();
+    const disabled = makeHarness({ enabled: false });
+    expect(
+      (await disabled.handlers.undoSet(request('POST', 'undo-set', 'token-a', {}))).status,
+    ).toBe(404);
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    await handlers.enroll(request('POST', 'enroll', 'token-b', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const exerciseId = session.exercises[0].id;
+    const first = {
+      sessionId: session.id,
+      exerciseId,
+      setNumber: 1,
+      reps: 10,
+      loadKg: 20,
+      rir: 2,
+    };
+    const second = { ...first, setNumber: 2, reps: 8, loadKg: 22.5, rir: 1 };
+    const logged = await (
+      await handlers.logSet(request('POST', 'log-set', 'token-a', first))
+    ).json();
+    const other = await (
+      await handlers.logSet(request('POST', 'log-set', 'token-a', second))
+    ).json();
+    const freshUndo = await handlers.undoSet(
+      request('POST', 'undo-set', 'token-a', {
+        sessionId: session.id,
+        exerciseId,
+        setNumber: 1,
+        undoId: '66666666-6666-4666-8666-000000000001',
+        expectedRevision: 0,
+      }),
+    );
+    expect(freshUndo.status).toBe(409);
+    await expect(freshUndo.json()).resolves.toMatchObject({ error: 'undo_unavailable' });
+    expect(
+      (
+        await handlers.undoSet(
+          request('POST', 'undo-set', 'token-a', {
+            sessionId: session.id,
+            exerciseId,
+            setNumber: 1,
+            undoId: 'not-a-uuid',
+            expectedRevision: 0,
+          }),
+        )
+      ).status,
+    ).toBe(400);
+
+    setNow('2026-01-10T12:01:00.000Z');
+    const correction = {
+      ...first,
+      reps: 9,
+      correctionId: '55555555-5555-4555-8555-000000000010',
+      expectedRevision: 0,
+    };
+    expect(
+      (await handlers.correctSet(request('POST', 'correct-set', 'token-a', correction))).status,
+    ).toBe(200);
+    const replayDuringCorrection = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', first),
+    );
+    expect(replayDuringCorrection.status).toBe(409);
+    expect(
+      (await records.pull('subject-a', 'logged_sets')).records.find((row) => row.setNumber === 1)
+        ?.reps,
+    ).toBe(9);
+
+    setNow('2026-01-10T12:02:00.000Z');
+    const undo = {
+      sessionId: session.id,
+      exerciseId,
+      setNumber: 1,
+      undoId: '66666666-6666-4666-8666-000000000002',
+      expectedRevision: 1,
+    };
+    const undone = await handlers.undoSet(request('POST', 'undo-set', 'token-a', undo));
+    expect(undone.status).toBe(200);
+    await expect(undone.json()).resolves.toMatchObject({
+      log: {
+        id: logged.log.id,
+        reps: 10,
+        loadKg: 20,
+        rir: 2,
+        revision: 2,
+        corrections: [
+          { id: correction.correctionId, previous: { reps: 10, loadKg: 20, rir: 2 } },
+          { id: undo.undoId, previous: { reps: 9, loadKg: 20, rir: 2 } },
+        ],
+      },
+    });
+    const retry = await handlers.undoSet(request('POST', 'undo-set', 'token-a', undo));
+    expect(retry.status).toBe(200);
+    const stored = (await records.pull('subject-a', 'logged_sets')).records;
+    const restored = stored.find((row) => row.id === logged.log.id);
+    const untouched = stored.find((row) => row.id === other.log.id);
+    expect(stored).toHaveLength(2);
+    expect(restored?.revision).toBe(2);
+    expect(restored?.corrections).toHaveLength(2);
+    expect(untouched).toMatchObject({ reps: 8, loadKg: 22.5, revision: 0, corrections: [] });
+
+    const replayAfterUndo = await handlers.logSet(request('POST', 'log-set', 'token-a', first));
+    expect(replayAfterUndo.status).toBe(201);
+    await expect(replayAfterUndo.json()).resolves.toMatchObject({
+      log: { id: logged.log.id, reps: 10, revision: 2 },
+    });
+    expect((await records.pull('subject-a', 'logged_sets')).records).toHaveLength(2);
+
+    const stale = await handlers.undoSet(
+      request('POST', 'undo-set', 'token-a', {
+        ...undo,
+        undoId: '66666666-6666-4666-8666-000000000003',
+        expectedRevision: 1,
+      }),
+    );
+    expect(stale.status).toBe(409);
+    setNow('2026-01-10T12:03:00.000Z');
+    const newer = await handlers.correctSet(
+      request('POST', 'correct-set', 'token-a', {
+        ...first,
+        reps: 8,
+        correctionId: '55555555-5555-4555-8555-000000000011',
+        expectedRevision: 2,
+      }),
+    );
+    expect(newer.status).toBe(200);
+    const rolledBack = await handlers.undoSet(request('POST', 'undo-set', 'token-a', undo));
+    expect(rolledBack.status).toBe(409);
+    await expect(rolledBack.json()).resolves.toMatchObject({ error: 'set_conflict' });
+    expect(
+      (await records.pull('subject-a', 'logged_sets')).records.find(
+        (row) => row.id === logged.log.id,
+      ),
+    ).toMatchObject({ reps: 8, revision: 3 });
+
+    expect(
+      (
+        await handlers.undoSet(
+          request('POST', 'undo-set', 'token-a', {
+            ...undo,
+            sessionId: '99999999-9999-4999-8999-999999999999',
+            undoId: '66666666-6666-4666-8666-000000000004',
+            expectedRevision: 3,
+          }),
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await handlers.undoSet(
+          request('POST', 'undo-set', 'token-b', { ...undo, expectedRevision: 3 }),
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (await records.pull('subject-a', 'logged_sets')).records.find(
+        (row) => row.id === logged.log.id,
+      )?.reps,
+    ).toBe(8);
+  });
+
   it.each([false, true])(
     'atomically resolves concurrent set submissions (identical=%s)',
     async (identical) => {

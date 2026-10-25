@@ -618,6 +618,140 @@ export async function correctTrainingSet(input: {
   return { kind: 'corrected', log: saved };
 }
 
+export type UndoSetInput = {
+  sessionId: string;
+  exerciseId: string;
+  setNumber: number;
+  undoId: string;
+  expectedRevision: number;
+};
+
+export type UndoSetResult =
+  | { kind: 'undone'; log: NativeProductRecord | (SetLog & { record_type: string }) }
+  | { kind: 'program_not_enrolled' }
+  | { kind: 'session_not_found' }
+  | { kind: 'set_not_found' }
+  | { kind: 'set_conflict' }
+  | { kind: 'undo_unavailable' }
+  | { kind: 'rejected' };
+
+type SetValues = Pick<SetLog, 'reps' | 'loadKg' | 'rir'>;
+
+function sameSetValues(left: SetValues, right: SetValues): boolean {
+  return left.reps === right.reps && left.loadKg === right.loadKg && left.rir === right.rir;
+}
+
+function restoredValuesValid(values: SetValues): boolean {
+  return (
+    Number.isInteger(values.reps) &&
+    values.reps >= 1 &&
+    values.reps <= 50 &&
+    Number.isInteger(values.rir) &&
+    values.rir >= 0 &&
+    values.rir <= 6 &&
+    (values.loadKg === null ||
+      (typeof values.loadKg === 'number' &&
+        Number.isFinite(values.loadKg) &&
+        values.loadKg >= 0 &&
+        values.loadKg <= 500))
+  );
+}
+
+/** An applied undo is idempotent only while it is still the latest correction and
+ * the row still holds the values that correction restored. */
+function appliedUndo(existing: SetLog, undoId: string): SetLog | 'conflict' | undefined {
+  const corrections = existing.corrections ?? [];
+  const undoIndex = corrections.findIndex((item) => item.id === undoId);
+  if (undoIndex < 0) return undefined;
+  const prior = corrections[undoIndex - 1];
+  if (undoIndex !== corrections.length - 1 || !prior || !sameSetValues(existing, prior.previous)) {
+    return 'conflict';
+  }
+  return existing;
+}
+
+/** Reverses the latest correction of one stable set. The client names the undo,
+ * and the server restores the previous audited values. */
+export async function undoTrainingSet(input: {
+  records: NativeProductRecordsPort;
+  subject: string;
+  now: Date;
+  set: UndoSetInput;
+  admission?: TrainingMutationAdmission;
+}): Promise<UndoSetResult> {
+  const { records, subject, set } = input;
+  const admission = input.admission ?? (await captureTrainingAdmission(records, subject));
+  if (!admission) return { kind: 'program_not_enrolled' };
+  const [snapshot, sessions] = await Promise.all([
+    loadTrainingRecords(records, subject),
+    pullAllTrainingRecords(records, subject, 'training_sessions'),
+  ]);
+  if (!snapshot.setup) return { kind: 'program_not_enrolled' };
+  requireAdmittedSetup(admission, snapshot.setup);
+  const sessionRecord = sessions.find((record) => record.id === set.sessionId);
+  if (
+    !sessionRecord ||
+    sessionRecord.deleted_at !== null ||
+    !isWorkoutSessionRecord(sessionRecord) ||
+    sessionRecord.programSetupId !== snapshot.setup.id
+  )
+    return { kind: 'session_not_found' };
+  const existing = snapshot.logs.find(
+    (log) =>
+      log.sessionId === set.sessionId &&
+      log.exerciseId === set.exerciseId &&
+      log.setNumber === set.setNumber,
+  );
+  if (!existing) return { kind: 'set_not_found' };
+  const already = appliedUndo(existing, set.undoId);
+  if (already === 'conflict') return { kind: 'set_conflict' };
+  if (already) {
+    await requireCurrentTrainingAdmission(records, subject, admission);
+    return { kind: 'undone', log: { ...already, record_type: 'set_log' } };
+  }
+  const corrections = existing.corrections ?? [];
+  if (corrections.length === 0) return { kind: 'undo_unavailable' };
+  if ((existing.revision ?? 0) !== set.expectedRevision) return { kind: 'set_conflict' };
+  const latest = corrections[corrections.length - 1];
+  if (!latest || !restoredValuesValid(latest.previous)) return { kind: 'undo_unavailable' };
+  if (!records.correctTrainingSet) return { kind: 'rejected' };
+  const restored = latest.previous;
+  const undone: SetLog & { record_type: string } = {
+    ...existing,
+    record_type: 'set_log',
+    reps: restored.reps,
+    loadKg: restored.loadKg,
+    rir: restored.rir,
+    revision: (existing.revision ?? 0) + 1,
+    corrections: [
+      ...corrections,
+      {
+        id: set.undoId,
+        correctedAt: input.now.toISOString(),
+        previous: { reps: existing.reps, loadKg: existing.loadKg, rir: existing.rir },
+      },
+    ],
+  };
+  await requireCurrentTrainingAdmission(records, subject, admission);
+  const saved = await records.correctTrainingSet(
+    subject,
+    existing.id,
+    set.expectedRevision,
+    undone,
+  );
+  if (!saved) {
+    const replay = await loadTrainingRecords(records, subject);
+    const current = replay.logs.find((log) => log.id === existing.id);
+    const applied = current ? appliedUndo(current, set.undoId) : undefined;
+    if (applied && applied !== 'conflict') {
+      await requireCurrentTrainingAdmission(records, subject, admission);
+      return { kind: 'undone', log: { ...applied, record_type: 'set_log' } };
+    }
+    return { kind: 'set_conflict' };
+  }
+  return { kind: 'undone', log: saved };
+}
+
 export type WorkoutActionInput =
   | { kind: 'equipment_unavailable'; exerciseId: string }
   | { kind: 'shorten'; minutes: number }

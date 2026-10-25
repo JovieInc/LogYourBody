@@ -335,8 +335,9 @@ enum TrainingCompletionMotionPolicy {
 struct TrainingLiveSessionView: View {
     let voiceEnabled: Bool
     let readinessEnabled: Bool
-    let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
+    let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> TrainingSavedSet
     let onCorrectSet: (TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
+    let onUndoSet: (TrainingSetUndoRequest) async throws -> TrainingSavedSet
     let onWorkoutAction: (TrainingWorkoutActionRequest) async throws -> TrainingSession
     let onVoiceIntent: (TrainingSession, String, VoiceSetContext?, VoiceSetContext?) async throws -> VoiceIntentResponse
     let onFeedback: (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
@@ -371,8 +372,9 @@ struct TrainingLiveSessionView: View {
         readinessEnabled: Bool = false,
         draftStore: TrainingDraftStore = .shared,
         isCurrent: @escaping () -> Bool,
-        onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
+        onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> TrainingSavedSet,
         onCorrectSet: @escaping (TrainingSetCorrectionRequest) async throws -> TrainingSavedSet,
+        onUndoSet: @escaping (TrainingSetUndoRequest) async throws -> TrainingSavedSet,
         onWorkoutAction: @escaping (TrainingWorkoutActionRequest) async throws -> TrainingSession,
         onVoiceIntent: @escaping (
             TrainingSession, String, VoiceSetContext?, VoiceSetContext?
@@ -383,6 +385,7 @@ struct TrainingLiveSessionView: View {
         self.readinessEnabled = readinessEnabled
         self.onLogSet = onLogSet
         self.onCorrectSet = onCorrectSet
+        self.onUndoSet = onUndoSet
         self.onWorkoutAction = onWorkoutAction
         self.onVoiceIntent = onVoiceIntent
         self.onFeedback = onFeedback
@@ -688,11 +691,21 @@ struct TrainingLiveSessionView: View {
                 Button("30 min", systemImage: "clock") { performAction(.shorten(30)) }
             }
             HStack(spacing: JovieTokens.itemGap) {
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    if let undo = draft.undoAffordance {
+                        Button(undo.submitted ? "Retry undo" : "Undo", systemImage: "arrow.uturn.backward") {
+                            Task { await undoLastCorrection() }
+                        }
+                        .accessibilityLabel(undo.submitted ? "Retry undo" : "Undo correction")
+                        .accessibilityIdentifier(undo.submitted ? "training_undo_pending" : "training_set_undo")
+                    }
+                }
                 Button("Correct", systemImage: "pencil") {
                     guard let last = draft.lastCompletedPosition else { return }
                     draft.beginCorrection(last)
                     correctionPosition = last
                 }
+                .accessibilityIdentifier("training_set_correct")
                 .disabled(draft.lastCompletedPosition == nil)
                 Menu("More", systemImage: "ellipsis") {
                     Button("Skip this today") {
@@ -940,11 +953,15 @@ struct TrainingLiveSessionView: View {
     private func log(_ exercise: TrainingExercisePrescription, setNumber: Int) async {
         guard !isSaving else { return }
         errorMessage = nil
-        await draft.save(exercise, setNumber: setNumber) { request in
+        await draft.saveAcknowledged(exercise, setNumber: setNumber) { request in
             try await onLogSet(
                 exercise, request.setNumber, request.reps, request.loadKg, request.rir
             )
         }
+    }
+
+    private func undoLastCorrection() async {
+        await draft.undo(send: onUndoSet)
     }
 
     private func saveCorrection(_ position: TrainingSetPosition) async {
@@ -1060,6 +1077,9 @@ struct TrainingLiveSessionView: View {
                     return
                 }
                 voiceReview = .action(action)
+            case "clarify":
+                errorMessage = trainingVoiceClarification(response.missingFields ?? [])
+                return
             default:
                 errorMessage = "That command needs a little more detail. Nothing changed."
                 return
@@ -1070,6 +1090,21 @@ struct TrainingLiveSessionView: View {
         } catch {
             errorMessage = "The command could not be reviewed."
         }
+    }
+
+    private func trainingVoiceClarification(_ fields: [String]) -> String {
+        let prompts = [
+            "session": "start a training session",
+            "exercise": "name one exercise in your current session",
+            "set_number": "say the set number",
+            "reps": "say the rep count",
+            "rir": "say the reps in reserve",
+            "weight": "say the load with a unit",
+            "load_accounting": "say whether that load is per hand"
+        ]
+        let needed = fields.compactMap { prompts[$0] }
+        if needed.isEmpty { return "That command needs a little more detail. Nothing changed." }
+        return "I heard a set log. To prepare it, \(needed.joined(separator: ", and ")). Nothing was logged."
     }
 
     private func voiceContext(_ position: TrainingSetPosition?) -> VoiceSetContext? {
@@ -1401,6 +1436,36 @@ struct TrainingLiveSessionFixtureView: View {
                     savedSets.append(saved)
                     Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
                     if losesResponse { throw URLError(.networkConnectionLost) }
+                    return saved
+                }, onUndoSet: { request in
+                    guard !offline else { throw URLError(.notConnectedToInternet) }
+                    let current = savedSets.first {
+                        $0.exerciseId == request.exerciseId && $0.setNumber == request.setNumber
+                    }
+                    let saved = TrainingSavedSet(
+                        sessionId: request.sessionId,
+                        exerciseId: request.exerciseId,
+                        setNumber: request.setNumber,
+                        reps: current?.corrections?.last?.previous.reps ?? current?.reps ?? 10,
+                        loadKg: current?.corrections?.last?.previous.loadKg ?? current?.loadKg,
+                        rir: current?.corrections?.last?.previous.rir ?? current?.rir ?? 3,
+                        revision: request.expectedRevision + 1,
+                        corrections: (current?.corrections ?? []) + [
+                            TrainingSetCorrectionAudit(
+                                id: request.undoId,
+                                correctedAt: "2026-10-12T00:00:00.000Z",
+                                previous: .init(
+                                    reps: current?.reps ?? 10,
+                                    loadKg: current?.loadKg,
+                                    rir: current?.rir ?? 3
+                                )
+                            )
+                        ]
+                    )
+                    savedSets.removeAll { $0.exerciseId == request.exerciseId && $0.setNumber == request.setNumber }
+                    savedSets.append(saved)
+                    Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
+                    return saved
                 }, onCorrectSet: { request in
                     guard !offline else { throw URLError(.notConnectedToInternet) }
                     let saved = TrainingSavedSet(

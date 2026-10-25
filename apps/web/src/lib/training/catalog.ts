@@ -633,6 +633,21 @@ export function catalogVariantById(id: string): CatalogVariant | undefined {
   return catalogById.get(id);
 }
 
+const SHARED_LOAD_IMPLEMENTS = ['barbell', 'ez_bar', 'smith', 'machine', 'cable'] as const;
+
+/** Dumbbell-only variants name the weight of the implement in one hand.
+ * Bars, machines, cables, and Smith rails do not establish that convention. */
+export function establishedLoadAccounting(exerciseId: string): 'per_hand' | undefined {
+  const variant = catalogVariantById(exerciseId);
+  if (!variant?.requires.includes('dumbbells')) return undefined;
+  if (
+    variant.requires.some((item) => (SHARED_LOAD_IMPLEMENTS as readonly string[]).includes(item))
+  ) {
+    return undefined;
+  }
+  return 'per_hand';
+}
+
 /** Standard inventory each profile can prove. Specialty items (an EZ bar, a
  * Smith machine) are never assumed; a full-gym preset alone cannot prove them. */
 export function profileEquipment(profile: Equipment): Set<CatalogEquipment> {
