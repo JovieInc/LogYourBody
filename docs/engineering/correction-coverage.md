@@ -13,7 +13,8 @@ The metric reads `packages/shared-lib/corrections.json`, retaining the receipt
 contract and recurrence behavior from [LYB-209](correction-recurrence.md). Count
 one rule per normalized fingerprint, regardless of how many correction receipts
 it has. This ledger is also the LYB lesson inventory; do not copy Jovie's lesson
-ledger into it. Each current receipt must include a reviewed classification
+ledger into it. The [capture guide](correction-ledger.md) covers chat/memory,
+review, Linear and revert sources. Each current receipt must include a reviewed classification
 (LYB-205) and a retained guard or explicit prose-only reason (LYB-206):
 
 ```json
@@ -87,6 +88,13 @@ regression guard. These are
 reviewed source-linkage metrics, not proof that the guards executed or that every
 historical correction has been captured.
 
+Each rule's JSON output also retains its `guard` (or `proseOnlyReason`), sorted
+`receipts` with source, lesson and mechanization, and derived `recurrence`:
+`receiptCount` counts distinct canonical source URLs and `repeatCount` excludes
+the first receipt. Duplicate replays count once, matching the recurrence intake.
+The existing owner report and CI summary show those sources, lessons, guard
+locations and counts alongside the enforcement level.
+
 Run from the repository root:
 
 ```sh
@@ -106,6 +114,10 @@ CI rejects any decrease in the unrounded overall or nonempty per-level ratio,
 removal of a retained rule, loss of a mechanized guard, or movement of an already
 mechanized rule from codebase to static/prose/human. Moving all rules out of a
 level by promoting them is allowed; an empty level has no percentage to compare.
+It also rejects removal, replacement or reassignment of any retained source
+URL within its fingerprint, even when aggregate coverage and receipt counts
+stay equal. Clarifying lesson text, removing duplicate replays, adding new
+receipts and canonical URL spelling changes remain allowed.
 New unmechanized rules can lower coverage and must be addressed in the same PR.
 Empty baselines establish no percentage floor. Existing quality gates remain in
 place.
