@@ -1088,7 +1088,7 @@
 		BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2EntryEditorLayout.swift; sourceTree = "<group>"; };
 		26820261025000000000001 /* DatedOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcome.swift; sourceTree = "<group>"; };
 		26820261025000000000003 /* DatedOutcomeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStore.swift; sourceTree = "<group>"; };
-		26820261025000000000005 /* ProductAPIClient+DatedOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductAPIClient+DatedOutcome.swift; sourceTree = "<group>"; };
+		26820261025000000000005 /* ProductAPIClient+DatedOutcome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ProductAPIClient+DatedOutcome.swift"; sourceTree = "<group>"; };
 		26820261025000000000007 /* DatedOutcomeStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatedOutcomeStoreTests.swift; sourceTree = "<group>"; };
 		26820261025000000000009 /* LogYourBodyV5.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV5.xcdatamodel; sourceTree = "<group>"; };
 		2682026102500000000000A /* LogYourBodyV5.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV5.xcdatamodel; sourceTree = "<group>"; };

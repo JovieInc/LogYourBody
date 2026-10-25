@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "xcode-project-quotes-extension-file-paths",
+    "correction": "PR #1561 / LYB-268: StoreKit exited 74 during simulator destination resolution before running tests. The dated outcome API extension path contained an unquoted plus sign, and the Xcode project parser rejected the manifest.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40197919510/job/121182776221",
+    "mechanization": "Quote the extension path without changing target membership or test selectors. The required shared-lib suite now rejects unquoted plus signs in Xcode file names and paths. The guard and real Xcodeproj parser both fail on the original project and pass after quoting. Refresh the existing reviewed project pin and generated source fingerprint.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime types cannot prevent malformed OpenStep syntax in the separately maintained Xcode project manifest."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib test task can reject unquoted plus signs in project file names and paths before native destination resolution."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/testflight-distribution-guard.test.ts",
+      "anchor": "quotes Xcode file names and paths containing plus signs"
+    }
+  },
+  {
     "fingerprint": "web-dated-outcome-runtime-env-declaration",
     "correction": "PR #1561 / LYB-268: The dated outcome API consumes LYB_DATED_OUTCOME_ENABLED without declaring it in apps/web/.env.example, failing the existing required product-registry environment surface guard.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1561",
