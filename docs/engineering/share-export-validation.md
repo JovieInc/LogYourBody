@@ -128,3 +128,51 @@ the same command under CI's bashcov 4.0.0 and then
 native coverage, Launch Quality and physical-device acceptance remain unverified.
 GBrain write and readback for `lyb-40-pr1532-repair` both failed with connection
 refused at `127.0.0.1:7801`; no durable persistence occurred.
+
+## PR #1532 aspect-fit repair
+
+Merged `origin/main` at `0c82e0c81` without conflicts in merge commit `40577f07e`
+before editing. The harness checkout was detached and the original branch was
+occupied by another worktree, so local work uses `fix/lyb-40-pr1532-repair`.
+No push or PR mutation is part of this repair.
+
+`gh run view 40154055343 --repo JovieInc/LogYourBody --log-failed` found nine
+assertion failures in `testPreparationBoundsPixelsAcrossSourceScalesAndExportAspects`:
+story thumbnails were 1280x1920 rather than 1080x1620 inside 1080x1920 bounds,
+at all three source scales. CI Summary failed because Launch Quality failed.
+The worker now requests the photo's explicit minimum-ratio fitted size after
+pixel-to-point conversion. The retained regression keeps every pixel-bound and
+exact-fit assertion, adds landscape sources, and covers an empty opted-in image
+as a render failure. The correction ledger records the CI receipt and guard.
+
+On this Linux host, Node 22.23.2/pnpm 10.34.1 ran
+`bash scripts/codex-setup.sh --run lint`, `--run typecheck`, `--run test`, and
+`--run test --filter=@logyourbody/shared-lib` successfully. The isolated shared-lib
+suite executed 156 Vitest tests and 122 Node tests. Its correction coverage test
+retained all configured coverage floors. The first root test attempt hit sandbox
+subprocess restrictions; the unrestricted retry had one correction-coverage test
+timeout before the isolated suite passed. The final root retry passed all eight
+Turbo tasks (six cached), including the web build and tests. No timeout or gate
+was changed. The marketing asset generator's timestamp-only side effect was
+discarded.
+
+Changed-file `swiftlint lint --strict --no-cache --config apps/ios/.swiftlint.yml`
+passed for the worker and native test file with zero violations; five
+SourceKit-dependent rules were unavailable. Correction coverage, correction
+ratchets, all 29 correction behavioral tests, repository source parity and
+`git diff --check` passed, using:
+
+```sh
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
+node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs packages/shared-lib/scripts/correction-ratchet.behavior.mjs
+python3 scripts/repository_docs.py
+git diff --check
+```
+
+`xcodebuild -version` returned command not found;
+repaired native execution, coverage, Launch Quality and device acceptance remain
+unverified until the harness runs the required checks.
+
+GBrain search, write to `lyb-40-pr1532-aspect-fit`, and readback failed with
+connection refused at `127.0.0.1:7801`. No durable write/readback occurred.

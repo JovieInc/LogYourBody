@@ -294,10 +294,14 @@ actor BodyScoreShareImageWorker {
         try Task.checkCancellation()
         var payload = snapshot.payload
         if snapshot.options.includeVisual, snapshot.options.selectedMetric == nil, let photo = payload.photoImage {
+            guard photo.size.width > 0, photo.size.height > 0 else { throw BodyScoreShareFailure.render }
             // UIKit takes points and preserves the source image's scale; export bounds are pixels.
             let pixels = snapshot.aspect.pixelSize
             let points = CGSize(width: pixels.width / photo.scale, height: pixels.height / photo.scale)
-            guard let thumbnail = await photo.byPreparingThumbnail(ofSize: points) else {
+            // Request the photo's fitted size: UIKit's thumbnail sizing can otherwise exceed one bound.
+            let fit = min(points.width / photo.size.width, points.height / photo.size.height)
+            let fittedSize = CGSize(width: photo.size.width * fit, height: photo.size.height * fit)
+            guard let thumbnail = await photo.byPreparingThumbnail(ofSize: fittedSize) else {
                 throw BodyScoreShareFailure.render
             }
             payload.photoImage = thumbnail

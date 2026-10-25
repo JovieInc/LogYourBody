@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "share-export-thumbnail-fits-both-pixel-bounds",
+    "correction": "PR #1532 Launch Quality still returned a 1280x1920 story thumbnail for a 1080x1920 export after point conversion. Request the source image's aspect-fitted dimensions rather than the export rectangle.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40154055343/job/121051559437",
+    "mechanization": "The worker computes an explicit minimum-ratio fit before the UIKit call. The retained failing native Unit test now covers portrait and landscape photos at 1x/2x/3x for every export aspect without weakening its backing-pixel or exact-fit assertions. Empty opted-in images have a named render-failure regression. CI supplies the original failing receipt; native pass execution remains unavailable on this Linux repair host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Passing a size with the photo's own aspect ratio bounds both dimensions by construction while preserving background preparation, source-scale conversion, and export geometry."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BodyScoreShareExport.swift",
+      "anchor": "let fit = min(points.width / photo.size.width, points.height / photo.size.height)"
+    }
+  },
+  {
     "fingerprint": "share-export-thumbnail-bounds-use-pixels",
     "correction": "PR #1532 Launch Quality found a 2700x4050 opted-in thumbnail exceeding the 1080x1350 export bounds on a 3x image. Convert export pixels to source-image points before thumbnail preparation.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151321879/job/121043485541",

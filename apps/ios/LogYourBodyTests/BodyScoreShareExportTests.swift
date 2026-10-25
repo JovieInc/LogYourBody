@@ -275,11 +275,31 @@ final class BodyScoreShareExportTests: XCTestCase {
     }
 
     func testPreparationBoundsPixelsAcrossSourceScalesAndExportAspects() async throws {
+        for size in [CGSize(width: 2_000, height: 3_000), CGSize(width: 3_000, height: 2_000)] {
+            try await assertPreparationBounds(sourceSize: size)
+        }
+    }
+
+    func testPreparationRejectsEmptyOptedInImage() async {
+        var payload = makeSnapshot().payload
+        payload.photoImage = UIImage()
+        var options = BodyScoreShareOptions()
+        options.includeVisual = true
+        do {
+            _ = try await BodyScoreShareImageWorker.shared.prepare(
+                .init(payload: payload, aspect: .story, options: options))
+            XCTFail("An empty photo must fail preparation")
+        } catch {
+            XCTAssertEqual(error as? BodyScoreShareFailure, .render)
+        }
+    }
+
+    private func assertPreparationBounds(sourceSize: CGSize) async throws {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
-        let source = UIGraphicsImageRenderer(size: CGSize(width: 2_000, height: 3_000), format: format).image { _ in
+        let source = UIGraphicsImageRenderer(size: sourceSize, format: format).image { _ in
             UIColor.red.setFill()
-            UIRectFill(CGRect(x: 0, y: 0, width: 2_000, height: 3_000))
+            UIRectFill(CGRect(origin: .zero, size: sourceSize))
         }
         let pixels = try XCTUnwrap(source.cgImage)
         var options = BodyScoreShareOptions()
@@ -294,9 +314,9 @@ final class BodyScoreShareExportTests: XCTestCase {
                 let image = try XCTUnwrap(photo.cgImage)
                 XCTAssertLessThanOrEqual(CGFloat(image.width), aspect.pixelSize.width)
                 XCTAssertLessThanOrEqual(CGFloat(image.height), aspect.pixelSize.height)
-                let fit = min(aspect.pixelSize.width / 2_000, aspect.pixelSize.height / 3_000)
-                XCTAssertEqual(CGFloat(image.width), 2_000 * fit, accuracy: 1)
-                XCTAssertEqual(CGFloat(image.height), 3_000 * fit, accuracy: 1)
+                let fit = min(aspect.pixelSize.width / sourceSize.width, aspect.pixelSize.height / sourceSize.height)
+                XCTAssertEqual(CGFloat(image.width), sourceSize.width * fit, accuracy: 1)
+                XCTAssertEqual(CGFloat(image.height), sourceSize.height * fit, accuracy: 1)
             }
         }
     }
