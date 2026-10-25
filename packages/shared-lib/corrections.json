@@ -32,6 +32,66 @@
     }
   },
   {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1560: Resolve the origin/main correction-ledger conflict by retaining the backward-planner CI receipts and the training-cycle merge receipt with their original sources and guards.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1560",
+    "mechanization": "Preserve both sides of the additive ledger merge. The existing required correction coverage check compares immutable-base source identities and rejects discarded receipts; its behavioral regressions cover deleted, replaced and reassigned source receipts. Verify the resolved ledger against both pre-merge parents.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    }
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1560: BackwardPlanner and its tests and launch-contract resource changed Xcode target membership without refreshing the exact diagnostic project dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40196279621/job/121177686899",
+    "mechanization": "Review the twelve project additions and refresh only the manifest SHA-256. The existing required runner-routing regression failed on the old pin locally and in CI; it retains all seven dependency pins and accepted/rejected trusted CLI cases.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    }
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1560: Adding backward-planner target membership left the generated Xcode manifest fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40196279621/job/121177687150",
+    "mechanization": "Regenerate the existing source projection after reviewing the Xcode manifest diff. The projection checker failed before regeneration locally and in CI; the required Detect Changes gate and its existing regression continue rejecting stale projection evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    }
+  },
+  {
     "fingerprint": "training-cycle-delegation-merge-parity",
     "correction": "PR #1541 conflicts with the delegated programming implementation merged in PR #1531. Preserve both proposal versions, owner-locked database admission and native entry points when merging origin/main.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1541",
@@ -539,6 +599,26 @@
     "guard": {
       "path": "apps/web/src/app/sitemap.ts",
       "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
+    }
+  },
+  {
+    "fingerprint": "guard-reference-paths-exist",
+    "correction": "LYB-254: A ledger entry that claims a guard must point at a test, lint rule, or CI step path that exists. Entries with no guard reference stay on a shrink-only baseline.",
+    "source": "https://linear.app/jovie/issue/LYB-254",
+    "mechanization": "The required Detect Changes job runs guard-reference.mjs on every diff. A missing guard path fails with the entry id and path. Unguarded entries warn, and the committed baseline can only shrink against the exact Git base.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot prove that a Git-tracked ledger guard still points at a file in the repository."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic CI check can stat each claimed guard path and compare the unguarded entry baseline with the immutable Git base."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/guard-reference.behavior.mjs",
+      "anchor": "deleted guard fails with the entry id and path"
     }
   }
 ]
