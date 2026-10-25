@@ -65,6 +65,13 @@ struct TrainingCoachCard: View {
                 Text("\(session.exercises.count) movements · engine-guided sets and reps")
                     .font(.system(size: 14))
                     .foregroundStyle(theme.colors.textSecondary)
+                if let nextAction = TrainingRecoveryCopy.appliedNextAction(session.explanation) {
+                    Text(nextAction)
+                        .font(.system(size: 14))
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("training_recovery_next_action")
+                }
                 Button(action: onStart) {
                     HStack {
                         Text("Start session")
@@ -495,6 +502,13 @@ struct TrainingLiveSessionView: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(theme.colors.text)
                 .accessibilityIdentifier("training_progress")
+            if let nextAction = TrainingRecoveryCopy.appliedNextAction(draft.session.explanation) {
+                Text(nextAction)
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("training_live_recovery_next_action")
+            }
         }
     }
 
