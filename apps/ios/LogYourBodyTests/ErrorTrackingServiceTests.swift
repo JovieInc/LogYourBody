@@ -42,6 +42,13 @@ final class ErrorTrackingServiceTests: XCTestCase {
             tags.append((value, key))
         }
 
+        private(set) var userIDs: [String] = []
+
+        func setUser(id: String) {
+            record("user:\(id)")
+            userIDs.append(id)
+        }
+
         func setExtra(value: String, key: String) {
             record("extra:\(key)=\(value)")
             extras.append((value, key))
@@ -70,7 +77,7 @@ final class ErrorTrackingServiceTests: XCTestCase {
 
     private func makeService() -> (ErrorTrackingService, FakeErrorTrackingVendor) {
         let vendor = FakeErrorTrackingVendor()
-        return (ErrorTrackingService(vendor: vendor), vendor)
+        return (ErrorTrackingService(vendor: vendor, installID: { "i_test-install" }), vendor)
     }
 
     private func tagValues(_ vendor: FakeErrorTrackingVendor, forKey key: String) -> [String] {
@@ -151,6 +158,28 @@ final class ErrorTrackingServiceTests: XCTestCase {
         XCTAssertEqual(tagValues(vendor, forKey: "userId"), ["[Filtered]"])
     }
 
+    func testUpdateUserIdSendsOnlyAnOpaqueHashedUser() throws {
+        let (service, vendor) = makeService()
+
+        service.updateUserId("user-9")
+
+        let id = try XCTUnwrap(vendor.userIDs.first)
+        XCTAssertTrue(id.hasPrefix("u_"))
+        XCTAssertEqual(id.count, 18)
+        XCTAssertFalse(id.contains("user-9"))
+        XCTAssertEqual(id, ErrorTrackingIdentity.anonymousID(for: "user-9"))
+        XCTAssertNotEqual(id, ErrorTrackingIdentity.anonymousID(for: "user-10"))
+    }
+
+    func testSignedOutSessionsReportTheInstallIdSoImpactIsNeverZeroUsers() {
+        let (service, vendor) = makeService()
+
+        service.updateUserId(nil)
+        service.updateUserId("")
+
+        XCTAssertEqual(vendor.userIDs, ["i_test-install", "i_test-install"])
+    }
+
     func testUpdateUserIdFallsBackToNoneForNilOrEmpty() {
         let (service, vendor) = makeService()
 
@@ -206,7 +235,10 @@ final class ErrorTrackingServiceTests: XCTestCase {
         await fulfillment(of: [delivered], timeout: 2)
 
         await MainActor.run {
-            XCTAssertEqual(vendor.calls, ["start", "tag:userId=[Filtered]", "breadcrumb"])
+            XCTAssertEqual(vendor.calls.count, 4)
+            XCTAssertEqual(vendor.calls.first, "start")
+            XCTAssertTrue(vendor.calls[1].hasPrefix("user:u_"))
+            XCTAssertEqual(Array(vendor.calls.suffix(2)), ["tag:userId=[Filtered]", "breadcrumb"])
             XCTAssertTrue(vendor.callsWereOnMain.allSatisfy { $0 })
             XCTAssertEqual(vendor.startCallCount, 1)
             XCTAssertEqual(vendor.breadcrumbMessages, ["[Filtered]"])
