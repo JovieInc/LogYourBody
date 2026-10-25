@@ -96,3 +96,35 @@ checks, not native execution receipts.
 
 GBrain search, write to `lyb-40-share-export-lifecycle`, and readback all failed
 with connection refused at `127.0.0.1:7801`. No durable write/readback is claimed.
+
+## PR #1532 repair evidence
+
+`git merge --no-edit origin/main` reported already up to date at `c99f4da73`.
+`gh run view 40151321879 --repo JovieInc/LogYourBody --log-failed` identified
+the thumbnail's pixel/point mismatch and the diagnostic fixture's project hash
+mismatch. The worker now converts export pixels to source-image points. Native
+tests retain the failing file-cleanup case and add all export aspects at 1x/2x/3x,
+checking backing pixel dimensions and expected aspect-fit resolution.
+
+The routing positive fixture uses compressed project bytes from the original
+policy-pinning commit `45d5dd3384b907a40352028c0a1b5404f27e03fd`, checked against
+the unchanged workflow digest. A changed-project refusal case runs the real
+trusted CLI without reaching any native tool. No workflow or gate was changed.
+
+On the Linux repair host, Node 22.23.2/pnpm 10.34.1 ran
+`bash scripts/codex-setup.sh --run lint`, `--run typecheck`, `--run test`, and
+`--run product:check` successfully. Turbo reused unaffected package results;
+shared-lib tests executed after rerunning with subprocess access because the
+sandbox denied process creation. Changed-file strict SwiftLint with `--no-cache`
+passed with its five Linux SourceKit rules unavailable. Correction coverage,
+correction ratchets, repository source parity and `git diff --check` passed.
+
+`python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q`
+reproduced 1 failure/40 passes before repair and passed all 41 afterward. Running
+the same command under CI's bashcov 4.0.0 and then
+`python3 scripts/tests/test_runner_routing.py` passed all four 80% coverage floors:
+93.48%, 82.50%, 90.62%, 90.91%. Local Ruby was 3.2.3; CI uses Ruby 4.0.
+`xcodebuild -version` failed because Xcode is absent. Repaired native tests,
+native coverage, Launch Quality and physical-device acceptance remain unverified.
+GBrain write and readback for `lyb-40-pr1532-repair` both failed with connection
+refused at `127.0.0.1:7801`; no durable persistence occurred.

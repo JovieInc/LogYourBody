@@ -1,5 +1,41 @@
 [
   {
+    "fingerprint": "share-export-thumbnail-bounds-use-pixels",
+    "correction": "PR #1532 Launch Quality found a 2700x4050 opted-in thumbnail exceeding the 1080x1350 export bounds on a 3x image. Convert export pixels to source-image points before thumbnail preparation.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151321879/job/121043485541",
+    "mechanization": "The image worker divides the target pixel bounds by UIImage.scale before calling UIKit. The existing required native Unit target retains the failing real-file regression and adds explicit 1x/2x/3x source coverage across every export aspect, checking CGImage dimensions and aspect-fit resolution. Native fail/pass execution remains unavailable on the Linux repair host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Converting units at the worker boundary prevents image scale from multiplying the requested pixel budget without changing export geometry or privacy behavior."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/BodyScoreShareExport.swift",
+      "anchor": "let points = CGSize(width: pixels.width / photo.scale, height: pixels.height / photo.scale)"
+    }
+  },
+  {
+    "fingerprint": "diagnostic-pin-tests-use-frozen-project-fixture",
+    "correction": "PR #1532 Mac Runner Routing Tests treated an ordinary Xcode target addition as an invalid positive fixture because the test copied the current project into a diagnostic policy pinned to historical bytes.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151321879/job/121043291797",
+    "mechanization": "The required routing suite uses a compressed offline copy of the exact project from the policy-pinning commit, verifies its digest against the unchanged trusted workflow, and retains all refusal cases plus an explicit changed-project refusal. The real CLI still rejects mismatched project bytes before any helper or native tool executes.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This is a test-fixture lifetime mismatch; product code cannot make a mutable project remain byte-identical to a frozen diagnostic policy."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required routing suite can exercise frozen accepted bytes and changed rejected bytes through the actual trusted CLI without repinning or changing CI policy."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]"
+    }
+  },
+  {
     "fingerprint": "share-export-stale-inputs-and-unconfirmed-photo-save",
     "correction": "LYB-40: A synchronous MainActor renderer cannot display its transient busy state, cached pixels survive payload refresh, and submitting a Photos write is not confirmed success. Freeze all export inputs, serialize work, suppress invalidated completions, and await the Photos transaction.",
     "source": "https://linear.app/jovie/issue/LYB-40",

@@ -274,6 +274,33 @@ final class BodyScoreShareExportTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
     }
 
+    func testPreparationBoundsPixelsAcrossSourceScalesAndExportAspects() async throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let source = UIGraphicsImageRenderer(size: CGSize(width: 2_000, height: 3_000), format: format).image { _ in
+            UIColor.red.setFill()
+            UIRectFill(CGRect(x: 0, y: 0, width: 2_000, height: 3_000))
+        }
+        let pixels = try XCTUnwrap(source.cgImage)
+        var options = BodyScoreShareOptions()
+        options.includeVisual = true
+        for scale: CGFloat in [1, 2, 3] {
+            for aspect in BodyScoreShareAspect.allCases {
+                var payload = makeSnapshot().payload
+                payload.photoImage = UIImage(cgImage: pixels, scale: scale, orientation: .up)
+                let prepared = try await BodyScoreShareImageWorker.shared.prepare(
+                    .init(payload: payload, aspect: aspect, options: options))
+                let photo = try XCTUnwrap(prepared.payload.photoImage)
+                let image = try XCTUnwrap(photo.cgImage)
+                XCTAssertLessThanOrEqual(CGFloat(image.width), aspect.pixelSize.width)
+                XCTAssertLessThanOrEqual(CGFloat(image.height), aspect.pixelSize.height)
+                let fit = min(aspect.pixelSize.width / 2_000, aspect.pixelSize.height / 3_000)
+                XCTAssertEqual(CGFloat(image.width), 2_000 * fit, accuracy: 1)
+                XCTAssertEqual(CGFloat(image.height), 3_000 * fit, accuracy: 1)
+            }
+        }
+    }
+
     func testProductionPipelineExportsRefreshedMetricWithoutPreviouslyEnabledPrivateSource() async throws {
         var pngs: [Data] = []
         let exporter = BodyScoreShareExport(save: { url, _ in
