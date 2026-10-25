@@ -496,6 +496,10 @@
 		3C8D01B01A2EBFA3C3EB73CD /* InterTight.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E0666550EE3D136A64FEB833 /* InterTight.ttf */; };
 		AB92EB88BB101CE4C08FF99D /* InterTight-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = C804289887C0B000A09DC147 /* InterTight-OFL.txt */; };
 		BFED20261016000100000001 /* HomeV2EntryEditorLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */; };
+		E24920261025000100000002 /* WorkoutReconciliationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24920261025000100000001 /* WorkoutReconciliationPolicy.swift */; };
+		E24920261025000200000002 /* CoreDataWorkoutReconciliationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24920261025000200000001 /* CoreDataWorkoutReconciliationStore.swift */; };
+		E24920261025000300000002 /* WorkoutReconciliationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24920261025000300000001 /* WorkoutReconciliationViewModel.swift */; };
+		E24920261025000400000002 /* WorkoutReconciliationPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1082,6 +1086,12 @@
 		E0666550EE3D136A64FEB833 /* InterTight.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "InterTight.ttf"; sourceTree = "<group>"; };
 		C804289887C0B000A09DC147 /* InterTight-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "InterTight-OFL.txt"; sourceTree = "<group>"; };
 		BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2EntryEditorLayout.swift; sourceTree = "<group>"; };
+		E24920261025000100000001 /* WorkoutReconciliationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutReconciliationPolicy.swift; sourceTree = "<group>"; };
+		E24920261025000200000001 /* CoreDataWorkoutReconciliationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreDataWorkoutReconciliationStore.swift; sourceTree = "<group>"; };
+		E24920261025000300000001 /* WorkoutReconciliationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutReconciliationViewModel.swift; sourceTree = "<group>"; };
+		E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutReconciliationPromptTests.swift; sourceTree = "<group>"; };
+		E24920261025000500000001 /* LogYourBodyV5.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV5.xcdatamodel; sourceTree = "<group>"; };
+		E24920261025000500000002 /* LogYourBodyV5.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV5.xcdatamodel; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1310,6 +1320,7 @@
 		AD723ACF2E15FA5C002376C6 /* LogYourBodyTests */ = {
 			isa = PBXGroup;
 			children = (
+				E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */,
 				896E3815B745A313FCD93C78 /* DesignSystem */,
 				8631504046C70A4EE432C9B8 /* AccountDeletionAndShareCardTests.swift */,
 				AB992727D1333B365F93F30E /* AccountDeletionCleanupServiceTests.swift */,
@@ -1499,6 +1510,8 @@
 		AD723AED2E15FA5C002376C6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				E24920261025000200000001 /* CoreDataWorkoutReconciliationStore.swift */,
+				E24920261025000100000001 /* WorkoutReconciliationPolicy.swift */,
 				C7A700012F20000000C0A701 /* ChatService.swift */,
 				D0C0DE000000000000000002 /* VoiceCaptureService.swift */,
 				E4172D019C9F4A30A881C001 /* TrainingService.swift */,
@@ -1595,6 +1608,7 @@
 		AD723AF22E15FA5C002376C6 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				E24920261025000300000001 /* WorkoutReconciliationViewModel.swift */,
 				ADF1F6B92ED4C66400745F33 /* GlobalTimelineStore.swift */,
 				ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */,
 			);
@@ -2194,6 +2208,7 @@
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
 				F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */,
+				E24920261025000400000002 /* WorkoutReconciliationPromptTests.swift in Sources */,
 				E11020261025000100000006 /* TrainingProgressTests.swift in Sources */,
 				E41302026025000000000004 /* DelegatedTrainingTests.swift in Sources */,
 				FE06A6A600000000000000B6 /* Glp1CardAndCatalogTests.swift in Sources */,
@@ -2395,6 +2410,9 @@
 				E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */,
 				E11020261025000100000002 /* TrainingProgress.swift in Sources */,
 				F00720261007000100000002 /* TrainingDraftStore.swift in Sources */,
+				E24920261025000300000002 /* WorkoutReconciliationViewModel.swift in Sources */,
+				E24920261025000200000002 /* CoreDataWorkoutReconciliationStore.swift in Sources */,
+				E24920261025000100000002 /* WorkoutReconciliationPolicy.swift in Sources */,
 				F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */,
 				E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */,
 				E11020261025000100000004 /* TrainingProgressViews.swift in Sources */,
@@ -3107,8 +3125,9 @@
 				F7A2B3C4D5E6F70809101112 /* LogYourBodyV2.xcdatamodel */,
 				F7A2B3C4D5E6F70809101114 /* LogYourBodyV3.xcdatamodel */,
 				F7A2B3C4D5E6F70809101116 /* LogYourBodyV4.xcdatamodel */,
+				E24920261025000500000001 /* LogYourBodyV5.xcdatamodel */,
 			);
-			currentVersion = F7A2B3C4D5E6F70809101116 /* LogYourBodyV4.xcdatamodel */;
+			currentVersion = E24920261025000500000001 /* LogYourBodyV5.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
@@ -3120,8 +3139,9 @@
 				F7A2B3C4D5E6F70809101113 /* LogYourBodyV2.xcdatamodel */,
 				F7A2B3C4D5E6F70809101115 /* LogYourBodyV3.xcdatamodel */,
 				F7A2B3C4D5E6F70809101117 /* LogYourBodyV4.xcdatamodel */,
+				E24920261025000500000002 /* LogYourBodyV5.xcdatamodel */,
 			);
-			currentVersion = F7A2B3C4D5E6F70809101117 /* LogYourBodyV4.xcdatamodel */;
+			currentVersion = E24920261025000500000002 /* LogYourBodyV5.xcdatamodel */;
 			path = LogYourBody.xcdatamodeld;
 			sourceTree = "<group>";
 			versionGroupType = wrapper.xcdatamodel;
