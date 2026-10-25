@@ -1,4 +1,5 @@
 import type { TrainingProgramSetup } from '@/lib/training/types';
+import type { DelegatedProposal, RevisionActor } from '@/lib/training/delegation-contract';
 import type {
   InitialTrainingProposal,
   RevisionContextToken,
@@ -10,6 +11,8 @@ export type TrainingRevisionContext = RevisionContextToken & {
   dateOfBirth: unknown;
   legacySetups: unknown[];
   headRevision: string | null;
+  canonicalTrainingInputs?: unknown;
+  evidenceFingerprint?: string;
 };
 export type RevisionConflict =
   | 'owner_missing'
@@ -18,7 +21,9 @@ export type RevisionConflict =
   | 'request_conflict'
   | 'already_decided'
   | 'proposal_not_found'
-  | 'program_already_enrolled';
+  | 'program_already_enrolled'
+  | 'unauthorized_actor'
+  | 'delayed_active_workout';
 export type ProposalWriteResult =
   { kind: 'stored'; stored: StoredTrainingProposal } | { kind: RevisionConflict };
 export type RevisionDecisionResult =
@@ -32,7 +37,7 @@ export interface TrainingRevisionsPort {
     subject: string;
     requestId: string;
     requestHash: string;
-    proposal: InitialTrainingProposal;
+    proposal: InitialTrainingProposal | DelegatedProposal;
   }): Promise<ProposalWriteResult>;
   decide(input: {
     subject: string;
@@ -44,6 +49,8 @@ export interface TrainingRevisionsPort {
     now: string;
     revisionId: string;
     setup: TrainingProgramSetup & { programRevisionId: string };
+    actor?: RevisionActor;
+    evidenceFingerprint?: string;
   }): Promise<RevisionDecisionResult>;
   storeLegacySetup(
     subject: string,

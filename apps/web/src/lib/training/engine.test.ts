@@ -17,6 +17,7 @@ import {
   type TrainingFeedback,
   type TrainingProgramSetup,
 } from './types';
+import { recommendProgram } from './delegated-planning';
 
 const setup: TrainingProgramSetup = {
   id: 'setup-id',
@@ -114,6 +115,62 @@ describe('deterministic training engine', () => {
               expect(exercise.substitutions.every((candidate) => !ids.includes(candidate.id))).toBe(
                 true,
               );
+            }
+          }
+        }
+      }
+    },
+  );
+
+  it.each([4, 5, 6] as const)(
+    'preserves reviewed delegated prescriptions across a %i-day schedule',
+    (sessionsPerWeek) => {
+      for (const equipment of ['dumbbells', 'full_gym'] as const) {
+        const delegated = recommendProgram(
+          {
+            goal: 'Build muscle',
+            goalDate: null,
+            experience: 'new',
+            sessionsPerWeek,
+            minutesPerSession: 60,
+            equipment,
+            excludedVariantIds: ['barbell_romanian_deadlift'],
+            limitations: [],
+            preferredVariantIds: [],
+          },
+          4,
+        );
+        for (let currentWeek = 1; currentWeek <= 4; currentWeek++) {
+          const week = buildMicrocycle({
+            setup: { ...setup, sessionsPerWeek, equipment, delegated },
+            block: { ...createMesoBlock(setup.startedAt, setup.startedAt), currentWeek },
+            sessionIds: Array.from({ length: sessionsPerWeek }, (_, slot) => `session-${slot}`),
+            logs: [],
+            feedback: [],
+          });
+          expect(week.sessions).toHaveLength(sessionsPerWeek);
+          for (const [slot, session] of week.sessions.entries()) {
+            const reviewed = delegated.plan.sessions[slot];
+            expect(session.title).toBe(reviewed.title);
+            expect(session.pattern).toBe(slot % 2 === 0 ? 'A' : 'B');
+            expect(
+              session.exercises.map(({ id, sets, targetReps }) => ({ id, sets, targetReps })),
+            ).toEqual(
+              reviewed.exercises.map((row) => ({
+                id: row.variantId,
+                sets: currentWeek === delegated.deloadWeek ? 1 : row.sets,
+                targetReps: row.targetReps,
+              })),
+            );
+            for (const exercise of session.exercises) {
+              expect(exercise.id).not.toBe('barbell_romanian_deadlift');
+              expect(
+                exercise.substitutions.every(
+                  (candidate) =>
+                    candidate.id !== 'barbell_romanian_deadlift' &&
+                    !reviewed.exercises.some((row) => row.variantId === candidate.id),
+                ),
+              ).toBe(true);
             }
           }
         }

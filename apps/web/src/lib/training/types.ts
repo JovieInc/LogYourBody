@@ -23,7 +23,7 @@ export type ProgressionAction = 'hold' | 'add_reps' | 'increase_load';
 export type MesoBlock = {
   id: string;
   startDate: string;
-  weekCount: typeof MESOCYCLE_WEEKS;
+  weekCount: 4 | 5 | 6;
   currentWeek: number;
   targetRir: number;
 };
@@ -181,6 +181,7 @@ export type TrainingProgramSetup = {
   startedAt: string;
   programRevisionId?: string;
   programPolicyVersion?: string;
+  delegated?: import('./delegation-contract').DelegatedProgram;
 };
 
 export type TrainingFeedback = {
