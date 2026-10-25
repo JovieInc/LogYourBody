@@ -294,7 +294,6 @@ private struct TrainingNumericScrubPreview: View {
 #Preview("Workout numeric scrub") { TrainingNumericScrubPreview() }
 #Preview("Workout numeric scrub · large type") {
     TrainingNumericScrubPreview().environment(\.dynamicTypeSize, .accessibility3)
-        .environment(\.accessibilityReduceMotion, true)
 }
 #endif
 

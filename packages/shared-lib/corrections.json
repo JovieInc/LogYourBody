@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "swiftui-reduce-motion-environment-is-read-only",
+    "correction": "PR #1544: The workout scrubber's large-type preview wrote SwiftUI's get-only accessibilityReduceMotion environment property, preventing both Launch Quality and StoreKit Purchase and Restore from compiling.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40167662977/job/121092153045",
+    "mechanization": "Remove the invalid preview override and inherit the system preference. The required JavaScript/TypeScript shared-lib suite rejects read-only Reduce Motion environment writes throughout native app source, including previews, while permitting reads and writable Dynamic Type overrides. The source regression failed on TrainingNumericScrub.swift before this repair. Existing native compilation and acceptance gates remain required.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime app logic cannot prevent future source edits from invoking an unsupported SwiftUI modifier, including within debug-only preview code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic source regression in the existing required shared-lib test task detects the unsupported environment write on Linux before the native compiler independently rejects it on macOS."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
+      "anchor": "keeps native views and previews free of read-only Reduce Motion writes (LYB-153)"
+    }
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1531: Adding the delegated training view and tests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151037308/job/121042459915",
