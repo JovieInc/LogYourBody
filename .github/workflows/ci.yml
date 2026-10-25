@@ -161,6 +161,19 @@ jobs:
           node --test packages/shared-lib/scripts/jovie-separation.behavior.mjs
           node packages/shared-lib/scripts/jovie-separation.mjs
 
+      # Native screens/modes and web pages against the Jovie launch inventory.
+      # The fixture test is deliberate red for one unlisted route and one
+      # still-mounted hidden screen. The repository run fails new surface ids
+      # and prints the diff table; the reviewed baseline may only shrink.
+      - name: Reconcile native and web surfaces with the launch inventory
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          node --test scripts/surface-reconciliation.test.mjs
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          node scripts/surface-reconciliation.mjs --base-ref "$BASE_SHA"
+
       - name: Detect changed surfaces locally
         id: filter
         env:
