@@ -1439,6 +1439,28 @@ struct TrainingLiveSessionFixtureView: View {
                     Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
                     if losesResponse { throw URLError(.networkConnectionLost) }
                     return saved
+                }, onCorrectSet: { request in
+                    guard !offline else { throw URLError(.notConnectedToInternet) }
+                    let saved = TrainingSavedSet(
+                        sessionId: request.sessionId,
+                        exerciseId: request.exerciseId,
+                        setNumber: request.setNumber,
+                        reps: request.reps,
+                        loadKg: request.loadKg,
+                        rir: request.rir,
+                        revision: request.expectedRevision + 1,
+                        corrections: [
+                            TrainingSetCorrectionAudit(
+                                id: request.correctionId,
+                                correctedAt: "2026-10-12T00:00:00.000Z",
+                                previous: .init(reps: 10, loadKg: 60, rir: 3)
+                            )
+                        ]
+                    )
+                    savedSets.removeAll { $0.exerciseId == request.exerciseId && $0.setNumber == request.setNumber }
+                    savedSets.append(saved)
+                    Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
+                    return saved
                 }, onUndoSet: { request in
                     guard !offline else { throw URLError(.notConnectedToInternet) }
                     let current = savedSets.first {
@@ -1461,28 +1483,6 @@ struct TrainingLiveSessionFixtureView: View {
                                     loadKg: current?.loadKg,
                                     rir: current?.rir ?? 3
                                 )
-                            )
-                        ]
-                    )
-                    savedSets.removeAll { $0.exerciseId == request.exerciseId && $0.setNumber == request.setNumber }
-                    savedSets.append(saved)
-                    Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
-                    return saved
-                }, onCorrectSet: { request in
-                    guard !offline else { throw URLError(.notConnectedToInternet) }
-                    let saved = TrainingSavedSet(
-                        sessionId: request.sessionId,
-                        exerciseId: request.exerciseId,
-                        setNumber: request.setNumber,
-                        reps: request.reps,
-                        loadKg: request.loadKg,
-                        rir: request.rir,
-                        revision: request.expectedRevision + 1,
-                        corrections: [
-                            TrainingSetCorrectionAudit(
-                                id: request.correctionId,
-                                correctedAt: "2026-10-12T00:00:00.000Z",
-                                previous: .init(reps: 10, loadKg: 60, rir: 3)
                             )
                         ]
                     )
