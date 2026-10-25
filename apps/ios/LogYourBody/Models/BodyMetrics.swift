@@ -126,7 +126,12 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
     private var weightEntrySource: String?
     private var bodyFatEntrySource: String?
     private var bodyFatEntryMethod: String?
+    private var weightOperationIdStorage: String?
+    private var weightRevisionStorage: Int?
     private var extraFields: [String: ReportedMeasurementJSON] = [:]
+
+    var weightOperationId: String? { weightOperationIdStorage }
+    var weightRevision: Int? { weightRevisionStorage }
 
     init(
         vendor: String? = nil,
@@ -165,6 +170,8 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         self.weightEntrySource = nil
         self.bodyFatEntrySource = nil
         self.bodyFatEntryMethod = nil
+        self.weightOperationIdStorage = nil
+        self.weightRevisionStorage = nil
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
@@ -187,6 +194,8 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         case weightEntrySource = "weight_entry_source"
         case bodyFatEntrySource = "body_fat_entry_source"
         case bodyFatEntryMethod = "body_fat_entry_method"
+        case weightOperationId = "weight_operation_id"
+        case weightRevision = "weight_revision"
     }
 
     init(from decoder: Decoder) throws {
@@ -210,6 +219,8 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         weightEntrySource = try container.decodeIfPresent(String.self, forKey: .weightEntrySource)
         bodyFatEntrySource = try container.decodeIfPresent(String.self, forKey: .bodyFatEntrySource)
         bodyFatEntryMethod = try container.decodeIfPresent(String.self, forKey: .bodyFatEntryMethod)
+        weightOperationIdStorage = try container.decodeIfPresent(String.self, forKey: .weightOperationId)
+        weightRevisionStorage = try container.decodeIfPresent(Int.self, forKey: .weightRevision)
         var budget = 4_096
         let fields = try ReportedMeasurementJSON.decode(from: decoder, depth: 0, budget: &budget).object ?? [:]
         let knownKeys = Set(CodingKeys.allCases.map(\.rawValue))
@@ -237,6 +248,8 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         try container.encodeIfPresent(weightEntrySource, forKey: .weightEntrySource)
         try container.encodeIfPresent(bodyFatEntrySource, forKey: .bodyFatEntrySource)
         try container.encodeIfPresent(bodyFatEntryMethod, forKey: .bodyFatEntryMethod)
+        try container.encodeIfPresent(weightOperationIdStorage, forKey: .weightOperationId)
+        try container.encodeIfPresent(weightRevisionStorage, forKey: .weightRevision)
         var extra = encoder.container(keyedBy: MetadataKey.self)
         for (key, value) in extraFields {
             try extra.encode(value, forKey: MetadataKey(key))
@@ -308,7 +321,20 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         object["weight_entry_source"] = weightEntrySource
         object["body_fat_entry_source"] = bodyFatEntrySource
         object["body_fat_entry_method"] = bodyFatEntryMethod
+        if let weightOperationIdStorage {
+            object["weight_operation_id"] = weightOperationIdStorage
+        }
+        if let weightRevisionStorage {
+            object["weight_revision"] = weightRevisionStorage
+        }
         return object
+    }
+
+    func settingWeightLifecycle(operationId: String, revision: Int) -> Self {
+        var updated = self
+        updated.weightOperationIdStorage = Self.clean(operationId)
+        updated.weightRevisionStorage = revision
+        return updated
     }
 
     var jsonString: String? {

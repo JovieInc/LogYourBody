@@ -826,6 +826,54 @@ final class SyncIntegrationBodyMetricSyncTests: XCTestCase {
         XCTAssertEqual(cachedAfterSync?.syncStatus, "synced")
         XCTAssertEqual(cachedAfterSync?.photoUrl, processedUrl)
     }
+
+    func testSyncLocalChangesMarksPushConflictsAndLeavesPhotoUploadsPending() async throws {
+        let coreData = CoreDataManager.shared
+        let userId = "sync_test_user_weight_conflict_\(UUID().uuidString)"
+        let date = Date(timeIntervalSince1970: 1_765_640_000)
+        let id = UUID().uuidString
+        let metric = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 81.6,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: nil,
+            photoUrl: nil,
+            dataSource: "manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        try await coreData.saveBodyMetricsAndWait(metric, userId: userId)
+
+        let photo = try await PhotoMetadataService.shared.createOrUpdateMetricsWithResult(
+            for: date.addingTimeInterval(86_400),
+            userId: userId
+        )
+        XCTAssertTrue(await coreData.markPhotoPlaceholderUploadInFlight(id: photo.metrics.id, userId: userId))
+
+        let stubProductAPI = StubProductAPIClient()
+        stubProductAPI.bodyMetricConflicts = [BodyMetricPushConflict(id: id, code: "tombstone")]
+        let manager = RealtimeSyncManager(
+            coreDataManager: coreData,
+            authManager: AuthManager.shared,
+            productAPIClient: stubProductAPI
+        )
+        try await manager.syncLocalChanges(token: "test-token")
+
+        let conflicted = await cachedBodyMetric(id: id)
+        XCTAssertEqual(conflicted?.syncStatus, "conflict")
+        XCTAssertEqual(conflicted?.isSynced, false)
+        let pending = try await coreData.fetchPendingLocalSyncSnapshot(for: userId)
+        XCTAssertFalse(pending.bodyMetrics.contains { $0.id == id })
+        XCTAssertTrue(pending.bodyMetrics.contains { $0.id == photo.metrics.id })
+        let counts = try await coreData.fetchPendingLocalSyncCounts(for: userId)
+        XCTAssertEqual(counts.bodyMetrics, 1)
+    }
 }
 
 /// Fails every HTTP request immediately so expired-token refresh cannot hang.

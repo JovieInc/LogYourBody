@@ -406,6 +406,94 @@ final class SyncIntegrationRemotePayloadTests: XCTestCase {
         XCTAssertTrue(unsynced.bodyMetrics.allSatisfy(\.isMarkedDeleted))
     }
 
+    func testUpdateOrCreateBodyMetric_AppliesANewerServerTombstone() async throws {
+        let coreData = self.coreData!
+        let id = UUID().uuidString
+        let userId = "sync_test_user_server_tombstone_\(UUID().uuidString)"
+        let date = wholeSecondDate(2_600)
+        let metric = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 81.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "still-live",
+            photoUrl: nil,
+            dataSource: "manual",
+            createdAt: date.addingTimeInterval(-60),
+            updatedAt: date
+        )
+        try await coreData.saveBodyMetricsAndWait(metric, userId: userId, markAsSynced: true)
+        let formatter = ISO8601DateFormatter()
+        let deletedAt = Date().addingTimeInterval(180)
+        coreData.updateOrCreateBodyMetric(from: [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: date),
+            "weight": 81.0,
+            "weight_unit": "kg",
+            "notes": "still-live",
+            "data_source": "manual",
+            "deleted_at": formatter.string(from: deletedAt),
+            "updated_at": formatter.string(from: deletedAt),
+            "created_at": formatter.string(from: date.addingTimeInterval(-60))
+        ])
+
+        let row = try XCTUnwrap(await cachedBodyMetric(id: id))
+        XCTAssertTrue(row.isMarkedDeleted)
+        XCTAssertTrue(row.isSynced)
+        XCTAssertEqual(row.syncStatus, "synced")
+        XCTAssertEqual(row.weight, 81.0, accuracy: 0.001)
+        let visible = await coreData.fetchBodyMetrics(for: userId)
+        XCTAssertFalse(visible.contains { $0.id == id })
+    }
+
+    func testUpdateOrCreateBodyMetric_KeepsANewerLocalEditOverAnOlderTombstone() async throws {
+        let coreData = self.coreData!
+        let id = UUID().uuidString
+        let userId = "sync_test_user_newer_local_\(UUID().uuidString)"
+        let date = wholeSecondDate(2_700)
+        let metric = BodyMetrics(
+            id: id,
+            userId: userId,
+            date: date,
+            weight: 82.0,
+            weightUnit: "kg",
+            bodyFatPercentage: nil,
+            bodyFatMethod: nil,
+            muscleMass: nil,
+            boneMass: nil,
+            notes: "offline-edit",
+            photoUrl: nil,
+            dataSource: "manual",
+            createdAt: date,
+            updatedAt: date
+        )
+        try await coreData.saveBodyMetricsAndWait(metric, userId: userId, markAsSynced: false)
+        let formatter = ISO8601DateFormatter()
+        let older = date.addingTimeInterval(-3_600)
+        coreData.updateOrCreateBodyMetric(from: [
+            "id": id,
+            "user_id": userId,
+            "date": formatter.string(from: older),
+            "weight": 70.0,
+            "weight_unit": "kg",
+            "notes": "stale-delete",
+            "deleted_at": formatter.string(from: older),
+            "updated_at": formatter.string(from: older),
+            "created_at": formatter.string(from: older)
+        ])
+
+        let row = try XCTUnwrap(await cachedBodyMetric(id: id))
+        XCTAssertFalse(row.isMarkedDeleted)
+        XCTAssertEqual(row.notes, "offline-edit")
+        XCTAssertEqual(row.weight, 82.0, accuracy: 0.001)
+    }
+
     func testUpdateOrCreateDailyMetric_IsIdempotentForSameId() async throws {
         let coreData = self.coreData!
 

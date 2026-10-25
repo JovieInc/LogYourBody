@@ -5,6 +5,35 @@
 import Foundation
 import SwiftUI
 
+struct BodyMetricPushConflict: Equatable {
+    let id: String
+    let code: String
+}
+
+struct BodyMetricBatchPushResult {
+    let records: [[String: Any]]
+    let conflicts: [BodyMetricPushConflict]
+
+    /// A bare record array is the older push shape and has no conflicts.
+    static func decode(from data: Data) throws -> BodyMetricBatchPushResult {
+        let object = try JSONSerialization.jsonObject(with: data)
+        if let records = object as? [[String: Any]] {
+            return BodyMetricBatchPushResult(records: records, conflicts: [])
+        }
+        guard let dict = object as? [String: Any] else {
+            return BodyMetricBatchPushResult(records: [], conflicts: [])
+        }
+        let records = dict["records"] as? [[String: Any]] ?? []
+        let conflicts = (dict["conflicts"] as? [[String: Any]] ?? []).compactMap { item -> BodyMetricPushConflict? in
+            guard let id = item["id"] as? String, let code = item["code"] as? String, !id.isEmpty else {
+                return nil
+            }
+            return BodyMetricPushConflict(id: id, code: code)
+        }
+        return BodyMetricBatchPushResult(records: records, conflicts: conflicts)
+    }
+}
+
 enum ProductAPIError: LocalizedError, Equatable {
     case notAuthenticated
     case tokenGenerationFailed
@@ -116,13 +145,13 @@ class ProductAPIClient: ObservableObject {
 
     // MARK: - Batch Operations
 
-    func upsertBodyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> [[String: Any]] {
+    func upsertBodyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> BodyMetricBatchPushResult {
         let url = try productAPIURL("/api/auth/mobile/sync/v1/body-metrics")
         let body = try JSONSerialization.data(withJSONObject: ["records": metrics])
         let request = authorizedJSONRequest(url: url, method: "POST", token: token, body: body)
         let (data, response) = try await session.data(for: request)
         _ = try requireHTTPSuccess(response, data: data)
-        return try records(from: data)
+        return try BodyMetricBatchPushResult.decode(from: data)
     }
 
     func upsertDailyMetricsBatch(_ metrics: [[String: Any]], token: String) async throws -> [[String: Any]] {
