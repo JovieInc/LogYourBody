@@ -4,6 +4,10 @@ import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import { applyClinicalGuardrail, holdCoachReplyForReview } from '@/lib/chat/coach-scaffold';
 import { buildChatModelMessages, isTrainingQuestion } from '@/lib/chat/context';
 import { hasUnauthorizedTrainingQuantity } from '@/lib/chat/training-number-boundary';
+import {
+  NATIVE_TRAINING_CARD_SCHEMA_VERSION,
+  nativeCardsForChatTurn,
+} from '@/lib/training/native-card-contract';
 import { coachPersonaGuardrailsEnabled } from '@/lib/flags/coach-persona';
 import type { NextWorkoutResult } from '@/lib/training/service';
 import {
@@ -33,12 +37,23 @@ type ChatStreamOutcome =
   | 'client_cancelled'
   | 'failure_persistence_error';
 
+type TrainingSteeringResult = {
+  content: string;
+  proposalId?: string;
+  revisionId?: string | null;
+  reason?: string;
+  diff?: Array<{ label: string; from: string; to: string }>;
+  reasons?: string[];
+  evidenceIds?: string[];
+  status?: 'pending' | 'applied' | 'rejected';
+};
+
 type ChatRouteDependencies = {
   proposeTrainingSteering?: (input: {
     subject: string;
     requestId: string;
     utterance: string;
-  }) => Promise<{ content: string; proposalId?: string } | null>;
+  }) => Promise<TrainingSteeringResult | null>;
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   conversations: ChatConversationPort;
   bodyMetrics: BodyMetricsPort;
@@ -207,7 +222,7 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
       const guardrailsEnabled = coachPersonaGuardrailsEnabled();
       const holdForReview = holdCoachReplyForReview(trainingTurn, guardrailsEnabled);
       let trainingOutput: NextWorkoutResult | null = null;
-      let trainingSteering: { content: string; proposalId?: string } | null = null;
+      let trainingSteering: TrainingSteeringResult | null = null;
       try {
         abortController.signal.throwIfAborted();
         trainingSteering =
@@ -260,6 +275,40 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
         return jsonError('chat_unavailable', 503, { 'Retry-After': '5' });
       }
 
+      const trainingCards = nativeCardsForChatTurn({
+        proposal: trainingSteering?.proposalId
+          ? {
+              id: trainingSteering.proposalId,
+              revisionId: trainingSteering.revisionId,
+              reason: trainingSteering.reason,
+              diff: trainingSteering.diff,
+              reasons: trainingSteering.reasons,
+              evidenceIds: trainingSteering.evidenceIds,
+              status: trainingSteering.status,
+            }
+          : null,
+        session:
+          trainingOutput?.kind === 'workout'
+            ? {
+                id: trainingOutput.session.id,
+                title: trainingOutput.session.title,
+                week: trainingOutput.session.week,
+                slot: trainingOutput.session.slot,
+                exercises: trainingOutput.session.exercises.map((exercise) => ({
+                  id: exercise.id,
+                  name: exercise.name,
+                  sets: exercise.sets,
+                  repRange: exercise.repRange,
+                  targetReps: exercise.targetReps,
+                  targetRir: exercise.targetRir,
+                  targetLoadKg: exercise.targetLoadKg,
+                  loadInstruction: exercise.loadInstruction,
+                })),
+                loggedSets: trainingOutput.session.loggedSets,
+              }
+            : null,
+      });
+
       let finalized = false;
 
       const body = new ReadableStream<Uint8Array>({
@@ -280,6 +329,14 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
                 version: CHAT_PROTOCOL_VERSION,
                 proposalId: trainingSteering.proposalId,
                 applied: false,
+              }),
+            );
+          if (trainingCards.length > 0)
+            controller.enqueue(
+              event('training_cards', {
+                version: CHAT_PROTOCOL_VERSION,
+                schemaVersion: NATIVE_TRAINING_CARD_SCHEMA_VERSION,
+                cards: trainingCards,
               }),
             );
           let content = '';

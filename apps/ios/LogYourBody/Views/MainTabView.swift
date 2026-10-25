@@ -780,6 +780,11 @@ struct ChatTabView: View {
     @State private var isStartingNextBlock = false
     @State private var trainingEnrollmentRequired = false
     @State private var trainingErrorMessage: String?
+    @State private var nativeCards: [NativeTrainingCard] = []
+    @State private var nativeIndexes: [String: Int] = [:]
+    @State private var nativeSessions: [String: TrainingSession] = [:]
+    @State private var nativePhases: [String: NativeTrainingCardPhase] = [:]
+    @State private var nativeOffline = false
     @State private var trainingPresentation: TrainingPresentation?
     @State private var voiceCapture = VoiceCaptureService()
     @State private var voicePlayback = VoicePlaybackService()
@@ -818,6 +823,11 @@ struct ChatTabView: View {
             trainingResponse = nil
             trainingOwner = nil
             trainingPresentation = nil
+            nativeCards = []
+            nativeIndexes = [:]
+            nativeSessions = [:]
+            nativePhases = [:]
+            nativeOffline = false
             await loadTrainingNext()
         }
         .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
@@ -1231,9 +1241,34 @@ struct ChatTabView: View {
         }
     }
 
+    private var nativeWorkoutCoversSession: Bool {
+        guard let sessionId = trainingResponse?.session?.id else { return false }
+        return nativeCards.contains { $0.component == "WorkoutSessionCard" && $0.object.id == sessionId }
+    }
+
+    private var nativeWeeklyProgram: [String] {
+        trainingResponse?.nextBlock?.proposal.plan.sessions.map { "\($0.title) · \($0.day) \($0.slot)" } ?? []
+    }
+
     @ViewBuilder
     private var trainingCard: some View {
-        if isTrainingLoading && trainingResponse == nil && !trainingEnrollmentRequired {
+        if let owner = trainingOwner ?? authManager.captureAccountSession(),
+           authManager.ownsAccountSession(owner), !nativeCards.isEmpty {
+            NativeTrainingCardStack(
+                cards: nativeCards,
+                phases: nativePhases,
+                exerciseIndexes: nativeIndexes,
+                ownerSubject: owner.subject,
+                offline: nativeOffline,
+                weeklyProgram: nativeWeeklyProgram,
+                showsStopCoaching: nativeWorkoutCoversSession,
+                onStopCoaching: { Task { await revokeTraining(ownership: owner) } },
+                onAction: { card, action in
+                    Task { await performNativeCard(card, action, ownership: owner) }
+                }
+            )
+        }
+        if isTrainingLoading && trainingResponse == nil && nativeCards.isEmpty && !trainingEnrollmentRequired {
             HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
                 Text("Loading your next session")
@@ -1245,7 +1280,7 @@ struct ChatTabView: View {
         } else if trainingEnrollmentRequired {
             TrainingSetupCard { trainingPresentation = .setup }
         } else if let session = trainingResponse?.session, let ownership = trainingOwner,
-                  authManager.ownsAccountSession(ownership) {
+                  authManager.ownsAccountSession(ownership), !nativeWorkoutCoversSession {
             TrainingCoachCard(
                 session: session,
                 onStart: {
@@ -1254,7 +1289,8 @@ struct ChatTabView: View {
                 },
                 onStop: { Task { await revokeTraining(ownership: ownership) } }
             )
-        } else if let next = trainingResponse?.nextBlock, delegatedTrainingEnabled {
+        } else if let next = trainingResponse?.nextBlock, delegatedTrainingEnabled,
+                  !nativeCards.contains(where: { $0.component == "PlanChangeCard" && $0.object.id == next.proposal.id }) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Your next block is ready").font(.headline)
                 if let transition = next.proposal.transition {
@@ -1317,8 +1353,11 @@ struct ChatTabView: View {
             trainingOwner = nil
             trainingEnrollmentRequired = false
             trainingErrorMessage = nil
+            nativeCards = []
+            nativeOffline = false
             return
         }
+        restoreNativeShelf(ownerId: ownership.subject)
         isTrainingLoading = true
         defer { if trainingLoadId == loadId { isTrainingLoading = false } }
         guard let accessToken = await chatAccessToken(),
@@ -1334,6 +1373,14 @@ struct ChatTabView: View {
             trainingOwner = ownership
             trainingEnrollmentRequired = false
             trainingErrorMessage = nil
+            nativeOffline = false
+            if let session = response.session {
+                nativeSessions[session.id] = session
+            }
+            mergeNativeCards(
+                NativeTrainingCardProjection.cards(session: response.session, proposal: response.nextBlock),
+                ownerId: ownership.subject
+            )
         } catch let error as TrainingServiceError {
             guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
             if error == .server(code: "program_not_enrolled") {
@@ -1345,8 +1392,368 @@ struct ChatTabView: View {
             }
         } catch {
             guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
-            trainingErrorMessage = "Training is temporarily unavailable. Please try again."
+            if nativeWriteIsOffline(error) {
+                markNativeCardsOffline()
+            } else {
+                trainingErrorMessage = "Training is temporarily unavailable. Please try again."
+            }
         }
+    }
+
+    private func restoreNativeShelf(ownerId: String) {
+        let record = NativeTrainingCardShelf.shared.load(ownerId: ownerId)
+        nativeCards = record.cards
+        nativeIndexes = record.exerciseIndexes
+        nativeSessions = record.sessions
+    }
+
+    private func mergeNativeCards(_ incoming: [NativeTrainingCard], ownerId: String) {
+        guard !incoming.isEmpty else { return }
+        var merged: [String: NativeTrainingCard] = [:]
+        for card in nativeCards {
+            merged[card.identity] = card
+        }
+        for card in incoming {
+            merged[card.identity] = card
+        }
+        let order = [
+            "MesoPlanCard", "PlanChangeCard", "WorkoutSessionCard",
+            "ExerciseSwapCard", "TrainingFeedbackCard", "ProgressReviewCard"
+        ]
+        nativeCards = merged.values.sorted { lhs, rhs in
+            let left = order.firstIndex(of: lhs.component) ?? order.count
+            let right = order.firstIndex(of: rhs.component) ?? order.count
+            return left == right ? lhs.object.id < rhs.object.id : left < right
+        }
+        persistNativeCards(ownerId: ownerId)
+    }
+
+    private func persistNativeCards(ownerId: String) {
+        let record = NativeTrainingCardRecord(
+            cards: nativeCards, exerciseIndexes: nativeIndexes, sessions: nativeSessions
+        )
+        try? NativeTrainingCardShelf.shared.save(ownerId: ownerId, record: record)
+    }
+
+    private func markNativeCardsOffline() {
+        nativeOffline = true
+        for card in nativeCards where card.component == "WorkoutSessionCard" {
+            switch nativePhases[card.identity] {
+            case nil, .loading, .offline:
+                nativePhases[card.identity] = .offline(
+                    "You are offline. Logging and exercise changes stay on this device."
+                )
+            default:
+                break
+            }
+        }
+    }
+
+    private func nativeWriteIsOffline(_ error: Error) -> Bool {
+        guard let url = error as? URLError else { return false }
+        switch url.code {
+        case .notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotConnectToHost,
+             .cannotFindHost, .dnsLookupFailed, .internationalRoamingOff, .dataNotAllowed:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func performNativeCard(
+        _ card: NativeTrainingCard,
+        _ action: AdmittedNativeTrainingAction,
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async {
+        guard authManager.ownsAccountSession(ownership) else { return }
+        switch action {
+        case .navigate(let sessionId, let exerciseIndex):
+            nativeIndexes[sessionId] = exerciseIndex
+            nativePhases[card.identity] = .ready(receipt: nil)
+            persistNativeCards(ownerId: ownership.subject)
+        case .expandSession, .expandProgram:
+            nativePhases[card.identity] = .ready(receipt: nil)
+        case .logSet(let request):
+            await performNativeLog(card, request: request, ownership: ownership)
+        case .correctSet(let request):
+            await performNativeCorrection(card, request: request, ownership: ownership)
+        case .decideRevision(let proposalId, let decision):
+            await performNativeDecision(card, proposalId: proposalId, decision: decision, ownership: ownership)
+        case .adjustRevision(let baseProposalId, let utterance):
+            await performNativeProposal(
+                card,
+                utterance: utterance,
+                reason: utterance,
+                baseProposalId: baseProposalId,
+                ownership: ownership
+            )
+        case .proposeChange(let intent, _, _, let utterance):
+            await performNativeProposal(
+                card,
+                utterance: utterance,
+                reason: "Review a \(intent) change against recorded training before anything starts.",
+                baseProposalId: nil,
+                ownership: ownership
+            )
+        case .swapExercise(let sessionId, let exerciseId, let toVariantId):
+            await performNativeSwap(
+                card, sessionId: sessionId, exerciseId: exerciseId, toVariantId: toVariantId, ownership: ownership
+            )
+        case .recordFeedback(let sessionId, let feedbackId, let statement):
+            await performNativeFeedback(
+                card, sessionId: sessionId, feedbackId: feedbackId, statement: statement, ownership: ownership
+            )
+        }
+    }
+
+    private func performNativeLog(
+        _ card: NativeTrainingCard,
+        request: TrainingSetLogRequest,
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async {
+        nativePhases[card.identity] = .pending("Saving set \(request.setNumber)")
+        do {
+            try await logTrainingSet(ownership: ownership, request: request)
+            guard authManager.ownsAccountSession(ownership) else { return }
+            nativeOffline = false
+            nativePhases[card.identity] = .ready(receipt: "Set \(request.setNumber) saved.")
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            if nativeWriteIsOffline(error) {
+                let row = TrainingSetDraft(
+                    exerciseId: request.exerciseId,
+                    setNumber: request.setNumber,
+                    repsText: String(request.reps),
+                    loadText: TrainingLoadInputPolicy.savedText(for: request.loadKg),
+                    rir: request.rir,
+                    pendingRequest: request
+                )
+                try? TrainingDraftStore.shared.put(row, ownerId: ownership.subject, sessionId: request.sessionId)
+                nativeOffline = true
+                nativePhases[card.identity] = .offline("Set saved on this device. It sends when you reconnect.")
+            } else {
+                nativePhases[card.identity] = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    private func performNativeCorrection(
+        _ card: NativeTrainingCard,
+        request: TrainingSetCorrectionRequest,
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async {
+        nativePhases[card.identity] = .pending("Saving the correction")
+        do {
+            _ = try await correctTrainingSet(ownership: ownership, request: request)
+            guard authManager.ownsAccountSession(ownership) else { return }
+            nativeOffline = false
+            nativePhases[card.identity] = .ready(receipt: "Set \(request.setNumber) corrected.")
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            if nativeWriteIsOffline(error),
+               let base = nativeSessions[request.sessionId]?.loggedSets?.first(where: {
+                   $0.exerciseId == request.exerciseId && $0.setNumber == request.setNumber
+               }) {
+                let row = TrainingSetDraft(
+                    exerciseId: request.exerciseId,
+                    setNumber: request.setNumber,
+                    repsText: String(request.reps),
+                    loadText: TrainingLoadInputPolicy.savedText(for: request.loadKg),
+                    rir: request.rir,
+                    correctionBase: base,
+                    pendingCorrection: request
+                )
+                try? TrainingDraftStore.shared.put(row, ownerId: ownership.subject, sessionId: request.sessionId)
+                nativeOffline = true
+                nativePhases[card.identity] = .offline("Correction saved on this device. It sends when you reconnect.")
+            } else if nativeWriteIsOffline(error) {
+                nativeOffline = true
+                nativePhases[card.identity] = .offline("You are offline. This correction was not saved.")
+            } else {
+                nativePhases[card.identity] = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    private func performNativeDecision(
+        _ card: NativeTrainingCard,
+        proposalId: String,
+        decision: String,
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async {
+        guard !nativeOffline, let delegated = trainingService as? DelegatedTrainingServicing else {
+            nativePhases[card.identity] = .offline("Reconnect before changing the saved plan.")
+            return
+        }
+        nativePhases[card.identity] = .pending(decision == "apply" ? "Applying the saved revision" : "Declining the draft")
+        do {
+            _ = try await TrainingOwnedRequest.perform(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { token in
+                    _ = try await delegated.decidePlan(
+                        accessToken: token,
+                        request: TrainingPlanDecisionRequest(
+                            requestId: UUID().uuidString, proposalId: proposalId, decision: decision
+                        )
+                    )
+                }
+            )
+            guard authManager.ownsAccountSession(ownership) else { return }
+            replacePlanCard(card, status: decision == "apply" ? "applied" : "rejected", ownerId: ownership.subject)
+            nativePhases[card.identity] = .ready(
+                receipt: decision == "apply" ? "Saved revision applied." : "Draft declined. Your saved plan is unchanged."
+            )
+            await loadTrainingNext()
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            if nativeWriteIsOffline(error) {
+                nativeOffline = true
+                nativePhases[card.identity] = .offline("Reconnect before changing the saved plan.")
+            } else {
+                nativePhases[card.identity] = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    private func performNativeProposal(
+        _ card: NativeTrainingCard,
+        utterance: String,
+        reason: String,
+        baseProposalId: String?,
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async {
+        guard !nativeOffline, let delegated = trainingService as? DelegatedTrainingServicing else {
+            nativePhases[card.identity] = .offline("Reconnect before changing the saved plan.")
+            return
+        }
+        nativePhases[card.identity] = .pending("Saving the revision draft")
+        do {
+            let context = try await TrainingOwnedRequest.value(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { token in
+                    try await delegated.planningContext(accessToken: token)
+                }
+            )
+            _ = try await TrainingOwnedRequest.perform(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { token in
+                    _ = try await delegated.proposePlan(
+                        accessToken: token,
+                        request: TrainingPlanProposalRequest(
+                            requestId: UUID().uuidString,
+                            expectedGeneration: context.generation,
+                            reason: reason,
+                            intent: nil,
+                            utterance: utterance,
+                            baseProposalId: baseProposalId
+                        )
+                    )
+                }
+            )
+            guard authManager.ownsAccountSession(ownership) else { return }
+            nativePhases[card.identity] = .ready(receipt: "Draft saved. Your current plan has not changed.")
+            await loadTrainingNext()
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            if nativeWriteIsOffline(error) {
+                nativeOffline = true
+                nativePhases[card.identity] = .offline("Reconnect before changing the saved plan.")
+            } else {
+                nativePhases[card.identity] = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    private func performNativeSwap(
+        _ card: NativeTrainingCard,
+        sessionId: String,
+        exerciseId: String,
+        toVariantId: String,
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async {
+        guard !nativeOffline else {
+            nativePhases[card.identity] = .offline("Reconnect before swapping this exercise.")
+            return
+        }
+        nativePhases[card.identity] = .pending("Saving the exercise swap")
+        do {
+            let swapped = try await TrainingOwnedRequest.value(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { token in
+                    try await trainingService.swapExercise(
+                        accessToken: token, sessionId: sessionId, exerciseId: exerciseId, toVariantId: toVariantId
+                    )
+                }
+            )
+            guard authManager.ownsAccountSession(ownership) else { return }
+            let receipt = swapped.diff.isEmpty ? "\(swapped.exerciseName) is now in this session." : swapped.diff.joined(separator: " ")
+            nativePhases[card.identity] = .ready(receipt: receipt)
+            await loadTrainingNext()
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            if nativeWriteIsOffline(error) {
+                nativeOffline = true
+                nativePhases[card.identity] = .offline("Reconnect before swapping this exercise.")
+            } else {
+                nativePhases[card.identity] = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    private func performNativeFeedback(
+        _ card: NativeTrainingCard,
+        sessionId: String,
+        feedbackId: String,
+        statement: String,
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async {
+        guard !nativeOffline else {
+            nativePhases[card.identity] = .offline("Reconnect before saving this note.")
+            return
+        }
+        nativePhases[card.identity] = .pending("Saving the note")
+        var request = TrainingFeedbackRequest(sessionId: sessionId, source: "text")
+        request.originalStatement = statement
+        request.sourceObservationId = feedbackId
+        do {
+            _ = try await TrainingOwnedRequest.perform(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { token in
+                    _ = try await trainingService.recordFeedback(accessToken: token, request: request)
+                }
+            )
+            guard authManager.ownsAccountSession(ownership) else { return }
+            nativePhases[card.identity] = .ready(receipt: "Note saved.")
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            if nativeWriteIsOffline(error) {
+                nativeOffline = true
+                nativePhases[card.identity] = .offline("Reconnect before saving this note.")
+            } else {
+                nativePhases[card.identity] = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    private func replacePlanCard(_ card: NativeTrainingCard, status: String, ownerId: String) {
+        guard case .planChange(let change) = card.properties else { return }
+        let updated = NativeTrainingCard(
+            component: card.component,
+            object: card.object,
+            properties: .planChange(NativePlanChangeBody(
+                reason: change.reason,
+                diff: change.diff,
+                reasons: change.reasons,
+                evidenceIds: change.evidenceIds,
+                status: status
+            ))
+        )
+        mergeNativeCards([updated], ownerId: ownerId)
     }
 
     private func enrollTraining(sessionsPerWeek: Int, equipment: String) async throws {
@@ -2155,6 +2562,8 @@ struct ChatTabView: View {
                             mutateAssistant(clientMessageId: clientMessageId) { assistant in
                                 assistant.text += text
                             }
+                        case .trainingCards(let cards):
+                            mergeNativeCards(cards, ownerId: ownership.subject)
                         case .completed(let messageId, _, _):
                             mutateAssistant(clientMessageId: clientMessageId) { assistant in
                                 assistant.id = messageId

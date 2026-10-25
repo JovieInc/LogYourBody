@@ -18,7 +18,7 @@ enum TrainingReadinessPolicy {
     static let featureGate = "workout_readiness_v1"
 }
 
-struct TrainingExercisePrescription: Decodable, Equatable, Identifiable, Sendable {
+struct TrainingExercisePrescription: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let name: String
     let primaryMuscle: String
@@ -33,13 +33,13 @@ struct TrainingExercisePrescription: Decodable, Equatable, Identifiable, Sendabl
     let evidenceIds: [String]
     var substitutions: [TrainingExerciseSubstitution]?
 
-    struct RepRange: Decodable, Equatable, Sendable {
+    struct RepRange: Codable, Equatable, Sendable {
         let min: Int
         let max: Int
     }
 }
 
-struct TrainingExerciseSubstitution: Decodable, Equatable, Identifiable, Sendable {
+struct TrainingExerciseSubstitution: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let name: String
     let primaryMuscle: String
@@ -54,7 +54,7 @@ struct TrainingExerciseSubstitution: Decodable, Equatable, Identifiable, Sendabl
     let evidenceIds: [String]
 }
 
-struct TrainingWorkoutEvent: Decodable, Equatable, Identifiable, Sendable {
+struct TrainingWorkoutEvent: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let kind: String
     let createdAt: String
@@ -63,7 +63,7 @@ struct TrainingWorkoutEvent: Decodable, Equatable, Identifiable, Sendable {
     let minutes: Int?
 }
 
-struct TrainingSession: Decodable, Equatable, Identifiable, Sendable {
+struct TrainingSession: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let week: Int
     let slot: Int
@@ -367,7 +367,15 @@ protocol TrainingServicing {
     func correctSet(accessToken: String, request: TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
     func applyAction(accessToken: String, request: TrainingWorkoutActionRequest) async throws -> TrainingSession
     func recordFeedback(accessToken: String, request: TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
+    func swapExercise(
+        accessToken: String, sessionId: String, exerciseId: String, toVariantId: String
+    ) async throws -> TrainingSwapResult
     func revoke(accessToken: String) async throws -> TrainingRevokeResponse
+}
+
+struct TrainingSwapResult: Equatable, Sendable {
+    let exerciseName: String
+    let diff: [String]
 }
 
 final class URLSessionTrainingService: TrainingServicing {
@@ -462,6 +470,19 @@ final class URLSessionTrainingService: TrainingServicing {
         )
         guard response.matches(request) else { throw TrainingServiceError.invalidResponse }
         return response
+    }
+
+    func swapExercise(
+        accessToken: String, sessionId: String, exerciseId: String, toVariantId: String
+    ) async throws -> TrainingSwapResult {
+        let response: TrainingSwapResponse = try await send(
+            path: "swap",
+            method: "POST",
+            accessToken: accessToken,
+            body: TrainingSwapBody(sessionId: sessionId, exerciseId: exerciseId, toVariantId: toVariantId)
+        )
+        guard !response.exercise.name.isEmpty else { throw TrainingServiceError.invalidResponse }
+        return TrainingSwapResult(exerciseName: response.exercise.name, diff: response.diff)
     }
 
     func revoke(accessToken: String) async throws -> TrainingRevokeResponse {
@@ -581,6 +602,17 @@ private struct TrainingWorkoutActionResponse: Decodable, VersionedTrainingRespon
     let version: Int
     let decision: String
     let session: TrainingSession
+}
+private struct TrainingSwapBody: Encodable {
+    let sessionId: String
+    let exerciseId: String
+    let toVariantId: String
+}
+private struct TrainingSwapResponse: Decodable, VersionedTrainingResponse {
+    struct Exercise: Decodable { let name: String }
+    let version: Int
+    let exercise: Exercise
+    let diff: [String]
 }
 private struct TrainingErrorResponse: Decodable { let error: String }
 

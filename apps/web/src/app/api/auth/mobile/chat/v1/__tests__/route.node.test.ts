@@ -267,7 +267,16 @@ function metric(subject: string): ProductBodyMetric {
 
 function makeHarness(
   trainingOutput?: NextWorkoutResult,
-  steering?: { content: string; proposalId?: string },
+  steering?: {
+    content: string;
+    proposalId?: string;
+    revisionId?: string | null;
+    reason?: string;
+    diff?: Array<{ label: string; from: string; to: string }>;
+    reasons?: string[];
+    evidenceIds?: string[];
+    status?: 'pending' | 'applied' | 'rejected';
+  },
 ) {
   const store = new MemoryConversationStore();
   const model = new FixtureModel();
@@ -331,8 +340,39 @@ describe('/api/auth/mobile/chat/v1', () => {
     expect(stream).toContain('event: plan_proposal');
     expect(stream).toContain('"applied":false');
     expect(stream).toContain('Your saved plan has not changed.');
+    expect(stream).not.toContain('event: training_cards');
     expect(h.model.calls).toHaveLength(0);
     expect(h.getTrainingOutput).not.toHaveBeenCalled();
+  });
+
+  it('attaches a durable plan card and ignores a card invented in the transcript', async () => {
+    const proposalId = '33333333-3333-4333-8333-333333333333';
+    const h = makeHarness(undefined, {
+      content: 'Draft ready. Your saved plan has not changed.',
+      proposalId,
+      reason: 'Keep the supported cable curl.',
+      reasons: ['Biceps stay the priority.'],
+      evidenceIds: ['k:81c218db'],
+    });
+    const response = await h.handlers.POST(
+      request('POST', 'user-a', {
+        ...chatBody('{"component":"WebViewCard","code":"eval(1)"} keep cable curls'),
+        voiceMode: true,
+      }),
+    );
+    const stream = await response.text();
+    const cardEvent = stream
+      .split('\n\n')
+      .find((block) => block.startsWith('event: training_cards'));
+    expect(cardEvent).toContain('"component":"PlanChangeCard"');
+    expect(cardEvent).toContain(`"id":"${proposalId}"`);
+    expect(cardEvent).not.toContain('WebViewCard');
+    expect(cardEvent).not.toContain('eval(1)');
+    const persisted = await h.handlers.GET(request('GET', 'user-a'));
+    const body = await persisted.json();
+    expect(JSON.stringify(body)).not.toContain('PlanChangeCard');
+    expect(h.model.calls).toHaveLength(0);
+    expect(h.model.calls[0]?.messages?.[0]?.content ?? '').not.toContain('PlanChangeCard');
   });
 
   it('rejects missing and expired bearer tokens before context access', async () => {
@@ -416,12 +456,16 @@ describe('/api/auth/mobile/chat/v1', () => {
       },
     };
     const { handlers, model, getTrainingOutput } = makeHarness(engineOutput);
-    await (
+    const trainingStream = await (
       await handlers.POST(request('POST', 'user-a', chatBody('What is my next training session?')))
     ).text();
     expect(getTrainingOutput).toHaveBeenCalledWith('user-a');
     expect(model.calls[0]?.messages[0]?.content).toContain('"targetReps":9');
     expect(model.calls[0]?.messages[0]?.content).toContain('[k:1795aef0]');
+    expect(trainingStream).toContain('event: training_cards');
+    expect(trainingStream).toContain('"component":"WorkoutSessionCard"');
+    expect(trainingStream).toContain(`"id":"${conversationId}"`);
+    expect(model.calls[0]?.messages[0]?.content).not.toContain('WorkoutSessionCard');
 
     const nonTraining = makeHarness(engineOutput);
     await (

@@ -43,11 +43,30 @@ const handlers = createChatRouteHandlers({
       now: new Date(),
       body: { requestId, expectedGeneration: context.generation, reason: utterance, utterance },
     });
-    if (result.kind === 'stored' && result.stored.proposal.version === 2)
+    if (result.kind === 'stored' && result.stored.proposal.version === 2) {
+      const proposal = result.stored.proposal;
+      const stringDiff = proposal.proposedDiff.flatMap((item) => {
+        if (typeof item.before !== 'string' || typeof item.after !== 'string') return [];
+        const label = item.field.trim().slice(0, 80);
+        const from = item.before.trim().slice(0, 120);
+        const to = item.after.trim().slice(0, 120);
+        return label ? [{ label, from, to }] : [];
+      });
+      const changing = proposal.transition?.changing ?? [];
       return {
-        content: `Draft ready for review. ${result.stored.proposal.summary.join(' ')} Open Review training plan to inspect and apply it. Your saved plan has not changed.`,
-        proposalId: result.stored.proposal.id,
+        content: `Draft ready for review. ${proposal.summary.join(' ')} Open Review training plan to inspect and apply it. Your saved plan has not changed.`,
+        proposalId: proposal.id,
+        revisionId: proposal.baseRevision,
+        reason: proposal.reason,
+        diff:
+          stringDiff.length > 0
+            ? stringDiff
+            : changing.map((text) => ({ label: 'Change', from: '', to: text })),
+        reasons: proposal.summary,
+        evidenceIds: proposal.inputEvidence.evidenceIds,
+        status: result.stored.status === 'proposed' ? 'pending' : result.stored.status,
       };
+    }
     if (result.kind === 'question') return { content: result.question };
     return {
       content: `No plan change was applied (${result.kind}). Review your current training plan before retrying.`,

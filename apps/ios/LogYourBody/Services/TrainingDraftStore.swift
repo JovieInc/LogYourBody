@@ -247,4 +247,17 @@ enum TrainingOwnedRequest {
         try await send(token)
         guard isCurrent() else { throw TrainingServiceError.authenticationExpired }
     }
+
+    static func value<T>(
+        isCurrent: () -> Bool,
+        getToken: () async -> String?,
+        send: (String) async throws -> T
+    ) async throws -> T {
+        guard isCurrent(), let token = await getToken(), isCurrent() else {
+            throw TrainingServiceError.authenticationExpired
+        }
+        let value = try await send(token)
+        guard isCurrent() else { throw TrainingServiceError.authenticationExpired }
+        return value
+    }
 }

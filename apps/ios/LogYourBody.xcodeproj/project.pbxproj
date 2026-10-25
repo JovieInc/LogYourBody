@@ -404,6 +404,9 @@
 		C65D81F714890E4F28FFBC9B /* HomeV2SystemStatePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2112475E73F20D464413207 /* HomeV2SystemStatePolicyTests.swift */; };
 		C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED9F05E697F00813F824903 /* LogoutButton.swift */; };
 		C7A700022F20000000C0A702 /* ChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A700012F20000000C0A701 /* ChatService.swift */; };
+		A124C0022F12400000C0A124 /* NativeTrainingCardContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = A124C0012F12400000C0A124 /* NativeTrainingCardContract.swift */; };
+		A124C0042F12400000C0A124 /* NativeTrainingCardViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A124C0032F12400000C0A124 /* NativeTrainingCardViews.swift */; };
+		A124C0062F12400000C0A124 /* NativeTrainingCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A124C0052F12400000C0A124 /* NativeTrainingCardTests.swift */; };
 		C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7A700032F20000000C0A703 /* ChatServiceTests.swift */; };
 		C7B9E48E55256B991FBCDEF0 /* HomeV2TrendChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA9844F348C4675E22E4592F /* HomeV2TrendChart.swift */; };
 		CB2DAC6AFD2CCDD76F568339 /* HomeV2PolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4877512DEE0F7236151A15AA /* HomeV2PolicyTests.swift */; };
@@ -971,6 +974,9 @@
 		C639B8116483011892C95543 /* BodyMetricLoggingServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BodyMetricLoggingServiceTests.swift; sourceTree = "<group>"; };
 		C7A700012F20000000C0A701 /* ChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatService.swift; sourceTree = "<group>"; };
 		C7A700032F20000000C0A703 /* ChatServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatServiceTests.swift; sourceTree = "<group>"; };
+		A124C0012F12400000C0A124 /* NativeTrainingCardContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTrainingCardContract.swift; sourceTree = "<group>"; };
+		A124C0032F12400000C0A124 /* NativeTrainingCardViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTrainingCardViews.swift; sourceTree = "<group>"; };
+		A124C0052F12400000C0A124 /* NativeTrainingCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTrainingCardTests.swift; sourceTree = "<group>"; };
 		C7CC52C2F710012ABB7E7219 /* EditEntrySavePolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditEntrySavePolicy.swift; sourceTree = "<group>"; };
 		C7E0D5025A2839599F4E281D /* PhotoMetadataAndImportPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoMetadataAndImportPolicyTests.swift; sourceTree = "<group>"; };
 		C8D57BE85A4043A0A831CFE4 /* SkeletonLoaders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SkeletonLoaders.swift; path = Components/SkeletonLoaders.swift; sourceTree = "<group>"; };
@@ -1494,6 +1500,7 @@
 			isa = PBXGroup;
 			children = (
 				C7A700012F20000000C0A701 /* ChatService.swift */,
+				A124C0012F12400000C0A124 /* NativeTrainingCardContract.swift */,
 				D0C0DE000000000000000002 /* VoiceCaptureService.swift */,
 				E4172D019C9F4A30A881C001 /* TrainingService.swift */,
 				F00720261007000100000001 /* TrainingDraftStore.swift */,
@@ -1636,6 +1643,7 @@
 				AD723B032E15FA5C002376C6 /* LoginView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
 				E4172D019C9F4A30A881C003 /* TrainingViews.swift */,
+				A124C0032F12400000C0A124 /* NativeTrainingCardViews.swift */,
 				E4C0A5110000000000000001 /* MesocycleCanvas.swift */,
 				E41302026025000000000001 /* DelegatedTrainingView.swift */,
 				8E3A26E632164AACAA5D77FD /* MainTabViewPolicies.swift */,
@@ -1742,6 +1750,7 @@
 			children = (
 				A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */,
 				C7A700032F20000000C0A703 /* ChatServiceTests.swift */,
+				A124C0052F12400000C0A124 /* NativeTrainingCardTests.swift */,
 				E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */,
 				F00720261007000100000005 /* TrainingSessionDraftTests.swift */,
 				E41302026025000000000003 /* DelegatedTrainingTests.swift */,
@@ -2183,6 +2192,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
+				A124C0062F12400000C0A124 /* NativeTrainingCardTests.swift in Sources */,
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
 				F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */,
 				E41302026025000000000004 /* DelegatedTrainingTests.swift in Sources */,
@@ -2386,6 +2396,8 @@
 				F00720261007000100000002 /* TrainingDraftStore.swift in Sources */,
 				F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */,
 				E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */,
+				A124C0022F12400000C0A124 /* NativeTrainingCardContract.swift in Sources */,
+				A124C0042F12400000C0A124 /* NativeTrainingCardViews.swift in Sources */,
 				E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */,
 				E41302026025000000000002 /* DelegatedTrainingView.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,

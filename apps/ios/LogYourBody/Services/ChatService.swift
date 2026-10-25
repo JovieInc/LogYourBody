@@ -118,6 +118,7 @@ enum ChatHistoryLoader {
 enum ChatStreamEvent: Equatable, Sendable {
     case metadata(conversationId: String, clientMessageId: String, replayed: Bool)
     case delta(String)
+    case trainingCards([NativeTrainingCard])
     case completed(messageId: String, createdAt: String, replayed: Bool)
     case failure(code: String, message: String, retryable: Bool)
 }
@@ -266,10 +267,30 @@ struct ChatSSEParser {
                 throw ChatServiceError.invalidResponse
             }
             return .failure(code: value.code, message: value.message, retryable: value.retryable)
+        case "training_cards":
+            guard let object = try JSONSerialization.jsonObject(with: payload) as? [String: Any] else {
+                throw ChatServiceError.invalidResponse
+            }
+            guard chatEventInt(object["version"]) == ChatAPIContract.protocolVersion,
+                  chatEventInt(object["schemaVersion"]) == NativeTrainingCardContract.schemaVersion else {
+                throw ChatServiceError.invalidResponse
+            }
+            guard let cards = object["cards"] else { return nil }
+            switch NativeTrainingCardContract.parseList(cards) {
+            case .success(let parsed):
+                return parsed.isEmpty ? nil : .trainingCards(parsed)
+            case .failure:
+                return nil
+            }
         default:
             return nil
         }
     }
+}
+
+private func chatEventInt(_ value: Any?) -> Int? {
+    guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
+    return number.intValue
 }
 
 final class URLSessionChatService: ChatServicing {
