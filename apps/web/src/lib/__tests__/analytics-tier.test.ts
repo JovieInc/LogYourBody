@@ -1,3 +1,6 @@
+// next.config.ts only needs the env map here; the real Sentry build plugin cannot load in jsdom (no TextDecoder).
+jest.mock('@sentry/nextjs/config', () => ({ withSentryConfig: (config: unknown) => config }));
+
 import {
   analyticsTierFromEnv,
   resolveAnalyticsTier,
