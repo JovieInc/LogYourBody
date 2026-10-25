@@ -199,6 +199,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-226', reason: 'LYB-226 source evidence for the public build environment placeholder correction.' },
       { value: 'https://linear.app/jovie/issue/LYB-230', reason: 'LYB-230 source evidence for public web claims lint coverage.' },
       { value: 'https://linear.app/jovie/issue/LYB-232', reason: 'LYB-232 source evidence for Statsig client-key injection into the production web build.' },
+      { value: 'https://linear.app/jovie/issue/LYB-252', reason: 'LYB-252 source evidence for recurring correction escalation and guard-failure detection.' },
       { value: 'https://linear.app/jovie/issue/LYB-97', reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.' },
       { value: 'https://linear.app/jovie/issue/LYB-33', reason: 'LYB-33, related issue cited by the LYB-97 trial audit.' },
       { value: 'https://linear.app/jovie/issue/JOV-7237', reason: 'JOV-7237, Doppler to GitHub sync capacity work cited by the secrets policy.' },

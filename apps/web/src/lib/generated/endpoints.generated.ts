@@ -321,6 +321,10 @@ export const endpoints = {
       reason: 'Ruby dependency host referenced by iOS tooling docs.',
     },
     {
+      value: 'https://api.vercel.com',
+      reason: 'CI-only Vercel env-type guard and public-env sync; not a runtime endpoint.',
+    },
+    {
       value: 'https://openapi.vercel.sh',
       reason: 'Vercel OpenAPI schema referenced by tooling.',
     },
@@ -420,6 +424,11 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-232',
       reason:
         'LYB-232 source evidence for Statsig client-key injection into the production web build.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-252',
+      reason:
+        'LYB-252 source evidence for recurring correction escalation and guard-failure detection.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-97',
