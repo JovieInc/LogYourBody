@@ -870,6 +870,10 @@ struct ChatTabView: View {
                     readinessEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
                         flagKey: TrainingReadinessPolicy.featureGate
                     ),
+                    progressEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
+                        flagKey: TrainingProgressPolicy.featureGate
+                    ),
+                    progressDecision: trainingErrorMessage == nil ? trainingResponse?.decision : nil,
                     isCurrent: { authManager.ownsAccountSession(ownership) },
                     onLogSet: { exercise, setNumber, reps, loadKg, rir in
                         try await logTrainingSet(
@@ -900,6 +904,9 @@ struct ChatTabView: View {
                             ownership: ownership,
                             request: request
                         )
+                    },
+                    onLoadProgress: {
+                        try await loadTrainingProgress(ownership: ownership)
                     }
                 )
             case .voiceSetReview(let session, let heard):
@@ -1235,6 +1242,21 @@ struct ChatTabView: View {
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .accessibilityIdentifier("training_open_canvas")
         }
+    }
+
+    private func loadTrainingProgress(
+        ownership: AuthManager.ProfileSessionOwnership
+    ) async throws -> TrainingProgressResponse {
+        var response: TrainingProgressResponse?
+        try await TrainingOwnedRequest.perform(
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            getToken: { await chatAccessToken() },
+            send: { accessToken in
+                response = try await trainingService.loadProgress(accessToken: accessToken)
+            }
+        )
+        guard let response else { throw TrainingServiceError.invalidResponse }
+        return response
     }
 
     private func loadTrainingNext() async {

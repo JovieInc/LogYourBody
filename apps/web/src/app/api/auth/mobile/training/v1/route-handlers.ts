@@ -19,10 +19,12 @@ import {
 } from '@/lib/training/commands';
 import {
   getOrCreateNextWorkout,
+  loadTrainingRecords,
   pullAllTrainingRecords,
   storeProgramSetup,
 } from '@/lib/training/service';
 import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from '@/lib/training/types';
+import { summarizeTrainingProgress } from '@/lib/training/progress';
 
 export const TRAINING_API_VERSION = 1;
 
@@ -239,6 +241,22 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
   }
 
   return {
+    async progress(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      try {
+        const snapshot = await loadTrainingRecords(dependencies.records, identity.sub);
+        return json(
+          withVersion({ progress: summarizeTrainingProgress(snapshot, dependencies.now()) }),
+        );
+      } catch {
+        return apiError('training_unavailable', 503);
+      }
+    },
+
     async next(request: NextRequest) {
       const identity = await authorized(request);
       if (!identity) return apiError('unauthorized', 401);
