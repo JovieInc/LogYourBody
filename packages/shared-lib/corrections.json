@@ -36,6 +36,42 @@
     }
   },
   {
+    "fingerprint": "share-preview-chrome-preserves-card-accessibility",
+    "correction": "LYB-39 / PR #1533: The preview chrome replaced body_score_share_card with its own unused accessibility identifier, so the required launch-quality timeline UI test could not discover the card inside the share overlay.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40157965320/job/121063372261",
+    "mechanization": "Remove the identifier from the decorative preview modifier chain so BodyScoreShareCardView owns the card identifier. The existing required testLaunchQualityGateCapturesTimelineSurfaces regression requires the card, validates its on-screen geometry, opts into FFMI and reads the metric from its descendants. The reported run fails the card-discovery assertion before this fix; current native execution remains required in CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The decorative preview has no separate accessibility identity to expose. Removing its unused identifier prevents the outer modifier chain from overriding the card identifier while preserving the artwork geometry and accessible children."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "Share card must remain accessibility-discoverable inside the overlay"
+    }
+  },
+  {
+    "fingerprint": "share-avatar-probe-matches-rendered-blue",
+    "correction": "LYB-39 / PR #1533: The square avatar render failed a bright-cyan pixel assertion even though the retained PNG contains the opted-in blue avatar. Detect the rendered avatar without counting the logo, white copy or a non-avatar photo as proof.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40152580750/job/121047155644",
+    "mechanization": "The existing required launch-quality opt-in fixture matrix checks blue channel dominance at the unchanged brightness floor and sample-count threshold in every export aspect. The score-only baseline accounts for the logo, and the magenta photo is an explicit negative control. Failed-run PNG replay rejects the old square probe and accepts the blue probe while rejecting the non-avatar controls; current native execution remains required in CI.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This correction concerns pixel evidence in a rendered regression test. Application runtime types cannot establish that a sampled color identifies the avatar rather than the logo or another visual."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing native render test can inspect actual exported pixels and assert positive and negative visual controls through the unchanged required launch-quality runner."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift",
+      "anchor": "The logo and a non-avatar photo must not satisfy the avatar probe"
+    }
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1531: Adding the delegated training view and tests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151037308/job/121042459915",
@@ -76,6 +112,26 @@
     }
   },
   {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "LYB-204: Retain LYB correction lessons and guards with their sources, enforcement levels and recurrence across repository revisions.",
+    "source": "https://linear.app/jovie/issue/LYB-204",
+    "mechanization": "The existing required correction coverage check reports each lesson, source, guard and distinct receipt count, and compares source identities with the exact Git base. Behavioral regressions reject deleted, replaced or reassigned receipts even when rule coverage and receipt counts remain unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",
@@ -96,6 +152,22 @@
       "ratchet": {
         "baseline": "packages/shared-lib/app-privacy-baseline.json"
       }
+    }
+  },
+  {
+    "fingerprint": "chart-playhead-preparation-and-label-mapping",
+    "correction": "LYB-44: The chart responsiveness and line/playhead tooltip request in audited session bg_092003_cba358 was missed. Establish budgets, retain correct selected-series labels, and prevent history preparation on every scrub.",
+    "source": "https://linear.app/jovie/issue/LYB-44",
+    "mechanization": "The view-owned input-keyed PreparationCache prepares selection samples once, retains daily/average provenance and reading times, and uses binary nearest-day lookup. Native HomeV2MetricEditorialTests cover latest daily selection, duplicate timestamps, gaps, invalid values, all cache inputs, gate rollback and policy latency budgets. The existing required shared-lib chart regression also prevents removing the gated cache from the actual SwiftUI path. Device frame and display-latency receipts remain separate required release evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Cache chart geometry by render inputs rather than playhead state and construct the date-to-reading mapping alongside the plotted series, retaining provenance by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/HomeV2MetricEditorialTests.swift",
+      "anchor": "func testPlayheadSelectsLatestDailyReadingRegardlessOfValueOrInputOrder()"
     }
   },
   {
@@ -367,6 +439,22 @@
     "guard": {
       "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
       "anchor": "public route metadata contract (LYB-223)"
+    }
+  },
+  {
+    "fingerprint": "marketing-sitemap-shares-public-route-inventory",
+    "correction": "LYB-224: The sitemap must match the public marketing route tests on the canonical host, omit request-time modification dates, and block legacy sign-in and sign-up routes from crawling.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/8c586db0ddcfaf7bff208f77204ce9c3d8ee6d99/apps/web/src/app/sitemap.ts#L4",
+    "mechanization": "Generate the sitemap from the same public route inventory used by marketing browser tests. Required web tests compare the complete sitemap with that inventory, verify inventory completeness against public page files, and reject fabricated modification dates and missing auth exclusions in robots.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The sitemap maps the shared marketing inventory directly using the registry's canonical origin, omits unverified timestamps, and robots explicitly excludes the retained auth routes."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/sitemap.ts",
+      "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
     }
   }
 ]
