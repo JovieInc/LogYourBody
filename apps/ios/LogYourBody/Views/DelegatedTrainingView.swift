@@ -16,6 +16,7 @@ final class DelegatedTrainingModel: ObservableObject {
     private let isCurrent: () -> Bool
     private var proposalRequestId = UUID().uuidString
     private var decisionRequestId = UUID().uuidString
+    private var pendingReversal = false
 
     init(
         service: DelegatedTrainingServicing,
@@ -63,11 +64,32 @@ final class DelegatedTrainingModel: ObservableObject {
             self.proposal = response.stored
             self.message = response.question
             self.decisionRequestId = UUID().uuidString
+            self.notePlanOutcome(response.stored, utterance: utterance, restoreRevision: restoreRevision)
         }
+    }
+
+    private func notePlanOutcome(
+        _ stored: TrainingPlanStoredProposal?, utterance: String?, restoreRevision: String?
+    ) {
+        guard stored != nil else {
+            pendingReversal = false
+            return
+        }
+        if restoreRevision != nil {
+            pendingReversal = true
+            return
+        }
+        pendingReversal = false
+        let steering = utterance?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !steering.isEmpty, let proposalId = stored?.proposal.id else { return }
+        BenefitEvents.planOverride(proposalId: proposalId, overrideKind: "steering")
     }
 
     func decide(_ decision: String) async -> Bool {
         guard let proposal, proposal.status == "proposed" else { return false }
+        let decisionId = proposal.proposal.id
+        let isHomeDecision = proposal.proposal.transition != nil
+        let isReversal = pendingReversal
         var applied = false
         await perform { token in
             let response = try await self.service.decidePlan(accessToken: token, request: .init(
@@ -83,13 +105,27 @@ final class DelegatedTrainingModel: ObservableObject {
                     throw TrainingServiceError.invalidResponse
                 }
                 applied = true
+                if isHomeDecision {
+                    BenefitEvents.homeDecisionAccepted(decisionId: decisionId, decisionKind: "next_block")
+                }
+                if isReversal {
+                    BenefitEvents.reversal(proposalId: decisionId, reversalKind: "restore")
+                }
+            } else if decision == "reject", isHomeDecision {
+                BenefitEvents.homeDecisionRejected(decisionId: decisionId, decisionKind: "next_block")
             }
             self.context = loaded
             self.proposal = nil
+            self.pendingReversal = false
             self.message = decision == "reject" ? "Draft declined. Your saved plan is unchanged." : nil
             self.proposalRequestId = UUID().uuidString
         }
         return applied
+    }
+
+    func noteHomeDecisionDeferred() {
+        guard let proposal, proposal.status == "proposed", proposal.proposal.transition != nil else { return }
+        BenefitEvents.homeDecisionDeferred(decisionId: proposal.proposal.id, decisionKind: "next_block")
     }
 
     private func perform(_ action: (String) async throws -> Void) async {
@@ -173,6 +209,7 @@ struct DelegatedTrainingView: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .disabled(model.busy)
             .task { await model.refresh() }
+            .onDisappear { model.noteHomeDecisionDeferred() }
             .onChange(of: model.inputs) { _, _ in model.inputsChanged() }
             .onChange(of: steering) { _, _ in model.inputsChanged() }
         }
