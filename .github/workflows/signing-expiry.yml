@@ -1,0 +1,63 @@
+name: Signing expiry check
+
+# Read-only LYB-141 check. Reports days to expiry for the Apple Distribution
+# certificate, active App Store profiles, and the App Store Connect API key.
+# Under 30 days it files or reopens one LYB issue (remediation:signing-expiry).
+# Under 7 days that same issue is Urgent. This workflow never creates,
+# revokes, rotates, or nukes signing material. Renew before nuke:
+# docs/engineering/signing-expiry.md
+
+on:
+  schedule:
+    - cron: '17 13 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print the expiry report and skip Linear'
+        required: false
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - .github/scripts/signing-expiry.mjs
+      - .github/scripts/signing-expiry.test.mjs
+      - .github/scripts/app-store-readiness.mjs
+      - .github/scripts/lib/linear-issue-intake.mjs
+      - .github/workflows/signing-expiry.yml
+      - docs/engineering/signing-expiry.md
+
+permissions: {}
+
+concurrency:
+  group: signing-expiry-${{ github.workflow }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  signing-expiry:
+    name: Report signing expiry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Unit tests
+        run: node --test .github/scripts/signing-expiry.test.mjs
+
+      - name: Read expiry and file if needed
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/signing-expiry.mjs

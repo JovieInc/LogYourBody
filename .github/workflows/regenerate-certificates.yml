@@ -6,6 +6,8 @@ name: Regenerate Certificates
 # development certificates while swallowing errors. A repository variable must
 # not be enough to turn that back on.
 # https://linear.app/jovie/issue/LYB-74
+# Expiry monitoring is signing-expiry.yml (LYB-141). Prefer the match refresh
+# in docs/engineering/signing-expiry.md. This workflow stays the manual nuke.
 on:
   workflow_dispatch:
     inputs:
@@ -62,11 +64,11 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           echo "🔥 Nuking all certificates and profiles..."
-          
+
           # Create a custom Fastfile for nuking
           cat > Fastfile.nuke << 'EOF'
           default_platform(:ios)
-          
+
           platform :ios do
             desc "Nuke all certificates"
             lane :nuke_all do
@@ -97,7 +99,7 @@ jobs:
             end
           end
           EOF
-          
+
           bundle exec fastlane -f Fastfile.nuke nuke_all || echo "Some certificates may not have existed"
           rm -f Fastfile.nuke
 
@@ -147,7 +149,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           echo "✨ Generating new App Store certificates..."
-          
+
           # Use our setup_provisioning lane with force
           bundle exec fastlane setup_provisioning type:appstore readonly:false force:true || {
             echo "❌ Failed to generate App Store certificates"
@@ -167,7 +169,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           echo "✨ Generating new Development certificates..."
-          
+
           # Use our setup_provisioning lane with force
           bundle exec fastlane setup_provisioning type:development readonly:false force:true || {
             echo "❌ Failed to generate Development certificates"
@@ -187,13 +189,13 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           echo "🧪 Testing new certificates..."
-          
+
           # Try to sync in readonly mode to verify
           bundle exec fastlane setup_provisioning type:appstore readonly:true || {
             echo "❌ Failed to verify certificates"
             exit 1
           }
-          
+
           echo "✅ Certificates regenerated successfully!"
 
       - name: Detect Slack webhook
