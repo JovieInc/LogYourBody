@@ -10,6 +10,9 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });
 
+const sentryRelease =
+  process.env.NEXT_PUBLIC_SENTRY_RELEASE || process.env.VERCEL_GIT_COMMIT_SHA || version;
+
 const nextConfig: NextConfig = {
   transpilePackages: ['@jovie/ui'],
   // Enable static export for Capacitor when needed
@@ -58,10 +61,7 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
     // Release identity for Sentry events and sourcemap upload: the deployed commit.
-    NEXT_PUBLIC_SENTRY_RELEASE:
-      process.env.NEXT_PUBLIC_SENTRY_RELEASE ||
-      process.env.VERCEL_GIT_COMMIT_SHA ||
-      version,
+    NEXT_PUBLIC_SENTRY_RELEASE: sentryRelease,
     // Lets browser analytics derive its tier from the Vercel environment.
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? '',
   },
@@ -167,9 +167,7 @@ const configWithAnalyzer = withBundleAnalyzer(nextConfig);
 // (Vercel build env: SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT). Without them
 // the runtime SDK still reports, just with minified frames.
 const shouldUploadSourcemaps = Boolean(
-  process.env.SENTRY_AUTH_TOKEN &&
-    process.env.SENTRY_ORG &&
-    process.env.SENTRY_PROJECT
+  process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT,
 );
 
 export default shouldUploadSourcemaps
@@ -178,7 +176,7 @@ export default shouldUploadSourcemaps
       project: process.env.SENTRY_PROJECT,
       authToken: process.env.SENTRY_AUTH_TOKEN,
       silent: true,
-      release: { name: process.env.NEXT_PUBLIC_SENTRY_RELEASE },
+      release: { name: sentryRelease },
       sourcemaps: { deleteSourcemapsAfterUpload: true },
       telemetry: false,
     })
