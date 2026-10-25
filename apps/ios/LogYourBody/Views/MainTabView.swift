@@ -780,6 +780,8 @@ struct ChatTabView: View {
     @State private var isStartingNextBlock = false
     @State private var trainingEnrollmentRequired = false
     @State private var trainingErrorMessage: String?
+    @State private var acceptedPlan: CanvasPlan?
+    @State private var acceptedPlanRevision: String?
     @State private var trainingPresentation: TrainingPresentation?
     @State private var voiceCapture = VoiceCaptureService()
     @State private var voicePlayback = VoicePlaybackService()
@@ -817,8 +819,17 @@ struct ChatTabView: View {
         .task(id: authManager.captureAccountSession()) {
             trainingResponse = nil
             trainingOwner = nil
+            acceptedPlan = nil
+            acceptedPlanRevision = nil
             trainingPresentation = nil
+            if let ownership = authManager.captureAccountSession() {
+                restoreNativeTrainingSnapshot(ownership: ownership)
+            }
             await loadTrainingNext()
+        }
+        .onAppear {
+            guard let ownership = authManager.captureAccountSession() else { return }
+            restoreNativeTrainingSnapshot(ownership: ownership)
         }
         .onReceive(NotificationCenter.default.publisher(for: .featureGatesDidChange)) { _ in
             Task { await loadTrainingNext() }
@@ -945,7 +956,10 @@ struct ChatTabView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            composer
+            VStack(spacing: 0) {
+                nativeWorkoutDock
+                composer
+            }
         }
     }
 
@@ -1195,6 +1209,12 @@ struct ChatTabView: View {
         TrainingCoachPolicy.isEnabled { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
     }
 
+    private var nativeTrainingCardsEnabled: Bool {
+        trainingCoachEnabled && NativeTrainingCardPolicy.isEnabled {
+            AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0)
+        }
+    }
+
     private var canvasEnabled: Bool {
         MesocycleCanvasPolicy.isEnabled { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
     }
@@ -1240,7 +1260,9 @@ struct ChatTabView: View {
 
     @ViewBuilder
     private var trainingCard: some View {
-        if isTrainingLoading && trainingResponse == nil && !trainingEnrollmentRequired {
+        if nativeTrainingCardsEnabled {
+            nativeTrainingCards
+        } else if isTrainingLoading && trainingResponse == nil && !trainingEnrollmentRequired {
             HStack(spacing: 10) {
                 ProgressView().controlSize(.small)
                 Text("Loading your next session")
@@ -1329,24 +1351,217 @@ struct ChatTabView: View {
         return response
     }
 
+    private var nativeTrainingCards: some View {
+        NativeTrainingCardStack(
+            source: NativeTrainingCardSource(
+                response: trainingResponse,
+                plan: acceptedPlan,
+                planRevisionId: acceptedPlanRevision,
+                ownerSubject: trainingOwner?.subject ?? "",
+                transcriptText: messages.last(where: { $0.role == .assistant })?.text ?? ""
+            ),
+            status: NativeTrainingCardStatus(
+                isLoading: isTrainingLoading,
+                errorMessage: trainingErrorMessage,
+                chatBusy: isResponding || isLoadingConversation
+            ),
+            actions: NativeTrainingCardActions(
+                retry: { Task { await loadTrainingNext() } },
+                openSession: { session in
+                    guard let ownership = trainingOwner, authManager.ownsAccountSession(ownership) else { return }
+                    trainingPresentation = .session(session, ownership)
+                },
+                mutations: NativeTrainingCardMutations(
+                    apply: { proposalId in await decideNativePlan(proposalId, decision: "apply") },
+                    reject: { proposalId in await decideNativePlan(proposalId, decision: "reject") },
+                    adjust: { proposalId, utterance in
+                        await adjustNativePlan(proposalId, utterance: utterance)
+                    },
+                    swap: { sessionId, exerciseId, variantId in
+                        await swapNativeExercise(
+                            sessionId: sessionId, exerciseId: exerciseId, variantId: variantId
+                        )
+                    },
+                    feedback: { sessionId, performance in
+                        await submitNativeFeedback(sessionId: sessionId, performance: performance)
+                    }
+                )
+            )
+        )
+    }
+
+    @ViewBuilder
+    private var nativeWorkoutDock: some View {
+        if !showsTranscript, nativeTrainingCardsEnabled,
+           let session = trainingResponse?.session,
+           let ownership = trainingOwner, authManager.ownsAccountSession(ownership),
+           let workout = nativeWorkoutCard(session: session, owner: ownership.subject) {
+            NativeWorkoutSessionCard(
+                session: session, card: workout,
+                chatBusy: isResponding || isLoadingConversation,
+                offline: trainingErrorMessage != nil,
+                onLog: { trainingPresentation = .session(session, ownership) }
+            )
+            .padding(.horizontal, JovieTokens.screenInset)
+            .padding(.bottom, JovieTokens.tightGap)
+        }
+    }
+
+    private func nativeWorkoutCard(session: TrainingSession, owner: String) -> ApprovedNativeTrainingCard? {
+        NativeTrainingCardProjector.renderable(
+            response: trainingResponse, plan: acceptedPlan, planRevisionId: acceptedPlanRevision,
+            ownerSubject: owner, transcriptText: ""
+        ).first { $0.component == "WorkoutSessionCard" && $0.objectId == session.id }
+    }
+
+    private func restoreNativeTrainingSnapshot(ownership: AuthManager.ProfileSessionOwnership) {
+        guard nativeTrainingCardsEnabled,
+              let snapshot = NativeTrainingCardStore.shared.load(ownerSubject: ownership.subject) else { return }
+        trainingResponse = snapshot.response
+        trainingOwner = ownership
+        acceptedPlan = snapshot.plan
+        acceptedPlanRevision = snapshot.planRevisionId
+        trainingEnrollmentRequired = false
+    }
+
+    private func persistNativeSnapshot(ownership: AuthManager.ProfileSessionOwnership) {
+        guard nativeTrainingCardsEnabled, let response = trainingResponse else { return }
+        try? NativeTrainingCardStore.shared.save(NativeTrainingCardSnapshot(
+            schemaVersion: NativeTrainingCardPolicy.schemaVersion,
+            ownerSubject: ownership.subject,
+            response: response,
+            plan: acceptedPlan,
+            planRevisionId: acceptedPlanRevision
+        ))
+    }
+
+    private func refreshAcceptedPlan(ownership: AuthManager.ProfileSessionOwnership) async {
+        guard nativeTrainingCardsEnabled, delegatedTrainingEnabled else { return }
+        let model = DelegatedTrainingModel(
+            service: URLSessionTrainingService(),
+            accessToken: { await chatAccessToken() },
+            isCurrent: { authManager.ownsAccountSession(ownership) }
+        )
+        await model.refresh()
+        guard authManager.ownsAccountSession(ownership), let context = model.context else { return }
+        acceptedPlan = context.currentSetup?.delegated?.plan
+        acceptedPlanRevision = context.currentSetup?.programRevisionId
+    }
+
+    private func decideNativePlan(_ proposalId: String, decision: String) async {
+        let kind = decision == "apply" ? "apply_saved_revision" : "reject_saved_revision"
+        guard NativeTrainingCardDispatch.savedRevisionDecision(kind) == decision,
+              let proposal = trainingResponse?.nextBlock, proposal.proposal.id == proposalId,
+              proposal.status == "proposed",
+              let ownership = authManager.captureAccountSession() else { return }
+        if decision == "apply" {
+            await startNextTrainingBlock(proposal, ownership: ownership)
+            return
+        }
+        let model = DelegatedTrainingModel(
+            service: URLSessionTrainingService(), initialProposal: proposal,
+            accessToken: { await chatAccessToken() },
+            isCurrent: { authManager.ownsAccountSession(ownership) }
+        )
+        _ = await model.decide("reject")
+        await loadTrainingNext()
+        if authManager.ownsAccountSession(ownership), let message = model.message {
+            trainingErrorMessage = message
+        }
+    }
+
+    private func adjustNativePlan(_ proposalId: String, utterance: String) async {
+        guard NativeTrainingCardDispatch.savedRevisionDecision("adjust_saved_revision") == "adjust",
+              NativeTrainingCardDispatch.adjustmentUtteranceIsValid(utterance),
+              let proposal = trainingResponse?.nextBlock, proposal.proposal.id == proposalId,
+              let ownership = authManager.captureAccountSession() else { return }
+        let model = DelegatedTrainingModel(
+            service: URLSessionTrainingService(), initialProposal: proposal,
+            accessToken: { await chatAccessToken() },
+            isCurrent: { authManager.ownsAccountSession(ownership) }
+        )
+        await model.refresh()
+        guard authManager.ownsAccountSession(ownership),
+              model.context?.pendingProposal?.proposal.id == proposalId ||
+                model.proposal?.proposal.id == proposalId else {
+            trainingErrorMessage = model.message ?? "Your training changed. Refresh the draft before applying it."
+            return
+        }
+        await model.propose(utterance: utterance)
+        await loadTrainingNext()
+        if authManager.ownsAccountSession(ownership) { trainingErrorMessage = model.message }
+    }
+
+    private func swapNativeExercise(sessionId: String, exerciseId: String, variantId: String) async {
+        guard let session = trainingResponse?.session, session.id == sessionId,
+              let exercise = session.exercises.first(where: { $0.id == exerciseId }),
+              exercise.substitutions?.contains(where: { $0.id == variantId }) == true,
+              let ownership = authManager.captureAccountSession() else { return }
+        do {
+            try await TrainingOwnedRequest.perform(
+                isCurrent: { authManager.ownsAccountSession(ownership) },
+                getToken: { await chatAccessToken() },
+                send: { token in
+                    _ = try await self.trainingService.swapExercise(
+                        accessToken: token,
+                        request: TrainingSwapRequest(
+                            sessionId: sessionId, exerciseId: exerciseId, toVariantId: variantId
+                        )
+                    )
+                }
+            )
+            await loadTrainingNext()
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            trainingErrorMessage = (error as? LocalizedError)?.errorDescription
+                ?? "Training is temporarily unavailable. Please try again."
+        }
+    }
+
+    private func submitNativeFeedback(sessionId: String, performance: String) async {
+        guard ["up", "stable", "down"].contains(performance),
+              trainingResponse?.session?.id == sessionId,
+              let ownership = authManager.captureAccountSession() else { return }
+        var request = TrainingFeedbackRequest(sessionId: sessionId, performance: performance, source: "touch")
+        request.sourceObservationId = UUID().uuidString
+        do {
+            _ = try await recordTrainingFeedback(ownership: ownership, request: request)
+        } catch {
+            guard authManager.ownsAccountSession(ownership) else { return }
+            trainingErrorMessage = (error as? LocalizedError)?.errorDescription
+                ?? "Training is temporarily unavailable. Please try again."
+        }
+    }
+
+    private func clearTrainingCard() {
+        isTrainingLoading = false
+        trainingResponse = nil
+        trainingOwner = nil
+        acceptedPlan = nil
+        acceptedPlanRevision = nil
+        trainingEnrollmentRequired = false
+        trainingErrorMessage = nil
+    }
+
     private func loadTrainingNext() async {
         let loadId = UUID()
         trainingLoadId = loadId
-        guard showsTranscript, trainingCoachEnabled,
-              let ownership = authManager.captureAccountSession() else {
-            isTrainingLoading = false
-            trainingResponse = nil
-            trainingOwner = nil
-            trainingEnrollmentRequired = false
-            trainingErrorMessage = nil
+        guard trainingCoachEnabled, let ownership = authManager.captureAccountSession() else {
+            clearTrainingCard()
             return
         }
-        isTrainingLoading = true
+        if !showsTranscript && !nativeTrainingCardsEnabled {
+            clearTrainingCard()
+            return
+        }
+        if trainingResponse == nil { isTrainingLoading = true }
         defer { if trainingLoadId == loadId { isTrainingLoading = false } }
         guard let accessToken = await chatAccessToken(),
               authManager.ownsAccountSession(ownership), trainingLoadId == loadId else {
             guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
-            trainingErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
+            if trainingResponse == nil {
+                trainingErrorMessage = ChatServiceError.authenticationExpired.localizedDescription
+            }
             return
         }
         do {
@@ -1356,12 +1571,19 @@ struct ChatTabView: View {
             trainingOwner = ownership
             trainingEnrollmentRequired = false
             trainingErrorMessage = nil
+            await refreshAcceptedPlan(ownership: ownership)
+            persistNativeSnapshot(ownership: ownership)
         } catch let error as TrainingServiceError {
             guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
             if error == .server(code: "program_not_enrolled") {
                 trainingResponse = nil
+                acceptedPlan = nil
+                acceptedPlanRevision = nil
                 trainingEnrollmentRequired = true
                 trainingErrorMessage = nil
+                NativeTrainingCardStore.shared.remove(ownerSubject: ownership.subject)
+            } else if nativeTrainingCardsEnabled, trainingResponse != nil {
+                trainingErrorMessage = error.localizedDescription
             } else {
                 trainingErrorMessage = error.localizedDescription
             }

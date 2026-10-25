@@ -18,7 +18,7 @@ enum TrainingReadinessPolicy {
     static let featureGate = "workout_readiness_v1"
 }
 
-struct TrainingExercisePrescription: Decodable, Equatable, Identifiable, Sendable {
+struct TrainingExercisePrescription: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let name: String
     let primaryMuscle: String
@@ -33,13 +33,13 @@ struct TrainingExercisePrescription: Decodable, Equatable, Identifiable, Sendabl
     let evidenceIds: [String]
     var substitutions: [TrainingExerciseSubstitution]?
 
-    struct RepRange: Decodable, Equatable, Sendable {
+    struct RepRange: Codable, Equatable, Sendable {
         let min: Int
         let max: Int
     }
 }
 
-struct TrainingExerciseSubstitution: Decodable, Equatable, Identifiable, Sendable {
+struct TrainingExerciseSubstitution: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let name: String
     let primaryMuscle: String
@@ -54,7 +54,7 @@ struct TrainingExerciseSubstitution: Decodable, Equatable, Identifiable, Sendabl
     let evidenceIds: [String]
 }
 
-struct TrainingWorkoutEvent: Decodable, Equatable, Identifiable, Sendable {
+struct TrainingWorkoutEvent: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let kind: String
     let createdAt: String
@@ -63,7 +63,7 @@ struct TrainingWorkoutEvent: Decodable, Equatable, Identifiable, Sendable {
     let minutes: Int?
 }
 
-struct TrainingSession: Decodable, Equatable, Identifiable, Sendable {
+struct TrainingSession: Codable, Equatable, Identifiable, Sendable {
     let id: String
     let week: Int
     let slot: Int
@@ -103,7 +103,7 @@ struct TrainingSetCorrectionAudit: Codable, Equatable, Sendable {
     let previous: Previous
 }
 
-struct TrainingNextResponse: Decodable, Equatable, Sendable {
+struct TrainingNextResponse: Codable, Equatable, Sendable {
     let version: Int
     let error: String?
     let session: TrainingSession?
@@ -361,6 +361,26 @@ enum TrainingServiceError: LocalizedError, Equatable {
     }
 }
 
+struct TrainingSwapRequest: Encodable, Equatable, Sendable {
+    let sessionId: String
+    let exerciseId: String
+    let toVariantId: String
+}
+
+struct TrainingSwapResponse: Decodable, Equatable, Sendable {
+    struct Record: Decodable, Equatable, Sendable {
+        let id: String
+        let sessionId: String
+        let fromExerciseId: String
+        let toVariantId: String
+    }
+
+    let version: Int
+    let swap: Record
+    let exercise: TrainingExercisePrescription
+    let diff: [String]
+}
+
 protocol TrainingServicing {
     func loadNext(accessToken: String) async throws -> TrainingNextResponse
     func loadProgress(accessToken: String) async throws -> TrainingProgressResponse
@@ -368,6 +388,7 @@ protocol TrainingServicing {
     func logSet(accessToken: String, request: TrainingSetLogRequest) async throws
     func correctSet(accessToken: String, request: TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
     func applyAction(accessToken: String, request: TrainingWorkoutActionRequest) async throws -> TrainingSession
+    func swapExercise(accessToken: String, request: TrainingSwapRequest) async throws -> TrainingSwapResponse
     func recordFeedback(accessToken: String, request: TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
     func revoke(accessToken: String) async throws -> TrainingRevokeResponse
 }
@@ -457,6 +478,18 @@ final class URLSessionTrainingService: TrainingServicing {
               response.session.executionEvents?.contains(where: { $0.id == request.eventId }) == true
         else { throw TrainingServiceError.invalidResponse }
         return response.session
+    }
+
+    func swapExercise(accessToken: String, request: TrainingSwapRequest) async throws -> TrainingSwapResponse {
+        let response: TrainingSwapResponse = try await send(
+            path: "swap", method: "POST", accessToken: accessToken, body: request
+        )
+        guard response.swap.sessionId == request.sessionId,
+              response.swap.fromExerciseId == request.exerciseId,
+              response.swap.toVariantId == request.toVariantId,
+              response.exercise.id == request.toVariantId
+        else { throw TrainingServiceError.invalidResponse }
+        return response
     }
 
     func recordFeedback(accessToken: String, request: TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse {
@@ -566,6 +599,7 @@ extension TrainingProgressResponse: VersionedTrainingResponse {}
 extension TrainingProgramResponse: VersionedTrainingResponse {}
 extension TrainingRevokeResponse: VersionedTrainingResponse {}
 extension TrainingFeedbackResponse: VersionedTrainingResponse {}
+extension TrainingSwapResponse: VersionedTrainingResponse {}
 
 private struct EnrollmentRequest: Encodable {
     let adultConfirmed = true
@@ -603,15 +637,15 @@ struct TrainingPlanningInputs: Codable, Equatable, Sendable {
     var preferredVariantIds: [String]?
 }
 
-struct TrainingPlanStoredProposal: Decodable, Equatable, Sendable {
-    struct Proposal: Decodable, Equatable, Sendable {
-        struct Transition: Decodable, Equatable, Sendable {
+struct TrainingPlanStoredProposal: Codable, Equatable, Sendable {
+    struct Proposal: Codable, Equatable, Sendable {
+        struct Transition: Codable, Equatable, Sendable {
             let staying: [String]
             let changing: [String]
             let why: String
             let expiring: [String]
         }
-        struct Actor: Decodable, Equatable, Sendable {
+        struct Actor: Codable, Equatable, Sendable {
             let kind: String
             let subject: String
         }

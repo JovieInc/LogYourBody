@@ -137,8 +137,8 @@ struct TrainingProgress: Decodable, Equatable, Sendable {
 }
 
 /// An engine receipt already returned by /next. The native surface only renders it.
-struct TrainingProgressDecision: Decodable, Equatable, Sendable {
-    struct Decision: Decodable, Equatable, Sendable {
+struct TrainingProgressDecision: Codable, Equatable, Sendable {
+    struct Decision: Codable, Equatable, Sendable {
         let kind: String
         let requiresConfirmation: Bool?
     }
