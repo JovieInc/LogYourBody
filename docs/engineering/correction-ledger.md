@@ -31,7 +31,8 @@ For each receipt:
    the existing URL drift guard applies to ledger receipts too.
 3. Review `classification` in priority order: codebase, static, prose, human.
    Provide feasibility and rationale through the first feasible level. The
-   selected level is derived; an optional `level` must agree with it.
+   selected level is derived. Run the deterministic classifier below to save
+   that `level` and its matching `ruleId` on every receipt.
 4. Link the existing or new `guard.path` and a specific retained `guard.anchor`.
    Prose/human lessons instead require an explicit `proseOnlyReason`. Follow the
    [classification contract](correction-coverage.md) and implement the
@@ -50,11 +51,36 @@ a guard where feasible.
 Inspect and verify the ledger from the repository root:
 
 ```sh
+node scripts/correction-classifier.mjs
+node --test scripts/correction-classifier.test.mjs
 node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
 node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs
 node --test packages/shared-lib/scripts/correction-recurrence.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
+
+The classifier accepts an optional ledger path, defaults to this repository's
+ledger regardless of the working directory, and validates every receipt before
+writing. It uses LYB-204's reviewed feasibility assessments to select the first
+feasible level; incidental keywords cannot override a rejected assessment.
+There is no implicit prose or human fallback for missing or malformed assessments.
+
+| Rule ID                  | Saved level | Matching rule within the reviewed feasible level                                     |
+| ------------------------ | ----------- | ------------------------------------------------------------------------------------ |
+| `type-or-schema`         | `codebase`  | The lesson or selected rationale names a type, schema, struct, enum or interface.    |
+| `code-prevention`        | `codebase`  | Other prevention through runtime logic or API design.                                |
+| `file-pattern-or-string` | `static`    | The lesson or selected rationale names a file, glob or quoted string.                |
+| `ci-invariant`           | `static`    | Other deterministically checkable invariants.                                        |
+| `prose-guidance`         | `prose`     | Precise guidance is feasible after codebase and static enforcement were ruled out.   |
+| `human-judgment`         | `human`     | Reviewed judgment or external authority is required after all earlier levels failed. |
+
+Lint and CI share the merged schema's `static` level. Matching considers all
+distinct lessons for a fingerprint so its receipts get consistent rule IDs.
+Existing levels can be promoted but never downgraded, including every guarded
+entry. Repeated runs preserve unchanged file bytes. Unknown fields, levels, rule
+IDs or assessment shapes fail with a diagnostic. Classification adds routing
+metadata; the existing coverage check still verifies retained guard evidence
+and compares it with the immutable Git base.
 
 The JSON report and existing CI/owner tables expose sources, lessons, selected
 levels, guards and recurrence. Required coverage CI compares against the exact

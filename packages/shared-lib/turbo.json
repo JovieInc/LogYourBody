@@ -4,6 +4,8 @@
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/correction-classifier*.mjs",
+        "$TURBO_ROOT$/scripts/fixtures/correction-classifier.json",
         "$TURBO_ROOT$/apps/ios/LogYourBody/ContentView.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBody/Views/HomeV2/HomeV2TrendChart.swift",
         "$TURBO_ROOT$/scripts/ios/launch-quality-audit.sh",
