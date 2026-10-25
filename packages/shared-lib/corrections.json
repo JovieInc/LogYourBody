@@ -1,22 +1,42 @@
 [
   {
-    "fingerprint": "training-rest-timer-keeps-native-source-pins-current",
-    "correction": "LYB-116 PR #1540: The rest Live Activity changes the Xcode project, so refresh its diagnostic dependency pin and regenerate the repository source projection before handing off the repair.",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40161023824",
-    "mechanization": "Retain the existing required routing regression that compares all seven diagnostic dependency pins with source bytes and exercises the trusted CLI's acceptance and rejection cases. The existing required Detect Changes projection check rejects stale source-map fingerprints. Both checks reproduced the reported failures before this repair; update the project pin and generated map without relaxing either guard.",
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1531: Adding the delegated training view and tests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151037308/job/121042459915",
+    "mechanization": "Retain the existing seven exact dependency pins and refresh only the reviewed project manifest hash. The required Mac Runner Routing Tests compare each pin to current source bytes and exercise the trusted CLI against accepted tooling and rejected changed, missing, symlinked, dirty and untracked inputs. The existing regression failed before the pin update and passes afterward.",
     "classification": {
       "codebase": {
         "feasible": false,
-        "rationale": "The workflow's trusted source hashes and generated documentation describe build inputs outside the app runtime. Application code cannot keep those source artifacts synchronized."
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
       },
       "static": {
         "feasible": true,
-        "rationale": "The installed routing regression and source projection checker deterministically reject stale hashes in the existing required CI jobs without new tooling or a weaker gate."
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
       }
     },
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
-      "anchor": "test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    }
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1531: Adding delegated training Xcode target membership left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and shadow parity. Regenerate the source projection after reviewing the manifest diff.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151037335/job/121042459738",
+    "mechanization": "The existing required projection checker failed on the stale Xcode manifest fingerprint and passes after regeneration. Detect Changes and its CI Summary gate retain the existing regression rejecting a missing or skippable parity step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
     }
   },
   {
@@ -311,6 +331,26 @@
     "guard": {
       "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
       "anchor": "public route metadata contract (LYB-223)"
+    }
+  },
+  {
+    "fingerprint": "training-rest-timer-keeps-native-source-pins-current",
+    "correction": "LYB-116 PR #1540: The rest Live Activity changes the Xcode project, so refresh its diagnostic dependency pin and regenerate the repository source projection before handing off the repair.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40161023824",
+    "mechanization": "Retain the existing required routing regression that compares all seven diagnostic dependency pins with source bytes and exercises the trusted CLI's acceptance and rejection cases. The existing required Detect Changes projection check rejects stale source-map fingerprints. Both checks reproduced the reported failures before this repair; update the project pin and generated map without relaxing either guard.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The workflow's trusted source hashes and generated documentation describe build inputs outside the app runtime. Application code cannot keep those source artifacts synchronized."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The installed routing regression and source projection checker deterministically reject stale hashes in the existing required CI jobs without new tooling or a weaker gate."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
     }
   }
 ]
