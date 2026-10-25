@@ -113,6 +113,7 @@ export const logYourBody = {
       apple: { appStore: 'https://apps.apple.com/us/app/logyourbody/id6755209876' },
     },
     allowlist: [
+      { value: 'https://pubmed.ncbi.nlm.nih.gov/28965198/', reason: 'Morán-Navarro et al. (2017) primary recovery evidence cited in the LYB-112 engineering policy; not a runtime endpoint or personal numerical bound.' },
       { value: 'https://www.allianceforeatingdisorders.com/find-treatment/', reason: 'Verified official U.S. eating-disorder support resource in the health disclosure, checked 2026-10-14.' },
       { value: 'https://www.crisistextline.org/', reason: 'Verified official U.S. crisis support resource in the health disclosure, checked 2026-10-14.' },
       { value: 'https://design-tokens.github.io/community-group/format/', reason: 'Schema identifier in the immutable canonical Jovie color export; not a runtime endpoint.' },
@@ -188,6 +189,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-74', reason: 'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.' },
       { value: 'https://linear.app/jovie/issue/LYB-85', reason: 'LYB-85 source evidence for filmstrip appearance within the single owned photo timeline.' },
       { value: 'https://linear.app/jovie/issue/LYB-95', reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.' },
+      { value: 'https://linear.app/jovie/issue/LYB-112', reason: 'LYB-112 source evidence for bounded adaptive recovery learning and the correction ledger.' },
       { value: 'https://linear.app/jovie/issue/LYB-129', reason: 'LYB-129 source evidence for canonical durable workout readiness integration.' },
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
       { value: 'https://linear.app/jovie/issue/LYB-194', reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.' },
