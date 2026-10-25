@@ -16,6 +16,42 @@
     }
   },
   {
+    "fingerprint": "product-registry-generated-endpoints-match-source",
+    "correction": "PR #1552: After merging main, product:check rejected stale generated endpoints missing main's CI-only Vercel API registration.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1552",
+    "mechanization": "Regenerate with pnpm product:generate. The existing required product-registry suite rejects stale generated files; product:check failed before regeneration and passes afterward. Retain that generation check without hand-editing outputs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime application logic cannot ensure a separately committed generated endpoint file matches the canonical registry after a merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required product-registry suite compares generated output with canonical source and rejects stale files."
+      }
+    },
+    "guard": {
+      "path": "packages/product-registry/scripts/generate.mjs",
+      "anchor": "is stale; run pnpm product:generate"
+    }
+  },
+  {
+    "fingerprint": "training-cycle-delegation-merge-parity",
+    "correction": "PR #1541 conflicts with the delegated programming implementation merged in PR #1531. Preserve both proposal versions, owner-locked database admission and native entry points when merging origin/main.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1541",
+    "mechanization": "Separate the cycle schema from revision/delegation dependencies to prevent the engine import cycle. Route cycle intents through version 1 while retaining version 2 dispatch, and extend the additive migration with both admission paths. The required web suite exercises cycle review/apply with the delegated gate both off and on and rejects replacement of an accepted delegated plan. The combined disposable PostgreSQL verifier retains all cycle and delegated transaction cases; the original cycle migration fails the delegated cases.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Independent cycle schema dependencies prevent module initialization failures; explicit intent/version dispatch and one owner-locked SQL command retain both implementations by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/api/auth/mobile/training/v1/__tests__/revisions.node.test.ts",
+      "anchor": "keeps cycle revisions reachable with delegated programming enabled=%s"
+    }
+  },
+  {
     "fingerprint": "web-sentry-runtime-env-declarations",
     "correction": "PR #1542: Declare every consumed public Sentry runtime variable in apps/web/.env.example. Missing DSN, environment and release declarations fail the required environment surface guard.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169587476/job/121097641374",
