@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
+import { loadTrainingRecords } from '@/lib/training/service';
+import { cycleBlock, cycleReuseOptions } from '@/lib/training/cycle-lifecycle';
 import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
 import type { NativeProductRecordsPort } from '@/lib/ports/native-product-records';
 import {
@@ -79,6 +81,7 @@ export function createTrainingRevisionHandlers(deps: Dependencies) {
           return stored ? json({ stored }) : error('proposal_not_found');
         }
         const context = await deps.revisions.readContext(subject);
+        const snapshot = deps.records ? await loadTrainingRecords(deps.records, subject) : null;
         const setup = context ? currentTrainingSetup(context) : null;
         const canonicalInputs =
           context?.canonicalTrainingInputs && typeof context.canonicalTrainingInputs === 'object'
@@ -91,6 +94,16 @@ export function createTrainingRevisionHandlers(deps: Dependencies) {
               generation: context.generation,
               headRevision: context.headRevision,
               supportedIntent: 'initial_enrollment',
+              ...(deps.records
+                ? {
+                    supportedIntents: ['initial_enrollment', 'revise_cycle', 'repeat_cycle'],
+                    setup: snapshot?.setup ?? null,
+                    cycle: snapshot?.setup
+                      ? cycleBlock(snapshot.setup, snapshot.sessions, snapshot.logs, deps.now())
+                      : null,
+                    reuseOptions: snapshot ? cycleReuseOptions(snapshot) : [],
+                  }
+                : {}),
               supportedBaseline: true,
               ...(delegated
                 ? {
@@ -138,7 +151,7 @@ export function createTrainingRevisionHandlers(deps: Dependencies) {
       const body = await request.json().catch(() => null);
       const isDelegated =
         action === 'create'
-          ? body?.intent?.kind !== 'initial_enrollment'
+          ? !['initial_enrollment', 'revise_cycle', 'repeat_cycle'].includes(body?.intent?.kind)
           : typeof body?.proposalId === 'string' &&
             (await deps.revisions.readProposal(subject, body.proposalId))?.proposal.version === 2;
       if (isDelegated) {
@@ -161,7 +174,13 @@ export function createTrainingRevisionHandlers(deps: Dependencies) {
         return error(result.kind);
       }
       if (subject !== owner.sub) return error('unauthorized_actor');
-      const input = { revisions: deps.revisions, subject: owner.sub, body, now: deps.now() };
+      const input = {
+        revisions: deps.revisions,
+        records: deps.records,
+        subject: owner.sub,
+        body,
+        now: deps.now(),
+      };
       const result =
         action === 'create'
           ? await createInitialTrainingProposal(input)
