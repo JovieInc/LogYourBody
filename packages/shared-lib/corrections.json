@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1585 / LYB-265: Resolve the origin/main correction-ledger conflict by retaining both benefit-instrumentation and backward-planner receipts with their original sources and guards.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1585",
+    "mechanization": "Preserve the additive union of both parent ledgers. The existing required correction coverage check rejects discarded source receipts. Verify the resolved ledger against both immutable merge parents and prove that dropping either parent-specific receipt fails the existing guard.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    }
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1585 / LYB-265: Adding BenefitEventsContractTests.swift to the native test target changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40220218344/job/121249973987",
@@ -24,6 +44,66 @@
     "correction": "PR #1585 / LYB-265: Adding benefit-event test target membership left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity. Regenerate the source projection after reviewing the manifest diff.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40220218344/job/121249973859",
     "mechanization": "The existing required projection checker fails before regeneration and passes afterward. Retain the Detect Changes and CI Summary gates and the existing regression rejecting a missing or skippable projection check.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    }
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1560: Resolve the origin/main correction-ledger conflict by retaining the backward-planner CI receipts and the training-cycle merge receipt with their original sources and guards.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1560",
+    "mechanization": "Preserve both sides of the additive ledger merge. The existing required correction coverage check compares immutable-base source identities and rejects discarded receipts; its behavioral regressions cover deleted, replaced and reassigned source receipts. Verify the resolved ledger against both pre-merge parents.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    }
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1560: BackwardPlanner and its tests and launch-contract resource changed Xcode target membership without refreshing the exact diagnostic project dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40196279621/job/121177686899",
+    "mechanization": "Review the twelve project additions and refresh only the manifest SHA-256. The existing required runner-routing regression failed on the old pin locally and in CI; it retains all seven dependency pins and accepted/rejected trusted CLI cases.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    }
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1560: Adding backward-planner target membership left the generated Xcode manifest fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40196279621/job/121177687150",
+    "mechanization": "Regenerate the existing source projection after reviewing the Xcode manifest diff. The projection checker failed before regeneration locally and in CI; the required Detect Changes gate and its existing regression continue rejecting stale projection evidence.",
     "classification": {
       "codebase": {
         "feasible": false,
