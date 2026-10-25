@@ -31,6 +31,7 @@ export const trainingHandlers = createTrainingRouteHandlers({
 
 export const trainingRevisionHandlers = createTrainingRevisionHandlers({
   authenticate,
+  records: neonNativeProductRecords,
   revisions: neonTrainingRevisions,
   reserveRequest: (subject) => neonChatConversations.reserveRequest(subject),
   now: () => new Date(),

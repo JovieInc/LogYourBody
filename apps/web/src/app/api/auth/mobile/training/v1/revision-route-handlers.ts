@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { NativeProductRecordsPort } from '@/lib/ports/native-product-records';
+import { loadTrainingRecords } from '@/lib/training/service';
+import { buildSession, createMesoBlock } from '@/lib/training/engine';
+import type { Session } from '@/lib/training/types';
+import { cycleLifecycle } from '@/lib/training/lifecycle';
 import { z } from 'zod';
 import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
@@ -11,6 +16,7 @@ import {
 type Dependencies = {
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   revisions: TrainingRevisionsPort;
+  records?: NativeProductRecordsPort;
   reserveRequest: (subject: string) => Promise<ChatRateLimitResult>;
   now: () => Date;
   enabled: () => boolean;
@@ -55,17 +61,85 @@ export function createTrainingRevisionHandlers(deps: Dependencies) {
           return stored ? json({ stored }) : error('proposal_not_found');
         }
         const context = await deps.revisions.readContext(owner.sub);
+        const snapshot = deps.records ? await loadTrainingRecords(deps.records, owner.sub) : null;
+        const setup = snapshot?.setup;
+        const variants =
+          setup && snapshot
+            ? [
+                ...new Map(
+                  snapshot.sessions
+                    .filter((row) => row.programSetupId === setup.id)
+                    .flatMap((row) => {
+                      const prescription = row.prescription as Session;
+                      if (!prescription?.exercises) return [];
+                      const baseline = buildSession({
+                        setup: { ...setup, cycle: undefined, excludedVariantIds: undefined },
+                        block: createMesoBlock(setup.startedAt, setup.startedAt),
+                        slot: prescription.slot,
+                        sessionId: 'review',
+                        logs: [],
+                        feedback: [],
+                      });
+                      return prescription.exercises.flatMap((exercise) => {
+                        const original = baseline.exercises.find(
+                          (seed) => seed.primaryMuscle === exercise.primaryMuscle,
+                        );
+                        if (!original) return [];
+                        const kept = setup.cycle?.retainedVariants.find(
+                          (item) =>
+                            item.fromExerciseId === original.id && item.toVariantId === exercise.id,
+                        );
+                        return [
+                          {
+                            fromExerciseId: original.id,
+                            toVariantId: exercise.id,
+                            reason: kept?.reason ?? 'Selected by you for review',
+                            name: exercise.name,
+                          },
+                        ];
+                      });
+                    })
+                    .map((item) => [item.fromExerciseId + ':' + item.toVariantId, item]),
+                ).values(),
+              ]
+            : [];
         return context
           ? json({
               generation: context.generation,
               headRevision: context.headRevision,
               supportedIntent: 'initial_enrollment',
               supportedBaseline: true,
+              ...(snapshot
+                ? {
+                    supportedIntents: ['initial_enrollment', 'revise_cycle', 'repeat_cycle'],
+                    cycle: setup
+                      ? {
+                          ...cycleLifecycle(
+                            setup,
+                            snapshot.sessions,
+                            snapshot.feedback,
+                            deps.now(),
+                          ),
+                          weekCount: setup.cycle?.weekCount ?? 4,
+                          priorities: setup.cycle?.priorities ?? [],
+                          constraints: setup.cycle?.constraints ?? [],
+                          retainedVariants: setup.cycle?.retainedVariants ?? [],
+                          variants,
+                        }
+                      : null,
+                  }
+                : {}),
             })
           : error('owner_missing');
       }
       const body = await request.json().catch(() => null);
-      const input = { revisions: deps.revisions, subject: owner.sub, body, now: deps.now() };
+      const input = {
+        records: deps.records,
+        revisions: deps.revisions,
+        subject: owner.sub,
+        body,
+        now: deps.now(),
+      };
       const result =
         action === 'create'
           ? await createInitialTrainingProposal(input)

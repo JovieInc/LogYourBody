@@ -844,11 +844,12 @@ export async function applyWorkoutAction(input: {
       event = { id: input.eventId, kind: 'resumed', createdAt: input.now.toISOString() };
       break;
     case 'end':
-      status = 'completed';
+      status = setup.cycle ? (sessionLogs.length ? 'incomplete' : 'skipped') : 'completed';
       event = { id: input.eventId, kind: 'ended', createdAt: input.now.toISOString() };
       break;
   }
 
+  if (setup.cycle && !exercises.length && !safetyStop) status = 'skipped';
   const updated: Session = {
     ...session,
     exercises,

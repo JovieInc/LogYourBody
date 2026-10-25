@@ -1,3 +1,5 @@
+import { trainingCycleSchema } from './revision-contract';
+import { catalogVariantById, isEligibleVariant, resolveAvailableEquipment } from './catalog';
 import {
   MESOCYCLE_WEEKS,
   MUSCLE_GROUPS,
@@ -8,6 +10,7 @@ import {
   type ExerciseSubstitution,
   type Microcycle,
   type MesoBlock,
+  type MesocycleLength,
   type MuscleContribution,
   type MuscleGroup,
   type NextSetRecommendation,
@@ -223,6 +226,12 @@ const EXERCISES: Record<Equipment, Record<ExercisePattern, ExerciseSeed[]>> = {
 };
 
 const RIR_LADDER = [4, 3, 3, 2] as const;
+// Conservative programming policy, not a claimed physiological optimum.
+export const CYCLE_RIR_LADDERS: Record<MesocycleLength, readonly number[]> = {
+  4: [4, 3, 2, 5],
+  5: [4, 3, 3, 2, 5],
+  6: [4, 4, 3, 3, 2, 5],
+};
 const REP_RANGE = { min: 8, max: 12 } as const;
 
 function eligibleSubstitutions(input: {
@@ -305,10 +314,30 @@ export function isEligibleExerciseSubstitution(input: {
   );
 }
 
-export function createMesoBlock(startDate: string, today: string): MesoBlock {
+export function createMesoBlock(
+  startDate: string,
+  today: string,
+  cycle?: { weekCount: MesocycleLength; completedWeeks: number; number?: number },
+): MesoBlock {
   const start = Date.parse(startDate);
   const current = Date.parse(today);
   const elapsedWeeks = Math.max(0, Math.floor((current - start) / (7 * 24 * 60 * 60 * 1000)));
+  if (cycle) {
+    const currentWeek = Math.min(cycle.weekCount, elapsedWeeks + 1, cycle.completedWeeks + 1);
+    return {
+      id: `block-${cycle.number ?? 1}`,
+      startDate,
+      weekCount: cycle.weekCount,
+      currentWeek,
+      targetRir: CYCLE_RIR_LADDERS[cycle.weekCount][currentWeek - 1]!,
+      phase:
+        cycle.completedWeeks >= cycle.weekCount
+          ? 'review'
+          : currentWeek === cycle.weekCount
+            ? 'planned_deload'
+            : 'accumulation',
+    };
+  }
   const currentWeek = (elapsedWeeks % MESOCYCLE_WEEKS) + 1;
   return {
     id: `block-${Math.floor(elapsedWeeks / MESOCYCLE_WEEKS) + 1}`,
@@ -704,6 +733,14 @@ export function progressionForExercise(
   const reportedRecovery =
     muscle && latestRecovery ? recoverySignal(latestRecovery, muscle)?.recovery : undefined;
   const carriedLoad = lastSets[lastSets.length - 1]?.loadKg ?? null;
+  if (targetRir >= 5) {
+    return {
+      action: 'hold',
+      targetReps: REP_RANGE.min,
+      targetLoadKg: carriedLoad,
+      loadInstruction: 'Keep the planned repetitions in reserve during this deload.',
+    };
+  }
   if (reportedRecovery === 'limited') {
     return {
       action: 'hold',
@@ -750,52 +787,74 @@ export function buildSession(input: {
   const pattern: ExercisePattern = input.slot % 2 === 0 ? 'A' : 'B';
   const sessionDeload = evaluateDeload(input.feedback);
   const safetyStop = sessionDeload.action === 'pause_session';
+  const plannedDeload = input.block.phase === 'planned_deload';
   const targetRir = input.block.targetRir;
   const muscleDeloads = new Map(
     MUSCLE_GROUPS.map((muscle) => [muscle, evaluateDeload(input.feedback, muscle)]),
   );
   const exercises = safetyStop
     ? []
-    : EXERCISES[input.setup.equipment][pattern].map((seed) => {
-        const muscleDeload = muscleDeloads.get(seed.primaryMuscle);
-        const sets = muscleDeload?.action === 'reduce_volume' ? 1 : 2;
-        const progression = progressionForExercise(
-          seed.id,
-          input.logs,
-          targetRir,
-          input.feedback,
-          seed.primaryMuscle,
-        );
-        return {
-          id: seed.id,
-          name: seed.name,
-          primaryMuscle: seed.primaryMuscle,
-          muscleContribution: seed.muscleContribution,
-          sets,
-          repRange: REP_RANGE,
-          targetReps: progression.targetReps,
-          targetRir,
-          targetLoadKg: progression.targetLoadKg,
-          loadInstruction: progression.loadInstruction,
-          progression: progression.action,
-          evidenceIds: progression.action === 'increase_load' ? LOAD_EVIDENCE : EFFORT_EVIDENCE,
-          substitutions: eligibleSubstitutions({
-            seed,
-            equipment: input.setup.equipment,
-            pattern,
-            sets,
+    : EXERCISES[input.setup.equipment][pattern]
+        .map((original) => {
+          const kept = input.setup.cycle?.retainedVariants.find(
+            (item) => item.fromExerciseId === original.id,
+          );
+          if (!kept) return original;
+          const variant = catalogVariantById(kept.toVariantId);
+          if (
+            !variant ||
+            variant.primaryMuscle !== original.primaryMuscle ||
+            input.setup.excludedVariantIds?.includes(variant.id) ||
+            !isEligibleVariant(variant, {
+              available: resolveAvailableEquipment({ profile: input.setup.equipment }),
+            })
+          )
+            throw new Error('training_retained_variant_requires_review');
+          return variant;
+        })
+        .filter((seed) => !input.setup.excludedVariantIds?.includes(seed.id))
+        .map((seed) => {
+          const muscleDeload = muscleDeloads.get(seed.primaryMuscle);
+          const sets = plannedDeload || muscleDeload?.action === 'reduce_volume' ? 1 : 2;
+          const progression = progressionForExercise(
+            seed.id,
+            input.logs,
             targetRir,
-          }),
-        };
-      });
+            input.feedback,
+            seed.primaryMuscle,
+          );
+          return {
+            id: seed.id,
+            name: seed.name,
+            primaryMuscle: seed.primaryMuscle,
+            muscleContribution: seed.muscleContribution,
+            sets,
+            repRange: REP_RANGE,
+            targetReps: progression.targetReps,
+            targetRir,
+            targetLoadKg: progression.targetLoadKg,
+            loadInstruction: progression.loadInstruction,
+            progression: progression.action,
+            evidenceIds: progression.action === 'increase_load' ? LOAD_EVIDENCE : EFFORT_EVIDENCE,
+            substitutions: eligibleSubstitutions({
+              seed,
+              equipment: input.setup.equipment,
+              pattern,
+              sets,
+              targetRir,
+            }).filter((candidate) => !input.setup.excludedVariantIds?.includes(candidate.id)),
+          };
+        });
   const reducedMuscles = MUSCLE_GROUPS.filter(
     (muscle) => muscleDeloads.get(muscle)?.action === 'reduce_volume',
   );
   const explanation = safetyStop
     ? sessionDeload.explanation
-    : reducedMuscles.length > 0 && sessionDeload.action !== 'reduce_volume'
-      ? `Repeated muscle-specific recovery signals reduced only ${reducedMuscles.join(', ')} work; the rest of the session stays unchanged.`
-      : sessionDeload.explanation;
+    : plannedDeload
+      ? 'Planned deload: reduced sets and more repetitions in reserve. Recovery and pain signals still apply.'
+      : reducedMuscles.length > 0 && sessionDeload.action !== 'reduce_volume'
+        ? `Repeated muscle-specific recovery signals reduced only ${reducedMuscles.join(', ')} work; the rest of the session stays unchanged.`
+        : sessionDeload.explanation;
   return {
     id: input.sessionId,
     week: input.block.currentWeek,
@@ -849,6 +908,10 @@ export function isProgramSetup(value: unknown): value is TrainingProgramSetup {
     setup.safetyConfirmed === true &&
     (setup.sessionsPerWeek === 2 || setup.sessionsPerWeek === 3) &&
     (setup.equipment === 'dumbbells' || setup.equipment === 'full_gym') &&
+    (setup.cycle === undefined || trainingCycleSchema.safeParse(setup.cycle).success) &&
+    (setup.excludedVariantIds === undefined ||
+      (Array.isArray(setup.excludedVariantIds) &&
+        setup.excludedVariantIds.every((id) => typeof id === 'string'))) &&
     typeof setup.startedAt === 'string' &&
     Number.isFinite(Date.parse(setup.startedAt))
   );

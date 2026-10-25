@@ -258,6 +258,7 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             withVersion({
               session: null,
               week: result.week,
+              lifecycle: result.lifecycle,
               weeklyFractionalVolume: result.weeklyFractionalVolume,
               decision: result.decision,
             }),
@@ -268,6 +269,7 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             session: result.session,
             week: result.week,
             weekCount: result.weekCount,
+            lifecycle: result.lifecycle,
             weeklyFractionalVolume: result.weeklyFractionalVolume,
             decision: result.decision,
           }),

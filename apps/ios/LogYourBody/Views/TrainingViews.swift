@@ -1,14 +1,14 @@
 import SwiftUI
 
 enum TrainingPresentation: Identifiable {
-    case setup
+    case cycle(AuthManager.ProfileSessionOwnership)
     case session(TrainingSession, AuthManager.ProfileSessionOwnership)
     case voiceSetReview(TrainingSession, VoiceHeardIntent)
     case canvas(AuthManager.ProfileSessionOwnership)
 
     var id: String {
         switch self {
-        case .setup: "setup"
+        case .cycle(let owner): "cycle-\(owner.subject)-\(owner.generation)"
         case .session(let session, let owner): "session-\(owner.subject)-\(owner.generation)-\(session.id)"
         case .voiceSetReview(let session, _): "voice-set-review-\(session.id)"
         case .canvas(let owner): "canvas-\(owner.subject)-\(owner.generation)"
@@ -153,6 +153,7 @@ struct TrainingSetupCard: View {
 
 struct TrainingWeekCompleteCard: View {
     let week: Int
+    var blockComplete = false
 
     @Environment(\.theme) private var theme
 
@@ -161,10 +162,10 @@ struct TrainingWeekCompleteCard: View {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(theme.colors.accentTeal)
             VStack(alignment: .leading, spacing: 4) {
-                Text("Weekly sessions complete")
+                Text(blockComplete ? "Block complete" : "Weekly sessions complete")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(theme.colors.text)
-                Text("Week \(week) is logged. Your next session will appear in the next training week.")
+                Text(blockComplete ? "Review your block and choose what to keep next time." : "Week \(week) is logged. Your next session will appear in the next training week.")
                     .font(.system(size: 13))
                     .foregroundStyle(theme.colors.textSecondary)
             }
@@ -172,104 +173,6 @@ struct TrainingWeekCompleteCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-}
-
-struct TrainingEnrollmentView: View {
-    let onEnroll: (Int, String) async throws -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.theme) private var theme
-    @State private var sessionsPerWeek = 2
-    @State private var equipment = "dumbbells"
-    @State private var adultConfirmed = false
-    @State private var safetyConfirmed = false
-    @State private var isSubmitting = false
-    @State private var errorMessage: String?
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text("A deterministic engine sets the workout. Chat can explain only what the engine returns.")
-                        .font(.system(size: 14))
-                        .foregroundStyle(theme.colors.textSecondary)
-                }
-
-                Section("Schedule") {
-                    Picker("Sessions each week", selection: $sessionsPerWeek) {
-                        Text("2 days").tag(2)
-                        Text("3 days").tag(3)
-                    }
-                    .pickerStyle(.segmented)
-                    Picker("Equipment", selection: $equipment) {
-                        Text("Dumbbells").tag("dumbbells")
-                        Text("Full gym").tag("full_gym")
-                    }
-                }
-
-                Section("Safety") {
-                    Toggle("I’m 18 or older.", isOn: $adultConfirmed)
-                    Toggle(
-                        "I’m not pregnant or postpartum, have no eating-disorder risk, " +
-                            "and have no medical restriction that makes this training unsafe.",
-                        isOn: $safetyConfirmed
-                    )
-                    Text("If these checks do not fit, do not start this program. Pause training for concerning pain " +
-                        "or symptoms and seek qualified care when needed.")
-                        .font(.footnote)
-                        .foregroundStyle(theme.colors.textSecondary)
-                }
-
-                if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .font(.footnote)
-                            .foregroundStyle(Color.appWarning)
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(theme.colors.background)
-            .navigationTitle("Training coach")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(isSubmitting ? "Starting…" : "Start") {
-                        Task { await submit() }
-                    }
-                    .disabled(isSubmitting || !adultConfirmed || !safetyConfirmed)
-                    .accessibilityIdentifier("training_enroll_confirm")
-                }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Button {
-                    dismiss()
-                } label: {
-                    Text("Close")
-                        .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .accessibilityIdentifier("training_enroll_close_button")
-                .padding(.horizontal, JovieTokens.screenInset)
-                .padding(.vertical, JovieTokens.itemGap)
-            }
-        }
-    }
-
-    private func submit() async {
-        isSubmitting = true
-        errorMessage = nil
-        defer { isSubmitting = false }
-        do {
-            try await onEnroll(sessionsPerWeek, equipment)
-            dismiss()
-        } catch let error as LocalizedError {
-            errorMessage = error.errorDescription ?? "Training could not be started. Please try again."
-        } catch {
-            errorMessage = "Training could not be started. Please try again."
-        }
     }
 }
 
@@ -1345,7 +1248,10 @@ struct TrainingLiveSessionFixtureView: View {
             )
         }
         .sheet(isPresented: $showEnrollment) {
-            TrainingEnrollmentView { _, _ in }
+            TrainingCycleReviewView(
+                accessToken: { "fixture-cycle-token" }, isCurrent: { true }, onApplied: {},
+                service: FixtureTrainingCycleReviewService()
+            )
         }
         .sheet(isPresented: $showVoiceReview) {
             VoiceSetReviewView(

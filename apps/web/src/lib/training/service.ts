@@ -14,6 +14,7 @@ import type {
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
 import { catalogVariantById } from './catalog';
+import { completedTraining, progressionTraining, cycleBlock, cycleLifecycle } from './lifecycle';
 import {
   evaluateTrajectory,
   type ControllerReceipt,
@@ -219,12 +220,14 @@ export type NextWorkoutResult =
   | { kind: 'not_enrolled' }
   | {
       kind: 'week_complete';
+      lifecycle?: ReturnType<typeof cycleLifecycle>;
       week: number;
       weeklyFractionalVolume: Record<string, number>;
       decision: ControllerReceipt;
     }
   | {
       kind: 'workout';
+      lifecycle?: ReturnType<typeof cycleLifecycle>;
       session: Session & { loggedSets: SetLog[] };
       week: number;
       weekCount: number;
@@ -309,14 +312,13 @@ export async function getOrCreateNextWorkout(input: {
   if (setup.programRevisionId && setup.programPolicyVersion !== TRAINING_BASELINE_POLICY)
     throw new Error('training_program_policy_requires_review');
 
-  const block = createMesoBlock(setup.startedAt, input.now.toISOString());
-  const blockSwaps = snapshot.swaps.filter(
-    (swap) => swap.programSetupId === setup.id && swap.blockId === block.id,
-  );
+  let block = cycleBlock(setup, snapshot.sessions, input.now);
   let periodSessions = snapshot.sessions as SessionRecord[];
   const programSessionIds = new Set(
     periodSessions
-      .filter((record) => record.programSetupId === setup.id)
+      .filter((record) =>
+        [setup.id, ...(setup.cycle?.historySetupIds ?? [])].includes(String(record.programSetupId)),
+      )
       .map((record) => record.id),
   );
   const programLogs = snapshot.logs.filter((log) => programSessionIds.has(log.sessionId));
@@ -373,17 +375,27 @@ export async function getOrCreateNextWorkout(input: {
     );
     activeRecord = undefined;
   }
+  block = cycleBlock(setup, periodSessions, input.now);
+  const lifecycle = cycleLifecycle(setup, periodSessions, programFeedback, input.now);
+  const blockSwaps = snapshot.swaps.filter(
+    (swap) => swap.programSetupId === setup.id && swap.blockId === block.id,
+  );
   const completedThisWeek = periodSessions.filter(
     (record) =>
       record.programSetupId === setup.id &&
       record.blockId === block.id &&
       record.weekNumber === block.currentWeek &&
-      record.status === 'completed',
+      record.status === 'completed' &&
+      (!setup.cycle || completedTraining(record)),
   );
 
   // Progression for a new session uses completed workouts, never its own unfinished sets.
   const completedSessionIds = new Set(
-    periodSessions.filter((record) => record.status === 'completed').map((record) => record.id),
+    periodSessions
+      .filter(
+        (record) => record.status === 'completed' && (!setup.cycle || progressionTraining(record)),
+      )
+      .map((record) => record.id),
   );
   const completedLogs = programLogs.filter((log) => completedSessionIds.has(log.sessionId));
 
@@ -432,6 +444,7 @@ export async function getOrCreateNextWorkout(input: {
       const savedState = `Saved workout, week ${existing.week}${paused ? ', paused' : ''}`;
       return {
         kind: 'workout',
+        lifecycle,
         session: {
           ...existing,
           loggedSets: programLogs.filter((log) => log.sessionId === existing.id),
@@ -473,7 +486,7 @@ export async function getOrCreateNextWorkout(input: {
       Number.isFinite(Date.parse(activeRecord.startedAt))
         ? activeRecord.startedAt
         : input.now.toISOString();
-    const originalBlock = createMesoBlock(setup.startedAt, startedAt);
+    const originalBlock = setup.cycle ? block : createMesoBlock(setup.startedAt, startedAt);
     const adjusted = buildSession({
       setup,
       block: {
@@ -508,6 +521,7 @@ export async function getOrCreateNextWorkout(input: {
     }
     return {
       kind: 'workout',
+      lifecycle,
       session: {
         ...prescribed,
         loggedSets: programLogs.filter((log) => log.sessionId === prescribed.id),
@@ -519,25 +533,56 @@ export async function getOrCreateNextWorkout(input: {
     };
   }
 
-  if (completedThisWeek.length >= setup.sessionsPerWeek) {
+  if (block.phase === 'review' || completedThisWeek.length >= setup.sessionsPerWeek) {
     return {
       kind: 'week_complete',
+      lifecycle,
       week: block.currentWeek,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
       decision,
     };
   }
 
-  const slot = completedThisWeek.length;
+  const slot = setup.cycle
+    ? Array.from({ length: setup.sessionsPerWeek }, (_, index) => index).find(
+        (index) => !completedThisWeek.some((record) => record.slot === index),
+      )!
+    : completedThisWeek.length;
   const planned = microcycle.sessions[slot];
   if (!planned)
     return {
       kind: 'week_complete',
+      lifecycle,
       week: block.currentWeek,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
       decision,
     };
-  const session = applyExerciseSwaps(planned, blockSwaps, completedLogs);
+  const attempts = setup.cycle
+    ? periodSessions.filter(
+        (record) =>
+          record.programSetupId === setup.id &&
+          record.blockId === block.id &&
+          record.weekNumber === block.currentWeek &&
+          record.slot === slot,
+      ).length
+    : 0;
+  const session = applyExerciseSwaps(
+    attempts
+      ? {
+          ...planned,
+          id: stableTrainingUuid(
+            input.subject,
+            setup.id,
+            block.id,
+            String(block.currentWeek),
+            String(slot),
+            String(attempts),
+          ),
+        }
+      : planned,
+    blockSwaps,
+    completedLogs,
+  );
   const sessionRecord = {
     id: session.id,
     record_type: 'workout_session',
@@ -545,6 +590,7 @@ export async function getOrCreateNextWorkout(input: {
     ...(setup.programRevisionId ? { programRevisionId: setup.programRevisionId } : {}),
     blockId: block.id,
     weekNumber: block.currentWeek,
+    ...(setup.cycle ? { cyclePhase: block.phase } : {}),
     slot,
     status: session.safetyStop ? 'paused' : 'in_progress',
     prescription: session,
@@ -563,6 +609,7 @@ export async function getOrCreateNextWorkout(input: {
   }
   return {
     kind: 'workout',
+    lifecycle,
     session: { ...session, loggedSets: programLogs.filter((log) => log.sessionId === session.id) },
     week: block.currentWeek,
     weekCount: block.weekCount,

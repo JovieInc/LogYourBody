@@ -4,6 +4,7 @@ Uses installed binaries, synthetic rows, and the actual migration. Never DATABAS
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 import getpass
 import json
 import os
@@ -16,8 +17,11 @@ import uuid
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--postgres-bin', type=Path, required=True)
+    cluster = parser.add_mutually_exclusive_group(required=True)
+    cluster.add_argument('--postgres-bin', type=Path)
+    cluster.add_argument('--docker-image', help='Cached PostgreSQL image; isolated network, no exposed ports')
     parser.add_argument('--migration', type=Path, help='Optional candidate migration for deliberate regression checks')
+    parser.add_argument('--cycle-migration', type=Path)
     args = parser.parse_args()
     web = Path(__file__).resolve().parents[2]
     env = {k: v for k, v in os.environ.items() if not k.startswith('PG') and k != 'DATABASE_URL'}
@@ -25,7 +29,13 @@ def main():
     checks = []
 
     def run(command):
-        result = subprocess.run(command, text=True, capture_output=True, env=env, timeout=30)
+        source = None
+        if command[0] == 'docker' and '-f' in command:
+            command = list(command)
+            index = command.index('-f') + 1
+            source = Path(command[index]).read_text()
+            command[index] = '-'
+        result = subprocess.run(command, input=source, text=True, capture_output=True, env=env, timeout=30)
         if result.returncode:
             raise RuntimeError(result.stderr or result.stdout)
         return result.stdout.strip()
@@ -33,16 +43,39 @@ def main():
     def quote(value):
         return "'" + str(value).replace("'", "''") + "'"
 
-    with tempfile.TemporaryDirectory(prefix='lyb-revision-pg-',dir='/private/tmp') as directory:
-        root = Path(directory)
-        data, socket = root / 'data', root / 'socket'
-        socket.mkdir(mode=0o700)
-        run([str(args.postgres_bin / 'initdb'), '-D', str(data), '-A', 'trust', '--no-locale', '-U', getpass.getuser()])
-        control = [str(args.postgres_bin / 'pg_ctl'), '-D', str(data)]
-        run(control + ['-l', str(root / 'postgres.log'), '-o', f"-c listen_addresses='' -k {socket} -p 6548", '-w', 'start'])
-        try:
-            client = [str(args.postgres_bin / 'psql'), '-X', '-q', '-A', '-t', '-h', str(socket), '-p', '6548', '-U', getpass.getuser(), '-d', 'postgres', '-v', 'ON_ERROR_STOP=1']
+    @contextmanager
+    def database():
+        if args.docker_image:
+            container = run(['docker', 'run', '--detach', '--rm', '--network', 'none',
+                '--user', 'postgres', '--entrypoint', '/bin/bash', args.docker_image, '-c',
+                'initdb -D /tmp/lyb-revision-pg -A trust --no-locale -U postgres >/tmp/lyb-init.log && exec postgres -D /tmp/lyb-revision-pg -c listen_addresses='])
+            try:
+                deadline = time.monotonic() + 15
+                while True:
+                    ready = subprocess.run(['docker', 'exec', container, 'pg_isready', '-U', 'postgres'],
+                        capture_output=True, env=env, timeout=5)
+                    if ready.returncode == 0: break
+                    if time.monotonic() > deadline: raise RuntimeError('Disposable PostgreSQL never became ready')
+                    time.sleep(0.1)
+                yield ['docker', 'exec', '-i', '--user', 'postgres', container, 'psql',
+                    '-X', '-q', '-A', '-t', '-U', 'postgres', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1']
+            finally:
+                run(['docker', 'rm', '--force', container])
+        else:
+            with tempfile.TemporaryDirectory(prefix='lyb-revision-pg-') as directory:
+                root = Path(directory)
+                data, socket = root / 'data', root / 'socket'
+                socket.mkdir(mode=0o700)
+                run([str(args.postgres_bin / 'initdb'), '-D', str(data), '-A', 'trust', '--no-locale', '-U', getpass.getuser()])
+                control = [str(args.postgres_bin / 'pg_ctl'), '-D', str(data)]
+                run(control + ['-l', str(root / 'postgres.log'), '-o', f"-c listen_addresses='' -k {socket} -p 6548", '-w', 'start'])
+                try:
+                    yield [str(args.postgres_bin / 'psql'), '-X', '-q', '-A', '-t', '-h', str(socket), '-p', '6548',
+                        '-U', getpass.getuser(), '-d', 'postgres', '-v', 'ON_ERROR_STOP=1']
+                finally:
+                    run(control + ['-m', 'immediate', '-w', 'stop'])
 
+    with database() as client:
             def sql(statement):
                 return run(client + ['-c', statement])
 
@@ -55,6 +88,8 @@ def main():
             run(client + ['-f', str(web / 'db/migrations/20261010103000_training_mutation_admission.sql')])
 
             run(client + ['-f', str(web / 'db/migrations/20261010120000_native_account_admission.sql')])
+            run(client + ['-f', str(web / 'db/migrations/20261014103000_training_execution_cas.sql')])
+            run(client + ['-f', str(args.cycle_migration or web / 'db/migrations/20261025030000_training_cycle_lifecycle.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -264,9 +299,84 @@ def main():
             assert command(subject,'apply',decision(a))['kind']=='decided'
             assert command(subject,'legacy_enroll',{'setup':legacy,'context':{k:v for k,v in context(subject).items() if k in ['ownerId','generation','profileFingerprint','legacyFingerprint']}})['kind']=='program_already_enrolled'
             check('legacy enrollment invalidates proposals; existing legacy replacement retained; canonical head cannot be bypassed')
+            def cycle_proposal(subject, current, length=5, repeat=False):
+                ctx = context(subject)
+                proposed = dict(current['setup'])
+                proposed.pop('programRevisionId')
+                proposed['cycle'] = dict(weekCount=length,number=2 if repeat else 1,
+                    priorities=[],constraints=[],retainedVariants=[],historySetupIds=[current['setup']['id']] if repeat else [])
+                if repeat: proposed['id'] = str(uuid.uuid4())
+                proposal = dict(id=str(uuid.uuid4()), programId=proposed['id'], baseRevision=ctx['headRevision'],
+                    actor=dict(kind='self',subject=subject), createdAt='2026-10-10T12:01:00Z',
+                    context={k:ctx[k] for k in ['ownerId','generation','profileFingerprint','legacyFingerprint']},
+                    proposedDiff='repeat_cycle' if repeat else 'revise_cycle', proposedSetup=proposed,
+                    priorState=dict(setupId=current['setup']['id'],revisionId=ctx['headRevision']),
+                    trainingFingerprint=ctx['trainingFingerprint'])
+                body=dict(requestId=str(uuid.uuid4()),requestHash=str(uuid.uuid4()),proposal=proposal)
+                assert command(subject,'create',body)['kind']=='stored'
+                applied=decision(body)
+                applied['setup']={**proposed,'programRevisionId':applied['revisionId']}
+                return body,applied
+
+            subject=owner(); initial=new_proposal(subject); original=decision(initial)
+            assert command(subject,'apply',original)['kind']=='decided'
+            a,change=cycle_proposal(subject,original,6)
+            results=concurrent(*[lambda: command(subject,'apply',change) for _ in range(3)])
+            assert all(item==results[0] and item['kind']=='decided' for item in results)
+            assert counts(subject)==[2,2,1]
+            assert results[0]['receipt']['priorState']['setupId']==original['setup']['id']
+            check('cycle revision atomically updates the same setup and replays the original receipt')
+
+            a,shorter=cycle_proposal(subject,change,4)
+            b,longer=cycle_proposal(subject,change,5)
+            results=concurrent(lambda: command(subject,'apply',shorter),lambda: command(subject,'apply',longer))
+            assert sorted(item['kind'] for item in results)==['decided','revision_conflict']
+            check('competing cycle revisions admit one head without overwriting accepted history')
+
+            subject=owner(); initial=new_proposal(subject); original=decision(initial)
+            assert command(subject,'apply',original)['kind']=='decided'
+            a,change=cycle_proposal(subject,original,6)
+            record_id=str(uuid.uuid4())
+            statement=f"insert into native_records(collection,id,user_subject,payload,updated_at) values('training_sessions','{record_id}',{quote(subject)},'{{}}',now());"
+            _,result=locked_order(subject,statement,command_sql(subject,'apply',change))
+            assert json.loads(result)['kind']=='stale_context' and counts(subject)==[2,1,2]
+            check('training write winning the owner lock invalidates a held cycle draft')
+            a,change=cycle_proposal(subject,original,5)
+            # Injection exercises rollback after the immutable revision write, before setup/head/receipt.
+            sql("create trigger injected_failure before insert on native_records for each row execute function fail_training_insert();")
+            try: command(subject,'apply',change); raise AssertionError('expected cycle setup failure')
+            except RuntimeError as error: assert 'injected setup failure' in str(error)
+            assert counts(subject)==[3,1,2] and context(subject)['headRevision']==original['revisionId']
+            sql('drop trigger injected_failure on native_records;')
+            assert command(subject,'apply',change)['kind']=='decided'
+            check('failed cycle setup write rolls back revision, head and decision receipt')
+
+            a,repeat=cycle_proposal(subject,change,4,repeat=True)
+            assert command(subject,'apply',repeat)['kind']=='decided'
+            assert counts(subject)==[4,3,3]
+            assert repeat['setup']['cycle']['historySetupIds']==[original['setup']['id']]
+            check('next block uses the same decision operation and preserves the source setup/history link')
+
+            subject=owner(); initial=new_proposal(subject); original=decision(initial)
+            assert command(subject,'apply',original)['kind']=='decided'
+            active_id=str(uuid.uuid4())
+            saved=dict(record_type='workout_session',programSetupId=original['setup']['id'],
+                programRevisionId=original['revisionId'],status='in_progress',weekNumber=1,
+                prescription=dict(targetRir=4,exercises=[dict(id='goblet_squat',sets=2,targetReps=8)]))
+            sql(f"insert into native_records(collection,id,user_subject,payload,updated_at) values('training_sessions','{active_id}',{quote(subject)},{quote(json.dumps(saved))}::jsonb,now());")
+            a,change=cycle_proposal(subject,original,6)
+            assert command(subject,'apply',change)['kind']=='decided'
+            rebound=json.loads(sql(f"select payload from native_records where collection='training_sessions' and id='{active_id}';"))
+            assert rebound=={**saved,'programRevisionId':change['revisionId']}
+            ctx=context(subject)
+            held=dict(ownerId=ctx['ownerId'],generation=ctx['generation'],setupId=original['setup']['id'],revisionId=original['revisionId'])
+            old_write={**saved,'id':active_id}
+            rejected=json.loads(sql(f"select training_mutation_command({quote(subject)},'session_update',{quote(json.dumps(held))}::jsonb,{quote(json.dumps(old_write))}::jsonb);"))
+            assert rejected['kind']=='stale_admission'
+            check('length revision rebinds the active attempt atomically and preserves every saved prescription field')
+
             print(json.dumps({'passed':len(checks),'checks':checks,'scope':'disposable PostgreSQL16; synthetic rows; actual migration and extracted delete transaction'}))
-        finally:
-            run(control + ['-m','immediate','-w','stop'])
+
 
 
 if __name__ == '__main__':

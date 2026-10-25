@@ -1215,6 +1215,69 @@ final class ChatServiceTests: XCTestCase {
         )
     }
 
+    func testTrainingCycleReviewPreservesSelectedVariantIdentityAndUsesReviewedDecision() async throws {
+        let kept = TrainingRetainedVariant(
+            fromExerciseId: "goblet_squat", toVariantId: "dumbbell_split_squat", reason: "Comfortable and progressed"
+        )
+        var intent = TrainingCycleIntent(kind: "repeat_cycle", weekCount: 6)
+        intent.priorities = []
+        intent.constraints = []
+        intent.retainedVariants = [kept]
+        var methods: [String] = []
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.url?.path, TrainingAPIContract.rootPath + "/program-proposals")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+            methods.append(request.httpMethod ?? "")
+            if request.httpMethod == "POST" {
+                let body = try XCTUnwrap(JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
+                let encoded = try XCTUnwrap(body["intent"] as? [String: Any])
+                XCTAssertEqual(encoded["weekCount"] as? Int, 6)
+                XCTAssertEqual(encoded["kind"] as? String, "repeat_cycle")
+                let variants = try XCTUnwrap(encoded["retainedVariants"] as? [[String: Any]])
+                XCTAssertEqual(variants.first?["toVariantId"] as? String, kept.toVariantId)
+                XCTAssertEqual(variants.first?["reason"] as? String, kept.reason)
+                XCTAssertNil(variants.first?["name"])
+                let preview = """
+                {"version":1,"stored":{"status":"proposed","proposal":{
+                    "id":"proposal-1","reason":"Repeat","assumptions":[],"plan":{"week":1,"sessions":[]}
+                }}}
+                """
+                return (201, [:], Data(preview.utf8))
+            }
+            return (200, [:], Data(#"{"version":1,"receipt":{"proposalId":"proposal-1","status":"applied"}}"#.utf8))
+        }
+        let service = URLSessionTrainingService(urlSession: makeSession(), baseURL: URL(string: "https://localhost")!)
+        let preview = try await service.proposeCycle(accessToken: "test-token", request: TrainingCycleProposalRequest(
+            requestId: "request-1", expectedGeneration: 0, intent: intent, reason: "Repeat"
+        ))
+        XCTAssertEqual(methods, ["POST"], "Preview never applies a draft")
+        _ = try await service.decideCycle(accessToken: "test-token", request: TrainingCycleDecisionRequest(
+            requestId: "decision-1", proposalId: preview.stored.proposal.id, decision: "apply"
+        ))
+        XCTAssertEqual(methods, ["POST", "PATCH"])
+    }
+
+    func testTrainingCycleReviewRejectsAnUnrelatedDecisionReceipt() async throws {
+        ChatURLProtocol.handler = { _ in
+            (200, [:], Data(#"{"version":1,"receipt":{"proposalId":"other-proposal","status":"applied"}}"#.utf8))
+        }
+        let service = URLSessionTrainingService(urlSession: makeSession(), baseURL: URL(string: "https://localhost")!)
+        do {
+            _ = try await service.decideCycle(accessToken: "test-token", request: TrainingCycleDecisionRequest(
+                requestId: "decision-1", proposalId: "proposal-1", decision: "apply"
+            ))
+            XCTFail("An unrelated receipt cannot acknowledge this draft")
+        } catch { XCTAssertEqual(error as? TrainingServiceError, .invalidResponse) }
+    }
+
+    func testTrainingNextDecodesExplicitCycleReviewWithoutAWorkout() throws {
+        let payload = Data(#"{"version":1,"session":null,"week":6,"lifecycle":{"phase":"review","weekCount":6}}"#.utf8)
+        let response = try JSONDecoder().decode(TrainingNextResponse.self, from: payload)
+        XCTAssertNil(response.session)
+        XCTAssertEqual(response.lifecycle?.phase, "review")
+        XCTAssertEqual(response.lifecycle?.weekCount, 6)
+    }
+
     private func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ChatURLProtocol.self]

@@ -198,3 +198,60 @@ describe('in-flight legacy enrollment consent fence', () => {
     ).toHaveLength(1);
   });
 });
+
+describe('cycle revision route', () => {
+  it('enrolls a selected length, reviews a revision, and returns cycle reuse options without starting a workout', async () => {
+    const h = harness();
+    const handlers = createTrainingRevisionHandlers({ ...h.dependencies, records: h.records });
+    jest
+      .mocked(h.port.readContext)
+      .mockImplementation(async () => ({ ...h.context, trainingFingerprint: 'training-v1' }));
+    const created = await handlers.POST(
+      request('POST', { ...proposalBody, intent: { ...proposalBody.intent, weekCount: 5 } }),
+    );
+    expect(created.status).toBe(201);
+    const { stored } = await created.json();
+    expect(
+      await (await handlers.PATCH(request('PATCH', decisionBody(stored.proposal.id)))).json(),
+    ).toMatchObject({ receipt: { setup: { cycle: { weekCount: 5 } } } });
+    const context = await (await handlers.GET(request())).json();
+    expect(context).toMatchObject({
+      supportedIntents: ['initial_enrollment', 'revise_cycle', 'repeat_cycle'],
+      cycle: { weekCount: 5, phase: 'accumulation', variants: [] },
+    });
+    expect((await h.records.pull('owner', 'training_sessions')).records).toHaveLength(0);
+    const revised = await handlers.POST(
+      request('POST', {
+        requestId: '33333333-3333-4333-8333-333333333333',
+        expectedGeneration: 0,
+        intent: { kind: 'revise_cycle', weekCount: 6 },
+        reason: 'Extend before deload',
+      }),
+    );
+    expect(revised.status).toBe(201);
+    const draft = await revised.json();
+    expect(draft).toMatchObject({
+      stored: {
+        proposal: { proposedDiff: 'revise_cycle', lifecycleTransition: { to: 'adjustment' } },
+      },
+    });
+    const rejected = await handlers.PATCH(
+      request('PATCH', {
+        ...decisionBody(draft.stored.proposal.id, 'reject'),
+        requestId: '44444444-4444-4444-8444-444444444444',
+      }),
+    );
+    expect(await rejected.json()).toMatchObject({ receipt: { status: 'rejected', setup: null } });
+  });
+  it.each([3, 7, 4.5])('rejects unsupported block length %s before storage', async (weekCount) => {
+    const h = harness();
+    expect(
+      (
+        await h.handlers.POST(
+          request('POST', { ...proposalBody, intent: { ...proposalBody.intent, weekCount } }),
+        )
+      ).status,
+    ).toBe(400);
+    expect(h.port.createProposal).not.toHaveBeenCalled();
+  });
+});

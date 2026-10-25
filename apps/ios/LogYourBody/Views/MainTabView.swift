@@ -858,10 +858,12 @@ struct ChatTabView: View {
         }
         .fullScreenCover(item: $trainingPresentation) { presentation in
             switch presentation {
-            case .setup:
-                TrainingEnrollmentView { sessionsPerWeek, equipment in
-                    try await enrollTraining(sessionsPerWeek: sessionsPerWeek, equipment: equipment)
-                }
+            case .cycle(let ownership):
+                TrainingCycleReviewView(
+                    accessToken: { await chatAccessToken() },
+                    isCurrent: { authManager.ownsAccountSession(ownership) },
+                    onApplied: { await loadTrainingNext() }
+                )
             case .session(let session, let ownership):
                 TrainingLiveSessionView(
                     session: session,
@@ -1200,7 +1202,10 @@ struct ChatTabView: View {
             .padding(.horizontal, 4)
             .accessibilityIdentifier("training_loading_card")
         } else if trainingEnrollmentRequired {
-            TrainingSetupCard { trainingPresentation = .setup }
+            TrainingSetupCard {
+                guard let ownership = authManager.captureAccountSession() else { return }
+                trainingPresentation = .cycle(ownership)
+            }
         } else if let session = trainingResponse?.session, let ownership = trainingOwner,
                   authManager.ownsAccountSession(ownership) {
             TrainingCoachCard(
@@ -1212,7 +1217,7 @@ struct ChatTabView: View {
                 onStop: { Task { await revokeTraining(ownership: ownership) } }
             )
         } else if let week = trainingResponse?.week {
-            TrainingWeekCompleteCard(week: week)
+            TrainingWeekCompleteCard(week: week, blockComplete: trainingResponse?.lifecycle?.phase == "review")
         } else if let trainingErrorMessage {
             Text(trainingErrorMessage)
                 .font(.system(size: 13))
@@ -1221,6 +1226,13 @@ struct ChatTabView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .accessibilityIdentifier("training_error_card")
+        }
+        if let ownership = trainingOwner, authManager.ownsAccountSession(ownership) {
+            Button(trainingResponse?.lifecycle?.phase == "review" ? "Review and repeat block" : "Review block length") {
+                trainingPresentation = .cycle(ownership)
+            }
+            .frame(minHeight: JovieTokens.minimumHitTarget)
+            .accessibilityIdentifier("training_review_cycle")
         }
         if canvasEnabled {
             Button("Open week plan") {
@@ -1274,17 +1286,6 @@ struct ChatTabView: View {
             guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
             trainingErrorMessage = "Training is temporarily unavailable. Please try again."
         }
-    }
-
-    private func enrollTraining(sessionsPerWeek: Int, equipment: String) async throws {
-        guard let accessToken = await chatAccessToken() else { throw TrainingServiceError.authenticationExpired }
-        _ = try await trainingService.enroll(
-            accessToken: accessToken,
-            sessionsPerWeek: sessionsPerWeek,
-            equipment: equipment
-        )
-        trainingEnrollmentRequired = false
-        await loadTrainingNext()
     }
 
     private func logTrainingSet(
@@ -1382,7 +1383,8 @@ struct ChatTabView: View {
                 session: updated,
                 week: $0.week,
                 weekCount: $0.weekCount,
-                weeklyFractionalVolume: $0.weeklyFractionalVolume
+                weeklyFractionalVolume: $0.weeklyFractionalVolume,
+                lifecycle: $0.lifecycle
             )
         }
     }

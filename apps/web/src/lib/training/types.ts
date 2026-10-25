@@ -1,5 +1,20 @@
 export const TRAINING_CONSENT_VERSION = 'hypertrophy-coach-v1';
 export const MESOCYCLE_WEEKS = 4;
+export type MesocycleLength = 4 | 5 | 6;
+export type CyclePhase =
+  'accumulation' | 'adjustment' | 'planned_deload' | 'reactive_deload' | 'review' | 'next_block';
+export type CyclePriority = { muscle: MuscleGroup; reason: string };
+export type CycleConstraint = { id: string; reason: string };
+export type RetainedVariant = { fromExerciseId: string; toVariantId: string; reason: string };
+export type TrainingCycle = {
+  weekCount: MesocycleLength;
+  number: number;
+  priorities: CyclePriority[];
+  constraints: CycleConstraint[];
+  retainedVariants: RetainedVariant[];
+  /** Links to source records; history and feedback are never copied or reassigned. */
+  historySetupIds: string[];
+};
 
 export const MUSCLE_GROUPS = [
   'chest',
@@ -22,9 +37,10 @@ export type ProgressionAction = 'hold' | 'add_reps' | 'increase_load';
 export type MesoBlock = {
   id: string;
   startDate: string;
-  weekCount: typeof MESOCYCLE_WEEKS;
+  weekCount: MesocycleLength;
   currentWeek: number;
   targetRir: number;
+  phase?: CyclePhase;
 };
 
 export type Microcycle = {
@@ -180,6 +196,8 @@ export type TrainingProgramSetup = {
   startedAt: string;
   programRevisionId?: string;
   programPolicyVersion?: string;
+  cycle?: TrainingCycle;
+  excludedVariantIds?: string[];
 };
 
 export type TrainingFeedback = {

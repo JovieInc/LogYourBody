@@ -106,6 +106,12 @@ struct TrainingNextResponse: Decodable, Equatable, Sendable {
     let week: Int?
     let weekCount: Int?
     let weeklyFractionalVolume: [String: Double]?
+    var lifecycle: Lifecycle?
+
+    struct Lifecycle: Decodable, Equatable, Sendable {
+        let phase: String
+        let weekCount: Int
+    }
 }
 
 struct TrainingProgramResponse: Decodable, Equatable, Sendable {
@@ -230,6 +236,12 @@ enum TrainingServiceError: LocalizedError, Equatable {
         case .invalidResponse:
             return "The training response could not be read. Please try again."
         case .server(let code):
+            if code == "cycle_review_required" {
+                return "Review the selected exercises and deload timing before changing this block."
+            }
+            if code == "stale_context" || code == "policy_changed" || code == "revision_conflict" {
+                return "Your training changed. Reload and review a new draft."
+            }
             return code == "not_found"
                 ? "Training coaching is not enabled for this account yet."
                 : "Training is temporarily unavailable. Please try again."
@@ -271,6 +283,25 @@ final class URLSessionTrainingService: TrainingServicing {
             accessToken: accessToken,
             body: EnrollmentRequest(sessionsPerWeek: sessionsPerWeek, equipment: equipment)
         )
+    }
+
+    func loadRevisionContext(accessToken: String) async throws -> TrainingRevisionContextResponse {
+        try await send(path: "program-proposals", method: "GET", accessToken: accessToken)
+    }
+
+    func proposeCycle(accessToken: String, request: TrainingCycleProposalRequest) async throws -> TrainingCycleProposalResponse {
+        try await send(path: "program-proposals", method: "POST", accessToken: accessToken, body: request)
+    }
+
+    func decideCycle(accessToken: String, request: TrainingCycleDecisionRequest) async throws -> TrainingCycleDecisionResponse {
+        let response: TrainingCycleDecisionResponse = try await send(
+            path: "program-proposals", method: "PATCH", accessToken: accessToken, body: request
+        )
+        guard response.receipt.proposalId == request.proposalId,
+              response.receipt.status == (request.decision == "apply" ? "applied" : "rejected") else {
+            throw TrainingServiceError.invalidResponse
+        }
+        return response
     }
 
     func logSet(accessToken: String, request: TrainingSetLogRequest) async throws {
@@ -458,3 +489,7 @@ private struct TrainingWorkoutActionResponse: Decodable, VersionedTrainingRespon
     let session: TrainingSession
 }
 private struct TrainingErrorResponse: Decodable { let error: String }
+
+extension TrainingRevisionContextResponse: VersionedTrainingResponse {}
+extension TrainingCycleProposalResponse: VersionedTrainingResponse {}
+extension TrainingCycleDecisionResponse: VersionedTrainingResponse {}

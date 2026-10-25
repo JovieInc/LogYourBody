@@ -47,7 +47,7 @@ export function revisionHarness() {
         decision: input.decision,
         status: input.decision === 'apply' ? 'applied' : 'rejected',
         actor: { kind: 'self', subject: input.subject },
-        priorState: null,
+        priorState: stored.proposal.priorState,
         revisionId: input.decision === 'apply' ? input.revisionId : null,
         setup: input.decision === 'apply' ? input.setup : null,
         decidedAt: input.now,
@@ -56,6 +56,20 @@ export function revisionHarness() {
         await records.push(input.subject, 'training_feedback', [
           { ...input.setup, record_type: 'program_setup' },
         ]);
+        if (stored.proposal.intent.kind === 'revise_cycle') {
+          const sessions = (await records.pull(input.subject, 'training_sessions')).records;
+          await records.push(
+            input.subject,
+            'training_sessions',
+            sessions
+              .filter(
+                (row) =>
+                  row.programSetupId === input.setup.id &&
+                  ['in_progress', 'paused'].includes(String(row.status)),
+              )
+              .map((row) => ({ ...row, programRevisionId: input.revisionId })),
+          );
+        }
         context.headRevision = input.revisionId;
       }
       stored.status = receipt.status;

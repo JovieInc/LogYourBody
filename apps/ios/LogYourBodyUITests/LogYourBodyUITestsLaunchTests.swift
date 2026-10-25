@@ -132,6 +132,46 @@ final class LogYourBodyUITestsLaunchTests: XCTestCase {
         XCTAssertFalse(app.navigationBars["Training coach"].exists)
     }
 
+    func testTrainingCycleLengthIsReviewedBeforeApply() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        let open = app.buttons["training_fixture_enroll"]
+        XCTAssertTrue(open.waitForExistence(timeout: 15))
+        open.tap()
+        let length = app.segmentedControls["training_cycle_length"]
+        XCTAssertTrue(length.waitForExistence(timeout: 8))
+        length.buttons["6 weeks"].tap()
+        app.switches["training_cycle_adult_confirm"].tap()
+        app.switches["training_cycle_safety_confirm"].tap()
+        let confirm = app.buttons["training_cycle_review_confirm"]
+        confirm.tap()
+        XCTAssertTrue(app.buttons["Reject draft"].waitForExistence(timeout: 5))
+        XCTAssertEqual(confirm.label, "Apply")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "week 1 of 6")).firstMatch.exists)
+        confirm.tap()
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+    }
+
+    func testTrainingCycleReuseKeepsSelectedReasonAndRequiresReview() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestCycleReuse"]
+        app.launch()
+        let open = app.buttons["training_fixture_enroll"]
+        XCTAssertTrue(open.waitForExistence(timeout: 15))
+        open.tap()
+        let keep = app.switches["training_cycle_keep_fixture_press"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 8))
+        keep.tap()
+        let renew = app.switches["training_cycle_renew_priorities"]
+        XCTAssertEqual(renew.value as? String, "0", "Temporary focus expires unless explicitly renewed")
+        app.buttons["training_cycle_review_confirm"].tap()
+        XCTAssertTrue(app.buttons["Reject draft"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Comfortable and progressed"].exists)
+        app.buttons["Reject draft"].tap()
+        XCTAssertTrue(keep.waitForExistence(timeout: 5))
+    }
+
     func testVoiceReviewCancelMeetsMinimumHitTarget() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
