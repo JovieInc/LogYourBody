@@ -49,6 +49,7 @@ export const endpoints = {
     'waitlist_entries',
     'waitlist_rate_limits',
     'native_records',
+    'gyms',
     'training_revision_proposals',
     'training_program_revisions',
     'training_revision_state',
