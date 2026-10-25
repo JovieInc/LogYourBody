@@ -88,6 +88,11 @@ export const catalogVariantSchema = z
   .object({
     id: z.string().regex(/^[a-z][a-z0-9_]*$/),
     name: text,
+    /** Explicit base movement identity for a setup change; never inferred from names. */
+    setupOf: z
+      .string()
+      .regex(/^[a-z][a-z0-9_]*$/)
+      .optional(),
     primaryMuscle: z.enum(MUSCLE_GROUPS),
     muscleContribution: z.partialRecord(z.enum(MUSCLE_GROUPS), z.number().nonnegative()),
     /** Concrete items that must be present; unknown availability fails eligibility. */
@@ -543,6 +548,7 @@ const baseCatalog: CatalogVariant[] = [
   {
     id: 'lying_dumbbell_curl',
     name: 'Lying dumbbell curl',
+    setupOf: 'dumbbell_curl',
     primaryMuscle: 'biceps',
     muscleContribution: { biceps: 1 },
     requires: ['dumbbells'],
@@ -553,11 +559,12 @@ const baseCatalog: CatalogVariant[] = [
     pulley: null,
     unilateral: false,
     cues: ['Upper arms rest on the floor', 'Curl without lifting the elbows'],
-    exclusions: [],
+    exclusions: ['floor_rom_blocked'],
   },
   {
     id: 'incline_dumbbell_curl',
     name: 'Incline dumbbell curl',
+    setupOf: 'dumbbell_curl',
     primaryMuscle: 'biceps',
     muscleContribution: { biceps: 1 },
     requires: ['dumbbells', 'adjustable_bench'],
@@ -573,6 +580,7 @@ const baseCatalog: CatalogVariant[] = [
   {
     id: 'supported_cable_curl',
     name: 'Incline cable curl',
+    setupOf: 'cable_curl',
     primaryMuscle: 'biceps',
     muscleContribution: { biceps: 1 },
     requires: ['cable', 'adjustable_bench'],
@@ -718,6 +726,21 @@ const catalogById = new Map(EXERCISE_CATALOG.map((variant) => [variant.id, varia
 
 export function catalogVariantById(id: string): CatalogVariant | undefined {
   return catalogById.get(id);
+}
+
+const SHARED_LOAD_IMPLEMENTS = ['barbell', 'ez_bar', 'smith', 'machine', 'cable'] as const;
+
+/** Dumbbell-only variants name the weight of the implement in one hand.
+ * Bars, machines, cables, and Smith rails do not establish that convention. */
+export function establishedLoadAccounting(exerciseId: string): 'per_hand' | undefined {
+  const variant = catalogVariantById(exerciseId);
+  if (!variant?.requires.includes('dumbbells')) return undefined;
+  if (
+    variant.requires.some((item) => (SHARED_LOAD_IMPLEMENTS as readonly string[]).includes(item))
+  ) {
+    return undefined;
+  }
+  return 'per_hand';
 }
 
 /** Standard inventory each profile can prove. Specialty items (an EZ bar, a
