@@ -1,5 +1,9 @@
 # Initial training enrollment revision foundation
 
+This document describes version 1. [Delegated programming](delegated-programming.md)
+extends this same ledger and transaction with version 2 proposals, existing-plan
+steering and automatic next-block preparation.
+
 This slice adds server-side reviewable proposals for the **existing** two- or three-day dumbbell/full-gym baseline. It is not the full LYB-37/LYB-130 training contract: no new exercise catalogue, goals, schedule personalization, program editing, trainer authority, numerical progression policy, MCP tools, or client onboarding is introduced.
 
 ## API and authority
