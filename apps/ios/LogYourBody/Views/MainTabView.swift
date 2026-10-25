@@ -923,6 +923,12 @@ struct ChatTabView: View {
                 VoiceSetReviewView(session: session, heard: heard) { proposal in
                     commitVoiceSet(proposal)
                 }
+            case .cycleReview(let ownership):
+                TrainingCycleReviewView(
+                    isCurrent: { authManager.ownsAccountSession(ownership) },
+                    accessToken: { await chatAccessToken() },
+                    onApplied: { await loadTrainingNext() }
+                )
             case .canvas(let ownership):
                 MesocycleCanvasScreen(
                     ownership: ownership,
@@ -1310,7 +1316,14 @@ struct ChatTabView: View {
             }
             .padding(16)
         } else if let week = trainingResponse?.week {
-            TrainingWeekCompleteCard(week: week)
+            if trainingResponse?.phase == "review" {
+                Text("Block complete. Review your training before starting the next block.")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(theme.colors.text)
+                    .accessibilityIdentifier("training_cycle_complete")
+            } else {
+                TrainingWeekCompleteCard(week: week)
+            }
         } else if let trainingErrorMessage {
             Text(trainingErrorMessage)
                 .font(.system(size: 13))
@@ -1327,6 +1340,16 @@ struct ChatTabView: View {
             Text("Saved session available. \(message)").font(.footnote)
             Button("Refresh training") { Task { await loadTrainingNext() } }
                 .frame(minHeight: JovieTokens.minimumHitTarget)
+        }
+        if trainingCoachEnabled {
+            Button(trainingEnrollmentRequired ? "Review a training block" : "Review or repeat block") {
+                guard let ownership = authManager.captureAccountSession() else { return }
+                trainingPresentation = .cycleReview(ownership)
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 15, weight: .semibold))
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .accessibilityIdentifier("training_review_cycle")
         }
         if trainingCardsEnabled, let plan = trainingPlanContext?.currentSetup?.delegated?.plan,
            let revisionId = trainingPlanContext?.currentSetup?.programRevisionId {
@@ -1584,7 +1607,10 @@ struct ChatTabView: View {
                 session: updated,
                 week: $0.week,
                 weekCount: $0.weekCount,
-                weeklyFractionalVolume: $0.weeklyFractionalVolume
+                weeklyFractionalVolume: $0.weeklyFractionalVolume,
+                phase: $0.phase,
+                decision: $0.decision,
+                nextBlock: $0.nextBlock
             )
         }
     }

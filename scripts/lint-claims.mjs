@@ -120,6 +120,35 @@ export function scanClaimText(text) {
   return claimIssues(text, RULES).map(({ rule, line }) => ({ rule, line }));
 }
 
+// Variant annotations are setup descriptions, never clinical assurances or
+// universal loading claims. Keep these stricter rules scoped to the catalog.
+const EXERCISE_RULES = [
+  {
+    id: 'exercise-medical-claim',
+    pattern:
+      /\b(?:treat(?:s|ment|ing)?|cur(?:e[sd]?|ing)|diagnos\w*|heal\w*|rehabilitat\w*|therapeutic)\b|\b(?:prevent\w*|reliev\w*|eliminat\w*|reduc\w*|fix\w*)\s+(?:(?:your|the|joint|back|shoulder|knee|risk of)\s+){0,3}(?:pain|injur\w*|discomfort)\b|\b(?:pain|injury|risk)\s+free\b|\bsafe\s+for\s+(?:(?:your|the)\s+)?(?:back|spine|joints|knees|shoulders)\b/gi,
+  },
+  {
+    id: 'zero-axial-load',
+    pattern:
+      /\b(?:zero|no|0)\s+(?:(?:axial|spinal|trunk|back)\s+){1,2}(?:load(?:ing)?|fatigue|demand|stress)\b|\b(?:axial|spinal|trunk)\s+(?:load|fatigue|stress)\s+(?:is\s+)?(?:zero|0|free)\b|\btrunk\s+carries\s+nothing\b/gi,
+  },
+  {
+    id: 'numeric-sfr',
+    pattern:
+      /\b(?:sfr|stimulus\s+to\s+fatigue(?:\s+ratio)?)(?:\s+(?:score|ratio|is|of))?\s*[:=]?\s*\d|\b\d+(?:\.\d+)?(?:\s*\/\s*\d+)?\s+(?:sfr|stimulus\s+to\s+fatigue)\b/gi,
+  },
+];
+
+export function scanExerciseVariantText(text) {
+  // Also inspect snake_case and hyphenated tags as readable words.
+  const normalized = text.replace(/[_-]+/g, ' ');
+  return [
+    ...scanClaimText(text),
+    ...claimIssues(normalized, EXERCISE_RULES).map(({ rule, line }) => ({ rule, line })),
+  ];
+}
+
 function isWebCopyFile(file) {
   if (
     /\/(?:__tests__|__fixtures__|fixtures)\//.test(file) ||
@@ -331,6 +360,19 @@ export async function run(root = ROOT) {
       );
   }
 
+  const variantSeedPath = 'apps/web/src/lib/training/catalog-variant-seed.json';
+  let variantFields = [];
+  try {
+    const seed = JSON.parse(await readFile(path.join(root, variantSeedPath), 'utf8'));
+    variantFields = stringFields(seed);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  for (const { field, text } of variantFields) {
+    for (const issue of scanExerciseVariantText(text))
+      violations.push(variantSeedPath + ':' + field + ' [' + issue.rule + ']');
+  }
+
   const webFiles = (
     await Promise.all(WEB_ROOTS.map((directory) => filesUnder(path.join(root, directory))))
   )
@@ -392,7 +434,9 @@ export async function run(root = ROOT) {
       transcriptCount +
       ' assistant eval outputs, and ' +
       storefrontSources.length +
-      ' storefront text fields/files, and ' +
+      ' storefront text fields/files, ' +
+      variantFields.length +
+      ' exercise variant text fields, and ' +
       webFiles.length +
       ' web copy sources.\n',
   );
