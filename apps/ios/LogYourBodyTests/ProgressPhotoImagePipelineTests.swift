@@ -14,6 +14,50 @@ import UIKit
 
 @MainActor
 final class ProgressPhotoImagePipelineTests: XCTestCase {
+    func testFilmstripDecodesTargetSizedPixelsAndRejectsMalformedData() async throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let size = CGSize(width: 2_400, height: 1_800)
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+        let data = try XCTUnwrap(image.jpegData(compressionQuality: 0.8))
+        let decoded = await ProgressPhotoImagePipeline.decodeAndOptimizeImage(from: data, maxPixelSize: 160)
+        let thumbnail = try XCTUnwrap(decoded)
+        XCTAssertEqual(thumbnail.size.width, 160, accuracy: 1)
+        XCTAssertEqual(thumbnail.size.height, 120, accuracy: 1)
+        XCTAssertEqual(thumbnail.imageOrientation, .up)
+        XCTAssertLessThanOrEqual(ProgressPhotoImagePipeline.cacheCost(for: thumbnail), 160 * 160 * 4)
+        let malformed = await ProgressPhotoImagePipeline.decodeAndOptimizeImage(from: Data([0, 1]), maxPixelSize: 160)
+        XCTAssertNil(malformed)
+        let invalidSize = await ProgressPhotoImagePipeline.decodeAndOptimizeImage(from: data, maxPixelSize: 0)
+        XCTAssertNil(invalidSize)
+    }
+
+    func testThumbnailCacheCannotReplaceHeroImageAndEvictsBothVariants() async throws {
+        let size = CGSize(width: 800, height: 1_000)
+        let image = UIGraphicsImageRenderer(size: size).image { context in
+            UIColor.systemTeal.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("filmstrip-\(UUID().uuidString).jpg")
+        try XCTUnwrap(image.jpegData(compressionQuality: 0.8)).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        let cache = ImageCacheService()
+        let small = await cache.loadThumbnail(from: url.absoluteString)
+        let large = await cache.loadImage(from: url.absoluteString)
+        XCTAssertEqual(small?.size.height, 160)
+        XCTAssertGreaterThan(try XCTUnwrap(large).size.height, 160)
+        let retained = await cache.loadThumbnail(from: url.absoluteString)
+        XCTAssertTrue(small === retained)
+        cache.clearImage(url.absoluteString)
+        try FileManager.default.removeItem(at: url)
+        let cleared = await cache.loadThumbnail(from: url.absoluteString)
+        XCTAssertNil(cleared)
+        XCTAssertNil(cache.cachedImage(for: url.absoluteString))
+    }
+
     func testOptimizeImageDownsamplesLargeImages() {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1

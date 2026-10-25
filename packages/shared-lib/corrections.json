@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "photo-filmstrip-shares-owned-timeline-selection",
+    "correction": "LYB-85 October 10 deduplication decision: add missing filmstrip appearance only within the JOV-6016-owned timeline; preserve one selection, photo/metric synchronization and 4:5 hero geometry.",
+    "source": "https://linear.app/jovie/issue/LYB-85",
+    "mechanization": "The former unused HomeV2Filmstrip becomes a read-only rendering layer of the existing ruler, behind a default-off port gate. Home and viewer pass their owned chronological photos into the same selection callback. Required shared-lib source regressions reject detached wiring, a second strip writer and full-size thumbnail decoding; they failed on the unchanged source and pass with this slice. Existing whole-unit classes cover bounded geometry, RTL, gate rollback, malformed image data and cache separation. The already-selected viewer UI case also exercises strip scrubbing and dated weight changes. Native execution and visual/device acceptance remain unverified on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A read-only strip has no selected-date binding, gesture or persistence path; the existing ruler and immutable Home selection continue to own navigation by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Views/HomeV2/HomeV2PhotoTimelineRuler.swift",
+      "anchor": "HomeV2Filmstrip(photoURLs: photoURLs, selected: selected)"
+    }
+  },
+  {
     "fingerprint": "share-preview-chrome-preserves-card-accessibility",
     "correction": "LYB-39 / PR #1533: The preview chrome replaced body_score_share_card with its own unused accessibility identifier, so the required launch-quality timeline UI test could not discover the card inside the share overlay.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40157965320/job/121063372261",

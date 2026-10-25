@@ -186,6 +186,7 @@ export const logYourBody = {
       { value: 'https://api.linear.app', reason: 'Linear GraphQL API used by CI remediation intake.' },
       { value: 'https://linear.app/jovie/issue/LYB-44', reason: 'LYB-44 source evidence for chart responsiveness and playhead label mapping.' },
       { value: 'https://linear.app/jovie/issue/LYB-74', reason: 'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.' },
+      { value: 'https://linear.app/jovie/issue/LYB-85', reason: 'LYB-85 source evidence for filmstrip appearance within the single owned photo timeline.' },
       { value: 'https://linear.app/jovie/issue/LYB-95', reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.' },
       { value: 'https://linear.app/jovie/issue/LYB-129', reason: 'LYB-129 source evidence for canonical durable workout readiness integration.' },
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
