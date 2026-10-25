@@ -494,6 +494,22 @@
     }
   },
   {
+    "fingerprint": "storekit-cleanup-deletes-only-captured-history",
+    "correction": "PR #1565 / LYB-240: Launch Quality lost the annual subscription during restore despite a shared SKTestSession (one transaction before restore, no entitlement or latest transaction afterward). Cleanup must not issue global clears that can affect later purchases, or treat missing active entitlements as proof that expired/refunded history has been removed.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40200942917/job/121191870429",
+    "mechanization": "Reuse PR #1537's cleanup: setup, teardown and warm-up delete only captured existing transaction IDs, poll both StoreKit history views without further mutation, and throw on timeout. The shared-lib regression rejects global clears and entitlement-only readiness; it fails against the original fixture. All four native lifecycle cases and required gates remain intact. Exact-head native execution remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Deleting only captured transaction IDs prevents delayed cleanup from targeting a transaction created by a later test. A bounded full-history barrier prevents setup from proceeding while old expired/refunded transactions remain visible."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
+      "anchor": "try session.deleteTransaction(identifier: transaction.identifier)"
+    }
+  },
+  {
     "fingerprint": "imported-weight-uses-effective-date-and-provenance",
     "correction": "LYB-240: A historical reading imported today must keep its measurement date and source, and must not displace a newer reading or become current outside the existing recency window.",
     "source": "https://linear.app/jovie/issue/LYB-240",
