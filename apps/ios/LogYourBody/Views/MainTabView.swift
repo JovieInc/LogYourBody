@@ -867,6 +867,9 @@ struct ChatTabView: View {
                     session: session,
                     ownerId: ownership.subject,
                     voiceEnabled: voiceCoachEnabled,
+                    readinessEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
+                        flagKey: TrainingReadinessPolicy.featureGate
+                    ),
                     isCurrent: { authManager.ownsAccountSession(ownership) },
                     onLogSet: { exercise, setNumber, reps, loadKg, rir in
                         try await logTrainingSet(
@@ -1414,15 +1417,20 @@ struct ChatTabView: View {
     private func recordTrainingFeedback(
         ownership: AuthManager.ProfileSessionOwnership,
         request: TrainingFeedbackRequest
-    ) async throws {
+    ) async throws -> TrainingFeedbackResponse {
+        var response: TrainingFeedbackResponse?
         try await TrainingOwnedRequest.perform(
             isCurrent: { authManager.ownsAccountSession(ownership) },
             getToken: { await chatAccessToken() },
             send: { accessToken in
-                try await trainingService.recordFeedback(accessToken: accessToken, request: request)
+                response = try await trainingService.recordFeedback(accessToken: accessToken, request: request)
             }
         )
         await loadTrainingNext()
+        guard let response, authManager.ownsAccountSession(ownership) else {
+            throw TrainingServiceError.authenticationExpired
+        }
+        return response
     }
 
     private func revokeTraining(ownership: AuthManager.ProfileSessionOwnership) async {

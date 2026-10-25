@@ -268,6 +268,7 @@ struct VoiceIntentResponse: Decodable {
     let heard: VoiceHeardIntent?
     let action: VoiceWorkoutAction?
     let requiresConfirmation: Bool?
+    var feedback: TrainingWorkoutFeedback?
 }
 
 struct VoiceWorkoutAction: Decodable, Equatable {
