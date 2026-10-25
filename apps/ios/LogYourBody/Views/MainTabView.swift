@@ -777,6 +777,7 @@ struct ChatTabView: View {
     @State private var trainingOwner: AuthManager.ProfileSessionOwnership?
     @State private var trainingLoadId: UUID?
     @State private var isTrainingLoading = false
+    @State private var isStartingNextBlock = false
     @State private var trainingEnrollmentRequired = false
     @State private var trainingErrorMessage: String?
     @State private var trainingPresentation: TrainingPresentation?
@@ -859,9 +860,15 @@ struct ChatTabView: View {
         .fullScreenCover(item: $trainingPresentation) { presentation in
             switch presentation {
             case .setup:
-                TrainingEnrollmentView { sessionsPerWeek, equipment in
-                    try await enrollTraining(sessionsPerWeek: sessionsPerWeek, equipment: equipment)
+                if delegatedTrainingEnabled, let ownership = authManager.captureAccountSession() {
+                    delegatedTrainingView(ownership: ownership)
+                } else {
+                    TrainingEnrollmentView { sessionsPerWeek, equipment in
+                        try await enrollTraining(sessionsPerWeek: sessionsPerWeek, equipment: equipment)
+                    }
                 }
+            case .program(let ownership):
+                delegatedTrainingView(ownership: ownership)
             case .session(let session, let ownership):
                 TrainingLiveSessionView(
                     session: session,
@@ -1182,6 +1189,39 @@ struct ChatTabView: View {
         MesocycleCanvasPolicy.isEnabled { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
     }
 
+    private var delegatedTrainingEnabled: Bool {
+        trainingCoachEnabled && AppServicePorts.analyticsTracker.isFeatureEnabled(
+            flagKey: DelegatedTrainingPolicy.featureGate
+        )
+    }
+
+    private func delegatedTrainingView(ownership: AuthManager.ProfileSessionOwnership) -> some View {
+        DelegatedTrainingView(
+            initialProposal: trainingResponse?.nextBlock,
+            accessToken: { await chatAccessToken() },
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            onApplied: { await loadTrainingNext() }
+        )
+    }
+
+    private func startNextTrainingBlock(
+        _ proposal: TrainingPlanStoredProposal, ownership: AuthManager.ProfileSessionOwnership
+    ) async {
+        guard !isStartingNextBlock, authManager.ownsAccountSession(ownership) else { return }
+        isStartingNextBlock = true
+        defer { isStartingNextBlock = false }
+        let model = DelegatedTrainingModel(
+            service: URLSessionTrainingService(), initialProposal: proposal,
+            accessToken: { await chatAccessToken() },
+            isCurrent: { authManager.ownsAccountSession(ownership) }
+        )
+        _ = await model.decide("apply")
+        await loadTrainingNext()
+        if authManager.ownsAccountSession(ownership), let message = model.message {
+            trainingErrorMessage = message
+        }
+    }
+
     private var voiceCoachEnabled: Bool {
         trainingCoachEnabled && VoiceCoachPolicy.isEnabled {
             AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0)
@@ -1211,6 +1251,30 @@ struct ChatTabView: View {
                 },
                 onStop: { Task { await revokeTraining(ownership: ownership) } }
             )
+        } else if let next = trainingResponse?.nextBlock, delegatedTrainingEnabled {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Your next block is ready").font(.headline)
+                if let transition = next.proposal.transition {
+                    Text(transition.why)
+                    Text("Staying: \(transition.staying.joined(separator: "; "))")
+                    Text("Changing: \(transition.changing.joined(separator: "; "))")
+                    if !transition.expiring.isEmpty {
+                        Text("Expiring: \(transition.expiring.joined(separator: ", "))")
+                    }
+                }
+                Button("Start next block") {
+                    guard let ownership = authManager.captureAccountSession() else { return }
+                    Task { await startNextTrainingBlock(next, ownership: ownership) }
+                }
+                .disabled(isStartingNextBlock || next.status != "proposed")
+                .accessibilityIdentifier("training_start_next_block")
+                Button("Review changes") {
+                    guard let ownership = authManager.captureAccountSession() else { return }
+                    trainingPresentation = .program(ownership)
+                }
+                if let trainingErrorMessage { Text(trainingErrorMessage).font(.footnote) }
+            }
+            .padding(16)
         } else if let week = trainingResponse?.week {
             TrainingWeekCompleteCard(week: week)
         } else if let trainingErrorMessage {
@@ -1222,7 +1286,13 @@ struct ChatTabView: View {
                 .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .accessibilityIdentifier("training_error_card")
         }
-        if canvasEnabled {
+        if delegatedTrainingEnabled {
+            Button("Review training plan") {
+                guard let ownership = authManager.captureAccountSession() else { return }
+                trainingPresentation = .program(ownership)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        } else if canvasEnabled {
             Button("Open week plan") {
                 guard let ownership = authManager.captureAccountSession() else { return }
                 trainingPresentation = .canvas(ownership)

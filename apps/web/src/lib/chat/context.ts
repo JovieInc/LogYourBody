@@ -40,6 +40,11 @@ function compactTrainingOutput(output: NextWorkoutResult | null | undefined) {
   const cited = (ids: string[]) => ids.map((id) => `[${id}]`);
   if (!output) return null;
   if (output.kind === 'not_enrolled') return null;
+  if (output.kind === 'block_complete')
+    return {
+      status: 'block_complete',
+      nextAction: 'Review the engine-prepared next block. Never ask the user to build a mesocycle.',
+    };
   const decision = {
     ...output.decision,
     evidenceIds: cited(output.decision.evidenceIds),
