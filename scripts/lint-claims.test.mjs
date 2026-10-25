@@ -1,9 +1,83 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { extractAssistantTexts, run, scan, scanClaimText } from './lint-claims.mjs';
+import {
+  extractAssistantTexts,
+  run,
+  scan,
+  scanClaimText,
+  scanExerciseVariantText,
+} from './lint-claims.mjs';
+
+const variantSeedPath = 'apps/web/src/lib/training/catalog-variant-seed.json';
+
+function variantStrings(value) {
+  if (typeof value === 'string') return [value];
+  if (!value || typeof value !== 'object') return [];
+  return Object.values(value).flatMap(variantStrings);
+}
+
+test('all curated variant text passes the shared claims policy and exercise banned list', async () => {
+  const seed = JSON.parse(
+    await readFile(new URL('../' + variantSeedPath, import.meta.url), 'utf8'),
+  );
+  assert.equal(seed.length, 25);
+  for (const entry of seed) {
+    for (const text of variantStrings(entry)) {
+      assert.deepEqual(scanExerciseVariantText(text), [], entry.id + ': ' + text);
+    }
+  }
+});
+
+for (const [text, rule] of [
+  ['This coach can treat diabetes.', 'clinical-action'],
+  ['Treats shoulder pain.', 'exercise-medical-claim'],
+  ['Prevents joint injury.', 'exercise-medical-claim'],
+  ['Pain-free movement.', 'exercise-medical-claim'],
+  ['Safe for your spine.', 'exercise-medical-claim'],
+  ['Zero axial load.', 'zero-axial-load'],
+  ['no_spinal_loading', 'zero-axial-load'],
+  ['Axial load is 0.', 'zero-axial-load'],
+  ['Trunk carries nothing.', 'zero-axial-load'],
+  ['SFR: 9.5', 'numeric-sfr'],
+  ['SFR score = 8', 'numeric-sfr'],
+  ['9/10 SFR', 'numeric-sfr'],
+  ['Stimulus-to-fatigue ratio: 7', 'numeric-sfr'],
+]) {
+  test('exercise claims policy rejects ' + text, () => {
+    assert.ok(scanExerciseVariantText(text).some((entry) => entry.rule === rule));
+  });
+}
+
+test('exercise policy allows setup uncertainty without claiming comfort or a loading measurement', () => {
+  assert.deepEqual(
+    scanExerciseVariantText(
+      'Chest pad contact; bracing varies with execution. User selected shorter range. Joint discomfort is unspecified.',
+    ),
+    [],
+  );
+});
+
+test('claims lint scans decoded seed strings independently, including nested editable tags', async (t) => {
+  for (const entry of [
+    { romSetupCaveat: 'Treats shoulder pain.' },
+    { disclaimer: 'Do not claim', romSetupCaveat: 'Zero axial load.' },
+    { toleranceTags: { stability: ['SFR score: 8'] } },
+  ]) {
+    const root = await claimsFixture(t, { [variantSeedPath]: JSON.stringify([entry]) });
+    await assert.rejects(run(root), (error) => {
+      assert.ok(error.message.includes(variantSeedPath));
+      assert.match(error.message, /\[(?:exercise-medical-claim|zero-axial-load|numeric-sfr)\]/);
+      return true;
+    });
+  }
+  const root = await claimsFixture(t, {
+    [variantSeedPath]: '[{"romSetupCaveat":"Zero ax\\u0069al load."}]',
+  });
+  await assert.rejects(run(root), /\[zero-axial-load\]/);
+});
 
 test('rejects disease treatment and diagnosis claims', () => {
   assert.ok(
