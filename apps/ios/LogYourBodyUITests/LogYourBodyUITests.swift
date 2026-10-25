@@ -240,6 +240,46 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "training-response-loss-relaunch-exact-retry", from: app)
     }
 
+    func testTrainingHistoryShowsRecordedPerformanceAtAccessibilityTextSize() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingProgress",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let history = app.descendants(matching: .any)["training_history_fixture_press"].firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 5))
+        for _ in 0..<5 where !history.isHittable { app.swipeUp() }
+        XCTAssertTrue(history.label.contains("8 reps"))
+        XCTAssertTrue(history.label.contains("Heaviest recorded"))
+        XCTAssertTrue(history.label.contains("2 RIR"))
+        XCTAssertTrue(history.isHittable)
+        attachScreenshot(named: "training-history-accessibility-text", from: app)
+    }
+
+    func testUnavailableHistoryLeavesSetLoggingUsable() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingProgress",
+            "-lybUITestTrainingHistoryUnavailable"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let log = app.buttons["training_log_set_fixture_press_1"]
+        XCTAssertTrue(log.waitForExistence(timeout: 5))
+        log.tap()
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
+        let retry = app.buttons["training_history_retry"]
+        for _ in 0..<8 where !retry.isHittable { app.swipeUp() }
+        XCTAssertTrue(retry.isHittable)
+        retry.tap()
+        XCTAssertTrue(app.staticTexts["training_history_error"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "training-history-unavailable-logging-works", from: app)
+    }
+
     func testTrainingControllerKeepsNowDominantAndUpNextVisible() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
