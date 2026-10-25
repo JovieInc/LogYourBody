@@ -8,7 +8,9 @@ import {
   type CatalogEquipment,
 } from './catalog';
 import { volume_landmarks } from './engine';
-import { MUSCLE_GROUPS, type Equipment, type MuscleGroup } from './types';
+import { reviewSessionSequence } from './sequencing';
+import { OPTIMIZER_RULES } from './optimizer-rules';
+import { MUSCLE_GROUPS, MUSCLE_TARGETS, type Equipment, type MuscleGroup } from './types';
 
 /**
  * One canonical plan document for chat, voice, and direct manipulation.
@@ -118,6 +120,9 @@ const operationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('set_training_days'), count: z.number().int() }).strict(),
   z.object({ kind: z.literal('split_day'), day: daySchema }).strict(),
   z
+    .object({ kind: z.literal('order_priority'), muscles: z.array(z.enum(MUSCLE_TARGETS)).min(1) })
+    .strict(),
+  z
     .object({
       kind: z.literal('swap'),
       exerciseName: z.string().min(1),
@@ -146,6 +151,15 @@ const operationSchema = z.discriminatedUnion('kind', [
 export type PlanOperation = z.infer<typeof operationSchema>;
 
 const changeSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('reordered'),
+      instanceId: z.string(),
+      name: z.string(),
+      beforeInstanceId: z.string(),
+      reason: z.string(),
+    })
+    .strict(),
   z
     .object({
       kind: z.literal('added'),
@@ -647,6 +661,7 @@ function narrate(changes: CanvasChange[], saved: boolean): string {
       if (change.kind === 'moved')
         return `moved ${change.name} from ${dayLabel(change.fromDay)} to ${dayLabel(change.toDay)} ${change.toSlot}`;
       if (change.kind === 'replaced') return `replaced ${change.fromName} with ${change.toName}`;
+      if (change.kind === 'reordered') return `${change.name}: ${change.reason}`;
       return `set ${change.name} from ${change.previousSets} to ${change.sets} sets`;
     })
     .join('; ');
@@ -1108,6 +1123,7 @@ function buildOperation(plan: CanvasPlan | null, operation: PlanOperation): Buil
     return buildDraft(operation);
   }
   if (!plan) return { ok: false, kind: 'plan_missing' };
+  if (operation.kind === 'order_priority') return buildPriorityOrder(plan, operation);
   if (operation.kind === 'prioritize') return buildPrioritize(plan, operation);
   if (operation.kind === 'set_training_days') return buildTrainingDays(plan, operation.count);
   if (operation.kind === 'split_day') return buildSplit(plan, operation.day);
@@ -1118,6 +1134,64 @@ function buildOperation(plan: CanvasPlan | null, operation: PlanOperation): Buil
     return { ok: false, kind: 'nothing_to_undo' };
   }
   return { ok: false, kind: 'nothing_to_redo' };
+}
+
+/** Reuses the optimizer policy. Ordering does not change allocation or infer
+ * that a regional goal reduces the user's other growth goals. */
+function buildPriorityOrder(
+  plan: CanvasPlan,
+  operation: Extract<PlanOperation, { kind: 'order_priority' }>,
+): Built {
+  if (
+    plan.sessions.some(
+      (session) =>
+        new Set(session.exercises.map((row) => row.variantId)).size !== session.exercises.length,
+    )
+  ) {
+    return { ok: false, kind: 'ambiguous_exercise' };
+  }
+  const changes: CanvasChange[] = [];
+  const sessions = plan.sessions.map((session) => {
+    const review = reviewSessionSequence({
+      session: {
+        id: session.id,
+        exercises: session.exercises.map((row) => ({ ...row, id: row.variantId })),
+      },
+      legacyPriorities: operation.muscles,
+      equipmentProfile: plan.equipment,
+      declaredEquipment: plan.declaredEquipment,
+      unavailableEquipment: [],
+      logs: [],
+      lowReadiness: false,
+      painfulExerciseIds: [],
+      rules: OPTIMIZER_RULES,
+    });
+    if (!review.move) return session;
+    const moved = session.exercises.find((row) => row.variantId === review.move!.exerciseId)!;
+    const before = session.exercises.find(
+      (row) => row.variantId === review.move!.beforeExerciseId,
+    )!;
+    const exercises = session.exercises.filter((row) => row.instanceId !== moved.instanceId);
+    exercises.splice(
+      exercises.findIndex((row) => row.instanceId === before.instanceId),
+      0,
+      moved,
+    );
+    changes.push({
+      kind: 'reordered',
+      instanceId: moved.instanceId,
+      name: moved.name,
+      beforeInstanceId: before.instanceId,
+      reason: `Place before ${before.name}; approved sets are unchanged`,
+    });
+    return { ...session, exercises };
+  });
+  return {
+    ok: true,
+    preview: planFrom(plan, sessions),
+    changes,
+    reason: 'Eligible priority work first. Retain the approved allocation and other growth goals.',
+  };
 }
 
 function sessionFor(plan: CanvasPlan, instanceId: string): CanvasSession | null {
@@ -1181,6 +1255,23 @@ function diffPlans(from: CanvasPlan, to: CanvasPlan, reason: string): CanvasChan
         reason,
       });
     }
+    if (previousSession?.id === nextSession.id) {
+      const previousIndex = previousSession.exercises.findIndex(
+        (row) => row.instanceId === exercise.instanceId,
+      );
+      const nextIndex = nextSession.exercises.findIndex(
+        (row) => row.instanceId === exercise.instanceId,
+      );
+      const next = nextSession.exercises[nextIndex + 1];
+      if (previousIndex !== nextIndex && next)
+        changes.push({
+          kind: 'reordered',
+          instanceId: exercise.instanceId,
+          name: exercise.name,
+          beforeInstanceId: next.instanceId,
+          reason,
+        });
+    }
   }
   return changes;
 }
@@ -1230,6 +1321,12 @@ export function interpretPlanUtterance(transcript: string): PlanOperation | null
   if (!text) return null;
   if (/^undo$/i.test(text)) return { kind: 'undo' };
   if (/^redo$/i.test(text)) return { kind: 'redo' };
+  const first = text.match(/^put (side delts|biceps|chest|back|lats|upper chest) first[.!]?$/i);
+  if (first?.[1])
+    return {
+      kind: 'order_priority',
+      muscles: [first[1].toLowerCase().replace(/ /g, '_') as (typeof MUSCLE_TARGETS)[number]],
+    };
   const days = text.match(/\b(one|two|three|four|five|six|\d+)\s+training days\b/i);
   if (days?.[1]) {
     const raw = days[1].toLowerCase();
@@ -1407,6 +1504,8 @@ export async function amendCanvasProposal(
   const stored = loaded.proposals.find((item) => item.proposal.id === input.proposalId) ?? null;
   if (!stored) return fail('proposal_not_found', loaded);
   if (stored.status !== 'proposed') return fail('already_decided', loaded);
+  if (stored.proposal.operation.kind === 'order_priority')
+    return fail('unsupported_or_invalid_intent', loaded);
   const found = findExercise(stored.proposal.preview, input.instanceId);
   if (!found) return fail('exercise_not_found', loaded);
   const preview = planFrom(
@@ -1490,6 +1589,14 @@ export async function decideCanvasProposal(
   }
   const guard = guardPreview(loaded.head, stored.proposal.preview);
   if (input.decision === 'apply' && guard) return fail(guard, loaded);
+  if (input.decision === 'apply' && stored.proposal.operation.kind === 'order_priority') {
+    const canonical = loaded.head
+      ? buildPriorityOrder(loaded.head, stored.proposal.operation)
+      : null;
+    if (!canonical?.ok || requestKey(canonical.preview) !== requestKey(stored.proposal.preview)) {
+      return fail('unsupported_or_invalid_intent', loaded);
+    }
+  }
   const applied = input.decision === 'apply';
   let head = loaded.head;
   let undo = loaded.undo;

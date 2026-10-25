@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "training-priority-order-retains-warmup-volume-and-completed-work",
+    "correction": "LYB-37 October 14 dogfood acceptance: specialization work precedes generic compound-first templates only when eligible; preserve warm-up, approved allocation and completed work across split segments, and distinguish anterior from medial delts.",
+    "source": "https://linear.app/jovie/issue/LYB-37",
+    "mechanization": "The existing optimizer computes priority order with scoped intent and qualitative demand metadata. Its certifier compares the complete deterministic result, including ordered changes and narration. The existing required web Jest suite runs golden regressions for warm-up, readiness, grip, shoulder regions, inventory/exclusions, segment continuity, scope expiry and tampered proposals. Canvas regressions require explicit apply, persisted readback, replay and undo without volume changes.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Priority sequencing and certification are deterministic domain behavior. Reuse the existing optimizer and canvas proposal ledger; never let coach prose authorize a reorder or volume edit. This guard covers the sequencing slice, not full native session certification or unfinished-work reconciliation."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/sequencing.test.ts",
+      "anchor": "priority sequencing golden scenarios"
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",

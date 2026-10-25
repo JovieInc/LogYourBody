@@ -286,7 +286,9 @@ function PreviewRow({
         ? `${change.name} moved to ${change.toDay} ${change.toSlot}`
         : change.kind === 'replaced'
           ? `${change.fromName} replaced with ${change.toName}`
-          : `${change.name} sets`;
+          : change.kind === 'reordered'
+            ? `${change.name} reordered`
+            : `${change.name} sets`;
   return (
     <li data-change={change.kind} data-instance-id={change.instanceId} className="text-sm">
       <span>

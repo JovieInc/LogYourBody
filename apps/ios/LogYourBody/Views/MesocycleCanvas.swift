@@ -17,6 +17,8 @@ struct CanvasClientRequest {
     var sets: Int?
     var operation: [String: Any]?
     var expectedWrite: Int?
+    // Retained with lastRequest so a lost response can replay the same command.
+    var requestId: String = UUID().uuidString
 
     var operationKind: String? { operation?["kind"] as? String }
     var toDay: String? { operation?["toDay"] as? String }
@@ -30,10 +32,13 @@ struct CanvasClientRequest {
         var body: [String: Any] = ["action": action, "expectedWrite": expectedWrite ?? NSNull()]
         switch action {
         case "submit":
+            body["requestId"] = requestId
             body["transcript"] = transcript ?? ""
         case "propose":
+            body["requestId"] = requestId
             body["operation"] = operation ?? [:]
         case "decide":
+            body["requestId"] = requestId
             body["proposalId"] = proposalId ?? ""
             body["decision"] = decision ?? ""
         case "amend":
@@ -755,6 +760,8 @@ struct MesocycleCanvasContainer: View {
             return "\(change.name ?? "Exercise") moved to \(change.toDay ?? "") \(change.toSlot ?? ""). \(change.reason)"
         case "replaced":
             return "\(change.fromName ?? "") replaced with \(change.toName ?? ""). \(change.reason)"
+        case "reordered":
+            return "\(change.name ?? "Exercise"): \(change.reason)"
         default:
             return "\(change.name ?? "Exercise") sets. \(change.reason)"
         }

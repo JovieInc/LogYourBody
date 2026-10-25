@@ -36,6 +36,71 @@ function post(body: unknown, authorization = 'Bearer token') {
 }
 
 describe('mesocycle canvas route', () => {
+  it('replays the native command identity after a lost apply response and rejects changed reuse', async () => {
+    const { route } = handlers();
+    const draft = {
+      action: 'submit',
+      requestId: '11111111-1111-4111-8111-111111111111',
+      transcript: 'Build a 4-week hypertrophy plan for a full gym',
+      expectedWrite: null,
+    };
+    const proposed = await (await route.POST(post(draft))).json();
+    const command = {
+      action: 'decide',
+      requestId: '22222222-2222-4222-8222-222222222222',
+      proposalId: proposed.proposal.id,
+      decision: 'apply',
+      expectedWrite: proposed.readback.write,
+    };
+    const saved = await (await route.POST(post(command))).json();
+    const retry = await route.POST(post(command));
+    expect(retry.status).toBe(200);
+    const replay = await retry.json();
+    expect(replay.receipt).toEqual(saved.receipt);
+    expect(replay.readback.plan).toEqual(saved.readback.plan);
+    const changed = await route.POST(post({ ...command, decision: 'reject' }));
+    expect(changed.status).toBe(409);
+    expect(await changed.json()).toMatchObject({ kind: 'request_conflict' });
+    const order = await route.POST(
+      post({
+        action: 'submit',
+        requestId: '33333333-3333-4333-8333-333333333333',
+        transcript: 'Put side delts first',
+        expectedWrite: saved.readback.write,
+      }),
+    );
+    expect(order.status).toBe(200);
+    const preview = await order.json();
+    expect(preview).toMatchObject({ kind: 'proposed', applied: false });
+    expect(preview.readback.plan).toEqual(saved.readback.plan);
+    const read = await (await route.POST(post({ action: 'read' }))).json();
+    expect(read.readback.plan).toEqual(saved.readback.plan);
+  });
+
+  it('rate limits and validates command identity before a proposal can write', async () => {
+    const reserveRequest = jest.fn(async () => ({
+      allowed: false as const,
+      retryAfterSeconds: 15,
+    }));
+    const limited = handlers({ reserveRequest });
+    const response = await limited.route.POST(
+      post({ action: 'submit', transcript: 'Put biceps first', expectedWrite: null }),
+    );
+    expect(response.status).toBe(429);
+    expect(response.headers.get('Retry-After')).toBe('15');
+    expect((await readCanvas(limited.ledger, 'owner')).readback.write).toBeNull();
+    const { route, ledger } = handlers();
+    const invalid = await route.POST(
+      post({
+        action: 'submit',
+        transcript: 'Put biceps first',
+        expectedWrite: null,
+        requestId: 'not-a-uuid',
+      }),
+    );
+    expect(invalid.status).toBe(400);
+    expect((await readCanvas(ledger, 'owner')).readback.write).toBeNull();
+  });
   it.each([
     [null, 404, 'account_not_found'],
     [new NativeAccountAdmissionError('account_changed'), 409, 'account_changed'],
