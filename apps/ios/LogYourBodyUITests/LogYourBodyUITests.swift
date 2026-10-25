@@ -4412,3 +4412,42 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_settings"].exists)
     }
 }
+
+extension LogYourBodyUITests {
+    func testCycleReuseDraftRequiresReviewBeforeApply() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_cycle_review"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_cycle_review"].tap()
+        XCTAssertTrue(app.segmentedControls["training_cycle_length"].waitForExistence(timeout: 5))
+        app.segmentedControls["training_cycle_length"].buttons["5 weeks"].tap()
+        app.switches["Smith incline press"].switches.firstMatch.tap()
+        XCTAssertTrue(app.textFields["Why it worked"].exists)
+        app.swipeUp()
+        app.buttons["training_cycle_create_draft"].tap()
+        let apply = app.buttons["training_cycle_apply"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Week 5 · Deload · 1 set · 5 RIR"].exists)
+        attachScreenshot(named: "training-five-week-reuse-draft", from: app)
+        apply.tap()
+        XCTAssertTrue(app.staticTexts["training_fixture_cycle_applied"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["training_fixture_cycle_applied"].label, "Applied blocks: 1")
+    }
+
+    func testRejectingCycleDraftDoesNotApplyIt() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_cycle_review"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_cycle_review"].tap()
+        XCTAssertTrue(app.segmentedControls["training_cycle_length"].waitForExistence(timeout: 5))
+        app.segmentedControls["training_cycle_length"].buttons["5 weeks"].tap()
+        app.swipeUp()
+        app.buttons["training_cycle_create_draft"].tap()
+        XCTAssertTrue(app.buttons["training_cycle_reject"].waitForExistence(timeout: 5))
+        app.buttons["training_cycle_reject"].tap()
+        app.buttons["Close"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_cycle_applied"].label, "Applied blocks: 0")
+    }
+}
