@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "recurring-corrections-escalate-or-report-guard-failure",
+    "correction": "LYB-252: Repeated corrections after a prose fix must request stronger enforcement once per rule; a correction recurring after mechanization is a guard failure rather than an ordinary repeat.",
+    "source": "https://linear.app/jovie/issue/LYB-252",
+    "mechanization": "The existing recurrence intake shares the reviewed classifier, requests static enforcement for prose rules, and returns explicit guard failures for new corrections to guarded rules. Shared-lib fixture tests exercise the real Linear adapter with a fake sink, deterministic deduplication, terminal issue reopening only on new evidence, and dry-run defaults through the script entrypoint.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime types cannot ensure that repository correction intake preserves evidence identity, escalation semantics and safe filing defaults."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib test suite runs fixture regressions through the actual recurrence runner and issue adapter, rejecting duplicate creates, silent guarded repeats and accidental live filing."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-recurrence.behavior.mjs",
+      "anchor": "new corrections to an already mechanized rule fail without filing or hiding the guard"
+    }
+  },
+  {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
     "correction": "PR #1560: Resolve the origin/main correction-ledger conflict by retaining the backward-planner CI receipts and the training-cycle merge receipt with their original sources and guards.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1560",
