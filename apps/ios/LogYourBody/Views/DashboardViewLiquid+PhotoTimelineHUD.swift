@@ -65,7 +65,8 @@ extension DashboardViewLiquid {
                 .padding(.top, 8)
                 .padding(.bottom, 4)
                 .contentShape(Rectangle())
-                .highPriorityGesture(photoTimelineSwipe)
+                // Header swipes must coexist with menu and day-detail button taps.
+                .simultaneousGesture(photoTimelineSwipe)
 
             photoTimelineHomeContent
                 .frame(maxWidth: .infinity, maxHeight: isHomeChatExpanded ? 0 : .infinity)

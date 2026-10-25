@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "home-header-swipe-preserves-menu-taps",
+    "correction": "PR #1556 / LYB-241: Launch Quality failed after a single Open Menu tap left Today visible and home_v2_sidebar_scrim absent. The failure hierarchy confirms that the sidebar never opened; preserve header button taps while retaining navigation swipes.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40192826999/job/121167380080",
+    "mechanization": "Compose the header drag simultaneously with its child button gestures instead of giving it priority. The existing required Launch Quality UI regression now requires three consecutive single-tap open/close cycles and a header-swipe open/close cycle, retaining Today selection, scrub-state and photo-viewer assertions. Native execution remains required from macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "SwiftUI simultaneous gesture composition lets the navigation drag observe swipes without taking priority over the menu and day-detail buttons in the header."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/HomeV2TimelineIntegrationUITests.swift",
+      "anchor": "Each single menu tap must open the sidebar"
+    }
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1556 / LYB-241: Adding HealthSyncState and its tests to their Xcode targets changed the project manifest without refreshing its reviewed diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40191598576/job/121163556934",
