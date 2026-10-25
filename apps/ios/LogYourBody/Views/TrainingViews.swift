@@ -5,6 +5,7 @@ enum TrainingPresentation: Identifiable {
     case session(TrainingSession, AuthManager.ProfileSessionOwnership)
     case voiceSetReview(TrainingSession, VoiceHeardIntent)
     case canvas(AuthManager.ProfileSessionOwnership)
+    case program(AuthManager.ProfileSessionOwnership)
 
     var id: String {
         switch self {
@@ -12,6 +13,7 @@ enum TrainingPresentation: Identifiable {
         case .session(let session, let owner): "session-\(owner.subject)-\(owner.generation)-\(session.id)"
         case .voiceSetReview(let session, _): "voice-set-review-\(session.id)"
         case .canvas(let owner): "canvas-\(owner.subject)-\(owner.generation)"
+        case .program(let owner): "program-\(owner.subject)-\(owner.generation)"
         }
     }
 }

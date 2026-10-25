@@ -1,4 +1,5 @@
 import type { TrainingMutationAdmission } from '@/lib/ports/training-mutations';
+import { eligibleForProgram } from './delegated-planning';
 import {
   captureTrainingAdmission,
   requireAdmittedSetup,
@@ -431,7 +432,12 @@ export async function swapExercise(input: {
   });
   const eligibility = {
     available,
-    excludedConcerns: swap.excludedConcerns,
+    excludedConcerns: [
+      ...new Set([
+        ...(swap.excludedConcerns ?? []),
+        ...(setup.delegated?.inputs.limitations ?? []),
+      ]),
+    ],
   };
 
   let variant;
@@ -440,7 +446,10 @@ export async function swapExercise(input: {
     if (!requested || requested.primaryMuscle !== exercise.primaryMuscle) {
       return { kind: 'variant_not_found' };
     }
-    if (!isEligibleVariant(requested, eligibility)) {
+    if (
+      !isEligibleVariant(requested, eligibility) ||
+      (setup.delegated && !eligibleForProgram(requested.id, setup.delegated.inputs))
+    ) {
       return { kind: 'variant_ineligible', missing: missingEquipment(requested, available) };
     }
     variant = requested;
@@ -450,10 +459,10 @@ export async function swapExercise(input: {
       currentExerciseId: exercise.id,
       currentContribution: exercise.muscleContribution,
       available,
-      excludedConcerns: swap.excludedConcerns,
+      excludedConcerns: eligibility.excludedConcerns,
       preferTorsoSupport: swap.preferTorsoSupport,
       maxTrunkDemand: swap.maxTrunkDemand,
-    })[0];
+    }).find((v) => !setup.delegated || eligibleForProgram(v.id, setup.delegated.inputs));
     if (!variant) return { kind: 'no_feasible_alternative' };
   }
 
@@ -910,6 +919,7 @@ export async function applyWorkoutAction(input: {
               exercise: current,
               candidate,
               equipment: setup.equipment,
+              constraints: setup.delegated?.inputs,
             }),
         );
         if (hasCompletedCurrentSet || !replacement) return { kind: 'no_eligible_substitution' };

@@ -110,6 +110,7 @@ struct TrainingNextResponse: Decodable, Equatable, Sendable {
     let week: Int?
     let weekCount: Int?
     let weeklyFractionalVolume: [String: Double]?
+    var nextBlock: TrainingPlanStoredProposal?
 }
 
 struct TrainingProgramResponse: Decodable, Equatable, Sendable {
@@ -361,6 +362,10 @@ enum TrainingServiceError: LocalizedError, Equatable {
                 return "This set changed since that action. Review it before trying again."
             case "undo_unavailable":
                 return "This set cannot be undone. Correct it instead."
+            case "delayed_active_workout":
+                return "Finish or end your current workout before applying this plan."
+            case "stale_context":
+                return "Your training changed. Refresh the draft before applying it."
             default:
                 return "Training is temporarily unavailable. Please try again."
             }
@@ -609,3 +614,143 @@ private struct TrainingWorkoutActionResponse: Decodable, VersionedTrainingRespon
     let session: TrainingSession
 }
 private struct TrainingErrorResponse: Decodable { let error: String }
+
+struct TrainingPlanningInputs: Codable, Equatable, Sendable {
+    var goal: String?
+    var goalDate: String?
+    var experience: String?
+    var sessionsPerWeek: Int?
+    var minutesPerSession: Int?
+    var equipment: String?
+    var excludedVariantIds: [String]?
+    var limitations: [String]?
+    var preferredVariantIds: [String]?
+}
+
+struct TrainingPlanStoredProposal: Decodable, Equatable, Sendable {
+    struct Proposal: Decodable, Equatable, Sendable {
+        struct Transition: Decodable, Equatable, Sendable {
+            let staying: [String]
+            let changing: [String]
+            let why: String
+            let expiring: [String]
+        }
+        struct Actor: Decodable, Equatable, Sendable {
+            let kind: String
+            let subject: String
+        }
+        let id: String
+        let reason: String
+        let actor: Actor
+        let summary: [String]
+        let assumptions: [String]
+        let plan: CanvasPlan
+        let transition: Transition?
+    }
+    let status: String
+    let proposal: Proposal
+}
+
+struct TrainingPlanContext: Decodable {
+    struct Revision: Decodable, Identifiable {
+        var id: String { revisionId }
+        let revisionId: String
+        let reason: String
+        let summary: [String]
+    }
+    struct Movement: Decodable, Identifiable {
+        let id: String
+        let name: String
+    }
+    struct Setup: Decodable {
+        struct Program: Decodable {
+            let plan: CanvasPlan
+        }
+        let programRevisionId: String?
+        let delegated: Program?
+    }
+    let generation: Int
+    let delegatedProgramming: Bool?
+    let knownInputs: TrainingPlanningInputs?
+    let currentSetup: Setup?
+    let movements: [Movement]?
+    let limitations: [String]?
+    let pendingProposal: TrainingPlanStoredProposal?
+    let history: [Revision]?
+}
+
+struct TrainingPlanProposalRequest: Encodable {
+    struct Intent: Encodable {
+        var kind: String
+        var inputs: TrainingPlanningInputs?
+        var adultConfirmed: Bool?
+        var safetyConfirmed: Bool?
+        var revisionId: String?
+    }
+    let requestId: String
+    let expectedGeneration: Int
+    let reason: String
+    var intent: Intent?
+    var utterance: String?
+    var baseProposalId: String?
+}
+
+struct TrainingPlanProposalResponse: Decodable {
+    let stored: TrainingPlanStoredProposal?
+    let question: String?
+}
+
+struct TrainingPlanDecisionRequest: Encodable {
+    let requestId: String
+    let proposalId: String
+    let decision: String
+}
+
+struct TrainingPlanDecisionResponse: Decodable {
+    struct Receipt: Decodable {
+        let proposalId: String
+        let requestId: String
+        let status: String
+        let revisionId: String?
+        let setup: TrainingPlanContext.Setup?
+    }
+    let receipt: Receipt
+}
+
+protocol DelegatedTrainingServicing {
+    func planningContext(accessToken: String) async throws -> TrainingPlanContext
+    func proposePlan(accessToken: String, request: TrainingPlanProposalRequest) async throws -> TrainingPlanProposalResponse
+    func decidePlan(accessToken: String, request: TrainingPlanDecisionRequest) async throws -> TrainingPlanDecisionResponse
+}
+
+extension URLSessionTrainingService: DelegatedTrainingServicing {
+    func planningContext(accessToken: String) async throws -> TrainingPlanContext {
+        try await send(path: "program-proposals", method: "GET", accessToken: accessToken)
+    }
+
+    func proposePlan(
+        accessToken: String, request: TrainingPlanProposalRequest
+    ) async throws -> TrainingPlanProposalResponse {
+        let response: TrainingPlanProposalResponse = try await send(
+            path: "program-proposals", method: "POST", accessToken: accessToken, body: request
+        )
+        guard response.stored != nil || response.question != nil else { throw TrainingServiceError.invalidResponse }
+        return response
+    }
+
+    func decidePlan(
+        accessToken: String, request: TrainingPlanDecisionRequest
+    ) async throws -> TrainingPlanDecisionResponse {
+        let response: TrainingPlanDecisionResponse = try await send(
+            path: "program-proposals", method: "PATCH", accessToken: accessToken, body: request
+        )
+        guard response.receipt.proposalId == request.proposalId,
+              response.receipt.requestId == request.requestId,
+              response.receipt.status == (request.decision == "apply" ? "applied" : "rejected"),
+              request.decision != "apply" || (
+                response.receipt.revisionId != nil &&
+                response.receipt.setup?.programRevisionId == response.receipt.revisionId
+              ) else { throw TrainingServiceError.invalidResponse }
+        return response
+    }
+}
