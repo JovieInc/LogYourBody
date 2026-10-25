@@ -601,6 +601,11 @@ func fetchOrCreateSyncMetadata(entityName: String, entityId: String) -> SyncMeta
                     context.delete(profile)
                 }
 
+                let outcomeRequest = NSFetchRequest<NSManagedObject>(entityName: "CachedDatedOutcome")
+                for outcome in try context.fetch(outcomeRequest) {
+                    context.delete(outcome)
+                }
+
                 // Delete all sync metadata
                 let syncRequest: NSFetchRequest<SyncMetadata> = SyncMetadata.fetchRequest()
                 let syncRecords = try context.fetch(syncRequest)
