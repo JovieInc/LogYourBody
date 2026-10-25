@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1581 conflicts with origin/main in the generated CI workflow fingerprint. Regenerate the source projection from the merged workflow while retaining StoreKit evidence on merge groups and main pushes.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1581",
+    "mechanization": "Reuse the required repository projection checker and its existing CI regression. The checker rejects the conflicted projection before regeneration and passes afterward; the change-detection suite verifies StoreKit selection and CI Summary behavior for PRs, merge groups and main pushes.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    }
+  },
+  {
     "fingerprint": "training-cycle-delegation-merge-parity",
     "correction": "PR #1541 conflicts with the delegated programming implementation merged in PR #1531. Preserve both proposal versions, owner-locked database admission and native entry points when merging origin/main.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1541",
@@ -507,6 +527,26 @@
     "guard": {
       "path": "apps/web/src/app/sitemap.ts",
       "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
+    }
+  },
+  {
+    "fingerprint": "guard-reference-paths-exist",
+    "correction": "LYB-254: A ledger entry that claims a guard must point at a test, lint rule, or CI step path that exists. Entries with no guard reference stay on a shrink-only baseline.",
+    "source": "https://linear.app/jovie/issue/LYB-254",
+    "mechanization": "The required Detect Changes job runs guard-reference.mjs on every diff. A missing guard path fails with the entry id and path. Unguarded entries warn, and the committed baseline can only shrink against the exact Git base.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot prove that a Git-tracked ledger guard still points at a file in the repository."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic CI check can stat each claimed guard path and compare the unguarded entry baseline with the immutable Git base."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/guard-reference.behavior.mjs",
+      "anchor": "deleted guard fails with the entry id and path"
     }
   }
 ]
