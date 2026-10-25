@@ -607,3 +607,15 @@ test('Launch Quality leaves StoreKit lifecycle tests to the dedicated StoreKit j
   // The skip is only safe while the dedicated job still runs the suite in the queue and on main.
   assert.match(jobBlock('ios_storekit'), /storekit-purchase-restore\.sh/);
 });
+
+test('UI tests are hermetic: no localhost, and fixed sleeps only shrink', () => {
+  const dir = new URL('../../apps/ios/LogYourBodyUITests/', import.meta.url);
+  let sleeps = 0;
+  for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.swift'))) {
+    const source = fs.readFileSync(new URL(name, dir), 'utf8');
+    assert.doesNotMatch(source, /localhost|127\.0\.0\.1/, `${name} reaches a local server; use a launch-argument fixture or URLProtocol stub`);
+    sleeps += (source.match(/Thread\.sleep|[^a-zA-Z.]u?sleep\(/g) ?? []).length;
+  }
+  // Ratchet (2 on 2026-10-25, both in the chaos suites): wait on element state instead of adding sleeps.
+  assert.ok(sleeps <= 2, `UI tests use ${sleeps} fixed sleeps; replace with waitForExistence or an XCTNSPredicateExpectation`);
+});
