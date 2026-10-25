@@ -34,5 +34,19 @@ Content-Type: application/json
 
 After deployment, the apex response should be 308 and preserve the path and
 query. `www` should return 200 with one self-referencing canonical and one
-brand in each public title. Sitemap route coverage and robots policy stay with
-the sibling issue; registry-driven origins follow this host.
+brand in each public title.
+
+## Sitemap and robots policy (LYB-224)
+
+`apps/web/src/data/publicMarketingRoutes.ts` supplies the sitemap and marketing
+route tests with the same 14 public routes. Required web tests compare the
+sitemap URLs with that inventory and check the inventory against public page
+files, excluding legacy auth and dynamic blog routes. Both the sitemap and
+robots host/sitemap directives use the registry's serving origin. Modification
+dates are omitted until reliable content or build timestamps are available.
+Legacy `/signin` and `/signup` remain blocked in robots until LYB-100 retires
+them.
+
+Tim decision flagged: should `/blog` stay in the header and footer while there
+are zero published posts? Navigation remains unchanged pending that product
+decision; `/blog` stays in the public route inventory.

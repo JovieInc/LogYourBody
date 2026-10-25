@@ -32,7 +32,7 @@ LogYourBody does not claim a shorter provider retention window without that rece
 
 Direct Chat Completions calls (mobile chat and PDF extraction) always send
 `store: false`. Options that can fail the request stay behind
-`LYB_AI_ZERO_RETENTION=1`, which defaults off:
+`LYB_AI_ZERO_RETENTION=1`. Production sets it to 1 (LYB-193, 2026-10-25); the Deploy workflow fails if the variable is missing from Vercel production. It defaults off elsewhere (local, preview). Rollback: remove the Vercel production variable, drop it from the Deploy required list, redeploy:
 
 | Call                            | SDK control                                           | When the flag is off                                                             |
 | ------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------- |
