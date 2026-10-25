@@ -1571,8 +1571,11 @@ struct ChatTabView: View {
 
     private func replaceTrainingSession(_ updated: TrainingSession) {
         if trainingCardsEnabled, let ownership = trainingOwner, authManager.ownsAccountSession(ownership) {
-            do { try TrainingDraftStore.shared.updateCachedSession(updated, ownerId: ownership.subject) }
-            catch { trainingErrorMessage = TrainingDraftError.unavailable.localizedDescription }
+            do {
+                try TrainingDraftStore.shared.updateCachedSession(updated, ownerId: ownership.subject)
+            } catch {
+                trainingErrorMessage = TrainingDraftError.unavailable.localizedDescription
+            }
         }
         trainingResponse = trainingResponse.map {
             TrainingNextResponse(
