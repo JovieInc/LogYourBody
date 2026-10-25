@@ -9,7 +9,11 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm';
 import * as contract from './fixtures/lyb-certification/lyb-launch-contract.mjs';
-import { emitLaunchManifest, nativeSurfaces } from './lyb-launch-manifest.mjs';
+import {
+  emitLaunchManifest,
+  launchEvidencePathIds,
+  nativeSurfaces,
+} from './lyb-launch-manifest.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const fixture = new URL('./fixtures/lyb-certification/', import.meta.url);
@@ -111,6 +115,31 @@ test('the emitted manifest validates against the unmodified Jovie main oracle fi
   assert.equal(manifest.observedNativeSurfaces.length, 49);
   assert.deepEqual(manifest.observedNativeSurfaces, nativeSurfaces());
   assert.deepEqual(manifest.launchContract.surfaces, contract.LAUNCH_CONTRACT.surfaces);
+});
+
+test('installed-build evidence ids list every contract path and route state', () => {
+  const evidence = launchEvidencePathIds();
+  assert.deepEqual(
+    evidence.contractIds,
+    contract.LAUNCH_CONTRACT.requiredPaths.map((path) => path.id),
+  );
+  assert.deepEqual(evidence.routeStateIds, [
+    ...['ios.screen.photoTimeline', 'ios.screen.stats', 'ios.screen.chat'].flatMap((surface) =>
+      [
+        'ready',
+        'denial',
+        'no-data',
+        'offline',
+        'stale',
+        'conflicting',
+        'unsafe-date',
+        'impossible-date',
+        'expired-date',
+        'maintenance',
+      ].map((state) => `${surface}:${state}`),
+    ),
+  ]);
+  assert.deepEqual(evidence.all, [...evidence.contractIds, ...evidence.routeStateIds]);
 });
 
 test('every primary route declares all LYB-183 launch states and binds known paths', () => {

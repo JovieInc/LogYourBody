@@ -64,6 +64,18 @@ export function nativeSurfaces(root = repositoryRoot) {
   ].sort();
 }
 
+/**
+ * Contract paths plus every primary-route state. Coverage keys only — this does
+ * not claim those paths were executed on an installed build.
+ */
+export function launchEvidencePathIds() {
+  const contractIds = LAUNCH_CONTRACT.requiredPaths.map((path) => path.id);
+  const routeStateIds = LAUNCH_CONTRACT.primarySurfaces.flatMap((surface) =>
+    Object.keys(states).map((state) => `${surface}:${state}`),
+  );
+  return { contractIds, routeStateIds, all: [...contractIds, ...routeStateIds] };
+}
+
 /** Bind the parent's exact XCTest selectors without manufacturing execution evidence. */
 export function emitLaunchManifest(bindings, root = repositoryRoot) {
   const observed = nativeSurfaces(root);

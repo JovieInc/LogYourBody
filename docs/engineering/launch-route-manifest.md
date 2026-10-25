@@ -56,5 +56,31 @@ registries and all producer/fixture files so a cached pass cannot mask a new
 registry entry.
 
 Feed the emitted manifest and LYB-183's real receipt to the Jovie oracle for
-certification. This slice does not provide native execution, installed-build,
-TestFlight, or real-device proof.
+certification. The manifest producer still does not run the installed app.
+
+Installed-build coverage is a separate check. It reads `xcresulttool` test
+exports from `.xcresult` bundles and diffs them against every contract path and
+every primary-route state (`ready`, `denial`, `no-data`, `offline`, `stale`,
+`conflicting`, `unsafe-date`, `impossible-date`, `expired-date`, `maintenance`
+on timeline, stats, and coach). Each id needs one passing `native-interaction`
+trace from a `UITests` case and one passing `service` trace from a non-UI test.
+Record them as activity or attachment names:
+
+```text
+lyb-installed-trace|<path-id>|native-interaction
+lyb-installed-trace|<path-id>|service
+lyb-installed-build-id|<40-hex git sha>
+```
+
+The route-state id is `<surface>:<state>`, for example
+`ios.screen.chat:offline`. A label containing fixture, synthetic, override,
+bypass, or `-lybUITest` is a fixture substitute and is not coverage. The check
+exits nonzero when a path lacks either trace, when a trace is a fixture
+substitute, or when the installed build id is absent. Hand-written JSON is not
+an accepted input.
+
+```sh
+node --experimental-strip-types scripts/lyb-installed-xcresult-evidence.mjs \
+  --xcresult /path/to/ui.xcresult \
+  --xcresult /path/to/service.xcresult
+```

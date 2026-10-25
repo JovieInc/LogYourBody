@@ -5,6 +5,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/scripts/lyb-launch-manifest*.mjs",
+        "$TURBO_ROOT$/scripts/lyb-installed-xcresult-evidence.mjs",
         "$TURBO_ROOT$/scripts/fixtures/lyb-certification/**",
         "$TURBO_ROOT$/apps/ios/LogYourBody/DesignSystem/Theme.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBody/Views/MainTabViewPolicies.swift",

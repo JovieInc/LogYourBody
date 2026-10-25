@@ -10,5 +10,5 @@ it('validates launch manifests against the pinned Jovie oracle and rejects uncla
     { cwd: root, encoding: 'utf8', timeout: 30_000 },
   );
   expect(output).toContain('# fail 0');
-  expect(output).toContain('# tests 11');
+  expect(output).toContain('# tests 12');
 });
