@@ -21,6 +21,8 @@ import {
 } from './catalog';
 import {
   evaluateNextSetReadiness,
+  completedTrainingSession,
+  sessionWorkLogged,
   isEligibleExerciseSubstitution,
   latestFeedbackPerSession,
   sameTrainingFeedbackObservation,
@@ -103,7 +105,10 @@ export async function logTrainingSet(input: {
     // A completed session permits an exact replay, never an edit or a new set.
     const prior = snapshot.logs.find((log) => log.id === logId);
     if (
-      sessionRecord.status === 'completed' &&
+      (sessionRecord.status === 'completed' ||
+        (sessionRecord.status === 'ended' &&
+          session &&
+          sessionWorkLogged(session, snapshot.logs))) &&
       prior &&
       prior.sessionId === set.sessionId &&
       prior.exerciseId === set.exerciseId &&
@@ -159,20 +164,11 @@ export async function logTrainingSet(input: {
   )
     return { kind: 'set_conflict' };
   const allLogs = [...snapshot.logs.filter((prior) => prior.id !== logId), saved];
-  const sessionComplete = session.exercises.every((exercise) =>
-    Array.from({ length: exercise.sets }, (_, index) => index + 1).every((setNumber) =>
-      allLogs.some(
-        (record) =>
-          record.sessionId === session.id &&
-          record.exerciseId === exercise.id &&
-          record.setNumber === setNumber,
-      ),
-    ),
-  );
+  const sessionComplete = sessionWorkLogged(session, allLogs as SetLog[]);
   if (sessionComplete) {
     await commitTrainingMutation(records, subject, admission, 'session_update', {
       ...sessionRecord,
-      status: 'completed',
+      status: completedTrainingSession(session, allLogs as SetLog[]) ? 'completed' : 'ended',
       completedAt,
     });
   }
@@ -427,7 +423,7 @@ export async function swapExercise(input: {
 
   const available = resolveAvailableEquipment({
     profile: setup.equipment,
-    declared: swap.declaredEquipment,
+    declared: [...(setup.declaredEquipment ?? []), ...(swap.declaredEquipment ?? [])],
     sessionUnavailable: swap.unavailableEquipment,
   });
   const eligibility = {
@@ -447,6 +443,7 @@ export async function swapExercise(input: {
       return { kind: 'variant_not_found' };
     }
     if (
+      setup.excludedVariantIds?.includes(requested.id) ||
       !isEligibleVariant(requested, eligibility) ||
       (setup.delegated && !eligibleForProgram(requested.id, setup.delegated.inputs))
     ) {
@@ -462,7 +459,11 @@ export async function swapExercise(input: {
       excludedConcerns: eligibility.excludedConcerns,
       preferTorsoSupport: swap.preferTorsoSupport,
       maxTrunkDemand: swap.maxTrunkDemand,
-    }).find((v) => !setup.delegated || eligibleForProgram(v.id, setup.delegated.inputs));
+    }).find(
+      (candidate) =>
+        !setup.excludedVariantIds?.includes(candidate.id) &&
+        (!setup.delegated || eligibleForProgram(candidate.id, setup.delegated.inputs)),
+    );
     if (!variant) return { kind: 'no_feasible_alternative' };
   }
 
@@ -893,10 +894,12 @@ export async function applyWorkoutAction(input: {
       event = { id: input.eventId, kind: 'resumed', createdAt: input.now.toISOString() };
       break;
     case 'end':
-      status = 'completed';
+      status = completedTrainingSession(session, sessionLogs) ? 'completed' : 'ended';
       event = { id: input.eventId, kind: 'ended', createdAt: input.now.toISOString() };
       break;
   }
+
+  if (event.kind === 'skipped' && exercises.length === 0) status = 'ended';
 
   const updated: Session = {
     ...session,
