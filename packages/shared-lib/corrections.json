@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "sentry-next-config-build-entrypoint",
+    "correction": "LYB-131: The credential-enabled Vercel build failed because Sentry 11.9.0 exports withSentryConfig from its config entrypoint, not its runtime root. The existing test mock invented the missing root export.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40222885361/job/121263329314",
+    "mechanization": "Import the build wrapper from the installed SDK config entrypoint. The existing required web configuration suite calls that real wrapper with synthetic upload credentials, preserves release and privacy assertions, and checks each missing-credential path. The three enabled cases fail with the original runtime import and pass with the corrected import.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dedicated build entrypoint provides the wrapper under Node module resolution without changing runtime adapters or disabling source-map upload. Calling the installed wrapper in the required suite prevents a mock from concealing the same export mismatch."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/adapters/__tests__/sentry-config.node.test.ts",
+      "anchor": "const actual = jest.requireActual('@sentry/nextjs/config');"
+    }
+  },
+  {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
     "correction": "PR #1560: Resolve the origin/main correction-ledger conflict by retaining the backward-planner CI receipts and the training-cycle merge receipt with their original sources and guards.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1560",
