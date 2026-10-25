@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "healthkit-types-disclosed-in-privacy-health-data",
+    "correction": "LYB-189: The privacy policy's Health Data bullet disclosed only steps/activity while native HealthKit paths read weight, body fat percentage, height, steps, date of birth and biological sex, and write weight/body fat.",
+    "source": "https://linear.app/jovie/issue/LYB-189",
+    "mechanization": "Extend the existing app-privacy scanner, already executed by the required Detect Changes correction ratchet on every diff, to compare native definitions, explicit identifiers, characteristic getters and HealthKit usage strings with the canonical Health Data bullet. Shared-lib mutation regressions reject the original steps-only wording and each omitted type. Tim/legal retains final prose review; source checks do not grant legal approval.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Privacy wording is authored legal/product truth. Generating it from native declarations would replace the requested Tim/legal prose review and cannot prevent an incomplete authored disclosure."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required snapshot scanner can fail on undisclosed native HealthKit identifiers and permission-string types without accessing HealthKit, ASC or credentials."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/app-privacy.mjs",
+      "anchor": "LYB-189: require each native HealthKit type in the policy's Health Data bullet."
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",
