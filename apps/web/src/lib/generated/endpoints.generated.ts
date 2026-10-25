@@ -369,6 +369,11 @@ export const endpoints = {
         'LYB-74, the certificate regeneration outage tracked in the regenerate-certificates workflow.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-85',
+      reason:
+        'LYB-85 source evidence for filmstrip appearance within the single owned photo timeline.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-95',
       reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
     },
