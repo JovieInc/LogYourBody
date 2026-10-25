@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "diagnostic-frozen-fixture-follows-reviewed-pin-refresh",
+    "correction": "PR #1532 merge repair: main refreshed the reviewed diagnostic project pin in PR #1531, leaving the offline positive fixture at the prior reviewed manifest and failing its exact-digest regression.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1532",
+    "mechanization": "Refresh the compressed offline fixture only from the immutable main commit that refreshed the trusted pin. Retain the existing digest assertion and real trusted-CLI admission and refusal cases. The focused regression failed after merging main because the old fixture digest differed; the repaired fixture must pass the same unchanged assertions. No workflow pin or production admission rule changes.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "This is an offline test fixture becoming stale after an explicitly reviewed policy update; product runtime code cannot synchronize the reviewed test bytes."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required routing test checks the fixture against the trusted workflow digest and exercises actual CLI acceptance and rejection, preventing a mismatched fixture from passing."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "assert hashlib.sha256(reviewed_project).hexdigest() == dependencies[project_name]"
+    }
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1531: Adding the delegated training view and tests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151037308/job/121042459915",

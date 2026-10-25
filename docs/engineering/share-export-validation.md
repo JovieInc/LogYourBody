@@ -176,3 +176,54 @@ unverified until the harness runs the required checks.
 
 GBrain search, write to `lyb-40-pr1532-aspect-fit`, and readback failed with
 connection refused at `127.0.0.1:7801`. No durable write/readback occurred.
+
+## PR #1532 main conflict repair
+
+Merged `origin/main` at `1572e8e99` first, without rebasing, in `f3f3e41df`.
+Resolved the correction-ledger conflict by retaining every entry from both
+parents and regenerated the repository source map for the combined Xcode target
+membership. The share implementation and native regressions are unchanged.
+The detached harness checkout uses local branch `fix/lyb-40-pr1532-conflicts`;
+the harness retains all push and PR ownership.
+
+GitHub reported no failing checks at `676cfaa67`. Reading the preceding failure
+with `gh run view 40154055343 --repo JovieInc/LogYourBody --log-failed` confirmed
+the already-repaired thumbnail-bound assertions. Merging main exposed a separate
+routing regression: main's reviewed project pin had advanced in PR #1531 while
+this PR's offline fixture still represented the earlier pin. The unchanged
+focused regression failed on that digest mismatch. Refreshed the compressed
+fixture from immutable reviewed commit
+`203aecb854b8e256c7115ab4ae7b77e3f2b8f67e`, whose project SHA-256 matches the
+existing trusted pin `5ecaca52c8447cb1af53c8a662b61e0551c311aa9716d25801e2fd01e2ed306d`.
+The workflow matches main exactly; all admission/refusal assertions remain.
+
+Local checks use Node 22.23.2 and pnpm 10.34.1 through
+`bash scripts/codex-setup.sh --run`. Root `lint` and `typecheck` passed, with
+unaffected tasks reused from Turbo cache. Root `test` passed all eight Turbo
+tasks (four cached), including 156 shared-lib Vitest tests, 122 shared-lib Node
+tests, 1,163 web Jest tests and three web Node tests. Its first sandboxed attempt
+failed on subprocess restrictions; the unrestricted retry passed without
+changing tests or timeouts. Discarded the build's timestamp-only marketing-asset
+side effect. The routing suite reproduced the
+failure before the fixture update and passed all 41 cases afterward:
+
+```sh
+python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q -k focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins
+python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
+python3 scripts/repository_docs.py
+git diff --check
+```
+
+Correction coverage, correction ratchets and source parity passed; the ratchet
+needed subprocess access after sandboxed Git returned EPERM. Strict SwiftLint
+with `--no-cache --config apps/ios/.swiftlint.yml` passed on BodyScoreShareCard,
+BodyScoreShareExport, ExternalServicePorts, ExportDataView and
+BodyScoreShareExportTests with zero violations; five SourceKit-dependent rules
+were unavailable. `xcodebuild -version` returned command not found, so native
+execution and coverage for the merged head remain for required CI. Bashcov is
+not installed on this host; the Python suite ran without shell coverage.
+
+GBrain search, write to `lyb-40-pr1532-main-conflict-repair`, and readback all
+failed with connection refused at `127.0.0.1:7801`; no persistence is claimed.
