@@ -69,6 +69,260 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertNil(object["performance"])
     }
 
+    private func feedbackProposal(
+        _ intent: TrainingWorkoutFeedback.Intent, set: Int = 1, statement: String = "reported observation"
+    ) -> TrainingWorkoutFeedback {
+        TrainingWorkoutFeedback(
+            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: set,
+            intent: intent, originalStatement: statement
+        )
+    }
+
+    func testReadinessVoiceWireContractAndFlattenedCanonicalReceiptDecode() throws {
+        let data = Data("""
+        {"version":1,"kind":"workout_feedback","requiresConfirmation":true,
+         "feedback":{"sessionId":"fixture-session","exerciseId":"fixture_press","setNumber":1,
+                     "intent":"breathing_limited","originalStatement":"still out of breath"}}
+        """.utf8)
+        let voice = try JSONDecoder().decode(VoiceIntentResponse.self, from: data)
+        XCTAssertEqual(voice.feedback?.intent, .breathingLimited)
+        XCTAssertEqual(voice.feedback?.setNumber, 1)
+        var request = TrainingFeedbackRequest(sessionId: "fixture-session", source: "voice")
+        request.breathingReadiness = "limited"
+        request.sourceObservationId = "utterance-1"
+        request.context = TrainingFeedbackContext(exerciseId: exercise.id, setNumber: 1)
+        let encoded = try JSONEncoder().encode(feedbackResponse(request, action: .extendRest))
+        let decoded = try JSONDecoder().decode(TrainingFeedbackResponse.self, from: encoded)
+        XCTAssertTrue(decoded.matches(request))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        let receipt = try XCTUnwrap(object["feedback"] as? [String: Any])
+        XCTAssertEqual(receipt["breathingReadiness"] as? String, "limited")
+        XCTAssertNil(receipt["observation"], "Native storage and the server use the same flat feedback shape")
+    }
+
+    func testRestRequestDoesNotInventAReadinessSignal() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = model(TrainingDraftStore(rootURL: directory))
+        for intent in [TrainingWorkoutFeedback.Intent.moreRest, .unknown] {
+            await draft.recordWorkoutFeedback(feedbackProposal(intent), source: "touch") { request in
+                XCTAssertEqual(request.targetMuscleReadiness, "unknown")
+                XCTAssertNil(request.breathingReadiness)
+                XCTAssertNil(request.supportingReadiness)
+                return self.feedbackResponse(request, action: .clarify)
+            }
+            XCTAssertEqual(draft.nextSetRecommendation?.action, .clarify)
+            XCTAssertEqual(draft.currentPosition?.setNumber, 1)
+        }
+    }
+
+    private func feedbackResponse(
+        _ request: TrainingFeedbackRequest, action: TrainingNextSetRecommendation.Action
+    ) -> TrainingFeedbackResponse {
+        TrainingFeedbackResponse(
+            version: 1, feedback: .init(id: "observation-1", observation: request),
+            nextSetRecommendation: .init(
+                scope: "between_set", action: action, reasons: ["Canonical decision"], uncertainty: "moderate",
+                observationIds: ["observation-1"], weeklyPlanChanged: false, safetyCertified: false
+            )
+        )
+    }
+
+    func testReadinessSurvivesExpiredTimerOfflineRetryAndDoesNotAdvanceTheSet() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        var time = Date()
+        let draft = TrainingSessionDraft(
+            session: session(), ownerId: "owner-A", store: store, isCurrent: { true }, now: { time }
+        )
+        await draft.save(exercise, setNumber: 1) { _ in }
+        let intended = try XCTUnwrap(draft.currentPosition)
+        time = time.addingTimeInterval(120)
+        XCTAssertLessThan(try XCTUnwrap(draft.restUntil), time)
+        XCTAssertNil(draft.nextSetRecommendation, "Timer expiry cannot establish readiness")
+        var attempts: [TrainingFeedbackRequest] = []
+        await draft.recordWorkoutFeedback(feedbackProposal(.breathingLimited, set: 2), source: "voice") { request in
+            attempts.append(request)
+            XCTAssertEqual(try store.loadFeedback(ownerId: "owner-A", sessionId: "fixture-session")?.request, request)
+            throw URLError(.notConnectedToInternet)
+        }
+        XCTAssertEqual(draft.currentPosition, intended)
+        XCTAssertNil(draft.feedback?.response)
+        let restored = TrainingSessionDraft(
+            session: session(saved: Array(draft.loggedSets.values)), ownerId: "owner-A", store: store,
+            isCurrent: { true }, now: { time }
+        )
+        XCTAssertEqual(restored.currentPosition, intended)
+        XCTAssertNotNil(restored.restUntil, "An expired timer stays advisory on relaunch")
+        await restored.retryFeedback { request in
+            attempts.append(request)
+            return self.feedbackResponse(request, action: .extendRest)
+        }
+        XCTAssertEqual(attempts.count, 2)
+        XCTAssertEqual(attempts.first, attempts.last, "Retry retains the observation identity and timestamp")
+        XCTAssertEqual(restored.nextSetRecommendation?.action, .extendRest)
+        XCTAssertEqual(restored.currentPosition, intended)
+        var submissions = 0
+        await restored.save(exercise, setNumber: 2) { _ in submissions += 1 }
+        await restored.save(exercise, setNumber: 2) { _ in submissions += 1 }
+        XCTAssertEqual(submissions, 1, "A limitation never prevents truthful logging of what happened")
+        XCTAssertEqual(restored.completedCount, 2)
+        XCTAssertNil(restored.nextSetRecommendation, "A receipt cannot certify the following set")
+    }
+
+    func testReadinessRejectsWrongSetReceiptStaleControllerAndWrongAccount() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        var sends = 0
+        await draft.recordWorkoutFeedback(feedbackProposal(.ready, set: 2), source: "text") { request in
+            sends += 1
+            return self.feedbackResponse(request, action: .proceed)
+        }
+        XCTAssertEqual(sends, 0)
+        await draft.recordWorkoutFeedback(feedbackProposal(.ready), source: "text") { request in
+            var wrong = request
+            wrong.context = TrainingFeedbackContext(exerciseId: "stale-exercise", setNumber: 1)
+            return self.feedbackResponse(wrong, action: .proceed)
+        }
+        XCTAssertNil(draft.nextSetRecommendation)
+        XCTAssertNotNil(draft.errorMessage)
+        XCTAssertNil(draft.feedback?.response)
+        XCTAssertNil(try store.loadFeedback(ownerId: "owner-B", sessionId: "fixture-session"))
+        let stale = model(store)
+        await draft.retryFeedback { request in self.feedbackResponse(request, action: .proceed) }
+        await stale.retryFeedback { request in self.feedbackResponse(request, action: .extendRest) }
+        XCTAssertNil(stale.feedback?.response, "A stale controller must not replace an acknowledged journal")
+        XCTAssertNotNil(stale.errorMessage)
+        XCTAssertEqual(draft.nextSetRecommendation?.action, .proceed)
+    }
+
+    func testPerformanceOnlyFeedbackRetainsCanonicalLimitationThroughOfflineRelaunch() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        await draft.save(exercise, setNumber: 1) { _ in }
+        await draft.recordWorkoutFeedback(feedbackProposal(.breathingLimited, set: 2), source: "voice") { request in
+            self.feedbackResponse(request, action: .extendRest)
+        }
+        await draft.recordWorkoutFeedback(feedbackProposal(.unusuallyWeak), source: "text") { _ in
+            throw URLError(.notConnectedToInternet)
+        }
+        XCTAssertEqual(draft.nextSetRecommendation?.action, .extendRest)
+        let restored = TrainingSessionDraft(
+            session: session(saved: Array(draft.loggedSets.values)), ownerId: "owner-A", store: store,
+            isCurrent: { true }
+        )
+        XCTAssertEqual(restored.nextSetRecommendation?.action, .extendRest)
+        await restored.retryFeedback { request in
+            TrainingFeedbackResponse(
+                version: 1, feedback: .init(id: "weak-set-observation", observation: request),
+                nextSetRecommendation: self.feedbackResponse(request, action: .extendRest).nextSetRecommendation
+            )
+        }
+        XCTAssertEqual(restored.feedback?.response?.feedback.id, "weak-set-observation")
+        XCTAssertEqual(restored.nextSetRecommendation?.action, .extendRest,
+                       "A performance receipt must retain the readiness evidence named by the canonical decision")
+        XCTAssertEqual(restored.currentPosition?.setNumber, 2)
+    }
+
+    func testPendingLimitationCannotRetainEarlierProceedRecommendation() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = model(TrainingDraftStore(rootURL: directory))
+        await draft.recordWorkoutFeedback(feedbackProposal(.ready), source: "touch") { request in
+            self.feedbackResponse(request, action: .proceed)
+        }
+        XCTAssertEqual(draft.nextSetRecommendation?.action, .proceed)
+        await draft.recordWorkoutFeedback(feedbackProposal(.gripLimited), source: "voice") { _ in
+            throw URLError(.notConnectedToInternet)
+        }
+        XCTAssertNil(draft.nextSetRecommendation, "Pending limitation cannot reuse earlier readiness clearance")
+        XCTAssertNil(draft.feedback?.response)
+        XCTAssertEqual(draft.currentPosition?.setNumber, 1)
+    }
+
+    func testWeakSetFeedbackRetainsActualValuesAndCorrectionLinksWithoutChangingPrescription() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        draft.update(exercise, setNumber: 1) { $0.repsText = "9"; $0.rir = 1 }
+        await draft.save(exercise, setNumber: 1) { _ in }
+        await draft.recordWorkoutFeedback(feedbackProposal(.unusuallyWeak), source: "text") { request in
+            XCTAssertEqual(request.performance, "down")
+            XCTAssertEqual(request.context?.reps, 9)
+            XCTAssertEqual(request.context?.loadKg, 60)
+            XCTAssertEqual(request.context?.rir, 1)
+            XCTAssertNil(request.soreness, "Unreported signals must stay unknown")
+            return self.feedbackResponse(request, action: .clarify)
+        }
+        await draft.recordWorkoutFeedback(feedbackProposal(.gripLimited, set: 2), source: "touch") { request in
+            XCTAssertEqual(request.supportingReadiness?.grip, "limited")
+            XCTAssertNil(request.breathingReadiness)
+            return self.feedbackResponse(request, action: .adjustOrSkip)
+        }
+        await draft.recordWorkoutFeedback(
+            feedbackProposal(.ready, set: 2, statement: "actually I am ready now"), source: "voice"
+        ) { request in
+            XCTAssertEqual(request.correctsObservationId, "observation-1")
+            return self.feedbackResponse(request, action: .proceed)
+        }
+        XCTAssertEqual(draft.session.exercises, session().exercises)
+        XCTAssertEqual(draft.currentPosition?.setNumber, 2)
+    }
+
+    func testReadinessDuplicateReceiptRetainsOriginalAgeAndSymptomsOverrideReady() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = model(TrainingDraftStore(rootURL: directory))
+        await draft.recordWorkoutFeedback(feedbackProposal(.ready), source: "text") { request in
+            var original = request
+            original.sourceObservationId = "original-duplicate"
+            original.observedAt = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3_600))
+            let response = self.feedbackResponse(original, action: .proceed)
+            XCTAssertTrue(response.matches(request), "The server may return the original exact-duplicate receipt")
+            return response
+        }
+        XCTAssertNotNil(draft.feedback?.response)
+        XCTAssertNil(draft.nextSetRecommendation, "An exact replay must not refresh old readiness")
+        await draft.recordWorkoutFeedback(feedbackProposal(.ready), source: "text") { request in
+            self.feedbackResponse(request, action: .symptomSafety)
+        }
+        XCTAssertEqual(draft.nextSetRecommendation?.action, .symptomSafety)
+        await draft.recordWorkoutFeedback(feedbackProposal(.unknown), source: "text") { _ in
+            throw URLError(.notConnectedToInternet)
+        }
+        XCTAssertEqual(draft.nextSetRecommendation?.action, .symptomSafety, "Pending feedback cannot clear symptoms")
+        let restored = model(TrainingDraftStore(rootURL: directory))
+        XCTAssertEqual(restored.nextSetRecommendation?.action, .symptomSafety, "The safety hold must survive relaunch")
+    }
+
+    func testFeedbackDiskFailureAndAccountChangeNeverAcknowledgeReadiness() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let brokenStore = TrainingDraftStore(rootURL: directory) { _, _, _ in throw TrainingDraftError.unavailable }
+        let broken = model(brokenStore)
+        await broken.recordWorkoutFeedback(feedbackProposal(.ready), source: "touch") { _ in
+            XCTFail("Persistence must precede transport")
+            throw TrainingDraftError.unavailable
+        }
+        XCTAssertNil(broken.feedback)
+        var current = true
+        let draft = TrainingSessionDraft(
+            session: session(), ownerId: "owner-A", store: TrainingDraftStore(rootURL: directory), isCurrent: { current }
+        )
+        await draft.recordWorkoutFeedback(feedbackProposal(.ready), source: "voice") { request in
+            current = false
+            return self.feedbackResponse(request, action: .proceed)
+        }
+        XCTAssertNil(draft.feedback?.response)
+        XCTAssertEqual(draft.completedCount, 0)
+    }
+
     func testCompletionMotionBecomesImmediateWhenReduceMotionIsEnabled() {
         XCTAssertTrue(TrainingCompletionMotionPolicy.shouldAnimate(reduceMotion: false))
         XCTAssertFalse(TrainingCompletionMotionPolicy.shouldAnimate(reduceMotion: true))

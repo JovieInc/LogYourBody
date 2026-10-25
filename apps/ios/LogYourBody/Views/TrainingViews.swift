@@ -327,6 +327,7 @@ private enum TrainingVoiceReview {
     case log(VoiceSetProposal)
     case correct(VoiceSetProposal)
     case action(TrainingWorkoutAction)
+    case feedback(TrainingWorkoutFeedback, String)
 }
 
 enum TrainingCompletionMotionPolicy {
@@ -335,11 +336,12 @@ enum TrainingCompletionMotionPolicy {
 
 struct TrainingLiveSessionView: View {
     let voiceEnabled: Bool
+    let readinessEnabled: Bool
     let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
     let onCorrectSet: (TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
     let onWorkoutAction: (TrainingWorkoutActionRequest) async throws -> TrainingSession
     let onVoiceIntent: (TrainingSession, String, VoiceSetContext?, VoiceSetContext?) async throws -> VoiceIntentResponse
-    let onFeedback: (TrainingFeedbackRequest) async throws -> Void
+    let onFeedback: (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
@@ -368,6 +370,7 @@ struct TrainingLiveSessionView: View {
         session: TrainingSession,
         ownerId: String,
         voiceEnabled: Bool,
+        readinessEnabled: Bool = false,
         draftStore: TrainingDraftStore = .shared,
         isCurrent: @escaping () -> Bool,
         onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
@@ -376,9 +379,10 @@ struct TrainingLiveSessionView: View {
         onVoiceIntent: @escaping (
             TrainingSession, String, VoiceSetContext?, VoiceSetContext?
         ) async throws -> VoiceIntentResponse,
-        onFeedback: @escaping (TrainingFeedbackRequest) async throws -> Void
+        onFeedback: @escaping (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
     ) {
         self.voiceEnabled = voiceEnabled
+        self.readinessEnabled = readinessEnabled
         self.onLogSet = onLogSet
         self.onCorrectSet = onCorrectSet
         self.onWorkoutAction = onWorkoutAction
@@ -394,7 +398,7 @@ struct TrainingLiveSessionView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: JovieTokens.screenInset) {
                     sessionHeader
-                    if draft.session.safetyStop {
+                    if hasSafetyStop {
                         safetyCard
                     } else if draft.session.executionPaused == true {
                         pausedCard
@@ -405,7 +409,10 @@ struct TrainingLiveSessionView: View {
                     } else {
                         completeCard
                     }
-                    if draft.session.safetyStop {
+                    if readinessEnabled {
+                        readinessControl
+                    }
+                    if hasSafetyStop {
                         Button("End workout", role: .destructive) { showEndConfirmation = true }
                             .buttonStyle(.bordered)
                     } else if draft.session.executionPaused == true {
@@ -609,12 +616,68 @@ struct TrainingLiveSessionView: View {
         if let restUntil = draft.restUntil {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let remaining = max(0, Int(restUntil.timeIntervalSince(context.date).rounded(.up)))
-                Text(remaining > 0 ? "Rest · \(remaining)s" : "Ready when you are")
+                Text(remaining > 0 ? "Rest · \(remaining)s" : "Timer elapsed · readiness not assessed")
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
                     .foregroundStyle(theme.colors.textSecondary)
                     .accessibilityIdentifier("training_rest_timer")
             }
         }
+    }
+
+    private var hasSafetyStop: Bool {
+        draft.session.safetyStop || (readinessEnabled && draft.nextSetRecommendation?.action == .symptomSafety)
+    }
+
+    private var readinessControl: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            readinessContent
+        }
+    }
+
+    private var readinessContent: some View {
+        VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+            if let recommendation = draft.nextSetRecommendation {
+                Text(recommendation.title)
+                    .font(.subheadline.weight(.medium))
+                    .accessibilityIdentifier("training_next_set_action")
+                ForEach(recommendation.reasons, id: \.self) { reason in
+                    Text(reason).font(.footnote).foregroundStyle(theme.colors.textSecondary)
+                }
+                Text("For today. Changes to future sessions need your review.")
+                    .font(.footnote)
+                    .foregroundStyle(theme.colors.textSecondary)
+            }
+            if draft.feedback?.response == nil, draft.feedback != nil {
+                Text("Feedback pending sync. No updated recommendation yet.")
+                    .font(.footnote)
+                    .accessibilityIdentifier("training_feedback_pending")
+                Button("Retry feedback") { Task { await draft.retryFeedback(send: onFeedback) } }
+                    .accessibilityIdentifier("training_feedback_retry")
+            } else if !hasSafetyStop {
+                Menu("Rest or readiness") {
+                    Button("Still out of breath") { submitReadiness(.breathingLimited, statement: "still out of breath") }
+                    Button("Grip is limiting me") { submitReadiness(.gripLimited, statement: "my grip is limiting me") }
+                    Button("Need more rest") { submitReadiness(.moreRest, statement: "need more rest") }
+                    Button("Ready now") { submitReadiness(.ready, statement: "ready now") }
+                    Button("That set was unusually weak") {
+                        submitReadiness(.unusuallyWeak, statement: "that set was unusually weak")
+                    }
+                }
+                .accessibilityIdentifier("training_readiness_menu")
+            }
+        }
+        .disabled(isSaving || draft.isSaving)
+        .accessibilityIdentifier("training_readiness_control")
+    }
+
+    private func submitReadiness(_ intent: TrainingWorkoutFeedback.Intent, statement: String) {
+        let position = intent == .unusuallyWeak ? draft.lastCompletedPosition : draft.currentPosition
+        guard let position else { return }
+        let proposal = TrainingWorkoutFeedback(
+            sessionId: draft.session.id, exerciseId: position.exercise.id, setNumber: position.setNumber,
+            intent: intent, originalStatement: statement
+        )
+        Task { await draft.recordWorkoutFeedback(proposal, source: "touch", send: onFeedback) }
     }
 
     private var sessionControls: some View {
@@ -699,7 +762,8 @@ struct TrainingLiveSessionView: View {
         VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
             Label("Workout paused", systemImage: "exclamationmark.shield")
                 .font(.system(size: 18, weight: .semibold))
-            Text(draft.session.explanation ?? "Pause and review this pain before continuing.")
+            Text(draft.nextSetRecommendation?.reasons.first ?? draft.session.explanation ??
+                "Pause and review these symptoms before continuing.")
                 .font(.system(size: 14))
                 .foregroundStyle(theme.colors.textSecondary)
             Text("If it persists or worsens, seek qualified care.")
@@ -951,7 +1015,7 @@ struct TrainingLiveSessionView: View {
         Task { @MainActor in
             do {
                 let transcript = try await voiceCapture.finish()
-                await interpretCommand(transcript)
+                await interpretCommand(transcript, source: "voice")
             } catch is CancellationError {
                 return
             } catch let error as LocalizedError {
@@ -966,10 +1030,10 @@ struct TrainingLiveSessionView: View {
         let text = commandText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         commandText = ""
-        Task { await interpretCommand(text) }
+        Task { await interpretCommand(text, source: "text") }
     }
 
-    private func interpretCommand(_ transcript: String) async {
+    private func interpretCommand(_ transcript: String, source: String) async {
         do {
             let response = try await onVoiceIntent(
                 draft.session,
@@ -979,6 +1043,11 @@ struct TrainingLiveSessionView: View {
             )
             pendingTranscript = transcript
             switch response.kind {
+            case "workout_feedback":
+                guard readinessEnabled, let feedback = response.feedback else {
+                    throw TrainingServiceError.invalidResponse
+                }
+                voiceReview = .feedback(feedback, source)
             case "log_set":
                 guard let proposal = response.proposal else { throw TrainingServiceError.invalidResponse }
                 voiceReview = .log(proposal)
@@ -1008,9 +1077,9 @@ struct TrainingLiveSessionView: View {
     private func voiceContext(_ position: TrainingSetPosition?) -> VoiceSetContext? {
         guard let position else { return nil }
         let row = draft.row(for: position.exercise, setNumber: position.setNumber)
-        guard let reps = Int(row.repsText), let load = try? TrainingLoadInputPolicy.loadKg(from: row.loadText) else {
-            return nil
-        }
+        guard let reps = Int(row.repsText) else { return nil }
+        let load: Double?
+        do { load = try TrainingLoadInputPolicy.loadKg(from: row.loadText) } catch { return nil }
         return VoiceSetContext(
             exerciseId: position.exercise.id,
             exerciseName: position.exercise.name,
@@ -1026,6 +1095,7 @@ struct TrainingLiveSessionView: View {
         case .log: "Log set"
         case .correct: "Save correction"
         case .action: "Apply"
+        case .feedback: "Save observation"
         case nil: "Continue"
         }
     }
@@ -1038,6 +1108,8 @@ struct TrainingLiveSessionView: View {
             "\(pendingTranscript)\n\nCorrect \(proposal.exerciseName), set \(proposal.setNumber) to \(proposal.reps) reps?"
         case .action(let action):
             "\(pendingTranscript)\n\nApply \(action.kind.replacingOccurrences(of: "_", with: " ")) for this workout?"
+        case .feedback:
+            "\(pendingTranscript)\n\nSave this observation for the intended set? It does not change your future plan."
         case nil:
             pendingTranscript
         }
@@ -1046,6 +1118,8 @@ struct TrainingLiveSessionView: View {
     private func confirmVoiceReview() {
         defer { voiceReview = nil }
         switch voiceReview {
+        case .feedback(let proposal, let source):
+            Task { await draft.recordWorkoutFeedback(proposal, source: source, send: onFeedback) }
         case .log(let proposal):
             guard let current = draft.currentPosition, current.id == "\(proposal.exerciseId)-\(proposal.setNumber)" else {
                 errorMessage = VoiceSetAdmission.rejectedLogMessage
@@ -1091,15 +1165,20 @@ struct TrainingLiveSessionView: View {
                     performance: performance
                 )
             ]
-            try await onFeedback(TrainingFeedbackRequest(
+            let request = TrainingFeedbackRequest(
                 sessionId: draft.session.id,
                 soreness: feedbackMuscle.isEmpty ? soreness : nil,
                 pump: feedbackMuscle.isEmpty ? pump : nil,
                 performance: feedbackMuscle.isEmpty ? performance : nil,
                 jointPain: jointPain,
                 muscles: muscles
-            ))
-            feedbackSaved = true
+            )
+            if readinessEnabled {
+                feedbackSaved = await draft.recordFeedback(request, send: onFeedback)
+            } else {
+                _ = try await onFeedback(request)
+                feedbackSaved = true
+            }
         } catch let error as LocalizedError {
             errorMessage = error.errorDescription ?? "The check-in could not be saved."
         } catch {
@@ -1246,6 +1325,15 @@ struct TrainingLiveSessionFixtureView: View {
             Self.defaults.removeObject(forKey: "submissionCount")
             try? Self.draftStore.purge(ownerId: "fixture-training-owner")
         }
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingExpiredRest"),
+           Self.defaults.data(forKey: "savedSets") == nil {
+            let seed = TrainingSavedSet(
+                sessionId: "fixture-training-session", exerciseId: "fixture_press", setNumber: 1,
+                reps: 9, loadKg: 60, rir: 1,
+                completedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-120))
+            )
+            Self.defaults.set(try? JSONEncoder().encode([seed]), forKey: "savedSets")
+        }
         let data = Self.defaults.data(forKey: "savedSets") ?? Data("[]".utf8)
         _savedSets = State(initialValue: (try? JSONDecoder().decode([TrainingSavedSet].self, from: data)) ?? [])
         _submissionCount = State(initialValue: Self.defaults.integer(forKey: "submissionCount"))
@@ -1298,6 +1386,7 @@ struct TrainingLiveSessionFixtureView: View {
         .sheet(isPresented: $presented) {
             TrainingLiveSessionView(
                 session: session, ownerId: "fixture-training-owner", voiceEnabled: true,
+                readinessEnabled: true,
                 draftStore: Self.draftStore,
                 isCurrent: { true }, onLogSet: { exercise, number, reps, load, rir in
                     submissionCount += 1
@@ -1341,8 +1430,22 @@ struct TrainingLiveSessionFixtureView: View {
                     return session
                 }, onVoiceIntent: { _, _, _, _ in
                     throw VoiceAPIError.unavailable
-                }, onFeedback: { _ in
+                }, onFeedback: { request in
                     guard !offline else { throw URLError(.notConnectedToInternet) }
+                    // Synthetic server receipt for UI wiring only; the production engine is tested separately.
+                    return TrainingFeedbackResponse(
+                        version: 1,
+                        feedback: .init(id: request.sourceObservationId ?? "fixture-feedback", observation: request),
+                        nextSetRecommendation: .init(
+                            scope: "between_set",
+                            action: request.breathingReadiness == "limited" ? .extendRest :
+                                request.supportingReadiness?.grip == "limited" ? .adjustOrSkip :
+                                request.targetMuscleReadiness == "ready" ? .proceed : .clarify,
+                            reasons: ["Fixture observation; timer expiry is advisory."], uncertainty: "moderate",
+                            observationIds: [request.sourceObservationId ?? "fixture-feedback"],
+                            weeklyPlanChanged: false, safetyCertified: false
+                        )
+                    )
                 }
             )
         }
