@@ -89,6 +89,7 @@ def main():
 
             run(client + ['-f', str(args.canvas_migration or web / 'db/migrations/20261014180000_training_canvas_ledger.sql')])
             run(client + ['-f', str(web / 'db/migrations/20261025030000_adaptive_recovery_trials.sql')])
+            run(client + ['-f', str(web / 'db/migrations/20261025190000_gym_registry.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -250,7 +251,14 @@ def main():
             import re
             adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
             statements=re.findall(r'database`([^`]+)`',adapter)
-            assert len(statements)==5 and all(s.strip().startswith('delete from') for s in statements)
+            assert [' '.join(s.split()) for s in statements] == [
+                'delete from public.chat_usage_limits where user_subject = ${subject}',
+                'delete from public.chat_conversations where user_subject = ${subject}',
+                'delete from public.body_metrics where user_subject = ${subject}',
+                'delete from public.native_records where user_subject = ${subject}',
+                'select public.lyb_delete_my_gyms(${subject})',
+                "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
+            ], 'Expected the complete ordered subject-scoped account cleanup'
             guard_source=(web/'src/lib/neon/native-account-admission.ts').read_text()
             guards=re.findall(r"database.query\('(select public.lyb_native_account_admit\(\$1, \$2::uuid\))'",guard_source)
             assert len(guards)==1, 'Expected the unique actual account guard SQL'
@@ -260,6 +268,30 @@ def main():
                 assert owner_id
                 guard=guards[0].replace('$1',quote(subject)).replace('$2',quote(owner_id))
                 return guard+';'+ ';'.join(s.replace('${subject}',quote(subject)) for s in statements)+';'
+
+            subject,setup,admission,session=fixture()
+            other=owner()
+            sql(f"""insert into gyms(id,user_subject,name,deleted_at) values
+                ('{uuid.uuid4()}',{quote(subject)},'Active gym',null),
+                ('{uuid.uuid4()}',{quote(subject)},'Deleted gym',now()),
+                ('{uuid.uuid4()}',{quote(other)},'Other owner gym',null);""")
+            before=sql(f'select jsonb_agg(to_jsonb(n) order by id) from native_records n where user_subject={quote(subject)};')
+            sql("create function fail_gym_cleanup() returns trigger language plpgsql as $$ begin raise exception 'injected gym cleanup failure'; end; $$; create trigger injected_gym_cleanup before delete on gyms for each row execute function fail_gym_cleanup();")
+            try:
+                sql('begin;'+deletion(subject)+'commit;')
+                raise AssertionError('expected gym cleanup failure')
+            except RuntimeError as error:
+                assert 'injected gym cleanup failure' in str(error)
+            assert sql(f'select jsonb_agg(to_jsonb(n) order by id) from native_records n where user_subject={quote(subject)};')==before
+            assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='1'
+            assert sql(f"select count(*) from gyms where user_subject={quote(subject)};")=='2'
+            sql('drop trigger injected_gym_cleanup on gyms;')
+            sql('begin;'+deletion(subject)+'commit;')
+            assert live_count(subject)==0
+            assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='0'
+            assert sql(f"select count(*) from gyms where user_subject={quote(subject)};")=='0'
+            assert sql(f"select count(*) from gyms where user_subject={quote(other)};")=='1'
+            check('gym cleanup failure rolls back account/training deletion; retry removes active/deleted gyms only for owner')
 
             for boundary in ['revoke','delete']:
                 for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert','set_correct','recovery_trial']:

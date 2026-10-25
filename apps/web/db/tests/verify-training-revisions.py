@@ -64,6 +64,7 @@ def main():
             run(client + ['-f', str(web / 'db/migrations/20261014180000_training_canvas_ledger.sql')])
             run(client + ['-f', str(args.delegated_migration or web / 'db/migrations/20261025010000_delegated_training_revisions.sql')])
             run(client + ['-f', str(args.cycle_migration or web / 'db/migrations/20261025040000_training_cycle_lifecycle.sql')])
+            run(client + ['-f', str(web / 'db/migrations/20261025190000_gym_registry.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -207,7 +208,14 @@ def main():
             adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
             import re
             statements=re.findall(r'database`([^`]+)`',adapter)
-            assert len(statements)==5 and all(s.strip().startswith('delete from') for s in statements)
+            assert [' '.join(s.split()) for s in statements] == [
+                'delete from public.chat_usage_limits where user_subject = ${subject}',
+                'delete from public.chat_conversations where user_subject = ${subject}',
+                'delete from public.body_metrics where user_subject = ${subject}',
+                'delete from public.native_records where user_subject = ${subject}',
+                'select public.lyb_delete_my_gyms(${subject})',
+                "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
+            ], 'Expected the complete ordered subject-scoped account cleanup'
             guard_source=(web/'src/lib/neon/native-account-admission.ts').read_text()
             guards=re.findall(r"database.query\('(select public.lyb_native_account_admit\(\$1, \$2::uuid\))'",guard_source)
             assert len(guards)==1, 'Expected the unique actual account guard SQL'
