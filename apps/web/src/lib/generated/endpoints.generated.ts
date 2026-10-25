@@ -413,6 +413,11 @@ export const endpoints = {
         'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-254',
+      reason:
+        'LYB-254 source evidence for the guard-reference existence check and shrink-only unguarded baseline.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-225',
       reason: 'LYB-225 source evidence for the public waitlist rate-limit correction.',
     },
