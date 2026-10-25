@@ -321,6 +321,10 @@ export const endpoints = {
       reason: 'Ruby dependency host referenced by iOS tooling docs.',
     },
     {
+      value: 'https://api.vercel.com',
+      reason: 'CI-only Vercel env-type guard and public-env sync; not a runtime endpoint.',
+    },
+    {
       value: 'https://openapi.vercel.sh',
       reason: 'Vercel OpenAPI schema referenced by tooling.',
     },
@@ -403,6 +407,11 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',
       reason:
         'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-254',
+      reason:
+        'LYB-254 source evidence for the guard-reference existence check and shrink-only unguarded baseline.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-225',

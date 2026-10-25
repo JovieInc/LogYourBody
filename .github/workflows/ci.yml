@@ -151,10 +151,12 @@ jobs:
           set -euo pipefail
           node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs
           node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
+          node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
           [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           node packages/shared-lib/scripts/correction-coverage.mjs --base-ref "$BASE_SHA"
           node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref "$BASE_SHA"
+          node packages/shared-lib/scripts/guard-reference.mjs --base-ref "$BASE_SHA"
 
       - name: Verify LYB and Jovie product separation
         run: |
