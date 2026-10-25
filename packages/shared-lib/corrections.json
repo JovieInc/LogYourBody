@@ -1,5 +1,61 @@
 [
   {
+    "fingerprint": "web-sentry-runtime-env-declarations",
+    "correction": "PR #1542: Declare every consumed public Sentry runtime variable in apps/web/.env.example. Missing DSN, environment and release declarations fail the required environment surface guard.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169587476/job/121097641374",
+    "mechanization": "Declare the three optional variables with blank defaults and retain the existing required product-registry environment surface guard. The guard fails on all three undeclared variables before the change and passes afterward.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot ensure that a separately maintained environment example declares every consumed variable."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing product-registry test scans production web source and rejects consumed variables absent from apps/web/.env.example in the required JavaScript/TypeScript check."
+      }
+    },
+    "guard": {
+      "path": "packages/product-registry/scripts/env-surface.test.mjs",
+      "anchor": "Web: process.env keys read in apps/web/src"
+    }
+  },
+  {
+    "fingerprint": "sentry-web-sdk-runtime-and-release-compatibility",
+    "correction": "PR #1542: Vercel rejected sendDefaultPii on Sentry 11 and warned that the server adapter imported the browser-only router hook. Preserve private error capture and a matching sourcemap release with the installed SDK.",
+    "source": "https://vercel.com/jovie/log-your-body/AKbAVaEindibaLTJKLsnhetLUMqg",
+    "mechanization": "Use the installed SDK dataCollection controls, isolate the router hook in the client adapter, inline public runtime configuration and share the resolved build release. Required web typecheck and production build reject SDK incompatibilities; the real-SDK synthetic transport verifies capture and redaction, and build configuration regressions verify matching releases and credential-gated upload.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Typed SDK options, a separate client entry point and one resolved release remove the incompatible API and mismatched release paths from runtime and build configuration."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/adapters/__tests__/sentry.node.test.ts",
+      "anchor": "disables automatic sensitive data collection with the installed SDK"
+    }
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1542: Adding the Sentry dependency left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity. Regenerate the existing projection.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40161338404/job/121073360393",
+    "mechanization": "The existing required projection checker failed before regeneration and passes afterward. Retain the required Detect Changes and CI Summary gates and their regression rejecting a missing or skippable parity step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    }
+  },
+  {
     "fingerprint": "share-preview-chrome-preserves-card-accessibility",
     "correction": "LYB-39 / PR #1533: The preview chrome replaced body_score_share_card with its own unused accessibility identifier, so the required launch-quality timeline UI test could not discover the card inside the share overlay.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40157965320/job/121063372261",
@@ -73,6 +129,22 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
+    }
+  },
+  {
+    "fingerprint": "adaptive-recovery-proposals-are-bounded-and-reviewed",
+    "correction": "LYB-112: Recovery learning must change reviewed future prescriptions, preserve trial and correction history, and never escalate from missing feedback or invent numerical caps. Existing specialization approval does not approve an exact dose or automatic weekly increases.",
+    "source": "https://linear.app/jovie/issue/LYB-112",
+    "mechanization": "The canonical training service consumes only applied current-block recovery trials. The recovery policy exposes missing escalation bounds without enabling increases. The existing web test suite covers pure evaluation, apply/reject/revert/replay and context corrections. The required disposable PostgreSQL training verifier executes trial source CAS, immutable history, single-active-trial and consent/deletion races.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Typed deterministic proposals, immutable baseline snapshots and an atomic source-and-revision check prevent silent or stale plan changes through the existing training record port. Missing numerical escalation policy is represented explicitly rather than supplied by conversation."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/recovery.test.ts",
+      "anchor": "applies a persisted proposal to the next prescription, survives session replay, and restores future work on revert"
     }
   },
   {
