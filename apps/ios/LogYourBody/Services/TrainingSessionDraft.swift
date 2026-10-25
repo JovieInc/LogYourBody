@@ -23,17 +23,23 @@ final class TrainingSessionDraft: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastSaveReceipt: TrainingSetSaveReceipt?
     @Published private(set) var restUntil: Date?
+    @Published private(set) var feedback: TrainingFeedbackDraft?
 
     private let ownerId: String
     private let store: TrainingDraftStore
     private let isCurrent: () -> Bool
+    private let now: () -> Date
     private var persistedRows: [String: TrainingSetDraft] = [:]
 
-    init(session: TrainingSession, ownerId: String, store: TrainingDraftStore, isCurrent: @escaping () -> Bool) {
+    init(
+        session: TrainingSession, ownerId: String, store: TrainingDraftStore,
+        isCurrent: @escaping () -> Bool, now: @escaping () -> Date = Date.init
+    ) {
         self.session = session
         self.ownerId = ownerId
         self.store = store
         self.isCurrent = isCurrent
+        self.now = now
         guard isCurrent() else { return }
         // A failed journal read or cleanup must never hide authoritative acknowledgements.
         for saved in session.loggedSets ?? [] where validSavedSet(saved) {
@@ -44,6 +50,7 @@ final class TrainingSessionDraft: ObservableObject {
                 validRow(row)
             }
             persistedRows = rows
+            feedback = try store.loadFeedback(ownerId: ownerId, sessionId: session.id)
         } catch {
             errorMessage = TrainingDraftError.unavailable.localizedDescription
         }
@@ -128,14 +135,14 @@ final class TrainingSessionDraft: ObservableObject {
             loggedSets[row.key] = TrainingSavedSet(
                 sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
                 reps: request.reps, loadKg: request.loadKg, rir: request.rir,
-                completedAt: ISO8601DateFormatter().string(from: Date()), revision: 0, corrections: []
+                completedAt: ISO8601DateFormatter().string(from: now()), revision: 0, corrections: []
             )
             lastSaveReceipt = TrainingSetSaveReceipt(
                 id: "\(row.key)-\(row.revision.uuidString)",
                 position: TrainingSetPosition(exercise: exercise, setNumber: setNumber),
                 corrected: false
             )
-            restUntil = Date().addingTimeInterval(90)
+            restUntil = now().addingTimeInterval(90)
         } catch let error as LocalizedError {
             if isCurrent() { errorMessage = error.errorDescription ?? "The set could not be saved." }
         } catch {
@@ -169,6 +176,114 @@ final class TrainingSessionDraft: ObservableObject {
 
     var completedCount: Int { loggedSets.count }
     var totalCount: Int { allPositions.count }
+
+    /// A timer never clears a reported limitation. A proceed receipt applies only to its intended set.
+    var nextSetRecommendation: TrainingNextSetRecommendation? {
+        guard let response = feedback?.recommendationReceipt else { return nil }
+        if response.nextSetRecommendation.action == .symptomSafety { return response.nextSetRecommendation }
+        guard let context = response.feedback.observation.context,
+              currentPosition?.id == "\(context.exerciseId)-\(context.setNumber)",
+              response.nextSetRecommendation.observationIds.contains(response.feedback.id),
+              let time = response.feedback.observation.observedAt.flatMap(observationDate),
+              (0...1_800).contains(now().timeIntervalSince(time))
+        else { return nil }
+        return response.nextSetRecommendation
+    }
+
+    func recordWorkoutFeedback(
+        _ proposal: TrainingWorkoutFeedback,
+        source: String,
+        send: (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
+    ) async {
+        let position = proposal.intent == .unusuallyWeak ? lastCompletedPosition : currentPosition
+        guard proposal.sessionId == session.id, let position,
+              position.id == "\(proposal.exerciseId)-\(proposal.setNumber)"
+        else {
+            errorMessage = TrainingDraftError.changed.localizedDescription
+            return
+        }
+        var request = TrainingFeedbackRequest(
+            sessionId: session.id,
+            performance: proposal.intent == .unusuallyWeak ? "down" : nil,
+            source: source
+        )
+        request.context = TrainingFeedbackContext(exerciseId: position.exercise.id, setNumber: position.setNumber)
+        request.targetMuscle = position.exercise.primaryMuscle
+        request.originalStatement = proposal.originalStatement
+        switch proposal.intent {
+        case .breathingLimited: request.breathingReadiness = "limited"
+        case .gripLimited: request.supportingReadiness = TrainingSupportingReadiness(grip: "limited")
+        case .ready: request.targetMuscleReadiness = "ready"
+        case .moreRest, .unknown: request.targetMuscleReadiness = "unknown"
+        case .unusuallyWeak:
+            if let saved = loggedSets[position.id] {
+                request.context?.reps = saved.reps
+                request.context?.loadKg = saved.loadKg
+                request.context?.rir = saved.rir
+            }
+        }
+        if proposal.originalStatement.lowercased().hasPrefix("actually"),
+           feedback?.request.context == request.context {
+            request.correctsObservationId = feedback?.response?.feedback.id
+        }
+        await recordFeedback(request, send: send)
+    }
+
+    @discardableResult
+    func recordFeedback(
+        _ input: TrainingFeedbackRequest,
+        send: (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
+    ) async -> Bool {
+        guard isCurrent(), !isSaving, input.sessionId == session.id else { return false }
+        guard feedback == nil || feedback?.response != nil else {
+            errorMessage = "Feedback is pending sync. Retry it before adding another observation."
+            return false
+        }
+        var request = input
+        request.sourceObservationId = UUID().uuidString
+        request.observedAt = ISO8601DateFormatter().string(from: now())
+        let previous = feedback?.recommendationReceipt
+        let pending = TrainingFeedbackDraft(
+            request: request,
+            readinessHold: previous?.nextSetRecommendation.action == .proceed ? nil : previous
+        )
+        do {
+            guard try store.replaceFeedback(
+                pending, expecting: feedback, ownerId: ownerId, sessionId: session.id
+            ) else { throw TrainingDraftError.changed }
+            feedback = pending
+        } catch {
+            errorMessage = TrainingDraftError.unavailable.localizedDescription
+            return false
+        }
+        return await retryFeedback(send: send)
+    }
+
+    @discardableResult
+    func retryFeedback(send: (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse) async -> Bool {
+        guard isCurrent(), !isSaving, let pending = feedback, pending.response == nil else { return false }
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            let response = try await send(pending.request)
+            guard isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            guard response.matches(pending.request) else { throw TrainingServiceError.invalidResponse }
+            let saved = TrainingFeedbackDraft(
+                request: pending.request, response: response, readinessHold: pending.readinessHold
+            )
+            guard try store.replaceFeedback(
+                saved, expecting: pending, ownerId: ownerId, sessionId: session.id
+            ) else { throw TrainingDraftError.changed }
+            feedback = saved
+            return true
+        } catch let error as LocalizedError {
+            if isCurrent() { errorMessage = error.errorDescription }
+        } catch {
+            if isCurrent() { errorMessage = "The check-in could not be saved. Retry when connected." }
+        }
+        return false
+    }
 
     func replaceSession(_ updated: TrainingSession) {
         guard updated.id == session.id, isCurrent() else { return }
@@ -390,14 +505,18 @@ final class TrainingSessionDraft: ObservableObject {
     }
 
     private func restoreRestTimer() {
-        let formatter = ISO8601DateFormatter()
-        let fractionalFormatter = ISO8601DateFormatter()
-        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let latest = loggedSets.values.compactMap { saved in
-            saved.completedAt.flatMap { formatter.date(from: $0) ?? fractionalFormatter.date(from: $0) }
+            saved.completedAt.flatMap(observationDate)
         }.max()
         guard let latest else { return }
         let restored = latest.addingTimeInterval(90)
-        restUntil = restored > Date() ? restored : nil
+        restUntil = restored
+    }
+
+    private func observationDate(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        if let date = formatter.date(from: value) { return date }
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value)
     }
 }
