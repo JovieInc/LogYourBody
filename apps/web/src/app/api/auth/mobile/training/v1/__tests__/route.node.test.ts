@@ -58,6 +58,87 @@ const eligibleSetup = {
 };
 
 describe('authenticated training API', () => {
+  it('protects progress reads with authentication, rollout and rate limits before reading records', async () => {
+    for (const [options, token, status] of [
+      [{}, undefined, 401],
+      [{ enabled: false }, 'token-a', 404],
+      [{ rateLimited: true }, 'token-a', 429],
+    ] as const) {
+      const { handlers, records } = makeHarness(options);
+      const pull = jest.spyOn(records, 'pull');
+      const response = await handlers.progress(request('GET', 'progress', token));
+      expect(response.status).toBe(status);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      if (status === 429) expect(response.headers.get('retry-after')).toBe('30');
+      expect(pull).not.toHaveBeenCalled();
+    }
+  });
+
+  it('reads the shared subject-scoped history without starting sessions or writing records', async () => {
+    const { handlers, records } = makeHarness();
+    await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const set = {
+      sessionId: session.id,
+      exerciseId: session.exercises[0].id,
+      setNumber: 1,
+      reps: 10,
+      loadKg: 15,
+      rir: 3,
+    };
+    await handlers.logSet(request('POST', 'log-set', 'token-a', set));
+    const correction = {
+      ...set,
+      reps: 8,
+      loadKg: 12,
+      expectedRevision: 0,
+      correctionId: '22222222-2222-4222-8222-000000000001',
+    };
+    const corrected = await (
+      await handlers.correctSet(request('POST', 'correct-set', 'token-a', correction))
+    ).json();
+    const push = jest.spyOn(records, 'push');
+    const commit = jest.spyOn(records.trainingMutations, 'commit');
+    const response = await handlers.progress(request('GET', 'progress', 'token-a'));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const body = await response.json();
+    expect(body).toMatchObject({
+      version: 1,
+      progress: {
+        enrolled: true,
+        completedSessions: 0,
+        setsLast7Days: 1,
+        exercises: [
+          { exerciseId: set.exerciseId, lastSession: [corrected.log], heaviestSet: corrected.log },
+        ],
+        sessions: [{ sessionId: session.id, status: 'in_progress', sets: [corrected.log] }],
+      },
+    });
+    expect(push).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
+    const other = await handlers.progress(request('GET', 'progress', 'token-b'));
+    await expect(other.json()).resolves.toEqual({
+      version: 1,
+      progress: {
+        enrolled: false,
+        completedSessions: 0,
+        setsLast7Days: 0,
+        exercises: [],
+        sessions: [],
+        latestCheckIn: null,
+      },
+    });
+  });
+
+  it('fails closed on a progress store outage and returns no partial history', async () => {
+    const { handlers, records } = makeHarness();
+    jest.spyOn(records, 'pull').mockRejectedValue(new Error('private database details'));
+    const response = await handlers.progress(request('GET', 'progress', 'token-a'));
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ version: 1, error: 'training_unavailable' });
+  });
+
   it('rejects unauthenticated access, disabled rollout, and rate-limited requests', async () => {
     const unauthorized = makeHarness();
     expect((await unauthorized.handlers.next(request('GET', 'next'))).status).toBe(401);
