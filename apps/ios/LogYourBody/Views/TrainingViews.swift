@@ -18,8 +18,21 @@ enum TrainingPresentation: Identifiable {
 
 struct TrainingCoachCard: View {
     let session: TrainingSession
+    let progress: TrainingProgressResponse?
     let onStart: () -> Void
     let onStop: () -> Void
+
+    init(
+        session: TrainingSession,
+        progress: TrainingProgressResponse? = nil,
+        onStart: @escaping () -> Void,
+        onStop: @escaping () -> Void
+    ) {
+        self.session = session
+        self.progress = progress
+        self.onStart = onStart
+        self.onStop = onStop
+    }
 
     @Environment(\.theme) private var theme
     @State private var isStopConfirmationPresented = false
@@ -65,6 +78,15 @@ struct TrainingCoachCard: View {
                 Text("\(session.exercises.count) movements · engine-guided sets and reps")
                     .font(.system(size: 14))
                     .foregroundStyle(theme.colors.textSecondary)
+                ForEach(session.exercises) { exercise in
+                    TrainingExerciseHistoryCard(
+                        name: exercise.name,
+                        history: TrainingProgressCopy.historyLine(
+                            for: progress?.exercises.first { $0.exerciseId == exercise.id }
+                        ),
+                        identifier: "training_exercise_history_\(exercise.id)"
+                    )
+                }
                 Button(action: onStart) {
                     HStack {
                         Text("Start session")
@@ -80,6 +102,8 @@ struct TrainingCoachCard: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("training_start_session")
             }
+
+            ProgressReviewCard(progress: progress)
 
             Button("Stop coaching and delete training data", role: .destructive) {
                 isStopConfirmationPresented = true
@@ -148,6 +172,63 @@ struct TrainingSetupCard: View {
         .padding(JovieTokens.compactInset)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius, style: .continuous))
+    }
+}
+
+struct TrainingExerciseHistoryCard: View {
+    let name: String
+    let history: String?
+    let identifier: String
+
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(name)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(theme.colors.text)
+            if let history {
+                Text(history)
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier(identifier)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.colors.background.opacity(0.45), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+struct ProgressReviewCard: View {
+    let progress: TrainingProgressResponse?
+
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let lines = TrainingProgressCopy.reviewLines(in: progress)
+        if lines.isEmpty {
+            EmptyView()
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("PROGRESS")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .tracking(0.7)
+                    .foregroundStyle(theme.colors.textSecondary)
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.system(size: 13))
+                        .foregroundStyle(theme.colors.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.colors.background.opacity(0.45), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("training_progress_review")
+        }
     }
 }
 
@@ -333,6 +414,7 @@ enum TrainingCompletionMotionPolicy {
 
 struct TrainingLiveSessionView: View {
     let voiceEnabled: Bool
+    let progress: TrainingProgressResponse?
     let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
     let onCorrectSet: (TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
     let onWorkoutAction: (TrainingWorkoutActionRequest) async throws -> TrainingSession
@@ -366,6 +448,7 @@ struct TrainingLiveSessionView: View {
         session: TrainingSession,
         ownerId: String,
         voiceEnabled: Bool,
+        progress: TrainingProgressResponse? = nil,
         draftStore: TrainingDraftStore = .shared,
         isCurrent: @escaping () -> Bool,
         onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
@@ -377,6 +460,7 @@ struct TrainingLiveSessionView: View {
         onFeedback: @escaping (TrainingFeedbackRequest) async throws -> Void
     ) {
         self.voiceEnabled = voiceEnabled
+        self.progress = progress
         self.onLogSet = onLogSet
         self.onCorrectSet = onCorrectSet
         self.onWorkoutAction = onWorkoutAction
@@ -507,6 +591,15 @@ struct TrainingLiveSessionView: View {
                     Text("Set \(position.setNumber) of \(exercise.sets) · \(exercise.repRange.min)–\(exercise.repRange.max) reps · \(exercise.targetRir) RIR")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(theme.colors.textSecondary)
+                    if let history = TrainingProgressCopy.historyLine(
+                        for: progress?.exercises.first { $0.exerciseId == exercise.id }
+                    ) {
+                        Text(history)
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("training_exercise_history_\(exercise.id)")
+                    }
                 }
                 Spacer(minLength: 8)
                 if completionReceipt?.corrected == false {

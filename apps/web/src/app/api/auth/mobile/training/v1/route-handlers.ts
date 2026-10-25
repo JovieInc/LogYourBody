@@ -17,8 +17,11 @@ import {
   recordTrainingFeedback,
   swapExercise,
 } from '@/lib/training/commands';
+import type { ControllerReceipt } from '@/lib/training/controller';
+import { assembleTrainingProgressRead } from '@/lib/training/progress';
 import {
   getOrCreateNextWorkout,
+  loadTrainingRecords,
   pullAllTrainingRecords,
   storeProgramSetup,
 } from '@/lib/training/service';
@@ -239,6 +242,42 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
   }
 
   return {
+    async progress(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      try {
+        const now = dependencies.now();
+        const snapshot = await loadTrainingRecords(dependencies.records, identity.sub);
+        let decision: ControllerReceipt | null = null;
+        if (snapshot.setup) {
+          try {
+            const next = await getOrCreateNextWorkout({
+              records: dependencies.records,
+              subject: identity.sub,
+              now,
+              persist: false,
+            });
+            if (next.kind !== 'not_enrolled') decision = next.decision;
+          } catch {
+            decision = null;
+          }
+        }
+        return json(
+          withVersion(
+            assembleTrainingProgressRead(snapshot, now, decision) as unknown as Record<
+              string,
+              unknown
+            >,
+          ),
+        );
+      } catch {
+        return apiError('training_unavailable', 503);
+      }
+    },
+
     async next(request: NextRequest) {
       const identity = await authorized(request);
       if (!identity) return apiError('unauthorized', 401);

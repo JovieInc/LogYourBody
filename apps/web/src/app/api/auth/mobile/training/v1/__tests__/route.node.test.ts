@@ -1159,4 +1159,241 @@ describe('authenticated training API', () => {
     expect(sessions.find((row) => row.id === session.id)?.status).toBe('completed');
     expect(sessions.filter((row) => row.status === 'in_progress')).toHaveLength(1);
   });
+
+  it('reads per-exercise history without prescribing or inferring hypertrophy', async () => {
+    const { handlers, records, setNow } = makeHarness();
+    expect((await handlers.progress(request('GET', 'progress'))).status).toBe(401);
+    const disabled = makeHarness({ enabled: false });
+    expect((await disabled.handlers.progress(request('GET', 'progress', 'token-a'))).status).toBe(
+      404,
+    );
+    const limited = makeHarness({ rateLimited: true });
+    const throttled = await limited.handlers.progress(request('GET', 'progress', 'token-a'));
+    expect(throttled.status).toBe(429);
+
+    const enrolled = await handlers.enroll(request('POST', 'enroll', 'token-a', eligibleSetup));
+    const setupId = (await enrolled.json()).program.id;
+    const { session } = await (await handlers.next(request('GET', 'next', 'token-a'))).json();
+    const skippedExercise = session.exercises[0];
+    const skip = await handlers.action(
+      request('POST', 'action', 'token-a', {
+        sessionId: session.id,
+        eventId: '55555555-5555-4555-8555-000000000001',
+        expectedRevision: 0,
+        action: { kind: 'skip', exerciseId: skippedExercise.id },
+      }),
+    );
+    expect(skip.status).toBe(200);
+    const skippedBody = await skip.json();
+    const exercise = skippedBody.session.exercises[0];
+    const logged = await handlers.logSet(
+      request('POST', 'log-set', 'token-a', {
+        sessionId: session.id,
+        exerciseId: exercise.id,
+        setNumber: 1,
+        reps: 10,
+        loadKg: 15,
+        rir: 3,
+      }),
+    );
+    expect(logged.status).toBe(201);
+    const log = (await logged.json()).log;
+    const corrected = await handlers.correctSet(
+      request('POST', 'correct-set', 'token-a', {
+        sessionId: session.id,
+        exerciseId: exercise.id,
+        setNumber: 1,
+        reps: 8,
+        loadKg: 12.5,
+        rir: 2,
+        correctionId: '55555555-5555-4555-8555-000000000002',
+        expectedRevision: 0,
+      }),
+    );
+    expect(corrected.status).toBe(200);
+    setNow('2026-01-10T12:05:00.000Z');
+    expect(
+      (
+        await handlers.feedback(
+          request('POST', 'feedback', 'token-a', {
+            sessionId: session.id,
+            trunkFatigue: 8,
+            source: 'touch',
+            sourceObservationId: 'obs-back-1',
+          }),
+        )
+      ).status,
+    ).toBe(201);
+    setNow('2026-01-10T12:06:00.000Z');
+    expect(
+      (
+        await handlers.feedback(
+          request('POST', 'feedback', 'token-a', {
+            sessionId: session.id,
+            pump: 9,
+            trunkFatigue: 3,
+            source: 'voice',
+            sourceObservationId: 'obs-pump-1',
+            originalStatement: 'The pump was huge and my back fatigue is lower, so I grew.',
+          }),
+        )
+      ).status,
+    ).toBe(201);
+
+    const setup = (await records.pull('subject-a', 'training_feedback')).records.find(
+      (row) => row.record_type === 'program_setup',
+    );
+    await records.push('subject-a', 'training_feedback', [
+      {
+        ...setup,
+        temporaryPriorities: [
+          { id: 'prio-upper', detail: 'upper chest', expiresAt: '2026-01-20T00:00:00.000Z' },
+          {
+            id: 'prio-kept',
+            detail: 'arms',
+            expiresAt: '2026-01-20T00:00:00.000Z',
+            renewed: true,
+          },
+        ],
+      },
+    ]);
+    const historySessionId = '22222222-2222-4222-8222-000000000001';
+    await records.push('subject-a', 'training_sessions', [
+      {
+        id: historySessionId,
+        record_type: 'workout_session',
+        programSetupId: setupId,
+        blockId: 'block-1',
+        status: 'completed',
+        prescription: {
+          id: historySessionId,
+          exercises: [{ id: 'chest_supported_dumbbell_row', name: 'Chest-supported dumbbell row' }],
+        },
+        initialPrescription: {
+          id: historySessionId,
+          exercises: [{ id: 'one_arm_dumbbell_row', name: 'One-arm dumbbell row' }],
+        },
+      },
+      {
+        id: '22222222-2222-4222-8222-000000000002',
+        record_type: 'exercise_swap',
+        programSetupId: setupId,
+        blockId: 'block-1',
+        sessionId: historySessionId,
+        fromExerciseId: 'one_arm_dumbbell_row',
+        toVariantId: 'chest_supported_dumbbell_row',
+      },
+      {
+        id: '22222222-2222-4222-8222-000000000004',
+        record_type: 'exercise_swap',
+        programSetupId: setupId,
+        blockId: 'block-1',
+        sessionId: historySessionId,
+        fromExerciseId: 'dumbbell_lateral_raise',
+        toVariantId: 'dumbbell_curl',
+      },
+    ]);
+    await records.push('subject-a', 'logged_sets', [
+      {
+        id: '22222222-2222-4222-8222-000000000003',
+        record_type: 'set_log',
+        sessionId: historySessionId,
+        exerciseId: 'chest_supported_dumbbell_row',
+        setNumber: 1,
+        reps: 8,
+        loadKg: 22,
+        rir: 2,
+        completedAt: '2026-01-09T12:00:00.000Z',
+      },
+    ]);
+
+    setNow('2026-02-08T12:00:00.000Z');
+    const push = jest.spyOn(records, 'push');
+    const update = jest.spyOn(records, 'updateTrainingSession');
+    const insert = jest.spyOn(records, 'insertTrainingSet');
+    const response = await handlers.progress(request('GET', 'progress', 'token-a'));
+    expect(response.status).toBe(200);
+    expect(push).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
+    const body = await response.json();
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toMatch(/hypertrophy|targetReps|targetLoadKg|"progression"/i);
+    expect(body.enrolled).toBe(true);
+    expect(body.exercises).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          exerciseId: exercise.id,
+          lastSession: [expect.objectContaining({ reps: 8, loadKg: 12.5, rir: 2 })],
+        }),
+        expect.objectContaining({
+          exerciseId: 'chest_supported_dumbbell_row',
+          heaviestSet: expect.objectContaining({ loadKg: 22, reps: 8 }),
+        }),
+      ]),
+    );
+    const reviewed = body.review.sessions.find(
+      (row: { sessionId: string }) => row.sessionId === session.id,
+    );
+    expect(reviewed).toMatchObject({
+      prescriptionId: session.id,
+      originalExerciseIds: expect.arrayContaining([skippedExercise.id, exercise.id]),
+    });
+    expect(reviewed.exercises).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          exerciseId: skippedExercise.id,
+          originalExerciseId: skippedExercise.id,
+          status: 'skipped',
+          skipEventId: '55555555-5555-4555-8555-000000000001',
+        }),
+        expect.objectContaining({
+          exerciseId: exercise.id,
+          variantId: exercise.id,
+          status: 'completed',
+          sets: [
+            expect.objectContaining({
+              id: log.id,
+              status: 'completed',
+              reps: 8,
+              loadKg: 12.5,
+              corrections: [
+                expect.objectContaining({
+                  id: '55555555-5555-4555-8555-000000000002',
+                  previous: expect.objectContaining({ reps: 10, loadKg: 15, rir: 3 }),
+                }),
+              ],
+            }),
+          ],
+        }),
+      ]),
+    );
+    expect(body.review.feedback).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'voice',
+          sourceObservationId: 'obs-pump-1',
+          pump: 9,
+          trunkFatigue: 3,
+        }),
+      ]),
+    );
+    expect(
+      body.review.connections.map((item: { statement: string }) => item.statement).join(' '),
+    ).toMatch(/Corrected performance: 8 reps at 12.5 kg/);
+    expect(body.review.decision.explanation).toBeNull();
+    expect(body.review.repeatBlock.reusableVariants).toEqual([
+      expect.objectContaining({
+        fromExerciseId: 'one_arm_dumbbell_row',
+        variantId: 'chest_supported_dumbbell_row',
+        sessionId: historySessionId,
+        blockId: 'block-1',
+      }),
+    ]);
+    expect(body.review.repeatBlock.expiredPriorities).toEqual([
+      { id: 'prio-upper', detail: 'upper chest' },
+    ]);
+    const other = await handlers.progress(request('GET', 'progress', 'token-b'));
+    await expect(other.json()).resolves.toMatchObject({ enrolled: false, exercises: [] });
+  });
 });

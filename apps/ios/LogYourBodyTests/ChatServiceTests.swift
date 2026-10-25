@@ -1215,6 +1215,81 @@ final class ChatServiceTests: XCTestCase {
         )
     }
 
+    func testTrainingProgressReadsHistoryAndRefusesPumpGrowthClaims() async throws {
+        ChatURLProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/progress")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access-token")
+            let body = """
+            {
+              "version": 1,
+              "enrolled": true,
+              "completedSessions": 2,
+              "setsLast7Days": 4,
+              "exercises": [{
+                "exerciseId": "goblet_squat",
+                "name": "Goblet squat",
+                "lastPerformedAt": "2026-02-01T12:00:00.000Z",
+                "lastSession": [{"setNumber": 1, "reps": 10, "loadKg": 15, "rir": 3}],
+                "heaviestSet": {
+                  "setNumber": 1, "reps": 8, "loadKg": 22.5, "rir": 2,
+                  "completedAt": "2026-01-11T12:00:00.000Z"
+                },
+                "totalSets": 4
+              }],
+              "latestCheckIn": {"pump": 9, "createdAt": "2026-02-01T12:00:00.000Z"},
+              "review": {
+                "sessions": [],
+                "feedback": [],
+                "connections": [{
+                  "observationId": "set-1",
+                  "signal": "result",
+                  "statement": "Corrected performance: 8 reps at 12.5 kg, 2 reps in reserve."
+                }],
+                "decision": {
+                  "kind": "hold",
+                  "changed": false,
+                  "explanation": "A bigger pump means hypertrophy is up.",
+                  "nextAction": "You're on track. Nothing needs changing today.",
+                  "before": "2 sessions/week",
+                  "after": "Plan unchanged.",
+                  "evidenceIds": ["k:81c218db"]
+                },
+                "repeatBlock": {
+                  "reusableVariants": [{
+                    "fromExerciseId": "one_arm_dumbbell_row",
+                    "variantId": "chest_supported_dumbbell_row",
+                    "name": "Chest-supported dumbbell row",
+                    "sessionId": "session-1",
+                    "blockId": "block-1"
+                  }],
+                  "expiredPriorities": [{"id": "prio-upper", "detail": "upper chest"}]
+                }
+              }
+            }
+            """
+            return (200, ["Content-Type": "application/json"], Data(body.utf8))
+        }
+
+        let service = URLSessionTrainingService(urlSession: makeSession(), baseURL: URL(string: ProductRegistry.Hosts.api)!)
+        let progress = try await service.loadProgress(accessToken: "access-token")
+        XCTAssertEqual(
+            TrainingProgressCopy.historyLine(for: progress.exercises.first),
+            "Last time 10 × 15 kg · Heaviest 22.5 kg for 8"
+        )
+        let lines = TrainingProgressCopy.reviewLines(in: progress)
+        XCTAssertFalse(lines.contains { $0.lowercased().contains("hypertrophy") })
+        XCTAssertTrue(lines.contains("Corrected performance: 8 reps at 12.5 kg, 2 reps in reserve."))
+        XCTAssertTrue(lines.contains("Chest-supported dumbbell row can be used again."))
+        XCTAssertTrue(lines.contains("Temporary priority ended: upper chest."))
+        XCTAssertNil(
+            TrainingProgressCopy.visibleStatement(
+                "Lower back fatigue shows the muscle grew.",
+                pumpOnlyOrLowerBackFatigue: true
+            )
+        )
+    }
+
     private func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ChatURLProtocol.self]

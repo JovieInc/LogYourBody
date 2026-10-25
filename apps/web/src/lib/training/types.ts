@@ -170,6 +170,14 @@ export type NextSetRecommendation = {
   safetyCertified: false;
 };
 
+/** A block-scoped emphasis. Review expires it at `expiresAt` unless `renewed`. */
+export type TemporaryTrainingPriority = {
+  id: string;
+  detail: string;
+  expiresAt: string;
+  renewed?: boolean;
+};
+
 export type TrainingProgramSetup = {
   id: string;
   consentVersion: typeof TRAINING_CONSENT_VERSION;
@@ -180,6 +188,7 @@ export type TrainingProgramSetup = {
   startedAt: string;
   programRevisionId?: string;
   programPolicyVersion?: string;
+  temporaryPriorities?: TemporaryTrainingPriority[];
 };
 
 export type TrainingFeedback = {

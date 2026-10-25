@@ -483,12 +483,17 @@ final class MesocycleCanvasModel: ObservableObject {
 
 struct MesocycleCanvasScreen: View {
     @StateObject private var model: MesocycleCanvasModel
+    @State private var historyLines: [String: String] = [:]
+    private let accessToken: () async -> String?
+    private let isCurrentAccount: () -> Bool
 
     init(
         ownership: AuthManager.ProfileSessionOwnership,
         isCurrentAccount: @escaping () -> Bool,
         accessToken: @escaping () async -> String?
     ) {
+        self.accessToken = accessToken
+        self.isCurrentAccount = isCurrentAccount
         _model = StateObject(wrappedValue: MesocycleCanvasModel(
             service: URLSessionTrainingService(),
             store: UserDefaultsCanvasStore(subject: ownership.subject),
@@ -499,13 +504,26 @@ struct MesocycleCanvasScreen: View {
     }
 
     var body: some View {
-        MesocycleCanvasContainer(model: model, showsFixtureControls: false)
+        MesocycleCanvasContainer(
+            model: model,
+            showsFixtureControls: false,
+            historyLines: historyLines
+        )
+        .task { await loadHistory() }
+    }
+
+    private func loadHistory() async {
+        guard let token = await accessToken(), isCurrentAccount() else { return }
+        guard let progress = try? await URLSessionTrainingService().loadProgress(accessToken: token),
+              isCurrentAccount() else { return }
+        historyLines = TrainingProgressCopy.historyLines(in: progress)
     }
 }
 
 struct MesocycleCanvasContainer: View {
     @ObservedObject var model: MesocycleCanvasModel
     var showsFixtureControls: Bool
+    var historyLines: [String: String] = [:]
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.theme) private var theme
     @State private var draft = ""
@@ -662,6 +680,13 @@ struct MesocycleCanvasContainer: View {
                     Text("\(exercise.sets) sets · \(exercise.targetReps) reps · \(exercise.variantId) · \(exercise.priority)")
                         .font(.system(size: 13))
                         .foregroundStyle(theme.colors.textSecondary)
+                    if let history = historyLines[exercise.variantId] {
+                        Text(history)
+                            .font(.system(size: 13))
+                            .foregroundStyle(theme.colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("training_exercise_history_\(exercise.variantId)")
+                    }
                     Button("Move to Friday") {
                         Task { await model.move(instanceId: exercise.instanceId, toDay: "friday", toSlot: "single") }
                     }
