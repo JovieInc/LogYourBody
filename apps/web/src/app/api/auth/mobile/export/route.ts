@@ -1,4 +1,5 @@
 import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
+import { neonGymRegistry } from '@/lib/neon/gym-registry-adapter';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { authCookies } from '@/lib/auth/constants';
@@ -26,11 +27,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const [user, metrics, records, trainingPrograms] = await Promise.all([
+  const [user, metrics, records, trainingPrograms, gyms] = await Promise.all([
     neonUserDirectory.getUser(identity.sub),
     neonBodyMetricsExport.listAll(identity.sub),
     neonNativeProductRecords.listAll(identity.sub),
     neonTrainingRevisions.exportForSubject(identity.sub),
+    neonGymRegistry.sync(identity.sub),
   ]);
 
   return NextResponse.json(
@@ -42,6 +44,7 @@ export async function GET(request: NextRequest) {
       body_metrics: metrics,
       ...records,
       training_program_revisions: trainingPrograms,
+      gyms: gyms.filter((record) => !record.deleted).map((record) => record.gym),
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );

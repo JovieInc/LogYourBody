@@ -50,6 +50,7 @@ def main():
     parser.add_argument('--migration', type=Path, help='Optional candidate migration for deliberate regression checks')
     parser.add_argument('--admission-migration', type=Path, help='Optional admission migration for deliberate regression checks')
     parser.add_argument('--canvas-migration', type=Path, help='Optional canvas migration for deliberate regression checks')
+    parser.add_argument('--gym-migration', type=Path, help='Optional gym migration for deliberate regression checks')
     args = parser.parse_args()
     web = Path(__file__).resolve().parents[2]
     env = isolated_environment(os.environ)
@@ -432,6 +433,14 @@ def main():
                 str(web / 'node_modules/tsx/dist/loader.mjs'),
                 str(web / 'db/tests/verify-training-recovery.ts'), json.dumps(client)], canvas_env), flush=True)
             check('recovery actual adapter/engine apply review revert and prescription replay')
+
+            run(client + ['-f', str(args.gym_migration or web / 'db/migrations/20261025180000_gym_registry.sql')])
+            run(client + ['-f', str(web / 'db/tests/gym-registry-rls.sql')])
+            check('gym RLS denies unscoped and foreign read/write; account deletion cascades')
+            print(run_command(['node', '--conditions=react-server', '--import',
+                str(web / 'node_modules/tsx/dist/loader.mjs'),
+                str(web / 'db/tests/verify-gym-registry.ts'), json.dumps(client)], canvas_env), flush=True)
+            check('gym actual adapter sync and tombstone qualification')
 
             print(json.dumps({'passed':len(checks),'checks':checks,'postgresTools':versions,'scope':'disposable PostgreSQL16; actual migrations, observed owner locks, synthetic rows only'}))
         finally:

@@ -754,6 +754,17 @@ export function missingEquipment(
   return variant.requires.filter((item) => !available.has(item));
 }
 
+/** Browse only: null means unrestricted, not a claim that any equipment exists.
+ * A selected gym's exact set (including an empty set) replaces all presets. */
+export function queryExerciseLibrary(input: {
+  equipment: ReadonlySet<CatalogEquipment> | null;
+}): CatalogVariant[] {
+  return EXERCISE_CATALOG.filter(
+    (variant) =>
+      input.equipment === null || missingEquipment(variant, input.equipment).length === 0,
+  );
+}
+
 export function isEligibleVariant(
   variant: CatalogVariant,
   input: { available: ReadonlySet<CatalogEquipment>; excludedConcerns?: readonly string[] },

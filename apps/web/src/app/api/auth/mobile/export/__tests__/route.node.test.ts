@@ -7,6 +7,8 @@ import { neonNativeProductRecords } from '@/lib/neon/native-product-records-adap
 import { neonUserDirectory } from '@/lib/neon/user-directory-adapter';
 import { GET, POST } from '../route';
 import { neonTrainingRevisions } from '@/lib/neon/training-revisions-adapter';
+import { neonGymRegistry } from '@/lib/neon/gym-registry-adapter';
+jest.mock('@/lib/neon/gym-registry-adapter', () => ({ neonGymRegistry: { sync: jest.fn() } }));
 jest.mock('@/lib/neon/training-revisions-adapter', () => ({
   neonTrainingRevisions: { exportForSubject: jest.fn() },
 }));
@@ -39,6 +41,7 @@ function request(method: 'GET' | 'POST', token?: string) {
 describe('/api/auth/mobile/export', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(neonGymRegistry.sync).mockResolvedValue([]);
     jest
       .mocked(neonTrainingRevisions.exportForSubject)
       .mockResolvedValue({ proposals: [], revisions: [{ id: 'revision-owned' }] });
@@ -75,6 +78,28 @@ describe('/api/auth/mobile/export', () => {
   });
 
   it('dumps the authenticated subject Neon rows without a legacy provider path', async () => {
+    jest.mocked(neonGymRegistry.sync).mockResolvedValue([
+      {
+        gym: {
+          id: 'gym-owned',
+          name: 'Home',
+          coarseRegion: null,
+          equipment: [],
+          preferredMachines: [],
+        },
+        deleted: false,
+      },
+      {
+        gym: {
+          id: 'gym-deleted',
+          name: 'Old',
+          coarseRegion: null,
+          equipment: [],
+          preferredMachines: [],
+        },
+        deleted: true,
+      },
+    ]);
     mockedFetchUserInfo.mockResolvedValue({ sub: 'owner-a' } as never);
     mockedDirectory.getUser.mockResolvedValue({
       subject: 'owner-a',
@@ -101,10 +126,12 @@ describe('/api/auth/mobile/export', () => {
       body_metrics: [{ id: 'metric-1' }],
       training_program_revisions: { proposals: [], revisions: [{ id: 'revision-owned' }] },
       daily_metrics: [{ id: 'daily-1' }],
+      gyms: [{ id: 'gym-owned', name: 'Home' }],
     });
     expect(mockedMetrics.listAll).toHaveBeenCalledWith('owner-a');
     expect(mockedRecords.listAll).toHaveBeenCalledWith('owner-a');
     expect(neonTrainingRevisions.exportForSubject).toHaveBeenCalledWith('owner-a');
+    expect(neonGymRegistry.sync).toHaveBeenCalledWith('owner-a');
   });
 
   it.each(['GET', 'POST'] as const)(

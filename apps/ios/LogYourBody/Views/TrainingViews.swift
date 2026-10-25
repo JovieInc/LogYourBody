@@ -7,6 +7,7 @@ enum TrainingPresentation: Identifiable {
     case canvas(AuthManager.ProfileSessionOwnership)
     case cycleReview(AuthManager.ProfileSessionOwnership)
     case program(AuthManager.ProfileSessionOwnership)
+    case gyms(AuthManager.ProfileSessionOwnership)
 
     var id: String {
         switch self {
@@ -16,6 +17,7 @@ enum TrainingPresentation: Identifiable {
         case .cycleReview(let owner): "cycle-review-\(owner.subject)-\(owner.generation)"
         case .canvas(let owner): "canvas-\(owner.subject)-\(owner.generation)"
         case .program(let owner): "program-\(owner.subject)-\(owner.generation)"
+        case .gyms(let owner): "gyms-\(owner.subject)-\(owner.generation)"
         }
     }
 }

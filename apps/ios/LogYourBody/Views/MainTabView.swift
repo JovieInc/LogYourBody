@@ -859,6 +859,12 @@ struct ChatTabView: View {
         }
         .fullScreenCover(item: $trainingPresentation) { presentation in
             switch presentation {
+            case .gyms(let ownership):
+                GymRegistryView(
+                    ownerID: ownership.subject,
+                    accessToken: { await chatAccessToken() },
+                    isCurrent: { authManager.ownsAccountSession(ownership) }
+                )
             case .setup:
                 if delegatedTrainingEnabled, let ownership = authManager.captureAccountSession() {
                     delegatedTrainingView(ownership: ownership)
@@ -1011,6 +1017,15 @@ struct ChatTabView: View {
                 LazyVStack(alignment: .leading, spacing: 20) {
                     if showsTranscript && trainingCoachEnabled {
                         trainingCard
+                    }
+                    if showsTranscript && AppServicePorts.analyticsTracker.isFeatureEnabled(
+                        flagKey: GymRegistryPolicy.featureGate
+                    ), let ownership = authManager.captureAccountSession() {
+                        Button("Your gyms", systemImage: "dumbbell") {
+                            guard authManager.ownsAccountSession(ownership) else { return }
+                            trainingPresentation = .gyms(ownership)
+                        }
+                        .accessibilityIdentifier("gym_registry_open")
                     }
 
                     if isLoadingConversation {

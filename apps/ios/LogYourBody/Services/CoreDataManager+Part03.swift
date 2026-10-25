@@ -560,6 +560,8 @@ func fetchOrCreateSyncMetadata(entityName: String, entityId: String) -> SyncMeta
         context.perform {
             do {
                 self.syncAcknowledgementVersions.removeAll()
+                let gymJournals = try context.fetch(NSFetchRequest<NSManagedObject>(entityName: "GymRegistryJournal"))
+                for journal in gymJournals { context.delete(journal) }
                 // Delete all body metrics
                 let bodyMetricsRequest: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
                 let bodyMetrics = try context.fetch(bodyMetricsRequest)
