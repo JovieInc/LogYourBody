@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "training-rest-timer-keeps-native-source-pins-current",
+    "correction": "LYB-116 PR #1540: The rest Live Activity changes the Xcode project, so refresh its diagnostic dependency pin and regenerate the repository source projection before handing off the repair.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40161023824",
+    "mechanization": "Retain the existing required routing regression that compares all seven diagnostic dependency pins with source bytes and exercises the trusted CLI's acceptance and rejection cases. The existing required Detect Changes projection check rejects stale source-map fingerprints. Both checks reproduced the reported failures before this repair; update the project pin and generated map without relaxing either guard.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The workflow's trusted source hashes and generated documentation describe build inputs outside the app runtime. Application code cannot keep those source artifacts synchronized."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The installed routing regression and source projection checker deterministically reject stale hashes in the existing required CI jobs without new tooling or a weaker gate."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",
