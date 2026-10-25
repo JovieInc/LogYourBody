@@ -38,6 +38,7 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
     let provenance: String?
     var evidence: String?
     var includesObservationContract = false
+    var trendWithoutDates: String?
 
     var id: ContextualMetricKind { kind }
     var isAvailable: Bool { !["", "–", "—", "-"].contains(value.trimmingCharacters(in: .whitespacesAndNewlines)) }
@@ -62,7 +63,9 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
             trend: [summary.changeText(unit: unit), average].compactMap { $0 }.joined(separator: " · "),
             provenance: provenance,
             evidence: ContextualMetricEvidencePolicy.label(for: kind, isEstimated: summary.point?.isEstimated == true),
-            includesObservationContract: true
+            includesObservationContract: true,
+            trendWithoutDates: [summary.changeText(unit: unit, includesDates: false), average]
+                .compactMap { $0 }.joined(separator: " · ")
         )
     }
 
@@ -93,10 +96,13 @@ struct ContextualMetricSnapshot: Equatable, Identifiable {
     }
 
     func detail(options: BodyScoreShareOptions) -> String {
-        [evidence, options.includeObservation ? observation : nil,
-         options.includeRange ? range : nil,
-         options.includeTrend ? trend : nil,
-         options.includeProvenance ? provenanceLabel : nil]
+        let visibleTrend = includesObservationContract && !options.includeObservation ? trendWithoutDates : trend
+        return [
+            evidence, options.includeObservation ? observation : nil,
+            options.includeRange ? range : nil,
+            options.includeTrend ? visibleTrend : nil,
+            options.includeProvenance ? provenanceLabel : nil
+        ]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 }

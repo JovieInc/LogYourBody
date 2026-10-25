@@ -173,9 +173,10 @@ struct MetricObservationSummary {
         return "Observed \(dateText(point.date))\(age)\(outside)"
     }
 
-    func changeText(unit: String) -> String {
+    func changeText(unit: String, includesDates: Bool = true) -> String {
         guard let stats else { return comparisonLabel }
-        return "\(Self.deltaText(stats.delta, unit: unit)) · \(comparisonLabel)"
+        let comparison = includesDates ? comparisonLabel : "First → last observation"
+        return "\(Self.deltaText(stats.delta, unit: unit)) · \(comparison)"
     }
 
     var averageLabel: String? {

@@ -117,6 +117,29 @@ final class BodyScoreShareCardTests: XCTestCase {
             points: [early], focus: focus, usesCalendarDayDomain: true, calendar: calendar))
     }
 
+    func testStatsTruthDatePrivacyAlsoHidesComparisonEndpointDatesInPNG() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let first = now.addingTimeInterval(-10 * 86_400)
+        let summary = MetricObservationSummary(
+            points: [.init(date: first, value: 80), .init(date: now, value: 82)], range: .month1, now: now)
+        let snapshot = ContextualMetricSnapshot.observationSummary(summary, kind: .weight, unit: "kg", provenance: "Manual")
+        var options = BodyScoreShareOptions(selectedMetric: .weight)
+        options.includeObservation = false
+        options.includeRange = false
+        options.includeTrend = true
+        let detail = snapshot.detail(options: options)
+        XCTAssertFalse(detail.contains(summary.dateText(first)))
+        XCTAssertFalse(detail.contains(summary.dateText(now)))
+        XCTAssertTrue(detail.contains("First → last observation"))
+        XCTAssertTrue(detail.contains("Mean of 2 observations"))
+        let text = try renderPNGText(snapshot, aspect: .square, options: options, name: "lyb47-share-hidden-dates.png")
+        let expected = SharePNGTruth(
+            kind: .weight, value: "82.0", unit: "kg", date: nil, evidence: nil,
+            hiddenDate: now.formatted(date: .abbreviated, time: .omitted))
+        XCTAssertEqual(pngTruthMismatches(text, expected: expected), [])
+        XCTAssertFalse(text.contains(first.formatted(date: .abbreviated, time: .omitted)))
+    }
+
     private func truthDetail(points: [MetricChartDataPoint], entries: [MetricHistoryEntry], selected: Date,
                              now: Date, goal: Double? = nil) -> FullMetricChartView {
         FullMetricChartView(

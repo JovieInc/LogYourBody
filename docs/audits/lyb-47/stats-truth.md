@@ -115,3 +115,8 @@ that plotted day/value/occurrence back to the original timestamp before looking
 up provenance or freezing a share. A native DST regression covers that mapping.
 No new Swift files or target memberships were needed. The harness owns pushing,
 PR creation and merge; this run only creates local commits.
+
+The existing share Date switch also removes comparison endpoint dates. Its
+undated trend still states first-to-last observation and the observation mean;
+it does not leave hidden dates in the Trend field. A native PNG truth regression
+covers Date off with Trend on.
