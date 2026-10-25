@@ -100,9 +100,21 @@ Run from the repository root:
 ```sh
 node packages/shared-lib/scripts/correction-coverage.mjs
 node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/correction-coverage.mjs --output coverage/corrections/coverage.json
 node packages/shared-lib/scripts/jovie-separation.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
+
+CI uploads `coverage.json` as `correction-coverage-<commit SHA>` on the existing
+every-diff change-detection path (LYB-253). The artifact retains the full report:
+`levels.<level>.total` counts distinct rules at each level, `mechanized` counts
+codebase/static rules with retained guards, and `mechanizedShare` is
+`mechanized / total` on a 0–1 scale. Empty ledgers have zero counts and a zero
+share; the existing human-readable percentage remains N/A. `commitSha` identifies
+the checked-out Git commit and `timestamp` is the report's UTC ISO 8601 generation
+time. With `--output`, the CLI writes the JSON file and prints one line with the
+counts and share; without it, stdout remains the full JSON report. This artifact
+adds no threshold enforcement and preserves the existing regression checks.
 
 The existing required CI path checks coverage on **every diff**, including
 changes outside the ledger. It fetches the event's exact base revision (PR base,

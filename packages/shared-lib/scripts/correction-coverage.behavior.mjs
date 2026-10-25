@@ -159,6 +159,78 @@ function fixtureRepo(t, receipts) {
   return { root, ref: git(['rev-parse', 'HEAD']) };
 }
 
+test('coverage artifacts report empty, mixed and fully mechanized fixture ledgers', (t) => {
+  const code = receipt('code', 'codebase', { guard, classification: classification('codebase') });
+  const lint = receipt('lint', 'static', { guard, classification: classification('static') });
+  const prose = receipt('copy', 'prose', {
+    classification: classification('prose'),
+    proseOnlyReason: 'Copy tone requires editorial judgment.',
+  });
+  const human = receipt('judgment', 'human', {
+    classification: classification('human'),
+    proseOnlyReason: 'Requires account-owner legal attestation.',
+  });
+  for (const { rows, counts, share } of [
+    { rows: [], counts: [0, 0, 0, 0, 0], share: 0 },
+    {
+      rows: [code, lint, prose, human, { ...code, source: 'https://example.com/another-receipt' }],
+      counts: [1, 1, 1, 1, 0],
+      share: 0.5,
+    },
+    { rows: [code, lint], counts: [1, 1, 0, 0, 0], share: 1 },
+  ]) {
+    const { root, ref } = fixtureRepo(t, rows);
+    const output = 'coverage/corrections/coverage.json';
+    const before = Date.now();
+    const value = runCoverage(['--base-ref', ref, '--output', output], { root, env: {} });
+    const artifact = JSON.parse(readFileSync(join(root, output), 'utf8'));
+    assert.deepEqual(artifact, value);
+    assert.deepEqual(
+      Object.values(artifact.levels).map((level) => level.total),
+      counts,
+    );
+    assert.equal(
+      artifact.total,
+      counts.reduce((sum, count) => sum + count, 0),
+    );
+    assert.equal(artifact.mechanized, counts[0] + counts[1]);
+    assert.equal(artifact.mechanizedShare, share);
+    assert.equal(artifact.commitSha, ref);
+    assert.equal(new Date(artifact.timestamp).toISOString(), artifact.timestamp);
+    assert.ok(
+      Date.parse(artifact.timestamp) >= before && Date.parse(artifact.timestamp) <= Date.now(),
+    );
+  }
+});
+
+test('artifact CLI prints one summary line and fails when the output cannot be written', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-coverage-cli-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cli = fileURLToPath(new URL('./correction-coverage.mjs', import.meta.url));
+  const output = join(root, 'coverage.json');
+  const options = { encoding: 'utf8', env: { ...process.env, GITHUB_STEP_SUMMARY: '' } };
+  const result = spawnSync(process.execPath, [cli, '--output', output], options);
+  assert.equal(result.status, 0, result.stderr);
+  const artifact = JSON.parse(readFileSync(output, 'utf8'));
+  assert.equal(result.stdout.trim().split('\n').length, 1);
+  assert.match(result.stdout, new RegExp(`${artifact.mechanized}/${artifact.total} mechanized`));
+  assert.ok(result.stdout.includes(`${(100 * artifact.mechanizedShare).toFixed(2)}%`));
+  for (const [level, count] of Object.entries(artifact.levels))
+    assert.ok(result.stdout.includes(`${level}=${count.total}`));
+  assert.equal(
+    artifact.commitSha,
+    execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  );
+  const failure = spawnSync(
+    process.execPath,
+    [cli, '--output', join(output, 'coverage.json')],
+    options,
+  );
+  assert.equal(failure.status, 1);
+  assert.match(failure.stderr, /Correction coverage failed/);
+  assert.equal(failure.stdout, '');
+});
+
 test('counts distinct rules, all four pyramid levels and unclassified receipts honestly', () => {
   const rows = [
     receipt('invariant', 'codebase', { guard }),
@@ -586,6 +658,14 @@ test('real CI and intake entrypoints retain coverage checking and publication wi
   );
   assert.match(workflow, /git fetch --no-tags --depth=1 origin "\$BASE_SHA"/);
   assert.match(workflow, /correction-coverage.mjs --base-ref "\$BASE_SHA"/);
+  assert.match(
+    workflow,
+    /correction-coverage.mjs --base-ref "\$BASE_SHA" --output coverage\/corrections\/coverage.json/,
+  );
+  assert.match(
+    workflow,
+    /uses: actions\/upload-artifact@v4\s+with:\s+name: correction-coverage-\$\{\{ github.sha \}\}\s+path: coverage\/corrections\/coverage.json\s+if-no-files-found: error/,
+  );
   assert.match(
     workflow,
     /node --test packages\/shared-lib\/scripts\/correction-ratchet.behavior.mjs/,
