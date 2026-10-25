@@ -931,7 +931,9 @@ func scheduleObservedBodyMetricSync() {
     }
 
 @MainActor
-    func scheduleObservedBodyMetricSync(for currentUserId: String?, debounce: TimeInterval = 5) {
+    func scheduleObservedBodyMetricSync(
+        for currentUserId: String?, debounce: TimeInterval = BatterySyncIntervalPolicy.debounceInterval
+    ) {
         // Legacy observers stay hourly. The smart-scale gate reconciles every delivery.
         let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
         let smartScale = smartScaleSyncEnabled()

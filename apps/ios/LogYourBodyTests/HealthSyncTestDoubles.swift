@@ -12,6 +12,12 @@ import UIKit
 @testable import LogYourBody
 
 final class MockHealthSyncCoordinator: HealthSyncCoordinating {
+    private(set) var foregroundRefreshRequests: [Bool] = []
+
+    func requestForegroundRefresh(syncEnabled: Bool) {
+        foregroundRefreshRequests.append(syncEnabled)
+    }
+
     private(set) var didCallBootstrapIfNeeded = false
     private(set) var lastBootstrapSyncEnabled: Bool?
 
@@ -100,6 +106,15 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
     private(set) var fetchTodayStepCountCallCount = 0
     private(set) var didCallForceFullHealthKitSync = false
     var forceFullHealthKitSyncResult = true
+    private(set) var smartScaleRefreshCallCount = 0
+    var smartScaleRefreshResult: HealthKitSmartScaleRefreshResult = .inactive
+    var weightSyncAction: (() async throws -> Void)?
+
+    @MainActor
+    func performSmartScaleRefresh() async -> HealthKitSmartScaleRefreshResult {
+        smartScaleRefreshCallCount += 1
+        return smartScaleRefreshResult
+    }
 
     func checkAuthorizationStatus() {
         didCallCheckAuthorizationStatus = true
@@ -136,6 +151,7 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
 
     func syncWeightFromHealthKit() async throws {
         syncWeightFromHealthKitCallCount += 1
+        try await weightSyncAction?()
     }
 
     func syncStepsFromHealthKit() async throws {

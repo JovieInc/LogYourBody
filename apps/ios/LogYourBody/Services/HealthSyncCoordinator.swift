@@ -4,6 +4,17 @@
 //
 
 import Foundation
+import UIKit
+
+enum HealthKitForegroundRefreshPolicy {
+    static let gateKey = "healthkit_foreground_refresh_v1"
+
+    @MainActor
+    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
+        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return checkGate(gateKey)
+    }
+}
 
 enum HealthKitAccountSyncPolicy {
     static let accountIdKey = "healthKitSyncAccountId"
@@ -45,6 +56,7 @@ protocol HealthKitSyncManaging: AnyObject {
     func fetchTodayStepCount() async throws -> Int?
     func forceFullHealthKitSync() async -> Bool
     func refreshSmartScaleSamplesIfEnabled() async
+    @MainActor func performSmartScaleRefresh() async -> HealthKitSmartScaleRefreshResult
 }
 
 extension HealthKitSyncManaging {
@@ -52,6 +64,7 @@ extension HealthKitSyncManaging {
     func admitsAutomaticImportForCurrentAccount() -> Bool { true }
     func claimAutomaticImportAccount() async {}
     func refreshSmartScaleSamplesIfEnabled() async {}
+    @MainActor func performSmartScaleRefresh() async -> HealthKitSmartScaleRefreshResult { .inactive }
 }
 
 extension HealthKitManager: HealthKitSyncManaging {}
@@ -62,6 +75,7 @@ extension HealthKitManager: HealthKitSyncManaging {}
 @MainActor
 protocol HealthSyncCoordinating {
     func bootstrapIfNeeded(syncEnabled: Bool)
+    func requestForegroundRefresh(syncEnabled: Bool)
     func resetForCurrentUser() async
     func configureSyncPipelineAfterAuthorizationAndRunInitialWeightSync() async
     func configureSyncPipelineAfterAuthorizationAndRunInitialWeightAndStepSync() async
@@ -82,9 +96,87 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
 
     private let healthKitManager: HealthKitSyncManaging
     private var hasBootstrappedObservers = false
+    private var foregroundRefreshTask: Task<Void, Never>?
+    private var foregroundRefreshID: UUID?
+    private var lastForegroundRefresh: Date?
+    private let foregroundRefreshEnabled: @MainActor () -> Bool
+    private let syncEnabled: @MainActor () -> Bool
+    private let minimumInterval: @MainActor () -> TimeInterval
+    private let now: @MainActor () -> Date
+    private let sleep: @MainActor (TimeInterval) async throws -> Void
 
-    init(healthKitManager: HealthKitSyncManaging = HealthKitManager.shared) {
+    init(
+        healthKitManager: HealthKitSyncManaging = HealthKitManager.shared,
+        foregroundRefreshEnabled: @escaping @MainActor () -> Bool = { HealthKitForegroundRefreshPolicy.isEnabled() },
+        syncEnabled: @escaping @MainActor () -> Bool = {
+            UserDefaults.standard.object(forKey: Constants.healthKitSyncEnabledKey) as? Bool ?? true
+        },
+        minimumInterval: @escaping @MainActor () -> TimeInterval = {
+            UIDevice.current.isBatteryMonitoringEnabled = true
+            return BatterySyncIntervalPolicy.interval(
+                state: UIDevice.current.batteryState, level: UIDevice.current.batteryLevel
+            )
+        },
+        now: @escaping @MainActor () -> Date = { Date() },
+        sleep: @escaping @MainActor (TimeInterval) async throws -> Void = {
+            try await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000))
+        }
+    ) {
         self.healthKitManager = healthKitManager
+        self.foregroundRefreshEnabled = foregroundRefreshEnabled
+        self.syncEnabled = syncEnabled
+        self.minimumInterval = minimumInterval
+        self.now = now
+        self.sleep = sleep
+    }
+
+    /// Scene activation and view appearance share this pending task and cooldown.
+    /// Returning immediately lets cached data paint before any HealthKit work.
+    func requestForegroundRefresh(syncEnabled: Bool) {
+        guard syncEnabled, foregroundRefreshTask == nil, canRefreshInForeground() else { return }
+        guard foregroundRefreshIsDue() else { return }
+
+        let requestID = UUID()
+        foregroundRefreshID = requestID
+        foregroundRefreshTask = Task(priority: .utility) { [weak self, sleep] in
+            defer {
+                if self?.foregroundRefreshID == requestID {
+                    self?.foregroundRefreshTask = nil
+                    self?.foregroundRefreshID = nil
+                }
+            }
+            do { try await sleep(BatterySyncIntervalPolicy.debounceInterval) } catch { return }
+            guard let self, !Task.isCancelled else { return }
+            guard self.canRefreshInForeground(), self.foregroundRefreshIsDue() else { return }
+            self.lastForegroundRefresh = self.now()
+            let anchored = await self.healthKitManager.performSmartScaleRefresh()
+            guard !Task.isCancelled, anchored.outcome != .denied, self.canRefreshInForeground() else { return }
+            if anchored.outcome == .inactive {
+                try? await self.syncWeightFromHealthKit()
+            }
+            guard !Task.isCancelled, self.canRefreshInForeground() else { return }
+            try? await self.syncStepsFromHealthKit()
+        }
+    }
+
+    private func canRefreshInForeground() -> Bool {
+        guard foregroundRefreshEnabled(), syncEnabled(), healthKitManager.isHealthKitAvailable,
+              healthKitManager.admitsAutomaticImportForCurrentAccount() else { return false }
+        healthKitManager.checkAuthorizationStatus()
+        return healthKitManager.isAuthorized
+    }
+
+    private func foregroundRefreshIsDue() -> Bool {
+        BatterySyncIntervalPolicy.permitsRefresh(
+            lastRefresh: lastForegroundRefresh, now: now(), minimumInterval: minimumInterval()
+        )
+    }
+
+    private func cancelForegroundRefresh() {
+        foregroundRefreshTask?.cancel()
+        foregroundRefreshTask = nil
+        foregroundRefreshID = nil
+        lastForegroundRefresh = nil
     }
 
     /// Idempotent bootstrap for HealthKit observers and background delivery.
@@ -132,6 +224,10 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
 
     /// Foreground entry. The manager no-ops while `healthkit_smart_scale_sync_v1` is off.
     private func scheduleSmartScaleForegroundRefresh() {
+        if foregroundRefreshEnabled() {
+            requestForegroundRefresh(syncEnabled: true)
+            return
+        }
         Task { await healthKitManager.refreshSmartScaleSamplesIfEnabled() }
     }
 
@@ -139,6 +235,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
     /// coordinator bootstrap state. Used when deleting the account or
     /// signing out completely.
     func resetForCurrentUser() async {
+        cancelForegroundRefresh()
         hasBootstrappedObservers = false
         await healthKitManager.resetForCurrentUser()
     }
@@ -147,6 +244,7 @@ final class HealthSyncCoordinator: ObservableObject, HealthSyncCoordinating {
     /// automatic import. The same account can bootstrap again. Another
     /// account cannot inherit this device's HealthKit sync.
     func suspendAutomaticImportAfterSignOut() async {
+        cancelForegroundRefresh()
         hasBootstrappedObservers = false
         await healthKitManager.suspendAutomaticImportAfterSignOut()
     }

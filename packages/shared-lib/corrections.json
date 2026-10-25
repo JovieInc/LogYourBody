@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "healthkit-foreground-refresh-coalesces-lifecycle-requests",
+    "correction": "LYB-242: Refresh Apple Health on scene activation and dashboard or metric appearance without a gesture, coalescing requests and doing nothing without permission or availability.",
+    "source": "https://linear.app/jovie/issue/LYB-242",
+    "mechanization": "Route scene activation, bootstrap and view appearance through one HealthSyncCoordinator pending task with the shared observer debounce and BatterySyncIntervalPolicy minimum interval. Recheck authorization, availability, preference, gate and account ownership before import; cancel on sign-out. Extend the existing XCTest suites selected by the native launch-quality runner. Native execution and failing/passing regression receipts require macOS CI; this Linux host cannot supply them.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A main-actor coordinator owns the only automatic foreground request, pending task and cooldown. Admission checks before scheduling and import prevent unauthorized reads and duplicate lifecycle requests by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/DashboardViewModelHealthSyncWiringTests.swift",
+      "anchor": "testSceneActiveAndViewAppearancesDebounceOneRefreshWithoutBlockingFirstPaint"
+    }
+  },
+  {
     "fingerprint": "web-sentry-runtime-env-declarations",
     "correction": "PR #1542: Declare every consumed public Sentry runtime variable in apps/web/.env.example. Missing DSN, environment and release declarations fail the required environment surface guard.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169587476/job/121097641374",

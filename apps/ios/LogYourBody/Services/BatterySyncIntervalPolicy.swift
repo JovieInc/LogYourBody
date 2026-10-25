@@ -10,6 +10,14 @@ import UIKit
 /// thresholds can be unit tested without a physical device (battery level/state
 /// are not controllable in the simulator).
 enum BatterySyncIntervalPolicy {
+    /// Coalesce foreground and observer deliveries before querying HealthKit.
+    static let debounceInterval: TimeInterval = 5
+
+    static func permitsRefresh(lastRefresh: Date?, now: Date, minimumInterval: TimeInterval) -> Bool {
+        guard let lastRefresh else { return true }
+        return now.timeIntervalSince(lastRefresh) >= minimumInterval
+    }
+
     /// Sync aggressively while charging, then back off as the battery drains.
     ///
     /// - Note: `level` is `-1` when battery monitoring is unavailable; that falls
