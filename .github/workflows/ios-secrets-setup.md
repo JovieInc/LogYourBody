@@ -53,6 +53,14 @@ Optional production integrations:
 6. Run certificate creation locally only when rotating or bootstrapping Match.
    CI release jobs should use readonly Match sync.
 
+## Expiry
+
+`.github/workflows/signing-expiry.yml` reads days left on the distribution
+certificate, App Store profiles, and the App Store Connect API key. It does
+not renew or nuke signing material. When something is close to expiry, follow
+[the signing expiry runbook](../../docs/engineering/signing-expiry.md). Refresh
+with match before the manual nuke workflow.
+
 ## Rotation
 
 If a real value is ever committed or exposed in logs:
