@@ -15,6 +15,122 @@ import Vision
 
 @MainActor
 final class BodyScoreShareCardTests: XCTestCase {
+    func testStatsTruthCardDetailTimelineAndShareUseSameObservationContract() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let selected = now.addingTimeInterval(-2 * 86_400)
+        let points = [MetricChartDataPoint(date: now.addingTimeInterval(-29 * 86_400), value: 80),
+                      MetricChartDataPoint(date: selected, value: 82), MetricChartDataPoint(date: now, value: 83)]
+        let entries = [MetricHistoryEntry(id: "selected", date: selected, primaryValue: 82,
+                                          secondaryValue: nil, source: .healthKit),
+                       MetricHistoryEntry(id: "newest", date: now, primaryValue: 83,
+                                          secondaryValue: nil, source: .manual)]
+        let summary = MetricObservationSummary(points: points, range: .month1, selectedDate: selected, now: now)
+        let card = ContextualMetricSnapshot.observationSummary(summary, kind: .weight, unit: "kg", provenance: "Apple Health")
+        let detail = truthDetail(points: points, entries: entries, selected: selected, now: now)
+        XCTAssertEqual(detail.observationSnapshot, card)
+        XCTAssertEqual(detail.headlineValueText, "82.0")
+        XCTAssertEqual(detail.headlineDateText, card.observation)
+        XCTAssertEqual(detail.contextualSharePayload?.contextualMetrics, [card])
+        XCTAssertEqual(detail.observationSummary.stats?.delta, summary.stats?.delta)
+        let timeline = HomeV2MetricEditorial.canvas(HomeV2MetricCanvasRequest(
+            metric: .weight, points: points, unit: "kg", deltaUnit: "kg", range: .month1,
+            provenance: nil, target: nil, hasEnoughData: false,
+            formatValue: { String(format: "%.1f", $0) }, dateText: { summary.dateText($0) },
+            observationSummary: summary))
+        XCTAssertEqual(timeline.comparison, summary.changeText(unit: "kg"))
+        XCTAssertTrue(card.trend?.contains("Mean of 3 observations") == true)
+        XCTAssertTrue(card.observation.contains("2 days ago"))
+        XCTAssertFalse(card.observation.contains("Updated"))
+    }
+
+    func testStatsTruthMixedSourceAndGoalFixturesNeverBorrowSourceOrAssignProgress() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let early = MetricChartDataPoint(date: now.addingTimeInterval(-86_400), value: 82)
+        let latest = MetricChartDataPoint(date: now, value: 80)
+        let entries = [MetricHistoryEntry(id: "old", date: early.date, primaryValue: 82,
+                                          secondaryValue: nil, source: .healthKit),
+                       MetricHistoryEntry(id: "new", date: now, primaryValue: 80,
+                                          secondaryValue: nil, source: .manual)]
+        for goal in [nil, 70, 90, Double.nan, Double.infinity] as [Double?] {
+            let detail = truthDetail(points: [latest, early], entries: entries, selected: early.date, now: now, goal: goal)
+            XCTAssertEqual(detail.observationSnapshot?.provenance, "Apple Health")
+            XCTAssertEqual(detail.headlineValueText, "82.0")
+            XCTAssertEqual(detail.deltaColor(for: -2), Color.metricTextSecondary)
+            XCTAssertEqual(detail.deltaColor(for: 2), Color.metricTextSecondary)
+            if goal?.isFinite == false { XCTAssertNil(detail.plottedGoalValue) }
+        }
+        let conflict = MetricHistoryEntry(id: "conflict", date: early.date, primaryValue: 82,
+                                          secondaryValue: nil, source: .manual)
+        let ambiguous = truthDetail(points: [early, latest], entries: entries + [conflict],
+                                    selected: early.date, now: now)
+        XCTAssertEqual(ambiguous.observationSnapshot?.provenance, "Source unavailable or mixed")
+        let stale = ContextualMetricDetailPolicy.validatedFocus(
+            early, in: [latest], currentFingerprint: "refreshed", cachedFingerprint: "old")
+        XCTAssertNil(stale)
+    }
+
+    func testStatsTruthFFMIUsesCanonicalJOV3331ValueAndExportsDerivedEvidence() throws {
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        let metric = BodyMetrics(
+            id: "ffmi-truth", userId: "synthetic", date: date,
+            weight: 80, weightUnit: "kg", bodyFatPercentage: 20, bodyFatMethod: "manual",
+            muscleMass: nil, boneMass: nil, notes: nil, photoUrl: nil, dataSource: "manual",
+            createdAt: date, updatedAt: date)
+        let expected = try XCTUnwrap(UnitConversion.calculateFFMI(weightKg: 80, bodyFatPercentage: 20, heightCm: 180))
+        let canonical = try XCTUnwrap(MetricsInterpolationService.shared.estimateFFMI(
+            for: date, metrics: [metric], heightInches: 180 / 2.54))
+        XCTAssertEqual(canonical.value, (expected * 10).rounded() / 10, accuracy: 0.0001)
+        let summary = MetricObservationSummary(
+            points: [.init(date: date, value: canonical.value)], range: .month1, now: date)
+        let snapshot = ContextualMetricSnapshot.observationSummary(
+            summary, kind: .ffmi, unit: "", provenance: "Derived from smoothed weight, body fat and height")
+        XCTAssertEqual(snapshot.value, String(format: "%.1f", expected))
+        XCTAssertEqual(snapshot.evidence, "Derived estimate")
+        XCTAssertEqual(snapshot.trend, "Need 2 observations at different times")
+        var options = BodyScoreShareOptions(selectedMetric: .ffmi)
+        options.includeProvenance = true
+        let text = try renderPNGText(snapshot, aspect: .square, options: options, name: "lyb47-ffmi-truth.png")
+        XCTAssertEqual(pngTruthMismatches(text, expected: SharePNGTruth(
+            kind: .ffmi, value: snapshot.value, unit: "", date: nil, evidence: "Derived estimate")), [])
+    }
+
+    func testProgressCalendarDayFocusRecoversOriginalTimestampAndSourceAcrossDST() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles"))
+        let earlyDate = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-03-08T09:30:00Z"))
+        let lateDate = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-03-08T10:30:00Z"))
+        let early = MetricChartDataPoint(date: earlyDate, value: 82)
+        let late = MetricChartDataPoint(date: lateDate, value: 82)
+        let entries = [MetricHistoryEntry(id: "early", date: earlyDate, primaryValue: 82,
+                                          secondaryValue: nil, source: .healthKit),
+                       MetricHistoryEntry(id: "late", date: lateDate, primaryValue: 82,
+                                          secondaryValue: nil, source: .manual)]
+        let plot = HomeV2ChartIntegrity.plot(
+            points: [early, late], anchorsToZero: false, keepsCarriedValues: false, calendar: calendar)
+        let focus = try XCTUnwrap(plot.marks.first { $0.occurrence == 1 })
+        XCTAssertEqual(focus.date, calendar.startOfDay(for: earlyDate))
+        let selected = try XCTUnwrap(ContextualMetricProgressPolicy.selection(
+            points: [early, late], focus: focus, usesCalendarDayDomain: true, calendar: calendar))
+        XCTAssertEqual(selected.point.date, lateDate)
+        XCTAssertEqual(selected.source(entries: entries), "Manual")
+        XCTAssertNil(ContextualMetricProgressPolicy.selection(
+            points: [early], focus: focus, usesCalendarDayDomain: true, calendar: calendar))
+    }
+
+    private func truthDetail(points: [MetricChartDataPoint], entries: [MetricHistoryEntry], selected: Date,
+                             now: Date, goal: Double? = nil) -> FullMetricChartView {
+        FullMetricChartView(
+            title: "Weight", icon: "figure.stand", iconColor: .blue,
+            currentValue: "999", unit: "kg", currentDate: "Unrelated sync date",
+            chartData: points, onAdd: nil,
+            metricEntries: MetricEntriesPayload(
+                config: MetricEntriesConfiguration(metricType: .weight, unitLabel: "kg", secondaryUnitLabel: nil,
+                                                   primaryFormatter: NumberFormatter(), secondaryFormatter: nil),
+                entries: entries),
+            goalValue: goal, selectedTimeRange: .constant(.month1), selectedTimelineDate: .constant(selected),
+            statsTruthEnabled: true, referenceDate: now)
+    }
+
     func testShareSheetDefaultsToPortraitExportAspect() {
         XCTAssertEqual(BodyScoreShareAspect.defaultExportAspect, .portrait)
         XCTAssertEqual(BodyScoreShareAspect.preferredExportAspect(for: nil), .portrait)

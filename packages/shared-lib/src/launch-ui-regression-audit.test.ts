@@ -14,16 +14,23 @@ it('checks Stats composition and real card styling through the launch audit with
     const output = execFileSync(
       'python3',
       [
-        '-m',
-        'trace',
-        '--count',
-        '--summary',
-        '--missing',
-        '--ignore-dir',
-        pythonLibrary,
-        '--coverdir',
-        coverage,
+        '-c',
+        `import runpy, sys, trace
+test, library, coverage = sys.argv[1:]
+runner = trace.Trace(count=True, trace=False, ignoredirs=[library])
+status = 0
+sys.argv = [test]
+try:
+    runner.runctx("runpy.run_path(test, run_name='__main__')", {"runpy": runpy, "test": test}, {})
+except SystemExit as error:
+    status = error.code
+finally:
+    runner.results().write_results(show_missing=True, summary=True, coverdir=coverage)
+sys.exit(status)
+`,
         `${root}/scripts/ios/test_launch_ui_regression_audit.py`,
+        pythonLibrary,
+        coverage,
       ],
       { encoding: 'utf8', cwd: root, timeout: 30_000 },
     );
@@ -33,7 +40,7 @@ it('checks Stats composition and real card styling through the launch audit with
         .filter((line) => /launch-ui-regression-audit|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Launch UI audit behavior tests executed: 7');
+    expect(output).toContain('Launch UI audit behavior tests executed: 12');
     expect(output).toContain('launch-ui-regression-audit');
   } finally {
     rmSync(coverage, { recursive: true, force: true });

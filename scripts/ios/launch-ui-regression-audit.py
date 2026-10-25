@@ -235,7 +235,7 @@ def main() -> int:
         ("DesignSystem/Organisms/MetricSummaryCard.swift",
          "if MetricStatsTruthPolicy.isEnabled() {\n            return secondaryTextColor\n        }"),
         ("Components/FullMetricChartView+Part02.swift",
-         "if MetricStatsTruthPolicy.isEnabled() {\n            return Color.metricTextSecondary"),
+         "if usesStatsTruth {\n            return Color.metricTextSecondary"),
     ]:
         require_token(
             root=root, path=app_dir / relative_path, token=token,
@@ -243,6 +243,22 @@ def main() -> int:
             detail="Stats truth must keep direction neutral without a validated safe goal comparison.",
             violations=violations,
         )
+
+    card_path = app_dir / "DesignSystem/Organisms/MetricSummaryCard.swift"
+    card_source = card_path.read_text()
+    observation_chart = card_source.split("private func observationChart", 1)[-1].split("private func legacyChart", 1)[0]
+    if ("PointMark(x: .value(\"Observation date\", date)" not in observation_chart
+            or re.search(r"\b(?:LineMark|AreaMark)\s*\(|\.interpolationMethod", observation_chart)):
+        violations.append(AuditViolation(
+            check="dashboard.observation_plot", file=str(card_path.relative_to(root)), line=1,
+            detail="Stats truth must plot dated observations without interpolated continuous history.",
+        ))
+    require_token(
+        root=root, path=app_dir / "Helpers/DashboardMetricFormatting.swift",
+        token="if requiresComparison && first.date == last.date { return nil }",
+        check="dashboard.minimum_comparison_samples",
+        detail="One timestamp cannot establish no change.", violations=violations,
+    )
 
     system_b_surface_files = [
         app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift",

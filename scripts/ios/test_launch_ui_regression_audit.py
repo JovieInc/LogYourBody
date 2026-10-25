@@ -94,6 +94,23 @@ class StatsCardCompositionTests(unittest.TestCase):
                      "return Color.metricDeltaPositive\n        }")
         self.assert_rejected("dashboard.neutral_trend_direction")
 
+    def test_observation_plot_cannot_erase_elapsed_time(self):
+        self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
+                     'PointMark(x: .value("Observation date", date)',
+                     'PointMark(x: .value("Observation index", point.index)')
+        self.assert_rejected("dashboard.observation_plot")
+
+    def test_observation_plot_cannot_claim_continuous_measured_history(self):
+        self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
+                     'PointMark(x: .value("Observation date", date)',
+                     'LineMark(x: .value("Observation date", date)')
+        self.assert_rejected("dashboard.observation_plot")
+
+    def test_single_timestamp_cannot_establish_no_change(self):
+        self.replace("Helpers/DashboardMetricFormatting.swift",
+                     "if requiresComparison && first.date == last.date { return nil }", "")
+        self.assert_rejected("dashboard.minimum_comparison_samples")
+
 
 if __name__ == "__main__":
     result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(StatsCardCompositionTests))

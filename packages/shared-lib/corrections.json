@@ -2,7 +2,7 @@
   {
     "fingerprint": "stats-truth-neutral-direction-and-observation-windows",
     "correction": "LYB-47: Stats must distinguish observation, sync, display and comparison dates; insufficient samples and direction alone cannot imply unchanged health or goal progress.",
-    "source": "Linear LYB-47; user task received 2026-10-25",
+    "source": "https://linear.app/jovie/issue/LYB-47",
     "mechanization": "The existing metric helpers own the shared Stats truth contract behind metric_stats_truth_v1. Existing native formatting, chart and share truth tests cover fixtures. The required launch-quality audit rejects reintroduced success/error direction styling; mutation tests prove rejection.",
     "classification": {
       "codebase": {

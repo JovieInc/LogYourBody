@@ -287,7 +287,8 @@ struct BodyScoreShareCardView: View {
                         Text(deltaText)
                             .font(.system(size: layout.deltaFontSize, weight: .medium))
                             .foregroundColor(Color.white.opacity(0.66))
-                            .lineLimit(options.selectedMetric == nil ? 1 : 4)
+                            .lineLimit(options.selectedMetric == nil ? 1
+                                       : (payload.snapshot(for: options)?.includesObservationContract == true ? nil : 4))
                             .allowsTightening(true)
                             .minimumScaleFactor(0.72)
                             .accessibilityIdentifier("body_score_share_delta")

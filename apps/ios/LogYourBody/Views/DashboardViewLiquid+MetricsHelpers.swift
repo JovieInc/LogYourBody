@@ -174,7 +174,7 @@ extension DashboardViewLiquid {
                     date: metric.date,
                     primaryValue: convertedWeight,
                     secondaryValue: metric.bodyFatPercentage,
-                    source: metricEntrySourceType(from: metric.dataSource)
+                    source: metricEntrySourceType(from: metric.measurementSource(for: .weight).rawValue)
                 )
             }
 
@@ -217,7 +217,7 @@ extension DashboardViewLiquid {
                     date: metric.date,
                     primaryValue: bodyFatValue,
                     secondaryValue: secondaryValue,
-                    source: metricEntrySourceType(from: metric.dataSource)
+                    source: metricEntrySourceType(from: metric.measurementSource(for: .bodyFat).rawValue)
                 )
             }
 
