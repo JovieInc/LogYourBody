@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "web-sentry-runtime-env-declarations",
+    "correction": "PR #1542: Declare every consumed public Sentry runtime variable in apps/web/.env.example. Missing DSN, environment and release declarations fail the required environment surface guard.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169587476/job/121097641374",
+    "mechanization": "Declare the three optional variables with blank defaults and retain the existing required product-registry environment surface guard. The guard fails on all three undeclared variables before the change and passes afterward.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot ensure that a separately maintained environment example declares every consumed variable."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing product-registry test scans production web source and rejects consumed variables absent from apps/web/.env.example in the required JavaScript/TypeScript check."
+      }
+    },
+    "guard": {
+      "path": "packages/product-registry/scripts/env-surface.test.mjs",
+      "anchor": "Web: process.env keys read in apps/web/src"
+    }
+  },
+  {
     "fingerprint": "sentry-web-sdk-runtime-and-release-compatibility",
     "correction": "PR #1542: Vercel rejected sendDefaultPii on Sentry 11 and warned that the server adapter imported the browser-only router hook. Preserve private error capture and a matching sourcemap release with the installed SDK.",
     "source": "https://vercel.com/jovie/log-your-body/AKbAVaEindibaLTJKLsnhetLUMqg",
