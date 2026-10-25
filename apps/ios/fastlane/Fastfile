@@ -442,7 +442,7 @@ platform :ios do
     end
     
     # Get the actual build and version numbers for logging
-    version = get_version_number(xcodeproj: project_path)
+    version = get_version_number(xcodeproj: project_path, target: "LogYourBody")
     build = get_build_number(xcodeproj: project_path)
     UI.message("Building version #{version} (#{build})")
     

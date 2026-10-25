@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "training-rest-extension-noninteractive-version-target",
+    "correction": "LYB-116 PR #1540: Adding the rest Live Activity extension made get_version_number prompt for a target, failing iOS Unit merge-group validation in noninteractive Fastlane before compilation.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189003309",
+    "mechanization": "The shared build lane explicitly reads the LogYourBody target's marketing version. The existing required shared-lib suite executes the real lane with separate app and extension versions, rejects an absent target in noninteractive mode, and verifies the app target remains selected for both the app and Unit-tier schemes. The regression fails before the target selection and passes after it; native compilation and coverage still require the real macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Passing the stable main app target to Fastlane eliminates interactive target selection from every caller of the shared build lane, regardless of the requested build scheme or the extension target."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/fastlane/Fastfile",
+      "anchor": "get_version_number(xcodeproj: project_path, target: \"LogYourBody\")"
+    }
+  },
+  {
     "fingerprint": "training-cycle-delegation-merge-parity",
     "correction": "PR #1541 conflicts with the delegated programming implementation merged in PR #1531. Preserve both proposal versions, owner-locked database admission and native entry points when merging origin/main.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1541",
