@@ -420,5 +420,24 @@
       "path": "apps/web/src/app/sitemap.ts",
       "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
     }
+  },
+  {
+    "fingerprint": "metric-state-actions-have-one-native-control-owner",
+    "correction": "LYB-43: MetricSummaryCard ignores actionable children, relies on external button wrapping, and can advertise actions without an executable owner. Preserve metric/state/context and expose the same actual handler to touch and accessibility.",
+    "source": "https://linear.app/jovie/issue/LYB-43",
+    "mechanization": "The card resolves one actual handler before constructing its native Button, suppresses loading actions and gives state actions precedence over detail navigation. The existing required correction ratchet rejects external button wrappers across all native app Swift sources with an empty baseline. The shared-lib suite executes its negative fixture and source regressions. This avoids relying on Turbo cache invalidation for source outside the package. Native contract tests cover action selection/hints, and the UI fixture tests all four metric families and states at standard/AX3 sizes, invocation counts, navigation and Reduce Motion. Native execution, VoiceOver and Switch Control device acceptance remain separate, unverified evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Own the native Button in the metric primitive and pass explicit executable actions from callers so a wrapper flag cannot invent interactivity or hide a nested state control."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/metric-card-control-owner.mjs",
+      "anchor": "LYB-43: keep metric controls inside the card, never inside an external Button.",
+      "ratchet": {
+        "baseline": "packages/shared-lib/metric-card-control-owner-baseline.json"
+      }
+    }
   }
 ]

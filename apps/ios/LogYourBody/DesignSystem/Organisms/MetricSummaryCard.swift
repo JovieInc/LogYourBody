@@ -18,8 +18,22 @@ enum MetricCardIdentityPolicy {
     }
 }
 
+enum MetricCardActionPolicy {
+    static let gateKey = "metric_card_actions_v1"
+
+    @MainActor
+    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
+        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return MetricCardIdentityPolicy.isEnabled(isGateEnabled: checkGate) && checkGate(gateKey)
+    }
+}
+
 #if DEBUG
 private struct MetricCardIdentityKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+private struct MetricCardActionsKey: EnvironmentKey {
     static let defaultValue: Bool? = nil
 }
 
@@ -27,6 +41,11 @@ extension EnvironmentValues {
     var metricCardIdentity: Bool? {
         get { self[MetricCardIdentityKey.self] }
         set { self[MetricCardIdentityKey.self] = newValue }
+    }
+
+    var metricCardActions: Bool? {
+        get { self[MetricCardActionsKey.self] }
+        set { self[MetricCardActionsKey.self] = newValue }
     }
 }
 #endif
@@ -116,10 +135,12 @@ public struct MetricSummaryCard: View {
 
     public struct CardAction {
         public let title: String
+        public let hint: String?
         public let handler: () -> Void
 
-        public init(title: String, handler: @escaping () -> Void) {
+        public init(title: String, hint: String? = nil, handler: @escaping () -> Void) {
             self.title = title
+            self.hint = hint
             self.handler = handler
         }
     }
@@ -134,13 +155,14 @@ public struct MetricSummaryCard: View {
     public let icon: String
     public let accentColor: Color
     public let state: State
-    public var isButtonContext: Bool = false
+    public let detailAction: CardAction?
 
-    public init(icon: String, accentColor: Color, state: State, isButtonContext: Bool = false) {
+    /// The card owns its control. Callers supply navigation here instead of wrapping it in a Button.
+    public init(icon: String, accentColor: Color, state: State, detailAction: CardAction? = nil) {
         self.icon = icon
         self.accentColor = accentColor
         self.state = state
-        self.isButtonContext = isButtonContext
+        self.detailAction = detailAction
     }
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -149,6 +171,7 @@ public struct MetricSummaryCard: View {
     @Environment(\.theme) private var theme
     #if DEBUG
     @Environment(\.metricCardIdentity) private var identityOverride
+    @Environment(\.metricCardActions) private var actionsOverride
     #endif
 
     private var identityEnabled: Bool {
@@ -156,6 +179,31 @@ public struct MetricSummaryCard: View {
         if let identityOverride { return identityOverride }
         #endif
         return MetricCardIdentityPolicy.isEnabled()
+    }
+
+    private var actionsEnabled: Bool {
+        #if DEBUG
+        if let actionsOverride { return identityEnabled && actionsOverride }
+        #endif
+        return MetricCardActionPolicy.isEnabled()
+    }
+
+    func primaryAction(actionsEnabled: Bool) -> CardAction? {
+        switch state {
+        case .loading:
+            return nil
+        case .data:
+            return detailAction
+        case .empty(_, _, let action), .error(_, _, let action):
+            // The rollback path keeps its legacy inline state button, so it
+            // cannot also create a surrounding navigation button.
+            return actionsEnabled ? action ?? detailAction : (action == nil ? detailAction : nil)
+        }
+    }
+
+    func actionHint(actionsEnabled: Bool) -> String? {
+        guard let action = primaryAction(actionsEnabled: actionsEnabled) else { return nil }
+        return action.hint ?? action.title
     }
 
     @ScaledMetric(relativeTo: .largeTitle) private var valueFontSize: CGFloat = 44
@@ -171,6 +219,21 @@ public struct MetricSummaryCard: View {
     }
 
     public var body: some View {
+        if let action = primaryAction(actionsEnabled: actionsEnabled) {
+            Button(action: action.handler) {
+                cardSurface
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(actionsEnabled ? "\(accessibilityLabel), \(action.title)" : accessibilityLabel)
+            .accessibilityHint(actionsEnabled ? actionHint(actionsEnabled: true) ?? "" : accessibilityHint ?? "")
+        } else {
+            cardSurface
+                .accessibilityAddTraits(.isStaticText)
+        }
+    }
+
+    private var cardSurface: some View {
         let shape = RoundedRectangle(cornerRadius: theme.radius.card, style: .continuous)
 
         return VStack(alignment: .leading, spacing: 0) {
@@ -190,7 +253,13 @@ public struct MetricSummaryCard: View {
         .contentShape(shape)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint(accessibilityHint ?? "")
+        .accessibilityHint(actionsEnabled ? actionHint(actionsEnabled: true) ?? "" : accessibilityHint ?? "")
+        .transaction {
+            if actionsEnabled && reduceMotion {
+                $0.animation = nil
+                $0.disablesAnimations = true
+            }
+        }
     }
 
     private var header: some View {
@@ -215,7 +284,7 @@ public struct MetricSummaryCard: View {
             HStack(spacing: 4) {
                 timestampText
 
-                if isButtonContext && hasActionableState {
+                if showsDetailChevron {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(secondaryTextColor)
@@ -436,17 +505,17 @@ public struct MetricSummaryCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(placeholderColor)
                 .frame(width: 140, height: 36)
-                .shimmer()
+                .modifier(MetricCardShimmer(enabled: !(actionsEnabled && reduceMotion)))
 
             RoundedRectangle(cornerRadius: 8)
                 .fill(placeholderColor)
                 .frame(width: 80, height: 16)
-                .shimmer()
+                .modifier(MetricCardShimmer(enabled: !(actionsEnabled && reduceMotion)))
 
             RoundedRectangle(cornerRadius: 8)
                 .fill(placeholderColor)
                 .frame(maxWidth: .infinity, minHeight: chartHeight)
-                .shimmer()
+                .modifier(MetricCardShimmer(enabled: !(actionsEnabled && reduceMotion)))
         }
     }
 
@@ -464,27 +533,36 @@ public struct MetricSummaryCard: View {
             }
 
             if let action = action {
-                Button(action: action.handler) {
-                    Text(action.title)
-                        .font(.system(.callout, design: .rounded).weight(.semibold))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(actionBackground(isError: isError))
-                        .cornerRadius(14)
+                if actionsEnabled {
+                    actionLabel(action, isError: isError)
+                } else {
+                    Button(action: action.handler) {
+                        actionLabel(action, isError: isError)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(isError ? "Retry" : "Add data")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(isError ? theme.colors.error : accentColor)
-                .accessibilityHint(isError ? "Retry" : "Add data")
             }
         }
     }
 
-    private var hasActionableState: Bool {
+    private func actionLabel(_ action: CardAction, isError: Bool) -> some View {
+        Text(action.title)
+            .font(.system(.callout, design: .rounded).weight(.semibold))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(actionBackground(isError: isError))
+            .cornerRadius(14)
+            .foregroundStyle(isError ? theme.colors.error : accentColor)
+    }
+
+    private var showsDetailChevron: Bool {
+        guard detailAction != nil else { return false }
         switch state {
         case .data:
             return true
         case .empty(_, _, let action), .error(_, _, let action):
-            return action != nil || isButtonContext
+            return action == nil
         case .loading:
             return false
         }
@@ -593,77 +671,171 @@ public struct MetricSummaryCard: View {
         case .error(_, _, let action):
             return action == nil ? nil : "Double tap to retry"
         case .data:
-            return isButtonContext ? "Double tap for details" : nil
+            return detailAction != nil ? "Double tap for details" : nil
         }
     }
 }
 
 // MARK: - Metric Card Button Style
 
+private struct MetricCardShimmer: ViewModifier {
+    let enabled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.shimmer()
+        } else {
+            content
+        }
+    }
+}
+
 struct MetricCardButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1.0)
             .brightness(configuration.isPressed ? 0.06 : 0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
-// MARK: - Preview
+// MARK: - Deterministic metric state fixture
 
-#Preview("Metric Summary Card States") {
-    ScrollView {
-        VStack(spacing: 20) {
-            Button(action: {}, label: {
-                MetricSummaryCard(
-                    icon: "flame.fill",
-                    accentColor: Color.appWarning,
-                    state: .data(
-                        MetricSummaryCard.Content(
-                            title: "Steps",
-                            value: "7,842",
-                            unit: "steps",
-                            timestamp: "6:15 PM",
-                            dataPoints: stride(from: 0, through: 6, by: 1).map { index in
-                                MetricSummaryCard.DataPoint(index: index, value: Double.random(in: 4_000...6_000))
-                            },
-                            chartAccessibilityLabel: "Steps trend for the last week",
-                            chartAccessibilityValue: "Latest value 7,842 steps",
-                            trend: MetricSummaryCard.Trend(direction: .up, valueText: "12%", caption: "vs last week"),
-                            footnote: "On track for your 10K goal"
-                        )
-                    ),
-                    isButtonContext: true
+#if DEBUG
+/// Uses the production card and its native Button; handlers produce observable state/navigation.
+struct MetricCardFixtureView: View {
+    private let metrics = ["Steps", "Weight", "Body Fat", "FFMI"]
+    @State private var order = DashboardViewLiquid.MetricIdentifier.allCases
+    @State private var draggedMetric: DashboardViewLiquid.MetricIdentifier?
+    @State private var dropTargetMetric: DashboardViewLiquid.MetricIdentifier?
+    @State private var selectedState = "loading"
+    @State private var completed: Set<String> = []
+    @State private var invocations: [String: Int] = [:]
+    @State private var detail: String?
+    private let arguments = ProcessInfo.processInfo.arguments
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                DashboardMetricsList(
+                    metricsOrder: $order, draggedMetric: $draggedMetric,
+                    dropTargetMetric: $dropTargetMetric, onReorder: {},
+                    cardContent: { metric in
+                        metricCard(for: metric)
+                    }
                 )
-            })
-
-            MetricSummaryCard(
-                icon: "figure.stand",
-                accentColor: Color.linearPurple,
-                state: .loading(title: "Weight")
-            )
-
-            MetricSummaryCard(
-                icon: "percent",
-                accentColor: Color.appPrimary,
-                state: .empty(
-                    title: "Body fat",
-                    message: "Log your body fat to see trends and insights.",
-                    action: MetricSummaryCard.CardAction(title: "Add measurement", handler: {})
-                )
-            )
-
-            MetricSummaryCard(
-                icon: "figure.arms.open",
-                accentColor: Color.metricAccentBodyFat,
-                state: .error(
-                    title: "FFMI",
-                    message: "We couldn’t load FFMI data.",
-                    action: MetricSummaryCard.CardAction(title: "Retry", handler: {})
-                )
-            )
+                .padding(20)
+            }
+            .safeAreaInset(edge: .top) {
+                VStack {
+                    HStack {
+                        stateButton("loading")
+                        stateButton("empty")
+                        stateButton("error")
+                    }
+                    HStack {
+                        stateButton("permission")
+                        stateButton("data")
+                        stateButton("unavailable")
+                    }
+                    ForEach(metrics, id: \.self) { title in
+                        Text("\(title) calls: \(invocations[title, default: 0])")
+                            .font(.caption2)
+                            .accessibilityIdentifier("metric_fixture_calls_\(title)")
+                    }
+                }
+                .font(.caption)
+                .padding(8)
+                .background(Color.appBackground)
+            }
+            .navigationDestination(item: $detail) { title in
+                Text("\(title) details")
+                    .accessibilityIdentifier("metric_fixture_detail")
+            }
         }
-        .padding(24)
+        .preferredColorScheme(.dark)
     }
-    .background(DefaultTheme().colors.background)
+
+    private func metricCard(for metric: DashboardViewLiquid.MetricIdentifier) -> some View {
+        let title = metric == .bodyFat ? "Body Fat" : metric == .ffmi ? "FFMI" : metric.rawValue.capitalized
+        return MetricSummaryCard(
+            icon: "chart.xyaxis.line", accentColor: Color.appPrimary,
+            state: state(for: title), detailAction: detailAction(for: title)
+        )
+        .buttonStyle(MetricCardButtonStyle())
+        .environment(\.metricCardIdentity, !arguments.contains("-lybUITestMetricCardLegacy"))
+        .environment(\.metricCardActions, !arguments.contains("-lybUITestMetricCardLegacy"))
+        .environment(\.dynamicTypeSize, arguments.contains("-lybUITestMetricCardAX3") ? .accessibility3 : .large)
+        .environment(\.accessibilityReduceMotion, arguments.contains("-lybUITestReduceMotion"))
+        .accessibilityIdentifier("metric_fixture_\(title)")
+    }
+
+    private func stateButton(_ name: String) -> some View {
+        Button(name.capitalized) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedState = name
+                completed = []
+                invocations = [:]
+            }
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("metric_fixture_state_\(name)")
+    }
+
+    private func state(for title: String) -> MetricSummaryCard.State {
+        let actionTitle = selectedState == "error" ? "Retry"
+            : selectedState == "permission" ? "Review Health access" : "Add measurement"
+        let action = MetricSummaryCard.CardAction(
+            title: actionTitle,
+            hint: selectedState == "permission" ? "Shows Health access details" : nil
+        ) {
+            invocations[title, default: 0] += 1
+            if selectedState == "permission" {
+                detail = "\(title) Health access"
+            } else {
+                completed.insert(title)
+            }
+        }
+        if completed.contains(title) || selectedState == "data" {
+            let unit = title == "Steps" ? "steps" : title == "Weight" ? "kg" : title == "Body Fat" ? "%" : ""
+            let value = title == "Steps" ? "8,000" : title == "Weight" ? "80" : title == "Body Fat" ? "18" : "20"
+            let reading = Double(value.replacingOccurrences(of: ",", with: "")) ?? 0
+            return .data(.init(
+                title: title, value: value, unit: unit, timestamp: "October 25 at 08:00",
+                dataPoints: [.init(index: 0, value: reading), .init(index: 1, value: reading)],
+                chartAccessibilityLabel: "\(title) history, last 30 days",
+                chartAccessibilityValue: "Latest value \(value) \(unit)",
+                trend: .init(direction: .flat, valueText: "No change", caption: "1M"),
+                footnote: title == "FFMI" ? "Calculated from weight, body fat and height" : "Source: Apple Health"
+            ))
+        }
+        switch selectedState {
+        case "empty":
+            return .empty(title: title, message: "No measurements yet", action: action)
+        case "error":
+            return .error(title: title, message: "Unable to load measurements", action: action)
+        case "permission":
+            return .empty(title: title, message: "Health access needed", action: action)
+        case "unavailable":
+            return .error(title: title, message: "Measurements unavailable", action: nil)
+        default:
+            return .loading(title: title)
+        }
+    }
+
+    private func detailAction(for title: String) -> MetricSummaryCard.CardAction? {
+        guard selectedState != "unavailable" else { return nil }
+        return .init(title: "Show \(title) details") {
+            invocations[title, default: 0] += 1
+            detail = title
+        }
+    }
 }
+
+#Preview("Metric state actions") {
+    MetricCardFixtureView()
+}
+#endif

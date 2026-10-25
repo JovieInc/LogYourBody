@@ -158,6 +158,53 @@ enum UIAccessibilityContract {
 }
 
 extension UIAccessibilityContractTests {
+    @MainActor
+    func testMetricActionRolloutRequiresItsSpecificGate() {
+        XCTAssertFalse(MetricCardActionPolicy.isEnabled { _ in false })
+        XCTAssertTrue(MetricCardActionPolicy.isEnabled {
+            [MetricCardIdentityPolicy.gateKey, "metric_card_actions_v1"].contains($0)
+        })
+        XCTAssertFalse(MetricCardActionPolicy.isEnabled { $0 == "metric_card_actions_v1" })
+        XCTAssertFalse(MetricCardActionPolicy.isEnabled { $0 == MetricCardIdentityPolicy.gateKey })
+    }
+
+    @MainActor
+    func testEveryMetricStateHasOneTruthfulActionAndLoadingHasNone() {
+        for title in ["Steps", "Weight", "Body Fat", "FFMI"] {
+            var detailCalls = 0
+            var stateCalls = 0
+            let detail = MetricSummaryCard.CardAction(title: "Show details") { detailCalls += 1 }
+            let action = MetricSummaryCard.CardAction(title: "Review Health access", hint: "Shows Health access details") {
+                stateCalls += 1
+            }
+            for state: MetricSummaryCard.State in [
+                .empty(title: title, message: "Health access needed", action: action),
+                .error(title: title, message: "Unable to load", action: action)
+            ] {
+                let card = MetricSummaryCard(icon: "circle", accentColor: .blue, state: state, detailAction: detail)
+                XCTAssertEqual(card.primaryAction(actionsEnabled: true)?.title, "Review Health access")
+                XCTAssertEqual(card.actionHint(actionsEnabled: true), "Shows Health access details")
+                card.primaryAction(actionsEnabled: true)?.handler()
+                XCTAssertEqual(detailCalls, 0, "The state action must take precedence over navigation")
+                XCTAssertNil(card.primaryAction(actionsEnabled: false), "Rollback must not nest state/navigation buttons")
+            }
+            XCTAssertEqual(stateCalls, 2, "One invocation per activation")
+            let loading = MetricSummaryCard(
+                icon: "circle", accentColor: .blue, state: .loading(title: title), detailAction: detail
+            )
+            for enabled in [false, true] {
+                XCTAssertNil(loading.primaryAction(actionsEnabled: enabled))
+                XCTAssertNil(loading.actionHint(actionsEnabled: enabled))
+            }
+            let unavailable = MetricSummaryCard(
+                icon: "circle", accentColor: .blue,
+                state: .error(title: title, message: "Unavailable", action: nil)
+            )
+            XCTAssertNil(unavailable.primaryAction(actionsEnabled: true))
+            XCTAssertNil(unavailable.actionHint(actionsEnabled: true))
+        }
+    }
+
     func testMetricTrendAccessibilityPreservesEveryDisplayedPeriodWithoutRepeatingNoChange() {
         for period in ["7d", "1M", "3M", "6M", "1Y", "All"] {
             let trend = MetricSummaryCard.Trend(direction: .flat, valueText: "No change", caption: period)
@@ -241,6 +288,7 @@ extension UIAccessibilityContractTests {
                 for (name, state) in states {
                     let card = MetricSummaryCard(icon: "percent", accentColor: .blue, state: state)
                         .environment(\.metricCardIdentity, enabled)
+                        .environment(\.metricCardActions, false)
                         .environment(\.dynamicTypeSize, size)
                         .transaction { $0.animation = nil; $0.disablesAnimations = true }
                         .padding(20)
