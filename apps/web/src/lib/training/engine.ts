@@ -1,6 +1,7 @@
 import {
   MESOCYCLE_WEEKS,
   MUSCLE_GROUPS,
+  TRAINING_SESSIONS_PER_WEEK,
   type DeloadState,
   type Equipment,
   type ExercisePattern,
@@ -222,13 +223,77 @@ const EXERCISES: Record<Equipment, Record<ExercisePattern, ExerciseSeed[]>> = {
   },
 };
 
+type SessionFocus = 'Full body' | 'Upper body' | 'Lower body' | 'Push' | 'Pull' | 'Legs';
+const FOCUS_MUSCLES: Record<SessionFocus, readonly MuscleGroup[]> = {
+  'Full body': MUSCLE_GROUPS,
+  'Upper body': ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
+  'Lower body': ['quads', 'hamstrings', 'glutes', 'calves', 'core'],
+  Push: ['chest', 'shoulders', 'triceps'],
+  Pull: ['back', 'biceps'],
+  Legs: ['quads', 'hamstrings', 'glutes', 'calves', 'core'],
+};
+const SESSION_TEMPLATES: Record<
+  TrainingProgramSetup['sessionsPerWeek'],
+  Array<{ focus: SessionFocus; pattern: ExercisePattern }>
+> = {
+  2: [
+    { focus: 'Full body', pattern: 'A' },
+    { focus: 'Full body', pattern: 'B' },
+  ],
+  3: [
+    { focus: 'Full body', pattern: 'A' },
+    { focus: 'Full body', pattern: 'B' },
+    { focus: 'Full body', pattern: 'A' },
+  ],
+  4: [
+    { focus: 'Upper body', pattern: 'A' },
+    { focus: 'Lower body', pattern: 'A' },
+    { focus: 'Upper body', pattern: 'B' },
+    { focus: 'Lower body', pattern: 'B' },
+  ],
+  5: [
+    { focus: 'Push', pattern: 'A' },
+    { focus: 'Pull', pattern: 'A' },
+    { focus: 'Legs', pattern: 'A' },
+    { focus: 'Upper body', pattern: 'B' },
+    { focus: 'Lower body', pattern: 'B' },
+  ],
+  6: [
+    { focus: 'Push', pattern: 'A' },
+    { focus: 'Pull', pattern: 'A' },
+    { focus: 'Legs', pattern: 'A' },
+    { focus: 'Push', pattern: 'B' },
+    { focus: 'Pull', pattern: 'B' },
+    { focus: 'Legs', pattern: 'B' },
+  ],
+};
+
+function sessionSeeds(
+  equipment: Equipment,
+  focus: SessionFocus,
+  pattern: ExercisePattern,
+): ExerciseSeed[] {
+  const seeds = EXERCISES[equipment][pattern];
+  if (focus === 'Full body') return seeds;
+  // Both lower sessions use a hinge. Squat + hinge contributions give quads,
+  // hamstrings and glutes four weekly sets each, rather than counting the hip
+  // thrust's small hamstring contribution as the second hamstring exposure.
+  return seeds
+    .filter((seed) => FOCUS_MUSCLES[focus].includes(seed.primaryMuscle))
+    .map((seed) =>
+      seed.primaryMuscle === 'glutes'
+        ? EXERCISES[equipment].A.find((candidate) => candidate.primaryMuscle === 'hamstrings')!
+        : seed,
+    );
+}
+
 const RIR_LADDER = [4, 3, 3, 2] as const;
 const REP_RANGE = { min: 8, max: 12 } as const;
 
 function eligibleSubstitutions(input: {
   seed: ExerciseSeed;
   equipment: Equipment;
-  pattern: ExercisePattern;
+  plannedSeeds: ExerciseSeed[];
   sets: number;
   targetRir: number;
 }): ExerciseSubstitution[] {
@@ -236,7 +301,7 @@ function eligibleSubstitutions(input: {
     input.equipment === 'full_gym'
       ? [EXERCISES.full_gym.A, EXERCISES.full_gym.B, EXERCISES.dumbbells.A, EXERCISES.dumbbells.B]
       : [EXERCISES.dumbbells.A, EXERCISES.dumbbells.B];
-  const plannedIds = new Set(EXERCISES[input.equipment][input.pattern].map((item) => item.id));
+  const plannedIds = new Set(input.plannedSeeds.map((item) => item.id));
   const seen = new Set<string>();
   return pools
     .flat()
@@ -747,7 +812,10 @@ export function buildSession(input: {
   logs: SetLog[];
   feedback: TrainingFeedback[];
 }): Session {
-  const pattern: ExercisePattern = input.slot % 2 === 0 ? 'A' : 'B';
+  const template = SESSION_TEMPLATES[input.setup.sessionsPerWeek][input.slot];
+  if (!template) throw new Error('unsupported_training_session_slot');
+  const { focus, pattern } = template;
+  const seeds = sessionSeeds(input.setup.equipment, focus, pattern);
   const sessionDeload = evaluateDeload(input.feedback);
   const safetyStop = sessionDeload.action === 'pause_session';
   const targetRir = input.block.targetRir;
@@ -756,7 +824,7 @@ export function buildSession(input: {
   );
   const exercises = safetyStop
     ? []
-    : EXERCISES[input.setup.equipment][pattern].map((seed) => {
+    : seeds.map((seed) => {
         const muscleDeload = muscleDeloads.get(seed.primaryMuscle);
         const sets = muscleDeload?.action === 'reduce_volume' ? 1 : 2;
         const progression = progressionForExercise(
@@ -782,7 +850,7 @@ export function buildSession(input: {
           substitutions: eligibleSubstitutions({
             seed,
             equipment: input.setup.equipment,
-            pattern,
+            plannedSeeds: seeds,
             sets,
             targetRir,
           }),
@@ -801,7 +869,7 @@ export function buildSession(input: {
     week: input.block.currentWeek,
     slot: input.slot,
     pattern,
-    title: `Full body ${pattern}`,
+    title: `${focus} ${pattern}`,
     exercises,
     safetyStop,
     explanation,
@@ -847,7 +915,7 @@ export function isProgramSetup(value: unknown): value is TrainingProgramSetup {
     setup.consentVersion === 'hypertrophy-coach-v1' &&
     setup.adultConfirmed === true &&
     setup.safetyConfirmed === true &&
-    (setup.sessionsPerWeek === 2 || setup.sessionsPerWeek === 3) &&
+    TRAINING_SESSIONS_PER_WEEK.some((count) => setup.sessionsPerWeek === count) &&
     (setup.equipment === 'dumbbells' || setup.equipment === 'full_gym') &&
     typeof setup.startedAt === 'string' &&
     Number.isFinite(Date.parse(setup.startedAt))

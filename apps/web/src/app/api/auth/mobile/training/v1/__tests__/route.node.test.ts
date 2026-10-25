@@ -58,6 +58,54 @@ const eligibleSetup = {
 };
 
 describe('authenticated training API', () => {
+  it.each([4, 5, 6])('enrolls and serves all %i split sessions', async (sessionsPerWeek) => {
+    const { handlers } = makeHarness();
+    const enrolled = await handlers.enroll(
+      request('POST', 'enroll', 'token-a', { ...eligibleSetup, sessionsPerWeek }),
+    );
+    expect(enrolled.status).toBe(201);
+    await expect(enrolled.json()).resolves.toMatchObject({ program: { sessionsPerWeek } });
+    const sessionIds = new Set<string>();
+    for (let slot = 0; slot < sessionsPerWeek; slot++) {
+      const next = await handlers.next(request('GET', 'next', 'token-a'));
+      expect(next.status).toBe(200);
+      const { session } = await next.json();
+      expect(session.slot).toBe(slot);
+      expect(sessionIds.has(session.id)).toBe(false);
+      sessionIds.add(session.id);
+      for (const exercise of session.exercises) {
+        for (let setNumber = 1; setNumber <= exercise.sets; setNumber++) {
+          const logged = await handlers.logSet(
+            request('POST', 'log-set', 'token-a', {
+              sessionId: session.id,
+              exerciseId: exercise.id,
+              setNumber,
+              reps: 8,
+              loadKg: null,
+              rir: 4,
+            }),
+          );
+          expect(logged.status).toBe(201);
+        }
+      }
+    }
+    expect(sessionIds.size).toBe(sessionsPerWeek);
+    const completed = await handlers.next(request('GET', 'next', 'token-a'));
+    await expect(completed.json()).resolves.toMatchObject({ session: null });
+  });
+
+  it.each([1, 7, 4.5, '4', null])(
+    'rejects an unsupported enrollment schedule: %s',
+    async (sessionsPerWeek) => {
+      const { handlers, records } = makeHarness();
+      const response = await handlers.enroll(
+        request('POST', 'enroll', 'token-a', { ...eligibleSetup, sessionsPerWeek }),
+      );
+      expect(response.status).toBe(400);
+      expect((await records.pull('subject-a', 'training_feedback')).records).toHaveLength(0);
+    },
+  );
+
   it('rejects unauthenticated access, disabled rollout, and rate-limited requests', async () => {
     const unauthorized = makeHarness();
     expect((await unauthorized.handlers.next(request('GET', 'next'))).status).toBe(401);

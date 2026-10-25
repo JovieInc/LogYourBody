@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from './types';
+import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION, TRAINING_SESSIONS_PER_WEEK } from './types';
 
 export const TRAINING_BASELINE_POLICY = 'hypertrophy-baseline-v1';
 const timestamp = z.string().datetime({ offset: true });
@@ -19,7 +19,7 @@ export const initialIntentSchema = z
     kind: z.literal('initial_enrollment'),
     adultConfirmed: z.literal(true),
     safetyConfirmed: z.literal(true),
-    sessionsPerWeek: z.union([z.literal(2), z.literal(3)]),
+    sessionsPerWeek: z.literal(TRAINING_SESSIONS_PER_WEEK),
     equipment: z.enum(['dumbbells', 'full_gym']),
   })
   .strict();
@@ -73,7 +73,7 @@ export const baselinePlanSchema = z.object({
       }),
     )
     .min(2)
-    .max(3),
+    .max(6),
   plannedFractionalVolume: z.record(z.string(), z.number().finite().nonnegative()),
 });
 export const initialProposalSchema = z
@@ -106,7 +106,7 @@ export const appliedSetupSchema = z.object({
   consentVersion: z.literal(TRAINING_CONSENT_VERSION),
   adultConfirmed: z.literal(true),
   safetyConfirmed: z.literal(true),
-  sessionsPerWeek: z.union([z.literal(2), z.literal(3)]),
+  sessionsPerWeek: z.literal(TRAINING_SESSIONS_PER_WEEK),
   equipment: z.enum(['dumbbells', 'full_gym']),
   startedAt: timestamp,
   programRevisionId: uuid,

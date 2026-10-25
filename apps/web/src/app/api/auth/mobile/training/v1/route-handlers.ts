@@ -22,7 +22,11 @@ import {
   pullAllTrainingRecords,
   storeProgramSetup,
 } from '@/lib/training/service';
-import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from '@/lib/training/types';
+import {
+  MUSCLE_GROUPS,
+  TRAINING_CONSENT_VERSION,
+  TRAINING_SESSIONS_PER_WEEK,
+} from '@/lib/training/types';
 
 export const TRAINING_API_VERSION = 1;
 
@@ -30,7 +34,7 @@ const EnrollBodySchema = z
   .object({
     adultConfirmed: z.boolean(),
     safetyConfirmed: z.boolean(),
-    sessionsPerWeek: z.union([z.literal(2), z.literal(3)]),
+    sessionsPerWeek: z.literal(TRAINING_SESSIONS_PER_WEEK),
     equipment: z.enum(['dumbbells', 'full_gym']),
   })
   .strict();
