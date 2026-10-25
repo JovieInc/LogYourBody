@@ -23,6 +23,22 @@
     }
   },
   {
+    "fingerprint": "chart-playhead-preparation-and-label-mapping",
+    "correction": "LYB-44: The chart responsiveness and line/playhead tooltip request in audited session bg_092003_cba358 was missed. Establish budgets, retain correct selected-series labels, and prevent history preparation on every scrub.",
+    "source": "https://linear.app/jovie/issue/LYB-44",
+    "mechanization": "The view-owned input-keyed PreparationCache prepares selection samples once, retains daily/average provenance and reading times, and uses binary nearest-day lookup. Native HomeV2MetricEditorialTests cover latest daily selection, duplicate timestamps, gaps, invalid values, all cache inputs, gate rollback and policy latency budgets. The existing required shared-lib chart regression also prevents removing the gated cache from the actual SwiftUI path. Device frame and display-latency receipts remain separate required release evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Cache chart geometry by render inputs rather than playhead state and construct the date-to-reading mapping alongside the plotted series, retaining provenance by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/HomeV2MetricEditorialTests.swift",
+      "anchor": "func testPlayheadSelectsLatestDailyReadingRegardlessOfValueOrInputOrder()"
+    }
+  },
+  {
     "fingerprint": "claims-lint-covers-public-web-copy",
     "correction": "LYB-230: The claims lint added storefront coverage in LYB-188 but omitted public web copy and page metadata, leaving the 2026-10-14 marketing audit vulnerable to regressions.",
     "source": "https://linear.app/jovie/issue/LYB-230",
