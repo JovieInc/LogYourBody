@@ -47,6 +47,7 @@ export function createNeonCanvasLedger(
       ]);
       const kind = (rows[0]?.result as { kind?: string } | undefined)?.kind;
       if (kind === 'saved') return { kind: 'saved' };
+      if (kind === 'canonical_revision_required') return { kind: 'canonical_revision_required' };
       if (kind === 'stale' || kind === 'owner_missing') return { kind: 'stale' };
       return { kind: 'missed_update' };
     },
