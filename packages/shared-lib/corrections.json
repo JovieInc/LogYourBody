@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "training-cycle-delegation-merge-parity",
+    "correction": "PR #1541 conflicts with the delegated programming implementation merged in PR #1531. Preserve both proposal versions, owner-locked database admission and native entry points when merging origin/main.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1541",
+    "mechanization": "Separate the cycle schema from revision/delegation dependencies to prevent the engine import cycle. Route cycle intents through version 1 while retaining version 2 dispatch, and extend the additive migration with both admission paths. The required web suite exercises cycle review/apply with the delegated gate both off and on and rejects replacement of an accepted delegated plan. The combined disposable PostgreSQL verifier retains all cycle and delegated transaction cases; the original cycle migration fails the delegated cases.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Independent cycle schema dependencies prevent module initialization failures; explicit intent/version dispatch and one owner-locked SQL command retain both implementations by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/api/auth/mobile/training/v1/__tests__/revisions.node.test.ts",
+      "anchor": "keeps cycle revisions reachable with delegated programming enabled=%s"
+    }
+  },
+  {
     "fingerprint": "web-sentry-runtime-env-declarations",
     "correction": "PR #1542: Declare every consumed public Sentry runtime variable in apps/web/.env.example. Missing DSN, environment and release declarations fail the required environment surface guard.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169587476/job/121097641374",
@@ -523,6 +539,26 @@
     "guard": {
       "path": "apps/ios/LogYourBody/Helpers/DashboardMetricFormatting.swift",
       "anchor": "return metric.effectiveDate >= start && metric.effectiveDate <= now"
+    }
+  },
+  {
+    "fingerprint": "guard-reference-paths-exist",
+    "correction": "LYB-254: A ledger entry that claims a guard must point at a test, lint rule, or CI step path that exists. Entries with no guard reference stay on a shrink-only baseline.",
+    "source": "https://linear.app/jovie/issue/LYB-254",
+    "mechanization": "The required Detect Changes job runs guard-reference.mjs on every diff. A missing guard path fails with the entry id and path. Unguarded entries warn, and the committed baseline can only shrink against the exact Git base.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot prove that a Git-tracked ledger guard still points at a file in the repository."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic CI check can stat each claimed guard path and compare the unguarded entry baseline with the immutable Git base."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/guard-reference.behavior.mjs",
+      "anchor": "deleted guard fails with the entry id and path"
     }
   }
 ]
