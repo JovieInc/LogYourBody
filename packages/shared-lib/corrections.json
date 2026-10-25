@@ -1,5 +1,28 @@
 [
   {
+    "fingerprint": "app-store-privacy-matches-native-collection",
+    "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
+    "source": "https://linear.app/jovie/issue/LYB-194",
+    "mechanization": "The existing required Detect Changes correction ratchet scans the questionnaire on every diff, including iOS-only and docs-only changes. An empty baseline rejects any missing answer, changed HealthKit type or authorization set, or changed Info.plist usage description. Shared-lib runs mutation regressions against real source snapshots.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "ASC answers are external account metadata. Native runtime types cannot ensure that the versioned questionnaire matches permission declarations or the ASC console."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing deterministic correction ratchet can enforce reviewed native types, read/write sets, permission descriptions and complete disclosure fields without ASC credentials or workflow changes."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/app-privacy.mjs",
+      "anchor": "LYB-194: reject HealthKit authorization and usage-description drift from ASC answers.",
+      "ratchet": {
+        "baseline": "packages/shared-lib/app-privacy-baseline.json"
+      }
+    }
+  },
+  {
     "fingerprint": "workout-readiness-uses-canonical-durable-feedback",
     "correction": "LYB-129 October 14 addendum: Make saved recovery observations change the live workout; timer expiry is advisory, and conversational acknowledgments are not state-change receipts.",
     "source": "https://linear.app/jovie/issue/LYB-129",
