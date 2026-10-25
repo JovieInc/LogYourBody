@@ -588,6 +588,9 @@ func formatDeltaValue(_ delta: Double) -> String {
     }
 
 func deltaColor(for delta: Double) -> Color {
+        if MetricStatsTruthPolicy.isEnabled() {
+            return Color.metricTextSecondary
+        }
         let threshold: Double = 0.0001
         guard abs(delta) > threshold else {
             return Color.metricTextPrimary

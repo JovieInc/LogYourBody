@@ -82,6 +82,18 @@ class StatsCardCompositionTests(unittest.TestCase):
         path.write_text(path.read_text() + "\nlet legacyColor = Color.white\n")
         self.assert_rejected("dashboard.system_b_theme_tokens")
 
+    def test_card_cannot_assign_success_to_direction_alone(self):
+        self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
+                     "return secondaryTextColor\n        }\n        switch direction",
+                     "return theme.colors.success\n        }\n        switch direction")
+        self.assert_rejected("dashboard.neutral_trend_direction")
+
+    def test_detail_cannot_assign_success_to_direction_alone(self):
+        self.replace("Components/FullMetricChartView+Part02.swift",
+                     "return Color.metricTextSecondary\n        }",
+                     "return Color.metricDeltaPositive\n        }")
+        self.assert_rejected("dashboard.neutral_trend_direction")
+
 
 if __name__ == "__main__":
     result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(StatsCardCompositionTests))

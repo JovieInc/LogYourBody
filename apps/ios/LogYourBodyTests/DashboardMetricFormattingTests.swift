@@ -13,6 +13,15 @@ import XCTest
 final class DashboardMetricFormattingTests: XCTestCase {
     private let base = Date(timeIntervalSince1970: 1_800_000_000)
 
+    @MainActor
+    func testStatsTruthRequiresExplicitGateAndKeepsGoalsNeutral() {
+        XCTAssertFalse(MetricStatsTruthPolicy.isEnabled { _ in false })
+        XCTAssertTrue(MetricStatsTruthPolicy.isEnabled { key in key == "metric_stats_truth_v1" })
+        for goal in [nil, 60, 80, 100, Double.nan, Double.infinity] as [Double?] {
+            XCTAssertTrue(MetricStatsTruthPolicy.usesNeutralDirection(goal: goal))
+        }
+    }
+
     // MARK: - computeRangeStats (drives heroWeightDelta30d / heroBodyFatDelta30d / heroFFMIDelta30d)
 
     func testComputeRangeStatsReturnsNilForEmpty() {

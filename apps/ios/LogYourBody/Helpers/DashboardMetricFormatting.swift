@@ -1,6 +1,20 @@
 import SwiftUI
 import Charts
 
+enum MetricStatsTruthPolicy {
+    static let gateKey = "metric_stats_truth_v1"
+
+    @MainActor
+    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
+        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return check(gateKey)
+    }
+
+    /// A saved target does not establish clinical safety or a preference for every change.
+    /// Keep direction neutral until a separate, validated goal comparison is available.
+    static func usesNeutralDirection(goal: Double?) -> Bool { true }
+}
+
 struct CircleSymbol: ChartSymbolShape {
     var perceptualUnitRect: CGRect { CGRect(x: -0.5, y: -0.5, width: 1, height: 1) }
 

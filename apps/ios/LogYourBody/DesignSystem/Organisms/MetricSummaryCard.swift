@@ -527,6 +527,9 @@ public struct MetricSummaryCard: View {
     }
 
     private func trendBackground(for direction: Trend.Direction) -> Color {
+        if MetricStatsTruthPolicy.isEnabled() {
+            return secondaryTextColor.opacity(0.15)
+        }
         switch direction {
         case .up:
             return theme.colors.success.opacity(0.15)
@@ -538,6 +541,9 @@ public struct MetricSummaryCard: View {
     }
 
     private func trendForeground(for direction: Trend.Direction) -> Color {
+        if MetricStatsTruthPolicy.isEnabled() {
+            return secondaryTextColor
+        }
         switch direction {
         case .up:
             return theme.colors.success

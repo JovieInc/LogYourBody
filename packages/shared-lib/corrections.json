@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "stats-truth-neutral-direction-and-observation-windows",
+    "correction": "LYB-47: Stats must distinguish observation, sync, display and comparison dates; insufficient samples and direction alone cannot imply unchanged health or goal progress.",
+    "source": "Linear LYB-47; user task received 2026-10-25",
+    "mechanization": "The existing metric helpers own the shared Stats truth contract behind metric_stats_truth_v1. Existing native formatting, chart and share truth tests cover fixtures. The required launch-quality audit rejects reintroduced success/error direction styling; mutation tests prove rejection.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Keep direction neutral by construction and share a dated observation summary across Stats, detail, timeline and share rather than adding a competing calculator."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "# LYB-47: direction alone cannot establish safe goal progress."
+    }
+  },
+  {
     "fingerprint": "app-store-privacy-matches-native-collection",
     "correction": "LYB-194: Version App Store Connect privacy answers and reject drift from native HealthKit authorization and Info.plist permissions before submission.",
     "source": "https://linear.app/jovie/issue/LYB-194",

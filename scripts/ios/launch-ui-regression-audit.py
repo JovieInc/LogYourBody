@@ -230,6 +230,20 @@ def main() -> int:
             violations=violations,
         )
 
+    # LYB-47: direction alone cannot establish safe goal progress.
+    for relative_path, token in [
+        ("DesignSystem/Organisms/MetricSummaryCard.swift",
+         "if MetricStatsTruthPolicy.isEnabled() {\n            return secondaryTextColor\n        }"),
+        ("Components/FullMetricChartView+Part02.swift",
+         "if MetricStatsTruthPolicy.isEnabled() {\n            return Color.metricTextSecondary"),
+    ]:
+        require_token(
+            root=root, path=app_dir / relative_path, token=token,
+            check="dashboard.neutral_trend_direction",
+            detail="Stats truth must keep direction neutral without a validated safe goal comparison.",
+            violations=violations,
+        )
+
     system_b_surface_files = [
         app_dir / "Views/DashboardViewLiquid+PhotoTimelineHUD.swift",
         app_dir / "Views/DashboardViewLiquid+PhotoTimelineInsights.swift",
