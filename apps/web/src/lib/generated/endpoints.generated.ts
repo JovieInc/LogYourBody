@@ -167,6 +167,10 @@ export const endpoints = {
       reason: 'Apple developer documentation links in docs/research.',
     },
     {
+      value: 'https://docs.statsig.com/client/iosClientSDK',
+      reason: 'LYB-194 source for SDK stable identifiers and privacy disclosure review.',
+    },
+    {
       value: 'https://support.apple.com/en-in/guide/iphone/iphe3d379c32/ios',
       reason: 'LYB-179 primary reference teardown; documentation only, no integration.',
     },
@@ -367,6 +371,10 @@ export const endpoints = {
     {
       value: 'https://linear.app/jovie/issue/LYB-173',
       reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-194',
+      reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet',
