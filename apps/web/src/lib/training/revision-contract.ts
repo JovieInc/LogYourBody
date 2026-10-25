@@ -1,4 +1,7 @@
+import { cycleConfigurationSchema } from './cycle-contract';
+export { cycleConfigurationSchema } from './cycle-contract';
 import { z } from 'zod';
+import { CATALOG_EQUIPMENT } from './catalog';
 import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from './types';
 import {
   delegatedProposalSchema,
@@ -7,6 +10,8 @@ import {
 } from './delegation-contract';
 
 export const TRAINING_BASELINE_POLICY = 'hypertrophy-baseline-v1';
+export const TRAINING_CYCLE_POLICY = 'hypertrophy-cycle-v1';
+const policyVersionSchema = z.enum([TRAINING_BASELINE_POLICY, TRAINING_CYCLE_POLICY]);
 const timestamp = z.string().datetime({ offset: true });
 const uuid = z.string().uuid();
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -19,6 +24,20 @@ export const revisionContextSchema = z.object({
 });
 export type RevisionContextToken = z.infer<typeof revisionContextSchema>;
 
+const programSetupSchema = z.object({
+  id: uuid,
+  consentVersion: z.literal(TRAINING_CONSENT_VERSION),
+  adultConfirmed: z.literal(true),
+  safetyConfirmed: z.literal(true),
+  sessionsPerWeek: z.union([z.literal(2), z.literal(3)]),
+  equipment: z.enum(['dumbbells', 'full_gym']),
+  startedAt: timestamp,
+  programRevisionId: uuid.optional(),
+  programPolicyVersion: z.string().optional(),
+  cycle: cycleConfigurationSchema.optional(),
+  excludedVariantIds: z.array(z.string()).optional(),
+  declaredEquipment: z.array(z.enum(CATALOG_EQUIPMENT)).max(16).optional(),
+});
 export const initialIntentSchema = z
   .object({
     kind: z.literal('initial_enrollment'),
@@ -26,13 +45,30 @@ export const initialIntentSchema = z
     safetyConfirmed: z.literal(true),
     sessionsPerWeek: z.union([z.literal(2), z.literal(3)]),
     equipment: z.enum(['dumbbells', 'full_gym']),
+    weekCount: cycleConfigurationSchema.shape.weekCount.optional(),
+    declaredEquipment: programSetupSchema.shape.declaredEquipment,
+    excludedVariantIds: programSetupSchema.shape.excludedVariantIds,
   })
   .strict();
+const cycleIntentSchema = z
+  .object({
+    kind: z.enum(['revise_cycle', 'repeat_cycle']),
+    weekCount: cycleConfigurationSchema.shape.weekCount,
+    keepVariants: cycleConfigurationSchema.shape.retainedVariants.default([]),
+    renewPriorities: z.boolean().default(false),
+    renewConstraints: z.boolean().default(false),
+  })
+  .strict();
+const proposalIntentSchema = z.union([initialIntentSchema, cycleIntentSchema]);
+const priorStateSchema = z.object({
+  setup: programSetupSchema,
+  trainingFingerprint: z.string().min(1),
+});
 export const createProposalInputSchema = z
   .object({
     requestId: uuid,
     expectedGeneration: integer,
-    intent: initialIntentSchema,
+    intent: proposalIntentSchema,
     reason: z.string().trim().min(1).max(500),
   })
   .strict();
@@ -62,17 +98,17 @@ const exerciseSchema = exerciseCoreSchema.extend({
   substitutions: z.array(exerciseCoreSchema).default([]),
 });
 export const baselinePlanSchema = z.object({
-  week: z.literal(1),
+  week: z.number().int().min(1).max(6),
   sessions: z
     .array(
       z.object({
         id: uuid,
-        week: z.literal(1),
+        week: z.number().int().min(1).max(6),
         slot: integer,
         pattern: z.enum(['A', 'B']),
         title: z.string(),
-        exercises: z.array(exerciseSchema).min(1),
-        safetyStop: z.literal(false),
+        exercises: z.array(exerciseSchema),
+        safetyStop: z.boolean(),
         explanation: z.string().nullable(),
         evidenceIds: z.array(z.string()),
       }),
@@ -86,36 +122,41 @@ export const initialProposalSchema = z
     version: z.literal(1),
     id: uuid,
     programId: uuid,
-    baseRevision: z.null(),
+    baseRevision: uuid.nullable(),
     context: revisionContextSchema,
     actor: z.object({ kind: z.literal('self'), subject: z.string().min(1) }),
     authority: z.literal('self_review_required'),
-    intent: initialIntentSchema,
+    intent: proposalIntentSchema,
     reason: z.string(),
-    priorState: z.null(),
-    proposedDiff: z.literal('create_supported_baseline_program'),
-    policyVersion: z.literal(TRAINING_BASELINE_POLICY),
+    priorState: priorStateSchema.nullable(),
+    proposedDiff: z.enum(['create_supported_baseline_program', 'revise_cycle', 'repeat_cycle']),
+    proposedSetup: programSetupSchema.optional(),
+    lifecyclePhase: z.enum(['adjustment', 'next_block']).optional(),
+    schedule: z
+      .array(
+        z.object({
+          week: z.number().int().positive(),
+          targetRir: z.number().int(),
+          deload: z.boolean(),
+          setsPerExercise: z.number().int().positive(),
+        }),
+      )
+      .optional(),
+    policyVersion: policyVersionSchema,
     assumptions: z.array(z.string()),
     inputEvidence: z.object({
       source: z.literal('canonical_profile_and_explicit_consent'),
       observedAt: timestamp,
     }),
-    reviewPoint: z.literal('before_first_workout'),
+    reviewPoint: z.enum(['before_first_workout', 'before_cycle_revision', 'before_next_block']),
     plan: baselinePlanSchema,
     createdAt: timestamp,
   })
   .strict();
 export type InitialTrainingProposal = z.infer<typeof initialProposalSchema>;
-export const appliedSetupSchema = z.object({
-  id: uuid,
-  consentVersion: z.literal(TRAINING_CONSENT_VERSION),
-  adultConfirmed: z.literal(true),
-  safetyConfirmed: z.literal(true),
-  sessionsPerWeek: z.union([z.literal(2), z.literal(3)]),
-  equipment: z.enum(['dumbbells', 'full_gym']),
-  startedAt: timestamp,
+export const appliedSetupSchema = programSetupSchema.extend({
   programRevisionId: uuid,
-  programPolicyVersion: z.literal(TRAINING_BASELINE_POLICY),
+  programPolicyVersion: policyVersionSchema,
 });
 const initialReceiptSchema = z
   .object({
@@ -125,7 +166,7 @@ const initialReceiptSchema = z
     decision: z.enum(['apply', 'reject']),
     status: z.enum(['applied', 'rejected']),
     actor: z.object({ kind: z.literal('self'), subject: z.string().min(1) }),
-    priorState: z.null(),
+    priorState: priorStateSchema.nullable(),
     revisionId: uuid.nullable(),
     setup: appliedSetupSchema.nullable(),
     decidedAt: timestamp,

@@ -5,6 +5,7 @@ enum TrainingPresentation: Identifiable {
     case session(TrainingSession, AuthManager.ProfileSessionOwnership)
     case voiceSetReview(TrainingSession, VoiceHeardIntent)
     case canvas(AuthManager.ProfileSessionOwnership)
+    case cycleReview(AuthManager.ProfileSessionOwnership)
     case program(AuthManager.ProfileSessionOwnership)
 
     var id: String {
@@ -12,6 +13,7 @@ enum TrainingPresentation: Identifiable {
         case .setup: "setup"
         case .session(let session, let owner): "session-\(owner.subject)-\(owner.generation)-\(session.id)"
         case .voiceSetReview(let session, _): "voice-set-review-\(session.id)"
+        case .cycleReview(let owner): "cycle-review-\(owner.subject)-\(owner.generation)"
         case .canvas(let owner): "canvas-\(owner.subject)-\(owner.generation)"
         case .program(let owner): "program-\(owner.subject)-\(owner.generation)"
         }
@@ -67,6 +69,13 @@ struct TrainingCoachCard: View {
                 Text("\(session.exercises.count) movements · engine-guided sets and reps")
                     .font(.system(size: 14))
                     .foregroundStyle(theme.colors.textSecondary)
+                if let nextAction = TrainingRecoveryCopy.appliedNextAction(session.explanation) {
+                    Text(nextAction)
+                        .font(.system(size: 14))
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("training_recovery_next_action")
+                }
                 Button(action: onStart) {
                     HStack {
                         Text("Start session")
@@ -543,6 +552,13 @@ struct TrainingLiveSessionView: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(theme.colors.text)
                 .accessibilityIdentifier("training_progress")
+            if let nextAction = TrainingRecoveryCopy.appliedNextAction(draft.session.explanation) {
+                Text(nextAction)
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("training_live_recovery_next_action")
+            }
         }
     }
 
@@ -1370,6 +1386,8 @@ struct TrainingLiveSessionFixtureView: View {
     @State private var savedSets: [TrainingSavedSet]
     @State private var presented = false
     @State private var showEnrollment = false
+    @State private var showCycleReview = false
+    @StateObject private var cycleFixture = TrainingCycleFixtureService()
     @State private var showVoiceReview = false
     @State private var showStopCard = false
     @State private var stopCount = 0
@@ -1436,6 +1454,10 @@ struct TrainingLiveSessionFixtureView: View {
                 .accessibilityIdentifier("training_fixture_enroll")
             Button("Open voice review") { showVoiceReview = true }
                 .accessibilityIdentifier("training_fixture_voice_review")
+            Button("Review cycle fixture") { showCycleReview = true }
+                .accessibilityIdentifier("training_fixture_cycle_review")
+            Text("Applied blocks: \(cycleFixture.appliedCount)")
+                .accessibilityIdentifier("training_fixture_cycle_applied")
             Button("Open stop card") { showStopCard = true }
                 .accessibilityIdentifier("training_fixture_stop_card")
             if showStopCard {
@@ -1529,6 +1551,9 @@ struct TrainingLiveSessionFixtureView: View {
                 }
             )
         }
+        .sheet(isPresented: $showCycleReview) {
+            TrainingCycleReviewView(service: cycleFixture, isCurrent: { true }, accessToken: { "fixture" }, onApplied: {})
+        }
         .sheet(isPresented: $showEnrollment) {
             TrainingEnrollmentView { _, _ in }
         }
@@ -1548,4 +1573,285 @@ struct TrainingLiveSessionFixtureView: View {
         }
     }
 }
+// Synthetic transport for review UI qualification. The production engine's
+// schedule and lifecycle are verified by the service/route fixtures.
+@MainActor
+private final class TrainingCycleFixtureService: ObservableObject, TrainingCycleServicing {
+    @Published private(set) var appliedCount = 0
+
+    func cycleContext(accessToken: String) async throws -> TrainingCycleContext {
+        TrainingCycleContext(
+            version: 1, generation: 0,
+            setup: .init(id: "fixture", equipment: "full_gym", sessionsPerWeek: 2, cycle: .init(
+                weekCount: 4, temporaryPriorities: ["chest"], temporaryConstraints: [], retainedVariants: []
+            )),
+            cycle: .init(currentWeek: 4, weekCount: 4, phase: "review"),
+            reuseOptions: [.init(
+                fromExerciseId: "machine_chest_press", toVariantId: "smith_incline_press",
+                reason: "Comfortable setup", name: "Smith incline press"
+            )]
+        )
+    }
+
+    func proposeCycle(accessToken: String, request: TrainingCycleProposalRequest) async throws -> TrainingCycleDraft {
+        guard request.intent.weekCount == 5 else { throw TrainingServiceError.invalidResponse }
+        let draft = try JSONDecoder().decode(TrainingCycleDraft.self, from: Data("""
+        {"id":"fixture-review","reason":"Repeat selected exercises",
+         "assumptions":["Temporary priorities expire without renewal."],
+         "schedule":[{"week":1,"targetRir":4,"deload":false,"setsPerExercise":2},
+         {"week":2,"targetRir":3,"deload":false,"setsPerExercise":2},
+         {"week":3,"targetRir":3,"deload":false,"setsPerExercise":2},
+         {"week":4,"targetRir":2,"deload":false,"setsPerExercise":2},
+         {"week":5,"targetRir":5,"deload":true,"setsPerExercise":1}],"plan":{"sessions":[]}}
+        """.utf8))
+        return TrainingCycleDraft(
+            id: draft.id, reason: draft.reason,
+            assumptions: draft.assumptions + (request.intent.keepVariants ?? []).map { "Smith incline press: \($0.reason)" },
+            schedule: draft.schedule, plan: draft.plan
+        )
+    }
+
+    func decideCycle(accessToken: String, request: TrainingCycleDecisionRequest) async throws {
+        if request.decision == "apply" { appliedCount += 1 }
+    }
+}
 #endif
+
+@MainActor
+final class TrainingCycleReviewModel: ObservableObject {
+    @Published private(set) var context: TrainingCycleContext?
+    @Published private(set) var draft: TrainingCycleDraft?
+    @Published private(set) var isBusy = false
+    @Published private(set) var errorMessage: String?
+    private let service: TrainingCycleServicing
+    private let isCurrent: () -> Bool
+    private let accessToken: () async -> String?
+    private var proposalRequest: TrainingCycleProposalRequest?
+    private var decisionId = UUID().uuidString
+
+    init(
+        service: TrainingCycleServicing = URLSessionTrainingService(),
+        isCurrent: @escaping () -> Bool,
+        accessToken: @escaping () async -> String?
+    ) {
+        self.service = service
+        self.isCurrent = isCurrent
+        self.accessToken = accessToken
+    }
+
+    func load() async {
+        await perform { token in
+            let value = try await self.service.cycleContext(accessToken: token)
+            guard self.isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            self.context = value
+        }
+    }
+
+    func propose(intent: TrainingCycleIntent) async {
+        guard let context else { return }
+        // Retain the request identity after an interrupted response; changing the
+        // draft's inputs is an explicit new proposal.
+        if proposalRequest?.intent != intent {
+            proposalRequest = TrainingCycleProposalRequest(
+                requestId: UUID().uuidString, expectedGeneration: context.generation, intent: intent,
+                reason: intent.kind == "repeat_cycle"
+                    ? "Repeat the last block with selected exercises." : "Review training block length."
+            )
+        }
+        guard let request = proposalRequest else { return }
+        await perform { token in
+            let value = try await self.service.proposeCycle(accessToken: token, request: request)
+            guard self.isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            self.draft = value
+        }
+    }
+
+    func decide(_ decision: String) async -> Bool {
+        guard let draft else { return false }
+        var saved = false
+        await perform { token in
+            try await self.service.decideCycle(accessToken: token, request: TrainingCycleDecisionRequest(
+                requestId: self.decisionId, proposalId: draft.id, decision: decision
+            ))
+            guard self.isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            self.draft = nil
+            self.proposalRequest = nil
+            self.decisionId = UUID().uuidString
+            saved = true
+        }
+        return saved
+    }
+
+    private func perform(_ action: (String) async throws -> Void) async {
+        guard !isBusy, isCurrent() else { return }
+        isBusy = true
+        errorMessage = nil
+        defer { isBusy = false }
+        do {
+            guard let token = await accessToken(), isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            try await action(token)
+        } catch {
+            guard isCurrent() else { context = nil; draft = nil; return }
+            if case TrainingServiceError.server(let code) = error {
+                switch code {
+                case "deload_boundary_requires_review":
+                    errorMessage = "This length would remove a deload already underway. Finish and review this block first."
+                case "active_session_requires_review":
+                    errorMessage = "Finish or end the saved workout before starting another block."
+                case "stale_context":
+                    proposalRequest = nil
+                    draft = nil
+                    errorMessage = "Your training changed. Close and reopen review to create a current draft."
+                default:
+                    errorMessage = "The block could not be saved. Try again."
+                }
+            } else {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
+
+struct TrainingCycleReviewView: View {
+    let onApplied: () async -> Void
+    @StateObject private var model: TrainingCycleReviewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var weeks = 4
+    @State private var sessions = 2
+    @State private var equipment = "dumbbells"
+    @State private var adultConfirmed = false
+    @State private var safetyConfirmed = false
+    @State private var renewPriorities = false
+    @State private var renewConstraints = false
+    @State private var selected: [TrainingCycleSelection] = []
+
+    init(
+        service: TrainingCycleServicing = URLSessionTrainingService(), isCurrent: @escaping () -> Bool,
+        accessToken: @escaping () async -> String?, onApplied: @escaping () async -> Void
+    ) {
+        self.onApplied = onApplied
+        _model = StateObject(wrappedValue: TrainingCycleReviewModel(
+            service: service, isCurrent: isCurrent, accessToken: accessToken
+        ))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let draft = model.draft {
+                    draftReview(draft)
+                } else if let context = model.context {
+                    configuration(context)
+                }
+                if model.isBusy { ProgressView().accessibilityIdentifier("training_cycle_loading") }
+                if let message = model.errorMessage {
+                    Text(message).foregroundStyle(.secondary).accessibilityIdentifier("training_cycle_error")
+                }
+            }
+            .navigationTitle("Review block")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .disabled(model.isBusy)
+            .task {
+                await model.load()
+                weeks = model.context?.setup?.cycle?.weekCount ?? 4
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private func configuration(_ context: TrainingCycleContext) -> some View {
+        Section("Block length") {
+            Picker("Weeks", selection: $weeks) {
+                ForEach(4...6, id: \.self) { Text("\($0) weeks").tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("training_cycle_length")
+            Text("The final week is a planned deload. Missed workouts do not count as completed training.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        if context.setup == nil {
+            Section("Schedule and safety") {
+                Picker("Sessions each week", selection: $sessions) { Text("2").tag(2); Text("3").tag(3) }
+                Picker("Equipment", selection: $equipment) {
+                    Text("Dumbbells").tag("dumbbells"); Text("Full gym").tag("full_gym")
+                }
+                Toggle("I’m 18 or older.", isOn: $adultConfirmed)
+                Toggle(
+                    "I’m not pregnant or postpartum, have no eating-disorder risk, " +
+                        "and have no medical restriction that makes this training unsafe.",
+                    isOn: $safetyConfirmed
+                )
+            }
+        }
+        if context.cycle?.phase == "review" {
+            Section("Keep exercises that worked") {
+                ForEach(context.reuseOptions) { option in
+                    Toggle(option.name, isOn: Binding(
+                        get: { selected.contains(where: { $0.id == option.id }) },
+                        set: { keep in
+                            selected.removeAll { $0.fromExerciseId == option.fromExerciseId }
+                            if keep { selected.append(option.selection) }
+                        }
+                    ))
+                    if let index = selected.firstIndex(where: { $0.id == option.id }) {
+                        TextField("Why it worked", text: $selected[index].reason)
+                    }
+                }
+                Text("Selected exercises keep their own history, feedback and recorded reasons.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Toggle("Renew temporary muscle priorities", isOn: $renewPriorities)
+                Toggle("Renew temporary constraints", isOn: $renewConstraints)
+                Text("Without renewal, temporary priorities and constraints expire. " +
+                    "Equipment and enduring exclusions stay in place.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        Section {
+            Button("Create draft") {
+                let isNew = context.setup == nil
+                let repeating = context.cycle?.phase == "review"
+                let intent = TrainingCycleIntent(
+                    kind: isNew ? "initial_enrollment" : repeating ? "repeat_cycle" : "revise_cycle", weekCount: weeks,
+                    adultConfirmed: isNew ? true : nil, safetyConfirmed: isNew ? true : nil,
+                    sessionsPerWeek: isNew ? sessions : nil, equipment: isNew ? equipment : nil,
+                    keepVariants: repeating ? selected : nil,
+                    renewPriorities: isNew ? nil : renewPriorities, renewConstraints: isNew ? nil : renewConstraints
+                )
+                Task { await model.propose(intent: intent) }
+            }
+            .disabled(context.setup == nil && (!adultConfirmed || !safetyConfirmed))
+            .accessibilityIdentifier("training_cycle_create_draft")
+        }
+    }
+
+    @ViewBuilder
+    private func draftReview(_ draft: TrainingCycleDraft) -> some View {
+        Section("Draft") {
+            Text(draft.reason)
+            ForEach(draft.schedule ?? []) { week in
+                Text("Week \(week.week)\(week.deload ? " · Deload" : "") · " +
+                    "\(week.setsPerExercise) \(week.setsPerExercise == 1 ? "set" : "sets") · \(week.targetRir) RIR")
+            }
+            ForEach(draft.assumptions, id: \.self) { Text($0).font(.footnote).foregroundStyle(.secondary) }
+        }
+        ForEach(draft.plan.sessions) { session in
+            Section(session.title) {
+                if session.safetyStop {
+                    Text(session.explanation ?? "Training is paused for a recovery review.")
+                }
+                ForEach(session.exercises) { exercise in
+                    Text("\(exercise.name) · \(exercise.sets) sets · \(exercise.targetRir) RIR")
+                }
+            }
+        }
+        Section {
+            Button("Apply reviewed block") {
+                Task { if await model.decide("apply") { await onApplied(); dismiss() } }
+            }
+            .accessibilityIdentifier("training_cycle_apply")
+            Button("Reject draft", role: .destructive) { Task { _ = await model.decide("reject") } }
+                .accessibilityIdentifier("training_cycle_reject")
+        }
+    }
+}
