@@ -9,6 +9,19 @@ const source = (path: string) =>
   );
 const code = (path: string) => source(path).replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
 
+it('quotes Xcode file-reference paths containing OpenStep punctuation (LYB-243)', () => {
+  const project = readFileSync(
+    fileURLToPath(
+      new URL('../../../apps/ios/LogYourBody.xcodeproj/project.pbxproj', import.meta.url),
+    ),
+    'utf8',
+  );
+  const paths = [...project.matchAll(/\bpath\s*=\s*([^;]+);/g)].map((match) => match[1].trim());
+  expect(paths.length).toBeGreaterThan(0);
+  // OpenStep bare strings allow these token characters; '+' requires quotes.
+  expect(paths.filter((path) => !/^"(?:[^"\\]|\\.)*"$|^[\w$/:.-]+$/.test(path))).toEqual([]);
+});
+
 it('keeps imported metric correction, persistence and cloud sync free of HealthKit writes (LYB-243)', () => {
   // These are the concrete production dependencies used by the service, including
   // its default sync callback. No health-writing service may enter this boundary.

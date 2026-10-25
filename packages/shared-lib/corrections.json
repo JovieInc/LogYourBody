@@ -1,5 +1,25 @@
 [
   {
+    "fingerprint": "xcode-file-paths-use-valid-openstep-strings",
+    "correction": "PR #1564 / LYB-243: Quote the CoreDataManager+Part06.swift project path. Its unquoted plus sign prevents Xcode project loading, so Launch Quality and StoreKit exit with code 74 before tests run.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40202027853/job/121195099171",
+    "mechanization": "Quote the path and retain a required shared-lib regression that rejects file-reference paths containing punctuation outside the OpenStep bare-string grammar unless quoted. The regression fails on the original path and passes with the fix; the Nanaimo parser independently reproduces the original error and accepts the repaired project.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot enforce the serialization grammar of the Xcode project manifest loaded before the app compiles."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing shared-lib test suite runs in required JavaScript/TypeScript CI and can reject unquoted file-reference paths with invalid OpenStep token characters before native jobs load the project."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/metric-correction-boundary.test.ts",
+      "anchor": "quotes Xcode file-reference paths containing OpenStep punctuation (LYB-243)"
+    }
+  },
+  {
     "fingerprint": "web-sentry-runtime-env-declarations",
     "correction": "PR #1542: Declare every consumed public Sentry runtime variable in apps/web/.env.example. Missing DSN, environment and release declarations fail the required environment surface guard.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169587476/job/121097641374",
