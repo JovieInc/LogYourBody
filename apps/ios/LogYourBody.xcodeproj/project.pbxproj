@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AD2600012F00000100ABCDEF /* HomeFocusSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD2600022F00000100ABCDEF /* HomeFocusSelector.swift */; };
+		AD2600032F00000100ABCDEF /* HomeFocusSelectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD2600042F00000100ABCDEF /* HomeFocusSelectorTests.swift */; };
 		A19900000000000000000001 /* StoreKitPurchaseRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */; };
 		A16800000000000000000001 /* ContextualMetricShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16800000000000000000002 /* ContextualMetricShare.swift */; };
 		5AAEA63151156B8F114A0B83 /* BodyRecordReviewConsumerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */; };
@@ -516,6 +518,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AD2600022F00000100ABCDEF /* HomeFocusSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFocusSelector.swift; sourceTree = "<group>"; };
+		AD2600042F00000100ABCDEF /* HomeFocusSelectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeFocusSelectorTests.swift; sourceTree = "<group>"; };
 		A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitPurchaseRestoreTests.swift; sourceTree = "<group>"; };
 		A16800000000000000000002 /* ContextualMetricShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContextualMetricShare.swift; path = Components/ContextualMetricShare.swift; sourceTree = "<group>"; };
 		533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyRecordReviewConsumerTests.swift; sourceTree = "<group>"; };
@@ -1310,6 +1314,7 @@
 		AD723ACF2E15FA5C002376C6 /* LogYourBodyTests */ = {
 			isa = PBXGroup;
 			children = (
+				AD2600042F00000100ABCDEF /* HomeFocusSelectorTests.swift */,
 				896E3815B745A313FCD93C78 /* DesignSystem */,
 				8631504046C70A4EE432C9B8 /* AccountDeletionAndShareCardTests.swift */,
 				AB992727D1333B365F93F30E /* AccountDeletionCleanupServiceTests.swift */,
@@ -1595,6 +1600,7 @@
 		AD723AF22E15FA5C002376C6 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				AD2600022F00000100ABCDEF /* HomeFocusSelector.swift */,
 				ADF1F6B92ED4C66400745F33 /* GlobalTimelineStore.swift */,
 				ADA4B75C2ED1183900F4262A /* DashboardViewModel.swift */,
 			);
@@ -2240,6 +2246,7 @@
 				CC4917DEC8E46FACECDF3424 /* DashboardDataVizPolicyTests.swift in Sources */,
 				98DAEAD9993013F8C7C81764 /* DashboardTimelineAndPolicyTests.swift in Sources */,
 				050A49949BCAA09D23C66035 /* DashboardViewModelHealthSyncWiringTests.swift in Sources */,
+				AD2600032F00000100ABCDEF /* HomeFocusSelectorTests.swift in Sources */,
 				B7E4D91A06C34815F02A6C32 /* DashboardStepPersistenceTests.swift in Sources */,
 				B11404E6ED2FB64ADE0E0EAE /* EditEntrySavePolicyTests.swift in Sources */,
 				18ED1A86B416E8821C250840 /* GlobalTimelineServiceTests.swift in Sources */,
@@ -2531,6 +2538,7 @@
 				C6C89B5EB7601C19F712D015 /* LogoutButton.swift in Sources */,
 				AD8872952EB946BE0041C426 /* CoreMetricsRow.swift in Sources */,
 				ADA4B75D2ED1183900F4262A /* DashboardViewModel.swift in Sources */,
+				AD2600012F00000100ABCDEF /* HomeFocusSelector.swift in Sources */,
 				AD8872962EB946BE0041C426 /* Theme.swift in Sources */,
 				ADA6003E2ED2BC9100088042 /* Glp1DoseLog.swift in Sources */,
 				AD8872972EB946BE0041C426 /* ErrorStateView.swift in Sources */,
