@@ -264,7 +264,7 @@ test('ci.yml wires detection, the iOS jobs and the CI Summary dependencies', () 
   }
   assert.match(jobBlock('ios'), /if: needs\.detect-changes\.outputs\.ios_unit == 'true'/);
   assert.match(jobBlock('ios_quality'), /if: needs\.detect-changes\.outputs\.ios_quality == 'true'/);
-  assert.match(jobBlock('ci-summary'), /if: always\(\)[\s\S]*needs: \[detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_storekit\]/);
+  assert.match(jobBlock('ci-summary'), /if: always\(\)[\s\S]*needs: \[detect-changes, mac-runner-routing-tests, js, ios, ios_quality, ios_static, ios_storekit\]/);
 });
 
 test('required CI rejects a stale repository source projection', () => {
@@ -286,7 +286,7 @@ test('required CI rejects a stale repository source projection', () => {
   assert.equal(check.status, 0, `${check.stdout}${check.stderr}`);
 });
 
-function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult, event = 'pull_request', storekitResult }) {
+function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult, event = 'pull_request', storekitResult, staticResult }) {
   const block = jobBlock('ci-summary');
   const script = block
     .slice(block.indexOf('run: |') + 'run: |'.length)
@@ -305,6 +305,7 @@ function runSummaryGate({ web, ios, quality = ios, js, iosResult, qualityResult,
     'needs.js.result': js,
     'needs.ios.result': iosResult,
     'needs.ios_quality.result': qualityResult,
+    'needs.ios_static.result': staticResult ?? qualityResult,
     'needs.ios_storekit.result': storekitResult ?? (event === 'push' || (event === 'merge_group' && (ios === 'true' || quality === 'true')) ? 'success' : 'skipped'),
   };
   const rendered = script.replace(/\$\{\{\s*([^}]+?)\s*\}\}/g, (_, expr) => {
@@ -598,4 +599,22 @@ test('CI Summary does not require StoreKit on a native pull_request (the merge g
   const pr = { web: 'false', ios: 'false', quality: 'true', js: 'skipped', iosResult: 'skipped', qualityResult: 'success', event: 'pull_request' };
   assert.equal(runSummaryGate({ ...pr, storekitResult: 'skipped' }), 0);
   assert.notEqual(runSummaryGate({ ...pr, storekitResult: 'success' }), 0);
+});
+
+test('Launch Quality static audits run on ubuntu and are gated by CI Summary', () => {
+  const staticJob = jobBlock('ios_static');
+  assert.match(staticJob, /if: needs\.detect-changes\.outputs\.ios_quality == 'true'/);
+  assert.match(staticJob, /runs-on: ubuntu-24\.04/);
+  assert.match(staticJob, /swift-actions\/setup-swift@[0-9a-f]{40}/, 'SwiftLint SourceKit rules need a real toolchain');
+  assert.doesNotMatch(staticJob, /swiftlint-static/);
+  assert.match(staticJob, /bash scripts\/ios\/static-quality-audit\.sh/);
+  assert.match(jobBlock('ios_quality'), /static-audits: false/);
+  const quality = fs.readFileSync(new URL('../workflows/ios-quality.yml', import.meta.url), 'utf8');
+  assert.match(quality, /RUN_SWIFTLINT: \$\{\{ format\('\{0\}', inputs\.static-audits\) \}\}/);
+  assert.match(quality, /static-audits:[\s\S]*default: true/, 'post-merge and dispatch keep the full audit');
+  const ok = { web: 'false', ios: 'false', quality: 'true', js: 'skipped', iosResult: 'skipped', qualityResult: 'success', event: 'pull_request' };
+  assert.equal(runSummaryGate({ ...ok, staticResult: 'success' }), 0);
+  for (const staticResult of ['failure', 'cancelled', 'skipped']) {
+    assert.notEqual(runSummaryGate({ ...ok, staticResult }), 0, staticResult);
+  }
 });
