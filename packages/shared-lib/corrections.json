@@ -548,5 +548,25 @@
       "path": "apps/web/src/app/sitemap.ts",
       "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
     }
+  },
+  {
+    "fingerprint": "guard-reference-paths-exist",
+    "correction": "LYB-254: A ledger entry that claims a guard must point at a test, lint rule, or CI step path that exists. Entries with no guard reference stay on a shrink-only baseline.",
+    "source": "https://linear.app/jovie/issue/LYB-254",
+    "mechanization": "The required Detect Changes job runs guard-reference.mjs on every diff. A missing guard path fails with the entry id and path. Unguarded entries warn, and the committed baseline can only shrink against the exact Git base.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot prove that a Git-tracked ledger guard still points at a file in the repository."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic CI check can stat each claimed guard path and compare the unguarded entry baseline with the immutable Git base."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/guard-reference.behavior.mjs",
+      "anchor": "deleted guard fails with the entry id and path"
+    }
   }
 ]
