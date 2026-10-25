@@ -98,6 +98,8 @@ struct PendingBodyMetricSyncItem {
     let createdAt: Date
     let updatedAt: Date
     let isMarkedDeleted: Bool
+    var isExcluded: Bool = false
+    var correctedValueJSON: String?
 }
 
 struct PendingDailyMetricSyncItem {
@@ -504,7 +506,9 @@ extension CachedBodyMetrics {
             syncStatus: syncStatus,
             createdAt: createdAt ?? date,
             updatedAt: updatedAt ?? createdAt ?? date,
-            isMarkedDeleted: isMarkedDeleted
+            isMarkedDeleted: isMarkedDeleted,
+            isExcluded: isExcluded,
+            correctedValueJSON: correctedValueJSON
         )
     }
 
@@ -537,6 +541,8 @@ extension CachedBodyMetrics {
             photoUrl: photoUrl,
             dataSource: BodyMetricSource.normalizedRawValue(dataSource),
             sourceMetadata: BodyMetricSourceMetadata(jsonString: sourceMetadataJSON),
+            isExcluded: isExcluded,
+            correctedValue: MetricCorrectedValue(jsonString: correctedValueJSON),
             createdAt: createdAt,
             updatedAt: updatedAt
         )

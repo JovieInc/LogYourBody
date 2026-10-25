@@ -259,6 +259,7 @@ enum MetricEntrySourceType: Equatable {
 }
 
 struct MetricHistoryEntry: Identifiable, Sendable {
+    var isExcluded: Bool = false
     let id: String
     let date: Date
     let primaryValue: Double

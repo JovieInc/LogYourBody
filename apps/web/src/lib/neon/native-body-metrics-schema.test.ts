@@ -43,3 +43,16 @@ describe('native body metrics Neon schema', () => {
     expect(pdfSourceMigrationSql).toContain('body_metrics_data_source_check');
   });
 });
+
+const overlaysSql = readFileSync(
+  join(process.cwd(), 'db/migrations/20261025140000_imported_metric_overlays.sql'),
+  'utf8',
+);
+
+it('adds reversible overlays with safe defaults without updating imported data or reports', () => {
+  expect(overlaysSql).toContain('is_excluded boolean not null default false');
+  expect(overlaysSql).toContain('corrected_value jsonb');
+  expect(overlaysSql).not.toMatch(
+    /update public\.body_metrics|update public\.dexa_results|drop column/i,
+  );
+});

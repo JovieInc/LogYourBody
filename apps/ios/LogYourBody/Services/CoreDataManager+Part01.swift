@@ -517,16 +517,20 @@ func saveAndWait() {
                     cached.createdAt = metrics.createdAt
                 }
 
+                if markAsSynced || results.isEmpty {
+                    cached.isExcluded = metrics.isExcluded
+                    cached.correctedValueJSON = metrics.correctedValue?.jsonString
+                }
                 // Update values
                 cached.userId = userId
                 cached.date = metrics.date
                 cached.localDate = metrics.localDate
-                cached.weight = metrics.weight ?? 0
+                cached.weight = metrics.originalWeight ?? 0
                 cached.weightUnit = metrics.weightUnit
                 cached.waistCircumference = metrics.waistCm ?? 0
                 cached.hipCircumference = metrics.hipCm ?? 0
                 cached.waistUnit = metrics.waistUnit
-                cached.bodyFatPercentage = metrics.bodyFatPercentage ?? 0
+                cached.bodyFatPercentage = metrics.originalBodyFatPercentage ?? 0
                 cached.bodyFatMethod = metrics.bodyFatMethod
                 cached.muscleMass = metrics.muscleMass ?? 0
                 cached.boneMass = metrics.boneMass ?? 0

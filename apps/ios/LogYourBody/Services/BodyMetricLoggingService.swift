@@ -205,6 +205,7 @@ final class BodyMetricLoggingService {
 
         return cachedMetrics
             .compactMap { $0.toBodyMetrics() }
+            .filter { !$0.isExcluded && $0.weight != nil }
             .max { $0.date < $1.date }?
             .weight
     }

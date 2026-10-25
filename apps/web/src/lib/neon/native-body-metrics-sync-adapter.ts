@@ -26,7 +26,7 @@ function getDatabase(): NeonQueryFunction<false, false> {
 const columns = `
   id, date, local_date, measured_at, weight, weight_unit, waist, hip, waist_unit,
   body_fat_percentage, body_fat_method, muscle_mass, bone_mass, photo_url, notes,
-  data_source, source_metadata, client_created_at, client_updated_at, deleted_at,
+  data_source, source_metadata, is_excluded, corrected_value, client_created_at, client_updated_at, deleted_at,
   updated_at
 `;
 
@@ -48,6 +48,8 @@ type NativeBodyMetricRow = {
   notes: string | null;
   data_source: string;
   source_metadata: Record<string, unknown> | string | null;
+  is_excluded: boolean;
+  corrected_value: NativeBodyMetricSyncRecord['corrected_value'];
   client_created_at: string | Date;
   client_updated_at: string | Date;
   deleted_at: string | Date | null;
@@ -108,6 +110,8 @@ function mapRecord(row: NativeBodyMetricRow): NativeBodyMetricSyncRecord {
     notes: row.notes,
     data_source: row.data_source,
     source_metadata: asMetadata(row.source_metadata),
+    is_excluded: row.is_excluded ?? false,
+    corrected_value: row.corrected_value ?? null,
     created_at: iso(row.client_created_at),
     updated_at: iso(row.client_updated_at),
     deleted_at: optionalIso(row.deleted_at),
@@ -136,6 +140,9 @@ function pushParams(subject: string, record: NativeBodyMetricPushInput) {
     JSON.stringify(record.source_metadata),
     record.created_at,
     record.updated_at,
+    record.is_excluded ?? null,
+    record.corrected_value == null ? null : JSON.stringify(record.corrected_value),
+    record.corrected_value !== undefined,
   ];
 }
 
@@ -174,11 +181,11 @@ export function createNeonNativeBodyMetricsSync(
              weight, weight_unit, body_fat_percentage, body_fat_method,
              muscle_mass, bone_mass, waist, hip, waist_unit, notes, photo_url,
              data_source, source_metadata, client_created_at, client_updated_at,
-             deleted_at
+             deleted_at, is_excluded, corrected_value
            ) values (
              $1, $2, $3::date, $4::timestamptz, $3::date, 'native',
              $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-             $16, $17::jsonb, $18::timestamptz, $19::timestamptz, null
+             $16, $17::jsonb, $18::timestamptz, $19::timestamptz, null, coalesce($20, false), $21::jsonb
            )
            on conflict (id) do update set
              date = excluded.date,
@@ -198,6 +205,9 @@ export function createNeonNativeBodyMetricsSync(
              photo_url = excluded.photo_url,
              data_source = excluded.data_source,
              source_metadata = excluded.source_metadata,
+             is_excluded = coalesce($20, public.body_metrics.is_excluded),
+             corrected_value = case when $22::boolean then excluded.corrected_value
+               else public.body_metrics.corrected_value end,
              client_updated_at = excluded.client_updated_at,
              deleted_at = null,
              updated_at = now()

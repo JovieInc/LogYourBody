@@ -104,6 +104,36 @@ describe('createNeonNativeBodyMetricsSync', () => {
     expect(query.mock.calls[1]?.[1]?.[0]).toBe(evening.id);
   });
 
+  it('round trips overlays while keeping originals separate and preserving omitted old-client fields', async () => {
+    const corrected = { ...morning, is_excluded: true, corrected_value: { weight: 79.123456 } };
+    const query = jest.fn().mockResolvedValue([
+      row(corrected, {
+        is_excluded: true,
+        corrected_value: corrected.corrected_value,
+      }),
+    ]);
+    const store = createNeonNativeBodyMetricsSync(databaseWith(query));
+    const pushed = await store.push('owner-subject', [corrected]);
+    expect(pushed.records[0]).toMatchObject({
+      weight: morning.weight,
+      is_excluded: true,
+      corrected_value: { weight: 79.123456 },
+    });
+    expect(query.mock.calls[0]?.[1]?.slice(19)).toEqual([true, '{"weight":79.123456}', true]);
+    expect(normalized(query.mock.calls[0]?.[0])).toContain(
+      'is_excluded = coalesce($20, public.body_metrics.is_excluded)',
+    );
+    expect(normalized(query.mock.calls[0]?.[0])).toContain(
+      'case when $22::boolean then excluded.corrected_value',
+    );
+    const pulled = await store.pull('owner-subject', { since: morning.date, after_id: null });
+    expect(pulled.records[0]?.corrected_value).toEqual(corrected.corrected_value);
+    await store.push('owner-subject', [morning]);
+    expect(query.mock.calls[2]?.[1]?.slice(19)).toEqual([null, null, false]);
+    await store.push('owner-subject', [{ ...morning, is_excluded: false, corrected_value: null }]);
+    expect(query.mock.calls[3]?.[1]?.slice(19)).toEqual([false, null, true]);
+  });
+
   it('rejects client ids owned by another subject instead of rewriting them', async () => {
     const query = jest.fn().mockResolvedValue([]);
     const store = createNeonNativeBodyMetricsSync(databaseWith(query));
@@ -115,10 +145,9 @@ describe('createNeonNativeBodyMetricsSync', () => {
   });
 
   it('pulls incrementally for the authenticated subject including tombstones', async () => {
-    const query = jest.fn().mockResolvedValue([
-      row(morning),
-      row(evening, { deleted_at: '2026-08-13T23:50:00.000Z' }),
-    ]);
+    const query = jest
+      .fn()
+      .mockResolvedValue([row(morning), row(evening, { deleted_at: '2026-08-13T23:50:00.000Z' })]);
     const store = createNeonNativeBodyMetricsSync(databaseWith(query));
 
     const result = await store.pull('owner-subject', {

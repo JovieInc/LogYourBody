@@ -21,7 +21,7 @@ extension DashboardViewLiquid {
 
     var homeV2InsightMetrics: [BodyMetrics] {
         bodyMetrics.filter {
-            $0.weight == nil || HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight)
+            !$0.isExcluded && ($0.weight == nil || HomeV2WeightQuality.isWithinSupportedLoggingRange($0.weight))
         }
     }
 
@@ -30,7 +30,7 @@ extension DashboardViewLiquid {
     func homeV2DisplayedTodayMetric() -> BodyMetrics? {
         let owner = authManager.currentUser?.id
         let today = HomeV2TimelinePolicy.metrics(
-            onSameDayAs: Date(), in: bodyMetrics, owner: owner
+            onSameDayAs: Date(), in: bodyMetrics.filter { !$0.isExcluded }, owner: owner
         )
         if let selection = homeV2TimelineSelection,
            let retained = today.first(where: { $0.userId == selection.id.owner && $0.id == selection.id.record }) {

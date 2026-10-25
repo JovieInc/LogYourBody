@@ -170,6 +170,7 @@ extension DashboardViewLiquid {
                 guard let rawWeight = metric.weight else { return nil }
                 let convertedWeight = convertWeight(rawWeight, to: system) ?? rawWeight
                 return MetricHistoryEntry(
+                    isExcluded: metric.isExcluded,
                     id: metric.id,
                     date: metric.date,
                     primaryValue: convertedWeight,
@@ -213,6 +214,7 @@ extension DashboardViewLiquid {
                 }
 
                 return MetricHistoryEntry(
+                    isExcluded: metric.isExcluded,
                     id: metric.id,
                     date: metric.date,
                     primaryValue: bodyFatValue,
@@ -442,7 +444,7 @@ extension DashboardViewLiquid {
     func generateWeightChartData() -> [MetricDataPoint] {
         let system = currentMeasurementSystem
 
-        let allPoints: [Double] = sortedBodyMetricsAscending.compactMap { metric in
+        let allPoints: [Double] = sortedBodyMetricsAscending.filter { !$0.isExcluded }.compactMap { metric in
             guard let weight = metric.weight else { return nil }
             return convertWeight(weight, to: system) ?? weight
         }
@@ -457,7 +459,7 @@ extension DashboardViewLiquid {
         let interpolationContext = MetricsInterpolationService.shared
             .makeBodyFatInterpolationContext(for: bodyMetrics)
 
-        let allPoints: [Double] = sortedBodyMetricsAscending.compactMap { metric in
+        let allPoints: [Double] = sortedBodyMetricsAscending.filter { !$0.isExcluded }.compactMap { metric in
             if let bf = metric.bodyFatPercentage {
                 return bf
             }
@@ -486,7 +488,7 @@ extension DashboardViewLiquid {
             return []
         }
 
-        let allPoints: [Double] = sortedBodyMetricsAscending.compactMap { metric in
+        let allPoints: [Double] = sortedBodyMetricsAscending.filter { !$0.isExcluded }.compactMap { metric in
             guard let ffmiResult = interpolationContext.estimate(for: metric.date) else {
                 return nil
             }
@@ -501,11 +503,11 @@ extension DashboardViewLiquid {
 
     func filteredMetrics(for range: TimeRange) -> [BodyMetrics] {
         guard let days = range.days else {
-            return sortedBodyMetricsAscending
+            return sortedBodyMetricsAscending.filter { !$0.isExcluded }
         }
 
         let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
-        return sortedBodyMetricsAscending.filter { $0.date >= cutoffDate }
+        return sortedBodyMetricsAscending.filter { !$0.isExcluded && $0.date >= cutoffDate }
     }
 
     func cachedMetricEntries(for type: MetricType) -> MetricEntriesPayload? {

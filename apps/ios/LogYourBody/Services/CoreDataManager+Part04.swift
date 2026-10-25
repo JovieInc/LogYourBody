@@ -161,6 +161,11 @@ extension CoreDataManager {
                 metric.waistUnit = rawWaistValue > 0 || rawHipValue > 0 ? "cm" : nil
                 metric.bodyFatPercentage = data["body_fat_percentage"] as? Double ?? 0
                 metric.bodyFatMethod = data["body_fat_method"] as? String
+                // Missing keys from older clients do not clear a local overlay.
+                if let excluded = data["is_excluded"] as? Bool { metric.isExcluded = excluded }
+                if data.keys.contains("corrected_value") {
+                    metric.correctedValueJSON = MetricCorrectedValue(jsonObject: data["corrected_value"])?.jsonString
+                }
                 metric.muscleMass = data["muscle_mass"] as? Double ?? 0
                 metric.boneMass = data["bone_mass"] as? Double ?? 0
                 metric.notes = data["notes"] as? String

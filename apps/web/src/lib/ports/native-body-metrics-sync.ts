@@ -17,6 +17,9 @@ export type NativeBodyMetricSyncRecord = {
   notes: string | null;
   data_source: string;
   source_metadata: Record<string, unknown>;
+  // Optional on pushes from older clients; omitted fields preserve an existing overlay.
+  is_excluded?: boolean;
+  corrected_value?: { weight?: number; body_fat_percentage?: number } | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

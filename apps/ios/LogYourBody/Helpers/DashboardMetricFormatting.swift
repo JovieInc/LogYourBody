@@ -39,7 +39,7 @@ func computeRangeStats(
     metrics: [BodyMetrics],
     valueProvider: (BodyMetrics) -> Double?
 ) -> MetricRangeStats? {
-    let sortedMetrics = metrics.sorted { $0.date < $1.date }
+    let sortedMetrics = metrics.filter { !$0.isExcluded }.sorted { $0.date < $1.date }
     let dataPoints: [(date: Date, value: Double)] = sortedMetrics.compactMap { metric in
         guard let value = valueProvider(metric) else { return nil }
         return (metric.date, value)

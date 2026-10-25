@@ -612,3 +612,63 @@ final class CoreDataModelMigrationTests: XCTestCase {
 private enum MigrationFixtureError: Error {
     case message(String)
 }
+
+extension CoreDataModelMigrationTests {
+    @MainActor
+    func testPopulatedV4StoreMigratesOverlayDefaultsAndRetainsImportAfterReopen() throws {
+        let bundle = Bundle(for: CoreDataManager.self)
+        let models = try XCTUnwrap(bundle.url(forResource: "LogYourBody", withExtension: "momd"))
+        let legacy = try XCTUnwrap(NSManagedObjectModel(contentsOf: models.appendingPathComponent("LogYourBodyV4.mom")))
+        XCTAssertNil(legacy.entitiesByName["CachedBodyMetrics"]?.attributesByName["isExcluded"])
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: legacy)
+        let store = try coordinator.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL)
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = coordinator
+        let date = Date(timeIntervalSince1970: 1_780_000_000)
+        let row = NSEntityDescription.insertNewObject(forEntityName: "CachedBodyMetrics", into: context)
+        for key in ["createdAt", "date", "lastModified", "updatedAt"] { row.setValue(date, forKey: key) }
+        row.setValue("v4-import", forKey: "id")
+        row.setValue("owner-243", forKey: "userId")
+        row.setValue(81.234567, forKey: "weight")
+        row.setValue("kg", forKey: "weightUnit")
+        row.setValue(18.25, forKey: "bodyFatPercentage")
+        row.setValue("bodyspec_dexa", forKey: "dataSource")
+        row.setValue("{\"external_result_id\":\"original-report\"}", forKey: "sourceMetadataJSON")
+        try context.save()
+        try coordinator.remove(store)
+
+        let current = CoreDataManager.makeManagedObjectModel(in: bundle)
+        _ = try NSMappingModel.inferredMappingModel(forSourceModel: legacy, destinationModel: current)
+        let migrated = NSPersistentStoreCoordinator(managedObjectModel: current)
+        let migratedStore = try migrated.addPersistentStore(
+            ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL,
+            options: [NSMigratePersistentStoresAutomaticallyOption: true, NSInferMappingModelAutomaticallyOption: true]
+        )
+        let verification = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        verification.persistentStoreCoordinator = migrated
+        let request = NSFetchRequest<NSManagedObject>(entityName: "CachedBodyMetrics")
+        let rows = try verification.fetch(request)
+        XCTAssertEqual(rows.count, 1)
+        let imported = try XCTUnwrap(rows.first)
+        XCTAssertEqual(imported.value(forKey: "weight") as? Double, 81.234567)
+        XCTAssertEqual(imported.value(forKey: "bodyFatPercentage") as? Double, 18.25)
+        XCTAssertEqual(imported.value(forKey: "sourceMetadataJSON") as? String,
+                       "{\"external_result_id\":\"original-report\"}")
+        XCTAssertEqual(imported.value(forKey: "isExcluded") as? Bool, false)
+        XCTAssertNil(imported.value(forKey: "correctedValueJSON"))
+        imported.setValue(true, forKey: "isExcluded")
+        imported.setValue("{\"weight\":79.125}", forKey: "correctedValueJSON")
+        try verification.save()
+        try migrated.remove(migratedStore)
+
+        let reopened = NSPersistentStoreCoordinator(managedObjectModel: current)
+        let reopenedStore = try reopened.addPersistentStore(ofType: NSSQLiteStoreType, configurationName: nil, at: storeURL)
+        let reopenedContext = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        reopenedContext.persistentStoreCoordinator = reopened
+        let retained = try XCTUnwrap(reopenedContext.fetch(request).first)
+        XCTAssertEqual(retained.value(forKey: "weight") as? Double, 81.234567)
+        XCTAssertEqual(retained.value(forKey: "isExcluded") as? Bool, true)
+        XCTAssertEqual(retained.value(forKey: "correctedValueJSON") as? String, "{\"weight\":79.125}")
+        try reopened.remove(reopenedStore)
+    }
+}

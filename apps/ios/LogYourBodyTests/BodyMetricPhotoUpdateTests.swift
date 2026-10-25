@@ -73,7 +73,9 @@ final class BodyMetricPhotoUpdateTests: XCTestCase {
         XCTAssertEqual(updated.syncStatus, "synced")
     }
 
-    private func makePhotoUpdateMetric(id: String, userId: String, date: Date) -> BodyMetrics {
+    private func makePhotoUpdateMetric(
+        id: String, userId: String, date: Date, source: String = "manual"
+    ) -> BodyMetrics {
         BodyMetrics(
             id: id,
             userId: userId,
@@ -86,7 +88,7 @@ final class BodyMetricPhotoUpdateTests: XCTestCase {
             boneMass: nil,
             notes: nil,
             photoUrl: nil,
-            dataSource: BodyMetricSource.manual.rawValue,
+            dataSource: source,
             createdAt: date,
             updatedAt: date
         )
@@ -236,5 +238,34 @@ final class BodyMetricPhotoUpdateTests: XCTestCase {
 
     private enum CoreDataPhotoUpdateTestError: Error {
         case missingMetric
+    }
+}
+
+
+extension BodyMetricPhotoUpdateTests {
+    func testAttachingPhotoDoesNotFlattenAnImportedCorrectionIntoOriginals() async throws {
+        let manager = CoreDataManager.shared
+        let owner = "photo-overlay-\(UUID().uuidString)"
+        let original = makePhotoUpdateMetric(id: UUID().uuidString, userId: owner, date: Date(), source: "healthkit")
+        try await manager.saveBodyMetricsAndWait(original, userId: owner)
+        let rows = await manager.fetchBodyMetrics(for: owner)
+        let stored = try XCTUnwrap(rows.first?.toBodyMetrics())
+        let service = MetricCorrectionService(
+            coreDataManager: manager, isEnabled: { true }, admission: { _ in {} }, syncTrigger: {}
+        )
+        let corrected = try await service.correct(stored, to: .init(weight: 79, bodyFatPercentage: 17))
+        _ = try await service.exclude(corrected.metrics)
+        let attached = try await PhotoMetadataService.shared.createOrUpdateMetrics(
+            for: original.date, photoUrl: "https://example.com/attached.png", userId: owner,
+            preserveExistingMeasurements: true
+        )
+        XCTAssertEqual(attached.originalWeight, 81.2)
+        XCTAssertEqual(attached.originalBodyFatPercentage, 16.4)
+        XCTAssertEqual(attached.correctedValue, corrected.metrics.correctedValue)
+        XCTAssertTrue(attached.isExcluded)
+        let updated = await manager.fetchBodyMetrics(for: owner)
+        XCTAssertEqual(updated.first?.weight, 81.2)
+        XCTAssertEqual(updated.first?.bodyFatPercentage, 16.4)
+        XCTAssertEqual(updated.first?.photoUrl, "https://example.com/attached.png")
     }
 }

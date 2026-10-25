@@ -452,12 +452,15 @@ struct BodyMetricLocalDate: Equatable {
 
 struct BodyMetrics: Identifiable, Codable, Equatable {
     func measurementSource(for field: BodyMetricField) -> BodyMetricSource {
-        sourceMetadata?.entrySource(for: field) ?? metricSource
+        if field == .weight && correctedValue?.weight != nil ||
+            field == .bodyFat && correctedValue?.bodyFatPercentage != nil { return .manual }
+        return sourceMetadata?.entrySource(for: field) ?? metricSource
     }
 
     /// Keep the imported method in storage; a typed replacement cannot claim it.
     var attributedBodyFatMethod: String? {
-        sourceMetadata?.entrySource(for: .bodyFat) == .manual
+        if correctedValue?.bodyFatPercentage != nil { return "manual" }
+        return sourceMetadata?.entrySource(for: .bodyFat) == .manual
             ? sourceMetadata?.enteredBodyFatMethod ?? "manual" : bodyFatMethod
     }
 
@@ -465,9 +468,14 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
     let userId: String
     let date: Date
     let localDate: String
-    let weight: Double?
+    /// Imported values remain the wire/storage values, even after correction.
+    let originalWeight: Double?
+    let originalBodyFatPercentage: Double?
+    let isExcluded: Bool
+    let correctedValue: MetricCorrectedValue?
+    var weight: Double? { correctedValue?.weight ?? originalWeight }
+    var bodyFatPercentage: Double? { correctedValue?.bodyFatPercentage ?? originalBodyFatPercentage }
     let weightUnit: String?
-    let bodyFatPercentage: Double?
     let bodyFatMethod: String?
     let muscleMass: Double?
     let boneMass: Double?
@@ -499,6 +507,8 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
         photoUrl: String?,
         dataSource: String?,
         sourceMetadata: BodyMetricSourceMetadata? = nil,
+        isExcluded: Bool = false,
+        correctedValue: MetricCorrectedValue? = nil,
         createdAt: Date,
         updatedAt: Date
     ) {
@@ -506,9 +516,11 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
         self.userId = userId
         self.date = date
         self.localDate = BodyMetricLocalDate.normalized(localDate, fallback: date)
-        self.weight = weight
+        self.originalWeight = weight
+        self.isExcluded = isExcluded
+        self.correctedValue = correctedValue
         self.weightUnit = weightUnit
-        self.bodyFatPercentage = bodyFatPercentage
+        self.originalBodyFatPercentage = bodyFatPercentage
         self.bodyFatMethod = bodyFatMethod
         self.muscleMass = muscleMass
         self.boneMass = boneMass
@@ -528,9 +540,11 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
         case userId = "user_id"
         case date
         case localDate = "local_date"
-        case weight
+        case originalWeight = "weight"
+        case isExcluded = "is_excluded"
+        case correctedValue = "corrected_value"
         case weightUnit = "weight_unit"
-        case bodyFatPercentage = "body_fat_percentage"
+        case originalBodyFatPercentage = "body_fat_percentage"
         case bodyFatMethod = "body_fat_method"
         case muscleMass = "muscle_mass"
         case boneMass = "bone_mass"
@@ -559,9 +573,11 @@ struct BodyMetrics: Identifiable, Codable, Equatable {
             try container.decodeIfPresent(String.self, forKey: .localDate),
             fallback: date
         )
-        weight = try container.decodeIfPresent(Double.self, forKey: .weight)
+        originalWeight = try container.decodeIfPresent(Double.self, forKey: .originalWeight)
+        isExcluded = try container.decodeIfPresent(Bool.self, forKey: .isExcluded) ?? false
+        correctedValue = try container.decodeIfPresent(MetricCorrectedValue.self, forKey: .correctedValue)
         weightUnit = try container.decodeIfPresent(String.self, forKey: .weightUnit)
-        bodyFatPercentage = try container.decodeIfPresent(Double.self, forKey: .bodyFatPercentage)
+        originalBodyFatPercentage = try container.decodeIfPresent(Double.self, forKey: .originalBodyFatPercentage)
         bodyFatMethod = try container.decodeIfPresent(String.self, forKey: .bodyFatMethod)
         muscleMass = try container.decodeIfPresent(Double.self, forKey: .muscleMass)
         boneMass = try container.decodeIfPresent(Double.self, forKey: .boneMass)
