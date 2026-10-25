@@ -745,7 +745,7 @@ struct BodyScoreSharePreviewChrome: View {
                 Rectangle()
                     .strokeBorder(Color.white.opacity(0.88), lineWidth: 1)
             )
-            .accessibilityIdentifier("body_score_share_preview_bounds")
+            // An identifier here replaces the card's own accessibility identifier.
     }
 }
 
