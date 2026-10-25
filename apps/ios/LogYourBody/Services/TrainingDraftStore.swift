@@ -63,6 +63,7 @@ final class TrainingDraftStore {
         let sessionId: String
         var rows: [String: TrainingSetDraft]
         var feedback: TrainingFeedbackDraft?
+        var rest: TrainingRestDraft?
     }
 
     private let rootURL: URL
@@ -81,6 +82,16 @@ final class TrainingDraftStore {
 
     func loadFeedback(ownerId: String, sessionId: String) throws -> TrainingFeedbackDraft? {
         try loadJournal(ownerId: ownerId, sessionId: sessionId).feedback
+    }
+
+    func loadRest(ownerId: String, sessionId: String) throws -> TrainingRestDraft {
+        try loadJournal(ownerId: ownerId, sessionId: sessionId).rest ?? TrainingRestDraft()
+    }
+
+    func saveRest(_ rest: TrainingRestDraft, ownerId: String, sessionId: String) throws {
+        var journal = try loadJournal(ownerId: ownerId, sessionId: sessionId)
+        journal.rest = rest
+        try persist(journal)
     }
 
     func replaceFeedback(
@@ -115,6 +126,11 @@ final class TrainingDraftStore {
                       $0.feedback.observation.sessionId == sessionId &&
                           $0.matches($0.feedback.observation) && $0.nextSetRecommendation.action != .proceed
                   }) ?? true
+            else { throw TrainingDraftError.unavailable }
+        }
+        if let rest = journal.rest {
+            guard rest.durations.values.allSatisfy(TrainingRestPolicy.durationRange.contains),
+                  rest.countdown.map({ TrainingRestPolicy.durationRange.contains($0.duration) }) ?? true
             else { throw TrainingDraftError.unavailable }
         }
         return journal

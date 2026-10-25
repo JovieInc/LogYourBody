@@ -29,6 +29,32 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["login_email_field"].exists)
     }
 
+    func testTrainingRestTimerAdjustsAndSkipSurvivesReopening() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingRestTimer"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let timer = app.staticTexts["training_rest_timer"]
+        XCTAssertFalse(timer.exists)
+        app.buttons["training_log_set_fixture_press_1"].tap()
+        XCTAssertTrue(timer.waitForExistence(timeout: 5))
+        let increase = app.buttons["training_rest_increase"]
+        if !increase.isHittable { app.swipeDown() }
+        increase.tap()
+        let seconds = Int(timer.label.components(separatedBy: " ")[0]) ?? 0
+        XCTAssertGreaterThan(seconds, 90)
+        XCTAssertLessThanOrEqual(seconds, 105)
+        app.buttons["training_rest_skip"].tap()
+        XCTAssertFalse(timer.exists)
+        app.buttons["Close"].tap()
+        app.buttons["training_fixture_open"].tap()
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
+        XCTAssertFalse(timer.exists, "Reopening must preserve Skip")
+    }
+
     func testTrainingStopConfirmationIncludesCancel() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]

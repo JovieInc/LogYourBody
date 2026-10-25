@@ -19,6 +19,21 @@ private final class TrainingHeldResponse {
 }
 
 @MainActor
+private final class TrainingRestAlertSpy: TrainingRestAlerting {
+    var starts: [TrainingRestCountdown] = []
+    var stops: [Bool] = []
+    var haptics = 0
+    var didStart: (() -> Void)?
+
+    func start(_ countdown: TrainingRestCountdown) async {
+        starts.append(countdown)
+        didStart?()
+    }
+    func stop(cancelNotification: Bool) { stops.append(cancelNotification) }
+    func playCompletionHaptic() { haptics += 1 }
+}
+
+@MainActor
 final class TrainingSessionDraftTests: XCTestCase {
     private let exercise = TrainingExercisePrescription(
         id: "fixture_press", name: "Fixture press", primaryMuscle: "chest", muscleContribution: ["chest": 1],
@@ -39,6 +54,200 @@ final class TrainingSessionDraftTests: XCTestCase {
 
     private func model(_ store: TrainingDraftStore, owner: String = "owner-A") -> TrainingSessionDraft {
         TrainingSessionDraft(session: session(), ownerId: owner, store: store, isCurrent: { true })
+    }
+
+    func testRestDefaultsUseExerciseMetadataAndCountdownClampsAtZero() {
+        let compound = TrainingExercisePrescription(
+            id: "press", name: "Press", primaryMuscle: "chest",
+            muscleContribution: ["chest": 1, "triceps": 0.5],
+            sets: 3, repRange: .init(min: 8, max: 12), targetReps: 10, targetRir: 3,
+            targetLoadKg: nil, loadInstruction: nil, progression: "hold", evidenceIds: []
+        )
+        XCTAssertEqual(TrainingRestPolicy.defaultDuration(for: compound), 120)
+        XCTAssertEqual(TrainingRestPolicy.defaultDuration(for: exercise), 90)
+        let start = Date(timeIntervalSince1970: 2_000_000_000)
+        let timer = TrainingRestCountdown(id: UUID(), exerciseId: exercise.id, startedAt: start, duration: 90)
+        XCTAssertEqual(timer.remaining(at: start.addingTimeInterval(0.1)), 90)
+        XCTAssertEqual(timer.remaining(at: start.addingTimeInterval(89.1)), 1)
+        XCTAssertEqual(timer.remaining(at: start.addingTimeInterval(90)), 0)
+        XCTAssertEqual(timer.remaining(at: start.addingTimeInterval(300)), 0)
+        XCTAssertEqual(timer.adjusted(by: -600).duration, 15)
+        XCTAssertEqual(timer.adjusted(by: 600).duration, 600)
+        XCTAssertEqual(timer.adjusted(by: 15).startedAt, start)
+    }
+
+    func testRestStartsOnlyAfterAcknowledgementAndRetryUsesOneTimer() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let start = Date(timeIntervalSince1970: 2_000_000_000)
+        let draft = TrainingSessionDraft(
+            session: session(), ownerId: "owner-A", store: TrainingDraftStore(rootURL: directory),
+            isCurrent: { true }, now: { start }, restTimerEnabled: true
+        )
+        XCTAssertNil(draft.rest.countdown)
+        await draft.save(exercise, setNumber: 1) { _ in throw URLError(.notConnectedToInternet) }
+        XCTAssertNil(draft.rest.countdown, "An unacknowledged set must not start rest")
+        let held = TrainingHeldResponse()
+        let sent = expectation(description: "Retry reached transport")
+        let retry = Task {
+            await draft.save(exercise, setNumber: 1) { _ in
+                sent.fulfill()
+                await held.wait()
+            }
+        }
+        await fulfillment(of: [sent], timeout: 3)
+        XCTAssertNil(draft.rest.countdown)
+        held.release()
+        await retry.value
+        let timer = try XCTUnwrap(draft.rest.countdown)
+        XCTAssertEqual(timer.endsAt, start.addingTimeInterval(90))
+        await draft.save(exercise, setNumber: 1) { _ in XCTFail("Duplicate send") }
+        XCTAssertEqual(draft.rest.countdown, timer)
+        await draft.save(exercise, setNumber: 2) { _ in }
+        XCTAssertNil(draft.rest.countdown, "No rest is needed after the last set of a workout")
+    }
+
+    func testAdjustedRestAndSkipSurviveRefreshAndRelaunchWithoutRestarting() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        var time = Date(timeIntervalSince1970: 2_000_000_000)
+        let start = time
+        let draft = TrainingSessionDraft(
+            session: session(), ownerId: "owner-A", store: store,
+            isCurrent: { true }, now: { time }, restTimerEnabled: true
+        )
+        await draft.save(exercise, setNumber: 1) { _ in }
+        time = time.addingTimeInterval(30)
+        draft.adjustRest(by: 15)
+        let timer = try XCTUnwrap(draft.rest.countdown)
+        XCTAssertEqual(timer.endsAt, start.addingTimeInterval(105))
+        XCTAssertEqual(timer.remaining(at: time), 75, "Adjustments preserve elapsed time")
+        let savedSession = session(saved: Array(draft.loggedSets.values))
+        draft.replaceSession(savedSession)
+        XCTAssertEqual(draft.rest.countdown, timer)
+        let restored = TrainingSessionDraft(
+            session: savedSession, ownerId: "owner-A", store: store,
+            isCurrent: { true }, now: { time }, restTimerEnabled: true
+        )
+        XCTAssertEqual(restored.rest.countdown, timer)
+        XCTAssertEqual(restored.rest.durations[exercise.id], 105)
+        restored.cancelRest()
+        restored.replaceSession(savedSession)
+        XCTAssertNil(restored.rest.countdown)
+        let skipped = TrainingSessionDraft(
+            session: savedSession, ownerId: "owner-A", store: store,
+            isCurrent: { true }, now: { time }, restTimerEnabled: true
+        )
+        XCTAssertNil(skipped.rest.countdown, "Reopening must not undo Skip")
+        XCTAssertNil(skipped.nextSetRecommendation, "A skipped timer never implies readiness")
+        let otherOwner = TrainingSessionDraft(
+            session: session(), ownerId: "owner-B", store: store,
+            isCurrent: { true }, now: { time }, restTimerEnabled: true
+        )
+        XCTAssertTrue(otherOwner.rest.durations.isEmpty)
+        XCTAssertNil(otherOwner.rest.countdown)
+    }
+
+    func testCorrectionDoesNotRestartRestAndPauseCancelsIt() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = TrainingSessionDraft(
+            session: session(), ownerId: "owner-A", store: TrainingDraftStore(rootURL: directory),
+            isCurrent: { true }, restTimerEnabled: true
+        )
+        await draft.save(exercise, setNumber: 1) { _ in }
+        let timer = try XCTUnwrap(draft.rest.countdown)
+        let position = try XCTUnwrap(draft.lastCompletedPosition)
+        draft.beginCorrection(position)
+        await draft.correct(position) { request in
+            TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: request.reps, loadKg: request.loadKg, rir: request.rir, revision: 1
+            )
+        }
+        XCTAssertEqual(draft.rest.countdown, timer)
+        var paused = session(saved: Array(draft.loggedSets.values))
+        paused.executionPaused = true
+        draft.replaceSession(paused)
+        XCTAssertNil(draft.rest.countdown)
+    }
+
+    func testRestGateOffKeepsExistingTimerAndNoNewAlertState() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = model(TrainingDraftStore(rootURL: directory))
+        await draft.save(exercise, setNumber: 1) { _ in }
+        XCTAssertNotNil(draft.restUntil)
+        XCTAssertNil(draft.rest.countdown)
+        draft.adjustRest(by: 15)
+        XCTAssertTrue(draft.rest.durations.isEmpty)
+    }
+
+    func testReadinessSafetyReceiptCancelsAnActiveRestTimer() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let draft = TrainingSessionDraft(
+            session: session(), ownerId: "owner-A", store: TrainingDraftStore(rootURL: directory),
+            isCurrent: { true }, restTimerEnabled: true
+        )
+        await draft.save(exercise, setNumber: 1) { _ in }
+        XCTAssertNotNil(draft.rest.countdown)
+        await draft.recordWorkoutFeedback(feedbackProposal(.breathingLimited, set: 2), source: "touch") { request in
+            self.feedbackResponse(request, action: .symptomSafety)
+        }
+        XCTAssertEqual(draft.nextSetRecommendation?.action, .symptomSafety)
+        XCTAssertNil(draft.rest.countdown)
+    }
+
+    func testRestAlertHapticFiresOnceAtZeroAndNeverForRestoredExpiredTimer() async throws {
+        let spy = TrainingRestAlertSpy()
+        let start = Date(timeIntervalSince1970: 2_000_000_000)
+        let alerts = TrainingRestAlerts(client: spy, now: { start })
+        let timer = TrainingRestCountdown(id: UUID(), exerciseId: exercise.id, startedAt: start, duration: 90)
+        let started = expectation(description: "Rest alerts started")
+        spy.didStart = { started.fulfill() }
+        alerts.synchronize(timer, isCurrent: { true })
+        await fulfillment(of: [started], timeout: 3)
+        XCTAssertEqual(spy.starts, [timer])
+        alerts.completeIfElapsed(at: start.addingTimeInterval(89), isCurrent: true, isForeground: true)
+        XCTAssertEqual(spy.haptics, 0)
+        alerts.completeIfElapsed(at: timer.endsAt, isCurrent: true, isForeground: true)
+        alerts.completeIfElapsed(at: timer.endsAt, isCurrent: true, isForeground: true)
+        XCTAssertEqual(spy.haptics, 1)
+        XCTAssertEqual(spy.stops.last, true)
+        let expired = TrainingRestAlerts(client: spy, now: { start.addingTimeInterval(300) })
+        expired.synchronize(timer, isCurrent: { true })
+        await Task.yield()
+        XCTAssertEqual(spy.starts.count, 1)
+        XCTAssertEqual(spy.haptics, 1)
+    }
+
+    func testRestAlertReplacementSkipAndBackgroundCompletionCancelCorrectly() async {
+        let spy = TrainingRestAlertSpy()
+        let start = Date(timeIntervalSince1970: 2_000_000_000)
+        let alerts = TrainingRestAlerts(client: spy, now: { start })
+        let timer = TrainingRestCountdown(id: UUID(), exerciseId: exercise.id, startedAt: start, duration: 90)
+        alerts.synchronize(timer, isCurrent: { true })
+        await Task.yield()
+        let extended = timer.adjusted(by: 15)
+        alerts.synchronize(extended, isCurrent: { true })
+        await Task.yield()
+        alerts.completeIfElapsed(at: timer.endsAt, isCurrent: true, isForeground: true)
+        XCTAssertEqual(spy.haptics, 0, "The old deadline cannot finish an adjusted timer")
+        alerts.completeIfElapsed(at: extended.endsAt, isCurrent: true, isForeground: false)
+        XCTAssertEqual(spy.haptics, 0)
+        XCTAssertEqual(spy.stops.last, false, "Background completion leaves system notification delivery intact")
+        alerts.synchronize(timer, isCurrent: { true })
+        alerts.synchronize(nil, isCurrent: { true })
+        alerts.completeIfElapsed(at: timer.endsAt, isCurrent: true, isForeground: true)
+        XCTAssertEqual(spy.haptics, 0, "Skip cancels the haptic")
+        alerts.synchronize(timer, isCurrent: { true })
+        alerts.completeIfElapsed(at: timer.endsAt.addingTimeInterval(10), isCurrent: true, isForeground: true)
+        XCTAssertEqual(spy.haptics, 0, "Resuming a suspended app cannot replay a late haptic")
+        alerts.synchronize(timer, isCurrent: { true })
+        alerts.completeIfElapsed(at: timer.endsAt, isCurrent: false, isForeground: true)
+        XCTAssertEqual(spy.haptics, 0, "An obsolete account lifetime cannot alert")
     }
 
     func testFeedbackRequestEncodesOptionalMuscleDetailAndTouchSource() throws {

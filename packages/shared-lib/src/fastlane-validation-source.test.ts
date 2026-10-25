@@ -137,6 +137,21 @@ function expectCleanValidation(result: Result) {
 }
 
 describe('Fastlane validation source preservation', () => {
+  it('builds and embeds the rest Live Activity through the app target', () => {
+    const script = fileURLToPath(
+      new URL('../../../scripts/ios/test_training_rest_project.py', import.meta.url),
+    );
+    expect(execFileSync('python3', [script], { encoding: 'utf8' })).toContain(
+      'project graph passed',
+    );
+  });
+  it('signs the rest Live Activity extension separately in the real release lane', () => {
+    const script = fileURLToPath(
+      new URL('../../../scripts/ios/test_training_rest_release.rb', import.meta.url),
+    );
+    const result = JSON.parse(execFileSync('ruby', [script], { encoding: 'utf8' }));
+    expect(result.cases).toBe(2);
+  });
   it.each(['ci_ios', 'build_check'])(
     '%s compiles without changing tracked metadata or docs',
     (lane) => {

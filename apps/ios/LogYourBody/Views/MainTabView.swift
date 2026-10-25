@@ -870,6 +870,9 @@ struct ChatTabView: View {
                     readinessEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
                         flagKey: TrainingReadinessPolicy.featureGate
                     ),
+                    restTimerEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
+                        flagKey: TrainingRestPolicy.featureGate
+                    ),
                     isCurrent: { authManager.ownsAccountSession(ownership) },
                     onLogSet: { exercise, setNumber, reps, loadKg, rir in
                         try await logTrainingSet(
