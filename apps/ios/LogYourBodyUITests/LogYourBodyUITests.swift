@@ -3334,8 +3334,19 @@ final class LogYourBodyUITests: XCTestCase {
     private func submitSyntheticChatQuestion(in app: XCUIApplication) {
         let composer = app.textFields["chat_composer"]
         composer.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 8))
         let question = "Synthetic full-turn question"
-        composer.typeText(question)
+        // The simulator can drop a typing burst while the keyboard connects.
+        // Acknowledge each prefix before sending more input; never retry a turn.
+        var prefix = ""
+        for character in question {
+            composer.typeText(String(character))
+            prefix.append(character)
+            let received = XCTNSPredicateExpectation(
+                predicate: NSPredicate(format: "value == %@", prefix), object: composer
+            )
+            guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }
+        }
         let entered = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "value == %@", question), object: composer
         )

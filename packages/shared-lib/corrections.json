@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "synthetic-chat-replay-acknowledges-keyboard-input",
+    "correction": "PR #1534 Launch Quality failed before cancellation coverage because the simulator accepted only S from a burst of Synthetic full-turn question while its keyboard service timed out. Synchronize input without accepting or submitting a partial question.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40153702079/job/121050481329",
+    "mechanization": "The existing required synthetic chat UI cases wait for the keyboard and acknowledge each exact typed prefix before continuing. The complete-question predicate still gates Send, and the full-turn, cancellation, original-identity retry and persistence assertions remain required. Native runtime proof remains required from Launch Quality.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The UI test driver controls input delivery and can prevent a typing burst from outrunning keyboard initialization. The existing failed native case is the regression; no product behavior or CI gate needs to change."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "guard XCTWaiter.wait(for: [received], timeout: 8) == .completed else { break }"
+    }
+  },
+  {
     "fingerprint": "training-priority-order-retains-warmup-volume-and-completed-work",
     "correction": "LYB-37 October 14 dogfood acceptance: specialization work precedes generic compound-first templates only when eligible; preserve warm-up, approved allocation and completed work across split segments, and distinguish anterior from medial delts.",
     "source": "https://linear.app/jovie/issue/LYB-37",
