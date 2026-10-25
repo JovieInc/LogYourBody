@@ -1,5 +1,41 @@
 [
   {
+    "fingerprint": "sentry-web-private-release-reporting",
+    "correction": "PR #1542: Vercel rejects the removed sendDefaultPii option in Sentry 11. Preserve private error reporting, browser configuration, commit release identity and credential-gated sourcemap uploads using the installed SDK.",
+    "source": "https://vercel.com/jovie/log-your-body/AKbAVaEindibaLTJKLsnhetLUMqg",
+    "mechanization": "The existing typed adapter configures Sentry 11 dataCollection explicitly, retains beforeSend redaction including request URL queries, and reads public browser values through literal process.env properties. Runtime and sourcemaps share one release value; Turbo retains the build inputs. The existing required web suite verifies resolved real-SDK collection controls, synthetic capture, redaction and upload gating. The privacy regressions and root typecheck fail before the adapter fix and pass afterward.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "One typed vendor adapter and a shared resolved release eliminate the removed option and mismatched event/upload identities by construction. Explicit collection controls and beforeSend redaction preserve the privacy boundary."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/adapters/sentry.ts",
+      "anchor": "dataCollection: {\n      userInfo: false,"
+    }
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1542: Adding the Sentry dependency left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and shadow parity. Regenerate the source projection after reviewing the dependency manifest.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40161338404/job/121073360393",
+    "mechanization": "The existing required projection checker rejected the stale web manifest before regeneration and passes afterward. Retain the existing Detect Changes regression and CI Summary gate; no checks or baselines are relaxed.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    }
+  },
+  {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
     "correction": "PR #1531: Adding the delegated training view and tests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40151037308/job/121042459915",

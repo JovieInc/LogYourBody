@@ -1,4 +1,4 @@
-import { captureRouterTransitionStart, initSentry } from "@/lib/adapters/sentry";
+import { captureRouterTransitionStart, initSentry } from '@/lib/adapters/sentry-client';
 
 initSentry();
 

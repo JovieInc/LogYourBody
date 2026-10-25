@@ -1,54 +1,59 @@
-import * as Sentry from "@sentry/nextjs";
+/** @jest-environment node */
+import * as Sentry from '@sentry/nextjs';
 import {
   captureSyntheticError,
   initSentry,
   redactSentryEvent,
   sentryRuntimeConfig,
-} from "../sentry";
+} from '../sentry';
 
-describe("sentry adapter", () => {
+describe('sentry adapter', () => {
   afterEach(async () => {
     await Sentry.close();
   });
 
-  it("stays off without a DSN", () => {
+  it('stays off without a DSN', () => {
     expect(initSentry({})).toBe(false);
     expect(sentryRuntimeConfig({}).dsn).toBeUndefined();
   });
 
-  it("reads release and environment from config", () => {
+  it('reads release and environment from config', () => {
     expect(
       sentryRuntimeConfig({
-        NEXT_PUBLIC_SENTRY_DSN: "https://k@o0.ingest.sentry.io/1",
-        NEXT_PUBLIC_SENTRY_RELEASE: "abc123",
-        VERCEL_ENV: "production",
-      })
+        NEXT_PUBLIC_SENTRY_DSN: 'https://k@o0.ingest.sentry.io/1',
+        NEXT_PUBLIC_SENTRY_RELEASE: 'abc123',
+        VERCEL_ENV: 'production',
+      }),
     ).toEqual({
-      dsn: "https://k@o0.ingest.sentry.io/1",
-      release: "abc123",
-      environment: "production",
+      dsn: 'https://k@o0.ingest.sentry.io/1',
+      release: 'abc123',
+      environment: 'production',
     });
   });
 
-  it("strips user, cookies, bodies and credential headers", () => {
+  it('strips user, cookies, bodies and credential headers', () => {
     const event = redactSentryEvent({
       type: undefined,
-      user: { id: "u", email: "a@b.c" },
+      user: { id: 'u', email: 'a@b.c' },
       request: {
-        cookies: { s: "1" },
-        data: "secret",
-        query_string: "token=1",
-        headers: { authorization: "Bearer x", "x-api-key": "k", accept: "*/*" },
+        url: 'https://example.com/api/check?token=secret#private',
+        cookies: { s: '1' },
+        data: 'secret',
+        query_string: 'token=1',
+        headers: { authorization: 'Bearer x', 'x-api-key': 'k', accept: '*/*' },
       },
     } as Sentry.ErrorEvent);
     expect(event.user).toBeUndefined();
-    expect(event.request).toEqual({ headers: { accept: "*/*" } });
+    expect(event.request).toEqual({
+      url: 'https://example.com/api/check',
+      headers: { accept: '*/*' },
+    });
   });
 
-  it("captures a synthetic error end to end with release, environment and no user", async () => {
+  it('captures a synthetic error end to end with release, environment and no user', async () => {
     const envelopes: string[] = [];
     const started = initSentry(
-      { dsn: "https://k@o0.ingest.sentry.io/1", release: "rel-1", environment: "test" },
+      { dsn: 'https://k@o0.ingest.sentry.io/1', release: 'rel-1', environment: 'test' },
       {
         transport: () => ({
           send: async (envelope) => {
@@ -57,15 +62,25 @@ describe("sentry adapter", () => {
           },
           flush: async () => true,
         }),
-      }
+      },
     );
     expect(started).toBe(true);
+    expect(Sentry.getClient()?.getDataCollectionOptions()).toEqual(
+      expect.objectContaining({
+        userInfo: false,
+        cookies: false,
+        httpHeaders: { request: false, response: false },
+        httpBodies: [],
+        urlQueryParams: false,
+      }),
+    );
 
-    await captureSyntheticError("unit");
+    await captureSyntheticError('unit');
 
-    const sent = envelopes.join("\n");
-    expect(sent).toContain("synthetic-capture-check: unit");
-    expect(sent).toContain("rel-1");
-    expect(sent).not.toContain("\"user\"");
+    const sent = envelopes.join('\n');
+    expect(sent).toContain('synthetic-capture-check: unit');
+    expect(sent).toContain('rel-1');
+    expect(sent).toContain('"environment":"test"');
+    expect(sent).not.toContain('"user"');
   });
 });

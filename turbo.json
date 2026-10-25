@@ -5,6 +5,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT", "VERCEL_GIT_COMMIT_SHA"],
       "outputs": ["apps/web/.next/**", "!.next/cache/**", "dist/**", "build/**"]
     },
     "dev": {
