@@ -4437,6 +4437,129 @@ final class LogYourBodyUITests: XCTestCase {
     }
 }
 
+// LYB-43: this fixture mounts the shipping card, not a separate accessible mock.
+extension LogYourBodyUITests {
+    func testMetricCardLegacyFixtureExposesTheMissingStateControl() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestMetricCardFixture", "-lybUITestMetricCardLegacy"]
+        app.launch()
+        for (state, expected) in [("loading", "Loading metric"), ("empty", "No data"), ("error", "Metric unavailable")] {
+            app.buttons["metric_fixture_state_\(state)"].tap()
+            resetMetricList(in: app)
+            for title in ["Steps", "Weight", "Body Fat", "FFMI"] {
+                let identifier = "metric_fixture_\(title)"
+                let card = app.staticTexts[identifier]
+                revealMetricCard(card, in: app)
+                XCTAssertTrue(card.waitForExistence(timeout: 8))
+                XCTAssertEqual(card.label, expected)
+                XCTAssertEqual(app.buttons.matching(identifier: identifier).count, 0)
+                XCTAssertEqual(card.descendants(matching: .button).count, 0)
+                XCTAssertEqual(app.staticTexts["metric_fixture_calls_\(title)"].label, "\(title) calls: 0")
+            }
+        }
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "metric-legacy-ignored-state-controls"
+        tree.lifetime = .keepAlways
+        add(tree)
+    }
+
+    func testMetricCardStateAccessibilityTreeAndActions() {
+        verifyMetricCardMatrix(accessibilitySize: false)
+    }
+
+    func testMetricCardAX3StateAccessibilityTreeAndActionsWithReduceMotion() {
+        verifyMetricCardMatrix(accessibilitySize: true)
+    }
+
+    func testMetricCardReducedMotionLoadingRemainsStill() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestMetricCardFixture", "-lybUITestReduceMotion"]
+        app.launch()
+        let card = app.staticTexts["metric_fixture_Steps"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8))
+        let first = card.screenshot().pngRepresentation
+        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertEqual(first, card.screenshot().pngRepresentation, "Reduce Motion must stop the loading shimmer")
+        XCTAssertFalse(app.buttons["metric_fixture_Steps"].exists)
+    }
+
+    private func verifyMetricCardMatrix(accessibilitySize: Bool) {
+        executionTimeAllowance = 180
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestMetricCardFixture"]
+        if accessibilitySize {
+            app.launchArguments += ["-lybUITestMetricCardAX3", "-lybUITestReduceMotion"]
+        }
+        app.launch()
+        let states = [
+            ("loading", "Loading", false), ("empty", "No measurements yet", true),
+            ("error", "Unable to load measurements", true), ("permission", "Health access needed", true),
+            ("data", "No change, 1M", true), ("unavailable", "Measurements unavailable", false)
+        ]
+        for (state, status, actionable) in states {
+            app.buttons["metric_fixture_state_\(state)"].tap()
+            resetMetricList(in: app)
+            for title in ["Steps", "Weight", "Body Fat", "FFMI"] {
+                let identifier = "metric_fixture_\(title)"
+                let card = actionable ? app.buttons[identifier] : app.staticTexts[identifier]
+                revealMetricCard(card, in: app)
+                XCTAssertTrue(card.waitForExistence(timeout: 8), "\(title) \(state)")
+                XCTAssertTrue(card.label.contains(title), card.label)
+                XCTAssertTrue(card.label.contains(status), card.label)
+                XCTAssertFalse(card.label.contains("No change No change"), card.label)
+                XCTAssertEqual(app.buttons.matching(identifier: identifier).count, actionable ? 1 : 0)
+                XCTAssertEqual(card.descendants(matching: .button).count, 0, "The card has one control owner")
+                if state == "data" {
+                    for context in ["October 25 at 08:00", "last 30 days", "Latest value", "1M"] {
+                        XCTAssertTrue(card.label.contains(context), card.label)
+                    }
+                    XCTAssertTrue(card.label.contains(title == "FFMI" ? "Calculated from" : "Source: Apple Health"))
+                    XCTAssertEqual(card.label.components(separatedBy: "No change").count - 1, 1)
+                }
+                let tree = XCTAttachment(string: app.debugDescription)
+                tree.name = "metric-tree-\(title)-\(state)-AX3-\(accessibilitySize)"
+                tree.lifetime = .keepAlways
+                add(tree)
+                if actionable {
+                    let actionTitle = state == "error" ? "Retry" : state == "empty" ? "Add measurement"
+                        : state == "permission" ? "Review Health access" : "Show \(title) details"
+                    XCTAssertTrue(card.label.contains(actionTitle), "The action must be named even with hints disabled")
+                    XCTAssertTrue(card.isHittable, "\(title) \(state) must be reachable")
+                    card.tap()
+                    if state == "data" || state == "permission" {
+                        let detail = app.staticTexts["metric_fixture_detail"]
+                        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+                        XCTAssertTrue(detail.label.contains(title))
+                        if state == "permission" { XCTAssertTrue(detail.label.contains("Health access")) }
+                        app.navigationBars.buttons.firstMatch.tap()
+                    } else {
+                        let updated = app.buttons[identifier]
+                        XCTAssertTrue(updated.waitForExistence(timeout: 5))
+                        XCTAssertTrue(updated.label.contains("Latest value"), "The handler must change state")
+                    }
+                    XCTAssertEqual(app.staticTexts["metric_fixture_calls_\(title)"].label, "\(title) calls: 1")
+                }
+            }
+        }
+    }
+
+    private func revealMetricCard(_ card: XCUIElement, in app: XCUIApplication) {
+        let scroll = app.scrollViews.firstMatch
+        for _ in 0..<12 {
+            if card.exists && card.isHittable { return }
+            scroll.swipeUp(velocity: .slow)
+        }
+    }
+
+    private func resetMetricList(in app: XCUIApplication) {
+        let firstCard = app.descendants(matching: .any)["metric_fixture_Steps"]
+        for _ in 0..<8 {
+            if firstCard.exists && firstCard.isHittable { return }
+            app.scrollViews.firstMatch.swipeDown(velocity: .fast)
+        }
+    }
+}
+
 extension LogYourBodyUITests {
     func testCycleReuseDraftRequiresReviewBeforeApply() {
         let app = XCUIApplication()
