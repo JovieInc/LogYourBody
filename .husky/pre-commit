@@ -15,3 +15,6 @@ fi
 if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
   node scripts/correction-classifier.mjs --check-merge . || exit $?
 fi
+
+# Refresh derived documentation after formatters and ledger classification.
+python3 scripts/resolve-repository-docs.py --staged
