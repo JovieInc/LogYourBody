@@ -48,14 +48,15 @@ without re-resolving unrelated dependencies.
 
 For dependency PRs, stage the reviewed manifests and run
 `python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
-repair first verifies the existing lockfile offline. Only
-`ERR_PNPM_OUTDATED_LOCKFILE` triggers regeneration through the pinned Corepack
-pnpm without lifecycle scripts, followed by another frozen offline pass.
-Valid bot lockfiles are preserved; configuration and other failures stop repair.
-It stages the lockfile and source map only after verification. It refuses
-unresolved source conflicts, unstaged dependency or projection edits, and
-pinned-source drift. Uncached resolutions require registry access; commit hooks
-and CI keep frozen installation.
+repair first verifies the existing lockfile offline with pinned Corepack pnpm.
+Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
+regeneration without lifecycle scripts and a second frozen offline check.
+Valid lockfiles keep their resolutions; other installation failures stop repair.
+If resolution or frozen verification fails, the helper restores the original
+lockfile bytes so the same command can be retried without manual cleanup.
+It then stages the lockfile and source map, refusing unresolved source conflicts,
+unstaged dependency or projection edits, and pinned-source drift. It requires registry
+access for uncached resolutions; commit hooks and CI keep frozen installation.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
