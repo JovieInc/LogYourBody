@@ -1643,5 +1643,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-cold-build-retains-finite-budget",
+    "correction": "PR #1569 / fix-red-5df69c1e5f: After the shell fixtures passed, Launch Quality interrupted a cold build at 600 seconds while test targets were still compiling, before any native tests ran.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40416849347/job/121901451602",
+    "mechanization": "Extend the existing launch evidence behavior suite and bounded shell fixture runner to execute the real build_for_testing_once function with a virtual elapsed clock. A 650-second cold build succeeds within the new 900-second default; a hung build, compiler failure and explicit shorter timeout still stop before native testing after one attempt with retained logs. The regression fails against the old default and passes after repair. Required shared-lib and native audit commands run the suite; XCTest limits, diagnostic build budget, retry policy, coverage and outer workflow cap are unchanged. The harness owns push and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing single-build runner owns a finite compilation deadline separately from XCTest execution. Its executable shell contract enforces failure propagation and no build retry while allowing measured cold compilation beyond ten minutes."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_shell_cold_build_budget_preserves_build_failures_and_timeout(self):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
