@@ -1142,7 +1142,84 @@ def test_ruby_setup_fails_when_cached_date_or_psych_cannot_load(tmp_path: Path) 
                                 text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
         assert result.returncode == status, result.stderr
     assert len(marker.read_text().splitlines()) == 2
-    assert all('exec ruby -rdate -rpsych' in line for line in marker.read_text().splitlines())
+    assert all('exec ruby' in line and 'date' in line and 'psych' in line
+               for line in marker.read_text().splitlines())
+
+
+def test_ruby_setup_loads_locked_native_gems_after_bundler_setup(tmp_path: Path) -> None:
+    ruby_api = subprocess.check_output(
+        ['ruby', '-rrbconfig', '-e', 'print RbConfig::CONFIG.fetch("ruby_version")'], text=True,
+    )
+    cache = tmp_path / 'vendor/bundle/ruby' / ruby_api
+    (cache / 'specifications').mkdir(parents=True)
+    for name in ['date', 'psych']:
+        library = cache / 'gems' / f'{name}-99.0.0' / 'lib'
+        library.mkdir(parents=True)
+        (cache / 'specifications' / f'{name}-99.0.0.gemspec').write_text(textwrap.dedent(f'''\
+            Gem::Specification.new do |spec|
+              spec.name = "{name}"
+              spec.version = "99.0.0"
+              spec.summary = "Offline bundled native dependency fixture"
+              spec.authors = ["CI"]
+            end
+        '''))
+        (library / f'{name}.rb').write_text(
+            f'raise LoadError, "fixture {name} native load failed" if ENV["BROKEN_NATIVE_GEM"] == "{name}"\n'
+            f'puts "Bundled {name} loaded"\n'
+        )
+    (tmp_path / 'Gemfile').write_text(
+        'source "https://rubygems.org"\ngem "date", "99.0.0"\ngem "psych", "99.0.0"\n'
+    )
+    (tmp_path / 'Gemfile.lock').write_text(textwrap.dedent('''\
+        GEM
+          remote: https://rubygems.org/
+          specs:
+            date (99.0.0)
+            psych (99.0.0)
+
+        PLATFORMS
+          ruby
+
+        DEPENDENCIES
+          date (= 99.0.0)
+          psych (= 99.0.0)
+    '''))
+    bundle = tmp_path / 'bundle'
+    # Reproduce the failing runner's command-line -r loads before RUBYOPT's
+    # bundler/setup on every host Ruby, using the real Bundler and gem loader.
+    bundle.write_text(textwrap.dedent('''\
+        #!/usr/bin/env bash
+        set -euo pipefail
+        if [[ "$1" == exec ]]; then
+          shift
+          command="$1"
+          shift
+          options=()
+          while [[ "$1" != -e ]]; do
+            options+=("$1")
+            shift
+          done
+          exec "$command" "${options[@]}" -rbundler/setup "$@"
+        fi
+        echo 'fixture bundle config'
+    '''))
+    bundle.chmod(0o755)
+    for broken in ['', 'date', 'psych']:
+        result = subprocess.run(
+            ['bash', '-e', '-c', _ruby_setup_command('Verify Ruby setup')], cwd=tmp_path,
+            env={**os.environ, 'PATH': f'{tmp_path}:{os.environ["PATH"]}', 'RUBYOPT': '',
+                 'BUNDLE_GEMFILE': str(tmp_path / 'Gemfile'), 'BUNDLE_PATH': str(tmp_path / 'vendor/bundle'),
+                 'BUNDLE_IGNORE_CONFIG': 'true', 'BUNDLE_DEPLOYMENT': 'true', 'BUNDLE_FROZEN': 'true',
+                 'BROKEN_NATIVE_GEM': broken},
+            text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+        )
+        if broken:
+            assert result.returncode != 0
+            assert f'fixture {broken} native load failed' in result.stderr
+            assert 'Ruby native dependencies loaded' not in result.stdout
+        else:
+            assert result.returncode == 0, result.stderr
+            assert 'Bundled date loaded\nBundled psych loaded\nRuby native dependencies loaded' in result.stdout
 
 
 def test_invalid_awaiter_bounds_and_missing_helper_fall_back(tmp_path: Path) -> None:

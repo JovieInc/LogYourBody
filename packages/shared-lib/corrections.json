@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "ruby-native-verification-loads-after-bundler",
+    "correction": "PR #1593: Launch Quality failed in Verify Ruby setup because command-line -rdate activated Ruby's default date 3.2.2 before Bundler selected the locked date 3.6.0.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40266780512/job/121390909536",
+    "mechanization": "Require date and psych inside the bundled Ruby script after Bundler setup. The existing required Mac Runner Routing Tests execute the action command against an offline vendor bundle using the real Bundler and gem loader, reproduce the runner's preload order, and verify that default-gem conflicts are avoided while individual date and psych load failures remain fatal. The regression fails with the old command and passes with the fix.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot control native gem verification in the CI setup action before the application builds."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite can execute the actual verification command with real Bundler setup, isolated locked gems, the failing preload order and individual load failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_ruby_setup_loads_locked_native_gems_after_bundler_setup"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "ruby-native-gem-cache-runtime-isolation",
     "correction": "LYB-295: Post-merge Launch Quality failed during self-hosted Ruby setup after restoring cached date/psych native extensions with a missing _rb_cFalseClass symbol. Ruby version alone does not identify a compatible native gem cache.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40261816170/job/121375622829",

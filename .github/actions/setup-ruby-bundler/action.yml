@@ -113,4 +113,5 @@ runs:
         echo "Bundler: $(bundle --version)"
         echo "Bundle path: $(bundle config get path)"
         # bundle check validates gem presence, not native-extension loadability.
-        bundle exec ruby -rdate -rpsych -e 'puts "Ruby native dependencies loaded"'
+        # Require after Bundler setup so Ruby cannot activate default gems first.
+        bundle exec ruby -e 'require "date"; require "psych"; puts "Ruby native dependencies loaded"'
