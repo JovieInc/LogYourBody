@@ -1586,5 +1586,30 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "healthkit-sync-identifier-requires-version",
+    "correction": "PR #1565: Launch Quality crashed testHealthKitDeclaresObserverDeliveryAndUsesSampleUUID because the provenance sample set HKMetadataKeySyncIdentifier without HKMetadataKeySyncVersion.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40399735171/job/121842307951",
+    "mechanization": "The existing correction ratchet runs healthkit-sync-metadata.mjs on every diff. It rejects a Swift metadata dictionary that names HKMetadataKeySyncIdentifier without HKMetadataKeySyncVersion. Its repair inserts NSNumber(value: 1) and a [String: Any] cast. The original launch-quality fixture fails that scan and passes after repair. The empty baseline makes the rule strict. Use --fix for this sample.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "HealthKit validates metadata inside Apple's HKQuantitySample initializer. Application types cannot reject a dictionary literal that calls that initializer directly."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "healthkit-sync-metadata.mjs can require HKMetadataKeySyncVersion in the same Swift dictionary as HKMetadataKeySyncIdentifier and insert the missing NSNumber version."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/healthkit-sync-metadata.mjs",
+      "anchor": "reject HKMetadataKeySyncIdentifier without HKMetadataKeySyncVersion",
+      "ratchet": {
+        "baseline": "packages/shared-lib/healthkit-sync-metadata-baseline.json"
+      }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   }
 ]

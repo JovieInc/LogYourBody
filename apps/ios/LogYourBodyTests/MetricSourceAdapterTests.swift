@@ -235,13 +235,18 @@ final class MetricSourceAdapterTests: XCTestCase {
         let sample = HKQuantitySample(
             type: type, quantity: HKQuantity(unit: .gramUnit(with: .kilo), doubleValue: 80),
             start: measured, end: measured,
-            metadata: [HKMetadataKeyTimeZone: "America/Los_Angeles", HKMetadataKeySyncIdentifier: "weight-edit"]
+            metadata: [
+                HKMetadataKeyTimeZone: "America/Los_Angeles",
+                HKMetadataKeySyncIdentifier: "weight-edit",
+                HKMetadataKeySyncVersion: NSNumber(value: 1)
+            ] as [String: Any]
         )
         XCTAssertEqual(adapter.idempotencyKey(for: sample), sample.uuid.uuidString)
         let metadata = adapter.sourceMetadata(from: sample)
         XCTAssertEqual(metadata.sampleId, adapter.idempotencyKey(for: sample))
         XCTAssertEqual(metadata.sourceBundleId, sample.sourceRevision.source.bundleIdentifier)
         XCTAssertEqual(metadata.healthKitContext["sync_identifier"], "weight-edit")
+        XCTAssertEqual(metadata.healthKitContext["sync_version"], "1")
         XCTAssertEqual(metadata.healthKitContext["time_zone"], "America/Los_Angeles")
         let imported = try XCTUnwrap(metadata.importedAt.flatMap(ISO8601DateFormatter().date(from:)))
         XCTAssertGreaterThan(imported, measured)
