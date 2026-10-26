@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "launch-quality-cold-build-budget-and-failure-propagation",
+    "correction": "PR #1587: Launch Quality interrupted an active cold build after 600 seconds while Xcode was still compiling tests; CI Summary failed with it.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40406691475/job/121866453051",
+    "mechanization": "Extend the existing required runner-routing dispatcher harness with a simulated 750-second cold build and build failure/timeout cases. Full qualification now allows one bounded 900-second build before the complete unit target. Both new regressions fail with the old 600-second default and pass with the repair. Preserve command exit status, no retry after a build timeout, no qualification receipts on failure, diagnostic-only 600-second builds, test execution caps, coverage and the 52-minute outer step. Refresh only the reviewed audit digest and matching strict assertions; all seven dependency pins remain. Native execution and coverage require the configured macOS CI runner; the harness owns push and PR operations.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The failure is the native runner build deadline, not gym product behavior; changing runtime code cannot allocate cold-build time."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Mac Runner Routing Tests execute the real audit dispatcher with bounded build duration and exit-status fixtures, rejecting premature interruption, retry, skipped complete-unit selection or false qualification."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_full_launch_cold_build_budget_reaches_the_complete_unit_target"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "gym-registry-verifiers-track-account-erasure-schema",
     "correction": "PR #1587: The required training transaction verifiers reject the gym cleanup function added to account erasure and do not load its migration.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40224215238/job/121286077254",

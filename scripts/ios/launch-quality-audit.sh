@@ -29,7 +29,10 @@ MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-
 # killed healthy runs. 1020s still stops a hung simulator well inside the step
 # budget. A command timeout is not retried; see is_simulator_infra_failure.
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
-BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"
+# Run 40406691475 hit 600s while still compiling the test target, without a
+# compiler error. Allow cold builds 15m within the existing 52m audit step;
+# test execution allowances, evidence requirements, and no-timeout-retry stay fixed.
+BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
