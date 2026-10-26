@@ -85,6 +85,32 @@ IDs or assessment shapes fail with a diagnostic. Classification adds routing
 metadata; the existing coverage check still verifies retained guard evidence
 and compares it with the immutable Git base.
 
+For new lint/typecheck/CI source checks (LYB-307), pass classified receipts to
+`emitCorrectionChecks` in
+[`correction-checks.mjs`](../../packages/shared-lib/scripts/correction-checks.mjs).
+It emits one check per `static` fingerprint and no check for `codebase`, `prose`
+or `human`. The guard must export the existing side-effect-free
+`scan({ files, readSource })` interface and return `{ path, key }` findings.
+The emitter routes reviewed checks; it does not translate lesson text into a
+scanner or add the domain checks owned by LYB-188/189.
+
+Run those new checks from the source repository, using a ledger containing their
+classified receipts:
+
+```sh
+node packages/shared-lib/scripts/correction-checks.mjs classified-checks.json
+```
+
+The CLI reports each violation and prints the emitted checks and findings as
+JSON without writing files. At zero distinct repeats, violations emit warnings
+and exit 0; at one or more repeats, the same scanner emits errors and exits 1.
+Clean checks exit 0 at either severity. Recurrence uses the ledger's canonical
+source identity, so replaying one receipt cannot harden a check. Invalid input,
+missing guards and broken scanners fail regardless of severity. Existing hard
+checks retain their own invocations; guards with finding-baseline ratchets must
+use the existing ratchet runner and cannot be wrapped by this emitter. The normal
+shared-lib test task runs the CLI regression fixtures and emitter coverage gate.
+
 The JSON report and existing CI/owner tables expose sources, lessons, selected
 levels, guards and recurrence. Required coverage CI compares against the exact
 Git base and rejects lost sources as well as lost rules or guards. It permits

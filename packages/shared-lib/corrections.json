@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "lint-correction-checks-warn-then-harden",
+    "correction": "LYB-307: Emit new checks only for lint/typecheck/CI classifications. The first receipt warns with exit 0; a distinct repeat hardens the same check. Codebase, prose and human-review classifications emit no new check.",
+    "source": "https://linear.app/jovie/issue/LYB-307",
+    "mechanization": "The existing required shared-lib test task runs real scanner and CLI fixtures proving warning exit 0, repeated violation exit 1, clean recurrent checks, duplicate receipt deduplication and no emitted checks for the other levels. Existing hard gates and finding-baseline ratchets retain their runners.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot enforce repository correction routing or the exit status of newly emitted lint and CI checks."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib suite can execute classified fixture receipts through the check emitter and assert diagnostics, recurrence, no-check routes and actual process exit statuses."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-checks.behavior.mjs",
+      "anchor": "lint-level violation warns at recurrence zero and fails at recurrence one or more"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "generated-source-map-conflict-repair",
     "correction": "PR #1582: Repeated merges of origin/main conflict only in the generated ci.yml fingerprint. Regenerate from the merged sources instead of choosing either parent hash.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1582",
