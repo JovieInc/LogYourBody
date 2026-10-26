@@ -714,3 +714,92 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
     }
   });
 }
+
+function stagedSourceMap() {
+  const fx = sourceMapConflict();
+  git(fx.root, 'merge', '--abort');
+  fx.run = (...args) => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', fx.root, '--staged', ...args,
+  ], { env: gitEnv, encoding: 'utf8' });
+  return fx;
+}
+
+test('pre-commit refreshes the staged source map after all formatters and ledger updates', () => {
+  const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
+  const refresh = 'python3 scripts/resolve-repository-docs.py --staged || exit $?';
+  assert.ok(hook.trimEnd().endsWith(refresh));
+  assert.ok(hook.indexOf(refresh) > hook.indexOf('pnpm exec lint-staged'));
+  assert.ok(hook.indexOf(refresh) > hook.indexOf('node scripts/correction-classifier.mjs'));
+});
+
+test('staged source-map repair refreshes dependency bumps and preserves unrelated edits', () => {
+  const fx = stagedSourceMap();
+  try {
+    fx.config.sources.push({ path: 'package.json', purpose: 'Dependencies' });
+    commit(fx.root, {
+      'repository-docs.json': JSON.stringify(fx.config),
+      'package.json': '{"dependencies":{"@radix-ui/react-separator":"^1.1.15"}}',
+    }, 'track dependency manifest');
+    assert.equal(fx.resolve().status, 0);
+    git(fx.root, 'commit', '-qm', 'fresh projection');
+    fs.writeFileSync(path.join(fx.root, 'package.json'), '{"dependencies":{"@radix-ui/react-separator":"^1.1.16"}}');
+    git(fx.root, 'add', 'package.json');
+    fs.writeFileSync(path.join(fx.root, 'unrelated.txt'), 'keep unstaged');
+    const result = fx.run();
+    assert.equal(result.status, 0, result.stderr);
+    const projection = git(fx.root, 'show', `:${fx.output}`);
+    assert.match(projection, /"@radix-ui\/react-separator": "\^1\.1\.16"/);
+    assert.deepEqual(git(fx.root, 'diff', '--cached', '--name-only').split('\n'), [fx.output, 'package.json']);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'unrelated.txt'), 'utf8'), 'keep unstaged');
+    assert.equal(fx.run().status, 0, 'repair is idempotent');
+    assert.equal(git(fx.root, 'show', `:${fx.output}`), projection);
+    git(fx.root, 'commit', '-qm', 'fresh dependency projection');
+    commit(fx.root, {
+      'package.json': '{"dependencies":{"@radix-ui/react-separator":"^1.1.17"}}',
+    }, 'simulate bot commit without hooks');
+    assert.equal(fx.run().status, 0, 'repair also handles already committed bot updates');
+    assert.match(git(fx.root, 'show', `:${fx.output}`), /"@radix-ui\/react-separator": "\^1\.1\.17"/);
+    assert.equal(git(fx.root, 'diff', '--cached', '--name-only'), fx.output);
+  } finally { fs.rmSync(fx.root, { recursive: true, force: true }); }
+});
+
+for (const dirty of ['workflow.yml', 'repository-docs.json', 'README.md', 'docs/SOURCES.md']) {
+  test(`staged source-map repair refuses unstaged ${dirty} without changing files or index`, () => {
+    const fx = stagedSourceMap();
+    try {
+      fs.appendFileSync(path.join(fx.root, 'workflow.yml'), 'staged source\n');
+      git(fx.root, 'add', 'workflow.yml');
+      fs.appendFileSync(path.join(fx.root, dirty), '\n');
+      const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.run();
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /stage or restore documentation inputs first:/);
+      assert.ok(result.stderr.includes(dirty), result.stderr);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally { fs.rmSync(fx.root, { recursive: true, force: true }); }
+  });
+}
+
+test('staged source-map repair skips unrelated commits and rejects untracked inputs', () => {
+  const fx = stagedSourceMap();
+  try {
+    fs.appendFileSync(path.join(fx.root, 'workflow.yml'), 'unstaged source\n');
+    fs.writeFileSync(path.join(fx.root, 'unrelated.txt'), 'staged unrelated edit');
+    git(fx.root, 'add', 'unrelated.txt');
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.run().status, 0);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    git(fx.root, 'restore', 'workflow.yml');
+    fx.config.sources.push({ path: 'new-source.txt', purpose: 'New source' });
+    fs.writeFileSync(path.join(fx.root, 'new-source.txt'), 'not staged');
+    fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+    git(fx.root, 'add', 'repository-docs.json');
+    const before = git(fx.root, 'ls-files', '--stage');
+    const result = fx.run();
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /stage or restore documentation inputs first: new-source.txt/);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), before);
+  } finally { fs.rmSync(fx.root, { recursive: true, force: true }); }
+});

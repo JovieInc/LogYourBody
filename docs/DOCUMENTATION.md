@@ -33,6 +33,15 @@ map from the merged sources. This wraps the pinned generator and refuses to
 write while any other file is unmerged or a shared import fails parity. It
 stages only the generated output; review the source diff before committing.
 
+The pre-commit hook runs the same resolver with `--staged` after formatting. It
+refreshes and stages the source map from fully staged inputs, including stale
+maps inherited from bot commits. Stage or restore partial edits to documentation
+inputs before committing; the hook refuses to fingerprint unstaged content.
+Unrelated commits with unstaged documentation inputs leave the map alone.
+Dependency repair runners can use the same command after merging main.
+Dependabot commits created on GitHub still require this repair step; the CI
+parity check remains read-only.
+
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
 exact upstream bytes. Only listed imports and generated output are written;

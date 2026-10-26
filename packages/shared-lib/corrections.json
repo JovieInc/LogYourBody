@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "source-map-commit-regeneration",
+    "correction": "PR #1599: The Radix separator 1.1.16 manifest bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, documentation parity and CI Summary. Repeated projection repairs must refresh the source map automatically before local commits.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300503285/job/121496904858",
+    "mechanization": "Extend the existing pinned-generator resolver with --staged and run it after formatting in the existing pre-commit hook. It regenerates and stages only the source map from fully staged inputs, including inherited bot updates, refuses partial source commits before mutation, and preserves unrelated unstaged edits. Required Detect Changes tests execute real dependency-bump and Git-index fixtures, idempotence, partial-staging refusal and hook wiring. The six new behavioral cases failed against the old resolver. Use --staged for this repair; retain read-only CI parity and its required gate. GitHub-created Dependabot commits still need the harness to run this local repair command.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct the source map from fully staged inputs before committing. Connecting it after formatters prevents stale local fingerprints by construction without modifying immutable shared tooling or starting another PR owner."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "stage or restore documentation inputs first: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",
