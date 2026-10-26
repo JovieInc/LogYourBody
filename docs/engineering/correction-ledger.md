@@ -84,6 +84,46 @@ then stages the classified bytes so a commit cannot land missing level or ruleId
 feasible level; incidental keywords cannot override a rejected assessment.
 There is no implicit prose or human fallback for missing or malformed assessments.
 
+For additive ledger conflicts during a merge, run
+`node scripts/correction-classifier.mjs --resolve-merge .` from the repository
+root. This classifies all three immutable Git index stages and reuses the coverage
+tool's `mergeCorrectionLedgers` policy. It retains incoming order and appends
+branch-only receipts, allowing later main-side prepends to merge without
+repeating the same conflict. It preserves independent additions and
+one-sided edits, rejects deletions, duplicate identities and divergent concurrent
+edits, and validates retained guards before writing the classified result.
+Missing conflict stages fail without writing.
+Both resolver entrypoints share a preflight that refuses other unresolved Git
+paths before reading guard evidence or writing the ledger. Resolve and stage
+those source conflicts first, even when their files still contain guard anchors.
+Review the result, stage the ledger, and run the coverage check against both
+merge parents. The command leaves the index and unrelated edits untouched.
+
+For unattended repairs, use
+`node scripts/correction-classifier.mjs --resolve-merge . --stage`. This opts in
+to staging only the resolved ledger after validating its classification, staged
+guard sources and receipt retention against both merge parents. A failed
+validation preserves the ledger and index. Retrying after staging runs the
+read-only merge check; it does not restage files or overwrite unrelated edits.
+A staged retry refuses any unstaged ledger edits rather than reporting success
+while ignoring new receipts. Review and stage those edits explicitly before
+retrying; refusal preserves both the index and working file.
+
+After staging the resolution, run
+`node scripts/correction-classifier.mjs --check-merge .`. This read-only mode
+verifies the staged ledger's classification, receipts and staged guard sources
+against both immutable merge parents using the existing coverage nonregression
+policy. It rejects a lost rule or source, a missing guard, or unclassified
+metadata even when the working tree is correct. Pre-commit runs this check for
+every merge, including merges whose staged ledger has no diff against `HEAD`.
+An absent merge or an unstaged ledger conflict fails without writing files.
+
+For exported parent snapshots, `node scripts/correction-classifier.mjs left.json
+--merge right.json` writes the validated union to `left.json` without changing
+the second input. Without a common ancestor, conflicting edits to the same
+receipt require explicit resolution. The Git resolver accepts one-sided edits
+only when the other parent matches the immutable common ancestor.
+
 | Rule ID                  | Saved level | Matching rule within the reviewed feasible level                                     |
 | ------------------------ | ----------- | ------------------------------------------------------------------------------------ |
 | `type-or-schema`         | `codebase`  | The lesson or selected rationale names a type, schema, struct, enum or interface.    |

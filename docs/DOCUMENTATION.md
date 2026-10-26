@@ -33,18 +33,30 @@ map from the merged sources. This wraps the pinned generator and refuses to
 write while any other file is unmerged or a shared import fails parity. It
 stages only the generated output; review the source diff before committing.
 
-For dependency updates, run
-`python3 scripts/resolve-repository-docs.py --refresh-lockfile` to refresh the
-lockfile with the source-pinned pnpm before regenerating the map. This mode may
-contact the package registry and leaves dependency edits unstaged for review.
-Then run `corepack pnpm install --frozen-lockfile` and the relevant checks;
-the repair command does not install dependencies or replace validation.
-
 The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
 after formatting and correction classification. It refreshes the projection
 from indexed sources, preserves unstaged source edits, and refuses unstaged
 projection edits or pinned-source drift. Bot commits created outside local
 hooks still need this refresh during repair; CI continues to reject stale output.
+
+For dependency bumps with an already updated lockfile, run
+`python3 scripts/resolve-repository-docs.py --verify-lockfile`. It verifies the
+existing lockfile with pinned Corepack pnpm (frozen, offline, lockfile-only,
+lifecycle scripts disabled) before regenerating and staging only the source map.
+It retains the refusal of unstaged dependency/output edits and pinned-source drift
+without re-resolving unrelated dependencies.
+
+For dependency PRs, stage the reviewed manifests and run
+`python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
+repair first verifies the existing lockfile offline with pinned Corepack pnpm.
+Only a confirmed manifest mismatch (`ERR_PNPM_OUTDATED_LOCKFILE`) triggers
+regeneration without lifecycle scripts and a second frozen offline check.
+Valid lockfiles keep their resolutions; other installation failures stop repair.
+If resolution or frozen verification fails, the helper restores the original
+lockfile bytes so the same command can be retried without manual cleanup.
+It then stages the lockfile and source map, refusing unresolved source conflicts,
+unstaged dependency or projection edits, and pinned-source drift. It requires registry
+access for uncached resolutions; commit hooks and CI keep frozen installation.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the

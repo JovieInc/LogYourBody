@@ -22,13 +22,13 @@ importers:
     dependencies:
       ai:
         specifier: ^7.0.114
-        version: 7.0.114(zod@4.6.6)
+        version: 7.0.114(zod@4.6.7)
       eve:
         specifier: 0.27.13
-        version: 0.27.13(@opentelemetry/api@1.10.0)(ai@7.0.114(zod@4.6.6))(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.3)(rollup@4.65.0)(vite@7.3.7(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)(yaml@2.9.1))
+        version: 0.27.13(@opentelemetry/api@1.10.0)(ai@7.0.114(zod@4.6.7))(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.3)(rollup@4.65.0)(vite@7.3.7(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)(yaml@2.9.1))
       zod:
-        specifier: ^4.6.6
-        version: 4.6.6
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@commitlint/cli':
         specifier: ^19.8.1
@@ -83,16 +83,16 @@ importers:
     dependencies:
       '@ai-sdk/elevenlabs':
         specifier: ^3.0.54
-        version: 3.0.54(zod@4.6.6)
+        version: 3.0.54(zod@4.6.7)
       '@ai-sdk/gateway':
         specifier: ^4.0.96
-        version: 4.0.96(zod@4.6.6)
+        version: 4.0.96(zod@4.6.7)
       '@headlessui/react':
         specifier: ^2.2.10
         version: 2.2.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@hookform/resolvers':
         specifier: ^5.9.1
-        version: 5.9.1(@sinclair/typebox@0.34.52)(@standard-schema/spec@1.1.0)(ajv@8.20.0)(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.6)
+        version: 5.9.1(@sinclair/typebox@0.34.52)(@standard-schema/spec@1.1.0)(ajv@8.20.0)(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.7)
       '@jovie/ui':
         specifier: workspace:*
         version: link:../../packages/jovie-ui
@@ -109,8 +109,8 @@ importers:
         specifier: ^1.1.23
         version: 1.1.23(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@radix-ui/react-aspect-ratio':
-        specifier: ^1.1.15
-        version: 1.1.15(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: ^1.2.0
+        version: 1.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@radix-ui/react-avatar':
         specifier: ^1.3.1
         version: 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -175,8 +175,8 @@ importers:
         specifier: ^1.2.23
         version: 1.2.23(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@radix-ui/react-toggle':
-        specifier: ^1.1.18
-        version: 1.1.18(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        specifier: ^1.2.1
+        version: 1.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@radix-ui/react-toggle-group':
         specifier: ^1.1.19
         version: 1.1.19(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -215,7 +215,7 @@ importers:
         version: 1.3.1(next@15.5.28(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.63.0)(@types/node@20.19.43)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react@19.3.0)
       ai:
         specifier: ^7.0.114
-        version: 7.0.114(zod@4.6.6)
+        version: 7.0.114(zod@4.6.7)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -263,7 +263,7 @@ importers:
         version: 0.4.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       openai:
         specifier: ^7.38.0
-        version: 7.38.0(undici@8.12.3)(ws@8.21.0)(zod@4.6.6)
+        version: 7.38.0(undici@8.12.3)(ws@8.21.0)(zod@4.6.7)
       pdf-lib:
         specifier: ^1.17.1
         version: 1.17.1
@@ -319,8 +319,8 @@ importers:
         specifier: 8.21.0
         version: 8.21.0
       zod:
-        specifier: ^4.6.6
-        version: 4.6.6
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3.3.7
@@ -2094,8 +2094,8 @@ packages:
       '@types/react-dom':
         optional: true
 
-  '@radix-ui/react-aspect-ratio@1.1.15':
-    resolution: {integrity: sha512-fy+dyVR+90nelK8rqIznFlxzx7uPcGbhxH8Nfr2bHb4UfSe+e3hklOC0luK0hDwVwnRX7xTRySpsrQVeW+/oNQ==}
+  '@radix-ui/react-aspect-ratio@1.2.0':
+    resolution: {integrity: sha512-gHEU+Lx8DlT/FYIjZQvvBJrFSwUngXTjh7FeL9QvJaNALDLez6pgDj2axCUihBjtPBy82LN0gNb25+sTcSXNmA==}
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
@@ -2815,6 +2815,19 @@ packages:
 
   '@radix-ui/react-toggle@1.1.18':
     resolution: {integrity: sha512-7lonPlKfSacd20GlOBx2ltuVKz9oqWYZz+oMQyOltw6t1y2nyftj2ZmwwUHYn49kqfDWcp8dNZm5NgV+5Z+mug==}
+    peerDependencies:
+      '@types/react': '*'
+      '@types/react-dom': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+
+  '@radix-ui/react-toggle@1.2.1':
+    resolution: {integrity: sha512-+3MUq+WyiBplXYqQ0EIYlq8R4sLQ0T5NbOK7DMdDLCKO93pe2uE0DUJTWWfTBprpJJXxfoF3eMW0xpakVZrYsg==}
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
@@ -7811,8 +7824,8 @@ packages:
     resolution: {integrity: sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ==}
     engines: {node: '>=12.20'}
 
-  zod@4.6.6:
-    resolution: {integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -7821,52 +7834,52 @@ snapshots:
 
   '@adobe/css-tools@4.5.0': {}
 
-  '@ai-sdk/elevenlabs@3.0.54(zod@4.6.6)':
+  '@ai-sdk/elevenlabs@3.0.54(zod@4.6.7)':
     dependencies:
       '@ai-sdk/provider': 4.0.21
-      '@ai-sdk/provider-utils': 5.0.53(zod@4.6.6)
-      zod: 4.6.6
+      '@ai-sdk/provider-utils': 5.0.53(zod@4.6.7)
+      zod: 4.6.7
 
-  '@ai-sdk/gateway@4.0.92(zod@4.6.6)':
+  '@ai-sdk/gateway@4.0.92(zod@4.6.7)':
     dependencies:
       '@ai-sdk/provider': 4.0.18
-      '@ai-sdk/provider-utils': 5.0.47(zod@4.6.6)
+      '@ai-sdk/provider-utils': 5.0.47(zod@4.6.7)
       '@vercel/oidc': 3.2.0
-      zod: 4.6.6
+      zod: 4.6.7
 
-  '@ai-sdk/gateway@4.0.96(zod@4.6.6)':
+  '@ai-sdk/gateway@4.0.96(zod@4.6.7)':
     dependencies:
       '@ai-sdk/provider': 4.0.18
-      '@ai-sdk/provider-utils': 5.0.49(zod@4.6.6)
+      '@ai-sdk/provider-utils': 5.0.49(zod@4.6.7)
       '@vercel/oidc': 3.2.0
-      zod: 4.6.6
+      zod: 4.6.7
 
-  '@ai-sdk/provider-utils@5.0.47(zod@4.6.6)':
+  '@ai-sdk/provider-utils@5.0.47(zod@4.6.7)':
     dependencies:
       '@ai-sdk/provider': 4.0.18
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
       undici: 8.12.3
-      zod: 4.6.6
+      zod: 4.6.7
 
-  '@ai-sdk/provider-utils@5.0.49(zod@4.6.6)':
+  '@ai-sdk/provider-utils@5.0.49(zod@4.6.7)':
     dependencies:
       '@ai-sdk/provider': 4.0.18
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
       undici: 8.12.3
-      zod: 4.6.6
+      zod: 4.6.7
 
-  '@ai-sdk/provider-utils@5.0.53(zod@4.6.6)':
+  '@ai-sdk/provider-utils@5.0.53(zod@4.6.7)':
     dependencies:
       '@ai-sdk/provider': 4.0.21
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
       undici: 8.12.3
-      zod: 4.6.6
+      zod: 4.6.7
 
   '@ai-sdk/provider@4.0.18':
     dependencies:
@@ -8422,7 +8435,7 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
       use-sync-external-store: 1.7.0(react@19.3.0)
 
-  '@hookform/resolvers@5.9.1(@sinclair/typebox@0.34.52)(@standard-schema/spec@1.1.0)(ajv@8.20.0)(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.6)':
+  '@hookform/resolvers@5.9.1(@sinclair/typebox@0.34.52)(@standard-schema/spec@1.1.0)(ajv@8.20.0)(react-hook-form@7.88.0(react@19.3.0))(zod@4.6.7)':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.88.0(react@19.3.0)
@@ -8430,7 +8443,7 @@ snapshots:
       '@sinclair/typebox': 0.34.52
       '@standard-schema/spec': 1.1.0
       ajv: 8.20.0
-      zod: 4.6.6
+      zod: 4.6.7
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -9281,9 +9294,9 @@ snapshots:
       '@types/react': 19.3.0
       '@types/react-dom': 19.3.0(@types/react@19.3.0)
 
-  '@radix-ui/react-aspect-ratio@1.1.15(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@radix-ui/react-aspect-ratio@1.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
-      '@radix-ui/react-primitive': 2.1.10(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@radix-ui/react-primitive': 2.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
     optionalDependencies:
@@ -10067,6 +10080,17 @@ snapshots:
       '@radix-ui/primitive': 1.1.7
       '@radix-ui/react-primitive': 2.1.10(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@radix-ui/react-use-controllable-state': 1.2.6(@types/react@19.3.0)(react@19.3.0)
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+    optionalDependencies:
+      '@types/react': 19.3.0
+      '@types/react-dom': 19.3.0(@types/react@19.3.0)
+
+  '@radix-ui/react-toggle@1.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@radix-ui/primitive': 1.2.0
+      '@radix-ui/react-primitive': 2.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@radix-ui/react-use-controllable-state': 1.3.0(@types/react@19.3.0)(react@19.3.0)
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
     optionalDependencies:
@@ -11178,12 +11202,12 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@7.0.114(zod@4.6.6):
+  ai@7.0.114(zod@4.6.7):
     dependencies:
-      '@ai-sdk/gateway': 4.0.92(zod@4.6.6)
+      '@ai-sdk/gateway': 4.0.92(zod@4.6.7)
       '@ai-sdk/provider': 4.0.18
-      '@ai-sdk/provider-utils': 5.0.47(zod@4.6.6)
-      zod: 4.6.6
+      '@ai-sdk/provider-utils': 5.0.47(zod@4.6.7)
+      zod: 4.6.7
 
   ajv@6.15.0:
     dependencies:
@@ -12229,9 +12253,9 @@ snapshots:
 
   esutils@2.0.3: {}
 
-  eve@0.27.13(@opentelemetry/api@1.10.0)(ai@7.0.114(zod@4.6.6))(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.3)(rollup@4.65.0)(vite@7.3.7(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)(yaml@2.9.1)):
+  eve@0.27.13(@opentelemetry/api@1.10.0)(ai@7.0.114(zod@4.6.7))(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.3)(rollup@4.65.0)(vite@7.3.7(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)(yaml@2.9.1)):
     dependencies:
-      ai: 7.0.114(zod@4.6.6)
+      ai: 7.0.114(zod@4.6.7)
       nitro: 3.0.260610-beta(dotenv@17.4.2)(jiti@2.7.0)(lru-cache@11.5.3)(rollup@4.65.0)(vite@7.3.7(@types/node@26.6.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)(yaml@2.9.1))
       undici: 8.12.3
     optionalDependencies:
@@ -13986,11 +14010,11 @@ snapshots:
     dependencies:
       mimic-function: 5.0.1
 
-  openai@7.38.0(undici@8.12.3)(ws@8.21.0)(zod@4.6.6):
+  openai@7.38.0(undici@8.12.3)(ws@8.21.0)(zod@4.6.7):
     optionalDependencies:
       undici: 8.12.3
       ws: 8.21.0
-      zod: 4.6.6
+      zod: 4.6.7
 
   opener@1.5.2: {}
 
@@ -15450,6 +15474,6 @@ snapshots:
 
   yocto-queue@1.2.2: {}
 
-  zod@4.6.6: {}
+  zod@4.6.7: {}
 
   zwitch@2.0.4: {}
