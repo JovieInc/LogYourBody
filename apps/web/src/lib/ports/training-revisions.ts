@@ -11,7 +11,6 @@ export type TrainingRevisionContext = RevisionContextToken & {
   dateOfBirth: unknown;
   legacySetups: unknown[];
   headRevision: string | null;
-  trainingFingerprint?: string;
   canonicalTrainingInputs?: unknown;
   evidenceFingerprint?: string;
 };
