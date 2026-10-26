@@ -1,6 +1,24 @@
 [
   {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1610: The Radix Toggle 1.2.1 manifest bump retained the 1.1.18 lockfile and stale source map, failing Vercel frozen installation, Detect Changes, parity and CI Summary. Repeated dependency repairs need one verify-first repair path.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1610",
+    "mechanization": "Extend the existing --refresh-lockfile resolver to probe frozen offline installation first, preserve valid bot resolutions, and regenerate only on ERR_PNPM_OUTDATED_LOCKFILE before requiring another frozen check. Other installation errors stop without invoking resolution or staging the source map. The existing required Detect Changes fixtures prove valid-lockfile preservation, stale-lockfile repair, idempotence and failure propagation. Five targeted regressions failed against the prior helper and pass after the extension. Use the extended helper for this PR while retaining all parity and frozen-install gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1601: Dependabot's Radix Aspect Ratio 1.2.0 update left the repository source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must verify valid bot lockfiles without re-resolving unrelated dependencies.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1601",
     "mechanization": "Extend the existing source resolver with --verify-lockfile: retain dirty-input and pinned-source checks, verify the existing lockfile through frozen offline Corepack pnpm with lifecycle scripts disabled, then stage only the regenerated projection. Four behavioral regressions in the existing required Detect Changes suite fail before the extension and pass afterward, proving successful repair and idempotence without re-resolution, frozen-check failure propagation, dirty-source refusal and pinned-drift refusal. Use the mode on this dependency update; retain every existing frozen-install and parity gate.",
