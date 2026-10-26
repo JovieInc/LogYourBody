@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A24420261025000000000002 /* MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000001 /* MetricSourceAdapter.swift */; };
+		A24420261025000000000004 /* HealthKitManager+MetricSourceAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */; };
+		A24420261025000000000006 /* MetricSourceAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24420261025000000000005 /* MetricSourceAdapterTests.swift */; };
+		B26920261025000000000002 /* BackwardPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000001 /* BackwardPlanner.swift */; };
+		B26920261025000000000004 /* BackwardPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000003 /* BackwardPlannerTests.swift */; };
+		B26920261025000000000006 /* lyb-launch-contract.json in Resources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000005 /* lyb-launch-contract.json */; };
 		A19900000000000000000001 /* StoreKitPurchaseRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */; };
 		A16800000000000000000001 /* ContextualMetricShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16800000000000000000002 /* ContextualMetricShare.swift */; };
 		5AAEA63151156B8F114A0B83 /* BodyRecordReviewConsumerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */; };
@@ -17,6 +23,7 @@
 		9A041FE1B8AF416FB7931540 /* DailyStepValidationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 577B839EE95E4F09A47A27E0 /* DailyStepValidationTests.swift */; };
 		DB6F742008744039AA49CA01 /* HomeV2ShareRecoveryUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6F742008744039AA49CA02 /* HomeV2ShareRecoveryUITests.swift */; };
 		A62E114302EC00A5A0070201 /* HealthKitImportOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */; };
+		C23900000000000000000001 /* HealthImportIdempotencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23900000000000000000002 /* HealthImportIdempotencyTests.swift */; };
 		E9A811932F40800000C0A701 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */; };
 		0183C845E0301D4B10100ACE /* BodyMetricAppIntentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC71479CEEDEAD772518C5E9 /* BodyMetricAppIntentsTests.swift */; };
 		022D79AC5B1840BC58FB7D70 /* BodyMetricContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB121088934BE398599BE39A /* BodyMetricContractTests.swift */; };
@@ -429,7 +436,9 @@
 		E11020261025000100000002 /* TrainingProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11020261025000100000001 /* TrainingProgress.swift */; };
 		F00720261007000100000002 /* TrainingDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000001 /* TrainingDraftStore.swift */; };
 		F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000003 /* TrainingSessionDraft.swift */; };
+		153A00000000000000000004 /* TrainingNumericScrubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153A00000000000000000003 /* TrainingNumericScrubTests.swift */; };
 		F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000005 /* TrainingSessionDraftTests.swift */; };
+		153A00000000000000000002 /* TrainingNumericScrub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153A00000000000000000001 /* TrainingNumericScrub.swift */; };
 		E11020261025000100000006 /* TrainingProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11020261025000100000005 /* TrainingProgressTests.swift */; };
 		E41302026025000000000004 /* DelegatedTrainingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41302026025000000000003 /* DelegatedTrainingTests.swift */; };
 		E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C003 /* TrainingViews.swift */; };
@@ -437,6 +446,7 @@
 		E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000001 /* MesocycleCanvas.swift */; };
 		E41302026025000000000002 /* DelegatedTrainingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41302026025000000000001 /* DelegatedTrainingView.swift */; };
 		E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */; };
+		153A00000000000000000006 /* TrainingNumericScrubUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153A00000000000000000005 /* TrainingNumericScrubUITests.swift */; };
 		E4C0A5110000000000000006 /* MesocycleCanvasUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */; };
 		E4C0A5110000000000000008 /* MesocycleCanvasSequence.json in Resources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */; };
 		E6CBDEE0211741843DCF52AA /* CoreDataManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF02BFDD936CBA59B3704AA3 /* CoreDataManager+Part01.swift */; };
@@ -500,6 +510,16 @@
 		E24920261025000200000002 /* CoreDataWorkoutReconciliationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24920261025000200000001 /* CoreDataWorkoutReconciliationStore.swift */; };
 		E24920261025000300000002 /* WorkoutReconciliationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24920261025000300000001 /* WorkoutReconciliationViewModel.swift */; };
 		E24920261025000400000002 /* WorkoutReconciliationPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */; };
+		F11620261025000000000002 /* TrainingRestTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000001 /* TrainingRestTimer.swift */; };
+		F11620261025000000000004 /* TrainingRestAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000003 /* TrainingRestAlerts.swift */; };
+		F11620261025000000000006 /* TrainingRestTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000005 /* TrainingRestTimerView.swift */; };
+		F11620261025000000000008 /* TrainingRestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000007 /* TrainingRestActivityAttributes.swift */; };
+		F11620261025000000000009 /* TrainingRestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000007 /* TrainingRestActivityAttributes.swift */; };
+		F1162026102500000000000B /* TrainingRestLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1162026102500000000000A /* TrainingRestLiveActivity.swift */; };
+		F1162026102500000000000E /* LogYourBodyRestTimer.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F1162026102500000000000C /* LogYourBodyRestTimer.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E26220261025000100000001 /* MeasurementValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000002 /* MeasurementValue.swift */; };
+		E26220261025000100000003 /* MeasurementValueConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000004 /* MeasurementValueConstants.swift */; };
+		E26220261025000100000005 /* MeasurementValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000006 /* MeasurementValueTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -517,9 +537,36 @@
 			remoteGlobalIDString = AD7D30912E14907F0072AA5B;
 			remoteInfo = LogYourBody;
 		};
+		F11620261025000000000014 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AD7D308A2E14907F0072AA5B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F11620261025000000000016;
+			remoteInfo = LogYourBodyRestTimer;
+		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		F11620261025000000000013 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F1162026102500000000000E /* LogYourBodyRestTimer.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		A24420261025000000000001 /* MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapter.swift; sourceTree = "<group>"; };
+		A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HealthKitManager+MetricSourceAdapter.swift"; sourceTree = "<group>"; };
+		A24420261025000000000005 /* MetricSourceAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapterTests.swift; sourceTree = "<group>"; };
+		B26920261025000000000001 /* BackwardPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackwardPlanner.swift; sourceTree = "<group>"; };
+		B26920261025000000000003 /* BackwardPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackwardPlannerTests.swift; sourceTree = "<group>"; };
+		B26920261025000000000005 /* lyb-launch-contract.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "Fixtures/lyb-launch-contract.json"; sourceTree = "<group>"; };
 		A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitPurchaseRestoreTests.swift; sourceTree = "<group>"; };
 		A16800000000000000000002 /* ContextualMetricShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContextualMetricShare.swift; path = Components/ContextualMetricShare.swift; sourceTree = "<group>"; };
 		533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyRecordReviewConsumerTests.swift; sourceTree = "<group>"; };
@@ -530,6 +577,7 @@
 		577B839EE95E4F09A47A27E0 /* DailyStepValidationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DailyStepValidationTests.swift; sourceTree = "<group>"; };
 		DB6F742008744039AA49CA02 /* HomeV2ShareRecoveryUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2ShareRecoveryUITests.swift; sourceTree = "<group>"; };
 		A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitImportOwnershipTests.swift; sourceTree = "<group>"; };
+		C23900000000000000000002 /* HealthImportIdempotencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthImportIdempotencyTests.swift; sourceTree = "<group>"; };
 		E9A811922F40800000C0A701 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		012FFE30028F04055FFF6538 /* DSTrendIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DSTrendIndicator.swift; path = DesignSystem/Atoms/DSTrendIndicator.swift; sourceTree = "<group>"; };
 		01BD02DCEF0318DCF497AA0D /* HomeV2SystemStates.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2SystemStates.swift; sourceTree = "<group>"; };
@@ -1012,7 +1060,9 @@
 		E11020261025000100000001 /* TrainingProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgress.swift; sourceTree = "<group>"; };
 		F00720261007000100000001 /* TrainingDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDraftStore.swift; sourceTree = "<group>"; };
 		F00720261007000100000003 /* TrainingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraft.swift; sourceTree = "<group>"; };
+		153A00000000000000000003 /* TrainingNumericScrubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrubTests.swift; sourceTree = "<group>"; };
 		F00720261007000100000005 /* TrainingSessionDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraftTests.swift; sourceTree = "<group>"; };
+		153A00000000000000000001 /* TrainingNumericScrub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrub.swift; sourceTree = "<group>"; };
 		E11020261025000100000005 /* TrainingProgressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgressTests.swift; sourceTree = "<group>"; };
 		E41302026025000000000003 /* DelegatedTrainingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DelegatedTrainingTests.swift; sourceTree = "<group>"; };
 		E4172D019C9F4A30A881C003 /* TrainingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingViews.swift; sourceTree = "<group>"; };
@@ -1020,6 +1070,7 @@
 		E4C0A5110000000000000001 /* MesocycleCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvas.swift; sourceTree = "<group>"; };
 		E41302026025000000000001 /* DelegatedTrainingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DelegatedTrainingView.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasTests.swift; sourceTree = "<group>"; };
+		153A00000000000000000005 /* TrainingNumericScrubUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingNumericScrubUITests.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasUITests.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MesocycleCanvasSequence.json; sourceTree = "<group>"; };
 		E442F03731E41EA713BCAE3E /* HomeV2Policy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeV2Policy.swift; sourceTree = "<group>"; };
@@ -1092,6 +1143,16 @@
 		E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutReconciliationPromptTests.swift; sourceTree = "<group>"; };
 		E24920261025000500000001 /* LogYourBodyV5.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV5.xcdatamodel; sourceTree = "<group>"; };
 		E24920261025000500000002 /* LogYourBodyV5.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = LogYourBodyV5.xcdatamodel; sourceTree = "<group>"; };
+		F11620261025000000000001 /* TrainingRestTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingRestTimer.swift; path = Services/TrainingRestTimer.swift; sourceTree = "<group>"; };
+		F11620261025000000000003 /* TrainingRestAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingRestAlerts.swift; path = Services/TrainingRestAlerts.swift; sourceTree = "<group>"; };
+		F11620261025000000000005 /* TrainingRestTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingRestTimerView.swift; path = Views/TrainingRestTimerView.swift; sourceTree = "<group>"; };
+		F11620261025000000000007 /* TrainingRestActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingRestActivityAttributes.swift; path = Models/TrainingRestActivityAttributes.swift; sourceTree = "<group>"; };
+		F1162026102500000000000A /* TrainingRestLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingRestLiveActivity.swift; sourceTree = "<group>"; };
+		F1162026102500000000000C /* LogYourBodyRestTimer.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LogYourBodyRestTimer.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F1162026102500000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		E26220261025000100000002 /* MeasurementValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValue.swift; sourceTree = "<group>"; };
+		E26220261025000100000004 /* MeasurementValueConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueConstants.swift; sourceTree = "<group>"; };
+		E26220261025000100000006 /* MeasurementValueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1122,6 +1183,12 @@
 			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F11620261025000000000011 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -1321,6 +1388,8 @@
 			isa = PBXGroup;
 			children = (
 				E24920261025000400000001 /* WorkoutReconciliationPromptTests.swift */,
+				B26920261025000000000003 /* BackwardPlannerTests.swift */,
+				B26920261025000000000005 /* lyb-launch-contract.json */,
 				896E3815B745A313FCD93C78 /* DesignSystem */,
 				8631504046C70A4EE432C9B8 /* AccountDeletionAndShareCardTests.swift */,
 				AB992727D1333B365F93F30E /* AccountDeletionCleanupServiceTests.swift */,
@@ -1343,6 +1412,7 @@
 				006434E8EF977B41ED40B4EA /* ReportedMeasurementsMigrationTests.swift */,
 				C4240D5F0129EC16E29C2259 /* DexaReportedMeasurementsPersistenceTests.swift */,
 				C099761C4FC8CFBB0454CC70 /* ReportedMeasurementsTests.swift */,
+				E26220261025000100000006 /* MeasurementValueTests.swift */,
 				060DD24271B0B2120CB0AA33 /* BulkProgressPhotoImportPolicyTests.swift */,
 				AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */,
 				AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */,
@@ -1360,6 +1430,7 @@
 				22FEDB2A6B2D920273613C82 /* Glp1WeeklyCheckInPolicyTests.swift */,
 				E84A7C68943959BD45325D9B /* HealthKitAuthorizationPolicyTests.swift */,
 				A62E114302EC00A5A0070202 /* HealthKitImportOwnershipTests.swift */,
+				C23900000000000000000002 /* HealthImportIdempotencyTests.swift */,
 				18FA96B2F0B80609BBBC0DE1 /* HealthKitFullSyncCompletionPolicyTests.swift */,
 				DDACB9E8EEAB1EBF446F0F02 /* HealthSyncCoordinatorPipelineTests.swift */,
 				1C662CF613D4755CA2B93A43 /* HealthSyncPipelineTests.swift */,
@@ -1385,6 +1456,7 @@
 				8EA82A71E77423D56A70AA46 /* ProductAPIProfilePayloadTests.swift */,
 				C0AE830DA0CFDB1735F6894C /* SyncIntegrationBodyMetricSyncTests.swift */,
 				435C11A63FEC409A966732E7 /* BodySpecAtomicImportTests.swift */,
+				A24420261025000000000005 /* MetricSourceAdapterTests.swift */,
 				CA338579090538FBCCA21785 /* SyncIntegrationImportAndMappingTests.swift */,
 				128B0622423D7E7711DCD94D /* SyncIntegrationRemotePayloadTests.swift */,
 				245B5601A048FDB45C7F4042 /* SyncIntegrationSupplementalSyncTests.swift */,
@@ -1472,6 +1544,8 @@
 				ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */,
 				ADA600212ED2594200088042 /* DexaResult.swift */,
 				B1F2A97E0DC1E8AB1DB030D6 /* ReportedMeasurements.swift */,
+				E26220261025000100000004 /* MeasurementValueConstants.swift */,
+				E26220261025000100000002 /* MeasurementValue.swift */,
 				AD050C422EBFFEE50082A313 /* DashboardDisplayMode.swift */,
 				ADDC48642E2D8A33003C97E7 /* LogYourBody.xcdatamodeld */,
 				AD85525F2E19DC44003552EE /* Changelog.swift */,
@@ -1512,6 +1586,7 @@
 			children = (
 				E24920261025000200000001 /* CoreDataWorkoutReconciliationStore.swift */,
 				E24920261025000100000001 /* WorkoutReconciliationPolicy.swift */,
+				B26920261025000000000001 /* BackwardPlanner.swift */,
 				C7A700012F20000000C0A701 /* ChatService.swift */,
 				D0C0DE000000000000000002 /* VoiceCaptureService.swift */,
 				E4172D019C9F4A30A881C001 /* TrainingService.swift */,
@@ -1526,6 +1601,8 @@
 				ADA600342ED2602F00088042 /* BodySpecAuthManager.swift */,
 				BAA76179221F4B5C885A1140 /* BodySpecConnection.swift */,
 				ADA600352ED2602F00088042 /* BodySpecDexaImporter.swift */,
+				A24420261025000000000001 /* MetricSourceAdapter.swift */,
+				A24420261025000000000003 /* HealthKitManager+MetricSourceAdapter.swift */,
 				ADA600362ED2602F00088042 /* ErrorTrackingService.swift */,
 				ADA600272ED259DB00088042 /* BodyScoreRecalculationService.swift */,
 				ADA4B74C2ED00F1500F4262A /* KeychainManager.swift */,
@@ -1656,6 +1733,7 @@
 				AD3134022F01313400D134A1 /* DailyWeighInReminderPromptView.swift */,
 				AD723B032E15FA5C002376C6 /* LoginView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
+				153A00000000000000000001 /* TrainingNumericScrub.swift */,
 				E4172D019C9F4A30A881C003 /* TrainingViews.swift */,
 				E11020261025000100000003 /* TrainingProgressViews.swift */,
 				E4C0A5110000000000000001 /* MesocycleCanvas.swift */,
@@ -1687,6 +1765,10 @@
 		AD723B132E15FA5C002376C6 /* LogYourBody */ = {
 			isa = PBXGroup;
 			children = (
+				F11620261025000000000007 /* TrainingRestActivityAttributes.swift */,
+				F11620261025000000000005 /* TrainingRestTimerView.swift */,
+				F11620261025000000000003 /* TrainingRestAlerts.swift */,
+				F11620261025000000000001 /* TrainingRestTimer.swift */,
 				C0D300022F30000100ABCDEF /* GeneratedProductRegistry.swift */,
 				ADBAF04D2ECAD88A00A95F98 /* Features */,
 				AD8872922EB946BE0041C426 /* DesignSystem */,
@@ -1724,6 +1806,7 @@
 		AD7D30892E14907F0072AA5B = {
 			isa = PBXGroup;
 			children = (
+				F1162026102500000000000F /* LogYourBodyWidget */,
 				AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */,
 				AD722F162E15FA5A002376C6 /* generate_app_icons.sh */,
 				AD722F102E15FA5A002376C6 /* icon-1024.png */,
@@ -1744,6 +1827,7 @@
 		AD7D30932E14907F0072AA5B /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				F1162026102500000000000C /* LogYourBodyRestTimer.appex */,
 				AD7D30922E14907F0072AA5B /* LogYourBody.app */,
 				AD7D30A22E1490810072AA5B /* LogYourBodyTests.xctest */,
 				AD7D30AC2E1490810072AA5B /* LogYourBodyUITests.xctest */,
@@ -1765,6 +1849,7 @@
 				A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */,
 				C7A700032F20000000C0A703 /* ChatServiceTests.swift */,
 				E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */,
+				153A00000000000000000003 /* TrainingNumericScrubTests.swift */,
 				F00720261007000100000005 /* TrainingSessionDraftTests.swift */,
 				E11020261025000100000005 /* TrainingProgressTests.swift */,
 				E41302026025000000000003 /* DelegatedTrainingTests.swift */,
@@ -1790,6 +1875,7 @@
 			isa = PBXGroup;
 			children = (
 				AD7D30B02E1490810072AA5B /* LogYourBodyUITests.swift */,
+				153A00000000000000000005 /* TrainingNumericScrubUITests.swift */,
 				E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */,
 				B39A732AA4894B1DB77C9902 /* HomeV2PhotoViewerLayoutUITests.swift */,
 				AD7D30B22E1490810072AA5B /* LogYourBodyUITestsLaunchTests.swift */,
@@ -2038,6 +2124,15 @@
 			path = Fonts;
 			sourceTree = "<group>";
 		};
+		F1162026102500000000000F /* LogYourBodyWidget */ = {
+			isa = PBXGroup;
+			children = (
+				F1162026102500000000000A /* TrainingRestLiveActivity.swift */,
+				F1162026102500000000000D /* Info.plist */,
+			);
+			path = LogYourBodyWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -2045,6 +2140,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = AD7D30B62E1490810072AA5B /* Build configuration list for PBXNativeTarget "LogYourBody" */;
 			buildPhases = (
+				F11620261025000000000013 /* Embed App Extensions */,
 				AD7D308F2E14907F0072AA5B /* Frameworks */,
 				AD7D30902E14907F0072AA5B /* Resources */,
 				ADDC479C2E2D89E5003C97E7 /* Sources */,
@@ -2052,6 +2148,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				F11620261025000000000015 /* PBXTargetDependency */,
 			);
 			name = LogYourBody;
 			packageProductDependencies = (
@@ -2105,6 +2202,21 @@
 			productReference = AD7D30AC2E1490810072AA5B /* LogYourBodyUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		F11620261025000000000016 /* LogYourBodyRestTimer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F11620261025000000000017 /* Build configuration list for PBXNativeTarget "LogYourBodyRestTimer" */;
+			buildPhases = (
+				F11620261025000000000010 /* Sources */,
+				F11620261025000000000011 /* Frameworks */,
+				F11620261025000000000012 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = LogYourBodyRestTimer;
+			productName = LogYourBodyRestTimer;
+			productReference = F1162026102500000000000C /* LogYourBodyRestTimer.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -2151,6 +2263,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				F11620261025000000000016 /* LogYourBodyRestTimer */,
 				AD7D30912E14907F0072AA5B /* LogYourBody */,
 				AD7D30A12E1490810072AA5B /* LogYourBodyTests */,
 				AD7D30AB2E1490810072AA5B /* LogYourBodyUITests */,
@@ -2188,6 +2301,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B26920261025000000000006 /* lyb-launch-contract.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2198,6 +2312,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F11620261025000000000012 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -2205,8 +2325,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B26920261025000000000004 /* BackwardPlannerTests.swift in Sources */,
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
+				153A00000000000000000004 /* TrainingNumericScrubTests.swift in Sources */,
 				F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */,
 				E24920261025000400000002 /* WorkoutReconciliationPromptTests.swift in Sources */,
 				E11020261025000100000006 /* TrainingProgressTests.swift in Sources */,
@@ -2246,6 +2368,7 @@
 				91EF9EABCFA5B86B70872411 /* ReportedMeasurementsMigrationTests.swift in Sources */,
 				7F3682C47FFCDC96AC7171E2 /* DexaReportedMeasurementsPersistenceTests.swift in Sources */,
 				377F3B5263A3F5C8274A0BD4 /* ReportedMeasurementsTests.swift in Sources */,
+				E26220261025000100000005 /* MeasurementValueTests.swift in Sources */,
 				46D2D60CC0C168272E5B0A14 /* BulkProgressPhotoImportPolicyTests.swift in Sources */,
 				AD9E00112F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift in Sources */,
 				AD9E00132F20001100ABCDEF /* BulkImportManagerBoundsTests.swift in Sources */,
@@ -2263,6 +2386,7 @@
 				DF4A68C6C15578CBB9293C37 /* Glp1WeeklyCheckInPolicyTests.swift in Sources */,
 				1CCAD9C764D3D35B5BF0522B /* HealthKitAuthorizationPolicyTests.swift in Sources */,
 				A62E114302EC00A5A0070201 /* HealthKitImportOwnershipTests.swift in Sources */,
+				C23900000000000000000001 /* HealthImportIdempotencyTests.swift in Sources */,
 				6200622347BFBBB809890E19 /* HealthKitFullSyncCompletionPolicyTests.swift in Sources */,
 				9BCEB21BE7B69676BCA5C211 /* HealthSyncCoordinatorPipelineTests.swift in Sources */,
 				8FB91216C622624E0F7815CC /* HealthSyncPipelineTests.swift in Sources */,
@@ -2289,6 +2413,7 @@
 				0922CA98E79021C4CB2595A5 /* ProductAPIProfilePayloadTests.swift in Sources */,
 				F5BBD3CA8052B53CA70ADDA1 /* SyncIntegrationBodyMetricSyncTests.swift in Sources */,
 				D7B509EA4FE543A7A3E32A1F /* BodySpecAtomicImportTests.swift in Sources */,
+				A24420261025000000000006 /* MetricSourceAdapterTests.swift in Sources */,
 				DB19A6EC4AA997A0EF4C5791 /* SyncIntegrationImportAndMappingTests.swift in Sources */,
 				C5C96F424F3D65A1180A3EA7 /* SyncIntegrationRemotePayloadTests.swift in Sources */,
 				FE090848E956D28A4C72FAD1 /* SyncIntegrationSupplementalSyncTests.swift in Sources */,
@@ -2372,6 +2497,7 @@
 				F1179AAA0000000000000001 /* HomeV2TimelineIntegrationUITests.swift in Sources */,
 				DB6F742008744039AA49CA01 /* HomeV2ShareRecoveryUITests.swift in Sources */,
 				AD7D30B12E1490810072AA5B /* LogYourBodyUITests.swift in Sources */,
+				153A00000000000000000006 /* TrainingNumericScrubUITests.swift in Sources */,
 				E4C0A5110000000000000006 /* MesocycleCanvasUITests.swift in Sources */,
 				B39A732AA4894B1DB77C9901 /* HomeV2PhotoViewerLayoutUITests.swift in Sources */,
 				401055DB589E0EF494FCBB1E /* OnboardingGoldenPathUITests.swift in Sources */,
@@ -2384,6 +2510,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F11620261025000000000002 /* TrainingRestTimer.swift in Sources */,
+				F11620261025000000000004 /* TrainingRestAlerts.swift in Sources */,
+				F11620261025000000000006 /* TrainingRestTimerView.swift in Sources */,
+				F11620261025000000000008 /* TrainingRestActivityAttributes.swift in Sources */,
+				B26920261025000000000002 /* BackwardPlanner.swift in Sources */,
 				AD8F12EA2ED6AA76003C4559 /* AnalyticsService.swift in Sources */,
 				FE13A3A300000000000000C1 /* FeatureReleasePolicy.swift in Sources */,
 				ADE146462EBF090D00B64DA0 /* ProgressTimelineView.swift in Sources */,
@@ -2414,6 +2545,7 @@
 				E24920261025000200000002 /* CoreDataWorkoutReconciliationStore.swift in Sources */,
 				E24920261025000100000002 /* WorkoutReconciliationPolicy.swift in Sources */,
 				F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */,
+				153A00000000000000000002 /* TrainingNumericScrub.swift in Sources */,
 				E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */,
 				E11020261025000100000004 /* TrainingProgressViews.swift in Sources */,
 				E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */,
@@ -2528,6 +2660,8 @@
 				0C4EFBDDCBCA1C2DBAC4DA0A /* BaseButton.swift in Sources */,
 				ADA4B7532ED0E61600F4262A /* ErrorReporter.swift in Sources */,
 				ADA600372ED2602F00088042 /* BodySpecDexaImporter.swift in Sources */,
+				A24420261025000000000002 /* MetricSourceAdapter.swift in Sources */,
+				A24420261025000000000004 /* HealthKitManager+MetricSourceAdapter.swift in Sources */,
 				ADA600382ED2602F00088042 /* BodySpecAPI.swift in Sources */,
 				ADA600392ED2602F00088042 /* ErrorTrackingService.swift in Sources */,
 				ADA6003A2ED2602F00088042 /* BodySpecAuthManager.swift in Sources */,
@@ -2564,6 +2698,8 @@
 				ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */,
 				ADA600222ED2594300088042 /* DexaResult.swift in Sources */,
 				2DB2C8F582E3823A58973EC9 /* ReportedMeasurements.swift in Sources */,
+				E26220261025000100000003 /* MeasurementValueConstants.swift in Sources */,
+				E26220261025000100000001 /* MeasurementValue.swift in Sources */,
 				AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */,
 				AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */,
 				ADF1F6B82ED4C63900745F33 /* GlobalTimelineHeader.swift in Sources */,
@@ -2689,6 +2825,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F11620261025000000000010 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F11620261025000000000009 /* TrainingRestActivityAttributes.swift in Sources */,
+				F1162026102500000000000B /* TrainingRestLiveActivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -2701,6 +2846,11 @@
 			isa = PBXTargetDependency;
 			target = AD7D30912E14907F0072AA5B /* LogYourBody */;
 			targetProxy = AD7D30AD2E1490810072AA5B /* PBXContainerItemProxy */;
+		};
+		F11620261025000000000015 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F11620261025000000000016 /* LogYourBodyRestTimer */;
+			targetProxy = F11620261025000000000014 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -3004,6 +3154,50 @@
 			};
 			name = Release;
 		};
+		F11620261025000000000018 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CURRENT_PROJECT_VERSION = 20251126162826;
+				DEVELOPMENT_TEAM = G24T327LXT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LogYourBodyWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks", );
+				MARKETING_VERSION = 1.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app.rest-timer;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.logyourbody.app.rest-timer";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F11620261025000000000019 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CURRENT_PROJECT_VERSION = 20251126162826;
+				DEVELOPMENT_TEAM = G24T327LXT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LogYourBodyWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks", );
+				MARKETING_VERSION = 1.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app.rest-timer;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.logyourbody.app.rest-timer";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -3039,6 +3233,15 @@
 			buildConfigurations = (
 				AD7D30BD2E1490810072AA5B /* Debug */,
 				AD7D30BE2E1490810072AA5B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F11620261025000000000017 /* Build configuration list for PBXNativeTarget "LogYourBodyRestTimer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F11620261025000000000018 /* Debug */,
+				F11620261025000000000019 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
