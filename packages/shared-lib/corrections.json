@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "staged-dependency-source-map-refresh",
+    "correction": "PR #1603: Dependabot's Radix Switch 1.3.8 manifest bump left the generated source map stale, failing Detect Changes, documentation parity and CI Summary. Repeated source-map repairs need a reusable commit-time refresh.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1603",
+    "mechanization": "Extend the existing source-map resolver with an index-backed staged mode and run it after formatting and correction classification in pre-commit. Existing required Detect Changes tests prove staged dependency projection, preservation of partial staging, idempotence, and refusal of unstaged output, missing sources, unsafe paths and pinned drift. The new cases fail before the extension and pass afterward. Use the extended resolver to repair this PR while retaining all CI parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct and stage generated documentation directly from the Git index at local commit time, preventing stale manifest fingerprints by construction while preserving unstaged edits. GitHub-created bot commits remain protected by the required parity check and use the same resolver during repair."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Render the index, so partially staged manifests cannot leak into the commit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",
