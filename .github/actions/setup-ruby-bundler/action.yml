@@ -42,10 +42,14 @@ runs:
         echo "$prefix/bin" >> "$GITHUB_PATH"
         "$prefix/bin/ruby" -e 'puts Gem.bindir' >> "$GITHUB_PATH"
 
-    - name: Get Ruby version
+    - name: Get Ruby runtime identity
       id: ruby-version
       shell: bash
-      run: echo "version=$(ruby -v | awk '{print $2}')" >> $GITHUB_OUTPUT
+      run: |
+        echo "version=$(ruby -v | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        # Equal version strings do not make hosted and Homebrew native gems compatible.
+        identity=$(ruby -rrbconfig -e 'puts [RUBY_DESCRIPTION, RUBY_PLATFORM, RbConfig::CONFIG.fetch("prefix")].join("\n")' | shasum -a 256 | awk '{print $1}')
+        echo "identity=$identity" >> "$GITHUB_OUTPUT"
 
     - name: Get Gemfile.lock hash
       id: gemfile-hash
@@ -63,17 +67,17 @@ runs:
       uses: actions/cache@v4
       id: bundler-cache
       with:
-        path: ${{ inputs.working-directory }}/vendor/bundle
-        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.gemfile-hash.outputs.hash }}
+        path: ${{ inputs.working-directory }}/vendor/bundle/${{ steps.ruby-version.outputs.identity }}
+        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-v2-${{ runner.arch }}-${{ runner.environment }}-ruby-${{ steps.ruby-version.outputs.identity }}-${{ steps.gemfile-hash.outputs.hash }}
         restore-keys: |
-          ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-
+          ${{ runner.os }}-${{ inputs.cache-key-prefix }}-v2-${{ runner.arch }}-${{ runner.environment }}-ruby-${{ steps.ruby-version.outputs.identity }}-
 
     - name: Install Bundler
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
         gem install bundler:${{ inputs.bundler-version }}
-        bundle config path vendor/bundle
+        bundle config set --local path vendor/bundle/${{ steps.ruby-version.outputs.identity }}
         bundle config set --local deployment 'true'
         bundle config set --local jobs '4'
         bundle config set --local retry '3'

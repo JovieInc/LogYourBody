@@ -1,5 +1,21 @@
 [
   {
+    "fingerprint": "ruby-native-gem-cache-matches-runtime",
+    "correction": "PR #1552 merge-group iOS setup restored Ruby native extensions that failed to load under Homebrew Ruby with Symbol not found: _rb_cFalseClass before any native build or tests ran.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40256430731/job/121359180915",
+    "mechanization": "Partition cache keys and restore prefixes by architecture, runner environment and a digest of the actual Ruby description, platform and installation prefix. Use the same digest in the installed bundle directory so persistent incompatible gems cannot leak in. Required shared-lib regressions fail on the previous shared key/path and pass with runtime isolation; setup also fails if runtime identification fails. Native execution remains unverified on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared Ruby setup action can select a runtime-specific cache and bundle directory by construction before loading any cached native extensions."
+      }
+    },
+    "guard": {
+      "path": ".github/actions/setup-ruby-bundler/action.yml",
+      "anchor": "bundle config set --local path vendor/bundle/${{ steps.ruby-version.outputs.identity }}"
+    }
+  },
+  {
     "fingerprint": "recurring-corrections-escalate-or-report-guard-failure",
     "correction": "LYB-252: Repeated corrections after a prose fix must request stronger enforcement once per rule; a correction recurring after mechanization is a guard failure rather than an ordinary repeat.",
     "source": "https://linear.app/jovie/issue/LYB-252",

@@ -4,6 +4,7 @@
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.github/actions/setup-ruby-bundler/action.yml",
         "$TURBO_ROOT$/scripts/lyb-launch-manifest*.mjs",
         "$TURBO_ROOT$/scripts/fixtures/lyb-certification/**",
         "$TURBO_ROOT$/apps/ios/LogYourBody/DesignSystem/Theme.swift",
