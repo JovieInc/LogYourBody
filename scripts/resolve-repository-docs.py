@@ -78,7 +78,18 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False):
         modes = [["--frozen-lockfile", "--offline"]]
         # Explicit repair only: normal commit hooks and CI retain frozen installs.
         if refresh_lockfile:
-            modes.insert(0, ["--no-frozen-lockfile"])
+            probe = subprocess.run(
+                ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *modes[0]],
+                cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            )
+            print(probe.stdout, end="", flush=True)
+            # Refresh only a confirmed manifest mismatch; other failures remain blockers.
+            if probe.returncode:
+                if "ERR_PNPM_OUTDATED_LOCKFILE" not in probe.stdout:
+                    probe.check_returncode()
+                modes.insert(0, ["--no-frozen-lockfile"])
+            else:
+                modes = []
         for mode in modes:
             subprocess.run(
                 ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
