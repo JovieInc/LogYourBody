@@ -1172,6 +1172,46 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "healthkit-types-disclosed-in-privacy-health-data",
+    "correction": "LYB-189: The privacy policy's Health Data bullet disclosed only steps/activity while native HealthKit paths read weight, body fat percentage, height, steps, date of birth and biological sex, and write weight/body fat.",
+    "source": "https://linear.app/jovie/issue/LYB-189",
+    "mechanization": "Extend the existing app-privacy scanner, already executed by the required Detect Changes correction ratchet on every diff, to compare native definitions, explicit identifiers, characteristic getters and HealthKit usage strings with the canonical Health Data bullet. Shared-lib mutation regressions reject the original steps-only wording and each omitted type. Tim/legal retains final prose review; source checks do not grant legal approval.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Privacy wording is authored legal/product truth. Generating it from native declarations would replace the requested Tim/legal prose review and cannot prevent an incomplete authored disclosure."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required snapshot scanner can fail on undisclosed native HealthKit identifiers and permission-string types without accessing HealthKit, ASC or credentials."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/app-privacy.mjs",
+      "anchor": "LYB-189: require each native HealthKit type in the policy's Health Data bullet."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-ledger-conflict-safe-merge",
+    "correction": "PR #1545 conflict repair: retain both parents' correction receipts and resolve other source conflicts before validating guards during an automatic ledger merge.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1545",
+    "mechanization": "Extend the existing --merge-ledger resolver to reject other unresolved Git paths before reading guard evidence or writing the ledger. The existing required shared-lib Git-fixture regression fails without this check and passes with it, preserving the ledger on refusal. Use the resolver on the actual PR conflict, retaining the HealthKit disclosure receipt and all main receipts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing ledger tool can construct a lossless three-way merge from Git conflict stages and refuse ambiguous edits before writing, replacing repeated manual append-conflict repair with one deterministic operation."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Independent additions merge; concurrent receipt edits require explicit resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-update-artifact-refresh",
     "correction": "PR #1607: The @types/lodash manifest bump omitted its lockfile and generated source map, failing Vercel's frozen install, Detect Changes, documentation parity and CI Summary. Repair both derived artifacts together for recurring dependency updates.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40303984325/job/121508439128",
