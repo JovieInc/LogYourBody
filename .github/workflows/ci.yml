@@ -110,6 +110,9 @@ jobs:
       - name: Verify workflow concurrency policy
         run: node .github/scripts/verify-workflow-concurrency.mjs
 
+      - name: Test release check enclosing budget
+        run: node --test .github/scripts/release-check-budget.test.mjs
+
       - name: Verify repository merge queue policy
         run: node --test .github/scripts/verify-merge-queue-policy.test.mjs
 
@@ -127,6 +130,9 @@ jobs:
       # or run workflows: 150 backup pushes starved the shared build queue on 2026-10-20.
       - name: Verify Vercel and Actions ignore bot-only refs
         run: node --test .github/scripts/verify-vercel-branch-exclusions.test.mjs
+
+      - name: Test the Vercel public-env type guard
+        run: node --test .github/scripts/verify-public-build-env-types.test.mjs
 
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
@@ -148,10 +154,12 @@ jobs:
           set -euo pipefail
           node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs
           node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
+          node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
           [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           node packages/shared-lib/scripts/correction-coverage.mjs --base-ref "$BASE_SHA"
           node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref "$BASE_SHA"
+          node packages/shared-lib/scripts/guard-reference.mjs --base-ref "$BASE_SHA"
 
       - name: Verify LYB and Jovie product separation
         run: |

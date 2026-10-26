@@ -9,6 +9,8 @@ import {
   CORRECTION_LEDGER,
   planCorrectionIssues,
   runCorrectionRecurrence,
+  runRecurrenceCli,
+  scanCorrectionRecurrence,
 } from './correction-recurrence.mjs';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url));
@@ -108,6 +110,8 @@ function linearStore(options = {}) {
       if (options.updateFailure) return response({ issueUpdate: { success: false } });
       const issue = issues.get(variables.id);
       Object.assign(issue, variables.input);
+      if (variables.input.stateId)
+        issue.state = states.find((state) => state.id === variables.input.stateId);
       return response({ issueUpdate: { success: true, issue } });
     }
     throw new Error('Unexpected fixture query');
@@ -122,8 +126,218 @@ const intake = (store, receipts, overrides = {}) =>
     event,
     receipts,
     fetchImpl: store.fetchImpl,
+    dryRun: false,
     ...overrides,
   });
+
+const classifiedReceipt = (number, level, extra = {}) => ({
+  ...receipt(number),
+  classification: Object.fromEntries(
+    ['codebase', 'static', 'prose', 'human'].map((candidate) => [
+      candidate,
+      { feasible: candidate === level, rationale: `Reviewed ${candidate} feasibility.` },
+    ]),
+  ),
+  ...(level === 'prose'
+    ? { proseOnlyReason: 'The previous fix only added repository instructions.' }
+    : { guard: { path: 'guard.mjs', anchor: 'reject removal of required tests' } }),
+  ...extra,
+});
+
+test('third recurrence after a prose fix requests static enforcement once per rule id', async () => {
+  const store = linearStore();
+  const fixtures = [1, 2, 3, 4].map((number) => classifiedReceipt(number, 'prose'));
+  for (const rows of [
+    fixtures.slice(0, 3),
+    fixtures,
+    [...fixtures, fixtures[3]],
+    [...fixtures].reverse(),
+  ]) {
+    const result = await intake(store, rows);
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.recurrence, [
+      {
+        fingerprint: 'keep-test-gates',
+        repeatCount: new Set(rows.map((row) => row.source)).size - 1,
+      },
+    ]);
+  }
+  assert.equal(store.issues.size, 1);
+  assert.equal(
+    store.calls.filter(({ query }) => query.includes('CreateDedupedLinearIssue')).length,
+    1,
+  );
+  const [issue] = store.issues.values();
+  assert.match(issue.description, /Requested enforcement: prose -> static/);
+  assert.match(issue.description, /3 repeats/);
+});
+
+test('a fixed prose issue reopens for new evidence or a higher recurrence, but never for replay', async () => {
+  const store = linearStore();
+  const first = [classifiedReceipt(1, 'prose'), classifiedReceipt(2, 'prose')];
+  await intake(store, first);
+  const [issue] = store.issues.values();
+  for (const next of [
+    [...first, classifiedReceipt(3, 'prose')],
+    [...first, classifiedReceipt(3, 'prose', { recurrence: 3 })],
+  ]) {
+    issue.state = { id: 'done', type: 'completed' };
+    const reopened = await intake(store, next);
+    assert.equal(reopened.issues[0].reopened, true);
+    assert.equal(issue.state.id, 'todo');
+    issue.state = { id: 'done', type: 'completed' };
+    assert.equal((await intake(store, next)).issues[0].reopened, false);
+    assert.equal(issue.state.id, 'done');
+  }
+  assert.equal(store.issues.size, 1);
+});
+
+test('explicit recurrence counts and matching rule ids use the same deduplication identity', () => {
+  const explicit = classifiedReceipt(1, 'prose', { recurrence: 3 });
+  const [plan] = scanCorrectionRecurrence([explicit]).plans;
+  assert.equal(plan.label, planCorrectionIssues([receipt(1), receipt(2)])[0].label);
+  assert.deepEqual(scanCorrectionRecurrence([explicit]).recurrence, [
+    { fingerprint: 'keep-test-gates', repeatCount: 3 },
+  ]);
+  assert.deepEqual(
+    scanCorrectionRecurrence([explicit, classifiedReceipt(2, 'prose')], {
+      previousReceipts: [explicit],
+    }).recurrence,
+    [{ fingerprint: 'keep-test-gates', repeatCount: 4 }],
+  );
+  for (const recurrence of [-1, 1.5, '3', null]) {
+    assert.throws(() => scanCorrectionRecurrence([{ ...explicit, recurrence }]), /recurrence/);
+  }
+});
+
+test('the runner defaults to dry-run even with valid credentials and a verified event', async () => {
+  const store = linearStore();
+  const result = await runCorrectionRecurrence({
+    env: { GITHUB_REPOSITORY: 'JovieInc/LogYourBody', LINEAR_API_KEY: 'fixture-key' },
+    eventName: 'workflow_run',
+    event,
+    receipts: [classifiedReceipt(1, 'prose'), classifiedReceipt(2, 'prose')],
+    fetchImpl: store.fetchImpl,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.action, 'dry_run');
+  assert.equal(result.plans.length, 1);
+  assert.equal(store.calls.length, 0);
+});
+
+test('new corrections to an already mechanized rule fail without filing or hiding the guard', async () => {
+  for (const level of ['codebase', 'static']) {
+    const previousReceipts = [classifiedReceipt(1, level)];
+    const rows = [...previousReceipts, classifiedReceipt(2, level)];
+    const store = linearStore();
+    for (const dryRun of [true, false]) {
+      const result = await intake(store, rows, { previousReceipts, dryRun });
+      assert.equal(result.ok, false);
+      assert.equal(result.reason, 'correction_guard_failure');
+      assert.deepEqual(result.guardFailures, [
+        {
+          fingerprint: 'keep-test-gates',
+          guard: previousReceipts[0].guard,
+          sources: [rows[1].source],
+        },
+      ]);
+      assert.deepEqual(result.plans, []);
+    }
+    assert.equal(store.calls.length, 0);
+  }
+});
+
+test('replayed receipts and a newly installed guard are not new guard failures', () => {
+  const old = [classifiedReceipt(1, 'static'), classifiedReceipt(2, 'static')];
+  assert.deepEqual(
+    scanCorrectionRecurrence([...old, old[1]], { previousReceipts: old }).guardFailures,
+    [],
+  );
+  assert.deepEqual(
+    scanCorrectionRecurrence(old, {
+      previousReceipts: old.map((row, index) => classifiedReceipt(index + 1, 'prose')),
+    }).guardFailures,
+    [],
+  );
+  const increased = old.map((row) => ({ ...row, recurrence: 3 }));
+  assert.equal(
+    scanCorrectionRecurrence(increased, { previousReceipts: old }).guardFailures.length,
+    1,
+  );
+  const downgraded = [...old, classifiedReceipt(3, 'static')].map((row, index) =>
+    classifiedReceipt(index + 1, 'prose'),
+  );
+  assert.equal(
+    scanCorrectionRecurrence(downgraded, { previousReceipts: old }).guardFailures.length,
+    1,
+  );
+});
+
+test('the standalone scanner is dry-run by default and exits nonzero on a guard failure', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lyb-correction-scan-'));
+  try {
+    const ledger = join(dir, 'corrections.json');
+    const preload = join(dir, 'no-network.mjs');
+    writeFileSync(preload, 'globalThis.fetch = () => { throw new Error("unexpected network"); };');
+    for (const level of ['prose', 'static']) {
+      writeFileSync(ledger, JSON.stringify([1, 2, 3, 4].map((n) => classifiedReceipt(n, level))));
+      const result = spawnSync(
+        process.execPath,
+        [
+          '--import',
+          preload,
+          'packages/shared-lib/scripts/correction-recurrence.mjs',
+          '--ledger',
+          ledger,
+        ],
+        { cwd: root, encoding: 'utf8', timeout: 10_000 },
+      );
+      assert.ifError(result.error);
+      assert.equal(result.status, level === 'prose' ? 0 : 1, result.stderr);
+      const report = JSON.parse(result.stdout);
+      assert.equal(report.action, level === 'prose' ? 'dry_run' : 'guard_failure');
+      assert.equal(report.guardFailures.length, level === 'prose' ? 0 : 1);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the standalone scanner files only with --apply and respects the emergency stop', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lyb-correction-apply-'));
+  try {
+    const ledger = join(dir, 'corrections.json');
+    writeFileSync(ledger, JSON.stringify([1, 2, 3].map((n) => classifiedReceipt(n, 'prose'))));
+    const store = linearStore();
+    const options = { env: { LINEAR_API_KEY: 'fixture-key' }, fetchImpl: store.fetchImpl };
+    const args = ['--ledger', ledger];
+    assert.equal((await runRecurrenceCli(args, options)).action, 'dry_run');
+    assert.equal(store.calls.length, 0);
+    assert.equal(
+      (await runRecurrenceCli([...args, '--apply'], options)).issues[0].action,
+      'created',
+    );
+    assert.equal(
+      (await runRecurrenceCli([...args, '--apply'], options)).issues[0].action,
+      'updated',
+    );
+    assert.equal(store.issues.size, 1);
+    assert.equal(
+      (
+        await runRecurrenceCli(['--ledger', '/missing', '--apply'], {
+          ...options,
+          env: { REMEDIATION_INTAKE_DISABLED: '1' },
+        })
+      ).action,
+      'disabled',
+    );
+    for (const args of [['--unknown'], ['--ledger'], ['--base-ref', 'HEAD;echo unsafe']]) {
+      await assert.rejects(runRecurrenceCli(args, options), /usage:/);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('only two distinct correction receipts for the same normalized fingerprint trigger an issue', () => {
   assert.doesNotThrow(() =>

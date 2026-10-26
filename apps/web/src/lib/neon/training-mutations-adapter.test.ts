@@ -1,6 +1,10 @@
 /** @jest-environment node */
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 import { createNeonTrainingMutations } from './training-mutations-adapter';
+import {
+  neonNativeProductRecords,
+  createNeonNativeProductRecords,
+} from './native-product-records-adapter';
 const ownerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const setupId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const recordId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -11,6 +15,50 @@ function fixture() {
   return { query, port };
 }
 describe('training mutation database boundary', () => {
+  it('wires recovery trials through both the injected and production records ports', async () => {
+    expect(typeof neonNativeProductRecords.trainingMutations?.commitRecoveryTrial).toBe('function');
+    const { query } = fixture();
+    const records = createNeonNativeProductRecords({ query } as unknown as NeonQueryFunction<
+      false,
+      false
+    >);
+    const saved = {
+      id: recordId,
+      user_id: 'owner',
+      deleted_at: null,
+      server_updated_at: '2026-10-13T10:00:00Z',
+    };
+    query.mockResolvedValue([{ result: { kind: 'saved', record: saved } }]);
+    const basis = { 'training_feedback/setup': { id: setupId } };
+    expect(
+      await records.trainingMutations!.commitRecoveryTrial!({
+        subject: 'owner',
+        admission,
+        expectedRecords: basis,
+        expectedRevision: 2,
+        record: { id: recordId },
+      }),
+    ).toEqual({ kind: 'saved', record: saved });
+    expect(query.mock.calls[0][0]).toContain('training_recovery_trial_command');
+    expect(query.mock.calls[0][1]).toEqual([
+      'owner',
+      JSON.stringify(admission),
+      JSON.stringify(basis),
+      2,
+      JSON.stringify({ id: recordId }),
+    ]);
+    query.mockResolvedValueOnce([{ result: { kind: 'record_conflict' } }]);
+    expect(
+      await records.trainingMutations!.commitRecoveryTrial!({
+        subject: 'owner',
+        admission,
+        expectedRecords: basis,
+        expectedRevision: 2,
+        record: { id: recordId },
+      }),
+    ).toEqual({ kind: 'record_conflict' });
+    expect(query).toHaveBeenCalledTimes(2);
+  });
   it('captures owner incarnation and the canonical supported setup without writing', async () => {
     const { query, port } = fixture();
     query.mockResolvedValue([

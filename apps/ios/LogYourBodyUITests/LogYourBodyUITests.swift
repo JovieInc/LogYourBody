@@ -214,6 +214,46 @@ final class LogYourBodyUITests: XCTestCase {
         attachScreenshot(named: "training-response-loss-relaunch-exact-retry", from: app)
     }
 
+    func testTrainingHistoryShowsRecordedPerformanceAtAccessibilityTextSize() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingProgress",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let history = app.descendants(matching: .any)["training_history_fixture_press"].firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 5))
+        for _ in 0..<5 where !history.isHittable { app.swipeUp() }
+        XCTAssertTrue(history.label.contains("8 reps"))
+        XCTAssertTrue(history.label.contains("Heaviest recorded"))
+        XCTAssertTrue(history.label.contains("2 RIR"))
+        XCTAssertTrue(history.isHittable)
+        attachScreenshot(named: "training-history-accessibility-text", from: app)
+    }
+
+    func testUnavailableHistoryLeavesSetLoggingUsable() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingProgress",
+            "-lybUITestTrainingHistoryUnavailable"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let log = app.buttons["training_log_set_fixture_press_1"]
+        XCTAssertTrue(log.waitForExistence(timeout: 5))
+        log.tap()
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
+        let retry = app.buttons["training_history_retry"]
+        for _ in 0..<8 where !retry.isHittable { app.swipeUp() }
+        XCTAssertTrue(retry.isHittable)
+        retry.tap()
+        XCTAssertTrue(app.staticTexts["training_history_error"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "training-history-unavailable-logging-works", from: app)
+    }
+
     func testTrainingControllerKeepsNowDominantAndUpNextVisible() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
@@ -245,6 +285,45 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.images["training_set_completion_receipt"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.textFields["training_load_fixture_press_2"].exists)
         XCTAssertTrue(app.buttons["training_log_set_fixture_press_2"].isEnabled)
+    }
+
+    func testTrainingReadinessAfterTimerExpiryRetriesOfflineWithoutAdvancing() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingExpiredRest"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.switches["training_fixture_offline"].tap()
+        app.buttons["training_fixture_open"].tap()
+        let timer = app.staticTexts["training_rest_timer"]
+        XCTAssertTrue(timer.waitForExistence(timeout: 5))
+        XCTAssertEqual(timer.label, "Timer elapsed · readiness not assessed")
+        app.swipeUp()
+        app.buttons["training_readiness_menu"].tap()
+        app.buttons["Still out of breath"].tap()
+        XCTAssertTrue(app.staticTexts["training_feedback_pending"].waitForExistence(timeout: 5))
+        app.buttons["training_live_session_close_button"].tap()
+        app.terminate()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestTrainingExpiredRest"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["training_feedback_retry"].waitForExistence(timeout: 5))
+        app.buttons["training_feedback_retry"].tap()
+        let action = app.staticTexts["training_next_set_action"]
+        XCTAssertTrue(action.waitForExistence(timeout: 5))
+        XCTAssertEqual(action.label, "Continue resting")
+        app.swipeDown()
+        XCTAssertEqual(app.staticTexts["training_progress"].label, "1 of 2 sets")
+        let log = app.buttons["training_log_set_fixture_press_2"]
+        XCTAssertTrue(log.isEnabled)
+        log.tap()
+        XCTAssertTrue(app.staticTexts["Workout complete"].waitForExistence(timeout: 5))
+        app.buttons["training_live_session_close_button"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_count"].label, "Acknowledged sets: 2")
+        XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 1")
     }
 
     func testTrainingCurrentNumericRowAcceptsFocusWithoutHidingUpNext() throws {
@@ -3261,6 +3340,10 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     func testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity() throws {
+        // XCTest rounds the 90s default up to 2 minutes. Send on the error
+        // fixture can spend one 60s quiescence stall before Retry is tappable,
+        // and that kill retries the whole UI suite. 180s is the audit maximum.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launchSyntheticChatReplay(app, extra: ["-lybUITestChatErrorFixture"])
         submitSyntheticChatQuestion(in: app)
@@ -4361,5 +4444,44 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_settings"].exists)
+    }
+}
+
+extension LogYourBodyUITests {
+    func testCycleReuseDraftRequiresReviewBeforeApply() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_cycle_review"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_cycle_review"].tap()
+        XCTAssertTrue(app.segmentedControls["training_cycle_length"].waitForExistence(timeout: 5))
+        app.segmentedControls["training_cycle_length"].buttons["5 weeks"].tap()
+        app.switches["Smith incline press"].switches.firstMatch.tap()
+        XCTAssertTrue(app.textFields["Why it worked"].exists)
+        app.swipeUp()
+        app.buttons["training_cycle_create_draft"].tap()
+        let apply = app.buttons["training_cycle_apply"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Week 5 · Deload · 1 set · 5 RIR"].exists)
+        attachScreenshot(named: "training-five-week-reuse-draft", from: app)
+        apply.tap()
+        XCTAssertTrue(app.staticTexts["training_fixture_cycle_applied"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["training_fixture_cycle_applied"].label, "Applied blocks: 1")
+    }
+
+    func testRejectingCycleDraftDoesNotApplyIt() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_cycle_review"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_cycle_review"].tap()
+        XCTAssertTrue(app.segmentedControls["training_cycle_length"].waitForExistence(timeout: 5))
+        app.segmentedControls["training_cycle_length"].buttons["5 weeks"].tap()
+        app.swipeUp()
+        app.buttons["training_cycle_create_draft"].tap()
+        XCTAssertTrue(app.buttons["training_cycle_reject"].waitForExistence(timeout: 5))
+        app.buttons["training_cycle_reject"].tap()
+        app.buttons["Close"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_cycle_applied"].label, "Applied blocks: 0")
     }
 }

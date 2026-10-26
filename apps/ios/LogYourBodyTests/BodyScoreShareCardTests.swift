@@ -334,7 +334,8 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertEqual(payload.avatarMatch.assetName, "avatar_male_15")
         XCTAssertEqual(payload.avatarMatch.badgeText, "Male 15% body fat")
         XCTAssertEqual(payload.visualBadgeText(includeVisual: true), "Male 15% body fat")
-        XCTAssertEqual(payload.visualBadgeText(includeVisual: false), "Private summary")
+        XCTAssertEqual(payload.visualBadgeText(includeVisual: false), "")
+        XCTAssertFalse(payload.visualBadgeText(includeVisual: false).localizedCaseInsensitiveContains("private"))
         XCTAssertNil(payload.photoImage)
     }
 
@@ -361,6 +362,247 @@ final class BodyScoreShareCardTests: XCTestCase {
 
         XCTAssertTrue(options.hasMetrics)
         XCTAssertEqual(options.includedSummary, "Body Score, weight, visual")
+    }
+
+    func testShareLayoutScaleMatchesExportPixelsWithoutClamping() {
+        for aspect in BodyScoreShareAspect.allCases {
+            let exportSize = aspect.pixelSize
+            let export = ShareCardLayout(
+                size: exportSize,
+                aspect: aspect,
+                includesMetrics: false,
+                composition: .scoreOnly
+            )
+            XCTAssertEqual(export.scale, 1, accuracy: 0.0001, "Export \(aspect.rawValue) is the canonical space")
+
+            let factor: CGFloat = 0.17
+            let previewSize = CGSize(width: exportSize.width * factor, height: exportSize.height * factor)
+            let preview = ShareCardLayout(
+                size: previewSize,
+                aspect: aspect,
+                includesMetrics: false,
+                composition: .scoreOnly
+            )
+            XCTAssertEqual(preview.scale, factor, accuracy: 0.0001)
+            XCTAssertEqual(
+                preview.scoreFontSize / preview.size.width,
+                export.scoreFontSize / export.size.width,
+                accuracy: 0.0001,
+                "\(aspect.rawValue) type must scale with the export canvas"
+            )
+            let minimumHero = aspect == .story ? 0.16 : 0.20
+            XCTAssertGreaterThan(
+                export.scoreFontSize / export.size.height,
+                minimumHero,
+                "\(aspect.rawValue) score-only type is still a caption"
+            )
+
+            let tiny = ShareCardLayout(size: previewSize, aspect: aspect)
+            XCTAssertLessThan(tiny.scale, 0.2, "\(aspect.rawValue) preview scale is clamped")
+        }
+    }
+
+    func testScoreOnlyCardIsAGroupedHeroAndMatchesItsPreview() throws {
+        let payload = makeScorePayload()
+        let options = BodyScoreShareOptions()
+        XCTAssertEqual(options.cardComposition, .scoreOnly)
+
+        for aspect in BodyScoreShareAspect.allCases {
+            let export = try renderShareImage(
+                payload: payload,
+                options: options,
+                aspect: aspect,
+                name: "score-only-\(aspect.rawValue).png"
+            )
+            assertExportPixels(export, aspect: aspect)
+            let lines = try recognizedShareLines(export, diagnosticName: "score-only-\(aspect.rawValue)")
+            try assertScoreOnlyCopy(lines, score: "74", aspect: aspect)
+            try assertTextInsideSafeMargins(lines, aspect: aspect)
+            assertNoScoreOverlap(lines, score: "74")
+
+            let preview = try renderShareImage(
+                payload: payload,
+                options: options,
+                aspect: aspect,
+                name: "score-only-preview-\(aspect.rawValue).png",
+                preview: narrowArtwork(for: aspect)
+            )
+            let previewLines = try recognizedShareLines(
+                preview,
+                diagnosticName: "score-only-preview-\(aspect.rawValue)"
+            )
+            try assertScoreOnlyCopy(previewLines, score: "74", aspect: aspect)
+            assertHeroParity(
+                export: lines,
+                preview: previewLines,
+                score: "74",
+                aspect: aspect
+            )
+        }
+    }
+
+    func testShareCardOptInFixturesKeepOnlyTheChosenContent() throws {
+        let scoreOnly = makeScorePayload(includesBody: true)
+        var weight = BodyScoreShareOptions()
+        weight.includeWeight = true
+        var bodyFat = BodyScoreShareOptions()
+        bodyFat.includeBodyFat = true
+        var ffmi = BodyScoreShareOptions()
+        ffmi.includeFFMI = true
+        var allMetrics = BodyScoreShareOptions()
+        allMetrics.includeWeight = true
+        allMetrics.includeBodyFat = true
+        allMetrics.includeFFMI = true
+        var avatar = BodyScoreShareOptions()
+        avatar.includeVisual = true
+        var photo = BodyScoreShareOptions()
+        photo.includeVisual = true
+        let photoPayload = makeScorePayload(photoImage: makeMagentaShareImage(), includesBody: true)
+
+        for aspect in BodyScoreShareAspect.allCases {
+            let plain = try renderFixture(scoreOnly, weight, aspect: aspect, name: "metric-weight-\(aspect.rawValue)")
+            try assertContains(plain, score: "74", required: ["181"], forbidden: ["16.4", "21.8", "private", "progress"])
+            let fat = try renderFixture(scoreOnly, bodyFat, aspect: aspect, name: "metric-body-fat-\(aspect.rawValue)")
+            try assertContains(fat, score: "74", required: ["16.4"], forbidden: ["181", "21.8", "private"])
+            let ffmiImage = try renderFixture(scoreOnly, ffmi, aspect: aspect, name: "metric-ffmi-\(aspect.rawValue)")
+            try assertContains(ffmiImage, score: "74", required: ["21.8"], forbidden: ["181", "16.4", "private"])
+            let everyMetric = try renderFixture(
+                scoreOnly, allMetrics, aspect: aspect, name: "metric-all-\(aspect.rawValue)"
+            )
+            try assertContains(
+                everyMetric,
+                score: "74",
+                required: ["181", "16.4", "21.8"],
+                forbidden: ["private", "progress"]
+            )
+
+            let avatarImage = try renderFixture(
+                scoreOnly, avatar, aspect: aspect, name: "avatar-opt-in-\(aspect.rawValue)"
+            )
+            let avatarText = try recognizedShareText(avatarImage, diagnosticName: "avatar-opt-in-\(aspect.rawValue)")
+            XCTAssertTrue(avatarText.lowercased().contains("male"))
+            XCTAssertTrue(avatarText.filter(\.isNumber).contains("15"))
+            XCTAssertFalse(avatarText.lowercased().contains("private"))
+            let minimumAvatarSamples = blueSampleCount(try renderFixture(
+                makeScorePayload(),
+                BodyScoreShareOptions(),
+                aspect: aspect,
+                name: "score-only-blue-baseline-\(aspect.rawValue)"
+            )) * 5 + 200
+            XCTAssertGreaterThan(
+                blueSampleCount(avatarImage),
+                minimumAvatarSamples,
+                "Avatar opt-in should draw the body visual on \(aspect.rawValue)"
+            )
+
+            let photoImage = try renderFixture(
+                photoPayload, photo, aspect: aspect, name: "photo-opt-in-\(aspect.rawValue)"
+            )
+            let photoText = try recognizedShareText(photoImage, diagnosticName: "photo-opt-in-\(aspect.rawValue)")
+            XCTAssertTrue(photoText.lowercased().contains("progress"))
+            XCTAssertTrue(photoText.filter(\.isNumber).contains("74"))
+            XCTAssertFalse(photoText.lowercased().contains("private"))
+            XCTAssertFalse(photoText.contains("181"))
+            XCTAssertGreaterThan(magentaSampleCount(photoImage), 500, "Photo pixels missing on \(aspect.rawValue)")
+            XCTAssertLessThan(magentaSampleCount(avatarImage), 30)
+            XCTAssertLessThanOrEqual(
+                blueSampleCount(photoImage),
+                minimumAvatarSamples,
+                "The logo and a non-avatar photo must not satisfy the avatar probe on \(aspect.rawValue)"
+            )
+        }
+    }
+
+    func testLongScoreCopyStaysInsideTheNarrowEditorAndTheExport() throws {
+        let payload = makeScorePayload(
+            tagline: "Recomposition is holding while the weekly average stays inside the selected range.",
+            deltaText: "+12 across the selected block"
+        )
+        let options = BodyScoreShareOptions()
+        for aspect in BodyScoreShareAspect.allCases {
+            let surfaces: [(String, CGSize?)] = [
+                ("export", nil),
+                ("narrow", narrowArtwork(for: aspect))
+            ]
+            for (label, preview) in surfaces {
+                let image = try renderShareImage(
+                    payload: payload,
+                    options: options,
+                    aspect: aspect,
+                    name: "long-copy-\(label)-\(aspect.rawValue).png",
+                    preview: preview
+                )
+                let lines = try recognizedShareLines(image, diagnosticName: "long-copy-\(label)-\(aspect.rawValue)")
+                let text = lines.map(\.text).joined(separator: " ").lowercased()
+                XCTAssertTrue(text.contains("recomposition"), text)
+                XCTAssertTrue(text.contains("range"), text)
+                XCTAssertTrue(text.contains("block"), text)
+                XCTAssertTrue(text.filter(\.isNumber).contains("74"))
+                try assertTextInsideSafeMargins(lines, aspect: aspect)
+                assertNoScoreOverlap(lines, score: "74")
+            }
+        }
+    }
+
+    func testScoreCardDoesNotInventTrendOrPrivacyCopy() throws {
+        let payload = makeScorePayload(tagline: "Score only", deltaText: nil)
+        let image = try renderShareImage(
+            payload: payload,
+            options: BodyScoreShareOptions(),
+            aspect: .portrait,
+            name: "score-only-no-invented-copy.png"
+        )
+        let text = try recognizedShareText(image, diagnosticName: "score-only-no-invented-copy").lowercased()
+        XCTAssertTrue(text.filter(\.isNumber).contains("74"))
+        XCTAssertTrue(text.replacingOccurrences(of: " ", with: "").contains("bodyscore"))
+        for absent in ["private", "trend", "kcal", "healthy", "estimated", "goal"] {
+            XCTAssertFalse(text.contains(absent), "Invented copy \(absent) in: \(text)")
+        }
+        XCTAssertLessThan(magentaSampleCount(image), 30)
+    }
+
+    func testPreviewChromeSitsOutsideTheExportedArtwork() throws {
+        let payload = makeScorePayload()
+        let options = BodyScoreShareOptions()
+        for aspect in BodyScoreShareAspect.allCases {
+            let export = try renderShareImage(
+                payload: payload,
+                options: options,
+                aspect: aspect,
+                name: "chrome-export-\(aspect.rawValue).png"
+            )
+            assertExportPixels(export, aspect: aspect)
+            assertCorners(of: export, brighterThan: nil, darkerThan: 18)
+
+            let artwork = CGSize(
+                width: 180,
+                height: 180 * aspect.pixelSize.height / aspect.pixelSize.width
+            )
+            let outset = BodyScoreSharePreviewGeometry.outset
+            let outer = CGSize(width: artwork.width + outset * 2, height: artwork.height + outset * 2)
+            let renderer = ImageRenderer(
+                content: BodyScoreSharePreviewChrome(
+                    payload: payload,
+                    aspect: aspect,
+                    options: options,
+                    artworkSize: artwork
+                )
+                .frame(width: outer.width, height: outer.height)
+                .environment(\.colorScheme, .dark)
+            )
+            renderer.scale = 2
+            let preview = try XCTUnwrap(renderer.uiImage)
+            if let png = preview.pngData() {
+                let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+                attachment.name = "chrome-preview-\(aspect.rawValue).png"
+                attachment.lifetime = .keepAlways
+                add(attachment)
+            }
+            let pixelsWide = try XCTUnwrap(preview.cgImage).width
+            XCTAssertGreaterThan(pixelsWide, Int(artwork.width * 2))
+            assertCorners(of: preview, brighterThan: 30, darkerThan: nil)
+            assertCorners(of: preview, brighterThan: nil, darkerThan: 18, insetInArtwork: true)
+        }
     }
 
     func testShareCardRendersRequestedExportSize() throws {
@@ -1006,14 +1248,26 @@ final class BodyScoreShareCardTests: XCTestCase {
             createdAt: date, updatedAt: date)
     }
 
-    private func recognizedShareText(_ image: UIImage, diagnosticName: String = "share-render") throws -> String {
+    private struct RecognizedShareLine {
+        let text: String
+        let box: CGRect
+    }
+
+    private func recognizedShareLines(
+        _ image: UIImage,
+        diagnosticName: String = "share-render"
+    ) throws -> [RecognizedShareLine] {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         request.recognitionLanguages = ["en-US"]
         request.usesLanguageCorrection = false
         try VNImageRequestHandler(cgImage: XCTUnwrap(image.cgImage), options: [:]).perform([request])
         let observations = request.results ?? []
-        let text = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        let lines = observations.compactMap { observation -> RecognizedShareLine? in
+            guard let text = observation.topCandidates(1).first?.string, !text.isEmpty else { return nil }
+            return RecognizedShareLine(text: text, box: observation.boundingBox)
+        }
+        let text = lines.map(\.text).joined(separator: " ")
         let records: [[String: Any]] = observations.map { observation in
             let candidate = observation.topCandidates(1).first
             let bounds = observation.boundingBox
@@ -1039,7 +1293,11 @@ final class BodyScoreShareCardTests: XCTestCase {
         attachment.name = diagnosticName + ".ocr.json"
         attachment.lifetime = .keepAlways
         add(attachment)
-        return text
+        return lines
+    }
+
+    private func recognizedShareText(_ image: UIImage, diagnosticName: String = "share-render") throws -> String {
+        try recognizedShareLines(image, diagnosticName: diagnosticName).map(\.text).joined(separator: " ")
     }
 
 
@@ -1196,26 +1454,57 @@ final class BodyScoreShareCardTests: XCTestCase {
         )
     }
 
+    private struct ShareFixture {
+        var score = 82
+        var scoreText = "82"
+        var tagline = "Athletic and trending leaner"
+        var deltaText: String? = "+4 over 30 days"
+        var bodyFatPercentage: Double?
+        var gender: String?
+        var photoImage: UIImage?
+
+        func payload() -> BodyScoreSharePayload {
+            BodyScoreSharePayload(
+                score: score,
+                scoreText: scoreText,
+                tagline: tagline,
+                ffmiValue: "21.8",
+                ffmiCaption: "Strong",
+                bodyFatValue: "16.4",
+                bodyFatCaption: "%",
+                weightValue: "181.0",
+                weightCaption: "lb",
+                deltaText: deltaText,
+                bodyFatPercentage: bodyFatPercentage,
+                gender: gender,
+                photoImage: photoImage
+            )
+        }
+    }
+
     private func makePayload(
         bodyFatPercentage: Double?,
         gender: String?,
         photoImage: UIImage? = nil
     ) -> BodyScoreSharePayload {
-        BodyScoreSharePayload(
-            score: 82,
-            scoreText: "82",
-            tagline: "Athletic and trending leaner",
-            ffmiValue: "21.8",
-            ffmiCaption: "Strong",
-            bodyFatValue: "16.4",
-            bodyFatCaption: "%",
-            weightValue: "181.0",
-            weightCaption: "lb",
-            deltaText: "+4 over 30 days",
-            bodyFatPercentage: bodyFatPercentage,
-            gender: gender,
+        ShareFixture(bodyFatPercentage: bodyFatPercentage, gender: gender, photoImage: photoImage).payload()
+    }
+
+    private func makeScorePayload(
+        tagline: String = "Athletic and trending leaner",
+        deltaText: String? = "+4 over 30 days",
+        photoImage: UIImage? = nil,
+        includesBody: Bool = false
+    ) -> BodyScoreSharePayload {
+        ShareFixture(
+            score: 74,
+            scoreText: "74",
+            tagline: tagline,
+            deltaText: deltaText,
+            bodyFatPercentage: includesBody ? 16.4 : nil,
+            gender: includesBody ? "male" : nil,
             photoImage: photoImage
-        )
+        ).payload()
     }
 
     private func makeShareTestImage(size: CGSize = CGSize(width: 480, height: 640)) -> UIImage {
@@ -1246,5 +1535,310 @@ final class BodyScoreShareCardTests: XCTestCase {
                 )
             )
         }
+    }
+
+    private func makeMagentaShareImage(size: CGSize = CGSize(width: 480, height: 640)) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { context in
+            // swiftlint:disable:next object_literal
+            UIColor(red: 1, green: 0, blue: 1, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+    }
+
+    /// Compact preview column. Narrow enough that the old scale floor changed type size.
+    private func narrowArtwork(for aspect: BodyScoreShareAspect) -> CGSize {
+        BodyScoreSharePreviewGeometry.artworkSize(in: CGSize(width: 220, height: 300), aspect: aspect)
+    }
+
+    private func renderScale(for size: CGSize) -> CGFloat {
+        let shortSide = max(1, min(size.width, size.height))
+        return max(1, (1_200 / shortSide).rounded(.up))
+    }
+
+    private func renderShareImage(
+        payload: BodyScoreSharePayload,
+        options: BodyScoreShareOptions,
+        aspect: BodyScoreShareAspect,
+        name: String,
+        preview: CGSize? = nil
+    ) throws -> UIImage {
+        let size = preview ?? aspect.pixelSize
+        let renderer = ImageRenderer(
+            content: BodyScoreShareCardView(payload: payload, aspect: aspect, options: options)
+                .frame(width: size.width, height: size.height)
+                .environment(\.colorScheme, .dark)
+        )
+        renderer.scale = preview == nil ? 1 : renderScale(for: size)
+        let image = try XCTUnwrap(renderer.uiImage, "Missing render for \(name)")
+        if let png = image.pngData() {
+            let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+            attachment.name = name
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        if preview == nil {
+            assertExportPixels(image, aspect: aspect)
+        }
+        return image
+    }
+
+    private func renderFixture(
+        _ payload: BodyScoreSharePayload,
+        _ options: BodyScoreShareOptions,
+        aspect: BodyScoreShareAspect,
+        name: String
+    ) throws -> UIImage {
+        let image = try renderShareImage(
+            payload: payload,
+            options: options,
+            aspect: aspect,
+            name: "\(name).png"
+        )
+        let lines = try recognizedShareLines(image, diagnosticName: name)
+        try assertTextInsideSafeMargins(lines, aspect: aspect)
+        return image
+    }
+
+    private func assertExportPixels(
+        _ image: UIImage,
+        aspect: BodyScoreShareAspect,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(image.size.width, aspect.pixelSize.width, accuracy: 0.5, file: file, line: line)
+        XCTAssertEqual(image.size.height, aspect.pixelSize.height, accuracy: 0.5, file: file, line: line)
+    }
+
+    private func assertScoreOnlyCopy(
+        _ lines: [RecognizedShareLine],
+        score: String,
+        aspect: BodyScoreShareAspect,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let text = lines.map(\.text).joined(separator: " ")
+        let compact = text.lowercased().filter { $0.isLetter || $0.isNumber }
+        let digits = text.filter(\.isNumber)
+        XCTAssertTrue(digits.contains(score), text, file: file, line: line)
+        XCTAssertTrue(compact.contains("bodyscore"), text, file: file, line: line)
+        XCTAssertTrue(compact.contains("logyour"), text, file: file, line: line)
+        XCTAssertFalse(text.lowercased().contains("private"), text, file: file, line: line)
+        XCTAssertFalse(digits.contains("181"), text, file: file, line: line)
+        XCTAssertFalse(digits.contains("164"), text, file: file, line: line)
+        XCTAssertFalse(digits.contains("218"), text, file: file, line: line)
+
+        let hero = try heroLine(lines, score: score)
+        XCTAssertGreaterThan(hero.box.midY, 0.40, "Score is pinned to the bottom on \(aspect.rawValue)", file: file, line: line)
+        XCTAssertLessThan(hero.box.midY, 0.72, "Score is pinned to the top on \(aspect.rawValue)", file: file, line: line)
+        let minimumHeight: CGFloat = aspect == .story ? 0.11 : 0.15
+        XCTAssertGreaterThan(hero.box.height, minimumHeight, text, file: file, line: line)
+
+        let brandParts = lines.filter { line in
+            let letters = line.text.lowercased().filter(\.isLetter)
+            return letters.contains("logyour") && !letters.contains("shared")
+        }
+        // The footer repeats the wordmark. Keep the upper line so a split footer cannot span the hero.
+        let brand = try XCTUnwrap(
+            brandParts.max(by: { $0.box.midY < $1.box.midY }),
+            "Brand missing from \(text)",
+            file: file,
+            line: line
+        )
+        let gap = brand.box.minY - hero.box.maxY
+        XCTAssertGreaterThan(gap, -0.03, "Brand overlaps the score on \(aspect.rawValue)", file: file, line: line)
+        XCTAssertLessThan(gap, 0.20, "Header and score are split by empty space on \(aspect.rawValue)", file: file, line: line)
+    }
+
+    private func assertHeroParity(
+        export: [RecognizedShareLine],
+        preview: [RecognizedShareLine],
+        score: String,
+        aspect: BodyScoreShareAspect,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard let exported = try? heroLine(export, score: score),
+              let previewed = try? heroLine(preview, score: score) else {
+            XCTFail("Missing hero line for \(aspect.rawValue)", file: file, line: line)
+            return
+        }
+        XCTAssertEqual(previewed.box.midX, exported.box.midX, accuracy: 0.02, file: file, line: line)
+        XCTAssertEqual(previewed.box.midY, exported.box.midY, accuracy: 0.02, aspect.rawValue, file: file, line: line)
+        XCTAssertEqual(previewed.box.width, exported.box.width, accuracy: 0.025, file: file, line: line)
+        XCTAssertEqual(previewed.box.height, exported.box.height, accuracy: 0.02, aspect.rawValue, file: file, line: line)
+    }
+
+    private func assertTextInsideSafeMargins(
+        _ lines: [RecognizedShareLine],
+        aspect: BodyScoreShareAspect,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        XCTAssertFalse(lines.isEmpty, "No text rendered for \(aspect.rawValue)", file: file, line: line)
+        for entry in lines {
+            XCTAssertGreaterThan(entry.box.minX, 0.03, entry.text, file: file, line: line)
+            XCTAssertLessThan(entry.box.maxX, 0.97, entry.text, file: file, line: line)
+            XCTAssertGreaterThan(entry.box.minY, 0.02, entry.text, file: file, line: line)
+            XCTAssertLessThan(entry.box.maxY, 0.98, entry.text, file: file, line: line)
+        }
+    }
+
+    private func assertNoScoreOverlap(
+        _ lines: [RecognizedShareLine],
+        score: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard let hero = try? heroLine(lines, score: score) else { return }
+        for entry in lines where !entry.text.filter(\.isNumber).contains(score) {
+            let hit = hero.box.intersection(entry.box)
+            guard !hit.isNull else { continue }
+            XCTAssertLessThan(hit.width * hit.height, 0.004, "Score overlaps \(entry.text)", file: file, line: line)
+        }
+    }
+
+    private func assertContains(
+        _ image: UIImage,
+        score: String,
+        required: [String],
+        forbidden: [String],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let text = try recognizedShareText(image, diagnosticName: "fixture-check")
+        let lower = text.lowercased()
+        let digits = text.filter(\.isNumber)
+        XCTAssertTrue(digits.contains(score), text, file: file, line: line)
+        for item in required {
+            XCTAssertTrue(
+                shareRenderContains(lower, digits: digits, item: item),
+                "Missing \(item) in \(text)",
+                file: file,
+                line: line
+            )
+        }
+        for item in forbidden {
+            XCTAssertFalse(
+                shareRenderContains(lower, digits: digits, item: item),
+                "Unexpected \(item) in \(text)",
+                file: file,
+                line: line
+            )
+        }
+    }
+
+    private func shareRenderContains(_ lower: String, digits: String, item: String) -> Bool {
+        if item.contains(where: \.isLetter) {
+            return lower.contains(item.lowercased())
+        }
+        return digits.contains(item.filter(\.isNumber))
+    }
+
+    private func heroLine(_ lines: [RecognizedShareLine], score: String) throws -> RecognizedShareLine {
+        let matches = lines.filter { $0.text.filter(\.isNumber).contains(score) }
+        if let best = matches.max(by: { $0.box.height < $1.box.height }) {
+            return best
+        }
+        let tallest = try XCTUnwrap(lines.max(by: { $0.box.height < $1.box.height }))
+        XCTAssertTrue(tallest.text.contains(where: \.isNumber))
+        return tallest
+    }
+
+    /// The avatar stays blue under the scrims, even when it is no longer bright cyan.
+    /// Channel dominance excludes white copy and magenta photos from the avatar probe.
+    private func blueSampleCount(_ image: UIImage) -> Int {
+        sampleCount(image) { red, green, blue in
+            blue > 160 && Int(blue) - Int(green) > 40 && Int(blue) - Int(red) > 80
+        }
+    }
+
+    private func magentaSampleCount(_ image: UIImage) -> Int {
+        sampleCount(image) { red, green, blue in
+            red > 220 && blue > 220 && green < 40
+        }
+    }
+
+    private func sampleCount(
+        _ image: UIImage,
+        matching: (UInt8, UInt8, UInt8) -> Bool
+    ) -> Int {
+        guard let (width, height, pixels) = rgbaPixels(image) else { return 0 }
+        var count = 0
+        let step = 4
+        var y = 0
+        while y < height {
+            var x = 0
+            while x < width {
+                let index = (y * width + x) * 4
+                if matching(pixels[index], pixels[index + 1], pixels[index + 2]) {
+                    count += 1
+                }
+                x += step
+            }
+            y += step
+        }
+        return count
+    }
+
+    private func assertCorners(
+        of image: UIImage,
+        brighterThan: UInt8?,
+        darkerThan: UInt8?,
+        insetInArtwork: Bool = false,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard let (width, height, pixels) = rgbaPixels(image) else {
+            XCTFail("Unable to read pixels", file: file, line: line)
+            return
+        }
+        let inset = insetInArtwork
+            ? Int((BodyScoreSharePreviewGeometry.outset * image.scale).rounded(.up)) + 3
+            : 1
+        guard width > inset * 2, height > inset * 2 else {
+            XCTFail("Image is smaller than the preview inset", file: file, line: line)
+            return
+        }
+        let points = [
+            (inset, inset),
+            (width - 1 - inset, inset),
+            (inset, height - 1 - inset),
+            (width - 1 - inset, height - 1 - inset)
+        ]
+        for (x, y) in points {
+            let index = (y * width + x) * 4
+            let value = max(pixels[index], pixels[index + 1], pixels[index + 2])
+            if let brighterThan {
+                XCTAssertGreaterThan(
+                    value,
+                    brighterThan,
+                    "Corner \(x),\(y) is \(value)",
+                    file: file,
+                    line: line
+                )
+            }
+            if let darkerThan {
+                XCTAssertLessThan(value, darkerThan, "Corner \(x),\(y) is \(value)", file: file, line: line)
+            }
+        }
+    }
+
+    private func rgbaPixels(_ image: UIImage) -> (Int, Int, [UInt8])? {
+        guard let cgImage = image.cgImage else { return nil }
+        let width = cgImage.width
+        let height = cgImage.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(
+            data: &pixels,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return (width, height, pixels)
     }
 }
