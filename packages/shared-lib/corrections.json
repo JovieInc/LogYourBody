@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-update-artifact-refresh",
+    "correction": "PR #1607: The @types/lodash manifest bump omitted its lockfile and generated source map, failing Vercel's frozen install, Detect Changes, documentation parity and CI Summary. Repair both derived artifacts together for recurring dependency updates.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40303984325/job/121508439128",
+    "mechanization": "Extend the existing repository documentation resolver with --refresh-lockfile. It refuses unresolved source conflicts and pinned-source drift before invoking source-pinned pnpm, refreshes the lockfile without installing dependencies or running lifecycle scripts, then regenerates and stages only the configured source map. The existing required Detect Changes suite proves combined repair, ordering, idempotence, explicit dependency staging and refusal on source conflicts, pinned drift and pnpm failure. Use the command for this PR; frozen install and CI gates remain unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct both dependency artifacts in order with the pinned package manager and documentation generator, preventing a repair from leaving either derived artifact stale."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "if refresh_lockfile:"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1595: Updating @radix-ui/react-accordion from 1.2.20 to 1.2.21 left the generated web manifest dependency and fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40299950152/job/121495099134",
