@@ -431,6 +431,11 @@ export const endpoints = {
         'LYB-232 source evidence for Statsig client-key injection into the production web build.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-252',
+      reason:
+        'LYB-252 source evidence for recurring correction escalation and guard-failure detection.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-97',
       reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.',
     },
