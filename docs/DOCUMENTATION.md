@@ -32,6 +32,9 @@ After merging a branch, resolve source conflicts first, then run
 map from the merged sources. This wraps the pinned generator and refuses to
 write while any other file is unmerged or a shared import fails parity. It
 stages only the generated output; review the source diff before committing.
+The pre-commit hook runs the same resolver with `--staged` after formatting,
+using only indexed sources and preserving unstaged source edits. It refuses
+unstaged edits to the projection itself; review and stage those explicitly.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the

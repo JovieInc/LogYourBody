@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `8411751746d4cde706045e7024cd02b50fbb12b275845c8f347cf06b1b2d18ab`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `59ab94e342c5d23fe3958ee2ec8fe40a4f74b1ca183b943c8abe7f3762e4daa0`)
 
 ### `apps/web/package.json`: engines
 
@@ -85,7 +85,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-avatar": "^1.3.1",
   "@radix-ui/react-checkbox": "^1.3.11",
   "@radix-ui/react-collapsible": "^1.1.20",
-  "@radix-ui/react-context-menu": "^2.3.7",
+  "@radix-ui/react-context-menu": "^2.3.8",
   "@radix-ui/react-dialog": "^1.1.23",
   "@radix-ui/react-dropdown-menu": "^2.1.24",
   "@radix-ui/react-hover-card": "^1.1.23",

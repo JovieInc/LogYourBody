@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const detectScript = path.join(scriptDir, 'detect-changes.sh');
@@ -653,8 +654,8 @@ function sourceMapConflict({ sourceConflict = false } = {}) {
   checkpoint(source.replace(sourceConflict ? 'first' : 'last', 'main'), 'main workflow');
   git(root, 'checkout', '-q', 'feature');
   assert.throws(() => git(root, 'merge', '--no-commit', 'main'), 'fixture must conflict');
-  const resolve = () => spawnSync('python3', [
-    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root,
+  const resolve = (...args) => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root, ...args,
   ], { env: gitEnv, encoding: 'utf8' });
   return { root, output, config, resolve };
 }
@@ -706,6 +707,74 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
         'source-conflict': /resolve source conflicts first: workflow.yml/,
         'pinned-drift': /pinned copy missing or changed: policy.md/,
         'unsafe-output': /unsafe repository path/,
+      }[failure]);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('pre-commit regenerates the projection from staged sources and preserves unstaged edits', () => {
+  const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
+  assert.match(hook, /^python3 scripts\/resolve-repository-docs\.py --staged(?: \|\| exit \$\?)?$/m);
+  const fx = sourceMapConflict();
+  try {
+    assert.equal(fx.resolve().status, 0);
+    const staged = 'reviewed dependency bump\n';
+    fs.writeFileSync(path.join(fx.root, 'workflow.yml'), staged);
+    git(fx.root, 'add', 'workflow.yml');
+    const unstaged = staged + 'unrelated local edit\n';
+    fs.writeFileSync(path.join(fx.root, 'workflow.yml'), unstaged);
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged instructions\n');
+    const result = fx.resolve('--staged');
+    assert.equal(result.status, 0, result.stderr);
+    const projection = git(fx.root, 'show', `:${fx.output}`);
+    assert.ok(projection.includes(createHash('sha256').update(staged).digest('hex')));
+    assert.ok(!projection.includes(createHash('sha256').update(unstaged).digest('hex')));
+    assert.equal(git(fx.root, 'show', ':workflow.yml'), staged.trim());
+    assert.equal(fs.readFileSync(path.join(fx.root, 'workflow.yml'), 'utf8'), unstaged);
+    assert.equal(git(fx.root, 'show', ':README.md'), 'Local instructions');
+    assert.equal(fs.readFileSync(path.join(fx.root, 'README.md'), 'utf8'), 'Unstaged instructions\n');
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.resolve('--staged').status, 0, 'staged regeneration is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['source-conflict', 'pinned-drift', 'unstaged-output', 'untracked-output']) {
+  test(`staged source-map regeneration refuses ${failure} without changing files or index`, () => {
+    const fx = sourceMapConflict({ sourceConflict: failure === 'source-conflict' });
+    try {
+      if (failure !== 'source-conflict') assert.equal(fx.resolve().status, 0);
+      if (failure === 'pinned-drift') {
+        fx.config.imports = [{
+          repository: 'example/policy', revision: 'a'.repeat(40),
+          path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+        }];
+        fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+        fs.writeFileSync(path.join(fx.root, 'policy.md'), 'Changed pinned policy\n');
+        git(fx.root, 'add', 'repository-docs.json', 'policy.md');
+      }
+      if (failure === 'unstaged-output') fs.appendFileSync(path.join(fx.root, fx.output), 'Local projection edit\n');
+      if (failure === 'untracked-output') {
+        fx.output = fx.config.output = 'docs/LOCAL.md';
+        fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+        git(fx.root, 'add', 'repository-docs.json');
+        fs.writeFileSync(path.join(fx.root, fx.output), 'Untracked local document\n');
+      }
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve('--staged');
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, {
+        'source-conflict': /resolve source conflicts first: .*workflow.yml/,
+        'pinned-drift': /pinned copy missing or changed: policy.md/,
+        'unstaged-output': /projection has unstaged edits/,
+        'untracked-output': /projection has unstaged edits/,
       }[failure]);
       assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
       assert.equal(git(fx.root, 'ls-files', '--stage'), index);
