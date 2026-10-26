@@ -1,0 +1,105 @@
+# LYB correction ledger (LYB-204)
+
+[`packages/shared-lib/corrections.json`](../../packages/shared-lib/corrections.json)
+is the single LYB lessons and guards file. Add a receipt in the PR addressing a
+correction, starting with its first occurrence. Keep LYB evidence separate from
+Jovie's ledger. The inventory covers recorded receipts; it does not claim every
+historical chat, review or revert has been imported.
+
+Capture corrections from these sources:
+
+| Origin             | Evidence to retain                                                                                                                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tim chat or memory | A stable HTTPS message permalink or a durable GBrain page containing a sanitized correction and its provenance. If the chat has no durable link, first preserve that summary in the relevant LYB issue comment and use its permalink. |
+| PR review          | The specific review or inline comment permalink, including its fragment.                                                                                                                                                              |
+| Linear comment     | The specific LYB comment permalink; use an issue URL when the correction is in its description.                                                                                                                                       |
+| Revert             | The immutable revert commit URL and a concise explanation of the corrected mistake, based on the commit or linked discussion. A revert alone does not establish a new rule.                                                           |
+
+Verify the source before recording it. Preserve only the concise lesson and
+sanitized evidence URL; never copy private transcripts, credentials, signed
+download links or customer data. Do not invent historical receipts from memory
+or treat replaying the same evidence as another correction.
+
+For each receipt:
+
+1. Reuse the short `fingerprint` for the same underlying mistake. Identity trims
+   outer whitespace, folds case and replaces whitespace with hyphens.
+2. Set `correction` to the lesson, `source` to its HTTPS evidence URL, and
+   `mechanization` to the concrete prevention mechanism.
+   Register a new evidence URL in the product registry's endpoint allowlist
+   with its reason, then run `pnpm product:generate` and `pnpm product:check`;
+   the existing URL drift guard applies to ledger receipts too.
+3. Review `classification` in priority order: codebase, static, prose, human.
+   Provide feasibility and rationale through the first feasible level. The
+   selected level is derived. Run the deterministic classifier below to save
+   that `level` and its matching `ruleId` on every receipt.
+4. Link the existing or new `guard.path` and a specific retained `guard.anchor`.
+   Prose/human lessons instead require an explicit `proseOnlyReason`. Follow the
+   [classification contract](correction-coverage.md) and implement the
+   [lowest feasible guard](correction-mechanization.md) in this PR.
+5. Append a separate receipt for each distinct correction source, retaining the
+   same classification and guard annotations for the fingerprint. If the guard
+   changes, update those annotations on all of its receipts together. Preserve
+   earlier source identities even after the underlying mistake is fixed.
+
+Recurrence is derived rather than hand-maintained: one canonical URL is one
+receipt per fingerprint, and repeats are distinct receipts after the first.
+The [existing recurrence intake](correction-recurrence.md) files its deduplicated
+mechanization task at two distinct receipts. The first receipt already requires
+a guard where feasible.
+
+Inspect and verify the ledger from the repository root:
+
+```sh
+node scripts/correction-classifier.mjs
+node --test scripts/correction-classifier.test.mjs
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
+node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs
+node --test packages/shared-lib/scripts/correction-recurrence.behavior.mjs
+node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
+pnpm test --filter=@logyourbody/shared-lib
+```
+
+For an additive ledger conflict, run the existing classifier from the repository
+root with both immutable merge-parent SHAs:
+
+```sh
+node scripts/correction-classifier.mjs --merge <main-sha> <branch-sha>
+```
+
+This replaces the conflicted ledger with the classified union of both parents,
+deduplicating by normalized fingerprint and source. It refuses differing lesson,
+guard or feasibility evidence for the same receipt before writing anything; those
+conflicts need a reviewed resolution. It also refuses unreadable or invalid refs.
+The normal shared-lib suite covers this merge mode and its failure paths.
+
+The classifier accepts an optional ledger path, defaults to this repository's
+ledger regardless of the working directory, and validates every receipt before
+writing. It uses LYB-204's reviewed feasibility assessments to select the first
+feasible level; incidental keywords cannot override a rejected assessment.
+There is no implicit prose or human fallback for missing or malformed assessments.
+
+| Rule ID                  | Saved level | Matching rule within the reviewed feasible level                                     |
+| ------------------------ | ----------- | ------------------------------------------------------------------------------------ |
+| `type-or-schema`         | `codebase`  | The lesson or selected rationale names a type, schema, struct, enum or interface.    |
+| `code-prevention`        | `codebase`  | Other prevention through runtime logic or API design.                                |
+| `file-pattern-or-string` | `static`    | The lesson or selected rationale names a file, glob or quoted string.                |
+| `ci-invariant`           | `static`    | Other deterministically checkable invariants.                                        |
+| `prose-guidance`         | `prose`     | Precise guidance is feasible after codebase and static enforcement were ruled out.   |
+| `human-judgment`         | `human`     | Reviewed judgment or external authority is required after all earlier levels failed. |
+
+Lint and CI share the merged schema's `static` level. Matching considers all
+distinct lessons for a fingerprint so its receipts get consistent rule IDs.
+Existing levels can be promoted but never downgraded, including every guarded
+entry. Repeated runs preserve unchanged file bytes. Unknown fields, levels, rule
+IDs or assessment shapes fail with a diagnostic. Classification adds routing
+metadata; the existing coverage check still verifies retained guard evidence
+and compares it with the immutable Git base.
+
+The JSON report and existing CI/owner tables expose sources, lessons, selected
+levels, guards and recurrence. Required coverage CI compares against the exact
+Git base and rejects lost sources as well as lost rules or guards. It permits
+lesson clarification, duplicate cleanup and guard promotion without erasing
+evidence. Source linkage proves retention; actual check execution still needs
+the PR's regression evidence.

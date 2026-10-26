@@ -1,4 +1,5 @@
 import { TrainingMutationError } from '@/lib/training/mutation-admission';
+import { prepareNextBlock } from '@/lib/training/delegated-revisions';
 import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
 import { profileConfirmsAdult } from '@/lib/training/eligibility';
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,13 +17,16 @@ import {
   logTrainingSet,
   recordTrainingFeedback,
   swapExercise,
+  undoTrainingSet,
 } from '@/lib/training/commands';
 import {
   getOrCreateNextWorkout,
+  loadTrainingRecords,
   pullAllTrainingRecords,
   storeProgramSetup,
 } from '@/lib/training/service';
 import { MUSCLE_GROUPS, TRAINING_CONSENT_VERSION } from '@/lib/training/types';
+import { summarizeTrainingProgress } from '@/lib/training/progress';
 
 export const TRAINING_API_VERSION = 1;
 
@@ -63,6 +67,16 @@ const CorrectSetBodySchema = LogSetBodySchema.extend({
   correctionId: z.string().uuid(),
   expectedRevision: z.number().int().min(0),
 }).strict();
+
+const UndoSetBodySchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    exerciseId: z.string().trim().min(1).max(64),
+    setNumber: z.number().int().min(1).max(10),
+    undoId: z.string().uuid(),
+    expectedRevision: z.number().int().min(0),
+  })
+  .strict();
 
 const FeedbackBodySchema = z
   .object({
@@ -184,6 +198,7 @@ const WorkoutActionBodySchema = z
   .strict();
 
 type RouteDependencies = {
+  delegatedEnabled?: () => boolean;
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   records: NativeProductRecordsPort;
   revisions?: TrainingRevisionsPort;
@@ -239,6 +254,22 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
   }
 
   return {
+    async progress(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      try {
+        const snapshot = await loadTrainingRecords(dependencies.records, identity.sub);
+        return json(
+          withVersion({ progress: summarizeTrainingProgress(snapshot, dependencies.now()) }),
+        );
+      } catch {
+        return apiError('training_unavailable', 503);
+      }
+    },
+
     async next(request: NextRequest) {
       const identity = await authorized(request);
       if (!identity) return apiError('unauthorized', 401);
@@ -253,11 +284,25 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
         });
         if (result.kind === 'not_enrolled')
           return json(withVersion({ error: 'program_not_enrolled' }), 409);
+        if (result.kind === 'block_complete') {
+          if (!dependencies.delegatedEnabled?.() || !dependencies.revisions)
+            return apiError('training_program_requires_review', 409);
+          const next = await prepareNextBlock({
+            revisions: dependencies.revisions,
+            records: dependencies.records,
+            subject: identity.sub,
+            now: dependencies.now(),
+          });
+          if (next.kind !== 'stored') return apiError(next.kind, 409);
+          return json(withVersion({ session: null, nextBlock: next.stored }));
+        }
         if (result.kind === 'week_complete') {
           return json(
             withVersion({
               session: null,
               week: result.week,
+              weekCount: result.weekCount,
+              phase: result.phase,
               weeklyFractionalVolume: result.weeklyFractionalVolume,
               decision: result.decision,
             }),
@@ -268,6 +313,7 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             session: result.session,
             week: result.week,
             weekCount: result.weekCount,
+            phase: result.phase,
             weeklyFractionalVolume: result.weeklyFractionalVolume,
             decision: result.decision,
           }),
@@ -533,6 +579,44 @@ export function createTrainingRouteHandlers(dependencies: RouteDependencies) {
             return apiError('set_not_in_session', 400);
           case 'set_conflict':
             return apiError('set_conflict', 409);
+          case 'rejected':
+            return apiError('training_unavailable', 503);
+        }
+      } catch (error) {
+        if (error instanceof TrainingMutationError && error.code === 'training_context_changed')
+          return apiError(error.code, 409);
+        return apiError('training_unavailable', 503);
+      }
+    },
+
+    async undoSet(request: NextRequest) {
+      const identity = await authorized(request);
+      if (!identity) return apiError('unauthorized', 401);
+      if (!featureEnabled()) return apiError('not_found', 404);
+      const denied = await allowed(identity.sub);
+      if (denied) return denied;
+      const parsed = UndoSetBodySchema.safeParse(await request.json().catch(() => null));
+      if (!parsed.success) return apiError('invalid_request', 400);
+      try {
+        const result = await undoTrainingSet({
+          records: dependencies.records,
+          subject: identity.sub,
+          now: dependencies.now(),
+          set: parsed.data,
+        });
+        switch (result.kind) {
+          case 'undone':
+            return json(withVersion({ log: result.log }));
+          case 'program_not_enrolled':
+            return apiError('program_not_enrolled', 409);
+          case 'session_not_found':
+            return apiError('session_not_found', 404);
+          case 'set_not_found':
+            return apiError('set_not_found', 404);
+          case 'set_conflict':
+            return apiError('set_conflict', 409);
+          case 'undo_unavailable':
+            return apiError('undo_unavailable', 409);
           case 'rejected':
             return apiError('training_unavailable', 503);
         }

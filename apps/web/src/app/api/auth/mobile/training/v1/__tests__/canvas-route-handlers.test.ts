@@ -101,6 +101,18 @@ describe('mesocycle canvas route', () => {
     expect(invalid.status).toBe(400);
     expect((await readCanvas(ledger, 'owner')).readback.write).toBeNull();
   });
+
+  it('routes accepted delegated programs to the canonical revision service without touching a second ledger', async () => {
+    const ledgerForAccount = jest.fn();
+    const { route } = handlers({ canonicalProgramRequired: async () => true, ledgerForAccount });
+    const response = await route.POST(post({ action: 'read' }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: 'canonical_revision_required',
+      applied: false,
+    });
+    expect(ledgerForAccount).not.toHaveBeenCalled();
+  });
   it.each([
     [null, 404, 'account_not_found'],
     [new NativeAccountAdmissionError('account_changed'), 409, 'account_changed'],

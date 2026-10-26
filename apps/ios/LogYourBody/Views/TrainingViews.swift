@@ -5,13 +5,17 @@ enum TrainingPresentation: Identifiable {
     case session(TrainingSession, AuthManager.ProfileSessionOwnership)
     case voiceSetReview(TrainingSession, VoiceHeardIntent)
     case canvas(AuthManager.ProfileSessionOwnership)
+    case cycleReview(AuthManager.ProfileSessionOwnership)
+    case program(AuthManager.ProfileSessionOwnership)
 
     var id: String {
         switch self {
         case .setup: "setup"
         case .session(let session, let owner): "session-\(owner.subject)-\(owner.generation)-\(session.id)"
         case .voiceSetReview(let session, _): "voice-set-review-\(session.id)"
+        case .cycleReview(let owner): "cycle-review-\(owner.subject)-\(owner.generation)"
         case .canvas(let owner): "canvas-\(owner.subject)-\(owner.generation)"
+        case .program(let owner): "program-\(owner.subject)-\(owner.generation)"
         }
     }
 }
@@ -65,6 +69,13 @@ struct TrainingCoachCard: View {
                 Text("\(session.exercises.count) movements · engine-guided sets and reps")
                     .font(.system(size: 14))
                     .foregroundStyle(theme.colors.textSecondary)
+                if let nextAction = TrainingRecoveryCopy.appliedNextAction(session.explanation) {
+                    Text(nextAction)
+                        .font(.system(size: 14))
+                        .foregroundStyle(theme.colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("training_recovery_next_action")
+                }
                 Button(action: onStart) {
                     HStack {
                         Text("Start session")
@@ -335,8 +346,12 @@ enum TrainingCompletionMotionPolicy {
 struct TrainingLiveSessionView: View {
     let voiceEnabled: Bool
     let readinessEnabled: Bool
-    let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void
+    let progressEnabled: Bool
+    let progressDecision: TrainingProgressDecision?
+    let onLoadProgress: (() async throws -> TrainingProgressResponse)?
+    let onLogSet: (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> TrainingSavedSet
     let onCorrectSet: (TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
+    let onUndoSet: (TrainingSetUndoRequest) async throws -> TrainingSavedSet
     let onWorkoutAction: (TrainingWorkoutActionRequest) async throws -> TrainingSession
     let onVoiceIntent: (TrainingSession, String, VoiceSetContext?, VoiceSetContext?) async throws -> VoiceIntentResponse
     let onFeedback: (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
@@ -345,6 +360,7 @@ struct TrainingLiveSessionView: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var draft: TrainingSessionDraft
+    @StateObject private var progress: TrainingProgressModel
     @State private var voiceCapture = VoiceCaptureService()
     @State private var soreness = 0
     @State private var pump = 0
@@ -369,26 +385,35 @@ struct TrainingLiveSessionView: View {
         ownerId: String,
         voiceEnabled: Bool,
         readinessEnabled: Bool = false,
+        progressEnabled: Bool = false,
+        progressDecision: TrainingProgressDecision? = nil,
         draftStore: TrainingDraftStore = .shared,
         isCurrent: @escaping () -> Bool,
-        onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> Void,
+        onLogSet: @escaping (TrainingExercisePrescription, Int, Int, Double?, Int) async throws -> TrainingSavedSet,
         onCorrectSet: @escaping (TrainingSetCorrectionRequest) async throws -> TrainingSavedSet,
+        onUndoSet: @escaping (TrainingSetUndoRequest) async throws -> TrainingSavedSet,
         onWorkoutAction: @escaping (TrainingWorkoutActionRequest) async throws -> TrainingSession,
         onVoiceIntent: @escaping (
             TrainingSession, String, VoiceSetContext?, VoiceSetContext?
         ) async throws -> VoiceIntentResponse,
-        onFeedback: @escaping (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
+        onFeedback: @escaping (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse,
+        onLoadProgress: (() async throws -> TrainingProgressResponse)? = nil
     ) {
         self.voiceEnabled = voiceEnabled
         self.readinessEnabled = readinessEnabled
+        self.progressEnabled = progressEnabled
+        self.progressDecision = progressDecision
+        self.onLoadProgress = onLoadProgress
         self.onLogSet = onLogSet
         self.onCorrectSet = onCorrectSet
+        self.onUndoSet = onUndoSet
         self.onWorkoutAction = onWorkoutAction
         self.onVoiceIntent = onVoiceIntent
         self.onFeedback = onFeedback
         _draft = StateObject(wrappedValue: TrainingSessionDraft(
             session: session, ownerId: ownerId, store: draftStore, isCurrent: isCurrent
         ))
+        _progress = StateObject(wrappedValue: TrainingProgressModel(isCurrent: isCurrent))
     }
 
     var body: some View {
@@ -402,7 +427,14 @@ struct TrainingLiveSessionView: View {
                         pausedCard
                     } else if let current = draft.currentPosition {
                         currentCard(current)
+                        if progressEnabled {
+                            TrainingExerciseHistoryRow(exerciseId: current.exercise.id, model: progress)
+                        }
                         upNextCard
+                        if progressEnabled, let next = draft.upNextPosition {
+                            TrainingExerciseHistoryRow(exerciseId: next.exercise.id, model: progress)
+                                .accessibilityIdentifier("training_history_up_next_\(next.exercise.id)")
+                        }
                         restState
                     } else {
                         completeCard
@@ -422,6 +454,11 @@ struct TrainingLiveSessionView: View {
                         commandControl
                     }
                     feedbackCard
+                    if progressEnabled {
+                        TrainingProgressReviewSection(model: progress, decision: progressDecision) {
+                            Task { await refreshProgress() }
+                        }
+                    }
                     if let message = errorMessage ?? draft.errorMessage {
                         Text(message)
                             .font(.footnote)
@@ -455,6 +492,7 @@ struct TrainingLiveSessionView: View {
             }
         }
         .interactiveDismissDisabled(isSaving || draft.isSaving)
+        .task(id: progressRefreshKey) { await refreshProgress() }
         .onDisappear { voiceCapture.cancel() }
         .onChange(of: draft.lastSaveReceipt) { _, receipt in
             guard let receipt else { return }
@@ -485,6 +523,16 @@ struct TrainingLiveSessionView: View {
         }
     }
 
+    private var progressRefreshKey: String {
+        "\(progressEnabled)-\(draft.session.executionRevision ?? 0)-" +
+            "\(draft.lastSaveReceipt?.id ?? "")-\(draft.feedback?.response?.feedback.id ?? "")"
+    }
+
+    private func refreshProgress() async {
+        guard progressEnabled, let onLoadProgress else { return }
+        await progress.load(using: onLoadProgress)
+    }
+
     private var sessionHeader: some View {
         VStack(alignment: .leading, spacing: JovieTokens.tightGap) {
             Text("WEEK \(draft.session.week) · \(draft.session.title.uppercased())")
@@ -495,6 +543,13 @@ struct TrainingLiveSessionView: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(theme.colors.text)
                 .accessibilityIdentifier("training_progress")
+            if let nextAction = TrainingRecoveryCopy.appliedNextAction(draft.session.explanation) {
+                Text(nextAction)
+                    .font(.system(size: 13))
+                    .foregroundStyle(theme.colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("training_live_recovery_next_action")
+            }
         }
     }
 
@@ -688,11 +743,21 @@ struct TrainingLiveSessionView: View {
                 Button("30 min", systemImage: "clock") { performAction(.shorten(30)) }
             }
             HStack(spacing: JovieTokens.itemGap) {
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    if let undo = draft.undoAffordance {
+                        Button(undo.submitted ? "Retry undo" : "Undo", systemImage: "arrow.uturn.backward") {
+                            Task { await undoLastCorrection() }
+                        }
+                        .accessibilityLabel(undo.submitted ? "Retry undo" : "Undo correction")
+                        .accessibilityIdentifier(undo.submitted ? "training_undo_pending" : "training_set_undo")
+                    }
+                }
                 Button("Correct", systemImage: "pencil") {
                     guard let last = draft.lastCompletedPosition else { return }
                     draft.beginCorrection(last)
                     correctionPosition = last
                 }
+                .accessibilityIdentifier("training_set_correct")
                 .disabled(draft.lastCompletedPosition == nil)
                 Menu("More", systemImage: "ellipsis") {
                     Button("Skip this today") {
@@ -940,11 +1005,15 @@ struct TrainingLiveSessionView: View {
     private func log(_ exercise: TrainingExercisePrescription, setNumber: Int) async {
         guard !isSaving else { return }
         errorMessage = nil
-        await draft.save(exercise, setNumber: setNumber) { request in
+        await draft.saveAcknowledged(exercise, setNumber: setNumber) { request in
             try await onLogSet(
                 exercise, request.setNumber, request.reps, request.loadKg, request.rir
             )
         }
+    }
+
+    private func undoLastCorrection() async {
+        await draft.undo(send: onUndoSet)
     }
 
     private func saveCorrection(_ position: TrainingSetPosition) async {
@@ -1060,6 +1129,9 @@ struct TrainingLiveSessionView: View {
                     return
                 }
                 voiceReview = .action(action)
+            case "clarify":
+                errorMessage = trainingVoiceClarification(response.missingFields ?? [])
+                return
             default:
                 errorMessage = "That command needs a little more detail. Nothing changed."
                 return
@@ -1070,6 +1142,21 @@ struct TrainingLiveSessionView: View {
         } catch {
             errorMessage = "The command could not be reviewed."
         }
+    }
+
+    private func trainingVoiceClarification(_ fields: [String]) -> String {
+        let prompts = [
+            "session": "start a training session",
+            "exercise": "name one exercise in your current session",
+            "set_number": "say the set number",
+            "reps": "say the rep count",
+            "rir": "say the reps in reserve",
+            "weight": "say the load with a unit",
+            "load_accounting": "say whether that load is per hand"
+        ]
+        let needed = fields.compactMap { prompts[$0] }
+        if needed.isEmpty { return "That command needs a little more detail. Nothing changed." }
+        return "I heard a set log. To prepare it, \(needed.joined(separator: ", and ")). Nothing was logged."
     }
 
     private func voiceContext(_ position: TrainingSetPosition?) -> VoiceSetContext? {
@@ -1311,6 +1398,8 @@ struct TrainingLiveSessionFixtureView: View {
     @State private var savedSets: [TrainingSavedSet]
     @State private var presented = false
     @State private var showEnrollment = false
+    @State private var showCycleReview = false
+    @StateObject private var cycleFixture = TrainingCycleFixtureService()
     @State private var showVoiceReview = false
     @State private var showStopCard = false
     @State private var stopCount = 0
@@ -1354,6 +1443,21 @@ struct TrainingLiveSessionFixtureView: View {
         )
     }
 
+    private var progressFixture: TrainingProgressResponse {
+        let recorded = TrainingProgress.RecordedSet(
+            id: "history-set", sessionId: "history-session", exerciseId: "fixture_press",
+            setNumber: 1, reps: 8, loadKg: 12.5, rir: 2,
+            completedAt: "2026-10-24T12:00:00.000Z", revision: 0, corrections: nil
+        )
+        return TrainingProgressResponse(version: 1, progress: TrainingProgress(
+            enrolled: true, completedSessions: 1, setsLast7Days: 1,
+            exercises: [.init(
+                exerciseId: "fixture_press", name: "Fixture press", lastPerformedAt: recorded.completedAt,
+                lastSession: [recorded], heaviestSet: recorded, totalSets: 1
+            )], latestCheckIn: nil, sessions: []
+        ))
+    }
+
     var body: some View {
         VStack(spacing: 20) {
             Button("Open fixture session") { presented = true }
@@ -1362,6 +1466,10 @@ struct TrainingLiveSessionFixtureView: View {
                 .accessibilityIdentifier("training_fixture_enroll")
             Button("Open voice review") { showVoiceReview = true }
                 .accessibilityIdentifier("training_fixture_voice_review")
+            Button("Review cycle fixture") { showCycleReview = true }
+                .accessibilityIdentifier("training_fixture_cycle_review")
+            Text("Applied blocks: \(cycleFixture.appliedCount)")
+                .accessibilityIdentifier("training_fixture_cycle_applied")
             Button("Open stop card") { showStopCard = true }
                 .accessibilityIdentifier("training_fixture_stop_card")
             if showStopCard {
@@ -1385,6 +1493,7 @@ struct TrainingLiveSessionFixtureView: View {
             TrainingLiveSessionView(
                 session: session, ownerId: "fixture-training-owner", voiceEnabled: true,
                 readinessEnabled: true,
+                progressEnabled: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingProgress"),
                 draftStore: Self.draftStore,
                 isCurrent: { true }, onLogSet: { exercise, number, reps, load, rir in
                     submissionCount += 1
@@ -1401,6 +1510,7 @@ struct TrainingLiveSessionFixtureView: View {
                     savedSets.append(saved)
                     Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
                     if losesResponse { throw URLError(.networkConnectionLost) }
+                    return saved
                 }, onCorrectSet: { request in
                     guard !offline else { throw URLError(.notConnectedToInternet) }
                     let saved = TrainingSavedSet(
@@ -1416,6 +1526,35 @@ struct TrainingLiveSessionFixtureView: View {
                                 id: request.correctionId,
                                 correctedAt: "2026-10-12T00:00:00.000Z",
                                 previous: .init(reps: 10, loadKg: 60, rir: 3)
+                            )
+                        ]
+                    )
+                    savedSets.removeAll { $0.exerciseId == request.exerciseId && $0.setNumber == request.setNumber }
+                    savedSets.append(saved)
+                    Self.defaults.set(try JSONEncoder().encode(savedSets), forKey: "savedSets")
+                    return saved
+                }, onUndoSet: { request in
+                    guard !offline else { throw URLError(.notConnectedToInternet) }
+                    let current = savedSets.first {
+                        $0.exerciseId == request.exerciseId && $0.setNumber == request.setNumber
+                    }
+                    let saved = TrainingSavedSet(
+                        sessionId: request.sessionId,
+                        exerciseId: request.exerciseId,
+                        setNumber: request.setNumber,
+                        reps: current?.corrections?.last?.previous.reps ?? current?.reps ?? 10,
+                        loadKg: current?.corrections?.last?.previous.loadKg ?? current?.loadKg,
+                        rir: current?.corrections?.last?.previous.rir ?? current?.rir ?? 3,
+                        revision: request.expectedRevision + 1,
+                        corrections: (current?.corrections ?? []) + [
+                            TrainingSetCorrectionAudit(
+                                id: request.undoId,
+                                correctedAt: "2026-10-12T00:00:00.000Z",
+                                previous: .init(
+                                    reps: current?.reps ?? 10,
+                                    loadKg: current?.loadKg,
+                                    rir: current?.rir ?? 3
+                                )
                             )
                         ]
                     )
@@ -1444,8 +1583,16 @@ struct TrainingLiveSessionFixtureView: View {
                             weeklyPlanChanged: false, safetyCertified: false
                         )
                     )
+                }, onLoadProgress: {
+                    if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingHistoryUnavailable") {
+                        throw URLError(.notConnectedToInternet)
+                    }
+                    return progressFixture
                 }
             )
+        }
+        .sheet(isPresented: $showCycleReview) {
+            TrainingCycleReviewView(service: cycleFixture, isCurrent: { true }, accessToken: { "fixture" }, onApplied: {})
         }
         .sheet(isPresented: $showEnrollment) {
             TrainingEnrollmentView { _, _ in }
@@ -1466,4 +1613,285 @@ struct TrainingLiveSessionFixtureView: View {
         }
     }
 }
+// Synthetic transport for review UI qualification. The production engine's
+// schedule and lifecycle are verified by the service/route fixtures.
+@MainActor
+private final class TrainingCycleFixtureService: ObservableObject, TrainingCycleServicing {
+    @Published private(set) var appliedCount = 0
+
+    func cycleContext(accessToken: String) async throws -> TrainingCycleContext {
+        TrainingCycleContext(
+            version: 1, generation: 0,
+            setup: .init(id: "fixture", equipment: "full_gym", sessionsPerWeek: 2, cycle: .init(
+                weekCount: 4, temporaryPriorities: ["chest"], temporaryConstraints: [], retainedVariants: []
+            )),
+            cycle: .init(currentWeek: 4, weekCount: 4, phase: "review"),
+            reuseOptions: [.init(
+                fromExerciseId: "machine_chest_press", toVariantId: "smith_incline_press",
+                reason: "Comfortable setup", name: "Smith incline press"
+            )]
+        )
+    }
+
+    func proposeCycle(accessToken: String, request: TrainingCycleProposalRequest) async throws -> TrainingCycleDraft {
+        guard request.intent.weekCount == 5 else { throw TrainingServiceError.invalidResponse }
+        let draft = try JSONDecoder().decode(TrainingCycleDraft.self, from: Data("""
+        {"id":"fixture-review","reason":"Repeat selected exercises",
+         "assumptions":["Temporary priorities expire without renewal."],
+         "schedule":[{"week":1,"targetRir":4,"deload":false,"setsPerExercise":2},
+         {"week":2,"targetRir":3,"deload":false,"setsPerExercise":2},
+         {"week":3,"targetRir":3,"deload":false,"setsPerExercise":2},
+         {"week":4,"targetRir":2,"deload":false,"setsPerExercise":2},
+         {"week":5,"targetRir":5,"deload":true,"setsPerExercise":1}],"plan":{"sessions":[]}}
+        """.utf8))
+        return TrainingCycleDraft(
+            id: draft.id, reason: draft.reason,
+            assumptions: draft.assumptions + (request.intent.keepVariants ?? []).map { "Smith incline press: \($0.reason)" },
+            schedule: draft.schedule, plan: draft.plan
+        )
+    }
+
+    func decideCycle(accessToken: String, request: TrainingCycleDecisionRequest) async throws {
+        if request.decision == "apply" { appliedCount += 1 }
+    }
+}
 #endif
+
+@MainActor
+final class TrainingCycleReviewModel: ObservableObject {
+    @Published private(set) var context: TrainingCycleContext?
+    @Published private(set) var draft: TrainingCycleDraft?
+    @Published private(set) var isBusy = false
+    @Published private(set) var errorMessage: String?
+    private let service: TrainingCycleServicing
+    private let isCurrent: () -> Bool
+    private let accessToken: () async -> String?
+    private var proposalRequest: TrainingCycleProposalRequest?
+    private var decisionId = UUID().uuidString
+
+    init(
+        service: TrainingCycleServicing = URLSessionTrainingService(),
+        isCurrent: @escaping () -> Bool,
+        accessToken: @escaping () async -> String?
+    ) {
+        self.service = service
+        self.isCurrent = isCurrent
+        self.accessToken = accessToken
+    }
+
+    func load() async {
+        await perform { token in
+            let value = try await self.service.cycleContext(accessToken: token)
+            guard self.isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            self.context = value
+        }
+    }
+
+    func propose(intent: TrainingCycleIntent) async {
+        guard let context else { return }
+        // Retain the request identity after an interrupted response; changing the
+        // draft's inputs is an explicit new proposal.
+        if proposalRequest?.intent != intent {
+            proposalRequest = TrainingCycleProposalRequest(
+                requestId: UUID().uuidString, expectedGeneration: context.generation, intent: intent,
+                reason: intent.kind == "repeat_cycle"
+                    ? "Repeat the last block with selected exercises." : "Review training block length."
+            )
+        }
+        guard let request = proposalRequest else { return }
+        await perform { token in
+            let value = try await self.service.proposeCycle(accessToken: token, request: request)
+            guard self.isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            self.draft = value
+        }
+    }
+
+    func decide(_ decision: String) async -> Bool {
+        guard let draft else { return false }
+        var saved = false
+        await perform { token in
+            try await self.service.decideCycle(accessToken: token, request: TrainingCycleDecisionRequest(
+                requestId: self.decisionId, proposalId: draft.id, decision: decision
+            ))
+            guard self.isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            self.draft = nil
+            self.proposalRequest = nil
+            self.decisionId = UUID().uuidString
+            saved = true
+        }
+        return saved
+    }
+
+    private func perform(_ action: (String) async throws -> Void) async {
+        guard !isBusy, isCurrent() else { return }
+        isBusy = true
+        errorMessage = nil
+        defer { isBusy = false }
+        do {
+            guard let token = await accessToken(), isCurrent() else { throw TrainingServiceError.authenticationExpired }
+            try await action(token)
+        } catch {
+            guard isCurrent() else { context = nil; draft = nil; return }
+            if case TrainingServiceError.server(let code) = error {
+                switch code {
+                case "deload_boundary_requires_review":
+                    errorMessage = "This length would remove a deload already underway. Finish and review this block first."
+                case "active_session_requires_review":
+                    errorMessage = "Finish or end the saved workout before starting another block."
+                case "stale_context":
+                    proposalRequest = nil
+                    draft = nil
+                    errorMessage = "Your training changed. Close and reopen review to create a current draft."
+                default:
+                    errorMessage = "The block could not be saved. Try again."
+                }
+            } else {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
+
+struct TrainingCycleReviewView: View {
+    let onApplied: () async -> Void
+    @StateObject private var model: TrainingCycleReviewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var weeks = 4
+    @State private var sessions = 2
+    @State private var equipment = "dumbbells"
+    @State private var adultConfirmed = false
+    @State private var safetyConfirmed = false
+    @State private var renewPriorities = false
+    @State private var renewConstraints = false
+    @State private var selected: [TrainingCycleSelection] = []
+
+    init(
+        service: TrainingCycleServicing = URLSessionTrainingService(), isCurrent: @escaping () -> Bool,
+        accessToken: @escaping () async -> String?, onApplied: @escaping () async -> Void
+    ) {
+        self.onApplied = onApplied
+        _model = StateObject(wrappedValue: TrainingCycleReviewModel(
+            service: service, isCurrent: isCurrent, accessToken: accessToken
+        ))
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let draft = model.draft {
+                    draftReview(draft)
+                } else if let context = model.context {
+                    configuration(context)
+                }
+                if model.isBusy { ProgressView().accessibilityIdentifier("training_cycle_loading") }
+                if let message = model.errorMessage {
+                    Text(message).foregroundStyle(.secondary).accessibilityIdentifier("training_cycle_error")
+                }
+            }
+            .navigationTitle("Review block")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .disabled(model.isBusy)
+            .task {
+                await model.load()
+                weeks = model.context?.setup?.cycle?.weekCount ?? 4
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private func configuration(_ context: TrainingCycleContext) -> some View {
+        Section("Block length") {
+            Picker("Weeks", selection: $weeks) {
+                ForEach(4...6, id: \.self) { Text("\($0) weeks").tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("training_cycle_length")
+            Text("The final week is a planned deload. Missed workouts do not count as completed training.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        if context.setup == nil {
+            Section("Schedule and safety") {
+                Picker("Sessions each week", selection: $sessions) { Text("2").tag(2); Text("3").tag(3) }
+                Picker("Equipment", selection: $equipment) {
+                    Text("Dumbbells").tag("dumbbells"); Text("Full gym").tag("full_gym")
+                }
+                Toggle("I’m 18 or older.", isOn: $adultConfirmed)
+                Toggle(
+                    "I’m not pregnant or postpartum, have no eating-disorder risk, " +
+                        "and have no medical restriction that makes this training unsafe.",
+                    isOn: $safetyConfirmed
+                )
+            }
+        }
+        if context.cycle?.phase == "review" {
+            Section("Keep exercises that worked") {
+                ForEach(context.reuseOptions) { option in
+                    Toggle(option.name, isOn: Binding(
+                        get: { selected.contains(where: { $0.id == option.id }) },
+                        set: { keep in
+                            selected.removeAll { $0.fromExerciseId == option.fromExerciseId }
+                            if keep { selected.append(option.selection) }
+                        }
+                    ))
+                    if let index = selected.firstIndex(where: { $0.id == option.id }) {
+                        TextField("Why it worked", text: $selected[index].reason)
+                    }
+                }
+                Text("Selected exercises keep their own history, feedback and recorded reasons.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Toggle("Renew temporary muscle priorities", isOn: $renewPriorities)
+                Toggle("Renew temporary constraints", isOn: $renewConstraints)
+                Text("Without renewal, temporary priorities and constraints expire. " +
+                    "Equipment and enduring exclusions stay in place.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        Section {
+            Button("Create draft") {
+                let isNew = context.setup == nil
+                let repeating = context.cycle?.phase == "review"
+                let intent = TrainingCycleIntent(
+                    kind: isNew ? "initial_enrollment" : repeating ? "repeat_cycle" : "revise_cycle", weekCount: weeks,
+                    adultConfirmed: isNew ? true : nil, safetyConfirmed: isNew ? true : nil,
+                    sessionsPerWeek: isNew ? sessions : nil, equipment: isNew ? equipment : nil,
+                    keepVariants: repeating ? selected : nil,
+                    renewPriorities: isNew ? nil : renewPriorities, renewConstraints: isNew ? nil : renewConstraints
+                )
+                Task { await model.propose(intent: intent) }
+            }
+            .disabled(context.setup == nil && (!adultConfirmed || !safetyConfirmed))
+            .accessibilityIdentifier("training_cycle_create_draft")
+        }
+    }
+
+    @ViewBuilder
+    private func draftReview(_ draft: TrainingCycleDraft) -> some View {
+        Section("Draft") {
+            Text(draft.reason)
+            ForEach(draft.schedule ?? []) { week in
+                Text("Week \(week.week)\(week.deload ? " · Deload" : "") · " +
+                    "\(week.setsPerExercise) \(week.setsPerExercise == 1 ? "set" : "sets") · \(week.targetRir) RIR")
+            }
+            ForEach(draft.assumptions, id: \.self) { Text($0).font(.footnote).foregroundStyle(.secondary) }
+        }
+        ForEach(draft.plan.sessions) { session in
+            Section(session.title) {
+                if session.safetyStop {
+                    Text(session.explanation ?? "Training is paused for a recovery review.")
+                }
+                ForEach(session.exercises) { exercise in
+                    Text("\(exercise.name) · \(exercise.sets) sets · \(exercise.targetRir) RIR")
+                }
+            }
+        }
+        Section {
+            Button("Apply reviewed block") {
+                Task { if await model.decide("apply") { await onApplied(); dismiss() } }
+            }
+            .accessibilityIdentifier("training_cycle_apply")
+            Button("Reject draft", role: .destructive) { Task { _ = await model.decide("reject") } }
+                .accessibilityIdentifier("training_cycle_reject")
+        }
+    }
+}
