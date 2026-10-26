@@ -825,9 +825,9 @@ if os.environ.get('FAIL_INSTALL') or (os.environ.get('FAIL_FREEZE') and '--froze
     sys.exit(42)
 assert json.loads(Path('package.json').read_text())['dependencies']['switch'] == '1.3.8'
 if '--no-frozen-lockfile' in sys.argv:
+    Path('pnpm-lock.yaml').write_text('resolved lock\\n')
     if os.environ.get('FAIL_REFRESH'):
         sys.exit(42)
-    Path('pnpm-lock.yaml').write_text('resolved lock\\n')
 else:
     if Path('pnpm-lock.yaml').read_text() != 'resolved lock\\n':
         print('ERR_PNPM_OUTDATED_LOCKFILE', file=sys.stderr)
@@ -985,6 +985,27 @@ for (const failure of ['FAIL_INSTALL', 'FAIL_FREEZE', 'FAIL_REFRESH', 'FAIL_RECH
         assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), 'old lock\n');
       }
       assert.notEqual(fx.refresh(['--staged']).status, 0, 'index-only commit hooks cannot run dependency refresh');
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const failure of ['FAIL_REFRESH', 'FAIL_RECHECK']) {
+  test(`dependency repair restores the lockfile after ${failure} so retries need no cleanup`, () => {
+    const fx = dependencyRefreshFixture();
+    try {
+      const lock = fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'));
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.refresh([], { [failure]: '1' });
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /exit status 42/);
+      assert.deepEqual(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml')), lock);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      const retry = fx.refresh();
+      assert.equal(retry.status, 0, retry.stderr);
+      assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), 'resolved lock');
+      assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
     } finally {
       fs.rmSync(fx.root, { recursive: true, force: true });
     }
