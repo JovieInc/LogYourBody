@@ -4,9 +4,25 @@ import argparse
 import json
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import repository_docs
+
+
+@contextmanager
+def restore_lockfile_on_failure(root):
+    lockfile = repository_docs.local(root, "pnpm-lock.yaml")
+    original = lockfile.read_bytes() if lockfile.exists() else None
+    try:
+        yield
+    except (OSError, subprocess.CalledProcessError):
+        # Failed dependency repairs must be retryable without manual lockfile cleanup.
+        if original is None:
+            lockfile.unlink(missing_ok=True)
+        else:
+            lockfile.write_bytes(original)
+        raise
 
 
 def staged_bytes(root, name):
@@ -51,7 +67,7 @@ def resolve_staged(root):
     print("repository-docs: regenerated and staged " + config["output"] + " from index")
 
 
-def resolve(root, refresh_lockfile=False):
+def resolve(root, refresh_lockfile=False, verify_lockfile=False):
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
     output = repository_docs.local(root, config["output"]).relative_to(root).as_posix()
@@ -62,7 +78,7 @@ def resolve(root, refresh_lockfile=False):
     unresolved = sorted(set(conflicts) - {"", output})
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
-    if refresh_lockfile:
+    if refresh_lockfile or verify_lockfile:
         dirty = subprocess.run(
             ["git", "diff", "--name-only", "--", "package.json", "**/package.json",
              "pnpm-workspace.yaml", "pnpm-lock.yaml", ".npmrc", output],
@@ -74,22 +90,28 @@ def resolve(root, refresh_lockfile=False):
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:
             raise ValueError("; ".join(errors))
-        # Explicit repair only: normal commit hooks and CI retain frozen installs.
-        lockfile = repository_docs.local(root, "pnpm-lock.yaml")
-        previous_lockfile = lockfile.read_bytes() if lockfile.exists() else None
-        try:
-            for mode in (["--no-frozen-lockfile"], ["--frozen-lockfile", "--offline"]):
+        with restore_lockfile_on_failure(root):
+            # Verify valid bot lockfiles without re-resolving unrelated dependencies.
+            modes = [["--frozen-lockfile", "--offline"]]
+            # Explicit repair only: normal commit hooks and CI retain frozen installs.
+            if refresh_lockfile:
+                probe = subprocess.run(
+                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *modes[0]],
+                    cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                )
+                print(probe.stdout, end="", flush=True)
+                # Refresh only a confirmed manifest mismatch; other failures remain blockers.
+                if probe.returncode:
+                    if "ERR_PNPM_OUTDATED_LOCKFILE" not in probe.stdout:
+                        probe.check_returncode()
+                    modes.insert(0, ["--no-frozen-lockfile"])
+                else:
+                    modes = []
+            for mode in modes:
                 subprocess.run(
                     ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
                     cwd=root, check=True,
                 )
-        except (OSError, subprocess.CalledProcessError):
-            # Failed repairs must remain retryable without discarding local edits.
-            if previous_lockfile is None:
-                lockfile.unlink(missing_ok=True)
-            else:
-                lockfile.write_bytes(previous_lockfile)
-            raise
     errors = repository_docs.run(root, write=True)
     if errors:
         raise ValueError("; ".join(errors))
@@ -104,12 +126,13 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
+    mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
     args = parser.parse_args()
     try:
         if args.staged:
             resolve_staged(args.root)
         else:
-            resolve(args.root, args.refresh_lockfile)
+            resolve(args.root, args.refresh_lockfile, args.verify_lockfile)
     except (ValueError, KeyError, TypeError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, "repository-docs: " + str(exc) + "\n")
 
