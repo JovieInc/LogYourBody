@@ -1,6 +1,28 @@
 [
   {
     "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1598: The Radix toggle 1.1.19 dependency update left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, documentation parity and CI Summary. Repeated source-map repairs need automatic regeneration on staged input changes.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300263221/job/121496112379",
+    "mechanization": "Extend the existing source-map resolver with --staged and invoke it after pre-commit formatting. It regenerates only for registered staged inputs, refuses partially staged or untracked input content and pinned-copy drift before mutation, and stages only the output. The existing required Detect Changes suite exercises a real Radix manifest update, idempotence, unrelated edit preservation and refusal paths. All eight added regressions failed before the extension and pass afterward. Retain strict CI parity because bot-created commits do not run local hooks.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1595: Updating @radix-ui/react-accordion from 1.2.20 to 1.2.21 left the generated web manifest dependency and fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40299950152/job/121495099134",
     "mechanization": "Regenerate the existing source projection after reviewing the accordion manifest and lockfile update. The required projection checker failed before regeneration and passes afterward; retain the required Detect Changes and CI Summary gates and their existing regression rejecting a missing or skippable parity step.",

@@ -628,7 +628,10 @@ function sourceMapConflict({ sourceConflict = false } = {}) {
     schemaVersion: 1,
     repository: 'example/app',
     entrypoints: ['README.md'],
-    sources: [{ path: 'workflow.yml', purpose: 'Workflow' }],
+    sources: [
+      { path: 'workflow.yml', purpose: 'Workflow' },
+      { path: 'apps/web/package.json', purpose: 'Web dependencies' },
+    ],
     imports: [],
     output,
   };
@@ -636,6 +639,7 @@ function sourceMapConflict({ sourceConflict = false } = {}) {
     'README.md': 'Local instructions\n',
     'repository-docs.json': JSON.stringify(config),
     'workflow.yml': source,
+    'apps/web/package.json': JSON.stringify({ dependencies: { '@radix-ui/react-toggle': '^1.1.18' } }),
   }, 'base sources');
   const generate = () => execFileSync('python3', [
     path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write',
@@ -707,6 +711,113 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
         'pinned-drift': /pinned copy missing or changed: policy.md/,
         'unsafe-output': /unsafe repository path/,
       }[failure]);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+function stagedSourceMap() {
+  const fx = sourceMapConflict();
+  assert.equal(fx.resolve().status, 0);
+  git(fx.root, 'commit', '-q', '-m', 'merge sources');
+  fx.refresh = () => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', fx.root, '--staged',
+  ], { env: gitEnv, encoding: 'utf8' });
+  fx.bump = () => {
+    fs.writeFileSync(path.join(fx.root, 'apps/web/package.json'), JSON.stringify({
+      dependencies: { '@radix-ui/react-toggle': '^1.1.19' },
+    }));
+    git(fx.root, 'add', '--', 'apps/web/package.json');
+  };
+  return fx;
+}
+
+test('pre-commit refreshes the source projection after staged formatting and propagates failures', () => {
+  const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
+  const refresh = 'python3 scripts/resolve-repository-docs.py --staged || exit $?';
+  assert.ok(hook.indexOf(refresh) > hook.indexOf('pnpm exec lint-staged'));
+  assert.equal(hook.trim().split('\n').at(-1), refresh);
+});
+
+test('staged dependency updates regenerate the projection without staging unrelated edits', () => {
+  const fx = stagedSourceMap();
+  try {
+    fx.bump();
+    fs.writeFileSync(path.join(fx.root, 'notes.txt'), 'staged note\n');
+    git(fx.root, 'add', '--', 'notes.txt');
+    fs.writeFileSync(path.join(fx.root, 'notes.txt'), 'unstaged note\n');
+    const check = () => spawnSync('python3', [
+      path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', fx.root,
+    ], { env: gitEnv, encoding: 'utf8' });
+    assert.equal(check().status, 1, 'dependency bump must reproduce stale parity');
+    const result = fx.refresh();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(check().status, 0, 'the same strict parity check must pass');
+    assert.match(git(fx.root, 'show', `:${fx.output}`), /"@radix-ui\/react-toggle": "\^1\.1\.19"/);
+    assert.deepEqual(git(fx.root, 'diff', '--cached', '--name-only').split('\n'), [
+      'apps/web/package.json', fx.output, 'notes.txt',
+    ]);
+    assert.equal(git(fx.root, 'show', ':notes.txt'), 'staged note');
+    assert.equal(fs.readFileSync(path.join(fx.root, 'notes.txt'), 'utf8'), 'unstaged note\n');
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.refresh().status, 0, 'repeated refresh is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('unrelated staged changes leave unstaged source edits and the projection alone', () => {
+  const fx = stagedSourceMap();
+  try {
+    fs.writeFileSync(path.join(fx.root, 'notes.txt'), 'staged note\n');
+    git(fx.root, 'add', '--', 'notes.txt');
+    fs.writeFileSync(path.join(fx.root, 'apps/web/package.json'), '{"dependencies":{}}');
+    const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const index = git(fx.root, 'ls-files', '--stage');
+    const result = fx.refresh();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['partial-source', 'unstaged-registry', 'unstaged-output', 'untracked-source', 'pinned-drift']) {
+  test(`staged source-map repair refuses ${failure} before changing files or the index`, () => {
+    const fx = stagedSourceMap();
+    try {
+      fx.bump();
+      if (failure === 'partial-source') fs.appendFileSync(path.join(fx.root, 'apps/web/package.json'), '\n');
+      if (failure === 'unstaged-registry') fs.appendFileSync(path.join(fx.root, 'repository-docs.json'), '\n');
+      if (failure === 'unstaged-output') fs.appendFileSync(path.join(fx.root, fx.output), 'local note\n');
+      if (failure === 'untracked-source') {
+        fx.config.sources.push({ path: 'untracked.txt', purpose: 'Untracked input' });
+        fs.writeFileSync(path.join(fx.root, 'untracked.txt'), 'local input');
+      }
+      if (failure === 'pinned-drift') {
+        fx.config.imports.push({
+          repository: 'example/policy', revision: 'a'.repeat(40),
+          path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+        });
+        fs.writeFileSync(path.join(fx.root, 'policy.md'), 'changed pinned copy');
+        git(fx.root, 'add', '--', 'policy.md');
+      }
+      if (['untracked-source', 'pinned-drift'].includes(failure)) {
+        fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+        git(fx.root, 'add', '--', 'repository-docs.json');
+      }
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.refresh();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, failure === 'pinned-drift'
+        ? /pinned copy missing or changed: policy.md/
+        : /stage or restore documentation input before refreshing:/);
       assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
       assert.equal(git(fx.root, 'ls-files', '--stage'), index);
     } finally {
