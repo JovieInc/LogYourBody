@@ -1,6 +1,24 @@
 [
   {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1608: The accordion 1.3.1 manifest update retained a 1.2.21 lockfile and stale source projection, failing Vercel frozen installation, Detect Changes, parity and CI Summary. Repair both artifacts together and keep failed repairs retryable.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1608",
+    "mechanization": "Extend the existing dependency repair helper to restore the previous lockfile when resolution or frozen verification fails. The required Detect Changes suite now simulates a resolver that writes an incomplete lockfile before either failure and proves the index and projection remain unchanged, the lockfile is restored, and a retry succeeds. Both regressions fail before the extension and pass afterward. Use --refresh-lockfile for this PR while retaining frozen install and parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1609: The web Zod 4.6.7 manifest update retained a 4.6.6 workspace lockfile and stale source projection, failing Vercel frozen installation, Detect Changes, parity and CI Summary. Repair dependency artifacts together with a reusable helper.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1609",
     "mechanization": "Extend the existing repository source resolver with an explicit lockfile refresh. It refuses unstaged dependency edits and pinned drift, regenerates through pinned Corepack pnpm with lifecycle scripts disabled, verifies frozen offline installation, and stages the lockfile with the projection only after success. The existing required Detect Changes suite exercises command execution, dirty inputs, idempotence, resolver and frozen-check failures. Six initial cases fail before the extension and pass afterward. Use the extended helper on this PR and retain all frozen install and source parity gates.",

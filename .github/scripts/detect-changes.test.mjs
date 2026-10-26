@@ -822,6 +822,7 @@ from pathlib import Path
 with Path('pnpm-calls').open('a') as log:
     log.write(json.dumps(sys.argv[1:]) + '\\n')
 if os.environ.get('FAIL_INSTALL') or (os.environ.get('FAIL_FREEZE') and '--frozen-lockfile' in sys.argv):
+    Path('pnpm-lock.yaml').write_text('incomplete lock\\n')
     sys.exit(42)
 assert json.loads(Path('package.json').read_text())['dependencies']['switch'] == '1.3.8'
 if '--no-frozen-lockfile' in sys.argv:
@@ -883,23 +884,45 @@ for (const file of ['package.json', 'apps/web/package.json', 'pnpm-workspace.yam
 }
 
 for (const failure of ['FAIL_INSTALL', 'FAIL_FREEZE']) {
-  test(`dependency repair propagates ${failure} without staging outputs`, () => {
+  test(`dependency repair rolls back ${failure} and permits a clean retry`, () => {
     const fx = dependencyRefreshFixture();
     try {
       const index = git(fx.root, 'ls-files', '--stage');
       const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const lockfile = fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8');
       const result = fx.refresh([], { [failure]: '1' });
       assert.notEqual(result.status, 0, result.stdout);
       assert.match(result.stderr, /exit status 42/);
       assert.equal(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').length, failure === 'FAIL_INSTALL' ? 1 : 2);
       assert.equal(git(fx.root, 'ls-files', '--stage'), index);
       assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+      assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), lockfile);
       assert.notEqual(fx.refresh(['--staged']).status, 0, 'index-only commit hooks cannot run dependency refresh');
+      const retry = fx.refresh();
+      assert.equal(retry.status, 0, retry.stderr);
+      assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), 'resolved lock');
     } finally {
       fs.rmSync(fx.root, { recursive: true, force: true });
     }
   });
 }
+
+test('failed dependency repair removes a newly generated lockfile', () => {
+  const fx = dependencyRefreshFixture();
+  try {
+    git(fx.root, 'rm', '-f', 'pnpm-lock.yaml');
+    const index = git(fx.root, 'ls-files', '--stage');
+    const result = fx.refresh([], { FAIL_FREEZE: '1' });
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /exit status 42/);
+    assert.equal(fs.existsSync(path.join(fx.root, 'pnpm-lock.yaml')), false);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    const retry = fx.refresh();
+    assert.equal(retry.status, 0, retry.stderr);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
 
 test('dependency repair refuses pinned-source drift before running pnpm', () => {
   const fx = dependencyRefreshFixture();
