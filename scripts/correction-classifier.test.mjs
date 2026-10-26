@@ -386,6 +386,23 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       );
       assert.equal(git('ls-files', '--stage'), index);
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      const edited = JSON.parse(resolved);
+      edited.push({ ...rows[1], source: `${rows[1].source}#unstaged-receipt` });
+      writeLedger(edited);
+      const unstaged = readFileSync(ledger, 'utf8');
+      for (const args of [
+        ['--resolve-merge', repository],
+        ['--resolve-merge', repository, '--stage'],
+        ['--check-merge', repository],
+      ]) {
+        const retry = run(...args);
+        assert.equal(retry.status, 1, 'merge verification must not silently ignore unstaged receipts');
+        assert.match(retry.stderr, /staged retry refuses unstaged ledger edits/);
+        assert.equal(git('ls-files', '--stage'), index, 'refused verification preserves the index');
+        assert.equal(readFileSync(ledger, 'utf8'), unstaged, 'refused verification preserves edits');
+      }
+      writeFileSync(ledger, resolved);
+      assert.equal(run('--resolve-merge', repository, '--stage').status, 0);
       // A clean worktree cannot hide conflict markers already staged as resolved.
       for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
@@ -432,9 +449,14 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
 
       writeFileSync(ledger, `${resolved}\n`);
-      for (const args of [[], ['--stage']]) {
-        const retry = run('--resolve-merge', repository, ...args);
-        assert.equal(retry.status, 0, retry.stderr);
+      for (const args of [
+        ['--resolve-merge', repository],
+        ['--resolve-merge', repository, '--stage'],
+        ['--check-merge', repository],
+      ]) {
+        const retry = run(...args);
+        assert.equal(retry.status, 1, 'even formatting edits must be reviewed and staged');
+        assert.match(retry.stderr, /staged retry refuses unstaged ledger edits/);
         assert.equal(git('ls-files', '--stage'), index, 'retry never restages files');
         assert.equal(readFileSync(ledger, 'utf8'), `${resolved}\n`, 'retry preserves local edits');
       }

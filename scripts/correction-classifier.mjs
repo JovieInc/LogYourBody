@@ -204,6 +204,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       // A retry after explicit staging verifies the index without overwriting local edits.
       if (checkingMerge || !git('ls-files', '--unmerged', '--', LEDGER_PATH)) {
         verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
+        assert.equal(
+          readSource(LEDGER_PATH, { root }),
+          git('show', `:0:${LEDGER_PATH}`),
+          'staged retry refuses unstaged ledger edits; review and stage them explicitly',
+        );
         console.log('correction-classifier: verified staged ledger against both merge parents');
         process.exit(0);
       }
