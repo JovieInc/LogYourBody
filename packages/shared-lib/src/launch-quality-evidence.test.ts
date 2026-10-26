@@ -25,7 +25,8 @@ function checkedTrace(test: string, coverage: string, root: string) {
   return execFileSync('python3', ['-c', driver, test, coverage], {
     encoding: 'utf8',
     cwd: root,
-    timeout: 30_000,
+    // Includes fixture startup allowance on a busy macOS host, not native test limits.
+    timeout: 120_000,
   });
 }
 
@@ -44,12 +45,12 @@ it('rejects incomplete XCTest proof through the launch gate validator with execu
         .filter((line) => /launch-quality-evidence|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Evidence validator behavior tests executed: 29');
+    expect(output).toContain('Evidence validator behavior tests executed: 30');
     expect(output).toContain('launch-quality-evidence');
   } finally {
     rmSync(coverage, { recursive: true, force: true });
   }
-}, 30_000);
+}, 120_000);
 
 it('propagates evidence assertion failures and nonzero exits despite passing suite markers', () => {
   const directory = mkdtempSync(`${tmpdir()}/lyb-evidence-failure-`);

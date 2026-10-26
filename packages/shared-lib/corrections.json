@@ -1625,5 +1625,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1569: The required launch-quality job fails in test_shell_does_not_retry_timeouts_or_started_tests before the native build because a shell fixture exceeds its 10-second process deadline on the hosted Mac.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40404264582/job/121858110012",
+    "mechanization": "Extend the existing evidence behavior suite with one bounded shell-fixture runner and use it for all three shell contracts. Give fixture startup 60 seconds and the outer traced suite 120 seconds while retaining every assertion, failure code, native timeout and retry limit. A regression preserves stderr and nonzero status and proves Python fixture timeouts propagate after exactly one invocation. Replay a controlled 11-second startup against the previous and repaired suite to prove failure then success. The real native runner and coverage still require macOS CI; the lanes harness owns push and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A shared fixture runner owns the finite scheduling allowance and propagates process failures without retry, preventing individual shell contracts from keeping the reported 10-second host-startup deadline. Native xcodebuild and XCTest enforcement remains in the unchanged production runner."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def run_shell_fixture(self, command, **environment):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

@@ -17,6 +17,25 @@ spec.loader.exec_module(evidence)
 
 
 class EvidenceTests(unittest.TestCase):
+    def run_shell_fixture(self, command, **environment):
+        # Hosted macOS can take over 10s to schedule these shell fixtures
+        # (PR #1569). This bounded harness allowance is separate from the real
+        # xcodebuild/XCTest limits; a timeout still fails and is never retried.
+        return subprocess.run(
+            ['bash', '-c', command], capture_output=True, text=True, timeout=60,
+            env={**os.environ, **environment})
+
+    def test_shell_fixture_preserves_failure_output_and_never_retries_a_timeout(self):
+        result = self.run_shell_fixture('printf "fixture failure" >&2; exit 65')
+        self.assertEqual(result.returncode, 65)
+        self.assertEqual(result.stderr, 'fixture failure')
+        timeout = subprocess.TimeoutExpired('fixture', 60, output='partial fixture evidence')
+        with patch.object(subprocess, 'run', side_effect=timeout) as run:
+            with self.assertRaises(subprocess.TimeoutExpired) as raised:
+                self.run_shell_fixture('fixture')
+            self.assertIs(raised.exception, timeout)
+            self.assertEqual(run.call_count, 1)
+
     def test_fixed_diagnostic_selectors_have_native_test_implementations(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / 'scripts/ios/launch-quality-audit.sh').read_text()
@@ -408,17 +427,16 @@ class EvidenceTests(unittest.TestCase):
         artifact.mkdir()
         prior = artifact / 'summary.md'
         prior.write_text('prior proof must survive')
-        result = subprocess.run(['bash', str(script)], env={**os.environ, 'ARTIFACT_DIR': str(artifact)},
-                                capture_output=True, text=True, timeout=10)
+        result = self.run_shell_fixture('bash "$FIXTURE_SCRIPT"',
+                                        FIXTURE_SCRIPT=str(script), ARTIFACT_DIR=str(artifact))
         self.assertEqual(result.returncode, 65)
         self.assertIn('Refusing to reuse', result.stderr)
         self.assertEqual(prior.read_text(), 'prior proof must survive')
 
     def test_shell_preserves_failed_attempt_and_stops_after_two(self):
         # Execute the real function definitions without running the product build.
-        # The extracted range includes the diagnostic launch probe. Its simctl
-        # calls can block longer than this timeout while CoreSimulatorService
-        # is still cold (CI run 38551518501), and they are not the retry contract.
+        # Stub the diagnostic probe: CoreSimulatorService is outside this
+        # retry contract (CI run 38551518501).
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         functions = source[source.index('is_simulator_infra_failure() {'):source.index('assert_xcresult_evidence() {')]
         result_bundle = self.root / 'retry.xcresult'
@@ -442,8 +460,7 @@ start_launch_probe() { :; }
 stop_launch_probe() { :; }
 run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
 """
-        result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                                env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
+        result = self.run_shell_fixture(command, RESULT_BUNDLE=str(result_bundle), RESULT_LOG=str(log))
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertTrue(result_bundle.with_name('retry.attempt-1.xcresult').is_dir())
         self.assertTrue(result_bundle.is_dir())
@@ -489,10 +506,9 @@ run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
                 directory.mkdir()
                 result_bundle = directory / 'timeout.xcresult'
                 log = directory / 'timeout.log'
-                result = subprocess.run(
-                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                    env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log),
-                         'FAILURE_STATUS': str(status), 'FAILURE_LOG': failure_log})
+                result = self.run_shell_fixture(
+                    command, RESULT_BUNDLE=str(result_bundle), RESULT_LOG=str(log),
+                    FAILURE_STATUS=str(status), FAILURE_LOG=failure_log)
                 self.assertEqual(result.returncode, status, result.stderr)
                 self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
                 self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
