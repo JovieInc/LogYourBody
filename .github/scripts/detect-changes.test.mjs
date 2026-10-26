@@ -808,3 +808,176 @@ for (const failure of ['unstaged-output', 'untracked-output', 'pinned-drift', 'm
     }
   });
 }
+
+function dependencyRefreshFixture() {
+  const fx = stagedSourceMap();
+  fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'old lock\n');
+  git(fx.root, 'add', 'pnpm-lock.yaml');
+  const bin = path.join(fx.root, 'bin');
+  fs.mkdirSync(bin);
+  const calls = path.join(fx.root, 'pnpm-calls');
+  fs.writeFileSync(path.join(bin, 'corepack'), `#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+with Path('pnpm-calls').open('a') as log:
+    log.write(json.dumps(sys.argv[1:]) + '\\n')
+if os.environ.get('FAIL_INSTALL') or (os.environ.get('FAIL_FREEZE') and '--frozen-lockfile' in sys.argv):
+    sys.exit(42)
+assert json.loads(Path('package.json').read_text())['dependencies']['switch'] == '1.3.8'
+if '--no-frozen-lockfile' in sys.argv:
+    Path('pnpm-lock.yaml').write_text('resolved lock\\n')
+else:
+    assert Path('pnpm-lock.yaml').read_text() == 'resolved lock\\n'
+`, { mode: 0o755 });
+  const refresh = (args = [], env = {}) => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'),
+    '--root', fx.root, '--refresh-lockfile', ...args,
+  ], {
+    encoding: 'utf8', env: { ...gitEnv, PATH: `${bin}:${process.env.PATH}`, ...env },
+  });
+  return { ...fx, calls, refresh };
+}
+
+function verifyDependencyLockfile(fx, env = {}) {
+  return spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'),
+    '--root', fx.root, '--verify-lockfile',
+  ], { encoding: 'utf8', env: { ...gitEnv, PATH: `${path.join(fx.root, 'bin')}:${process.env.PATH}`, ...env } });
+}
+
+test('dependency parity repair verifies the existing frozen lockfile without re-resolving dependencies', () => {
+  const fx = dependencyRefreshFixture();
+  try {
+    fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'resolved lock\n');
+    git(fx.root, 'add', 'pnpm-lock.yaml');
+    const lock = git(fx.root, 'show', ':pnpm-lock.yaml');
+    const result = verifyDependencyLockfile(fx);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').map(JSON.parse), [
+      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
+    ]);
+    assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), lock);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), `${lock}\n`);
+    assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(verifyDependencyLockfile(fx).status, 0, 'verified parity repair is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['frozen-lockfile', 'unstaged-source', 'pinned-drift']) {
+  test(`dependency parity repair refuses ${failure} without staging a projection`, () => {
+    const fx = dependencyRefreshFixture();
+    try {
+      if (failure === 'unstaged-source') fs.appendFileSync(path.join(fx.root, 'package.json'), '\n');
+      if (failure === 'pinned-drift') {
+        fx.config.imports = [{
+          repository: 'example/policy', revision: 'a'.repeat(40),
+          path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+        }];
+        fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+        git(fx.root, 'add', 'repository-docs.json');
+      }
+      const index = git(fx.root, 'ls-files', '--stage');
+      const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const result = verifyDependencyLockfile(fx, { FAIL_FREEZE: '1' });
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, {
+        'frozen-lockfile': /exit status 42/,
+        'unstaged-source': /unstaged dependency edits/,
+        'pinned-drift': /pinned copy missing or changed/,
+      }[failure]);
+      assert.equal(fs.existsSync(fx.calls), failure === 'frozen-lockfile');
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+      assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), 'old lock\n');
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('dependency repair refreshes and freezes the lockfile before staging source parity', () => {
+  const fx = dependencyRefreshFixture();
+  try {
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged local instructions\n');
+    const result = fx.refresh();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').map(JSON.parse), [
+      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--no-frozen-lockfile'],
+      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
+    ]);
+    assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), 'resolved lock');
+    assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
+    assert.equal(git(fx.root, 'diff', '--cached', '--name-only'), `${fx.output}\npackage.json\npnpm-lock.yaml`);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'README.md'), 'utf8'), 'Unstaged local instructions\n');
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.refresh().status, 0, 'dependency repair is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const file of ['package.json', 'apps/web/package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml', '.npmrc']) {
+  test(`dependency repair refuses unstaged ${file} before running pnpm`, () => {
+    const fx = dependencyRefreshFixture();
+    try {
+      fs.mkdirSync(path.dirname(path.join(fx.root, file)), { recursive: true });
+      if (!fs.existsSync(path.join(fx.root, file))) {
+        fs.writeFileSync(path.join(fx.root, file), '{}\n');
+        git(fx.root, 'add', file);
+      }
+      fs.appendFileSync(path.join(fx.root, file), 'local edit\n');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.refresh();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /unstaged dependency edits/);
+      assert.equal(fs.existsSync(fx.calls), false);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const failure of ['FAIL_INSTALL', 'FAIL_FREEZE']) {
+  test(`dependency repair propagates ${failure} without staging outputs`, () => {
+    const fx = dependencyRefreshFixture();
+    try {
+      const index = git(fx.root, 'ls-files', '--stage');
+      const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const result = fx.refresh([], { [failure]: '1' });
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /exit status 42/);
+      assert.equal(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').length, failure === 'FAIL_INSTALL' ? 1 : 2);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+      assert.notEqual(fx.refresh(['--staged']).status, 0, 'index-only commit hooks cannot run dependency refresh');
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('dependency repair refuses pinned-source drift before running pnpm', () => {
+  const fx = dependencyRefreshFixture();
+  try {
+    fx.config.imports = [{
+      repository: 'example/policy', revision: 'a'.repeat(40),
+      path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+    }];
+    fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+    git(fx.root, 'add', 'repository-docs.json');
+    const index = git(fx.root, 'ls-files', '--stage');
+    const result = fx.refresh();
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /pinned copy missing or changed: policy.md/);
+    assert.equal(fs.existsSync(fx.calls), false);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
