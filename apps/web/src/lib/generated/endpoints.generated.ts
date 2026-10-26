@@ -436,6 +436,11 @@ export const endpoints = {
         'LYB-252 source evidence for recurring correction escalation and guard-failure detection.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-307',
+      reason:
+        'LYB-307 source evidence for emitted lint correction checks and recurrence-based severity.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-97',
       reason: 'LYB-97, Pro intro-offer audit in docs/audits/lyb-97.',
     },
