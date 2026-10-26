@@ -1072,5 +1072,41 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "training-split-weekly-dose",
+    "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
+    "source": "https://linear.app/jovie/issue/LYB-111",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The deterministic engine owns the split and exercise contributions, so it can distribute a fixed weekly dose instead of repeating full-body work as frequency grows. Shared supported-frequency values prevent schema/type/setup drift."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/engine.ts",
+      "anchor": "const SESSION_TEMPLATES: Record<"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "correction-ledger-conflict-safe-merge",
+    "correction": "PR #1536 conflict repair: independent correction receipts appended on main and a feature branch must survive the merge without losing sources, annotations or guard coverage.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1536",
+    "mechanization": "Extend the existing correction-coverage tool with --merge-ledger. It reads the three immutable Git index conflict stages, merges by normalized fingerprint and source, retains incoming ledger order, rejects deletions, duplicate identities and divergent concurrent edits, and validates guard coverage and nonregression against all three snapshots before writing. It leaves staging explicit. The existing required shared-lib suite exercises successful merges, refusal without writes and real Git stage reads.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing ledger tool can construct a lossless three-way merge from Git conflict stages and refuse ambiguous edits before writing, replacing repeated manual append-conflict repair with one deterministic operation."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Independent additions merge; concurrent receipt edits require explicit resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
