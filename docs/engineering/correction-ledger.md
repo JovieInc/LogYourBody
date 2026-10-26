@@ -48,6 +48,15 @@ The [existing recurrence intake](correction-recurrence.md) files its deduplicate
 mechanization task at two distinct receipts. The first receipt already requires
 a guard where feasible.
 
+Recording uses the classifier's `ruleId` as the correction identity
+(`recordCorrection` in
+[`packages/shared-lib/src/correction-ledger.ts`](../../packages/shared-lib/src/correction-ledger.ts)).
+The first record for a rule id stays at `recurrence` 0. A later correction with
+that same rule id increments that record by one and does not add a second row.
+A different rule id leaves the earlier count unchanged. This step does not emit
+or change checks. Coverage and the recurrence intake still derive repeat counts
+from distinct source URLs per fingerprint.
+
 Inspect and verify the ledger from the repository root:
 
 ```sh
