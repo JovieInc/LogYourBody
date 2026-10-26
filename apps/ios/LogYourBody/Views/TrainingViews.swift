@@ -369,6 +369,7 @@ struct TrainingLiveSessionView: View {
     @AppStorage(Constants.preferredMeasurementSystemKey)
     private var measurementSystemRaw = MeasurementSystem.localeDefault.rawValue
     @StateObject private var draft: TrainingSessionDraft
+    @StateObject private var restAlerts: TrainingRestAlerts
     @StateObject private var progress: TrainingProgressModel
     @State private var voiceCapture = VoiceCaptureService()
     @State private var soreness = 0
@@ -397,6 +398,8 @@ struct TrainingLiveSessionView: View {
         cardsEnabled: Bool = false,
         voiceEnabled: Bool,
         readinessEnabled: Bool = false,
+        restTimerEnabled: Bool = false,
+        restAlertClient: TrainingRestAlerting? = nil,
         numericScrubEnabled: Bool = false,
         progressEnabled: Bool = false,
         progressDecision: TrainingProgressDecision? = nil,
@@ -426,8 +429,10 @@ struct TrainingLiveSessionView: View {
         self.onWorkoutAction = onWorkoutAction
         self.onVoiceIntent = onVoiceIntent
         self.onFeedback = onFeedback
+        _restAlerts = StateObject(wrappedValue: TrainingRestAlerts(client: restAlertClient))
         _draft = StateObject(wrappedValue: TrainingSessionDraft(
-            session: session, ownerId: ownerId, store: draftStore, isCurrent: isCurrent
+            session: session, ownerId: ownerId, store: draftStore, isCurrent: isCurrent,
+            restTimerEnabled: restTimerEnabled
         ))
         _progress = StateObject(wrappedValue: TrainingProgressModel(isCurrent: isCurrent))
     }
@@ -442,6 +447,7 @@ struct TrainingLiveSessionView: View {
                             workoutNavigation
                         }
                     } else { sessionHeader }
+                    if draft.restTimerEnabled { restState }
                     if hasSafetyStop {
                         safetyCard
                     } else if draft.session.executionPaused == true {
@@ -456,7 +462,7 @@ struct TrainingLiveSessionView: View {
                             TrainingExerciseHistoryRow(exerciseId: next.exercise.id, model: progress)
                                 .accessibilityIdentifier("training_history_up_next_\(next.exercise.id)")
                         }
-                        restState
+                        if !draft.restTimerEnabled { restState }
                     } else {
                         completeCard
                     }
@@ -527,7 +533,13 @@ struct TrainingLiveSessionView: View {
         }
         .interactiveDismissDisabled(!cardsEnabled && (isSaving || draft.isSaving))
         .task(id: progressRefreshKey) { await refreshProgress() }
-        .onDisappear { voiceCapture.cancel() }
+        .onDisappear {
+            voiceCapture.cancel()
+            restAlerts.cancel()
+        }
+        .onChange(of: draft.rest.countdown, initial: true) { _, countdown in
+            restAlerts.synchronize(countdown, isCurrent: { draft.ownsSession })
+        }
         .onChange(of: draft.lastSaveReceipt) { _, receipt in
             guard let receipt else { return }
             selectedPositionId = nil
@@ -802,7 +814,11 @@ struct TrainingLiveSessionView: View {
     }
 
     @ViewBuilder private var restState: some View {
-        if let restUntil = draft.restUntil {
+        if draft.restTimerEnabled {
+            if let countdown = draft.rest.countdown {
+                TrainingRestTimerView(countdown: countdown, onAdjust: draft.adjustRest, onSkip: draft.cancelRest)
+            }
+        } else if let restUntil = draft.restUntil {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let remaining = max(0, Int(restUntil.timeIntervalSince(context.date).rounded(.up)))
                 Text(remaining > 0 ? "Rest · \(remaining)s" : "Timer elapsed · readiness not assessed")
@@ -1579,6 +1595,13 @@ struct VoiceSetReviewView: View {
 }
 
 #if DEBUG
+@MainActor
+private final class TrainingFixtureRestAlerts: TrainingRestAlerting {
+    func start(_ countdown: TrainingRestCountdown) async {}
+    func stop(cancelNotification: Bool) {}
+    func playCompletionHaptic() {}
+}
+
 /// Uses the production live view with isolated synthetic acknowledgments; never contacts a service.
 struct TrainingLiveSessionFixtureView: View {
     private static let defaults = UserDefaults(suiteName: "lyb.training.ui-fixture")!
@@ -1700,6 +1723,8 @@ struct TrainingLiveSessionFixtureView: View {
             TrainingLiveSessionView(
                 session: session, ownerId: "fixture-training-owner", cardsEnabled: Self.cardsEnabled, voiceEnabled: true,
                 readinessEnabled: true,
+                restTimerEnabled: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingRestTimer"),
+                restAlertClient: TrainingFixtureRestAlerts(),
                 numericScrubEnabled: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingScrub"),
                 progressEnabled: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingProgress"),
                 draftStore: Self.draftStore,

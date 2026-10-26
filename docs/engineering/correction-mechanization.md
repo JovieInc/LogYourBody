@@ -76,6 +76,9 @@ node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
 
+Merge readiness inspects staged changes without external diff or text conversion
+drivers, so a presentation filter cannot hide unresolved conflict markers.
+
 Baselines have schema `lyb.correction-ratchet/v1` and a `findings` array. Seeding
 requires a readable immutable base: findings introduced by the PR cannot be
 grandfathered. For an existing rule, CI compares the head baseline with the
@@ -100,3 +103,11 @@ that automatic path on; all required checks, deployments and queue rules still
 apply. When the lanes harness owns pushing and PR creation, hand it the commits
 and validation evidence. Do not enable the retired Codex Auto-Fix workflow or
 start a second PR owner.
+
+For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
+merges and classifies the correction ledger after other conflicts are resolved.
+The shared readiness check also rejects newly added conflict markers in the index,
+including diff3 base markers, before writing or staging the ledger. The pre-commit
+`--check-merge` path and staged retries use the same check; cleaning only the working
+file cannot hide an unresolved staged source. Resolve and stage the source, then
+retry the same command. Unrelated unstaged edits remain untouched.

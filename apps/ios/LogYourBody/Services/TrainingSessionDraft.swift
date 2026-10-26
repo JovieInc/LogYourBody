@@ -65,6 +65,7 @@ final class TrainingSessionDraft: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var lastSaveReceipt: TrainingSetSaveReceipt?
     @Published private(set) var restUntil: Date?
+    @Published private(set) var rest = TrainingRestDraft()
     @Published private(set) var feedback: TrainingFeedbackDraft?
     @Published private(set) var undoReceipt: TrainingSetUndoReceipt?
 
@@ -72,17 +73,20 @@ final class TrainingSessionDraft: ObservableObject {
     private let store: TrainingDraftStore
     private let isCurrent: () -> Bool
     private let now: () -> Date
+    let restTimerEnabled: Bool
     private var persistedRows: [String: TrainingSetDraft] = [:]
 
     init(
         session: TrainingSession, ownerId: String, store: TrainingDraftStore,
-        isCurrent: @escaping () -> Bool, now: @escaping () -> Date = Date.init
+        isCurrent: @escaping () -> Bool, now: @escaping () -> Date = Date.init,
+        restTimerEnabled: Bool = false
     ) {
         self.session = session
         self.ownerId = ownerId
         self.store = store
         self.isCurrent = isCurrent
         self.now = now
+        self.restTimerEnabled = restTimerEnabled
         guard isCurrent() else { return }
         // A failed journal read or cleanup must never hide authoritative acknowledgements.
         for saved in session.loggedSets ?? [] where validSavedSet(saved) {
@@ -94,6 +98,7 @@ final class TrainingSessionDraft: ObservableObject {
             }
             persistedRows = rows
             feedback = try store.loadFeedback(ownerId: ownerId, sessionId: session.id)
+            if restTimerEnabled { rest = try store.loadRest(ownerId: ownerId, sessionId: session.id) }
             undoReceipt = try store.loadUndo(ownerId: ownerId, sessionId: session.id)
         } catch {
             errorMessage = TrainingDraftError.unavailable.localizedDescription
@@ -331,6 +336,7 @@ final class TrainingSessionDraft: ObservableObject {
                 saved, expecting: pending, ownerId: ownerId, sessionId: session.id
             ) else { throw TrainingDraftError.changed }
             feedback = saved
+            if response.nextSetRecommendation.action == .symptomSafety { cancelRest() }
             return true
         } catch let error as LocalizedError {
             if isCurrent() { errorMessage = error.errorDescription }
@@ -591,7 +597,11 @@ final class TrainingSessionDraft: ObservableObject {
             position: TrainingSetPosition(exercise: exercise, setNumber: setNumber),
             corrected: false
         )
-        restUntil = now().addingTimeInterval(90)
+        if restTimerEnabled {
+            startRest(after: exercise, setKey: row.key, at: now())
+        } else {
+            restUntil = now().addingTimeInterval(90)
+        }
     }
 
     private func issueUndoReceipt(for saved: TrainingSavedSet) {
@@ -736,12 +746,66 @@ final class TrainingSessionDraft: ObservableObject {
     }
 
     private func restoreRestTimer() {
+        if restTimerEnabled {
+            guard canRest else { cancelRest(); return }
+            guard let position = lastCompletedPosition,
+                  let date = loggedSets[position.id]?.completedAt.flatMap(observationDate)
+            else { return }
+            // Preserve adjustments and skips when refreshing or reopening this session.
+            guard rest.lastSetKey != position.id else {
+                restUntil = rest.countdown?.endsAt
+                return
+            }
+            startRest(after: position.exercise, setKey: position.id, at: date)
+            return
+        }
         let latest = loggedSets.values.compactMap { saved in
             saved.completedAt.flatMap(observationDate)
         }.max()
         guard let latest else { return }
         let restored = latest.addingTimeInterval(90)
         restUntil = restored
+    }
+
+    var ownsSession: Bool { isCurrent() }
+
+    private var canRest: Bool {
+        isCurrent() && currentPosition != nil && !session.safetyStop && session.executionPaused != true &&
+            session.executionEvents?.last?.kind != "ended" && nextSetRecommendation?.action != .symptomSafety
+    }
+
+    func adjustRest(by seconds: Int) {
+        guard restTimerEnabled, canRest, let countdown = rest.countdown,
+              countdown.remaining(at: now()) > 0 else { return }
+        let adjusted = countdown.adjusted(by: seconds)
+        rest.countdown = adjusted
+        rest.durations[countdown.exerciseId] = adjusted.duration
+        persistRest()
+    }
+
+    func cancelRest() {
+        guard restTimerEnabled else { return }
+        rest.countdown = nil
+        restUntil = nil
+        if isCurrent() { persistRest() }
+    }
+
+    private func startRest(after exercise: TrainingExercisePrescription, setKey: String, at date: Date) {
+        rest.lastSetKey = setKey
+        rest.countdown = canRest ? TrainingRestCountdown(
+            id: UUID(), exerciseId: exercise.id, startedAt: date,
+            duration: rest.durations[exercise.id] ?? TrainingRestPolicy.defaultDuration(for: exercise)
+        ) : nil
+        persistRest()
+    }
+
+    private func persistRest() {
+        restUntil = rest.countdown?.endsAt
+        do {
+            try store.saveRest(rest, ownerId: ownerId, sessionId: session.id)
+        } catch {
+            errorMessage = "The rest timer could not be saved on this device."
+        }
     }
 
     private func observationDate(_ value: String) -> Date? {
