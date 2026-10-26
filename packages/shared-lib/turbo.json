@@ -14,6 +14,7 @@
         "$TURBO_ROOT$/apps/ios/LogYourBody/DesignSystem/Theme.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBody/Views/MainTabViewPolicies.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBody/ContentView.swift",
+        "$TURBO_ROOT$/apps/ios/LogYourBody/LogYourBodyApp.swift",
         "$TURBO_ROOT$/apps/ios/LogYourBody/Views/HomeV2/HomeV2TrendChart.swift",
         "$TURBO_ROOT$/scripts/ios/launch-quality-audit.sh",
         "$TURBO_ROOT$/scripts/ios/launch-quality-evidence.py",

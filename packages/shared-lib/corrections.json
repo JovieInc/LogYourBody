@@ -1247,7 +1247,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1576,5 +1576,23 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "launch-quality-state-fixture-animation-quiescence",
+    "correction": "PR #1574 / LYB-249: Launch Quality passed the reconciliation unit tests but chat replay and onboarding state tests stalled on repeated 60-second animation idle waits and exceeded the unchanged 180-second execution allowance.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40215994807/job/121237251632",
+    "mechanization": "Merge main to retain its bounded simulator-startup retry policy and chat replay stabilization. Extend the existing DEBUG animation suppression into one exact-argument policy shared by UIKit and SwiftUI for replay and onboarding state fixtures. Add native positive and negative policy cases, plus a guard in the existing required shared-lib evidence suite that rejects missing fixture coverage, either disconnected animation sink, or release-build exposure. Include the app source in the Turbo task inputs. The source guard failed before the policy change and passes afterward; native execution and coverage remain required CI evidence on this Linux host. Preserve UI assertions, timeouts, retry bounds and the harness as sole shipper.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing DEBUG fixture startup can route both state fixtures through the same UIKit and SwiftUI animation policy, preventing repeated quiescence waits without changing production launches or weakening the behavior assertions."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "it('keeps replay and onboarding state fixtures free of UIKit and SwiftUI animation waits in DEBUG only'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

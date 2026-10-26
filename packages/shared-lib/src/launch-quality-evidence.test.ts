@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
@@ -28,6 +28,35 @@ function checkedTrace(test: string, coverage: string, root: string) {
     timeout: 30_000,
   });
 }
+
+it('keeps replay and onboarding state fixtures free of UIKit and SwiftUI animation waits in DEBUG only', () => {
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBody/LogYourBodyApp.swift', import.meta.url),
+    'utf8',
+  );
+  const debugBlocks = [...source.matchAll(/^[ \t]*#if DEBUG\n(.*?)^[ \t]*#endif/gms)]
+    .map((match) => match[1])
+    .join('\n');
+  const policy = debugBlocks.match(
+    /static func usesDeterministicUITestAnimations\(arguments: \[String\]\) -> Bool \{(.*?)\n {4}\}/s,
+  )?.[1];
+  expect(policy, 'a single DEBUG policy must cover both state fixtures').toBeDefined();
+  for (const flag of ['-lybUITestChatReplayFixture', '-lybUITestBodyScoreOnboardingFixture']) {
+    expect(policy).toContain(`arguments.contains("${flag}")`);
+  }
+  const condition = String.raw`if Self\.usesDeterministicUITestAnimations\(arguments: ProcessInfo\.processInfo\.arguments\) \{`;
+  expect(debugBlocks).toMatch(
+    new RegExp(`${condition}\\s*UIView\\.setAnimationsEnabled\\(false\\)`),
+  );
+  expect(debugBlocks).toMatch(
+    new RegExp(
+      `${condition}\\s*transaction\\.animation = nil\\s*transaction\\.disablesAnimations = true`,
+    ),
+  );
+  expect(source.replace(/^[ \t]*#if DEBUG\n.*?^[ \t]*#endif/gms, '')).not.toContain(
+    'usesDeterministicUITestAnimations',
+  );
+});
 
 it('rejects incomplete XCTest proof through the launch gate validator with executed line coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
