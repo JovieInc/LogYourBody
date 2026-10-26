@@ -156,10 +156,11 @@ struct DashboardMetricsSection: View {
 
     @ViewBuilder
     private func stepsMetricCard() -> some View {
-        Button {
-            selectedMetricType = .steps
-            isMetricDetailActive = true
-        } label: {
+        Group {
+            let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
+                selectedMetricType = .steps
+                isMetricDetailActive = true
+            }
             let latestSteps = latestStepsSnapshot()
 
             MetricSummaryCard(
@@ -178,7 +179,7 @@ struct DashboardMetricsSection: View {
                     trend: nil,
                     footnote: stepsGoalText
                 )),
-                isButtonContext: true
+                detailAction: detailAction
             )
         }
         .buttonStyle(MetricCardButtonStyle())
@@ -190,10 +191,11 @@ struct DashboardMetricsSection: View {
         if let currentMetric {
             let stats = weightRangeStats()
             let averageText = stats.map { formatAverageFootnote($0.average, weightUnit) }
-            Button {
-                selectedMetricType = .weight
-                isMetricDetailActive = true
-            } label: {
+            Group {
+                let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
+                    selectedMetricType = .weight
+                    isMetricDetailActive = true
+                }
                 MetricSummaryCard(
                     icon: "figure.stand",
                     accentColor: theme.colors.accentViolet,
@@ -210,7 +212,7 @@ struct DashboardMetricsSection: View {
                         trend: stats.flatMap { makeTrend($0.delta, weightUnit, selectedRange) },
                         footnote: metricSummaryFootnote(averageText: averageText, goalText: weightGoalText)
                     )),
-                    isButtonContext: true
+                    detailAction: detailAction
                 )
             }
             .buttonStyle(MetricCardButtonStyle())
@@ -223,10 +225,11 @@ struct DashboardMetricsSection: View {
         if let currentMetric {
             let stats = bodyFatRangeStats()
             let averageText = stats.map { formatAverageFootnote($0.average, "%") }
-            Button {
-                selectedMetricType = .bodyFat
-                isMetricDetailActive = true
-            } label: {
+            Group {
+                let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
+                    selectedMetricType = .bodyFat
+                    isMetricDetailActive = true
+                }
                 MetricSummaryCard(
                     icon: "percent",
                     accentColor: theme.colors.accentPink,
@@ -243,7 +246,7 @@ struct DashboardMetricsSection: View {
                         trend: stats.flatMap { makeTrend($0.delta, "%", selectedRange) },
                         footnote: metricSummaryFootnote(averageText: averageText, goalText: bodyFatGoalText)
                     )),
-                    isButtonContext: true
+                    detailAction: detailAction
                 )
             }
             .buttonStyle(MetricCardButtonStyle())
@@ -256,10 +259,11 @@ struct DashboardMetricsSection: View {
         if let currentMetric {
             let stats = ffmiRangeStats()
             let averageText = stats.map { formatAverageFootnote($0.average, "") }
-            Button {
-                selectedMetricType = .ffmi
-                isMetricDetailActive = true
-            } label: {
+            Group {
+                let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
+                    selectedMetricType = .ffmi
+                    isMetricDetailActive = true
+                }
                 MetricSummaryCard(
                     icon: "figure.arms.open",
                     accentColor: theme.colors.accentTeal,
@@ -276,7 +280,7 @@ struct DashboardMetricsSection: View {
                         trend: stats.flatMap { makeTrend($0.delta, "", selectedRange) },
                         footnote: metricSummaryFootnote(averageText: averageText, goalText: ffmiGoalText)
                     )),
-                    isButtonContext: true
+                    detailAction: detailAction
                 )
             }
             .buttonStyle(MetricCardButtonStyle())

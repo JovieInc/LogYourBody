@@ -17,7 +17,9 @@ import uuid
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--postgres-bin', type=Path, required=True)
+    parser.add_argument('--cycle-migration', type=Path, help='Optional LYB-115 migration candidate')
     parser.add_argument('--migration', type=Path, help='Optional candidate migration for deliberate regression checks')
+    parser.add_argument('--delegated-migration', type=Path, help='Optional delegated candidate for deliberate regression checks')
     args = parser.parse_args()
     web = Path(__file__).resolve().parents[2]
     env = {k: v for k, v in os.environ.items() if not k.startswith('PG') and k != 'DATABASE_URL'}
@@ -33,21 +35,27 @@ def main():
     def quote(value):
         return "'" + str(value).replace("'", "''") + "'"
 
-    with tempfile.TemporaryDirectory(prefix='lyb-revision-pg-',dir='/private/tmp') as directory:
+    with tempfile.TemporaryDirectory(prefix='lyb-revision-pg-') as directory:
         root = Path(directory)
         data, socket = root / 'data', root / 'socket'
         socket.mkdir(mode=0o700)
         run([str(args.postgres_bin / 'initdb'), '-D', str(data), '-A', 'trust', '--no-locale', '-U', getpass.getuser()])
         control = [str(args.postgres_bin / 'pg_ctl'), '-D', str(data)]
-        run(control + ['-l', str(root / 'postgres.log'), '-o', f"-c listen_addresses='' -k {socket} -p 6548", '-w', 'start'])
+        try:
+            run(control + ['-l', str(root / 'postgres.log'), '-o', f"-c listen_addresses='' -k {socket} -p 6548", '-w', 'start'])
+        except RuntimeError:
+            print((root / 'postgres.log').read_text())
+            raise
         try:
             client = [str(args.postgres_bin / 'psql'), '-X', '-q', '-A', '-t', '-h', str(socket), '-p', '6548', '-U', getpass.getuser(), '-d', 'postgres', '-v', 'ON_ERROR_STOP=1']
 
             def sql(statement):
                 return run(client + ['-c', statement])
 
-            sql("create table schema_migrations(version text primary key); create table chat_usage_limits(user_subject text); create table chat_conversations(user_subject text); create table body_metrics(user_subject text);")
+            sql("create table schema_migrations(version text primary key); create table chat_usage_limits(user_subject text); create table chat_conversations(user_subject text);")
             for migration in ['20260714183000_create_app_users.sql','20260714213000_add_app_user_profile.sql',
+                              '20260715040000_create_body_metrics.sql','20260813120000_native_body_metrics_sync.sql',
+                              '20261025120000_weight_lifecycle.sql',
                               '20260813130000_native_product_records.sql','20260927102000_training_record_collections.sql']:
                 run(client + ['-f', str(web/'db/migrations'/migration)])
             run(client + ['-f', str(args.migration or web / 'db/migrations/20261010090000_training_revision_foundation.sql')])
@@ -55,6 +63,9 @@ def main():
             run(client + ['-f', str(web / 'db/migrations/20261010103000_training_mutation_admission.sql')])
 
             run(client + ['-f', str(web / 'db/migrations/20261010120000_native_account_admission.sql')])
+            run(client + ['-f', str(web / 'db/migrations/20261014180000_training_canvas_ledger.sql')])
+            run(client + ['-f', str(args.delegated_migration or web / 'db/migrations/20261025010000_delegated_training_revisions.sql')])
+            run(client + ['-f', str(args.cycle_migration or web / 'db/migrations/20261025040000_training_cycle_lifecycle.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -198,7 +209,17 @@ def main():
             adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
             import re
             statements=re.findall(r'database`([^`]+)`',adapter)
-            assert len(statements)==5 and all(s.strip().startswith('delete from') for s in statements)
+            expected_cleanup = [
+                'delete from public.chat_usage_limits where user_subject = ${subject}',
+                'delete from public.chat_conversations where user_subject = ${subject}',
+                'delete from public.weight_operation_receipts where user_subject = ${subject}',
+                'delete from public.body_metric_audit where user_subject = ${subject}',
+                'delete from public.metrics_agent_grants where user_subject = ${subject}',
+                'delete from public.body_metrics where user_subject = ${subject}',
+                'delete from public.native_records where user_subject = ${subject}',
+                "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
+            ]
+            assert [re.sub(r'\s+', ' ', s).strip() for s in statements] == expected_cleanup
             guard_source=(web/'src/lib/neon/native-account-admission.ts').read_text()
             guards=re.findall(r"database.query\('(select public.lyb_native_account_admit\(\$1, \$2::uuid\))'",guard_source)
             assert len(guards)==1, 'Expected the unique actual account guard SQL'
@@ -264,6 +285,140 @@ def main():
             assert command(subject,'apply',decision(a))['kind']=='decided'
             assert command(subject,'legacy_enroll',{'setup':legacy,'context':{k:v for k,v in context(subject).items() if k in ['ownerId','generation','profileFingerprint','legacyFingerprint']}})['kind']=='program_already_enrolled'
             check('legacy enrollment invalidates proposals; existing legacy replacement retained; canonical head cannot be bypassed')
+            # Cycle revisions share exactly the same owner lock, head CAS and receipt ledger.
+            subject=owner(); initial=new_proposal(subject); initial_apply=decision(initial)
+            assert command(subject,'apply',initial_apply)['kind']=='decided'
+            program=initial_apply['setup']['id']
+
+            def cycle_proposal(repeat=False):
+                ctx=context(subject)
+                prior=json.loads(sql(f"select payload - 'record_type' from native_records where user_subject={quote(subject)} and collection='training_feedback' and id='{program}';"))
+                proposed=dict(prior)
+                proposed['cycle']=dict(weekCount=5,temporaryPriorities=[],temporaryConstraints=[],retainedVariants=[],historyProgramIds=[program] if repeat else [])
+                proposed['id']=str(uuid.uuid4()) if repeat else program
+                proposal=dict(id=str(uuid.uuid4()),programId=proposed['id'],baseRevision=ctx['headRevision'],
+                    context={k:ctx[k] for k in ['ownerId','generation','profileFingerprint','legacyFingerprint']},
+                    actor=dict(kind='self',subject=subject),createdAt='2026-10-25T12:00:00Z',
+                    intent=dict(kind='repeat_cycle' if repeat else 'revise_cycle',weekCount=5),
+                    priorState=dict(setup=prior,trainingFingerprint=ctx['trainingFingerprint']),proposedSetup=proposed)
+                body=dict(requestId=str(uuid.uuid4()),requestHash='cycle-'+proposal['id'],proposal=proposal)
+                assert command(subject,'create',body)['kind']=='stored'
+                apply=decision(body); apply['setup']=dict(proposed,programRevisionId=apply['revisionId'])
+                return body,apply
+
+            stale,stale_apply=cycle_proposal()
+            session=str(uuid.uuid4()); prescription=dict(id=session,week=1,exercises=[dict(id='goblet_squat',sets=2)])
+            session_payload=dict(record_type='workout_session',programSetupId=program,
+                programRevisionId=initial_apply['revisionId'],status='in_progress',prescription=prescription)
+            sql(f"insert into native_records(collection,id,user_subject,payload) values('training_sessions','{session}',{quote(subject)},{quote(json.dumps(session_payload))}::jsonb);")
+            assert command(subject,'apply',stale_apply)['kind']=='stale_context'
+            check('new session invalidates an already reviewed cycle draft under the owner lock')
+
+            first,first_apply=cycle_proposal(); competing,competing_apply=cycle_proposal()
+            assert command(subject,'apply',first_apply)['kind']=='decided'
+            assert command(subject,'apply',first_apply)['receipt']['revisionId']==first_apply['revisionId']
+            assert command(subject,'apply',competing_apply)['kind']=='revision_conflict'
+            saved=json.loads(sql(f"select payload from native_records where id='{session}' and collection='training_sessions';"))
+            assert saved['prescription']==prescription and saved['status']=='in_progress'
+            assert saved['programRevisionId']==first_apply['revisionId']
+            assert context(subject)['headRevision']==first_apply['revisionId']
+            check('length revision preserves unfinished prescription, atomically rebinds authority, and excludes competing applies')
+
+            sql(f"update native_records set payload=jsonb_set(payload,'{{status}}','\"ended\"'::jsonb) where id='{session}';")
+            repeated,repeat_apply=cycle_proposal(True)
+            assert command(subject,'apply',repeat_apply)['kind']=='decided'
+            assert sql(f"select count(*) from native_records where user_subject={quote(subject)} and collection='training_feedback' and deleted_at is null;")=='1'
+            assert json.loads(sql(f"select payload->'prescription' from native_records where id='{session}';"))==prescription
+            assert sql(f"select count(*) from training_program_revisions where user_subject={quote(subject)};")=='3'
+            check('next-block revision preserves session and revision history while leaving one current setup')
+            def delegated_proposal(subject, changes=None):
+                ctx=context(subject)
+                current=sql(f"select payload - 'record_type' from native_records where user_subject={quote(subject)} and collection='training_feedback' and deleted_at is null and coalesce(payload->>'programRevisionId','')={quote(ctx['headRevision'] or '')} order by payload->>'startedAt' desc limit 1;")
+                prior=json.loads(current) if current else None
+                program=dict(prior['delegated']) if prior and 'delegated' in prior else dict(inputs=dict(sessionsPerWeek=prior['sessionsPerWeek'] if prior else 2,equipment=prior['equipment'] if prior else 'dumbbells'),authority=dict(trainerSubject=None,coachDelegated=False))
+                if changes: program.update(changes)
+                proposal=dict(version=2,id=str(uuid.uuid4()),programId=prior['id'] if prior else str(uuid.uuid4()),
+                    ownerSubject=subject,baseRevision=ctx['headRevision'],context={k:ctx[k] for k in ['ownerId','generation','profileFingerprint','legacyFingerprint']},
+                    actor=dict(kind='coach',subject='lyb-coach'),authority='user_review',priorState=prior,
+                    proposedState=program,policyVersion='delegated-canvas-v1',createdAt='2026-10-25T12:00:00Z',
+                    inputEvidence=dict(fingerprint=sql(f'select training_planning_fingerprint({quote(subject)});')))
+                body=dict(requestId=str(uuid.uuid4()),requestHash=str(uuid.uuid4()),proposal=proposal)
+                assert command(subject,'create',body)['kind']=='stored'
+                return body
+
+            def delegated_decision(created, actor=None):
+                result=decision(created)
+                p=created['proposal']
+                result['actor']=actor or dict(kind='user',subject=p['ownerSubject'])
+                result['evidenceFingerprint']=p['inputEvidence']['fingerprint']
+                result['setup'].update(delegated=p['proposedState'],programPolicyVersion='delegated-canvas-v1',
+                    sessionsPerWeek=p['proposedState']['inputs']['sessionsPerWeek'],equipment=p['proposedState']['inputs']['equipment'])
+                return result
+
+            subject=owner(); initial_legacy=new_proposal(subject); setup=decision(initial_legacy)['setup']
+            setup.pop('programRevisionId'); setup.pop('programPolicyVersion')
+            assert command(subject,'legacy_enroll',dict(setup=setup,context=initial_legacy['proposal']['context']))['kind']=='enrolled'
+            replacement=dict(setup,id=str(uuid.uuid4()),startedAt='2026-10-12T12:00:00Z')
+            captured={k:context(subject)[k] for k in ['ownerId','generation','profileFingerprint','legacyFingerprint']}
+            assert command(subject,'legacy_enroll',dict(setup=replacement,context=captured))['kind']=='enrolled'
+            adopted=delegated_proposal(subject)
+            assert adopted['proposal']['priorState']==replacement
+            assert command(subject,'apply',delegated_decision(adopted))['kind']=='decided'
+            assert counts(subject)==[2,1,2]
+            check('legacy baseline adoption reuses one setup and retains exact prior state')
+
+            subject=owner(); initial=delegated_proposal(subject); accepted=delegated_decision(initial)
+            result=command(subject,'apply',accepted)
+            assert result['kind']=='decided' and result['receipt']['version']==2 and context(subject)['generation']==1
+            assert command(subject,'apply',accepted)==result
+            check('delegated initial enrollment atomically commits setup/head/immutable receipt and replays')
+            legacy_canvas=json.loads(sql(f"select training_canvas_save({quote(subject)},{quote(context(subject)['ownerId'])}::uuid,null,{quote(json.dumps(dict(version=1,write=1,generation=0)))}::jsonb);"))
+            assert legacy_canvas['kind']=='canonical_revision_required'
+            assert sql(f"select count(*) from training_canvas_ledgers where user_subject={quote(subject)};")=='0'
+            check('older canvas clients cannot install a second plan after delegated acceptance')
+
+
+            a=delegated_proposal(subject,dict(inputs=dict(sessionsPerWeek=4,equipment='dumbbells')))
+            b=delegated_proposal(subject,dict(inputs=dict(sessionsPerWeek=3,equipment='dumbbells')))
+            first,second=locked_order(subject,command_sql(subject,'apply',delegated_decision(a)),command_sql(subject,'apply',delegated_decision(b)))
+            assert 'decided' in first and json.loads(second)['kind']=='stale_context'
+            assert counts(subject)==[3,2,1]
+            check('delegated concurrent edits keep one canonical setup and admit only one new revision')
+
+            stale=delegated_proposal(subject)
+            sql(f"insert into native_records(collection,id,user_subject,payload,updated_at) values('training_feedback','{uuid.uuid4()}',{quote(subject)},{quote(json.dumps(dict(record_type='session_feedback')))},now());")
+            assert command(subject,'apply',delegated_decision(stale))['kind']=='stale_context'
+            check('new recovery evidence invalidates a delegated draft inside the owner lock')
+
+            active=str(uuid.uuid4())
+            sql(f"insert into native_records(collection,id,user_subject,payload,updated_at) values('training_sessions','{active}',{quote(subject)},{quote(json.dumps(dict(record_type='workout_session',status='in_progress',programSetupId=initial['proposal']['programId'])))},now());")
+            delayed=delegated_proposal(subject)
+            delayed_request=delegated_decision(delayed)
+            assert command(subject,'apply',delayed_request)['kind']=='delayed_active_workout'
+            assert command(subject,'apply',delayed_request)['kind']=='delayed_active_workout'
+            stored=json.loads(sql(f"select training_stored_proposal('{delayed['proposal']['id']}',{quote(subject)});"))
+            assert stored['status']=='proposed' and len(stored['attempts'])==1
+            assert stored['attempts'][0]['reason']=='active_workout' and stored['attempts'][0]['actor']==delayed_request['actor']
+            sql(f"update native_records set deleted_at=now() where id='{active}';")
+            check('active workout delays delegated application without a false applied receipt')
+
+            grant=delegated_proposal(subject,dict(authority=dict(trainerSubject='authorized-trainer',coachDelegated=False)))
+            assert command(subject,'apply',delegated_decision(grant))['kind']=='decided'
+            trained=delegated_proposal(subject)
+            assert command(subject,'apply',delegated_decision(trained,dict(kind='trainer',subject='stranger')))['kind']=='unauthorized_actor'
+            trainer=delegated_decision(trained,dict(kind='trainer',subject='authorized-trainer'))
+            assert command(subject,'apply',trainer)['receipt']['actor']==trainer['actor']
+            check('only the currently authorized trainer can commit and its actor is retained')
+
+            rollback=delegated_proposal(subject); before=counts(subject); head=context(subject)['headRevision']
+            sql("create trigger injected_edit_failure before update on native_records for each row execute function fail_training_insert();")
+            try: command(subject,'apply',delegated_decision(rollback)); raise AssertionError('expected delegated setup failure')
+            except RuntimeError as error: assert 'injected setup failure' in str(error)
+            assert counts(subject)==before and context(subject)['headRevision']==head
+            assert sql(f"select status from training_revision_proposals where id='{rollback['proposal']['id']}';")=='proposed'
+            sql('drop trigger injected_edit_failure on native_records;')
+            check('delegated setup update failure rolls back the new revision/head/receipt')
+
             print(json.dumps({'passed':len(checks),'checks':checks,'scope':'disposable PostgreSQL16; synthetic rows; actual migration and extracted delete transaction'}))
         finally:
             run(control + ['-m','immediate','-w','stop'])

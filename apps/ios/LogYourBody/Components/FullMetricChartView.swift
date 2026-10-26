@@ -118,7 +118,6 @@ struct MetricChartDataPoint: Identifiable, Sendable {
 
 struct ChartSeriesPreprocessor {
     let referenceDate: Date
-    let synchronizationText: String?
     let calendar = Calendar.current
 
     func seriesByRange(from points: [MetricChartDataPoint]) -> [TimeRange: [MetricChartDataPoint]] {
@@ -330,6 +329,7 @@ struct FullMetricChartView: View {
     let goalValue: Double?
     let statsTruthEnabled: Bool
     let referenceDate: Date
+    let synchronizationText: String?
 
     @Binding var selectedTimeRange: TimeRange
     @Binding var selectedTimelineDate: Date?

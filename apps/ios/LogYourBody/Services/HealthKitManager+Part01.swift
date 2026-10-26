@@ -122,13 +122,22 @@ func persistHealthKitSamples(
 
             for sample in samples {
                 let metadata = self.metadataDictionary(from: sample.metadata)
+                let storageUnit: HKUnit
+                switch sample.quantityType.identifier {
+                case HKQuantityTypeIdentifier.bodyMass.rawValue:
+                    storageUnit = .gramUnit(with: .kilo)
+                case HKQuantityTypeIdentifier.bodyFatPercentage.rawValue:
+                    storageUnit = .percent()
+                default:
+                    storageUnit = unit
+                }
                 let hkSample = HKRawSample(
                     id: UUID().uuidString,
                     userId: userId,
                     hkUUID: sample.uuid.uuidString,
                     quantityType: sample.quantityType.identifier,
-                    value: sample.quantity.doubleValue(for: unit),
-                    unit: unit.unitString,
+                    value: sample.quantity.doubleValue(for: storageUnit),
+                    unit: storageUnit.unitString,
                     startDate: sample.startDate,
                     endDate: sample.endDate,
                     sourceName: sample.sourceRevision.source.name,
@@ -184,6 +193,11 @@ func metadataDictionary(from metadata: [String: Any]?) -> [String: String]? {
 func sourceMetadata(from sample: HKQuantitySample) -> BodyMetricSourceMetadata {
         let deviceId = sample.device?.localIdentifier ?? sample.device?.udiDeviceIdentifier
 
+        let context = [
+            "time_zone": sample.metadata?[HKMetadataKeyTimeZone] as? String,
+            "sync_identifier": sample.metadata?[HKMetadataKeySyncIdentifier] as? String,
+            "sync_version": (sample.metadata?[HKMetadataKeySyncVersion] as? NSNumber)?.stringValue
+        ].compactMapValues { $0 }
         return BodyMetricSourceMetadata(
             vendor: "apple_health",
             sourceName: sample.sourceRevision.source.name,
@@ -191,9 +205,9 @@ func sourceMetadata(from sample: HKQuantitySample) -> BodyMetricSourceMetadata {
             deviceId: deviceId,
             deviceManufacturer: sample.device?.manufacturer,
             deviceModel: sample.device?.model,
-            sampleId: sample.uuid.uuidString,
+            sampleId: idempotencyKey(for: sample),
             quantityType: sample.quantityType.identifier
-        )
+        ).recordingHealthKitContext(context)
     }
 
 func combinedHealthKitMetadata(
@@ -204,7 +218,7 @@ func combinedHealthKitMetadata(
 
         let primary = weightMetadata ?? bodyFatMetadata
 
-        return BodyMetricSourceMetadata(
+        let combined = BodyMetricSourceMetadata(
             vendor: primary?.vendor ?? "apple_health",
             sourceName: primary?.sourceName ?? bodyFatMetadata?.sourceName,
             sourceBundleId: primary?.sourceBundleId ?? bodyFatMetadata?.sourceBundleId,
@@ -214,6 +228,21 @@ func combinedHealthKitMetadata(
             sampleId: primary?.sampleId ?? bodyFatMetadata?.sampleId,
             quantityType: primary?.quantityType ?? bodyFatMetadata?.quantityType,
             bodyFatSampleId: bodyFatMetadata?.sampleId
+        ).recordingHealthKitContext(primary?.healthKitContext ?? [:])
+        return bodyFatMetadata.map { combined.pairingHealthKitBodyFat($0) } ?? combined
+    }
+
+func weightImportSample(from sample: HKQuantitySample) -> HealthKitWeightImportSample {
+        HealthKitWeightImportSample(
+            weight: sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo)),
+            date: sample.startDate, sourceMetadata: sourceMetadata(from: sample)
+        )
+    }
+
+func bodyFatImportSample(from sample: HKQuantitySample) -> HealthKitBodyFatImportSample {
+        HealthKitBodyFatImportSample(
+            percentage: sample.quantity.doubleValue(for: HKUnit.percent()) * 100,
+            date: sample.startDate, sourceMetadata: sourceMetadata(from: sample)
         )
     }
 
@@ -393,12 +422,7 @@ func fetchWeightImportSamplesInRange(
         }
         if let ownership { try await requireImportOwnership(ownership) }
         persistHealthKitSamples(samples, unit: HKUnit.gramUnit(with: .kilo), ownership: ownership)
-        return samples.map { sample in
-            HealthKitWeightImportSample(
-                weight: sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo)),
-                date: sample.startDate, sourceMetadata: sourceMetadata(from: sample)
-            )
-        }
+        return samples.map { weightImportSample(from: $0) }
     }
 
 func fetchLatestBodyFatPercentage() async throws -> (percentage: Double?, date: Date?) {
@@ -468,12 +492,7 @@ func fetchBodyFatImportSamples(
         }
         if let ownership { try await requireImportOwnership(ownership) }
         persistHealthKitSamples(samples, unit: HKUnit.percent(), ownership: ownership)
-        return samples.map { sample in
-            HealthKitBodyFatImportSample(
-                percentage: sample.quantity.doubleValue(for: HKUnit.percent()) * 100,
-                date: sample.startDate, sourceMetadata: sourceMetadata(from: sample)
-            )
-        }
+        return samples.map { bodyFatImportSample(from: $0) }
     }
 
 func saveBodyFatPercentage(_ percentage: Double, date: Date = Date()) async throws {
@@ -496,6 +515,7 @@ func saveBodyFatPercentage(_ percentage: Double, date: Date = Date()) async thro
     }
 
 func setupBackgroundDelivery() async throws {
+        guard capabilities.pushEvents else { return }
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }

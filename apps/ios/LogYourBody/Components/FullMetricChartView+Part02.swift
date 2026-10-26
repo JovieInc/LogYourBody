@@ -515,13 +515,6 @@ func movingAverage(
         return smoothed
     }
 
-func computeSeriesStats(
-        for series: [MetricChartDataPoint]
-    ) -> MetricSeriesStats? {
-        guard series.count >= 2 else { return nil }
-        return computeRangeStats(points: series, requiresComparison: false, includesInferredValues: true)
-    }
-
 func combinedPresence(for presences: [MetricPresence]) -> MetricPresence {
     if presences.contains(.interpolated) {
         return .interpolated
@@ -751,4 +744,10 @@ var isStepsMetric: Bool {
             localHistorySections = sections
         }
     }
+}
+
+/// Shared by the chart and its deterministic calculation fixtures.
+func computeSeriesStats(for series: [MetricChartDataPoint]) -> MetricSeriesStats? {
+    guard series.count >= 2 else { return nil }
+    return computeRangeStats(points: series, requiresComparison: false, includesInferredValues: true)
 }

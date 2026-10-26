@@ -15,6 +15,8 @@ export type VoiceSetContext = {
   reps: number;
   loadKg: number | null;
   rir: number;
+  /** Server-derived. Dumbbell-only variants are per hand; shared implements stay unset. */
+  loadAccounting?: 'per_hand' | 'total';
 };
 
 export type VoiceLogProposal = {
@@ -30,6 +32,23 @@ export type VoiceLogProposal = {
 export type VoiceIntentResult =
   | { kind: 'message' }
   | { kind: 'clarify'; missingFields: string[] }
+  | {
+      kind: 'workout_feedback';
+      requiresConfirmation: true;
+      feedback: {
+        sessionId: string;
+        exerciseId: string;
+        setNumber: number;
+        intent:
+          | 'breathing_limited'
+          | 'grip_limited'
+          | 'more_rest'
+          | 'ready'
+          | 'unusually_weak'
+          | 'unknown';
+        originalStatement: string;
+      };
+    }
   | {
       kind: 'log_set';
       requiresConfirmation: true;
@@ -68,6 +87,27 @@ const LOAD_PATTERN =
   /\b(?:at|with)\s+(\d{1,3}(?:\.\d{1,2})?)\s*(kg|kgs|kilograms?|lb|lbs|pounds?)?\b/i;
 const RIR_PATTERN = /\b(\d)\s*(?:rir|reps?\s+in\s+reserve|left)\b/i;
 const SET_PATTERN = /\bset\s*(\d{1,2})\b/i;
+const COLLOQUIAL_PLATES: Array<[RegExp, number]> = [
+  [/\b(?:the|with)\s+twenty[-\s]fives\b/i, 25],
+  [/\b(?:the|with)\s+tens\b/i, 10],
+  [/\b(?:the|with)\s+fifteens\b/i, 15],
+  [/\b(?:the|with)\s+twenties\b/i, 20],
+  [/\b(?:the|with)\s+thirties\b/i, 30],
+  [/\b(?:the|with)\s+forties\b/i, 40],
+  [/\b(?:the|with)\s+fifties\b/i, 50],
+];
+
+/** Plate nicknames are read from the original transcript so "twenty-fives" is not
+ * rewritten into a bare number before the idiom can be recognized. */
+function colloquialPlateLoad(transcript: string): number | undefined {
+  for (const [pattern, value] of COLLOQUIAL_PLATES) {
+    if (pattern.test(transcript)) return value;
+  }
+  const digits = /\b(?:the|with)\s+(\d{1,3})s\b/i.exec(transcript);
+  if (!digits?.[1]) return undefined;
+  const value = Number(digits[1]);
+  return Number.isInteger(value) && value >= 0 && value <= 500 ? value : undefined;
+}
 
 export function poundsToKg(pounds: number): number {
   return Number((pounds * 0.45359237).toFixed(2));
@@ -144,8 +184,42 @@ export function parseVoiceIntent(
 ): VoiceIntentResult {
   const original = transcript.trim();
   const normalized = normalizeSpokenNumbers(original);
-  if (/\b(?:hurts?|pain|painful)\b/i.test(normalized))
+  if (/\b(?:hurts?|pain|painful|dizzy|faint|numb|tingling)\b/i.test(normalized))
     return contextualAction('pain', context, normalized);
+  // Normalize controls only. LYB-114 evaluates the saved observation, not this parser.
+  const readinessIntent = (
+    [
+      [/^(?:i(?:'m| am)\s+)?still out of breath[.!]?$/i, 'breathing_limited'],
+      [/^my grip is limiting me[.!]?$/i, 'grip_limited'],
+      [/^(?:i\s+)?need more rest[.!]?$/i, 'more_rest'],
+      [/^(?:actually\s+)?(?:i am\s+|i'm\s+)?ready now[.!]?$/i, 'ready'],
+      [/^that set was unusually weak[.!]?$/i, 'unusually_weak'],
+      [/^(?:i don't know if i'm ready|not ready now)[.!]?$/i, 'unknown'],
+    ] as const
+  ).find(([pattern]) => pattern.test(original))?.[1];
+  if (readinessIntent) {
+    const set =
+      readinessIntent === 'unusually_weak' ? context.lastCompletedSet : context.currentSet;
+    if (!context.sessionId || !set) {
+      return {
+        kind: 'clarify',
+        missingFields: [
+          readinessIntent === 'unusually_weak' ? 'last_completed_set' : 'current_set',
+        ],
+      };
+    }
+    return {
+      kind: 'workout_feedback',
+      requiresConfirmation: true,
+      feedback: {
+        sessionId: context.sessionId,
+        exerciseId: set.exerciseId,
+        setNumber: set.setNumber,
+        intent: readinessIntent,
+        originalStatement: original,
+      },
+    };
+  }
   if (/\b(?:taken|occupied|unavailable|in use|not available)\b/i.test(normalized))
     return contextualAction('equipment_unavailable', context, normalized);
   const minutes = Number(/\b(\d{1,3})\s*(?:minutes?|mins?)\b/i.exec(normalized)?.[1]);
@@ -175,9 +249,11 @@ export function parseVoiceIntent(
   const correctionReps = /\bactually\s+(\d{1,2})\b/i.exec(normalized)?.[1];
   const reps = Number(REP_PATTERN.exec(normalized)?.[1] ?? correctionReps);
   const loadMatch = LOAD_PATTERN.exec(normalized);
-  const loadValue = loadMatch ? Number(loadMatch[1]) : undefined;
-  const spokenUnit = canonicalWeightUnit(loadMatch?.[2]);
-  const weightUnit = spokenUnit ?? context.weightUnit;
+  const explicitUnit = canonicalWeightUnit(loadMatch?.[2]);
+  const colloquialValue = colloquialPlateLoad(original);
+  const usesColloquial = colloquialValue !== undefined && explicitUnit === undefined;
+  const loadValue = usesColloquial ? colloquialValue : loadMatch ? Number(loadMatch[1]) : undefined;
+  const weightUnit = explicitUnit ?? context.weightUnit;
   const parsedRir = Number(RIR_PATTERN.exec(normalized)?.[1]);
   const setNumber = Number(SET_PATTERN.exec(normalized)?.[1]);
   const missingFields: string[] = [];
@@ -188,7 +264,17 @@ export function parseVoiceIntent(
   if (!Number.isInteger(resolvedReps) || resolvedReps! < 1 || resolvedReps! > 50)
     missingFields.push('reps');
   if (!Number.isInteger(rir) || rir! < 0 || rir! > 6) missingFields.push('rir');
-  if (loadMatch && (!Number.isFinite(loadValue) || loadValue! < 0 || !weightUnit)) {
+  if (usesColloquial) {
+    // A plate nickname is not a number we can convert until both the unit and the
+    // per-hand convention are already known. Never fall through to the prescription load.
+    if (!weightUnit) missingFields.push('weight');
+    if (
+      /\b(?:total|altogether)\b/i.test(original) ||
+      contextualSet?.loadAccounting !== 'per_hand'
+    ) {
+      missingFields.push('load_accounting');
+    }
+  } else if (loadMatch && (!Number.isFinite(loadValue) || loadValue! < 0 || !weightUnit)) {
     missingFields.push('weight');
   }
 
@@ -212,8 +298,11 @@ export function parseVoiceIntent(
     missingContext.push('set_number');
   }
 
-  const loadKg =
-    loadMatch && loadValue !== undefined && weightUnit === 'lbs'
+  const loadKg = usesColloquial
+    ? weightUnit === 'lbs'
+      ? poundsToKg(loadValue!)
+      : loadValue!
+    : loadMatch && loadValue !== undefined && weightUnit === 'lbs'
       ? poundsToKg(loadValue)
       : loadMatch
         ? loadValue!
@@ -250,9 +339,9 @@ export function parseVoiceIntent(
     heard: {
       ...(Number.isInteger(resolvedSetNumber) ? { setNumber: resolvedSetNumber } : {}),
       reps: resolvedReps!,
-      ...(loadMatch && loadValue !== undefined ? { loadValue } : {}),
+      ...(loadValue !== undefined && (usesColloquial || loadMatch) ? { loadValue } : {}),
       ...(weightUnit ? { weightUnit } : {}),
-      ...(loadMatch ? { loadKg } : {}),
+      ...(usesColloquial || loadMatch ? { loadKg } : {}),
       rir: rir!,
     },
   };
