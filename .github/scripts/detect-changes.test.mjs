@@ -742,6 +742,76 @@ function stagedSourceMap() {
   return { root, output, config, resolve };
 }
 
+function dependencySourceMap() {
+  const fx = stagedSourceMap();
+  fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'old lockfile\n');
+  git(fx.root, 'add', 'pnpm-lock.yaml');
+  const bin = path.join(fx.root, 'bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'pnpm'), `#!/usr/bin/env python3
+import json, pathlib, sys
+assert sys.argv[1:] == ['install', '--lockfile-only', '--ignore-scripts', '--prefer-offline', '--no-frozen-lockfile']
+pathlib.Path('pnpm-called').touch()
+if pathlib.Path('pnpm-fail').exists(): sys.exit(42)
+version = json.loads(pathlib.Path('package.json').read_text())['dependencies']['switch']
+pathlib.Path('pnpm-lock.yaml').write_text('switch: ' + version + '\\n')
+`, { mode: 0o755 });
+  fx.resolve = (...args) => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', fx.root, '--dependencies', ...args,
+  ], { env: { ...gitEnv, PATH: bin + ':' + process.env.PATH }, encoding: 'utf8' });
+  return fx;
+}
+
+test('dependency repair refreshes the lockfile and source map together without staging source edits', () => {
+  const fx = dependencySourceMap();
+  try {
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged local instructions\n');
+    const source = git(fx.root, 'show', ':package.json');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), 'switch: 1.3.8');
+    assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
+    assert.equal(git(fx.root, 'show', ':package.json'), source);
+    assert.equal(git(fx.root, 'show', ':README.md'), 'Local instructions');
+    assert.equal(fs.readFileSync(path.join(fx.root, 'README.md'), 'utf8'), 'Unstaged local instructions\n');
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.resolve().status, 0, 'dependency repair is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['pnpm-failure', 'pinned-drift', 'staged-mode']) {
+  test(`dependency repair refuses ${failure} without staging output`, () => {
+    const fx = dependencySourceMap();
+    try {
+      if (failure === 'pnpm-failure') fs.writeFileSync(path.join(fx.root, 'pnpm-fail'), '');
+      if (failure === 'pinned-drift') {
+        fx.config.imports = [{
+          repository: 'example/policy', revision: 'a'.repeat(40),
+          path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+        }];
+        fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+      }
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve(...(failure === 'staged-mode' ? ['--staged'] : []));
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, {
+        'pnpm-failure': /exit status 42/,
+        'pinned-drift': /pinned copy missing or changed/,
+        'staged-mode': /not allowed with argument/,
+      }[failure]);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.existsSync(path.join(fx.root, 'pnpm-called')), failure === 'pnpm-failure');
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
 test('commit source-map repair uses staged dependencies and preserves unstaged source edits', () => {
   const fx = stagedSourceMap();
   try {

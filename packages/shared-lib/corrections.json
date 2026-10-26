@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-1423773703",
+    "correction": "PR #1610: The Radix Toggle 1.2.1 manifest bump left its pnpm lockfile importer and generated source map stale. Recurring dependency PR repairs must refresh both derived outputs with a reusable machine.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1610",
+    "mechanization": "Extend the existing source-map resolver with a dependency repair mode that refreshes the pnpm lockfile without install scripts, regenerates the projection and stages only those outputs. The existing required Detect Changes tests cover combined repair, idempotence, preservation of source edits, pnpm failure, pinned drift and incompatible staged mode. New regressions fail before the extension and pass afterward. Use the command for this PR and retain frozen installation and parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can generate both dependency-derived files in one operation, preventing partial repairs by construction. It rejects source conflicts and pinned drift before invoking pnpm, and stages neither output when pnpm fails."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Repair bot manifest bumps and their derived files in one operation."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "staged-dependency-source-map-refresh",
     "correction": "PR #1603: Dependabot's Radix Switch 1.3.8 manifest bump left the generated source map stale, failing Detect Changes, documentation parity and CI Summary. Repeated source-map repairs need a reusable commit-time refresh.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1603",
