@@ -64,6 +64,10 @@ metadata as well as classification and guard anchors.
 Run from the repository root:
 
 ```sh
+# Resolve a corrections.json conflict from Git's base/ours/theirs index stages.
+# Retains incoming order, validates coverage, and leaves review/staging explicit.
+# Deletions or divergent edits fail without writing; resolve those manually.
+node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger
 # Seed a new baseline, or remove findings fixed in this PR (review the diff).
 node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main --update-baselines
 # Read-only verification, using the PR's exact base SHA in CI.
