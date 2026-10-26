@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1593: Resolve the origin/main correction-ledger conflict without losing the Ruby runtime cache and Bundler load-order receipts or the incoming Sentry and StoreKit receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1593",
+    "mechanization": "Extend the existing required correction coverage guard to accept repeated immutable --base-ref arguments. Its normal shared-lib behavior suite proves that checking one parent can silently lose the other parent's source, while checking both rejects the loss and preserves recurrence. The new regression fails before the extension and passes afterward. Validate this merged ledger against both actual merge-parent SHAs in one invocation.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "ruby-native-verification-loads-after-bundler",
     "correction": "PR #1593: Launch Quality failed in Verify Ruby setup because command-line -rdate activated Ruby's default date 3.2.2 before Bundler selected the locked date 3.6.0.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40266780512/job/121390909536",

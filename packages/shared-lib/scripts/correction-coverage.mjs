@@ -220,16 +220,19 @@ export function renderCoverage(report) {
 
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
   assert.ok(
-    argv.length === 0 || (argv.length === 2 && argv[0] === '--base-ref'),
-    'usage: correction-coverage.mjs [--base-ref <sha|origin/main>]',
+    argv.length % 2 === 0 &&
+      argv.every((argument, index) =>
+        index % 2 === 0 ? argument === '--base-ref' : argument.length > 0,
+      ),
+    'usage: correction-coverage.mjs [--base-ref <sha|origin/main>]...',
   );
   const current = guardCoverageReport(
     JSON.parse(readSource(LEDGER_PATH, { root })),
     (path) => readSource(path, { root }),
     { requireClassification: true },
   );
-  if (argv.length) {
-    const ref = argv[1];
+  for (let index = 1; index < argv.length; index += 2) {
+    const ref = argv[index];
     const baseline = coverageReport(JSON.parse(readSource(LEDGER_PATH, { root, ref })), (path) =>
       readSource(path, { root, ref }),
     );
