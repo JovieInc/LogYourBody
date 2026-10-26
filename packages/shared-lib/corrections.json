@@ -1,5 +1,49 @@
 [
   {
+    "fingerprint": "gym-registry-verifiers-track-account-erasure-schema",
+    "correction": "PR #1587: The required training transaction verifiers reject the gym cleanup function added to account erasure and do not load its migration.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40224215238/job/121286077254",
+    "mechanization": "Extend both existing PostgreSQL transaction verifiers to load the actual gym migration and require all nine exact account-erasure statements. Extend the required mutation verifier with active and tombstoned gyms, a later account-delete failure, rollback, successful retry and isolation of another owner. The unchanged verifier fails on the eight-versus-nine statement inventory; the repaired mutation verifier passes 51 checks and the revision verifier passes 28 on disposable PostgreSQL16. Keep every prior weight, training and admission assertion.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Product erasure code cannot update the separately maintained PostgreSQL verifier fixture and its explicit SQL inventory."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required JavaScript/TypeScript check executes the verifier against real migrations and production erasure SQL, rejecting missing gym cleanup, incomplete rollback and cross-owner deletion."
+      }
+    },
+    "guard": {
+      "path": "apps/web/db/tests/verify-training-mutations.py",
+      "anchor": "gym account erasure rolls back on later failure, retries active and deleted rows, and preserves the other owner"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1587: Adding GymRegistry and GymRegistryTests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40224215238/job/121285974458",
+    "mechanization": "Review the eight gym target-membership additions against origin/main and refresh only the exact project SHA-256 pin. Retain all seven pins and every trusted CLI acceptance and rejection scenario. The existing required routing regression fails before the update and passes after it. Regenerate the repository source map through the existing merge resolver; the harness remains the sole shipper.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "healthkit-timezone-policy-without-source-identity",
     "correction": "PR #1567: Launch Quality failed the two cross-day timezone assertions in HealthImportIdempotencyTests. Selecting the sample-local day must not depend on having a complete source-scoped identity.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1567",
