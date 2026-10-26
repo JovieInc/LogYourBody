@@ -72,3 +72,36 @@ acceptance work; portable tests and syntax parsing do not establish those facts.
 
 The harness owns commit pushing, PR creation and merge. No push, PR operation,
 Statsig rollout or release was performed during implementation.
+
+## Merge repair, 2026-10-26
+
+Merged `origin/main` at `2e9187a7f2775d3abdfaf0f57af7cad1cc9d26dc` without
+rebasing. Retained numeric scrub alongside training progress, undo and canonical
+saved-set callbacks. The composed Xcode project retains both parents' Swift
+references; its diagnostic dependency pin and repository source map are current.
+
+Extended `scripts/correction-classifier.mjs` with `--merge` and used it on both
+immutable parent ledgers. The normal shared-lib suite runs the new CLI regression:
+it failed against the old CLI, then passed with 100% line, branch and function
+coverage. Distinct receipts survive, contradictory duplicate evidence fails
+without writing, and repeated merges preserve bytes. Recorded the correction in
+the existing ledger and documented the command in the ledger guide.
+
+Repair validation on Linux:
+
+- `corepack pnpm install --frozen-lockfile --prefer-offline`, `corepack pnpm lint`,
+  `corepack pnpm typecheck`, `corepack pnpm test`: passed (pnpm 10.34.1).
+- `python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q`:
+  44 passed. All seven diagnostic dependency hashes match the merged source.
+- Strict SwiftLint with `--no-cache` on the six PR Swift files: zero violations;
+  the five SourceKit-dependent rules remain unavailable on this host.
+- Correction coverage against both merge parents, guard-reference validation,
+  correction ratchets, URL drift, repository source parity and `git diff --check`:
+  passed. The existing 11 web-claims baseline findings remain warnings.
+- `gh run view 40172790796 --repo JovieInc/LogYourBody --log-failed`: no failed
+  logs; the existing head's reported checks passed. The repaired head still needs
+  the required macOS native checks; no Xcode runtime receipt is claimed here.
+
+The harness retains push and PR ownership. Its PR-body handoff line is
+`Machine: built scripts/correction-classifier.mjs`. GBrain query, write and
+readback could not connect to its local service; persistence is unverified.

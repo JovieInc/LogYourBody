@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 #if canImport(Sentry)
@@ -10,6 +11,7 @@ import Sentry
 protocol ErrorTrackingVendor {
     func start()
     func setTag(value: String, key: String)
+    func setUser(id: String)
     func setExtra(value: String, key: String)
     func capture(error: Error)
     func addBreadcrumb(
@@ -31,13 +33,18 @@ final class ErrorTrackingService: @unchecked Sendable {
     }
 
     private let vendor: ErrorTrackingVendor
+    private let installID: () -> String
 
     private convenience init() {
         self.init(vendor: SentryErrorTrackingVendor())
     }
 
-    init(vendor: ErrorTrackingVendor) {
+    init(
+        vendor: ErrorTrackingVendor,
+        installID: @escaping () -> String = ErrorTrackingIdentity.persistentInstallID
+    ) {
         self.vendor = vendor
+        self.installID = installID
     }
 
     func start() {
@@ -77,8 +84,13 @@ final class ErrorTrackingService: @unchecked Sendable {
         }
     }
 
+    /// Sets the Sentry user to an opaque identifier so issues report affected-user
+    /// counts. Signed-in users are a one-way hash of their account id; signed-out
+    /// sessions use a random per-install id. No email, name or raw account id is sent.
     func updateUserId(_ userId: String?) {
+        let anonymousID = ErrorTrackingIdentity.anonymousID(for: userId) ?? installID()
         withVendorOnMain { vendor in
+            vendor.setUser(id: anonymousID)
             if let userId = userId, !userId.isEmpty {
                 vendor.setTag(value: ErrorTrackingRedactor.filteredValue, key: "userId")
             } else {
@@ -144,6 +156,12 @@ private final class SentryErrorTrackingVendor: ErrorTrackingVendor {
         #endif
     }
 
+    func setUser(id: String) {
+        #if canImport(Sentry)
+        SentrySDK.setUser(Sentry.User(userId: id))
+        #endif
+    }
+
     func setExtra(value: String, key: String) {
         #if canImport(Sentry)
         SentrySDK.configureScope { scope in
@@ -189,6 +207,28 @@ private final class SentryErrorTrackingVendor: ErrorTrackingVendor {
     }
 }
 
+enum ErrorTrackingIdentity {
+    private static let installIDKey = "errorTracking.installID"
+
+    /// One-way, non-reversible id for a signed-in account. Nil for empty input.
+    static func anonymousID(for userId: String?) -> String? {
+        guard let userId, !userId.isEmpty else { return nil }
+        let digest = SHA256.hash(data: Data("lyb-sentry:\(userId)".utf8))
+        return "u_" + digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Random id for signed-out sessions, persisted so one device counts as one user.
+    static func persistentInstallID() -> String {
+        let defaults = UserDefaults.standard
+        if let existing = defaults.string(forKey: installIDKey), !existing.isEmpty {
+            return existing
+        }
+        let created = "i_" + UUID().uuidString.lowercased()
+        defaults.set(created, forKey: installIDKey)
+        return created
+    }
+}
+
 enum ErrorTrackingRedactor {
     static let filteredValue = "[Filtered]"
 
@@ -221,7 +261,12 @@ enum ErrorTrackingRedactor {
             result[entry.key] = sanitize(entry.value, key: entry.key)
         }
         event.message = event.message.map { SentryMessage(formatted: sanitize($0.formatted)) }
-        event.user = nil
+        // Keep only the opaque id so affected-user counts work; drop everything else.
+        if let id = event.user?.userId, !id.isEmpty {
+            event.user = Sentry.User(userId: id)
+        } else {
+            event.user = nil
+        }
         event.breadcrumbs = event.breadcrumbs?.compactMap { redact(breadcrumb: $0) }
         return event
     }
