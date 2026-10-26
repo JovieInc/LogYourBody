@@ -44,6 +44,86 @@
     "ruleId": "ci-invariant"
   },
   {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1537: Resolve the origin/main correction-ledger conflict by retaining the Sentry identity and StoreKit cleanup receipts alongside main's recurrence, measurement-freshness and release receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1537",
+    "mechanization": "Preserve complete receipts from both immutable merge parents. The existing required correction coverage check rejects removed or reassigned source receipts, and its behavior tests exercise those failures. Verify the resolved ledger against both parents without changing the Sentry implementation or any required gate.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "storekit-cleanup-deletes-only-captured-history",
+    "correction": "PR #1537: Launch Quality again lost the monthly subscription during restore despite a shared SKTestSession (one transaction before restore, no entitlement or latest transaction afterward). Cleanup must not issue global clears that can affect later purchases, or treat missing active entitlements as proof that expired/refunded history has been removed.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40167822205/job/121092440195",
+    "mechanization": "Setup, teardown and warm-up use one cleanup routine that deletes only captured existing transaction IDs, polls both StoreKit history views without further mutation, and throws on timeout. The shared-lib regression rejects global clears and entitlement-only readiness; it failed against the original fixture. All four native purchase/restore/expiration/refund cases and required gates remain intact. Native runtime confirmation requires the repaired head on macOS.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Deleting only captured transaction IDs prevents delayed cleanup from targeting a transaction created by a later test. A bounded full-history barrier prevents setup from proceeding while old expired/refunded transactions remain visible."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
+      "anchor": "try session.deleteTransaction(identifier: transaction.identifier)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "sentry-user-type-is-module-qualified",
+    "correction": "PR #1537: Both native CI jobs failed because User(userId:) resolved to LogYourBody.User instead of Sentry.User. The ErrorReporter test vendor also lacked the new setUser(id:) protocol requirement.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40157276257",
+    "mechanization": "Qualify both SDK user constructors with Sentry and complete the test vendor conformance. The existing required native build checks enforce the SDK argument type and every ErrorTrackingVendor conformance. ErrorTrackingServiceTests additionally exercises account and install identity preservation, personal-field removal, and missing or empty identity removal through the real SDK redactor. The original CI logs prove the unqualified build fails; native execution of the repaired head remains required on macOS.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Module-qualified SDK types prevent the app model from shadowing either constructor by construction. Swift protocol conformance requires every vendor implementation, including test fakes, to implement setUser(id:)."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/ErrorTrackingService.swift",
+      "anchor": "SentrySDK.setUser(Sentry.User(userId: id))"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1537: Merge-group CI rejected the retained Sentry identity and StoreKit cleanup receipts because their saved classifier level and ruleId were missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40263628787/job/121381212964",
+    "mechanization": "Run the existing deterministic classifier after retaining both merge parents. The required shared-lib idempotence regression reproduces the three missing annotations before classification and passes afterward without changing the guard or its 100% coverage thresholds.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1590: Adding installed-build xcresult test cache inputs left the generated Turbo manifest fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40238447521/job/121304913985",
