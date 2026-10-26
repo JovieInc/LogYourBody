@@ -1,59 +1,535 @@
 [
   {
-    "fingerprint": "weight-lifecycle-verifiers-track-account-erasure-schema",
-    "correction": "PR #1555: The required training mutation verifier still expected five cleanup statements and stubbed body_metrics after manual weight lifecycle added receipts, audit, and grants to account erasure.",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189270062/job/121156652050",
-    "mechanization": "Load the real body-metric and weight migrations in both transaction verifiers and assert all eight exact subject-scoped cleanup statements. The required mutation verifier exercises a committed weight receipt, audit, grant and metric, rollback after a later delete failure, successful retry and isolation of another owner. The original verifier reproduces the reported failure; the repaired verifier must pass on disposable PostgreSQL16.",
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1602: The root Zod 4.6.7 update left the generated source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must use the existing verify-first helper and remain retryable after resolver or frozen-check failures.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1602",
+    "mechanization": "Extend the existing dependency repair helper to restore the original lockfile bytes if dependency resolution or frozen verification fails. Two regressions in the existing required Detect Changes suite fail before the extension and pass afterward, proving lockfile and index preservation plus a successful retry without manual cleanup. Use --refresh-lockfile on this bump to verify and preserve the valid bot lockfile and regenerate the source map. Retain all frozen-install and parity gates; the harness remains the sole shipper.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1610: The Radix Toggle 1.2.1 manifest bump retained the 1.1.18 lockfile and stale source map, failing Vercel frozen installation, Detect Changes, parity and CI Summary. Repeated dependency repairs need one verify-first repair path.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1610",
+    "mechanization": "Extend the existing --refresh-lockfile resolver to probe frozen offline installation first, preserve valid bot resolutions, and regenerate only on ERR_PNPM_OUTDATED_LOCKFILE before requiring another frozen check. Other installation errors stop without invoking resolution or staging the source map. The existing required Detect Changes fixtures prove valid-lockfile preservation, stale-lockfile repair, idempotence and failure propagation. Five targeted regressions failed against the prior helper and pass after the extension. Use the extended helper for this PR while retaining all parity and frozen-install gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1601: Dependabot's Radix Aspect Ratio 1.2.0 update left the repository source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must verify valid bot lockfiles without re-resolving unrelated dependencies.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1601",
+    "mechanization": "Extend the existing source resolver with --verify-lockfile: retain dirty-input and pinned-source checks, verify the existing lockfile through frozen offline Corepack pnpm with lifecycle scripts disabled, then stage only the regenerated projection. Four behavioral regressions in the existing required Detect Changes suite fail before the extension and pass afterward, proving successful repair and idempotence without re-resolution, frozen-check failure propagation, dirty-source refusal and pinned-drift refusal. Use the mode on this dependency update; retain every existing frozen-install and parity gate.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1609: The web Zod 4.6.7 manifest update retained a 4.6.6 workspace lockfile and stale source projection, failing Vercel frozen installation, Detect Changes, parity and CI Summary. Repair dependency artifacts together with a reusable helper.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1609",
+    "mechanization": "Extend the existing repository source resolver with an explicit lockfile refresh. It refuses unstaged dependency edits and pinned drift, regenerates through pinned Corepack pnpm with lifecycle scripts disabled, verifies frozen offline installation, and stages the lockfile with the projection only after success. The existing required Detect Changes suite exercises command execution, dirty inputs, idempotence, resolver and frozen-check failures. Six initial cases fail before the extension and pass afterward. Use the extended helper on this PR and retain all frozen install and source parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "staged-dependency-source-map-refresh",
+    "correction": "PR #1603: Dependabot's Radix Switch 1.3.8 manifest bump left the generated source map stale, failing Detect Changes, documentation parity and CI Summary. Repeated source-map repairs need a reusable commit-time refresh.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1603",
+    "mechanization": "Extend the existing source-map resolver with an index-backed staged mode and run it after formatting and correction classification in pre-commit. Existing required Detect Changes tests prove staged dependency projection, preservation of partial staging, idempotence, and refusal of unstaged output, missing sources, unsafe paths and pinned drift. The new cases fail before the extension and pass afterward. Use the extended resolver to repair this PR while retaining all CI parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct and stage generated documentation directly from the Git index at local commit time, preventing stale manifest fingerprints by construction while preserving unstaged edits. GitHub-created bot commits remain protected by the required parity check and use the same resolver during repair."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Render the index, so partially staged manifests cannot leak into the commit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1595: Updating @radix-ui/react-accordion from 1.2.20 to 1.2.21 left the generated web manifest dependency and fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40299950152/job/121495099134",
+    "mechanization": "Regenerate the existing source projection after reviewing the accordion manifest and lockfile update. The required projection checker failed before regeneration and passes afterward; retain the required Detect Changes and CI Summary gates and their existing regression rejecting a missing or skippable parity step.",
     "classification": {
       "codebase": {
         "feasible": false,
-        "rationale": "Application schema and erasure logic cannot update the separately maintained PostgreSQL verifier fixture or its expected SQL inventory."
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
       },
       "static": {
         "feasible": true,
-        "rationale": "The existing required JavaScript/TypeScript check executes the verifier against real migrations and production erasure SQL, rejecting missing cleanup or incomplete rollback and owner isolation."
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
       }
     },
     "guard": {
-      "path": "apps/web/db/tests/verify-training-mutations.py",
-      "anchor": "weight account erasure rolls back on failure, retries completely, and preserves the other owner"
-    }
-  },
-  {
-    "fingerprint": "weight-intent-initializes-identity-before-wrapped-parameters",
-    "correction": "PR #1555: StoreKit compilation rejected LogWeightIntent because assigning the wrapped unit parameter used self before recordId and operationId were initialized.",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189270062/job/121156652049",
-    "mechanization": "Initialize both immutable invocation IDs before setting the wrapped unit parameter. Swift definite initialization rejects the original ordering, and the retained App Intent retry regression verifies stable record and operation identity. Native compilation and execution remain required in CI; Linux lint does not prove them.",
-    "classification": {
-      "codebase": {
-        "feasible": true,
-        "rationale": "Initializing both immutable stored IDs before invoking the property-wrapper setter satisfies Swift definite initialization while preserving identity for intent retries."
-      }
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
     },
-    "guard": {
-      "path": "apps/ios/LogYourBodyTests/BodyMetricAppIntentsTests.swift",
-      "anchor": "func testLogWeightIntentRetryKeepsTheSameRecordAndOperation()"
-    }
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
-    "fingerprint": "weight-sync-assertions-await-before-xctest-autoclosures",
-    "correction": "PR #1555: Launch Quality compilation rejected three sync regression assertions because XCTAssertTrue and XCTUnwrap use synchronous autoclosures that cannot await an asynchronous call.",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189270062/job/121156652284",
-    "mechanization": "Await the in-flight placeholder update and cached metric reads into local values before asserting or unwrapping them. Preserve the conflict and tombstone behavior assertions. The existing required native build compiles these test files and rejects await inside synchronous XCTest autoclosures; native execution remains unverified on Linux.",
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",
+    "mechanization": "Regenerate the existing source projection after reviewing the TruffleHog workflow version bump. The required projection checker failed before regeneration and passes afterward; retain the required Detect Changes and CI Summary gates and their existing regression rejecting a missing or skippable parity step.",
     "classification": {
       "codebase": {
         "feasible": false,
-        "rationale": "Product runtime code cannot enforce how asynchronous reads are evaluated inside separately compiled XCTest assertions."
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
       },
       "static": {
         "feasible": true,
-        "rationale": "The existing required Launch Quality native compiler checks every retained sync regression before execution and rejects asynchronous calls inside synchronous XCTest autoclosures."
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
       }
     },
     "guard": {
-      "path": "apps/ios/LogYourBodyTests/SyncIntegrationRemotePayloadTests.swift",
-      "anchor": "func testUpdateOrCreateBodyMetric_AppliesANewerServerTombstone()"
-    }
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "lint-correction-checks-warn-then-harden",
+    "correction": "LYB-307: Emit new checks only for lint/typecheck/CI classifications. The first receipt warns with exit 0; a distinct repeat hardens the same check. Codebase, prose and human-review classifications emit no new check.",
+    "source": "https://linear.app/jovie/issue/LYB-307",
+    "mechanization": "The existing required shared-lib test task runs real scanner and CLI fixtures proving warning exit 0, repeated violation exit 1, clean recurrent checks, duplicate receipt deduplication and no emitted checks for the other levels. Existing hard gates and finding-baseline ratchets retain their runners.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot enforce repository correction routing or the exit status of newly emitted lint and CI checks."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib suite can execute classified fixture receipts through the check emitter and assert diagnostics, recurrence, no-check routes and actual process exit statuses."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-checks.behavior.mjs",
+      "anchor": "lint-level violation warns at recurrence zero and fails at recurrence one or more"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "generated-source-map-conflict-repair",
+    "correction": "PR #1582: Repeated merges of origin/main conflict only in the generated ci.yml fingerprint. Regenerate from the merged sources instead of choosing either parent hash.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1582",
+    "mechanization": "Wrap the existing pinned repository_docs generator with a reusable merge resolver that refuses other unresolved files and pinned-source drift, then regenerates and stages only the configured output. Required Detect Changes tests exercise real conflicting Git branches, both parent edits, idempotence, unstaged edit preservation and refusal paths. Use the resolver for this merge.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The merge resolver constructs the projection from already merged sources using the pinned generator, preventing selection of a stale parent fingerprint. It refuses unresolved source conflicts before writing or staging."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "resolve source conflicts first: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "ruby-native-cache-matches-runtime-build",
+    "correction": "PR #1577: Merge-group Unit CI failed before native compilation because an exact Ruby-version cache restored date_core.bundle with an unavailable _rb_cFalseClass symbol. A Ruby version alone does not identify a compatible native gem build.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40270455941",
+    "mechanization": "Extend the shared Ruby/Bundler setup action with a new cache namespace bound to Ruby build configuration, executable location, platform, runner architecture and environment. Clear persistent bundle leftovers before restoring and require native gems during setup verification. The existing required Mac Runner Routing Tests execute the real identity and cleanup steps and reject incompatible cache prefixes and unloadable gems. All three regressions failed against the prior action and pass after repair; native execution still requires macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared setup action constructs cache identities from the active interpreter build and runner identity, preventing incompatible native cache reuse by construction. Clearing leftover bundles ensures a cache miss cannot inherit stale native artifacts."
+      }
+    },
+    "guard": {
+      "path": ".github/actions/setup-ruby-bundler/action.yml",
+      "anchor": "identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, File.realpath(RbConfig.ruby), RbConfig::CONFIG.sort]"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1537: Resolve the origin/main correction-ledger conflict by retaining the Sentry identity and StoreKit cleanup receipts alongside main's recurrence, measurement-freshness and release receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1537",
+    "mechanization": "Preserve complete receipts from both immutable merge parents. The existing required correction coverage check rejects removed or reassigned source receipts, and its behavior tests exercise those failures. Verify the resolved ledger against both parents without changing the Sentry implementation or any required gate.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "storekit-cleanup-deletes-only-captured-history",
+    "correction": "PR #1537: Launch Quality again lost the monthly subscription during restore despite a shared SKTestSession (one transaction before restore, no entitlement or latest transaction afterward). Cleanup must not issue global clears that can affect later purchases, or treat missing active entitlements as proof that expired/refunded history has been removed.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40167822205/job/121092440195",
+    "mechanization": "Setup, teardown and warm-up use one cleanup routine that deletes only captured existing transaction IDs, polls both StoreKit history views without further mutation, and throws on timeout. The shared-lib regression rejects global clears and entitlement-only readiness; it failed against the original fixture. All four native purchase/restore/expiration/refund cases and required gates remain intact. Native runtime confirmation requires the repaired head on macOS.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Deleting only captured transaction IDs prevents delayed cleanup from targeting a transaction created by a later test. A bounded full-history barrier prevents setup from proceeding while old expired/refunded transactions remain visible."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
+      "anchor": "try session.deleteTransaction(identifier: transaction.identifier)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "sentry-user-type-is-module-qualified",
+    "correction": "PR #1537: Both native CI jobs failed because User(userId:) resolved to LogYourBody.User instead of Sentry.User. The ErrorReporter test vendor also lacked the new setUser(id:) protocol requirement.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40157276257",
+    "mechanization": "Qualify both SDK user constructors with Sentry and complete the test vendor conformance. The existing required native build checks enforce the SDK argument type and every ErrorTrackingVendor conformance. ErrorTrackingServiceTests additionally exercises account and install identity preservation, personal-field removal, and missing or empty identity removal through the real SDK redactor. The original CI logs prove the unqualified build fails; native execution of the repaired head remains required on macOS.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Module-qualified SDK types prevent the app model from shadowing either constructor by construction. Swift protocol conformance requires every vendor implementation, including test fakes, to implement setUser(id:)."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/ErrorTrackingService.swift",
+      "anchor": "SentrySDK.setUser(Sentry.User(userId: id))"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1537: Merge-group CI rejected the retained Sentry identity and StoreKit cleanup receipts because their saved classifier level and ruleId were missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40263628787/job/121381212964",
+    "mechanization": "Run the existing deterministic classifier after retaining both merge parents. The required shared-lib idempotence regression reproduces the three missing annotations before classification and passes afterward without changing the guard or its 100% coverage thresholds.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1590: Adding installed-build xcresult test cache inputs left the generated Turbo manifest fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40238447521/job/121304913985",
+    "mechanization": "Regenerate the existing source projection after reviewing the three installed-build xcresult cache inputs. The projection checker failed before regeneration locally and in CI and passes afterward; retain the required Detect Changes gate and its regression rejecting stale projection evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "recurring-corrections-escalate-or-report-guard-failure",
+    "correction": "LYB-252: Repeated corrections after a prose fix must request stronger enforcement once per rule; a correction recurring after mechanization is a guard failure rather than an ordinary repeat.",
+    "source": "https://linear.app/jovie/issue/LYB-252",
+    "mechanization": "The existing recurrence intake shares the reviewed classifier, requests static enforcement for prose rules, and returns explicit guard failures for new corrections to guarded rules. Shared-lib fixture tests exercise the real Linear adapter with a fake sink, deterministic deduplication, terminal issue reopening only on new evidence, and dry-run defaults through the script entrypoint.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime types cannot ensure that repository correction intake preserves evidence identity, escalation semantics and safe filing defaults."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib test suite runs fixture regressions through the actual recurrence runner and issue adapter, rejecting duplicate creates, silent guarded repeats and accidental live filing."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-recurrence.behavior.mjs",
+      "anchor": "new corrections to an already mechanized rule fail without filing or hiding the guard"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "LYB-262 / PR #1573: Resolve the origin/main merge by retaining measurement-freshness and backward-planner correction receipts with their original source identities and guards.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1573",
+    "mechanization": "Preserve both parents of the additive ledger merge. The existing required correction coverage check rejects missing source receipts, including when fingerprint coverage is unchanged. Verify the resolved ledger against both immutable merge parents and retain the deleted, replaced and reassigned receipt regressions.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "LYB-262 / PR #1573: Adding the measurement freshness policy and tests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40204958224/job/121203813660",
+    "mechanization": "Review the 12-line Xcode target-membership diff and refresh only its exact SHA-256 pin. The existing required runner-routing suite reproduces the old-pin mismatch and passes after the update while retaining all seven pins and the accepted/rejected trusted CLI scenarios.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "LYB-262 / PR #1573: Adding measurement freshness Xcode target membership left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40204958224/job/121203813897",
+    "mechanization": "Regenerate the existing source projection after reviewing the native manifest diff. The required projection checker fails before regeneration and passes afterward; retain the existing change-detection regression that rejects a missing or skippable parity step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "LYB-244 / PR #1578: Resolve the origin/main correction-ledger conflict without discarding adapter-contract, backward-planner or training-cycle receipts and their original sources and guards.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1578",
+    "mechanization": "Preserve the union of correction receipts from both merge parents. The existing required correction coverage check rejects removed source identities; verify the resolved ledger against origin/main and the pre-merge PR head, and run its deleted, replaced and reassigned receipt regressions.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "LYB-244 / PR #1578: Adding the metric source adapters and regression tests to their Xcode targets changed the project manifest without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40207462533/job/121211359301",
+    "mechanization": "Retain the existing seven exact dependency pins and refresh only the reviewed project manifest hash. The required Mac Runner Routing Tests compare each pin to current source bytes and exercise the trusted CLI against accepted tooling and rejected changed, missing, symlinked, dirty and untracked inputs. The existing regression failed before the pin update and passes afterward.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "LYB-244 / PR #1578: Adding metric source adapter Xcode target membership left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity. Regenerate the source projection after reviewing the manifest diff.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40207462533/job/121211359157",
+    "mechanization": "The existing required projection checker failed before regeneration and passes afterward. Retain the required Detect Changes and CI Summary gates and their regression rejecting a missing or skippable parity step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1560: Resolve the origin/main correction-ledger conflict by retaining the backward-planner CI receipts and the training-cycle merge receipt with their original sources and guards.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1560",
+    "mechanization": "Preserve both sides of the additive ledger merge. The existing required correction coverage check compares immutable-base source identities and rejects discarded receipts; its behavioral regressions cover deleted, replaced and reassigned source receipts. Verify the resolved ledger against both pre-merge parents.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1560: BackwardPlanner and its tests and launch-contract resource changed Xcode target membership without refreshing the exact diagnostic project dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40196279621/job/121177686899",
+    "mechanization": "Review the twelve project additions and refresh only the manifest SHA-256. The existing required runner-routing regression failed on the old pin locally and in CI; it retains all seven dependency pins and accepted/rejected trusted CLI cases.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1560: Adding backward-planner target membership left the generated Xcode manifest fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40196279621/job/121177687150",
+    "mechanization": "Regenerate the existing source projection after reviewing the Xcode manifest diff. The projection checker failed before regeneration locally and in CI; the required Detect Changes gate and its existing regression continue rejecting stale projection evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "training-cycle-delegation-merge-parity",
+    "correction": "PR #1541 conflicts with the delegated programming implementation merged in PR #1531. Preserve both proposal versions, owner-locked database admission and native entry points when merging origin/main.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1541",
+    "mechanization": "Separate the cycle schema from revision/delegation dependencies to prevent the engine import cycle. Route cycle intents through version 1 while retaining version 2 dispatch, and extend the additive migration with both admission paths. The required web suite exercises cycle review/apply with the delegated gate both off and on and rejects replacement of an accepted delegated plan. The combined disposable PostgreSQL verifier retains all cycle and delegated transaction cases; the original cycle migration fails the delegated cases.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Independent cycle schema dependencies prevent module initialization failures; explicit intent/version dispatch and one owner-locked SQL command retain both implementations by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/api/auth/mobile/training/v1/__tests__/revisions.node.test.ts",
+      "anchor": "keeps cycle revisions reachable with delegated programming enabled=%s"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "web-sentry-runtime-env-declarations",
@@ -73,7 +549,9 @@
     "guard": {
       "path": "packages/product-registry/scripts/env-surface.test.mjs",
       "anchor": "Web: process.env keys read in apps/web/src"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "sentry-web-sdk-runtime-and-release-compatibility",
@@ -89,7 +567,9 @@
     "guard": {
       "path": "apps/web/src/lib/adapters/__tests__/sentry.node.test.ts",
       "anchor": "disables automatic sensitive data collection with the installed SDK"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -109,7 +589,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "share-preview-chrome-preserves-card-accessibility",
@@ -125,7 +607,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
       "anchor": "Share card must remain accessibility-discoverable inside the overlay"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "share-avatar-probe-matches-rendered-blue",
@@ -145,7 +629,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift",
       "anchor": "The logo and a non-avatar photo must not satisfy the avatar probe"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
@@ -165,7 +651,9 @@
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -185,7 +673,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "adaptive-recovery-proposals-are-bounded-and-reviewed",
@@ -201,7 +691,9 @@
     "guard": {
       "path": "apps/web/src/lib/training/recovery.test.ts",
       "anchor": "applies a persisted proposal to the next prescription, survives session replay, and restores future work on revert"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -221,7 +713,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "app-store-privacy-matches-native-collection",
@@ -244,7 +738,9 @@
       "ratchet": {
         "baseline": "packages/shared-lib/app-privacy-baseline.json"
       }
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "chart-playhead-preparation-and-label-mapping",
@@ -260,7 +756,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/HomeV2MetricEditorialTests.swift",
       "anchor": "func testPlayheadSelectsLatestDailyReadingRegardlessOfValueOrInputOrder()"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "workout-readiness-uses-canonical-durable-feedback",
@@ -276,7 +774,9 @@
     "guard": {
       "path": "apps/ios/LogYourBody/Services/TrainingSessionDraft.swift",
       "anchor": "guard response.matches(pending.request) else { throw TrainingServiceError.invalidResponse }"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "claims-lint-covers-public-web-copy",
@@ -299,7 +799,9 @@
       "ratchet": {
         "baseline": "scripts/knowledge/web-claims-baseline.json"
       }
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "dependabot-transitive-security-floors",
@@ -315,7 +817,9 @@
     "guard": {
       "path": "packages/shared-lib/src/dependency-security.test.ts",
       "anchor": "%s has no vulnerable locked copies below %s"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -335,7 +839,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "storekit-tests-share-one-session-and-wait-for-clean-state",
@@ -351,7 +857,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
       "anchor": "private static func session() throws -> SKTestSession"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "storekit-warmup-diagnostics-respect-swiftlint",
@@ -371,7 +879,9 @@
     "guard": {
       "path": "apps/ios/.swiftlint.yml",
       "anchor": "no_print_statements:"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "correction-baselines-only-shrink",
@@ -391,7 +901,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-ratchet.behavior.mjs",
       "anchor": "baseline edits cannot grandfather new violations"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "waitlist-public-write-rate-limit",
@@ -407,7 +919,9 @@
     "guard": {
       "path": "apps/web/src/app/api/waitlist/route.ts",
       "anchor": "const limit = await reserveWaitlistRequest(request.headers);"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "web-production-deploy-requires-smoke",
@@ -423,7 +937,9 @@
     "guard": {
       "path": ".github/scripts/web-production-smoke.mjs",
       "anchor": "export async function runWebProductionSmoke"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "retire-placeholder-store-redirect-and-route-logs",
@@ -443,7 +959,9 @@
     "guard": {
       "path": "packages/shared-lib/src/web-surface-cleanup.test.ts",
       "anchor": "retires the unused store redirect and unpublished Android listing"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "web-deploy-rejects-sensitive-public-env-placeholder",
@@ -459,7 +977,9 @@
     "guard": {
       "path": ".github/scripts/verify-public-build-env.mjs",
       "anchor": "export function checkPulledEnv"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "web-deploy-injects-validated-statsig-client-key",
@@ -475,7 +995,9 @@
     "guard": {
       "path": ".github/scripts/verify-public-build-env.mjs",
       "anchor": "if (failures.length === 0 && contents !== original) writeFileSync(paths[0], contents);"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -495,7 +1017,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "sidebar-swipe-preserves-first-row-tap",
@@ -511,7 +1035,9 @@
     "guard": {
       "path": "apps/ios/LogYourBody/Views/HomeV2/HomeV2SidebarView.swift",
       "anchor": "recognizer.delaysTouchesEnded = false"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "public-page-self-referencing-canonicals",
@@ -531,7 +1057,27 @@
     "guard": {
       "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
       "anchor": "public route metadata contract (LYB-223)"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "sentry-next-config-build-entrypoint",
+    "correction": "LYB-131: The credential-enabled Vercel build failed because Sentry 11.9.0 exports withSentryConfig from its config entrypoint, not its runtime root. The existing test mock invented the missing root export.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40222885361/job/121263329314",
+    "mechanization": "Import the build wrapper from the installed SDK config entrypoint. The existing required web configuration suite calls that real wrapper with synthetic upload credentials, preserves release and privacy assertions, and checks each missing-credential path. The three enabled cases fail with the original runtime import and pass with the corrected import.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The dedicated build entrypoint provides the wrapper under Node module resolution without changing runtime adapters or disabling source-map upload. Calling the installed wrapper in the required suite prevents a mock from concealing the same export mismatch."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/adapters/__tests__/sentry-config.node.test.ts",
+      "anchor": "const actual = jest.requireActual('@sentry/nextjs/config');"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "marketing-sitemap-shares-public-route-inventory",
@@ -547,6 +1093,332 @@
     "guard": {
       "path": "apps/web/src/app/sitemap.ts",
       "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "guard-reference-paths-exist",
+    "correction": "LYB-254: A ledger entry that claims a guard must point at a test, lint rule, or CI step path that exists. Entries with no guard reference stay on a shrink-only baseline.",
+    "source": "https://linear.app/jovie/issue/LYB-254",
+    "mechanization": "The required Detect Changes job runs guard-reference.mjs on every diff. A missing guard path fails with the entry id and path. Unguarded entries warn, and the committed baseline can only shrink against the exact Git base.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot prove that a Git-tracked ledger guard still points at a file in the repository."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic CI check can stat each claimed guard path and compare the unguarded entry baseline with the immutable Git base."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/guard-reference.behavior.mjs",
+      "anchor": "deleted guard fails with the entry id and path"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1557: Merge-group CI rejects receipts introduced by main when their saved classifier level and ruleId are missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40209479290/job/121217537825",
+    "mechanization": "Run the existing deterministic classifier after merging main. The required shared-lib test compares the complete committed ledger with classifier output and verifies default CLI idempotence; it fails on the merged unclassified receipts and passes after classification.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1557: Merge-group CI rejects receipts introduced by main when their saved classifier level and ruleId are missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40232010306/job/121285634603",
+    "mechanization": "Run the existing deterministic classifier after merging main. The required shared-lib test compares the complete committed ledger with classifier output and verifies default CLI idempotence; it fails on the merged unclassified receipts and passes after classification.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "release-validation-encloses-main-ci",
+    "correction": "LYB-127: Validate Release must wait long enough for the exact main SHA's required CI, including the measured macOS runner queue plus the StoreKit and iOS Unit job caps. Do not raise per-interaction native allowances, drop required checks, or skip MARKETING_VERSION binding to the pinned tag.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40169457518/job/121097203525",
+    "mechanization": "Poll required CI on ubuntu for at least that enclosing floor, then bind the pinned version on macOS. The required Detect Changes job rejects a shorter wait, a macOS poller, a raised native allowance, or a missing version bind.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime cannot keep a release workflow's wait aligned with separate CI job caps and a measured runner queue."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The workflow and release-source script expose the wait, runner, required checks, native allowances, and version bind. A deterministic test compares them on every CI run."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/release-check-budget.test.mjs",
+      "anchor": "enclosing release budget preserves native caps"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1578: Merge-group CI rejected the metric source adapter ledger receipts because their saved classifier level and ruleId were missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40280078467/job/121431356128",
+    "mechanization": "The pre-commit hook runs the existing deterministic classifier whenever the correction ledger is staged and stages its output. The required shared-lib idempotence regression fails on the merged unclassified receipts and passes after classification.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "training-split-weekly-dose",
+    "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
+    "source": "https://linear.app/jovie/issue/LYB-111",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The deterministic engine owns the split and exercise contributions, so it can distribute a fixed weekly dose instead of repeating full-body work as frequency grows. Shared supported-frequency values prevent schema/type/setup drift."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/training/engine.ts",
+      "anchor": "const SESSION_TEMPLATES: Record<"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "correction-ledger-conflict-safe-merge",
+    "correction": "PR #1536 conflict repair: independent correction receipts appended on main and a feature branch must survive the merge without losing sources, annotations or guard coverage.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1536",
+    "mechanization": "Extend the existing correction-coverage tool with --merge-ledger. It reads the three immutable Git index conflict stages, merges by normalized fingerprint and source, retains incoming ledger order, rejects deletions, duplicate identities and divergent concurrent edits, and validates guard coverage and nonregression against all three snapshots before writing. It leaves staging explicit. The existing required shared-lib suite exercises successful merges, refusal without writes and real Git stage reads.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing ledger tool can construct a lossless three-way merge from Git conflict stages and refuse ambiguous edits before writing, replacing repeated manual append-conflict repair with one deterministic operation."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Independent additions merge; concurrent receipt edits require explicit resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "healthkit-types-disclosed-in-privacy-health-data",
+    "correction": "LYB-189: The privacy policy's Health Data bullet disclosed only steps/activity while native HealthKit paths read weight, body fat percentage, height, steps, date of birth and biological sex, and write weight/body fat.",
+    "source": "https://linear.app/jovie/issue/LYB-189",
+    "mechanization": "Extend the existing app-privacy scanner, already executed by the required Detect Changes correction ratchet on every diff, to compare native definitions, explicit identifiers, characteristic getters and HealthKit usage strings with the canonical Health Data bullet. Shared-lib mutation regressions reject the original steps-only wording and each omitted type. Tim/legal retains final prose review; source checks do not grant legal approval.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Privacy wording is authored legal/product truth. Generating it from native declarations would replace the requested Tim/legal prose review and cannot prevent an incomplete authored disclosure."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required snapshot scanner can fail on undisclosed native HealthKit identifiers and permission-string types without accessing HealthKit, ASC or credentials."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/app-privacy.mjs",
+      "anchor": "LYB-189: require each native HealthKit type in the policy's Health Data bullet."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-ledger-conflict-safe-merge",
+    "correction": "PR #1545 conflict repair: retain both parents' correction receipts and resolve other source conflicts before validating guards during an automatic ledger merge.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1545",
+    "mechanization": "Extend the existing --merge-ledger resolver to reject other unresolved Git paths before reading guard evidence or writing the ledger. The existing required shared-lib Git-fixture regression fails without this check and passes with it, preserving the ledger on refusal. Use the resolver on the actual PR conflict, retaining the HealthKit disclosure receipt and all main receipts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing ledger tool can construct a lossless three-way merge from Git conflict stages and refuse ambiguous edits before writing, replacing repeated manual append-conflict repair with one deterministic operation."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Independent additions merge; concurrent receipt edits require explicit resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-correction-ledgers-before-classification",
+    "correction": "PR #1544: Repeated origin/main repairs must preserve both merge parents' correction receipts and classify their union instead of resolving the ledger by choosing one side.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1544",
+    "mechanization": "Extend the existing correction classifier with --merge and --resolve-merge. Git resolution classifies all three immutable index stages and delegates to the existing correction-coverage mergeCorrectionLedgers policy, preserving incoming order and appending branch-only receipts so subsequent main-side prepends merge cleanly. It preserves independent additions and one-sided edits while rejecting deletions, duplicate identities, concurrent edits and missing guards before writing. --check-merge and pre-commit verify staged retention against both parents. Used for this repair. The required shared-lib runner exercises real conflicting repositories and a subsequent clean main merge at 100% classifier coverage; the incoming-order regression failed on the previous resolver and passes with this extension. Both Git resolver entrypoints share assertLedgerMergeReady to refuse other unresolved source paths before guard validation or ledger writes. A real conflicting-guard regression fails without this preflight and passes with it, preserving the unresolved ledger and index. Reused for the current origin/main merge.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing classifier can construct the complete union before writing, preserving distinct source receipts by construction and refusing contradictory duplicates without changing either input on failure."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "assert.deepEqual(merged.get(key), normalized, `conflicting merge receipt: ${key}`);"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swiftui-reduce-motion-environment-is-read-only",
+    "correction": "PR #1544: The workout scrubber's large-type preview wrote SwiftUI's get-only accessibilityReduceMotion environment property, preventing both Launch Quality and StoreKit Purchase and Restore from compiling.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40167662977/job/121092153045",
+    "mechanization": "Remove the invalid preview override and inherit the system preference. The required JavaScript/TypeScript shared-lib suite rejects read-only Reduce Motion environment writes throughout native app source, including previews, while permitting reads and writable Dynamic Type overrides. The source regression failed on TrainingNumericScrub.swift before this repair. Existing native compilation and acceptance gates remain required.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime app logic cannot prevent future source edits from invoking an unsupported SwiftUI modifier, including within debug-only preview code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic source regression in the existing required shared-lib test task detects the unsupported environment write on Linux before the native compiler independently rejects it on macOS."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
+      "anchor": "keeps native views and previews free of read-only Reduce Motion writes (LYB-153)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "git-fixture-local-identity",
+    "correction": "PR #1544: The classifier merge regression supplied an identity to its Git helper but omitted it from a later merge, failing required CI on a runner without global Git identity.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40316539014/job/121551681050",
+    "mechanization": "Configure a local user.name and user.email in each disposable fixture repository so every Git command has an identity. The existing required shared-lib runner disables global and system Git configuration for this suite. The unchanged merge regression fails with the original fixture under that environment and passes with local configuration, retaining all 100% classifier coverage thresholds.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Repository-local fixture configuration supplies an identity to every Git subprocess by construction without changing the CI runner or developer configuration."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "git('config', 'user.name', 'Ledger fixture');"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "weight-lifecycle-verifiers-track-account-erasure-schema",
+    "correction": "PR #1555: The required training mutation verifier still expected five cleanup statements and stubbed body_metrics after manual weight lifecycle added receipts, audit, and grants to account erasure.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189270062/job/121156652050",
+    "mechanization": "Load the real body-metric and weight migrations in both transaction verifiers and assert all eight exact subject-scoped cleanup statements. The required mutation verifier exercises a committed weight receipt, audit, grant and metric, rollback after a later delete failure, successful retry and isolation of another owner. The original verifier reproduces the reported failure; the repaired verifier must pass on disposable PostgreSQL16.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application schema and erasure logic cannot update the separately maintained PostgreSQL verifier fixture or its expected SQL inventory."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required JavaScript/TypeScript check executes the verifier against real migrations and production erasure SQL, rejecting missing cleanup or incomplete rollback and owner isolation."
+      }
+    },
+    "guard": {
+      "path": "apps/web/db/tests/verify-training-mutations.py",
+      "anchor": "weight account erasure rolls back on failure, retries completely, and preserves the other owner"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "weight-intent-initializes-identity-before-wrapped-parameters",
+    "correction": "PR #1555: StoreKit compilation rejected LogWeightIntent because assigning the wrapped unit parameter used self before recordId and operationId were initialized.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189270062/job/121156652049",
+    "mechanization": "Initialize both immutable invocation IDs before setting the wrapped unit parameter. Swift definite initialization rejects the original ordering, and the retained App Intent retry regression verifies stable record and operation identity. Native compilation and execution remain required in CI; Linux lint does not prove them.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Initializing both immutable stored IDs before invoking the property-wrapper setter satisfies Swift definite initialization while preserving identity for intent retries."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/BodyMetricAppIntentsTests.swift",
+      "anchor": "func testLogWeightIntentRetryKeepsTheSameRecordAndOperation()"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "weight-sync-assertions-await-before-xctest-autoclosures",
+    "correction": "PR #1555: Launch Quality compilation rejected three sync regression assertions because XCTAssertTrue and XCTUnwrap use synchronous autoclosures that cannot await an asynchronous call.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189270062/job/121156652284",
+    "mechanization": "Await the in-flight placeholder update and cached metric reads into local values before asserting or unwrapping them. Preserve the conflict and tombstone behavior assertions. The existing required native build compiles these test files and rejects await inside synchronous XCTest autoclosures; native execution remains unverified on Linux.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Product runtime code cannot enforce how asynchronous reads are evaluated inside separately compiled XCTest assertions."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Launch Quality native compiler checks every retained sync regression before execution and rejects asynchronous calls inside synchronous XCTest autoclosures."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/SyncIntegrationRemotePayloadTests.swift",
+      "anchor": "func testUpdateOrCreateBodyMetric_AppliesANewerServerTombstone()"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-ledger-conflict-staging",
+    "correction": "PR #1555: Repeated conflict-only repairs must merge origin/main without dropping either parent's correction receipts, losing classification, or staging unrelated edits.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1555",
+    "mechanization": "Extend the existing correction classifier resolver with opt-in --stage. Validate staged guard sources, classification and retained receipts against both immutable merge parents before writing or staging only the ledger. A retry verifies the staged result without mutation. The existing required shared-lib suite exercises real conflicting Git branches, concurrent-edit and guard-conflict refusals, staged guard failure, index preservation and idempotence. The new staging regression fails before the extension and passes with unchanged 100% classifier coverage. Use the extension for this merge; the harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct, validate and stage the classified three-way ledger union in one opt-in operation, preserving both parents and unrelated edits by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "Validate staged guards and both parents before writing or staging anything."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
