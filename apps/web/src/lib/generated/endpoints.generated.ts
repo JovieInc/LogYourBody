@@ -102,6 +102,11 @@ export const endpoints = {
   },
   allowlist: [
     {
+      value: 'https://pubmed.ncbi.nlm.nih.gov/28965198/',
+      reason:
+        'Morán-Navarro et al. (2017) primary recovery evidence cited in the LYB-112 engineering policy; not a runtime endpoint or personal numerical bound.',
+    },
+    {
       value: 'https://www.allianceforeatingdisorders.com/find-treatment/',
       reason:
         'Verified official U.S. eating-disorder support resource in the health disclosure, checked 2026-10-14.',
@@ -316,6 +321,10 @@ export const endpoints = {
       reason: 'Ruby dependency host referenced by iOS tooling docs.',
     },
     {
+      value: 'https://api.vercel.com',
+      reason: 'CI-only Vercel env-type guard and public-env sync; not a runtime endpoint.',
+    },
+    {
       value: 'https://openapi.vercel.sh',
       reason: 'Vercel OpenAPI schema referenced by tooling.',
     },
@@ -373,6 +382,15 @@ export const endpoints = {
       reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-111',
+      reason: 'LYB-111 source evidence for bounded weekly training splits and enrollment parity.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-112',
+      reason:
+        'LYB-112 source evidence for bounded adaptive recovery learning and the correction ledger.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-129',
       reason: 'LYB-129 source evidence for canonical durable workout readiness integration.',
     },
@@ -400,6 +418,11 @@ export const endpoints = {
         'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-254',
+      reason:
+        'LYB-254 source evidence for the guard-reference existence check and shrink-only unguarded baseline.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-225',
       reason: 'LYB-225 source evidence for the public waitlist rate-limit correction.',
     },
@@ -415,6 +438,16 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-232',
       reason:
         'LYB-232 source evidence for Statsig client-key injection into the production web build.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-252',
+      reason:
+        'LYB-252 source evidence for recurring correction escalation and guard-failure detection.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-307',
+      reason:
+        'LYB-307 source evidence for emitted lint correction checks and recurrence-based severity.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-97',

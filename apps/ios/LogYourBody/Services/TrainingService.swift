@@ -18,6 +18,16 @@ enum TrainingReadinessPolicy {
     static let featureGate = "workout_readiness_v1"
 }
 
+enum TrainingRecoveryCopy {
+    /// Matches `APPLIED_RECOVERY_NEXT_ACTION_PREFIX` in the training service.
+    static let appliedPrefix = "Applied recovery trial:"
+
+    static func appliedNextAction(_ explanation: String?) -> String? {
+        guard let explanation, explanation.hasPrefix(appliedPrefix) else { return nil }
+        return explanation
+    }
+}
+
 struct TrainingExercisePrescription: Decodable, Equatable, Identifiable, Sendable {
     let id: String
     let name: String
@@ -110,6 +120,7 @@ struct TrainingNextResponse: Decodable, Equatable, Sendable {
     let week: Int?
     let weekCount: Int?
     let weeklyFractionalVolume: [String: Double]?
+    var phase: String?
     var decision: TrainingProgressDecision?
     var nextBlock: TrainingPlanStoredProposal?
 }
@@ -147,6 +158,14 @@ struct TrainingMuscleFeedbackRequest: Codable, Equatable, Sendable {
     let pump: Int?
     let workload: String?
     let performance: String?
+}
+
+struct TrainingSetUndoRequest: Codable, Equatable, Sendable {
+    let sessionId: String
+    let exerciseId: String
+    let setNumber: Int
+    let undoId: String
+    let expectedRevision: Int
 }
 
 struct TrainingSetCorrectionRequest: Codable, Equatable, Sendable {
@@ -348,15 +367,20 @@ enum TrainingServiceError: LocalizedError, Equatable {
         case .invalidResponse:
             return "The training response could not be read. Please try again."
         case .server(let code):
-            if code == "delayed_active_workout" {
+            switch code {
+            case "not_found":
+                return "Training coaching is not enabled for this account yet."
+            case "set_conflict":
+                return "This set changed since that action. Review it before trying again."
+            case "undo_unavailable":
+                return "This set cannot be undone. Correct it instead."
+            case "delayed_active_workout":
                 return "Finish or end your current workout before applying this plan."
-            }
-            if code == "stale_context" {
+            case "stale_context":
                 return "Your training changed. Refresh the draft before applying it."
+            default:
+                return "Training is temporarily unavailable. Please try again."
             }
-            return code == "not_found"
-                ? "Training coaching is not enabled for this account yet."
-                : "Training is temporarily unavailable. Please try again."
         }
     }
 }
@@ -365,8 +389,9 @@ protocol TrainingServicing {
     func loadNext(accessToken: String) async throws -> TrainingNextResponse
     func loadProgress(accessToken: String) async throws -> TrainingProgressResponse
     func enroll(accessToken: String, sessionsPerWeek: Int, equipment: String) async throws -> TrainingProgramResponse
-    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws
+    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws -> TrainingSavedSet
     func correctSet(accessToken: String, request: TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
+    func undoSet(accessToken: String, request: TrainingSetUndoRequest) async throws -> TrainingSavedSet
     func applyAction(accessToken: String, request: TrainingWorkoutActionRequest) async throws -> TrainingSession
     func recordFeedback(accessToken: String, request: TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
     func revoke(accessToken: String) async throws -> TrainingRevokeResponse
@@ -402,7 +427,7 @@ final class URLSessionTrainingService: TrainingServicing {
         )
     }
 
-    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws {
+    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws -> TrainingSavedSet {
         let response: TrainingSetLogResponse = try await send(
             path: "log-set",
             method: "POST",
@@ -418,6 +443,23 @@ final class URLSessionTrainingService: TrainingServicing {
               log.loadKg == request.loadKg,
               log.rir == request.rir
         else { throw TrainingServiceError.invalidResponse }
+        return log
+    }
+
+    func undoSet(accessToken: String, request: TrainingSetUndoRequest) async throws -> TrainingSavedSet {
+        let response: TrainingSetCorrectionResponse = try await send(
+            path: "undo-set",
+            method: "POST",
+            accessToken: accessToken,
+            body: request
+        )
+        guard response.log.sessionId == request.sessionId,
+              response.log.exerciseId == request.exerciseId,
+              response.log.setNumber == request.setNumber,
+              response.log.revision == request.expectedRevision + 1,
+              response.log.corrections?.contains(where: { $0.id == request.undoId }) == true
+        else { throw TrainingServiceError.invalidResponse }
+        return response.log
     }
 
     func correctSet(
@@ -590,6 +632,163 @@ private struct TrainingWorkoutActionResponse: Decodable, VersionedTrainingRespon
     let session: TrainingSession
 }
 private struct TrainingErrorResponse: Decodable { let error: String }
+
+struct TrainingCycleSelection: Codable, Equatable, Identifiable, Sendable {
+    var id: String { "\(fromExerciseId):\(toVariantId)" }
+    let fromExerciseId: String
+    let toVariantId: String
+    var reason: String
+}
+
+struct TrainingCycleSetup: Decodable, Equatable, Sendable {
+    let id: String
+    let equipment: String
+    let sessionsPerWeek: Int
+    let cycle: Configuration?
+
+    struct Configuration: Decodable, Equatable, Sendable {
+        let weekCount: Int
+        let temporaryPriorities: [String]
+        let temporaryConstraints: [Constraint]
+        let retainedVariants: [TrainingCycleSelection]
+
+        struct Constraint: Decodable, Equatable, Sendable {
+            let muscle: String
+            let reason: String
+        }
+    }
+}
+
+struct TrainingCycleReuseOption: Decodable, Identifiable, Sendable {
+    var id: String { "\(fromExerciseId):\(toVariantId)" }
+    let fromExerciseId: String
+    let toVariantId: String
+    let reason: String
+    let name: String
+    var selection: TrainingCycleSelection {
+        .init(fromExerciseId: fromExerciseId, toVariantId: toVariantId, reason: reason)
+    }
+}
+
+struct TrainingCycleContext: Decodable, Sendable {
+    let version: Int
+    let generation: Int
+    let setup: TrainingCycleSetup?
+    let cycle: Status?
+    let reuseOptions: [TrainingCycleReuseOption]
+
+    struct Status: Decodable, Sendable {
+        let currentWeek: Int
+        let weekCount: Int
+        let phase: String?
+    }
+}
+
+struct TrainingCycleIntent: Encodable, Equatable, Sendable {
+    let kind: String
+    let weekCount: Int
+    var adultConfirmed: Bool?
+    var safetyConfirmed: Bool?
+    var sessionsPerWeek: Int?
+    var equipment: String?
+    var keepVariants: [TrainingCycleSelection]?
+    var renewPriorities: Bool?
+    var renewConstraints: Bool?
+}
+
+struct TrainingCycleProposalRequest: Encodable, Sendable {
+    let requestId: String
+    let expectedGeneration: Int
+    let intent: TrainingCycleIntent
+    let reason: String
+}
+
+struct TrainingCycleDraft: Decodable, Sendable {
+    let id: String
+    let reason: String
+    let assumptions: [String]
+    let schedule: [Week]?
+    let plan: Plan
+
+    struct Week: Decodable, Identifiable, Sendable {
+        var id: Int { week }
+        let week: Int
+        let targetRir: Int
+        let deload: Bool
+        let setsPerExercise: Int
+    }
+    struct Plan: Decodable, Sendable {
+        let sessions: [TrainingSession]
+    }
+}
+
+struct TrainingCycleProposalResponse: Decodable, VersionedTrainingResponse {
+    let version: Int
+    let stored: Stored
+
+    struct Stored: Decodable {
+        let status: String
+        let proposal: TrainingCycleDraft
+    }
+}
+
+struct TrainingCycleDecisionRequest: Encodable, Sendable {
+    let requestId: String
+    let proposalId: String
+    let decision: String
+}
+
+struct TrainingCycleDecisionResponse: Decodable, VersionedTrainingResponse {
+    let version: Int
+    let receipt: Receipt
+
+    struct Receipt: Decodable {
+        let proposalId: String
+        let requestId: String
+        let status: String
+        let decision: String
+        let revisionId: String?
+        let setup: TrainingCycleSetup?
+    }
+
+    func matches(_ request: TrainingCycleDecisionRequest) -> Bool {
+        receipt.proposalId == request.proposalId && receipt.requestId == request.requestId &&
+            receipt.decision == request.decision && (request.decision == "apply"
+                ? receipt.status == "applied" && receipt.revisionId != nil && receipt.setup != nil
+                : receipt.status == "rejected" && receipt.revisionId == nil && receipt.setup == nil)
+    }
+}
+
+protocol TrainingCycleServicing {
+    func cycleContext(accessToken: String) async throws -> TrainingCycleContext
+    func proposeCycle(accessToken: String, request: TrainingCycleProposalRequest) async throws -> TrainingCycleDraft
+    func decideCycle(accessToken: String, request: TrainingCycleDecisionRequest) async throws
+}
+
+extension TrainingCycleContext: VersionedTrainingResponse {}
+
+extension URLSessionTrainingService: TrainingCycleServicing {
+    func cycleContext(accessToken: String) async throws -> TrainingCycleContext {
+        try await send(path: "program-proposals", method: "GET", accessToken: accessToken)
+    }
+
+    func proposeCycle(accessToken: String, request: TrainingCycleProposalRequest) async throws -> TrainingCycleDraft {
+        let response: TrainingCycleProposalResponse = try await send(
+            path: "program-proposals", method: "POST", accessToken: accessToken, body: request
+        )
+        guard response.stored.status == "proposed", response.stored.proposal.schedule?.count == request.intent.weekCount else {
+            throw TrainingServiceError.invalidResponse
+        }
+        return response.stored.proposal
+    }
+
+    func decideCycle(accessToken: String, request: TrainingCycleDecisionRequest) async throws {
+        let response: TrainingCycleDecisionResponse = try await send(
+            path: "program-proposals", method: "PATCH", accessToken: accessToken, body: request
+        )
+        guard response.matches(request) else { throw TrainingServiceError.invalidResponse }
+    }
+}
 
 struct TrainingPlanningInputs: Codable, Equatable, Sendable {
     var goal: String?
