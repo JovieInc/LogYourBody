@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0c3e6a93be883d68b0a7623e60d2154c4bcdbe0cae88b8eeb78beb9d1532852e`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a184d78ba6cf4c799260680b6c7c8ddd7d21c59147f871c01328184734818671`)
 
 ### `package.json`: packageManager
 
@@ -279,7 +279,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "lint-staged": "^15.5.2",
   "prettier": "^3.9.9",
   "prettier-plugin-tailwindcss": "^0.8.1",
-  "turbo": "^2.11.7",
+  "turbo": "^2.11.9",
   "typescript": "^5.9.3",
   "vitest": "^5.0.5"
 }
