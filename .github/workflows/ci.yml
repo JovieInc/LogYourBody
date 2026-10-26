@@ -110,6 +110,9 @@ jobs:
       - name: Verify workflow concurrency policy
         run: node .github/scripts/verify-workflow-concurrency.mjs
 
+      - name: Test release check enclosing budget
+        run: node --test .github/scripts/release-check-budget.test.mjs
+
       - name: Verify repository merge queue policy
         run: node --test .github/scripts/verify-merge-queue-policy.test.mjs
 
