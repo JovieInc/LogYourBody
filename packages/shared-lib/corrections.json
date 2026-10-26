@@ -207,7 +207,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
@@ -227,7 +229,9 @@
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -247,7 +251,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -983,6 +989,28 @@
     "guard": {
       "path": ".github/scripts/release-check-budget.test.mjs",
       "anchor": "enclosing release budget preserves native caps"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1578: Merge-group CI rejected the metric source adapter ledger receipts because their saved classifier level and ruleId were missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40280078467/job/121431356128",
+    "mechanization": "The pre-commit hook runs the existing deterministic classifier whenever the correction ledger is staged and stages its output. The required shared-lib idempotence regression fails on the merged unclassified receipts and passes after classification.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
     },
     "level": "static",
     "ruleId": "ci-invariant"
