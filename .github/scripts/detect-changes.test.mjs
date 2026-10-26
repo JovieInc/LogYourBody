@@ -7,7 +7,6 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const detectScript = path.join(scriptDir, 'detect-changes.sh');
@@ -654,8 +653,8 @@ function sourceMapConflict({ sourceConflict = false } = {}) {
   checkpoint(source.replace(sourceConflict ? 'first' : 'last', 'main'), 'main workflow');
   git(root, 'checkout', '-q', 'feature');
   assert.throws(() => git(root, 'merge', '--no-commit', 'main'), 'fixture must conflict');
-  const resolve = (...args) => spawnSync('python3', [
-    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root, ...args,
+  const resolve = () => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root,
   ], { env: gitEnv, encoding: 'utf8' });
   return { root, output, config, resolve };
 }
@@ -716,70 +715,319 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
   });
 }
 
+function stagedSourceMap() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'source-map-staged-'));
+  git(root, 'init', '-q', '-b', 'main');
+  const output = 'docs/SOURCES.md';
+  const config = {
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+    sources: [{ path: 'package.json', purpose: 'Dependencies' }], imports: [], output,
+  };
+  commit(root, {
+    'README.md': 'Local instructions\n',
+    'repository-docs.json': JSON.stringify(config),
+    'package.json': JSON.stringify({ dependencies: { switch: '1.3.7' } }),
+    'policy.md': 'Pinned policy\n',
+  }, 'base sources');
+  execFileSync('python3', [
+    path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write',
+  ], { env: gitEnv });
+  git(root, 'add', output);
+  git(root, 'commit', '-q', '-m', 'base projection');
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ dependencies: { switch: '1.3.8' } }));
+  git(root, 'add', 'package.json');
+  const resolve = () => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root, '--staged',
+  ], { env: gitEnv, encoding: 'utf8' });
+  return { root, output, config, resolve };
+}
+
 test('pre-commit regenerates the projection from staged sources and preserves unstaged edits', () => {
-  const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
-  assert.match(hook, /^python3 scripts\/resolve-repository-docs\.py --staged(?: \|\| exit \$\?)?$/m);
-  const fx = sourceMapConflict();
+  const fx = stagedSourceMap();
   try {
-    assert.equal(fx.resolve().status, 0);
-    const staged = 'reviewed dependency bump\n';
-    fs.writeFileSync(path.join(fx.root, 'workflow.yml'), staged);
-    git(fx.root, 'add', 'workflow.yml');
-    const unstaged = staged + 'unrelated local edit\n';
-    fs.writeFileSync(path.join(fx.root, 'workflow.yml'), unstaged);
-    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged instructions\n');
-    const result = fx.resolve('--staged');
+    const unstaged = JSON.stringify({ dependencies: { switch: '1.3.9' } });
+    fs.writeFileSync(path.join(fx.root, 'package.json'), unstaged);
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged local instructions\n');
+    const staged = git(fx.root, 'show', ':package.json');
+    const result = fx.resolve();
     assert.equal(result.status, 0, result.stderr);
     const projection = git(fx.root, 'show', `:${fx.output}`);
-    assert.ok(projection.includes(createHash('sha256').update(staged).digest('hex')));
-    assert.ok(!projection.includes(createHash('sha256').update(unstaged).digest('hex')));
-    assert.equal(git(fx.root, 'show', ':workflow.yml'), staged.trim());
-    assert.equal(fs.readFileSync(path.join(fx.root, 'workflow.yml'), 'utf8'), unstaged);
+    assert.match(projection, /"switch": "1\.3\.8"/);
+    assert.doesNotMatch(projection, /1\.3\.7|1\.3\.9/);
+    assert.equal(git(fx.root, 'show', ':package.json'), staged);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'package.json'), 'utf8'), unstaged);
     assert.equal(git(fx.root, 'show', ':README.md'), 'Local instructions');
-    assert.equal(fs.readFileSync(path.join(fx.root, 'README.md'), 'utf8'), 'Unstaged instructions\n');
+    assert.equal(git(fx.root, 'diff', '--cached', '--name-only'), `${fx.output}\npackage.json`);
     const index = git(fx.root, 'ls-files', '--stage');
-    assert.equal(fx.resolve('--staged').status, 0, 'staged regeneration is idempotent');
+    assert.equal(fx.resolve().status, 0, 'commit repair is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
+    assert.match(hook, /\npython3 scripts\/resolve-repository-docs\.py --staged(?:\n|$)/);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['unstaged-output', 'untracked-output', 'pinned-drift', 'missing-source', 'unsafe-output']) {
+  test(`commit source-map repair refuses ${failure} without changing the projection or index`, () => {
+    const fx = stagedSourceMap();
+    try {
+      if (failure === 'unstaged-output') fs.appendFileSync(path.join(fx.root, fx.output), 'Local note\n');
+      if (failure === 'untracked-output') {
+        fx.config.output = 'docs/LOCAL.md';
+        fs.writeFileSync(path.join(fx.root, fx.config.output), 'Local note\n');
+      }
+      if (failure === 'pinned-drift') {
+        fx.config.imports = [{
+          repository: 'example/policy', revision: 'a'.repeat(40),
+          path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+        }];
+      }
+      if (failure === 'missing-source') git(fx.root, 'rm', '--cached', 'package.json');
+      if (failure === 'unsafe-output') fx.config.output = '../escape.md';
+      fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+      git(fx.root, 'add', 'repository-docs.json');
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, {
+        'unstaged-output': /unstaged projection edits/,
+        'untracked-output': /unstaged projection edits/,
+        'pinned-drift': /pinned copy missing or changed: policy.md/,
+        'missing-source': /package.json/,
+        'unsafe-output': /unsafe repository path/,
+      }[failure]);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      if (failure === 'untracked-output') {
+        assert.equal(fs.readFileSync(path.join(fx.root, fx.config.output), 'utf8'), 'Local note\n');
+      }
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+function dependencyRefreshFixture() {
+  const fx = stagedSourceMap();
+  fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'old lock\n');
+  git(fx.root, 'add', 'pnpm-lock.yaml');
+  const bin = path.join(fx.root, 'bin');
+  fs.mkdirSync(bin);
+  const calls = path.join(fx.root, 'pnpm-calls');
+  fs.writeFileSync(path.join(bin, 'corepack'), `#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+with Path('pnpm-calls').open('a') as log:
+    log.write(json.dumps(sys.argv[1:]) + '\\n')
+if os.environ.get('FAIL_INSTALL') or (os.environ.get('FAIL_FREEZE') and '--frozen-lockfile' in sys.argv):
+    sys.exit(42)
+assert json.loads(Path('package.json').read_text())['dependencies']['switch'] == '1.3.8'
+if '--no-frozen-lockfile' in sys.argv:
+    Path('pnpm-lock.yaml').write_text('resolved lock\\n')
+    if os.environ.get('FAIL_REFRESH'):
+        sys.exit(42)
+else:
+    if Path('pnpm-lock.yaml').read_text() != 'resolved lock\\n':
+        print('ERR_PNPM_OUTDATED_LOCKFILE', file=sys.stderr)
+        sys.exit(1)
+    if os.environ.get('FAIL_RECHECK'):
+        sys.exit(42)
+`, { mode: 0o755 });
+  const refresh = (args = [], env = {}) => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'),
+    '--root', fx.root, '--refresh-lockfile', ...args,
+  ], {
+    encoding: 'utf8', env: { ...gitEnv, PATH: `${bin}:${process.env.PATH}`, ...env },
+  });
+  return { ...fx, calls, refresh };
+}
+
+function verifyDependencyLockfile(fx, env = {}) {
+  return spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'),
+    '--root', fx.root, '--verify-lockfile',
+  ], { encoding: 'utf8', env: { ...gitEnv, PATH: `${path.join(fx.root, 'bin')}:${process.env.PATH}`, ...env } });
+}
+
+test('dependency refresh keeps a valid bot lockfile without invoking the resolver', () => {
+  const fx = dependencyRefreshFixture();
+  try {
+    fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'resolved lock\n');
+    git(fx.root, 'add', 'pnpm-lock.yaml');
+    const result = fx.refresh([], { FAIL_REFRESH: '1' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').map(JSON.parse), [
+      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
+    ]);
+    assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), 'resolved lock');
+    assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('dependency parity repair verifies the existing frozen lockfile without re-resolving dependencies', () => {
+  const fx = dependencyRefreshFixture();
+  try {
+    fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'resolved lock\n');
+    git(fx.root, 'add', 'pnpm-lock.yaml');
+    const lock = git(fx.root, 'show', ':pnpm-lock.yaml');
+    const result = verifyDependencyLockfile(fx);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').map(JSON.parse), [
+      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
+    ]);
+    assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), lock);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), `${lock}\n`);
+    assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(verifyDependencyLockfile(fx).status, 0, 'verified parity repair is idempotent');
     assert.equal(git(fx.root, 'ls-files', '--stage'), index);
   } finally {
     fs.rmSync(fx.root, { recursive: true, force: true });
   }
 });
 
-for (const failure of ['source-conflict', 'pinned-drift', 'unstaged-output', 'untracked-output']) {
-  test(`staged source-map regeneration refuses ${failure} without changing files or index`, () => {
-    const fx = sourceMapConflict({ sourceConflict: failure === 'source-conflict' });
+for (const failure of ['frozen-lockfile', 'unstaged-source', 'pinned-drift']) {
+  test(`dependency parity repair refuses ${failure} without staging a projection`, () => {
+    const fx = dependencyRefreshFixture();
     try {
-      if (failure !== 'source-conflict') assert.equal(fx.resolve().status, 0);
+      if (failure === 'unstaged-source') fs.appendFileSync(path.join(fx.root, 'package.json'), '\n');
       if (failure === 'pinned-drift') {
         fx.config.imports = [{
           repository: 'example/policy', revision: 'a'.repeat(40),
           path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
         }];
         fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
-        fs.writeFileSync(path.join(fx.root, 'policy.md'), 'Changed pinned policy\n');
-        git(fx.root, 'add', 'repository-docs.json', 'policy.md');
-      }
-      if (failure === 'unstaged-output') fs.appendFileSync(path.join(fx.root, fx.output), 'Local projection edit\n');
-      if (failure === 'untracked-output') {
-        fx.output = fx.config.output = 'docs/LOCAL.md';
-        fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
         git(fx.root, 'add', 'repository-docs.json');
-        fs.writeFileSync(path.join(fx.root, fx.output), 'Untracked local document\n');
       }
-      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
       const index = git(fx.root, 'ls-files', '--stage');
-      const result = fx.resolve('--staged');
+      const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const result = verifyDependencyLockfile(fx, { FAIL_FREEZE: '1' });
       assert.notEqual(result.status, 0, result.stdout);
       assert.match(result.stderr, {
-        'source-conflict': /resolve source conflicts first: .*workflow.yml/,
-        'pinned-drift': /pinned copy missing or changed: policy.md/,
-        'unstaged-output': /projection has unstaged edits/,
-        'untracked-output': /projection has unstaged edits/,
+        'frozen-lockfile': /exit status 42/,
+        'unstaged-source': /unstaged dependency edits/,
+        'pinned-drift': /pinned copy missing or changed/,
       }[failure]);
-      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(fs.existsSync(fx.calls), failure === 'frozen-lockfile');
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+      assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), 'old lock\n');
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('dependency repair refreshes and freezes the lockfile before staging source parity', () => {
+  const fx = dependencyRefreshFixture();
+  try {
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged local instructions\n');
+    const result = fx.refresh();
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').map(JSON.parse), [
+      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
+      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--no-frozen-lockfile'],
+      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
+    ]);
+    assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), 'resolved lock');
+    assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
+    assert.equal(git(fx.root, 'diff', '--cached', '--name-only'), `${fx.output}\npackage.json\npnpm-lock.yaml`);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'README.md'), 'utf8'), 'Unstaged local instructions\n');
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.refresh().status, 0, 'dependency repair is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const file of ['package.json', 'apps/web/package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml', '.npmrc']) {
+  test(`dependency repair refuses unstaged ${file} before running pnpm`, () => {
+    const fx = dependencyRefreshFixture();
+    try {
+      fs.mkdirSync(path.dirname(path.join(fx.root, file)), { recursive: true });
+      if (!fs.existsSync(path.join(fx.root, file))) {
+        fs.writeFileSync(path.join(fx.root, file), '{}\n');
+        git(fx.root, 'add', file);
+      }
+      fs.appendFileSync(path.join(fx.root, file), 'local edit\n');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.refresh();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /unstaged dependency edits/);
+      assert.equal(fs.existsSync(fx.calls), false);
       assert.equal(git(fx.root, 'ls-files', '--stage'), index);
     } finally {
       fs.rmSync(fx.root, { recursive: true, force: true });
     }
   });
 }
+
+for (const failure of ['FAIL_INSTALL', 'FAIL_FREEZE', 'FAIL_REFRESH', 'FAIL_RECHECK']) {
+  test(`dependency repair propagates ${failure} without staging outputs`, () => {
+    const fx = dependencyRefreshFixture();
+    try {
+      const index = git(fx.root, 'ls-files', '--stage');
+      const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const result = fx.refresh([], { [failure]: '1' });
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /exit status 42/);
+      assert.equal(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').length, {
+        FAIL_INSTALL: 1, FAIL_FREEZE: 1, FAIL_REFRESH: 2, FAIL_RECHECK: 3,
+      }[failure]);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+      if (failure === 'FAIL_INSTALL' || failure === 'FAIL_FREEZE') {
+        assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), 'old lock\n');
+      }
+      assert.notEqual(fx.refresh(['--staged']).status, 0, 'index-only commit hooks cannot run dependency refresh');
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const failure of ['FAIL_REFRESH', 'FAIL_RECHECK']) {
+  test(`dependency repair restores the lockfile after ${failure} so retries need no cleanup`, () => {
+    const fx = dependencyRefreshFixture();
+    try {
+      const lock = fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'));
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.refresh([], { [failure]: '1' });
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /exit status 42/);
+      assert.deepEqual(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml')), lock);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      const retry = fx.refresh();
+      assert.equal(retry.status, 0, retry.stderr);
+      assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), 'resolved lock');
+      assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('dependency repair refuses pinned-source drift before running pnpm', () => {
+  const fx = dependencyRefreshFixture();
+  try {
+    fx.config.imports = [{
+      repository: 'example/policy', revision: 'a'.repeat(40),
+      path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+    }];
+    fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+    git(fx.root, 'add', 'repository-docs.json');
+    const index = git(fx.root, 'ls-files', '--stage');
+    const result = fx.refresh();
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /pinned copy missing or changed: policy.md/);
+    assert.equal(fs.existsSync(fx.calls), false);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});

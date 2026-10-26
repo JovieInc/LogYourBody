@@ -254,8 +254,35 @@ export function renderCoverage(report) {
   ].join('\n');
 }
 
+export function assertLedgerMergeReady(root) {
+  const otherConflicts = execFileSync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+    .split('\0')
+    .filter((path) => path && path !== LEDGER_PATH);
+  assert.equal(
+    otherConflicts.length,
+    0,
+    `ledger merge: resolve other conflicts first: ${otherConflicts.join(', ')}`,
+  );
+  const staged = execFileSync(
+    'git',
+    ['diff', '--cached', '--no-ext-diff', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  // Staging a file does not prove its conflict markers were resolved.
+  assert.doesNotMatch(
+    staged,
+    /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,
+    'ledger merge: resolve staged conflict markers first',
+  );
+}
+
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
   if (argv.length === 1 && argv[0] === '--merge-ledger') {
+    assertLedgerMergeReady(root);
     const stages = [1, 2, 3].map((stage) =>
       JSON.parse(
         execFileSync('git', ['show', `:${stage}:${LEDGER_PATH}`], {

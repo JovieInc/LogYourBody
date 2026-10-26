@@ -369,6 +369,10 @@ export const endpoints = {
       reason: 'Linear GraphQL API used by CI remediation intake.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-43',
+      reason: 'LYB-43 source evidence for metric identity and accessible action ownership.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-44',
       reason: 'LYB-44 source evidence for chart responsiveness and playhead label mapping.',
     },
@@ -397,6 +401,11 @@ export const endpoints = {
     {
       value: 'https://linear.app/jovie/issue/LYB-173',
       reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-189',
+      reason:
+        'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-194',
@@ -433,6 +442,10 @@ export const endpoints = {
       value: 'https://linear.app/jovie/issue/LYB-232',
       reason:
         'LYB-232 source evidence for Statsig client-key injection into the production web build.',
+    },
+    {
+      value: 'https://linear.app/jovie/issue/LYB-239',
+      reason: 'LYB-239 source evidence for HealthKit import identity and the correction ledger.',
     },
     {
       value: 'https://linear.app/jovie/issue/LYB-252',
