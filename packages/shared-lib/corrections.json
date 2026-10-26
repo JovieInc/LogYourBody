@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "generated-source-map-conflict-repair",
+    "correction": "PR #1582: Repeated merges of origin/main conflict only in the generated ci.yml fingerprint. Regenerate from the merged sources instead of choosing either parent hash.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1582",
+    "mechanization": "Wrap the existing pinned repository_docs generator with a reusable merge resolver that refuses other unresolved files and pinned-source drift, then regenerates and stages only the configured output. Required Detect Changes tests exercise real conflicting Git branches, both parent edits, idempotence, unstaged edit preservation and refusal paths. Use the resolver for this merge.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The merge resolver constructs the projection from already merged sources using the pinned generator, preventing selection of a stale parent fingerprint. It refuses unresolved source conflicts before writing or staging."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "resolve source conflicts first: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "ruby-native-cache-matches-runtime-build",
     "correction": "PR #1577: Merge-group Unit CI failed before native compilation because an exact Ruby-version cache restored date_core.bundle with an unavailable _rb_cFalseClass symbol. A Ruby version alone does not identify a compatible native gem build.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40270455941",

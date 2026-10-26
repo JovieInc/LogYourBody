@@ -27,6 +27,12 @@ python3 scripts/repository_docs.py --root /path/to/this-repo --write \
   --upstream JovieInc/Jovie=/path/to/Jovie
 ```
 
+After merging a branch, resolve source conflicts first, then run
+`python3 scripts/resolve-repository-docs.py` to regenerate and stage the source
+map from the merged sources. This wraps the pinned generator and refuses to
+write while any other file is unmerged or a shared import fails parity. It
+stages only the generated output; review the source diff before committing.
+
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
 exact upstream bytes. Only listed imports and generated output are written;
