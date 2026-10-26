@@ -4,9 +4,25 @@ import argparse
 import json
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import repository_docs
+
+
+@contextmanager
+def restore_lockfile_on_failure(root):
+    lockfile = repository_docs.local(root, "pnpm-lock.yaml")
+    original = lockfile.read_bytes() if lockfile.exists() else None
+    try:
+        yield
+    except (OSError, subprocess.CalledProcessError):
+        # Failed dependency repairs must be retryable without manual lockfile cleanup.
+        if original is None:
+            lockfile.unlink(missing_ok=True)
+        else:
+            lockfile.write_bytes(original)
+        raise
 
 
 def staged_bytes(root, name):
@@ -74,27 +90,28 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False):
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:
             raise ValueError("; ".join(errors))
-        # Verify valid bot lockfiles without re-resolving unrelated dependencies.
-        modes = [["--frozen-lockfile", "--offline"]]
-        # Explicit repair only: normal commit hooks and CI retain frozen installs.
-        if refresh_lockfile:
-            probe = subprocess.run(
-                ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *modes[0]],
-                cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            )
-            print(probe.stdout, end="", flush=True)
-            # Refresh only a confirmed manifest mismatch; other failures remain blockers.
-            if probe.returncode:
-                if "ERR_PNPM_OUTDATED_LOCKFILE" not in probe.stdout:
-                    probe.check_returncode()
-                modes.insert(0, ["--no-frozen-lockfile"])
-            else:
-                modes = []
-        for mode in modes:
-            subprocess.run(
-                ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
-                cwd=root, check=True,
-            )
+        with restore_lockfile_on_failure(root):
+            # Verify valid bot lockfiles without re-resolving unrelated dependencies.
+            modes = [["--frozen-lockfile", "--offline"]]
+            # Explicit repair only: normal commit hooks and CI retain frozen installs.
+            if refresh_lockfile:
+                probe = subprocess.run(
+                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *modes[0]],
+                    cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                )
+                print(probe.stdout, end="", flush=True)
+                # Refresh only a confirmed manifest mismatch; other failures remain blockers.
+                if probe.returncode:
+                    if "ERR_PNPM_OUTDATED_LOCKFILE" not in probe.stdout:
+                        probe.check_returncode()
+                    modes.insert(0, ["--no-frozen-lockfile"])
+                else:
+                    modes = []
+            for mode in modes:
+                subprocess.run(
+                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
+                    cwd=root, check=True,
+                )
     errors = repository_docs.run(root, write=True)
     if errors:
         raise ValueError("; ".join(errors))

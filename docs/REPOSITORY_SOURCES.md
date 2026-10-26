@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b3cbe42a378587a81873e7ff3a35e74125223a31bee5b9a8cd984859f88cebf8`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0c3e6a93be883d68b0a7623e60d2154c4bcdbe0cae88b8eeb78beb9d1532852e`)
 
 ### `package.json`: packageManager
 
@@ -257,7 +257,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "ai": "^7.0.114",
   "eve": "0.27.13",
-  "zod": "^4.6.6"
+  "zod": "^4.6.7"
 }
 ```
 
