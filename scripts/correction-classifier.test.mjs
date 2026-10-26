@@ -194,6 +194,13 @@ test('CLI writes only after validation and preserves bytes on repeat runs and fa
   assert.match(run(join(directory, 'missing.json')).stderr, /ENOENT/);
 });
 
+test('pre-commit classifies a staged correction ledger', () => {
+  const hook = readFileSync(join(root, '.husky/pre-commit'), 'utf8');
+  assert.match(hook, /packages\/shared-lib\/corrections\.json/);
+  assert.match(hook, /node scripts\/correction-classifier\.mjs \|\| exit \$\?/);
+  assert.match(hook, /git add -- packages\/shared-lib\/corrections\.json/);
+});
+
 test('committed ledger is classified and the default CLI run is idempotent', () => {
   const path = join(root, 'packages/shared-lib/corrections.json');
   const before = readFileSync(path, 'utf8');

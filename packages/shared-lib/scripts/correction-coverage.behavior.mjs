@@ -9,6 +9,7 @@ import {
   assertNoRegression,
   coverageReport,
   LEDGER_PATH,
+  mergeCorrectionLedgers,
   readSource,
   renderCoverage,
   runCoverage,
@@ -158,6 +159,97 @@ function fixtureRepo(t, receipts) {
   ]);
   return { root, ref: git(['rev-parse', 'HEAD']) };
 }
+
+test('ledger merge retains independent receipts and one-sided edits without mutating inputs', () => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const base = [row('kept')];
+  const edited = { ...base[0], correction: 'Clarify the retained invariant.' };
+  const ours = [row('ours'), edited];
+  const theirs = [row('theirs'), base[0]];
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, ours, theirs, () => anchor),
+    [ours[0], edited, theirs[0]],
+  );
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, base, [edited], () => anchor),
+    [edited],
+  );
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, [edited], [edited], () => anchor),
+    [edited],
+  );
+  assert.equal(base[0].correction, 'Keep the deterministic guard in place.');
+  const repeated = { ...base[0], source: 'https://example.com/second-receipt' };
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, [...base, repeated], base, () => anchor),
+    [base[0], repeated],
+  );
+});
+
+test('ledger merge refuses deletions, divergent edits, duplicates and lost guards', () => {
+  const base = [receipt('kept', 'static', { guard, classification: classification('static') })];
+  const edited = { ...base[0], correction: 'An independent change.' };
+  for (const [ours, theirs, error] of [
+    [[], base, /removed receipt/],
+    [base, [], /removed receipt/],
+    [[edited], [{ ...edited, correction: 'A conflicting change.' }], /concurrent receipt edits/],
+    [[...base, base[0]], base, /duplicate receipt/],
+    [[{ ...base[0], guard: undefined }], base, /guard coverage/],
+    [
+      [
+        {
+          ...base[0],
+          level: 'prose',
+          guard: undefined,
+          classification: classification('prose'),
+          proseOnlyReason: 'Editorial judgment.',
+        },
+      ],
+      base,
+      /regression/,
+    ],
+  ]) {
+    assert.throws(() => mergeCorrectionLedgers(base, ours, theirs, () => anchor), error);
+  }
+  assert.throws(() => mergeCorrectionLedgers({}, base, base), /array/);
+  assert.throws(() => mergeCorrectionLedgers([], base, base, () => ''), /guard coverage/);
+});
+
+test('ledger merge CLI uses all three Git conflict stages and leaves refused merges untouched', (t) => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const { root } = fixtureRepo(t, [row('kept')]);
+  const git = (args, input) => execFileSync('git', args, { cwd: root, encoding: 'utf8', input });
+  const path = join(root, LEDGER_PATH);
+  const marker = 'unresolved conflict';
+  writeFileSync(path, marker);
+  const stages = [[], [row('ours')], [row('theirs')]].map((added) => [row('kept'), ...added]);
+  const stage = () => {
+    git(['update-index', '--force-remove', LEDGER_PATH]);
+    const entries = stages
+      .map((rows, index) => {
+        const hash = git(['hash-object', '-w', '--stdin'], JSON.stringify(rows)).trim();
+        return `100644 ${hash} ${index + 1}\t${LEDGER_PATH}\n`;
+      })
+      .join('');
+    git(['update-index', '--index-info'], entries);
+  };
+  stage();
+  assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), [
+    row('kept'),
+    row('theirs'),
+    row('ours'),
+  ]);
+  assert.equal(git(['ls-files', '-u']).trim().split('\n').length, 3, 'staging remains explicit');
+  stages[2] = [];
+  stage();
+  writeFileSync(path, marker);
+  assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }), /removed receipt/);
+  assert.equal(readFileSync(path, 'utf8'), marker);
+  git(['update-index', '--force-remove', LEDGER_PATH]);
+  assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }));
+  assert.equal(readFileSync(path, 'utf8'), marker);
+});
 
 test('counts distinct rules, all four pyramid levels and unclassified receipts honestly', () => {
   const rows = [
