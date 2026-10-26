@@ -63,7 +63,8 @@ pnpm test --filter=@logyourbody/shared-lib
 
 The classifier accepts an optional ledger path, defaults to this repository's
 ledger regardless of the working directory, and validates every receipt before
-writing. It uses LYB-204's reviewed feasibility assessments to select the first
+writing. The pre-commit hook runs it whenever the correction ledger is staged,
+then stages the classified bytes so a commit cannot land missing level or ruleId. It uses LYB-204's reviewed feasibility assessments to select the first
 feasible level; incidental keywords cannot override a rejected assessment.
 There is no implicit prose or human fallback for missing or malformed assessments.
 

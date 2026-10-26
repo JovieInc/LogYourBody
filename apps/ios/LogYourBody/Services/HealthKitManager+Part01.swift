@@ -191,7 +191,7 @@ func sourceMetadata(from sample: HKQuantitySample) -> BodyMetricSourceMetadata {
             deviceId: deviceId,
             deviceManufacturer: sample.device?.manufacturer,
             deviceModel: sample.device?.model,
-            sampleId: sample.uuid.uuidString,
+            sampleId: idempotencyKey(for: sample),
             quantityType: sample.quantityType.identifier
         )
     }
@@ -496,6 +496,7 @@ func saveBodyFatPercentage(_ percentage: Double, date: Date = Date()) async thro
     }
 
 func setupBackgroundDelivery() async throws {
+        guard capabilities.pushEvents else { return }
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }
