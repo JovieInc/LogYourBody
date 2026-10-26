@@ -11,5 +11,10 @@ if git diff --cached --name-only --diff-filter=ACMR | grep -qx 'packages/shared-
   git add -- packages/shared-lib/corrections.json
 fi
 
+# Verify the staged merge, including when the ledger has no diff against HEAD.
+if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+  node scripts/correction-classifier.mjs --check-merge . || exit $?
+fi
+
 # Refresh derived documentation after formatters and ledger classification.
 python3 scripts/resolve-repository-docs.py --staged
