@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  assertLedgerMergeReady,
   assertNoRegression,
   coverageReport,
   LEDGER_PATH,
@@ -350,6 +351,31 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
   git(['update-index', '--force-remove', LEDGER_PATH]);
   assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }));
   assert.equal(readFileSync(path, 'utf8'), marker);
+});
+
+test('ledger merge readiness checks raw staged bytes despite Git diff attributes', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  git('config', 'diff.masked.textconv', 'head -c 0');
+  for (const attributes of [`${guard.path} -diff\n`, `${guard.path} diff=masked\n`]) {
+    writeFileSync(join(root, '.gitattributes'), attributes);
+    git('add', '.gitattributes');
+    for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
+      writeFileSync(join(root, guard.path), `${anchor}\n${marker}\n`);
+      git('add', guard.path);
+      writeFileSync(join(root, guard.path), anchor);
+      const index = git('ls-files', '--stage');
+      assert.throws(
+        () => assertLedgerMergeReady(root),
+        /ledger merge: resolve staged conflict markers first/,
+        attributes,
+      );
+      assert.equal(git('ls-files', '--stage'), index, 'refusal preserves the index');
+      assert.equal(readFileSync(join(root, guard.path), 'utf8'), anchor);
+    }
+    git('add', guard.path);
+    assertLedgerMergeReady(root);
+  }
 });
 
 test('coverage CLI retains reporting and ledger repair modes after concurrent changes', (t) => {

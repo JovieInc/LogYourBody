@@ -131,7 +131,8 @@ The required behavioral suite runs ledger repair, artifact emission, and default
 and baseline reporting together against real Git snapshots. This compatibility
 guard prevents concurrent CLI changes from dropping either repair or reporting.
 Invalid options must leave the ledger, existing artifact and job summary intact.
-Ledger repair rejects newly staged conflict markers even with forced Git colors;
+Ledger repair checks raw staged bytes, rejecting newly staged conflict markers
+even with forced Git colors, binary diff attributes or text conversion;
 an unstaged repair cannot hide markers still present in the index.
 
 The existing required CI path checks coverage on **every diff**, including
