@@ -304,6 +304,82 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(spy.haptics, 0, "An obsolete account lifetime cannot alert")
     }
 
+    func testScrubCommitsOnlyToDraftAndOfflineRetryRetainsCanonicalSetIdentity() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        var edit = try XCTUnwrap(TrainingNumericScrubEdit(
+            original: "60", dimension: .load(.imperial), increment: 2.5
+        ))
+        for pixel in 1...60 { edit.move(horizontal: Double(pixel), vertical: 0) }
+        XCTAssertTrue(draft.rows.isEmpty, "Provisional frames must not write the journal")
+        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: "fixture-session").isEmpty)
+        let canonical = try XCTUnwrap(edit.committedText(current: "60"))
+        draft.update(exercise, setNumber: 1) { $0.loadText = canonical; $0.repsText = "12"; $0.rir = 2 }
+        let restored = model(store)
+        XCTAssertEqual(restored.row(for: exercise, setNumber: 1).loadText, canonical)
+        XCTAssertTrue(restored.loggedSets.isEmpty, "Scrubbing never records a set")
+        var attempts: [TrainingSetLogRequest] = []
+        await restored.save(exercise, setNumber: 1) { request in
+            attempts.append(request)
+            throw URLError(.notConnectedToInternet)
+        }
+        let retry = model(store)
+        retry.update(exercise, setNumber: 1) { $0.loadText = "500" }
+        XCTAssertEqual(retry.row(for: exercise, setNumber: 1).loadText, canonical, "Pending requests stay immutable")
+        await retry.save(exercise, setNumber: 1) { attempts.append($0) }
+        await retry.save(exercise, setNumber: 1) { attempts.append($0) }
+        XCTAssertEqual(attempts.count, 2)
+        XCTAssertEqual(attempts.first, attempts.last)
+        XCTAssertEqual(attempts.last?.loadKg, Double(canonical))
+        XCTAssertEqual(attempts.last?.reps, 12)
+        XCTAssertEqual(attempts.last?.rir, 2)
+        XCTAssertEqual(retry.loggedSets.count, 1)
+        let readback = TrainingSessionDraft(
+            session: session(saved: Array(retry.loggedSets.values)), ownerId: "owner-A", store: store, isCurrent: { true }
+        )
+        XCTAssertEqual(readback.row(for: exercise, setNumber: 1).loadText, canonical)
+    }
+
+    func testScrubCorrectionUsesExistingDurableIdentityAndCancellingNeverWrites() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        await draft.save(exercise, setNumber: 1) { _ in }
+        let position = try XCTUnwrap(draft.allPositions.first)
+        draft.beginCorrection(position)
+        let before = draft.row(for: exercise, setNumber: 1)
+        var cancelled = try XCTUnwrap(TrainingNumericScrubEdit(
+            original: before.repsText, dimension: .reps, increment: 1
+        ))
+        cancelled.move(horizontal: 36, vertical: 0)
+        cancelled.move(horizontal: 36, vertical: 90)
+        XCTAssertNil(cancelled.committedText(current: before.repsText))
+        XCTAssertEqual(draft.row(for: exercise, setNumber: 1), before)
+        var edit = try XCTUnwrap(TrainingNumericScrubEdit(original: before.repsText, dimension: .reps, increment: 1))
+        edit.move(horizontal: 24, vertical: 0)
+        let reps = try XCTUnwrap(edit.committedText(current: before.repsText))
+        draft.update(exercise, setNumber: 1) { $0.repsText = reps }
+        XCTAssertEqual(draft.row(for: exercise, setNumber: 1).correctionBase, before.correctionBase)
+        var corrections = 0
+        await draft.correct(position) { request in
+            corrections += 1
+            XCTAssertEqual(request.sessionId, "fixture-session")
+            XCTAssertEqual(request.exerciseId, self.exercise.id)
+            XCTAssertEqual(request.setNumber, 1)
+            return TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: request.reps, loadKg: request.loadKg, rir: request.rir, revision: request.expectedRevision + 1
+            )
+        }
+        await draft.correct(position) { _ in XCTFail("A scrub correction cannot submit twice"); throw URLError(.cancelled) }
+        XCTAssertEqual(corrections, 1)
+        XCTAssertEqual(draft.loggedSets.count, 1)
+        XCTAssertEqual(draft.loggedSets[position.id]?.reps, 12)
+    }
+
     func testFeedbackRequestEncodesOptionalMuscleDetailAndTouchSource() throws {
         let request = TrainingFeedbackRequest(
             sessionId: "fixture-session",

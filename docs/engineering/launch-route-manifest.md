@@ -58,3 +58,25 @@ registry entry.
 Feed the emitted manifest and LYB-183's real receipt to the Jovie oracle for
 certification. This slice does not provide native execution, installed-build,
 TestFlight, or real-device proof.
+
+## Installed-build xcresult coverage (LYB-289)
+
+The evidence checker diffs an xcresult export against this manifest and the
+pinned launch contract. Every contract path, and every route state (`ready`,
+`denial`, `no-data`, `offline`, `stale`, `conflicting`, `unsafe-date`,
+`impossible-date`, `expired-date`, and `maintenance`) on timeline, stats, and
+coach, needs one passed native-interaction trace and one passed service trace.
+The check fails when a path or state has no xcresult entry, when a trace is a
+fixture substitute (`fixture`, `override`, `bypass`, or `-lybUITest`), or when
+the installed build id is absent. A passing result is a
+`lyb-native-certification/v2` receipt the pinned oracle can read. Checker tests
+use synthetic exports and are not installed-build proof. JOV-6013 stays open.
+
+```sh
+node --experimental-strip-types --experimental-vm-modules --test \
+  packages/shared-lib/scripts/installed-build-xcresult.behavior.mjs
+node --experimental-strip-types packages/shared-lib/scripts/installed-build-xcresult.mjs \
+  manifest.json \
+  scripts/fixtures/lyb-certification/fixtures/lyb-launch-contract.json \
+  xcresult-export.json
+```

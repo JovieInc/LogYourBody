@@ -6,7 +6,7 @@ import {
 import { decisionBody, proposalBody, revisionHarness } from './revisions.testing';
 import { getOrCreateNextWorkout, storeProgramSetup } from './service';
 import { TRAINING_CONSENT_VERSION } from './types';
-import { storedProposalSchema } from './revision-contract';
+import { revisionReceiptSchema, storedProposalSchema } from './revision-contract';
 
 const now = new Date('2026-10-10T12:00:00Z');
 async function proposed(h = revisionHarness()) {
@@ -38,7 +38,7 @@ describe('reviewed initial training enrollment', () => {
     { ...proposalBody, intent: { ...proposalBody.intent, musclePriority: 'arms' } },
     { ...proposalBody, actor: { kind: 'trainer', subject: 'other' } },
     { ...proposalBody, intent: { ...proposalBody.intent, adultConfirmed: false } },
-    { ...proposalBody, intent: { ...proposalBody.intent, sessionsPerWeek: 4 } },
+    { ...proposalBody, intent: { ...proposalBody.intent, sessionsPerWeek: 7 } },
   ])('fails closed for unsupported authority/intent/constraints without a write', async (body) => {
     const h = revisionHarness();
     expect(
@@ -46,6 +46,40 @@ describe('reviewed initial training enrollment', () => {
     ).toEqual({ kind: 'unsupported_or_invalid_intent' });
     expect(h.port.createProposal).not.toHaveBeenCalled();
   });
+  it.each(
+    [4, 5, 6].flatMap((sessionsPerWeek) =>
+      [undefined, 4, 5, 6].map((weekCount) => ({ sessionsPerWeek, weekCount })),
+    ),
+  )(
+    'reviews, applies and reloads a $sessionsPerWeek-day split, cycle $weekCount',
+    async ({ sessionsPerWeek, weekCount }) => {
+      const h = revisionHarness();
+      const result = await createInitialTrainingProposal({
+        revisions: h.port,
+        subject: 'owner',
+        body: { ...proposalBody, intent: { ...proposalBody.intent, sessionsPerWeek, weekCount } },
+        now,
+      });
+      if (result.kind !== 'stored') throw new Error(result.kind);
+      const proposal = result.stored.proposal;
+      expect(storedProposalSchema.parse(result.stored)).toEqual(result.stored);
+      expect(proposal.plan.sessions).toHaveLength(sessionsPerWeek);
+      const applied = await decideInitialTrainingProposal({
+        revisions: h.port,
+        subject: 'owner',
+        body: decisionBody(proposal.id),
+        now,
+      });
+      if (applied.kind !== 'decided') throw new Error(applied.kind);
+      expect(revisionReceiptSchema.parse(applied.receipt)).toEqual(applied.receipt);
+      expect(applied.receipt.setup?.sessionsPerWeek).toBe(sessionsPerWeek);
+      const next = await getOrCreateNextWorkout({ records: h.records, subject: 'owner', now });
+      if (next.kind !== 'workout') throw new Error(next.kind);
+      expect(next.session.title).toBe(proposal.plan.sessions[0]?.title);
+      expect(next.session.exercises).toEqual(proposal.plan.sessions[0]?.exercises);
+      expect(next.weeklyFractionalVolume).toEqual(proposal.plan.plannedFractionalVolume);
+    },
+  );
   it('returns original create retry and conflicts on changed reason with the same identity', async () => {
     const h = await proposed();
     expect(
