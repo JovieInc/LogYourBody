@@ -33,6 +33,20 @@ map from the merged sources. This wraps the pinned generator and refuses to
 write while any other file is unmerged or a shared import fails parity. It
 stages only the generated output; review the source diff before committing.
 
+The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
+after formatting and correction classification. It refreshes the projection
+from indexed sources, preserves unstaged source edits, and refuses unstaged
+projection edits or pinned-source drift. Bot commits created outside local
+hooks still need this refresh during repair; CI continues to reject stale output.
+
+For dependency PRs with a stale lockfile, stage the reviewed manifests and run
+`python3 scripts/resolve-repository-docs.py --refresh-lockfile`. This explicit
+repair uses the pinned pnpm through Corepack to regenerate the lockfile without
+lifecycle scripts, verifies it with a frozen offline pass, then stages the
+lockfile and source map. It refuses unresolved source conflicts, unstaged
+dependency or projection edits, and pinned-source drift. It requires registry
+access for uncached resolutions; commit hooks and CI keep frozen installation.
+
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
 exact upstream bytes. Only listed imports and generated output are written;
