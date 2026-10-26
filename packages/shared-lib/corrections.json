@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "storekit-lifecycles-isolate-simulator-state",
+    "correction": "PR #1593 merge-group run 40300882343: the fourth StoreKit lifecycle purchased successfully but restore returned no entitlement. The shared session and scoped cleanup still allowed cases to share the same StoreKit test server.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300882343",
+    "mechanization": "Extend the existing StoreKit runner to create a fresh compatible simulator and process for every required lifecycle and delete its owned devices on success or failure. Keep all four native assertions, source checks, coverage exports and exact-case evidence validation. The required runner-routing suite executes the runner with fake native tools and the real evidence validator, rejecting shared devices, skipped/duplicate cases, failed tests or coverage, dirty source and missing cleanup. The isolation regression fails against the prior runner and passes after the change. Native behavior remains subject to macOS merge-group CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner can construct independent simulator test environments for every lifecycle, preventing earlier expiration, refund and cleanup operations from affecting a later case by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/storekit-purchase-restore.sh",
+      "anchor": "SIMULATOR_ID=$(xcrun simctl create"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "lint-correction-checks-warn-then-harden",
     "correction": "LYB-307: Emit new checks only for lint/typecheck/CI classifications. The first receipt warns with exit 0; a distinct repeat hardens the same check. Codebase, prose and human-review classifications emit no new check.",
     "source": "https://linear.app/jovie/issue/LYB-307",

@@ -1322,6 +1322,103 @@ def test_ruby_setup_loads_locked_native_gems_after_bundler_setup(tmp_path: Path)
             assert 'Bundled date loaded\nBundled psych loaded\nBundled json loaded\nBundled ffi loaded\nRuby native dependencies loaded' in result.stdout
 
 
+def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence(tmp_path: Path) -> None:
+    cases = ['testAnnualTrialPurchaseRestoreExpiration', 'testMonthlyTrialPurchaseRestoreExpiration',
+             'testAnnualTrialPurchaseRestoreRefund', 'testMonthlyTrialPurchaseRestoreRefund']
+    root = tmp_path / 'repo'
+    (root / 'apps/ios').mkdir(parents=True)
+    scripts = root / 'scripts/ios'
+    scripts.mkdir(parents=True)
+    for name in ['storekit-purchase-restore.sh', 'resolve-simulator-destination.sh', 'launch-quality-evidence.py']:
+        (scripts / name).write_bytes((_REPO_ROOT / 'scripts/ios' / name).read_bytes())
+    _diagnostic_git(root, 'init', '-q')
+    _diagnostic_git(root, 'add', '.')
+    _diagnostic_git(root, '-c', 'user.name=CI Test', '-c', 'user.email=ci@example.invalid',
+                    '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'StoreKit runner fixture')
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    native = binaries / 'native.py'
+    native.write_text(textwrap.dedent('''\
+        #!/usr/bin/python3
+        import json, os, sys
+        from pathlib import Path
+        args = sys.argv[1:]
+        command = Path(sys.argv[0]).name
+        log = Path(os.environ['NATIVE_CALLS'])
+        with log.open('a') as stream:
+            stream.write(json.dumps([command, *args]) + '\\n')
+        scenario = os.environ['NATIVE_SCENARIO']
+        if command == 'xcodebuild':
+            if '-showdestinations' in args:
+                print('{ platform:iOS Simulator, arch:arm64, id:seed, OS:26.2, name:iPhone 16 }')
+            else:
+                selector = next((a for a in args if a.startswith('-only-testing:')), '')
+                case = selector.rsplit('/', 1)[-1]
+                bundle = Path(args[args.index('-resultBundlePath') + 1])
+                bundle.mkdir()
+                (bundle / 'case').write_text(case)
+                if scenario == 'dirty':
+                    Path('changed-source.swift').write_text('unreviewed generation')
+                    os.system('git add changed-source.swift')
+                if scenario == 'test-failure':
+                    print('No active subscriptions found', flush=True)
+                    sys.exit(65)
+        elif args[:4] == ['simctl', 'list', 'devices', 'available']:
+            print(json.dumps({'devices': {'runtime': [{'udid': 'seed', 'deviceTypeIdentifier': 'iphone'}]}}))
+        elif args[:2] == ['simctl', 'create']:
+            count = sum('"create"' in line for line in log.read_text().splitlines())
+            print(f'fresh-{count}')
+        elif args[:2] == ['simctl', 'bootstatus']:
+            if scenario == 'boot-failure' and args[2] != 'seed':
+                sys.exit(70)
+        elif args[:4] == ['xcresulttool', 'get', 'test-results', 'tests']:
+            case = (Path(args[-1]) / 'case').read_text()
+            result = 'Skipped' if scenario == 'skipped' else 'Passed'
+            nodes = [{'nodeType': 'Test Case', 'nodeIdentifier': f'StoreKitPurchaseRestoreTests/{case}()',
+                      'result': result}]
+            print(json.dumps({'testNodes': nodes * (2 if scenario == 'duplicate' else 1)}))
+        elif args[:2] == ['xccov', 'view']:
+            if scenario == 'coverage-failure':
+                sys.exit(65)
+            print('{"targets": []}')
+    '''))
+    native.chmod(0o755)
+    for name in ['xcrun', 'xcodebuild']:
+        (binaries / name).symlink_to(native)
+    for scenario in ['success', 'test-failure', 'skipped', 'duplicate', 'coverage-failure', 'boot-failure', 'dirty']:
+        results = tmp_path / scenario
+        calls = tmp_path / f'{scenario}.calls'
+        result = subprocess.run(['bash', str(scripts / 'storekit-purchase-restore.sh')], cwd=root,
+                                env={**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}',
+                                     'STOREKIT_RESULTS': str(results), 'NATIVE_CALLS': str(calls),
+                                     'NATIVE_SCENARIO': scenario, 'GITHUB_STEP_SUMMARY': ''},
+                                text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+        events = [json.loads(line) for line in calls.read_text().splitlines()]
+        invocations = [e for e in events if e[0] == 'xcodebuild' and '-showdestinations' not in e]
+        creates = [e for e in events if e[:3] == ['xcrun', 'simctl', 'create']]
+        deletes = [e[-1] for e in events if e[:3] == ['xcrun', 'simctl', 'delete']]
+        # Only devices created by this invocation may be deleted, including on failure.
+        assert deletes == [f'fresh-{i + 1}' for i in range(len(creates))], result.stderr
+        assert (results / 'source-working-tree.patch').exists()
+        assert (results / 'storekit.log').exists()
+        if scenario == 'success':
+            assert result.returncode == 0, result.stderr + result.stdout
+            assert len(invocations) == 4
+            for i, (invocation, case) in enumerate(zip(invocations, cases)):
+                assert f'-only-testing:LogYourBodyTests/StoreKitPurchaseRestoreTests/{case}' in invocation
+                assert invocation[invocation.index('-destination') + 1] == f'platform=iOS Simulator,id=fresh-{i + 1}'
+                receipt = json.loads((results / f'{case}.evidence.json').read_text())
+                assert receipt['tests'] == [{'identifier': f'StoreKitPurchaseRestoreTests/{case}()', 'result': 'Passed'}]
+                assert receipt['sourceRevision'] == _diagnostic_git(root, 'rev-parse', 'HEAD')
+                assert (results / f'{case}.coverage.json').is_file()
+        else:
+            assert result.returncode == (70 if scenario == 'boot-failure' else 65), scenario
+            assert len(invocations) <= 1, 'A failed lifecycle must not be retried or advance to the next case'
+            assert not list(results.glob('*.evidence.json'))
+            if scenario == 'test-failure':
+                assert 'restore returned no active entitlement' in result.stdout
+
+
 def test_invalid_awaiter_bounds_and_missing_helper_fall_back(tmp_path: Path) -> None:
     cases = [
         {'HEARTBEAT_POLL_ATTEMPTS': '0'},
