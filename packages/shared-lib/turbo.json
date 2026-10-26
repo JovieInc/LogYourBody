@@ -4,6 +4,8 @@
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/correction-classifier*.mjs",
+        "$TURBO_ROOT$/scripts/fixtures/correction-classifier.json",
         "$TURBO_ROOT$/scripts/lyb-launch-manifest*.mjs",
         "$TURBO_ROOT$/scripts/fixtures/lyb-certification/**",
         "$TURBO_ROOT$/packages/shared-lib/scripts/installed-build-xcresult.mjs",
