@@ -120,3 +120,51 @@ The existing share Date switch also removes comparison endpoint dates. Its
 undated trend still states first-to-last observation and the observation mean;
 it does not leave hidden dates in the Trend field. A native PNG truth regression
 covers Date off with Trend on.
+
+## PR #1535 repair, 2026-10-26
+
+Merged `origin/main` at `6f5f7b89a` without rebasing (merge `fd2d7b6eb`).
+The registry merge retains both URL exemptions and regenerates the endpoint
+output. The correction ledger retains every receipt from main and classifies
+the existing Stats truth receipt under main's current contract.
+
+Failed run `40153848379`, read with `gh run view --log-failed`, identified:
+
+- `synchronizationText` was declared on `ChartSeriesPreprocessor` instead of
+  `FullMetricChartView`. Moving the property restores the date-only preprocessor
+  initializer and the view's separate synchronization context.
+- The unequal-date test called the chart's instance helper as a global function.
+  It now constructs the real chart, compares its statistics with the observation
+  summary, and checks that the synchronization text survives initialization.
+- Adding the Stats truth UI selector changed the launch audit SHA-256. The
+  diagnostic workflow and routing witnesses now pin the exact resulting bytes
+  (`c50dbf251859a4ccc3da3285cb8881232df0816befbc4b0d6ef2912531a18c06`).
+  All seven dependency pins and trust checks remain enforced. The routing CLI
+  regression also rejects the previous audit without the new UI selector.
+
+Local evidence:
+
+- Routing suite: reproduced 2 failures and 39 passes before repair; all 41 pass
+  afterward, including the previous-audit rejection fixture.
+- Root `pnpm lint` and `pnpm typecheck` pass. `pnpm product:generate` and
+  `pnpm product:check` pass. `pnpm lint:swift --cache-path
+/tmp/lyb-pr1535-swiftlint-cache` reports zero violations in 474 files; this host
+  skips five SourceKit-dependent rules.
+- `VITEST_MAX_WORKERS=1 pnpm test --env-mode=loose --concurrency=1` passes
+  all eight Turbo tasks, including the real web build, 159 shared-lib cases,
+  and 122 supporting Node tests. The initial sandboxed run encountered
+  subprocess `EPERM`; the unchanged suite passes outside the sandbox. Build-only
+  marketing capture timestamp churn was restored afterward.
+- All 12 launch UI mutation tests and the real source audit pass. Correction
+  coverage and the immutable-base ratchet pass; the 11 existing public-copy
+  baseline findings remain unchanged. Repository source parity, shell syntax,
+  and `git diff --check` pass.
+- Both `xcodebuild` build-for-testing and test attempts exit 127 because Xcode
+  is absent. Native compilation, XCTest, UI/PNG/OCR, StoreKit, and native
+  coverage require receipts from the harness-pushed head on the real Mac runner.
+- GBrain query, `put lyb-47-pr1535-ci-repair`, and same-slug readback each time
+  out after 30 seconds outside the sandbox (curl 28 at localhost:7801). Neither
+  write persistence nor readback is verified; this document retains the findings.
+
+The harness retains push and PR ownership. The repair changes no rollout gate,
+measurement calculation, or trend semantics.

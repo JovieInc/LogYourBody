@@ -7,6 +7,7 @@
 // hero 30-day deltas), delta/footnote formatting, trend classification, and the
 // metric footnote precedence rule.
 //
+import SwiftUI
 import XCTest
 @testable import LogYourBody
 
@@ -232,6 +233,7 @@ final class DashboardMetricFormattingTests: XCTestCase {
     // MARK: - Fixture
 
     // LYB-47 extends the existing truth calculator fixtures; dates are deliberately unequal.
+    @MainActor
     func testObservationSummaryUsesEndpointsAndObservationMeanAcrossUnequalDates() throws {
         let points = [truthPoint(0, 80), truthPoint(-29, 90), truthPoint(-2, 70)]
         let summary = MetricObservationSummary(points: points, range: .month1, now: base)
@@ -245,8 +247,15 @@ final class DashboardMetricFormattingTests: XCTestCase {
         XCTAssertEqual(stats.endDate, base)
         XCTAssertEqual(summary.periodLabel, "Past 30 days")
         XCTAssertTrue(summary.comparisonLabel.hasPrefix("First → last"))
-        XCTAssertEqual(computeSeriesStats(for: points)?.delta, stats.delta)
-        XCTAssertEqual(computeSeriesStats(for: points)?.average, stats.average)
+        let chart = FullMetricChartView(
+            title: "Weight", icon: "figure.stand", iconColor: .blue,
+            currentValue: "80.0", unit: "kg", currentDate: "Observation date",
+            chartData: points, onAdd: nil, metricEntries: nil, goalValue: nil,
+            selectedTimeRange: .constant(.month1), statsTruthEnabled: true, referenceDate: base,
+            synchronizationText: "Cloud sync: Yesterday")
+        XCTAssertEqual(chart.computeSeriesStats(for: points)?.delta, stats.delta)
+        XCTAssertEqual(chart.computeSeriesStats(for: points)?.average, stats.average)
+        XCTAssertEqual(chart.synchronizationText, "Cloud sync: Yesterday")
     }
 
     func testMissingSingleTimestampAndOldOnlyNeverBecomeNoChange() {

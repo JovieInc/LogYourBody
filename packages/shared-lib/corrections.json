@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "stats-truth-chart-sync-ownership-and-native-test-compilation",
+    "correction": "PR #1535 repair: Keep synchronization context on the metric detail view, preserve the date-only chart preprocessor initializer, and exercise chart instance helpers through a real chart fixture.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "FullMetricChartView owns its synchronizationText initializer argument. The existing unequal-date native regression constructs that view, checks its separate sync context, and compares its instance statistics with the observation summary. Existing preprocessor fixtures retain their date-only initializer. The required native build rejects the previous ownership and scope errors; existing routing tests bind the reviewed audit checksum to the added Stats truth UI selector without relaxing any trust checks.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The Swift view's stored property and existing initializer own synchronization context by construction; compiled native fixtures reject misplaced state and unbound chart helper calls."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/DashboardMetricFormattingTests.swift",
+      "anchor": "XCTAssertEqual(chart.synchronizationText, \"Cloud sync: Yesterday\")"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "stats-truth-neutral-direction-and-observation-windows",
     "correction": "LYB-47: Stats must distinguish observation, sync, display and comparison dates; insufficient samples and direction alone cannot imply unchanged health or goal progress.",
     "source": "https://linear.app/jovie/issue/LYB-47",
