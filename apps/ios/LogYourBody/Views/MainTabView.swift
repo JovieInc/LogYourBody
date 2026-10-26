@@ -877,6 +877,12 @@ struct ChatTabView: View {
                     readinessEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
                         flagKey: TrainingReadinessPolicy.featureGate
                     ),
+                    restTimerEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
+                        flagKey: TrainingRestPolicy.featureGate
+                    ),
+                    numericScrubEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
+                        flagKey: TrainingNumericDimension.featureGate
+                    ),
                     progressEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
                         flagKey: TrainingProgressPolicy.featureGate
                     ),
@@ -893,6 +899,9 @@ struct ChatTabView: View {
                     },
                     onCorrectSet: { request in
                         try await correctTrainingSet(ownership: ownership, request: request)
+                    },
+                    onUndoSet: { request in
+                        try await undoTrainingSet(ownership: ownership, request: request)
                     },
                     onWorkoutAction: { request in
                         try await applyTrainingAction(ownership: ownership, request: request)
@@ -1408,15 +1417,35 @@ struct ChatTabView: View {
     private func logTrainingSet(
         ownership: AuthManager.ProfileSessionOwnership,
         request: TrainingSetLogRequest
-    ) async throws {
+    ) async throws -> TrainingSavedSet {
+        var saved: TrainingSavedSet?
         try await TrainingOwnedRequest.perform(
             isCurrent: { authManager.ownsAccountSession(ownership) },
             getToken: { await chatAccessToken() },
             send: { accessToken in
-                try await trainingService.logSet(accessToken: accessToken, request: request)
+                saved = try await trainingService.logSet(accessToken: accessToken, request: request)
             }
         )
+        guard let saved else { throw TrainingServiceError.invalidResponse }
         await loadTrainingNext()
+        return saved
+    }
+
+    private func undoTrainingSet(
+        ownership: AuthManager.ProfileSessionOwnership,
+        request: TrainingSetUndoRequest
+    ) async throws -> TrainingSavedSet {
+        var undone: TrainingSavedSet?
+        try await TrainingOwnedRequest.perform(
+            isCurrent: { authManager.ownsAccountSession(ownership) },
+            getToken: { await chatAccessToken() },
+            send: { accessToken in
+                undone = try await trainingService.undoSet(accessToken: accessToken, request: request)
+            }
+        )
+        guard let undone else { throw TrainingServiceError.invalidResponse }
+        await loadTrainingNext()
+        return undone
     }
 
     private func correctTrainingSet(
@@ -2043,7 +2072,8 @@ struct ChatTabView: View {
             "set_number": "say the set number",
             "reps": "say the rep count",
             "rir": "say the reps in reserve",
-            "weight": "say the load with a unit"
+            "weight": "say the load with a unit",
+            "load_accounting": "say whether that load is per hand"
         ]
         let needed = fields.compactMap { prompts[$0] }
         if needed.isEmpty { return "Review the transcript before sending or logging it." }
@@ -2078,7 +2108,7 @@ struct ChatTabView: View {
                 $0.loadText = TrainingLoadInputPolicy.savedText(for: proposal.loadKg)
                 $0.rir = proposal.rir
             }
-            await journal.save(exercise, setNumber: proposal.setNumber) { request in
+            await journal.saveAcknowledged(exercise, setNumber: proposal.setNumber) { request in
                 try await logTrainingSet(ownership: ownership, request: request)
             }
             if journal.loggedSets["\(proposal.exerciseId)-\(proposal.setNumber)"] != nil {

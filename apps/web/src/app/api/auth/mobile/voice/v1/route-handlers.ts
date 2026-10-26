@@ -4,6 +4,7 @@ import type { JovieUserInfo } from '@/lib/auth/jovie-oauth';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
 import type { VoiceCoachAccess } from '@/lib/voice/access';
 import type { VoiceProvider } from '@/lib/voice/provider';
+import { establishedLoadAccounting } from '@/lib/training/catalog';
 import { planUtteranceProposal } from '@/lib/training/mesocycle-canvas';
 import { parseVoiceIntent, type VoiceWeightUnit } from '@/lib/voice/intent-parser';
 
@@ -73,6 +74,12 @@ function jsonError(code: string, status: number, retryAfterSeconds?: number) {
   );
 }
 
+function withEstablishedLoadAccounting<T extends { exerciseId: string }>(set: T | undefined) {
+  if (!set) return undefined;
+  const loadAccounting = establishedLoadAccounting(set.exerciseId);
+  return loadAccounting ? { ...set, loadAccounting } : set;
+}
+
 function rateLimited(result: Extract<ChatRateLimitResult, { allowed: false }>) {
   return jsonError('rate_limited', 429, result.retryAfterSeconds);
 }
@@ -133,8 +140,8 @@ export function createVoiceRouteHandlers(dependencies: VoiceRouteDependencies) {
       const result = parseVoiceIntent(input.transcript, {
         sessionId: input.session?.id,
         exercises: input.session?.exercises,
-        currentSet: input.session?.currentSet,
-        lastCompletedSet: input.session?.lastCompletedSet,
+        currentSet: withEstablishedLoadAccounting(input.session?.currentSet),
+        lastCompletedSet: withEstablishedLoadAccounting(input.session?.lastCompletedSet),
         weightUnit,
       });
       // Plan sentences stay proposals. This route does not write the ledger.
