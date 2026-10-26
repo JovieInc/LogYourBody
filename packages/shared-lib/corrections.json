@@ -485,6 +485,68 @@
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1552: Resolve the origin/main correction-ledger conflict by retaining the photo-filmstrip receipts and main's backward-planner merge receipts with their original sources and guards.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1552",
+    "mechanization": "Preserve both sides of the additive ledger merge. The existing required correction coverage check rejects discarded source receipts; verify the resolved ledger against both pre-merge parents and demonstrate rejection when either side is omitted.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "photo-filmstrip-shares-owned-timeline-selection",
+    "correction": "LYB-85 October 10 deduplication decision: add missing filmstrip appearance only within the JOV-6016-owned timeline; preserve one selection, photo/metric synchronization and 4:5 hero geometry.",
+    "source": "https://linear.app/jovie/issue/LYB-85",
+    "mechanization": "The former unused HomeV2Filmstrip becomes a read-only rendering layer of the existing ruler, behind a default-off port gate. Home and viewer pass their owned chronological photos into the same selection callback. Required shared-lib source regressions reject detached wiring, a second strip writer and full-size thumbnail decoding; they failed on the unchanged source and pass with this slice. Existing whole-unit classes cover bounded geometry, RTL, gate rollback, malformed image data and cache separation. The already-selected viewer UI case also exercises strip scrubbing and dated weight changes. Native execution and visual/device acceptance remain unverified on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A read-only strip has no selected-date binding, gesture or persistence path; the existing ruler and immutable Home selection continue to own navigation by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Views/HomeV2/HomeV2PhotoTimelineRuler.swift",
+      "anchor": "HomeV2Filmstrip(photoURLs: photoURLs, selected: selected)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "product-registry-generated-endpoints-match-source",
+    "correction": "PR #1552: After merging main, product:check rejected stale generated endpoints missing main's CI-only Vercel API registration.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1552",
+    "mechanization": "Regenerate with pnpm product:generate. The existing required product-registry suite rejects stale generated files; product:check failed before regeneration and passes afterward. Retain that generation check without hand-editing outputs.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime application logic cannot ensure a separately committed generated endpoint file matches the canonical registry after a merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required product-registry suite compares generated output with canonical source and rejects stale files."
+      }
+    },
+    "guard": {
+      "path": "packages/product-registry/scripts/generate.mjs",
+      "anchor": "is stale; run pnpm product:generate"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
     "correction": "PR #1560: Resolve the origin/main correction-ledger conflict by retaining the backward-planner CI receipts and the training-cycle merge receipt with their original sources and guards.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1560",
     "mechanization": "Preserve both sides of the additive ledger merge. The existing required correction coverage check compares immutable-base source identities and rejects discarded receipts; its behavioral regressions cover deleted, replaced and reassigned source receipts. Verify the resolved ledger against both pre-merge parents.",
