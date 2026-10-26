@@ -2,6 +2,7 @@
 """Refresh generated documentation from merged or staged sources with the pinned generator."""
 import argparse
 import json
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -51,7 +52,7 @@ def resolve_staged(root):
     print("repository-docs: regenerated and staged " + config["output"] + " from index")
 
 
-def resolve(root):
+def resolve(root, sync_lockfile=False):
     root = Path(root).resolve()
     config = json.loads(repository_docs.local(root, "repository-docs.json").read_text())
     output = repository_docs.local(root, config["output"]).relative_to(root).as_posix()
@@ -62,6 +63,22 @@ def resolve(root):
     unresolved = sorted(set(conflicts) - {"", output})
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
+    if sync_lockfile:
+        # Validate pinned sources and output safety before invoking the package manager.
+        errors = [error for error in repository_docs.run(root)
+                  if error != "source projection stale: " + config["output"]]
+        if errors:
+            raise ValueError("; ".join(errors))
+        manifest = json.loads(repository_docs.local(root, "package.json").read_text())
+        pin = re.fullmatch(r"pnpm@(\d+\.\d+\.\d+)(?:\+[^\s]+)?", manifest.get("packageManager", ""))
+        if not pin:
+            raise ValueError("lockfile repair requires an exact pnpm packageManager pin")
+        version = subprocess.run(["pnpm", "--version"], cwd=root, check=True,
+                                 capture_output=True, text=True).stdout.strip()
+        if version != pin[1]:
+            raise ValueError("lockfile repair requires pnpm@" + pin[1] + "; found " + version)
+        subprocess.run(["pnpm", "install", "--lockfile-only", "--ignore-scripts",
+                        "--no-frozen-lockfile"], cwd=root, check=True)
     errors = repository_docs.run(root, write=True)
     if errors:
         raise ValueError("; ".join(errors))
@@ -72,13 +89,16 @@ def resolve(root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".")
-    parser.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
+    mode.add_argument("--sync-lockfile", action="store_true",
+                      help="refresh the lockfile with pinned pnpm before regenerating docs")
     args = parser.parse_args()
     try:
         if args.staged:
             resolve_staged(args.root)
         else:
-            resolve(args.root)
+            resolve(args.root, args.sync_lockfile)
     except (ValueError, KeyError, TypeError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, "repository-docs: " + str(exc) + "\n")
 

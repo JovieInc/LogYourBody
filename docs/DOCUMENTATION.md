@@ -39,6 +39,12 @@ from indexed sources, preserves unstaged source edits, and refuses unstaged
 projection edits or pinned-source drift. Bot commits created outside local
 hooks still need this refresh during repair; CI continues to reject stale output.
 
+For dependency updates, use `python3 scripts/resolve-repository-docs.py --sync-lockfile`.
+This first checks source conflicts, shared pins and the exact `packageManager`
+pnpm version, then runs a lockfile-only install with lifecycle scripts disabled
+before regenerating the projection. A failed install stops the repair. Review
+and stage dependency changes separately; only the projection is staged for you.
+
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
 exact upstream bytes. Only listed imports and generated output are written;

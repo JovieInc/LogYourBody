@@ -2,6 +2,7 @@
 // runs detect-changes.sh against real git fixtures, then runs the gate's shell.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -653,10 +654,69 @@ function sourceMapConflict({ sourceConflict = false } = {}) {
   checkpoint(source.replace(sourceConflict ? 'first' : 'last', 'main'), 'main workflow');
   git(root, 'checkout', '-q', 'feature');
   assert.throws(() => git(root, 'merge', '--no-commit', 'main'), 'fixture must conflict');
-  const resolve = () => spawnSync('python3', [
-    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root,
-  ], { env: gitEnv, encoding: 'utf8' });
+  const resolve = (args = [], env = {}) => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root, ...args,
+  ], { env: { ...gitEnv, ...env }, encoding: 'utf8' });
   return { root, output, config, resolve };
+}
+
+for (const failure of [null, 'version', 'install', 'source-conflict', 'pinned-drift']) {
+  test(`dependency repair synchronizes the lockfile before projecting sources: ${failure ?? 'success'}`, () => {
+    const fx = sourceMapConflict({ sourceConflict: failure === 'source-conflict' });
+    try {
+      const bin = path.join(fx.root, 'bin');
+      fs.mkdirSync(bin);
+      fs.writeFileSync(path.join(fx.root, 'package.json'), JSON.stringify({ packageManager: 'pnpm@10.34.1' }));
+      fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'old lockfile\n');
+      fs.writeFileSync(path.join(bin, 'pnpm'), `#!/usr/bin/env node
+const fs = require('node:fs');
+if (process.argv[2] === '--version') {
+  console.log('${failure === 'version' ? '9.15.4' : '10.34.1'}');
+} else {
+  require('node:assert/strict').deepEqual(process.argv.slice(2),
+    ['install', '--lockfile-only', '--ignore-scripts', '--no-frozen-lockfile']);
+  fs.writeFileSync('pnpm-called', 'yes');
+  if (${failure === 'install'}) process.exit(1);
+  fs.writeFileSync('pnpm-lock.yaml', 'updated lockfile\\n');
+}
+`, { mode: 0o755 });
+      if (failure === 'pinned-drift') {
+        fx.config.imports = [{
+          repository: 'example/policy', revision: 'a'.repeat(40),
+          path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+        }];
+      }
+      fx.config.sources.push({ path: 'pnpm-lock.yaml', purpose: 'Resolved dependencies' });
+      fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const env = { PATH: `${bin}:${process.env.PATH}` };
+      const result = fx.resolve(['--sync-lockfile'], env);
+      if (failure) {
+        assert.notEqual(result.status, 0);
+        assert.match(result.stderr, {
+          version: /requires pnpm@10.34.1; found 9.15.4/,
+          install: /returned non-zero exit status/,
+          'source-conflict': /resolve source conflicts first/,
+          'pinned-drift': /pinned copy missing or changed/,
+        }[failure]);
+        assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+        assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), 'old lockfile\n');
+        assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+        assert.equal(fs.existsSync(path.join(fx.root, 'pnpm-called')), failure === 'install');
+      } else {
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), 'updated lockfile\n');
+        const lockHash = createHash('sha256').update('updated lockfile\n').digest('hex');
+        assert.match(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), new RegExp(`pnpm-lock.yaml.*${lockHash}`));
+        assert.equal(git(fx.root, 'show', `:${fx.output}`), fs.readFileSync(path.join(fx.root, fx.output), 'utf8').trim());
+        assert.equal(git(fx.root, 'ls-files', '--', 'pnpm-lock.yaml'), '', 'dependency edits stay unstaged for review');
+        assert.equal(fx.resolve(['--sync-lockfile'], env).status, 0, 'repair is idempotent');
+      }
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
 }
 
 test('source-map merge repair regenerates from both parents and stages only the projection', () => {

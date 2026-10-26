@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-repair-syncs-generated-artifacts",
+    "correction": "PR #1606: The react-switch 1.4.1 dependency update omitted its pnpm lockfile update and source projection refresh, failing Detect Changes, CI Summary and documentation parity with a failed Vercel deployment.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1606",
+    "mechanization": "Extend the existing repository documentation resolver with --sync-lockfile, validating source conflicts, shared pins and the exact pnpm version before a lifecycle-disabled lockfile-only install and source projection regeneration. The existing required Detect Changes suite exercises successful repair, idempotence, version mismatch, install failure and source/pin refusal. All five regressions failed without this extension. Use the same command for this dependency update.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair command can construct both generated artifacts in dependency order and refuse failed resolution before writing or staging the projection. This prevents the recurring partial repair by construction while preserving the required parity gate."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "refresh the lockfile with pinned pnpm before regenerating docs"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "staged-dependency-source-map-refresh",
     "correction": "PR #1603: Dependabot's Radix Switch 1.3.8 manifest bump left the generated source map stale, failing Detect Changes, documentation parity and CI Summary. Repeated source-map repairs need a reusable commit-time refresh.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1603",
