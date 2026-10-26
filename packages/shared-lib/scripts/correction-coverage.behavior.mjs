@@ -241,6 +241,21 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
     row('ours'),
   ]);
   assert.equal(git(['ls-files', '-u']).trim().split('\n').length, 3, 'staging remains explicit');
+  const before = readFileSync(path, 'utf8');
+  const blob = git(['hash-object', '-w', '--stdin'], anchor).trim();
+  git(['update-index', '--force-remove', guard.path]);
+  git(
+    ['update-index', '--index-info'],
+    [1, 2, 3].map((index) => `100644 ${blob} ${index}\t${guard.path}\n`).join(''),
+  );
+  writeFileSync(join(root, guard.path), `<<<<<<< ours\n${anchor}\n=======\n${anchor}\n>>>>>>> theirs\n`);
+  assert.throws(
+    () => runCoverage(['--merge-ledger'], { root, env: {} }),
+    /ledger merge: resolve other conflicts first: guard.mjs/,
+  );
+  assert.equal(readFileSync(path, 'utf8'), before, 'unresolved guard leaves ledger untouched');
+  writeFileSync(join(root, guard.path), anchor);
+  git(['add', guard.path]);
   stages[2] = [];
   stage();
   writeFileSync(path, marker);
