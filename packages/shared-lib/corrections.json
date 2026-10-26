@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "staged-source-projection-repair",
+    "correction": "PR #1601: The Radix aspect-ratio dependency bump left the generated repository source map stale, failing Detect Changes, documentation parity and CI Summary. Regenerate from staged sources during commits without capturing unstaged edits.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1601",
+    "mechanization": "Extend the existing source-map resolver with an index-only mode and invoke it after pre-commit formatting. Required Detect Changes fixtures prove automatic repair of committed bumps, partial-source edit preservation, idempotence and refusal of unstaged projection edits, unsafe paths, symlinked sources and pin drift. The seven new regressions fail before the extension and pass afterward; use the staged resolver to repair this PR.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct and stage the projection from an isolated index snapshot during commits, preventing stale source evidence without staging unrelated working-tree changes. Existing required CI remains the backstop for commits created without hooks."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Render the index in isolation so partial source edits never enter the projection."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",

@@ -33,6 +33,12 @@ map from the merged sources. This wraps the pinned generator and refuses to
 write while any other file is unmerged or a shared import fails parity. It
 stages only the generated output; review the source diff before committing.
 
+The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
+after formatting. This mode renders only index contents, so partial source edits
+remain unstaged. It stages only the generated projection and refuses to overwrite
+unstaged projection edits or accept pinned-source drift. The same command
+repairs a committed dependency bump whose source map was not regenerated.
+
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
 exact upstream bytes. Only listed imports and generated output are written;
