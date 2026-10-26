@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a183af06f3cd7aa4838eb62ebef999b56621f7d027c2ab25374486b6eb48790b`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `dc723850d2e698cc17d03b2b13227bf3116b6b71da43cf0b2697170255ca8911`)
 
 ### `apps/web/package.json`: engines
 
@@ -112,7 +112,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@statsig/statsig-node-core": "0.23.1",
   "@tailwindcss/postcss": "^4.3.3",
   "@tailwindcss/typography": "^0.5.20",
-  "@tanstack/react-query": "^5.104.4",
+  "@tanstack/react-query": "^5.104.5",
   "@types/react-syntax-highlighter": "^15.5.13",
   "@vercel/analytics": "^1.6.1",
   "@vercel/speed-insights": "^1.3.1",
