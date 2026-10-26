@@ -506,6 +506,13 @@
 		3C8D01B01A2EBFA3C3EB73CD /* InterTight.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E0666550EE3D136A64FEB833 /* InterTight.ttf */; };
 		AB92EB88BB101CE4C08FF99D /* InterTight-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = C804289887C0B000A09DC147 /* InterTight-OFL.txt */; };
 		BFED20261016000100000001 /* HomeV2EntryEditorLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */; };
+		F11620261025000000000002 /* TrainingRestTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000001 /* TrainingRestTimer.swift */; };
+		F11620261025000000000004 /* TrainingRestAlerts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000003 /* TrainingRestAlerts.swift */; };
+		F11620261025000000000006 /* TrainingRestTimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000005 /* TrainingRestTimerView.swift */; };
+		F11620261025000000000008 /* TrainingRestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000007 /* TrainingRestActivityAttributes.swift */; };
+		F11620261025000000000009 /* TrainingRestActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11620261025000000000007 /* TrainingRestActivityAttributes.swift */; };
+		F1162026102500000000000B /* TrainingRestLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1162026102500000000000A /* TrainingRestLiveActivity.swift */; };
+		F1162026102500000000000E /* LogYourBodyRestTimer.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F1162026102500000000000C /* LogYourBodyRestTimer.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		E26220261025000100000001 /* MeasurementValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000002 /* MeasurementValue.swift */; };
 		E26220261025000100000003 /* MeasurementValueConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000004 /* MeasurementValueConstants.swift */; };
 		E26220261025000100000005 /* MeasurementValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000006 /* MeasurementValueTests.swift */; };
@@ -526,7 +533,28 @@
 			remoteGlobalIDString = AD7D30912E14907F0072AA5B;
 			remoteInfo = LogYourBody;
 		};
+		F11620261025000000000014 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AD7D308A2E14907F0072AA5B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F11620261025000000000016;
+			remoteInfo = LogYourBodyRestTimer;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F11620261025000000000013 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F1162026102500000000000E /* LogYourBodyRestTimer.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A24420261025000000000001 /* MetricSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricSourceAdapter.swift; sourceTree = "<group>"; };
@@ -1105,6 +1133,13 @@
 		E0666550EE3D136A64FEB833 /* InterTight.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "InterTight.ttf"; sourceTree = "<group>"; };
 		C804289887C0B000A09DC147 /* InterTight-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "InterTight-OFL.txt"; sourceTree = "<group>"; };
 		BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2EntryEditorLayout.swift; sourceTree = "<group>"; };
+		F11620261025000000000001 /* TrainingRestTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingRestTimer.swift; path = Services/TrainingRestTimer.swift; sourceTree = "<group>"; };
+		F11620261025000000000003 /* TrainingRestAlerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingRestAlerts.swift; path = Services/TrainingRestAlerts.swift; sourceTree = "<group>"; };
+		F11620261025000000000005 /* TrainingRestTimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingRestTimerView.swift; path = Views/TrainingRestTimerView.swift; sourceTree = "<group>"; };
+		F11620261025000000000007 /* TrainingRestActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TrainingRestActivityAttributes.swift; path = Models/TrainingRestActivityAttributes.swift; sourceTree = "<group>"; };
+		F1162026102500000000000A /* TrainingRestLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingRestLiveActivity.swift; sourceTree = "<group>"; };
+		F1162026102500000000000C /* LogYourBodyRestTimer.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LogYourBodyRestTimer.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F1162026102500000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E26220261025000100000002 /* MeasurementValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValue.swift; sourceTree = "<group>"; };
 		E26220261025000100000004 /* MeasurementValueConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueConstants.swift; sourceTree = "<group>"; };
 		E26220261025000100000006 /* MeasurementValueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueTests.swift; sourceTree = "<group>"; };
@@ -1138,6 +1173,12 @@
 			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F11620261025000000000011 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -1710,6 +1751,10 @@
 		AD723B132E15FA5C002376C6 /* LogYourBody */ = {
 			isa = PBXGroup;
 			children = (
+				F11620261025000000000007 /* TrainingRestActivityAttributes.swift */,
+				F11620261025000000000005 /* TrainingRestTimerView.swift */,
+				F11620261025000000000003 /* TrainingRestAlerts.swift */,
+				F11620261025000000000001 /* TrainingRestTimer.swift */,
 				C0D300022F30000100ABCDEF /* GeneratedProductRegistry.swift */,
 				ADBAF04D2ECAD88A00A95F98 /* Features */,
 				AD8872922EB946BE0041C426 /* DesignSystem */,
@@ -1747,6 +1792,7 @@
 		AD7D30892E14907F0072AA5B = {
 			isa = PBXGroup;
 			children = (
+				F1162026102500000000000F /* LogYourBodyWidget */,
 				AD0B7BF42EC552FA008B29E7 /* LogYourBody.storekit */,
 				AD722F162E15FA5A002376C6 /* generate_app_icons.sh */,
 				AD722F102E15FA5A002376C6 /* icon-1024.png */,
@@ -1767,6 +1813,7 @@
 		AD7D30932E14907F0072AA5B /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				F1162026102500000000000C /* LogYourBodyRestTimer.appex */,
 				AD7D30922E14907F0072AA5B /* LogYourBody.app */,
 				AD7D30A22E1490810072AA5B /* LogYourBodyTests.xctest */,
 				AD7D30AC2E1490810072AA5B /* LogYourBodyUITests.xctest */,
@@ -2063,6 +2110,15 @@
 			path = Fonts;
 			sourceTree = "<group>";
 		};
+		F1162026102500000000000F /* LogYourBodyWidget */ = {
+			isa = PBXGroup;
+			children = (
+				F1162026102500000000000A /* TrainingRestLiveActivity.swift */,
+				F1162026102500000000000D /* Info.plist */,
+			);
+			path = LogYourBodyWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -2070,6 +2126,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = AD7D30B62E1490810072AA5B /* Build configuration list for PBXNativeTarget "LogYourBody" */;
 			buildPhases = (
+				F11620261025000000000013 /* Embed App Extensions */,
 				AD7D308F2E14907F0072AA5B /* Frameworks */,
 				AD7D30902E14907F0072AA5B /* Resources */,
 				ADDC479C2E2D89E5003C97E7 /* Sources */,
@@ -2077,6 +2134,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				F11620261025000000000015 /* PBXTargetDependency */,
 			);
 			name = LogYourBody;
 			packageProductDependencies = (
@@ -2130,6 +2188,21 @@
 			productReference = AD7D30AC2E1490810072AA5B /* LogYourBodyUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		F11620261025000000000016 /* LogYourBodyRestTimer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F11620261025000000000017 /* Build configuration list for PBXNativeTarget "LogYourBodyRestTimer" */;
+			buildPhases = (
+				F11620261025000000000010 /* Sources */,
+				F11620261025000000000011 /* Frameworks */,
+				F11620261025000000000012 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = LogYourBodyRestTimer;
+			productName = LogYourBodyRestTimer;
+			productReference = F1162026102500000000000C /* LogYourBodyRestTimer.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -2176,6 +2249,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				F11620261025000000000016 /* LogYourBodyRestTimer */,
 				AD7D30912E14907F0072AA5B /* LogYourBody */,
 				AD7D30A12E1490810072AA5B /* LogYourBodyTests */,
 				AD7D30AB2E1490810072AA5B /* LogYourBodyUITests */,
@@ -2222,6 +2296,12 @@
 			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F11620261025000000000012 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
@@ -2415,6 +2495,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F11620261025000000000002 /* TrainingRestTimer.swift in Sources */,
+				F11620261025000000000004 /* TrainingRestAlerts.swift in Sources */,
+				F11620261025000000000006 /* TrainingRestTimerView.swift in Sources */,
+				F11620261025000000000008 /* TrainingRestActivityAttributes.swift in Sources */,
 				B26920261025000000000002 /* BackwardPlanner.swift in Sources */,
 				AD8F12EA2ED6AA76003C4559 /* AnalyticsService.swift in Sources */,
 				FE13A3A300000000000000C1 /* FeatureReleasePolicy.swift in Sources */,
@@ -2723,6 +2807,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F11620261025000000000010 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F11620261025000000000009 /* TrainingRestActivityAttributes.swift in Sources */,
+				F1162026102500000000000B /* TrainingRestLiveActivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -2735,6 +2828,11 @@
 			isa = PBXTargetDependency;
 			target = AD7D30912E14907F0072AA5B /* LogYourBody */;
 			targetProxy = AD7D30AD2E1490810072AA5B /* PBXContainerItemProxy */;
+		};
+		F11620261025000000000015 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F11620261025000000000016 /* LogYourBodyRestTimer */;
+			targetProxy = F11620261025000000000014 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -3038,6 +3136,50 @@
 			};
 			name = Release;
 		};
+		F11620261025000000000018 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CURRENT_PROJECT_VERSION = 20251126162826;
+				DEVELOPMENT_TEAM = G24T327LXT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LogYourBodyWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks", );
+				MARKETING_VERSION = 1.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app.rest-timer;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.logyourbody.app.rest-timer";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F11620261025000000000019 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Distribution";
+				CURRENT_PROJECT_VERSION = 20251126162826;
+				DEVELOPMENT_TEAM = G24T327LXT;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = LogYourBodyWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks", );
+				MARKETING_VERSION = 1.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.logyourbody.app.rest-timer;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "match AppStore com.logyourbody.app.rest-timer";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -3073,6 +3215,15 @@
 			buildConfigurations = (
 				AD7D30BD2E1490810072AA5B /* Debug */,
 				AD7D30BE2E1490810072AA5B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F11620261025000000000017 /* Build configuration list for PBXNativeTarget "LogYourBodyRestTimer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F11620261025000000000018 /* Debug */,
+				F11620261025000000000019 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
