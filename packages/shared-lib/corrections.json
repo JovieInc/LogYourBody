@@ -1362,5 +1362,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "native-chaos-verified-text-entry",
+    "correction": "PR #1554 red-check repair: Launch Quality read only l after typing local chaos draft in the keyboard-dismissal probe, without proving that the full draft existed before dismissal.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40365063632/job/121720772605",
+    "mechanization": "Extend the existing chaos typing harness with typeVerifiedText: pace real keyboard input one character at a time and require exact prefix readback before proceeding. Reuse it for random typing and the failing dismissal probe, preserving the full post-dismissal draft and no-send assertions. The existing required shared-lib launch audit rejects unverified setup and bulk typing in these paths; its new regression fails before the harness change and passes afterward. Add the native harness to Turbo test inputs. Native rerun remains required; this Linux host cannot establish UI acceptance. Harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing executable UI-test harness can construct a complete verified draft before performing dismissal, preventing partial injected input from being mistaken for dismissal data loss and preventing incomplete typing from counting as an executed action."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift",
+      "anchor": "private func typeVerifiedText(_ text: String, into field: XCUIElement, app: XCUIApplication) -> Bool"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
