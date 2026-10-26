@@ -1139,7 +1139,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1210,5 +1210,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "git-fixture-local-identity",
+    "correction": "PR #1544: The classifier merge regression supplied an identity to its Git helper but omitted it from a later merge, failing required CI on a runner without global Git identity.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40316539014/job/121551681050",
+    "mechanization": "Configure a local user.name and user.email in each disposable fixture repository so every Git command has an identity. The existing required shared-lib runner disables global and system Git configuration for this suite. The unchanged merge regression fails with the original fixture under that environment and passes with local configuration, retaining all 100% classifier coverage thresholds.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Repository-local fixture configuration supplies an identity to every Git subprocess by construction without changing the CI runner or developer configuration."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "git('config', 'user.name', 'Ledger fixture');"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

@@ -270,3 +270,41 @@ sandbox escalation. The harness owns pushing and the PR-body update, whose
 required single machine line is `Machine: built scripts/correction-classifier.mjs`.
 GBrain search, `put lyb-153-merge-repair` and same-slug `get_page` each failed to
 connect to `127.0.0.1:7801`; write and readback persistence remain unverified.
+
+## CI fixture identity repair, 2026-10-26
+
+Merged `origin/main` at `8f3ccd5d7` without rebasing in `bcc8c419c`, retaining
+both pre-commit additions: staged correction retention and source-map refresh.
+Read `gh run view 40316539014 --repo JovieInc/LogYourBody --log-failed`.
+The classifier fixture's later clean merge lacked the identity supplied to its
+earlier Git commands, causing the required JavaScript/TypeScript job to fail.
+
+Configure identity in each disposable repository and make the existing required
+shared-lib wrapper ignore global/system Git configuration. This extends the
+existing fixture harness; no additional workflow or runner configuration is
+needed. Recorded the verified CI source and prevention in the correction ledger.
+The same regression failed before the fix and passed afterward with global Git
+configuration disabled and author/committer environment overrides removed.
+
+Validation on Linux with Node 22.23.2 and pnpm 10.34.1:
+
+- `corepack pnpm install --frozen-lockfile --prefer-offline`, `corepack pnpm lint`,
+  `corepack pnpm typecheck`, `corepack pnpm test`: passed. All 174 shared-lib
+  Vitest tests and 122 subsequent Node tests ran; Turbo reused six unchanged tasks.
+- `node --test --experimental-test-coverage
+--test-coverage-include=scripts/correction-classifier.mjs
+--test-coverage-lines=100 --test-coverage-branches=100
+--test-coverage-functions=100 scripts/correction-classifier.test.mjs` with
+  `GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1`: 11 passed at 100% coverage.
+- `node --test .github/scripts/detect-changes.test.mjs`: 38 passed.
+- Correction coverage against both supplied head and incoming main, guard
+  references, correction ratchets, URL drift, repository source parity,
+  `bash -n .husky/pre-commit` and `git diff --check`: passed. The 11 existing
+  claims findings remain baseline warnings. Subprocess checks required sandbox
+  escalation after the ratchet encountered `EPERM`.
+
+Native source and target membership are unchanged from the supplied head. Xcode
+is unavailable here; CI must validate the repaired head after the harness pushes.
+The local repair branch is `fix/pr1544-ci-repair-20261026t1215`. The harness owns
+push and PR updates, including the existing machine line above. GBrain query,
+write and same-slug readback could not reach its local service.

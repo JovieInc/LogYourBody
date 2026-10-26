@@ -277,13 +277,6 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       const result = spawnSync('git', args, {
         cwd: repository,
         encoding: 'utf8',
-        env: {
-          ...process.env,
-          GIT_AUTHOR_NAME: 'Ledger fixture',
-          GIT_AUTHOR_EMAIL: 'fixture@example.test',
-          GIT_COMMITTER_NAME: 'Ledger fixture',
-          GIT_COMMITTER_EMAIL: 'fixture@example.test',
-        },
       });
       assert.equal(result.status, args[0] === 'merge' ? 1 : 0, result.stderr);
       return result.stdout;
@@ -293,6 +286,8 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     const writeLedger = (receipts) =>
       writeFileSync(ledger, `${JSON.stringify(receipts, null, 2)}\n`);
     git('init', '--initial-branch=left');
+    git('config', 'user.name', 'Ledger fixture');
+    git('config', 'user.email', 'fixture@example.test');
     for (const { guard } of rows.filter(({ guard }) => guard)) {
       writeFileSync(join(repository, guard.path), guard.anchor);
     }
