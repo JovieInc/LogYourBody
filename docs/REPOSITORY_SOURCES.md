@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5497b8ed9ec9b32c7c15ac637a0d1adbb931ac8199accc1dd4d550e6535e26fe`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a183af06f3cd7aa4838eb62ebef999b56621f7d027c2ab25374486b6eb48790b`)
 
 ### `apps/web/package.json`: engines
 
@@ -81,7 +81,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@neondatabase/serverless": "1.0.2",
   "@radix-ui/react-accordion": "^1.2.21",
   "@radix-ui/react-alert-dialog": "^1.1.23",
-  "@radix-ui/react-aspect-ratio": "^1.1.15",
+  "@radix-ui/react-aspect-ratio": "^1.2.0",
   "@radix-ui/react-avatar": "^1.3.1",
   "@radix-ui/react-checkbox": "^1.3.11",
   "@radix-ui/react-collapsible": "^1.1.20",
@@ -103,7 +103,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-switch": "^1.3.8",
   "@radix-ui/react-tabs": "^1.1.21",
   "@radix-ui/react-toast": "^1.2.23",
-  "@radix-ui/react-toggle": "^1.1.18",
+  "@radix-ui/react-toggle": "^1.2.1",
   "@radix-ui/react-toggle-group": "^1.1.19",
   "@radix-ui/react-tooltip": "^1.3.0",
   "@radix-ui/react-visually-hidden": "^1.2.11",
@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b3cbe42a378587a81873e7ff3a35e74125223a31bee5b9a8cd984859f88cebf8`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0c3e6a93be883d68b0a7623e60d2154c4bcdbe0cae88b8eeb78beb9d1532852e`)
 
 ### `package.json`: packageManager
 
@@ -257,7 +257,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "ai": "^7.0.114",
   "eve": "0.27.13",
-  "zod": "^4.6.6"
+  "zod": "^4.6.7"
 }
 ```
 
