@@ -160,16 +160,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const args = process.argv.slice(2);
     const resolvingMerge = args[0] === '--resolve-merge';
     const checkingMerge = args[0] === '--check-merge';
+    const stagingMerge = resolvingMerge && args[2] === '--stage';
     assert.ok(
       resolvingMerge || checkingMerge
-        ? args.length === 2 && !args[1].startsWith('-')
+        ? (args.length === 2 || (args.length === 3 && stagingMerge)) && !args[1].startsWith('-')
         : (args.length <= 1 ||
             (args.length === 3 && args[1] === '--merge' && !args[2].startsWith('-'))) &&
             !args[0]?.startsWith('-'),
-      'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository | --check-merge repository',
+      'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository [--stage] | --check-merge repository',
     );
     let path;
     let result;
+    let stageResolution;
     if (resolvingMerge || checkingMerge) {
       const git = (...gitArgs) =>
         execFileSync('git', ['-C', args[1], ...gitArgs], {
@@ -178,11 +180,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         });
       const root = git('rev-parse', '--show-toplevel').trim();
       path = resolve(root, LEDGER_PATH);
-      if (checkingMerge) {
+      const verifyMerge = (receipts) => {
         const parents = ['HEAD', 'MERGE_HEAD'].map((ref) =>
           git('rev-parse', '--verify', ref).trim(),
         );
-        const receipts = JSON.parse(git('show', `:0:${LEDGER_PATH}`));
         assert.deepEqual(
           receipts,
           classifyLedger(receipts),
@@ -198,10 +199,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
           );
           assertNoRegression(current, baseline);
         }
+      };
+      assertLedgerMergeReady(root);
+      if (checkingMerge || (stagingMerge && !git('ls-files', '--unmerged', '--', LEDGER_PATH))) {
+        verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
+        assert.equal(
+          readSource(LEDGER_PATH, { root }),
+          git('show', `:0:${LEDGER_PATH}`),
+          'staged retry refuses unstaged ledger edits; review and stage them explicitly',
+        );
         console.log('correction-classifier: verified staged ledger against both merge parents');
         process.exit(0);
       }
-      assertLedgerMergeReady(root);
       // Reuse the coverage tool's three-way policy rather than a second resolver.
       // Classify snapshots first so derived metadata cannot look like concurrent edits.
       const stages = [1, 2, 3].map((stage) =>
@@ -215,6 +224,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         ),
       );
       readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+      if (stagingMerge) {
+        // Validate staged guards and both parents before writing or staging anything.
+        verifyMerge(result);
+        stageResolution = () => git('add', '--', LEDGER_PATH);
+      }
     } else {
       path = args[0] ?? resolve(ROOT, LEDGER_PATH);
       const receipts = JSON.parse(readFileSync(path, 'utf8'));
@@ -233,6 +247,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     ) {
       writeFileSync(path, formatted);
     }
+    stageResolution?.();
     console.log(`correction-classifier: classified ${result.length} receipts`);
   } catch (error) {
     console.error(`correction-classifier: ${error.message}`);

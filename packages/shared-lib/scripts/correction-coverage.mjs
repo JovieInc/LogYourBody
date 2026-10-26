@@ -267,6 +267,17 @@ export function assertLedgerMergeReady(root) {
     0,
     `ledger merge: resolve other conflicts first: ${otherConflicts.join(', ')}`,
   );
+  const staged = execFileSync(
+    'git',
+    ['diff', '--cached', '--no-ext-diff', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  // Staging a file does not prove its conflict markers were resolved.
+  assert.doesNotMatch(
+    staged,
+    /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,
+    'ledger merge: resolve staged conflict markers first',
+  );
 }
 
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
