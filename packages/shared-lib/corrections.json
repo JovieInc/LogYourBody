@@ -1629,5 +1629,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1551: The expanded correction-classifier Git fixture matrix exceeds the existing 30-second subprocess deadline in required JavaScript/TypeScript CI. Preserve all scenarios, assertions and coverage thresholds while reducing execution time.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40415085533/job/121896099093",
+    "mechanization": "Extend the existing fixture runner with named, isolated Git subtests at concurrency two and asynchronous CLI waits. Every command remains sequential within its own repository. The original CI run failed with ETIMEDOUT at 30 seconds; rerun the complete matrix and required shared-lib suite after this change under the unchanged deadline and 100% line, branch and function coverage gates. No fixtures, assertions or required checks are removed. The lanes harness remains the sole shipper.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot control repository test-runner scheduling or Git fixture subprocess execution."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required classifier regression suite executes every isolated Git fixture with bounded concurrency and enforces the original deadline and complete coverage thresholds."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "test('CLI resolves Git ledger conflicts', { concurrency: 2 }"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
