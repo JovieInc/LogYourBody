@@ -825,8 +825,18 @@ if os.environ.get('FAIL_INSTALL') or (os.environ.get('FAIL_FREEZE') and '--froze
     sys.exit(42)
 assert json.loads(Path('package.json').read_text())['dependencies']['switch'] == '1.3.8'
 if '--no-frozen-lockfile' in sys.argv:
+    if os.environ.get('FAIL_RESOLVE'):
+        sys.exit(42)
     Path('pnpm-lock.yaml').write_text('resolved lock\\n')
 else:
+    if os.environ.get('FAIL_CHECK'):
+        print('ERR_PNPM_LOCKFILE_CONFIG_MISMATCH')
+        sys.exit(42)
+    if Path('pnpm-lock.yaml').read_text() == 'old lock\\n':
+        print('ERR_PNPM_OUTDATED_LOCKFILE')
+        sys.exit(1)
+    if os.environ.get('FAIL_REFREEZE'):
+        sys.exit(42)
     assert Path('pnpm-lock.yaml').read_text() == 'resolved lock\\n'
 `, { mode: 0o755 });
   const refresh = (args = [], env = {}) => spawnSync('python3', [
@@ -845,27 +855,30 @@ function verifyDependencyLockfile(fx, env = {}) {
   ], { encoding: 'utf8', env: { ...gitEnv, PATH: `${path.join(fx.root, 'bin')}:${process.env.PATH}`, ...env } });
 }
 
-test('dependency parity repair verifies the existing frozen lockfile without re-resolving dependencies', () => {
-  const fx = dependencyRefreshFixture();
-  try {
-    fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'resolved lock\n');
-    git(fx.root, 'add', 'pnpm-lock.yaml');
-    const lock = git(fx.root, 'show', ':pnpm-lock.yaml');
-    const result = verifyDependencyLockfile(fx);
-    assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').map(JSON.parse), [
-      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
-    ]);
-    assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), lock);
-    assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), `${lock}\n`);
-    assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
-    const index = git(fx.root, 'ls-files', '--stage');
-    assert.equal(verifyDependencyLockfile(fx).status, 0, 'verified parity repair is idempotent');
-    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
-  } finally {
-    fs.rmSync(fx.root, { recursive: true, force: true });
-  }
-});
+for (const mode of ['verify', 'refresh']) {
+  test(`dependency ${mode} preserves an already valid frozen lockfile without re-resolving dependencies`, () => {
+    const fx = dependencyRefreshFixture();
+    try {
+      fs.writeFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'resolved lock\n');
+      git(fx.root, 'add', 'pnpm-lock.yaml');
+      const lock = git(fx.root, 'show', ':pnpm-lock.yaml');
+      const repair = () => mode === 'verify' ? verifyDependencyLockfile(fx) : fx.refresh();
+      const result = repair();
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').map(JSON.parse), [
+        ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
+      ]);
+      assert.equal(git(fx.root, 'show', ':pnpm-lock.yaml'), lock);
+      assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), `${lock}\n`);
+      assert.match(git(fx.root, 'show', `:${fx.output}`), /"switch": "1\.3\.8"/);
+      const index = git(fx.root, 'ls-files', '--stage');
+      assert.equal(repair().status, 0, 'verified parity repair is idempotent');
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
 
 for (const failure of ['frozen-lockfile', 'unstaged-source', 'pinned-drift']) {
   test(`dependency parity repair refuses ${failure} without staging a projection`, () => {
@@ -906,6 +919,7 @@ test('dependency repair refreshes and freezes the lockfile before staging source
     const result = fx.refresh();
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').map(JSON.parse), [
+      ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
       ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--no-frozen-lockfile'],
       ['pnpm', 'install', '--lockfile-only', '--ignore-scripts', '--frozen-lockfile', '--offline'],
     ]);
@@ -943,7 +957,7 @@ for (const file of ['package.json', 'apps/web/package.json', 'pnpm-workspace.yam
   });
 }
 
-for (const failure of ['FAIL_INSTALL', 'FAIL_FREEZE']) {
+for (const [failure, calls] of [['FAIL_INSTALL', 1], ['FAIL_FREEZE', 1], ['FAIL_CHECK', 1], ['FAIL_RESOLVE', 2], ['FAIL_REFREEZE', 3]]) {
   test(`dependency repair propagates ${failure} without staging outputs`, () => {
     const fx = dependencyRefreshFixture();
     try {
@@ -952,7 +966,7 @@ for (const failure of ['FAIL_INSTALL', 'FAIL_FREEZE']) {
       const result = fx.refresh([], { [failure]: '1' });
       assert.notEqual(result.status, 0, result.stdout);
       assert.match(result.stderr, /exit status 42/);
-      assert.equal(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').length, failure === 'FAIL_INSTALL' ? 1 : 2);
+      assert.equal(fs.readFileSync(fx.calls, 'utf8').trim().split('\n').length, calls);
       assert.equal(git(fx.root, 'ls-files', '--stage'), index);
       assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
       assert.notEqual(fx.refresh(['--staged']).status, 0, 'index-only commit hooks cannot run dependency refresh');

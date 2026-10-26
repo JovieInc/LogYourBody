@@ -74,16 +74,22 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False):
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:
             raise ValueError("; ".join(errors))
-        # Verify valid bot lockfiles without re-resolving unrelated dependencies.
-        modes = [["--frozen-lockfile", "--offline"]]
+        install = ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts"]
+        frozen = [*install, "--frozen-lockfile", "--offline"]
         # Explicit repair only: normal commit hooks and CI retain frozen installs.
         if refresh_lockfile:
-            modes.insert(0, ["--no-frozen-lockfile"])
-        for mode in modes:
-            subprocess.run(
-                ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
-                cwd=root, check=True,
+            # Preserve valid bot lockfiles; only an outdated importer permits resolution.
+            check = subprocess.run(
+                frozen, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
             )
+            print(check.stdout, end="", flush=True)
+            if check.returncode:
+                if "ERR_PNPM_OUTDATED_LOCKFILE" not in check.stdout:
+                    check.check_returncode()
+                subprocess.run([*install, "--no-frozen-lockfile"], cwd=root, check=True)
+                subprocess.run(frozen, cwd=root, check=True)
+        else:
+            subprocess.run(frozen, cwd=root, check=True)
     errors = repository_docs.run(root, write=True)
     if errors:
         raise ValueError("; ".join(errors))
@@ -97,7 +103,7 @@ def main():
     parser.add_argument("--root", default=".")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
-    mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
+    mode.add_argument("--refresh-lockfile", action="store_true", help="verify pnpm, repair an outdated lockfile, then refresh docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
     args = parser.parse_args()
     try:
