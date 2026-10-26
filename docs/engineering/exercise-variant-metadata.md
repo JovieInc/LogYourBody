@@ -32,6 +32,12 @@ personal copy without mutating the curated defaults. Persistence and editing UI
 remain with the parent workstream. Tags do not change eligibility, override
 existing exclusions, or authorize prescriptions.
 
+Legacy records may omit `variantMetadata` entirely. Loading them preserves
+missing tolerance, fatigue and ROM annotations as `undefined`, never numeric
+zero. The existing qualitative `trunkDemand` describes expected setup demand;
+it does not fill in missing fatigue or tolerance observations. Objective spinal
+load and numeric SFR fields are rejected in metadata, including zero values.
+
 ## Dependency reconciliation
 
 Checked Linear and the merged source before implementation on October 25, 2026:
@@ -52,6 +58,10 @@ Checked Linear and the merged source before implementation on October 25, 2026:
 invalid fields, checks target/group agreement, and proves the four tag arrays
 can be edited independently. Existing catalog/swap tests retain eligibility and
 substitution coverage.
+
+LYB-296 adds explicit regression cases for loading a legacy exercise without
+metadata and rejecting objective spinal-load and numeric SFR fields through both
+the complete-record and seed schemas. It reuses the LYB-255 fields and taxonomy.
 
 The existing `pnpm lint:knowledge` / `pnpm test:knowledge-lint` claims policy
 scans every decoded seed string separately, including nested tags. It reuses the

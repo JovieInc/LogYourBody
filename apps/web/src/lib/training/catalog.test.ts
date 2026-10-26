@@ -65,6 +65,35 @@ describe('curated exercise variant contract', () => {
     }
   });
 
+  it('loads a legacy exercise with missing tolerance, fatigue and ROM remaining unknown', () => {
+    const legacyRecord = JSON.parse(JSON.stringify(catalogVariantById('dead_bug')));
+    expect(legacyRecord).not.toHaveProperty('variantMetadata');
+
+    const loaded = catalogVariantSchema.parse(legacyRecord);
+    expect(loaded.id).toBe('dead_bug');
+    expect(loaded.variantMetadata).toBeUndefined();
+    expect(loaded.variantMetadata?.toleranceTags.jointDiscomfort).toBeUndefined();
+    expect(loaded.variantMetadata?.toleranceTags.axialTrunkFatigue).toBeUndefined();
+    expect(loaded.variantMetadata?.toleranceTags.stability).toBeUndefined();
+    expect(loaded.variantMetadata?.toleranceTags.rom).toBeUndefined();
+    expect(loaded.variantMetadata?.romSetupCaveat).toBeUndefined();
+  });
+
+  it.each([
+    { spinalLoadNewtons: 0 },
+    { spinalLoadNewtons: 1200 },
+    { sfrScore: 0 },
+    { sfrScore: 8 },
+    { stimulusToFatigueRatio: 3.5 },
+  ])('rejects objective spinal load or numeric SFR in variant metadata: %j', (prohibited) => {
+    const entry = catalogVariantById('incline_dumbbell_press')!;
+    const variantMetadata = { ...entry.variantMetadata, ...prohibited };
+    expect(catalogVariantSchema.safeParse({ ...entry, variantMetadata }).success).toBe(false);
+    expect(catalogVariantSeedSchema.safeParse([{ id: entry.id, ...variantMetadata }]).success).toBe(
+      false,
+    );
+  });
+
   it('rejects unknown fields throughout catalog records and the raw seed', () => {
     const entry = catalogVariantById('supported_cable_curl')!;
     for (const change of [
