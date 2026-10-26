@@ -3,6 +3,7 @@
 // LogYourBody
 //
 import Foundation
+import CryptoKit
 
 struct BodyMetricSource: Codable, Equatable, Hashable {
     let rawValue: String
@@ -115,7 +116,7 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
     let deviceModel: String?
     let sampleId: String?
     let quantityType: String?
-    let bodyFatSampleId: String?
+    private(set) var bodyFatSampleId: String?
     let externalId: String?
     let externalResultId: String?
     let scannerModel: String?
@@ -358,6 +359,99 @@ struct BodyMetricSourceMetadata: Codable, Equatable {
         guard !trimmed.isEmpty else { return nil }
         return String(trimmed.prefix(256))
     }
+}
+
+extension BodyMetricSourceMetadata {
+    static func jsonFragment(for value: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: [value]),
+              let json = String(data: data, encoding: .utf8) else { return value }
+        return String(json.dropFirst().dropLast())
+    }
+
+    var healthKitContext: [String: String] {
+        extraFields["healthkit_context"]?.object?.compactMapValues(\.string) ?? [:]
+    }
+
+    func recordingHealthKitContext(_ context: [String: String]) -> Self {
+        var updated = self
+        if !context.isEmpty {
+            updated.extraFields["healthkit_context"] = .objectValue(context.mapValues { .text($0) })
+        }
+        return updated
+    }
+
+    var healthKitSampleKey: [String]? {
+        guard let sampleId, let sourceBundleId else { return nil }
+        return [sourceBundleId, sampleId]
+    }
+
+    var healthKitSyncKey: [String]? {
+        guard let sourceBundleId, let quantityType,
+              let identifier = healthKitContext["sync_identifier"], !identifier.isEmpty else { return nil }
+        return [sourceBundleId, quantityType, identifier]
+    }
+
+    var healthKitSyncVersion: Int { Int(healthKitContext["sync_version"] ?? "") ?? 0 }
+
+    var replacedHealthKitSampleIDs: [String] {
+        extraFields["healthkit_replaced_sample_ids"]?.array?.compactMap(\.string) ?? []
+    }
+
+    func replacingHealthKitSample(_ previous: Self) -> Self {
+        var updated = self
+        let retired = Set(previous.replacedHealthKitSampleIDs + [previous.sampleId].compactMap { $0 })
+        updated.extraFields["healthkit_replaced_sample_ids"] = .arrayValue(retired.sorted().map { .text($0) })
+        return updated
+    }
+
+    var pairedHealthKitBodyFat: Self? {
+        Self(jsonObject: extraFields["healthkit_body_fat"]?.foundationValue)
+    }
+
+    func pairingHealthKitBodyFat(_ metadata: Self) -> Self {
+        var updated = self
+        // The nested record retains the second sample's source, timezone and edit lineage.
+        var fields = metadata.extraFields
+        for (key, value) in metadata.jsonObject {
+            if let string = value as? String { fields[key] = .text(string) }
+        }
+        updated.bodyFatSampleId = metadata.sampleId
+        updated.extraFields["healthkit_body_fat"] = .objectValue(fields)
+        return updated
+    }
+
+    func healthKitLocalDate(for date: Date) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = healthKitContext["time_zone"].flatMap(TimeZone.init(identifier:)) ?? .current
+        return BodyMetricLocalDate.key(for: date, calendar: calendar)
+    }
+
+    func healthKitRecordID(userId: String) -> String? {
+        guard let key = healthKitSyncKey ?? healthKitSampleKey else { return nil }
+        // A stable cloud ID also deduplicates a fresh local store after reinstall.
+        let parts = ["healthkit-v1", userId, healthKitSyncKey == nil ? "sample" : "sync"] + key
+        let canonical = parts.map { "\($0.utf8.count):\($0)" }.joined()
+        let bytes = Array(SHA256.hash(data: Data(canonical.utf8)).prefix(16))
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5],
+            (bytes[6] & 0x0f) | 0x80, bytes[7], (bytes[8] & 0x3f) | 0x80,
+            bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        )).uuidString
+    }
+}
+
+enum HealthKitImportIdentityPolicy {
+    static let gateKey = "healthkit_sample_identity_v1"
+
+    @MainActor
+    static func isEnabled(isGateEnabled: ((String) -> Bool)? = nil) -> Bool {
+        let checkGate = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return checkGate(gateKey)
+    }
+}
+
+enum HealthKitImportIdentityError: Error {
+    case alreadyRecorded
 }
 
 struct BodyMetricLocalDate: Equatable {

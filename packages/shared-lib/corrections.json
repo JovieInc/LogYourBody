@@ -1,5 +1,41 @@
 [
   {
+    "fingerprint": "healthkit-timezone-policy-without-source-identity",
+    "correction": "PR #1567: Launch Quality failed the two cross-day timezone assertions in HealthImportIdempotencyTests. Selecting the sample-local day must not depend on having a complete source-scoped identity.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1567",
+    "mechanization": "Forward the enabled sample identity policy to weight metric construction; retain the complete identity check for identity admission and hour deduplication, and use the selected sample-local day for its fallback key. Extend the existing registered native HealthImportIdempotencyTests with an explicit missing-source fixture, gate-on/off date expectations and duplicate retries. The original timezone regression failed in run 40202549103. This Linux host cannot execute XCTest; updated native execution and coverage remain required CI evidence. Preserve main's batch failure callbacks when resolving the merge.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Separating the rollout policy from source identity availability selects the sample timezone consistently by construction, while the persistence boundary still requires a complete identity before using stable-ID admission."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/HealthImportIdempotencyTests.swift",
+      "anchor": "func testTimezonePolicyDoesNotRequireSourceIdentity()"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "healthkit-import-sample-source-identity",
+    "correction": "LYB-239: Repeated HealthKit imports must use sample UUID plus source bundle, retain separate sources, normalize units and preserve sample-local dates. A new UUID with the same sync identifier and metadata version replaces its prior sample.",
+    "source": "https://linear.app/jovie/issue/LYB-239",
+    "mechanization": "Behind healthkit_sample_identity_v1, serialize canonical identity admission with persistence, retain edit lineage and tombstones, and derive stable account-scoped cloud IDs. Register HealthImportIdempotencyTests in the existing native Unit target. Native failing/passing execution and coverage remain required in CI because this Linux host has no Xcode; local SwiftLint cannot establish behavior proof.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Matching source-scoped UUIDs and sync identifiers in the same Core Data context turn as admission and mutation prevents retry/concurrency duplicates while preserving edits, source provenance and user exclusions."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/HealthImportIdempotencyTests.swift",
+      "anchor": "func testDoubleImportTableKeepsRowsAndTimestampsUnchanged()"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1602: The root Zod 4.6.7 update left the generated source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must use the existing verify-first helper and remain retryable after resolver or frozen-check failures.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1602",

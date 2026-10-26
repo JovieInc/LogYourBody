@@ -440,6 +440,10 @@ export const endpoints = {
         'LYB-232 source evidence for Statsig client-key injection into the production web build.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-239',
+      reason: 'LYB-239 source evidence for HealthKit import identity and the correction ledger.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-252',
       reason:
         'LYB-252 source evidence for recurring correction escalation and guard-failure detection.',
