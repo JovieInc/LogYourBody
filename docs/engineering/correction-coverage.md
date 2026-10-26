@@ -88,6 +88,15 @@ regression guard. These are
 reviewed source-linkage metrics, not proof that the guards executed or that every
 historical correction has been captured.
 
+`correctionGuardCoverage` (`packages/shared-lib/src/correction-guard-coverage.ts`)
+is the narrower guard-coverage count. Its denominator is distinct rules
+classified `codebase` or `static` (lint, typecheck, or CI). A codebase rule
+counts as covered. A static rule counts only when a mechanized check exists:
+`mechanized: true`, or, when that flag is omitted, a retained guard path and
+anchor. Prose and human review stay outside the denominator. An empty
+denominator is covered 0, total 0, and ratio null. The function only reads the
+classified corrections it is given.
+
 Each rule's JSON output also retains its `guard` (or `proseOnlyReason`), sorted
 `receipts` with source, lesson and mechanization, and derived `recurrence`:
 `receiptCount` counts distinct canonical source URLs and `repeatCount` excludes
@@ -117,6 +126,11 @@ the checked-out Git commit and `timestamp` is the report's UTC ISO 8601 generati
 time. With `--output`, the CLI writes the JSON file and prints one line with the
 counts and share; without it, stdout remains the full JSON report. This artifact
 adds no threshold enforcement and preserves the existing regression checks.
+
+The required behavioral suite runs ledger repair, artifact emission, and default
+and baseline reporting together against real Git snapshots. This compatibility
+guard prevents concurrent CLI changes from dropping either repair or reporting.
+Invalid options must leave the ledger, existing artifact and job summary intact.
 
 The existing required CI path checks coverage on **every diff**, including
 changes outside the ledger. It fetches the event's exact base revision (PR base,

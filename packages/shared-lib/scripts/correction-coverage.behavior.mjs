@@ -9,6 +9,7 @@ import {
   assertNoRegression,
   coverageReport,
   LEDGER_PATH,
+  mergeCorrectionLedgers,
   readSource,
   renderCoverage,
   runCoverage,
@@ -229,6 +230,168 @@ test('artifact CLI prints one summary line and fails when the output cannot be w
   assert.equal(failure.status, 1);
   assert.match(failure.stderr, /Correction coverage failed/);
   assert.equal(failure.stdout, '');
+});
+
+test('ledger merge retains independent receipts and one-sided edits without mutating inputs', () => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const base = [row('kept')];
+  const edited = { ...base[0], correction: 'Clarify the retained invariant.' };
+  const ours = [row('ours'), edited];
+  const theirs = [row('theirs'), base[0]];
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, ours, theirs, () => anchor),
+    [ours[0], edited, theirs[0]],
+  );
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, base, [edited], () => anchor),
+    [edited],
+  );
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, [edited], [edited], () => anchor),
+    [edited],
+  );
+  assert.equal(base[0].correction, 'Keep the deterministic guard in place.');
+  const repeated = { ...base[0], source: 'https://example.com/second-receipt' };
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, [...base, repeated], base, () => anchor),
+    [base[0], repeated],
+  );
+});
+
+test('ledger merge refuses deletions, divergent edits, duplicates and lost guards', () => {
+  const base = [receipt('kept', 'static', { guard, classification: classification('static') })];
+  const edited = { ...base[0], correction: 'An independent change.' };
+  for (const [ours, theirs, error] of [
+    [[], base, /removed receipt/],
+    [base, [], /removed receipt/],
+    [[edited], [{ ...edited, correction: 'A conflicting change.' }], /concurrent receipt edits/],
+    [[...base, base[0]], base, /duplicate receipt/],
+    [[{ ...base[0], guard: undefined }], base, /guard coverage/],
+    [
+      [
+        {
+          ...base[0],
+          level: 'prose',
+          guard: undefined,
+          classification: classification('prose'),
+          proseOnlyReason: 'Editorial judgment.',
+        },
+      ],
+      base,
+      /regression/,
+    ],
+  ]) {
+    assert.throws(() => mergeCorrectionLedgers(base, ours, theirs, () => anchor), error);
+  }
+  assert.throws(() => mergeCorrectionLedgers({}, base, base), /array/);
+  assert.throws(() => mergeCorrectionLedgers([], base, base, () => ''), /guard coverage/);
+});
+
+test('ledger merge CLI uses all three Git conflict stages and leaves refused merges untouched', (t) => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const { root } = fixtureRepo(t, [row('kept')]);
+  const git = (args, input) => execFileSync('git', args, { cwd: root, encoding: 'utf8', input });
+  const path = join(root, LEDGER_PATH);
+  const marker = 'unresolved conflict';
+  writeFileSync(path, marker);
+  const stages = [[], [row('ours')], [row('theirs')]].map((added) => [row('kept'), ...added]);
+  const stage = () => {
+    git(['update-index', '--force-remove', LEDGER_PATH]);
+    const entries = stages
+      .map((rows, index) => {
+        const hash = git(['hash-object', '-w', '--stdin'], JSON.stringify(rows)).trim();
+        return `100644 ${hash} ${index + 1}\t${LEDGER_PATH}\n`;
+      })
+      .join('');
+    git(['update-index', '--index-info'], entries);
+  };
+  stage();
+  assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), [
+    row('kept'),
+    row('theirs'),
+    row('ours'),
+  ]);
+  assert.equal(git(['ls-files', '-u']).trim().split('\n').length, 3, 'staging remains explicit');
+  const before = readFileSync(path, 'utf8');
+  const blob = git(['hash-object', '-w', '--stdin'], anchor).trim();
+  git(['update-index', '--force-remove', guard.path]);
+  git(
+    ['update-index', '--index-info'],
+    [1, 2, 3].map((index) => `100644 ${blob} ${index}\t${guard.path}\n`).join(''),
+  );
+  writeFileSync(join(root, guard.path), `<<<<<<< ours\n${anchor}\n=======\n${anchor}\n>>>>>>> theirs\n`);
+  assert.throws(
+    () => runCoverage(['--merge-ledger'], { root, env: {} }),
+    /ledger merge: resolve other conflicts first: guard.mjs/,
+  );
+  assert.equal(readFileSync(path, 'utf8'), before, 'unresolved guard leaves ledger untouched');
+  writeFileSync(join(root, guard.path), anchor);
+  git(['add', guard.path]);
+  stages[2] = [];
+  stage();
+  writeFileSync(path, marker);
+  assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }), /removed receipt/);
+  assert.equal(readFileSync(path, 'utf8'), marker);
+  git(['update-index', '--force-remove', LEDGER_PATH]);
+  assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }));
+  assert.equal(readFileSync(path, 'utf8'), marker);
+});
+
+test('coverage CLI retains reporting and ledger repair modes after concurrent changes', (t) => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const { root, ref } = fixtureRepo(t, [row('kept')]);
+  const git = (args, input) => execFileSync('git', args, { cwd: root, encoding: 'utf8', input });
+  const stages = [[row('kept')], [row('kept'), row('ours')], [row('kept'), row('theirs')]];
+  git(['update-index', '--force-remove', LEDGER_PATH]);
+  git(
+    ['update-index', '--index-info'],
+    stages
+      .map((rows, index) => {
+        const hash = git(['hash-object', '-w', '--stdin'], JSON.stringify(rows)).trim();
+        return `100644 ${hash} ${index + 1}\t${LEDGER_PATH}\n`;
+      })
+      .join(''),
+  );
+  writeFileSync(join(root, LEDGER_PATH), 'unresolved conflict');
+  assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
+  const merged = readFileSync(join(root, LEDGER_PATH), 'utf8');
+  assert.deepEqual(JSON.parse(merged), [row('kept'), row('theirs'), row('ours')]);
+  git(['add', LEDGER_PATH]);
+  const output = 'coverage/corrections/coverage.json';
+  const value = runCoverage(['--output', output, '--base-ref', ref], { root, env: {} });
+  assert.deepEqual(JSON.parse(readFileSync(join(root, output), 'utf8')), value);
+  assert.equal(value.commitSha, ref);
+  assert.equal(value.mechanizedShare, 1);
+  assert.equal(value.total, 3);
+  for (const args of [[], ['--base-ref', ref]]) {
+    assert.equal(runCoverage(args, { root, env: {} }).mechanized, 3);
+  }
+  assert.equal(readFileSync(join(root, LEDGER_PATH), 'utf8'), merged);
+});
+
+test('invalid coverage options fail before writing artifacts, summaries or ledger repairs', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const before = readFileSync(join(root, LEDGER_PATH), 'utf8');
+  const output = join(root, 'coverage.json');
+  const summary = join(root, 'summary.md');
+  writeFileSync(output, 'retained artifact');
+  writeFileSync(summary, 'retained summary');
+  for (const args of [
+    ['--output'],
+    ['--output', ' '],
+    ['--output', '--base-ref'],
+    ['--output', output, '--output', output],
+    ['--merge-ledger', '--unknown'],
+  ]) {
+    assert.throws(
+      () => runCoverage(args, { root, env: { GITHUB_STEP_SUMMARY: summary } }),
+      /usage/,
+    );
+    assert.equal(readFileSync(join(root, LEDGER_PATH), 'utf8'), before);
+    assert.equal(readFileSync(output, 'utf8'), 'retained artifact');
+    assert.equal(readFileSync(summary, 'utf8'), 'retained summary');
+  }
 });
 
 test('counts distinct rules, all four pyramid levels and unclassified receipts honestly', () => {

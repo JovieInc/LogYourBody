@@ -2,7 +2,8 @@
 
 CI's **iOS StoreKit Purchase and Restore** job runs on every `main` push,
 including commits for which Unit was already verified by the merge queue. It
-also gates pull requests and merge groups that change iOS inputs. CI Summary
+also gates merge groups that change iOS inputs (not the pull request run: the
+queue reruns it on the exact tree that lands). CI Summary
 requires this job to succeed when selected. No release, submission or App Store
 Connect operation runs in this job, and it requires no credentials.
 
@@ -36,6 +37,12 @@ runner disable parallel execution, reset transactions/settings between cases,
 and use real-time subscription dates with explicit expiration/refund. Unit
 excludes this new simulator integration suite; its other selectors and coverage
 floors are unchanged.
+
+Cleanup deletes the existing transaction IDs once, then waits for both
+`SKTestSession.allTransactions()` and `Transaction.all` to become empty. This
+includes expired and refunded history, which is absent from current entitlements.
+Setup, teardown and warm-up share this bounded cleanup; a timeout throws before
+another purchase can start. No repeated global clear can erase a later purchase.
 
 On a Mac with the repo's Xcode toolchain, from a clean checkout:
 

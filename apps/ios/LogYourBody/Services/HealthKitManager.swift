@@ -9,6 +9,7 @@ enum HealthKitDefaultsKey: String {
     case authorizationConfirmed = "hasConfirmedHealthKitAuthorization"
     case readProbeRecord = "healthKitReadProbeRecord"
     case lastObserverSyncDate = "lastHealthKitObserverSyncDate"
+    case lastSuccessfulSync = "lastSuccessfulHealthKitMetricSourceSync"
     case fullSyncCompleted = "hasPerformedFullHealthKitSync"
     case smartScaleWeightAnchor = "healthKitSmartScaleWeightAnchor"
     case smartScaleBodyFatAnchor = "healthKitSmartScaleBodyFatAnchor"
@@ -244,6 +245,7 @@ class HealthKitManager: ObservableObject {
     /// Tests replace these. Production uses the Statsig gate and anchored HealthKit reads.
     var smartScaleSyncEnabled: @MainActor () -> Bool = { HealthKitSmartScaleSyncPolicy.isEnabled() }
     var smartScaleSampleQuery: ((HealthKitSmartScaleAnchors) async throws -> HealthKitSmartScaleQueryResult)?
+    var metricSourceSyncGuard: @MainActor () throws -> Void = {}
 
     init(
         userDefaults: UserDefaults = .standard,
