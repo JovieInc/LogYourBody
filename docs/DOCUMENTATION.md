@@ -33,6 +33,13 @@ map from the merged sources. This wraps the pinned generator and refuses to
 write while any other file is unmerged or a shared import fails parity. It
 stages only the generated output; review the source diff before committing.
 
+The pre-commit hook also calls this helper with `--staged` whenever a configured
+source, entry point, pinned import, registry or output changes. It regenerates
+from the Git index so partially staged dependency updates cannot include
+unrelated working-tree edits. Pinned-source drift still fails before any write.
+Bots that do not run hooks must invoke the helper or generator before submitting
+their update; the required CI parity check remains read-only.
+
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
 exact upstream bytes. Only listed imports and generated output are written;

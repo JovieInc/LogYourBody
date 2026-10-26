@@ -714,3 +714,107 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
     }
   });
 }
+
+function dependencyProjection() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-projection-'));
+  git(root, 'init', '-q', '-b', 'main');
+  const manifest = 'apps/web/package.json';
+  const output = 'docs/SOURCES.md';
+  const config = {
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+    sources: [{ path: manifest, purpose: 'Web dependencies' }], imports: [], output,
+  };
+  const version = (value) => JSON.stringify({ dependencies: { '@radix-ui/react-context-menu': value } });
+  commit(root, {
+    'README.md': 'Local instructions\n',
+    'repository-docs.json': JSON.stringify(config),
+    [manifest]: version('^2.3.7'),
+  }, 'base dependencies');
+  execFileSync('python3', [path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write'], { env: gitEnv });
+  git(root, 'add', output);
+  git(root, 'commit', '-q', '-m', 'base projection');
+  const resolve = () => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root, '--staged',
+  ], { env: gitEnv, encoding: 'utf8' });
+  return { root, manifest, output, config, version, resolve };
+}
+
+test('staged dependency updates regenerate the projection without including unstaged edits', () => {
+  const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
+  assert.match(hook, /^python3 scripts\/resolve-repository-docs\.py --staged$/m);
+  const fx = dependencyProjection();
+  try {
+    fs.writeFileSync(path.join(fx.root, fx.manifest), fx.version('^2.3.8'));
+    git(fx.root, 'add', fx.manifest);
+    fs.writeFileSync(path.join(fx.root, fx.manifest), fx.version('^9.9.9'));
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged local instructions\n');
+    fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), 'Unstaged invalid config');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    const projection = git(fx.root, 'show', `:${fx.output}`);
+    assert.match(projection, /"@radix-ui\/react-context-menu": "\^2\.3\.8"/);
+    assert.doesNotMatch(projection, /9\.9\.9/);
+    assert.equal(git(fx.root, 'diff', '--cached', '--name-only'), `${fx.manifest}\n${fx.output}`);
+    assert.equal(git(fx.root, 'show', ':README.md'), 'Local instructions');
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.manifest), 'utf8'), fx.version('^9.9.9'));
+    assert.equal(fx.resolve().status, 0, 'staged regeneration is idempotent');
+    assert.equal(git(fx.root, 'show', `:${fx.output}`), projection);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const symlink of ['input', 'output']) {
+  test(`staged projection repair refuses symlinked ${symlink} without changing sources or index`, () => {
+    const fx = dependencyProjection();
+    try {
+      fs.writeFileSync(path.join(fx.root, fx.manifest), fx.version('^2.3.8'));
+      git(fx.root, 'add', fx.manifest);
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const target = symlink === 'input' ? fx.manifest : fx.output;
+      fs.unlinkSync(path.join(fx.root, target));
+      fs.symlinkSync(symlink === 'input' ? '../../README.md' : '../README.md', path.join(fx.root, target));
+      if (symlink === 'input') git(fx.root, 'add', target);
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve();
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, symlink === 'input'
+        ? /projection input must be a staged regular file/
+        : /symlinked projection output/);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(path.join(fx.root, 'README.md'), 'utf8'), 'Local instructions\n');
+      if (symlink === 'input') assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('staged projection repair ignores unrelated commits and refuses pinned drift without writes', () => {
+  const fx = dependencyProjection();
+  try {
+    fs.writeFileSync(path.join(fx.root, fx.manifest), fx.version('^9.9.9'));
+    fs.writeFileSync(path.join(fx.root, 'unrelated.txt'), 'Unrelated change\n');
+    git(fx.root, 'add', 'unrelated.txt');
+    const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.resolve().status, 0);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+    fx.config.imports = [{
+      repository: 'example/policy', revision: 'a'.repeat(40),
+      path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+    }];
+    fs.writeFileSync(path.join(fx.root, 'policy.md'), 'Changed pinned policy\n');
+    fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+    git(fx.root, 'add', 'repository-docs.json', 'policy.md');
+    const staged = git(fx.root, 'ls-files', '--stage');
+    const result = fx.resolve();
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /pinned copy missing or changed: policy.md/);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), staged);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});

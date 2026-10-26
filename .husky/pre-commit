@@ -10,3 +10,6 @@ if git diff --cached --name-only --diff-filter=ACMR | grep -qx 'packages/shared-
   node scripts/correction-classifier.mjs || exit $?
   git add -- packages/shared-lib/corrections.json
 fi
+
+# Keep generated documentation aligned with the source bytes entering this commit.
+python3 scripts/resolve-repository-docs.py --staged

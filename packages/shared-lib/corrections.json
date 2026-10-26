@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "staged-source-projection-refresh",
+    "correction": "PR #1600: The context-menu dependency bump left the generated web manifest projection stale, failing Detect Changes, documentation parity and CI Summary. Repeated dependency updates need automatic projection regeneration.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300944443/job/121498388010",
+    "mechanization": "Extend the existing source-map resolver with --staged and call it from pre-commit after formatting. Generate only from indexed inputs in a temporary snapshot, retaining pinned-source checks and staging only the output. Required Detect Changes regressions exercise the exact dependency bump, partially staged source edits, idempotence, unrelated commits and refusal of pinned drift without mutation. The new cases fail before this extension and pass afterward. Bots without hooks still run the helper explicitly; CI remains read-only.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing generator wrapper can construct the source projection from the Git index before each source-changing commit, preventing stale dependency projections and accidental inclusion of unstaged edits by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Generate from the index so partially staged sources never leak into a commit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",
