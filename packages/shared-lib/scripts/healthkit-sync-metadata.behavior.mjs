@@ -16,6 +16,13 @@ function findings(source, path = 'Fixture.swift') {
   return scan({ files: [path], readSource: () => source });
 }
 
+test('a source that never names a sync identifier has no findings', () => {
+  const bulky = `[${'"["'.repeat(4000)}]`;
+  assert.equal(bulky.includes('HKMetadataKeySyncIdentifier'), false);
+  assert.deepEqual(findings(bulky), []);
+  assert.equal(repairSource(bulky), bulky);
+});
+
 test('the launch-quality fixture fails before repair and passes after it', () => {
   const before = findings(launchQualityFixture);
   assert.equal(before.length, 1);

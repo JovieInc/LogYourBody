@@ -48,6 +48,10 @@ function tokenAt(source, index, token) {
 
 export function analyze(path, source) {
   const findings = [];
+  // Full-tree ratchet scans import this for every Swift file. Skip the character
+  // walk unless the file can name a sync identifier; that walk was enough to push
+  // the coverage wrapper past Vitest's default timeout.
+  if (!source.includes(IDENTIFIER)) return findings;
   const stack = [];
   let index = 0;
   while (index < source.length) {

@@ -9,4 +9,4 @@ it('runs HealthKit sync-metadata regressions through the required test suite', (
     { cwd: fileURLToPath(new URL('../../..', import.meta.url)), encoding: 'utf8', timeout: 30_000 },
   );
   expect(output).toContain('# fail 0');
-});
+}, 30_000);
