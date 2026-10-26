@@ -110,6 +110,9 @@ jobs:
       - name: Verify workflow concurrency policy
         run: node .github/scripts/verify-workflow-concurrency.mjs
 
+      - name: Test release check enclosing budget
+        run: node --test .github/scripts/release-check-budget.test.mjs
+
       - name: Verify repository merge queue policy
         run: node --test .github/scripts/verify-merge-queue-policy.test.mjs
 
@@ -127,6 +130,9 @@ jobs:
       # or run workflows: 150 backup pushes starved the shared build queue on 2026-10-20.
       - name: Verify Vercel and Actions ignore bot-only refs
         run: node --test .github/scripts/verify-vercel-branch-exclusions.test.mjs
+
+      - name: Test the Vercel public-env type guard
+        run: node --test .github/scripts/verify-public-build-env-types.test.mjs
 
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
@@ -148,15 +154,30 @@ jobs:
           set -euo pipefail
           node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs
           node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
+          node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
           [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           node packages/shared-lib/scripts/correction-coverage.mjs --base-ref "$BASE_SHA"
           node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref "$BASE_SHA"
+          node packages/shared-lib/scripts/guard-reference.mjs --base-ref "$BASE_SHA"
 
       - name: Verify LYB and Jovie product separation
         run: |
           node --test packages/shared-lib/scripts/jovie-separation.behavior.mjs
           node packages/shared-lib/scripts/jovie-separation.mjs
+
+      # Native screens/modes and web pages against the Jovie launch inventory.
+      # The fixture test is deliberate red for one unlisted route and one
+      # still-mounted hidden screen. The repository run fails new surface ids
+      # and prints the diff table; the reviewed baseline may only shrink.
+      - name: Reconcile native and web surfaces with the launch inventory
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'merge_group' && github.event.merge_group.base_sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          node --test scripts/surface-reconciliation.test.mjs
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          node scripts/surface-reconciliation.mjs --base-ref "$BASE_SHA"
 
       - name: Detect changed surfaces locally
         id: filter

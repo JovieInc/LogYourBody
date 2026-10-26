@@ -1,8 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// Controls precisely which personal details leave the app in a rendered card.
-/// The private default keeps the card to the Body Score until the person opts in.
+/// Which details are rendered into an exported card.
+/// Weight, body fat, FFMI, and a photo or avatar stay off until the person opts in.
 struct BodyScoreShareOptions: Equatable {
     var selectedMetric: ContextualMetricKind?
     var includeObservation = true
@@ -33,6 +33,16 @@ struct BodyScoreShareOptions: Equatable {
         if includeFFMI { items.append("FFMI") }
         if includeVisual { items.append("visual") }
         return items.joined(separator: ", ")
+    }
+
+    /// No visual means a composed score card. Metrics or a contextual detail
+    /// share that card; they do not turn it into a photo caption.
+    var cardComposition: ShareCardComposition {
+        guard !includeVisual else { return .visualOverlay }
+        if hasMetrics || selectedMetric != nil {
+            return .scoreWithDetails
+        }
+        return .scoreOnly
     }
 }
 
@@ -70,9 +80,45 @@ struct BodyScoreSharePayload {
         AvatarBodyFatCatalog.match(bodyFatPercentage: bodyFatPercentage, gender: gender)
     }
 
+    /// Badge copy describes an opted-in visual only. An exported score is not a private delivery.
     func visualBadgeText(includeVisual: Bool) -> String {
-        guard includeVisual else { return "Private summary" }
+        guard includeVisual else { return "" }
         return photoImage == nil ? avatarMatch.badgeText : "Progress photo"
+    }
+}
+
+/// How the share card fills its export canvas.
+enum ShareCardComposition: Equatable {
+    /// Photo or avatar fills the card and the summary sits on the bottom matte.
+    case visualOverlay
+    /// Body Score alone. The number is the hero and the lockup stays one group.
+    case scoreOnly
+    /// Score plus opted-in metrics or a contextual detail line.
+    case scoreWithDetails
+
+    var isScoreComposition: Bool {
+        self != .visualOverlay
+    }
+}
+
+/// Preview frame drawn outside the exported artwork so the black card stays visible on the black editor.
+enum BodyScoreSharePreviewGeometry {
+    static let outset: CGFloat = 6
+
+    static func artworkSize(in container: CGSize, aspect: BodyScoreShareAspect) -> CGSize {
+        let available = CGSize(
+            width: max(0, container.width - outset * 2),
+            height: max(0, container.height - outset * 2)
+        )
+        return fitted(available, to: aspect.pixelSize)
+    }
+
+    static func fitted(_ container: CGSize, to target: CGSize) -> CGSize {
+        guard container.width > 0, container.height > 0, target.width > 0, target.height > 0 else {
+            return target
+        }
+        let fitted = min(container.width / target.width, container.height / target.height)
+        return CGSize(width: target.width * fitted, height: target.height * fitted)
     }
 }
 
@@ -144,26 +190,21 @@ struct BodyScoreShareCardView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let layout = ShareCardLayout(size: geometry.size, aspect: aspect, includesMetrics: options.hasMetrics)
+            let layout = ShareCardLayout(
+                size: geometry.size,
+                aspect: aspect,
+                includesMetrics: options.hasMetrics,
+                composition: options.cardComposition
+            )
 
             ZStack {
                 Color.black
 
-                visualStage(layout: layout)
-                    .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
-
-                shareScrims(layout: layout)
-
-                VStack(spacing: 0) {
-                    shareHeader(layout: layout)
-
-                    Spacer(minLength: layout.bottomOverlayHeight * 0.08)
-
-                    shareSummary(layout: layout)
+                if layout.composition == .visualOverlay {
+                    visualOverlay(layout: layout)
+                } else {
+                    scoreComposition(layout: layout)
                 }
-                .padding(.horizontal, layout.horizontalPadding)
-                .padding(.top, layout.topPadding)
-                .padding(.bottom, layout.bottomPadding)
             }
         }
         .aspectRatio(aspectRatioValue, contentMode: .fit)
@@ -178,6 +219,43 @@ struct BodyScoreShareCardView: View {
         let size = aspect.pixelSize
         guard size.height > 0 else { return 1 }
         return size.width / size.height
+    }
+
+    private func visualOverlay(layout: ShareCardLayout) -> some View {
+        ZStack {
+            visualStage(layout: layout)
+                .frame(width: layout.size.width, height: layout.size.height, alignment: .top)
+
+            shareScrims(layout: layout)
+
+            VStack(spacing: 0) {
+                shareHeader(layout: layout)
+
+                Spacer(minLength: layout.bottomOverlayHeight * 0.08)
+
+                shareSummary(layout: layout)
+            }
+            .padding(.horizontal, layout.horizontalPadding)
+            .padding(.top, layout.topPadding)
+            .padding(.bottom, layout.bottomPadding)
+        }
+    }
+
+    /// Header, hero score, and footer stay one group. Extra canvas becomes space around that group.
+    private func scoreComposition(layout: ShareCardLayout) -> some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: layout.compositionSpacing) {
+                shareHeader(layout: layout)
+                scoreCompositionSummary(layout: layout)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, layout.safeMargin)
+        .padding(.vertical, layout.safeMargin)
     }
 
     private func visualStage(layout: ShareCardLayout) -> some View {
@@ -226,17 +304,92 @@ struct BodyScoreShareCardView: View {
                     .minimumScaleFactor(0.78)
                     .accessibilityIdentifier("body_score_share_brand")
 
-                Text(payload.visualBadgeText(includeVisual: options.includeVisual))
-                    .font(.system(size: layout.badgeFontSize, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.62))
-                    .lineLimit(1)
-                    .allowsTightening(true)
-                    .minimumScaleFactor(0.72)
-                    .accessibilityIdentifier("body_score_share_badge")
+                let badge = payload.visualBadgeText(includeVisual: options.includeVisual)
+                if !badge.isEmpty {
+                    Text(badge)
+                        .font(.system(size: layout.badgeFontSize, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.62))
+                        .lineLimit(1)
+                        .allowsTightening(true)
+                        .minimumScaleFactor(0.72)
+                        .accessibilityIdentifier("body_score_share_badge")
+                }
             }
 
             Spacer(minLength: 0)
         }
+    }
+
+    private func scoreCompositionSummary(layout: ShareCardLayout) -> some View {
+        let snapshot = payload.snapshot(for: options)
+        let detail = snapshot.map { $0.detail(options: options) } ?? payload.deltaText
+        let supporting = snapshot?.unit ?? payload.tagline
+
+        return VStack(alignment: .leading, spacing: layout.heroStackSpacing) {
+            HStack(alignment: .lastTextBaseline, spacing: layout.scoreLabelSpacing) {
+                Text(snapshot?.value ?? payload.scoreText)
+                    .font(.system(size: layout.scoreFontSize, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .allowsTightening(true)
+                    .minimumScaleFactor(0.72)
+                    .accessibilityIdentifier("body_score_share_score")
+
+                if snapshot?.unit == "%" {
+                    Text("%")
+                        .font(.system(size: layout.scoreFontSize, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .accessibilityIdentifier("body_score_share_unit")
+                }
+            }
+
+            Text(options.selectedMetric?.title ?? "Body Score")
+                .font(.system(size: layout.scoreLabelFontSize, weight: .bold))
+                .foregroundColor(Color.white.opacity(0.66))
+                .textCase(.uppercase)
+                .lineLimit(1)
+                .allowsTightening(true)
+                .minimumScaleFactor(0.7)
+
+            if snapshot?.unit != "%" && !supporting.isEmpty {
+                Text(supporting)
+                    .font(.system(size: layout.taglineFontSize, weight: .semibold, design: .rounded))
+                    .foregroundColor(Color.white.opacity(0.9))
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("body_score_share_tagline")
+            }
+
+            if let detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.system(size: layout.deltaFontSize, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.66))
+                    .lineLimit(options.selectedMetric == nil ? 1 : 4)
+                    .allowsTightening(true)
+                    .minimumScaleFactor(0.72)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("body_score_share_delta")
+            }
+
+            if options.hasMetrics {
+                shareMetrics(layout: layout)
+            }
+
+            Text("Shared from LogYourBody")
+                .font(.system(size: layout.footerFontSize, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.58))
+                .lineLimit(1)
+                .allowsTightening(true)
+                .minimumScaleFactor(0.74)
+                .accessibilityIdentifier("body_score_share_footer")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("body_score_share_summary")
     }
 
     private func shareSummary(layout: ShareCardLayout) -> some View {
@@ -413,53 +566,92 @@ struct ShareCardLayout {
     let size: CGSize
     let aspect: BodyScoreShareAspect
     let includesMetrics: Bool
+    let composition: ShareCardComposition
 
-    init(size: CGSize, aspect: BodyScoreShareAspect, includesMetrics: Bool = true) {
+    init(
+        size: CGSize,
+        aspect: BodyScoreShareAspect,
+        includesMetrics: Bool = true,
+        composition: ShareCardComposition = .visualOverlay
+    ) {
         self.size = size
         self.aspect = aspect
         self.includesMetrics = includesMetrics
+        self.composition = composition
     }
 
+    /// Fit into the export canvas. Preview and export share this scale with no clamp.
     var scale: CGFloat {
-        let reference = referenceSize
-        let widthScale = reference.width > 0 ? size.width / reference.width : 1
-        let heightScale = reference.height > 0 ? size.height / reference.height : 1
-        return min(max(min(widthScale, heightScale), 0.58), 2.8)
+        let export = aspect.pixelSize
+        guard export.width > 0, export.height > 0, size.width > 0, size.height > 0 else { return 1 }
+        return min(size.width / export.width, size.height / export.height)
     }
 
-    private var referenceSize: CGSize {
+    /// Photo-overlay type stays at the size the export used before the canonical
+    /// space moved to export pixels, so avatar clearance does not shift.
+    private var overlayExportScale: CGFloat {
         switch aspect {
         case .square:
-            return CGSize(width: 390, height: 520)
+            return 1_080.0 / 520.0
         case .portrait:
-            return CGSize(width: 390, height: 620)
+            return 1_350.0 / 620.0
         case .story:
-            return CGSize(width: 390, height: 760)
+            return 1_920.0 / 760.0
         }
     }
 
-    var horizontalPadding: CGFloat { 28 * scale }
-    var topPadding: CGFloat { 30 * scale }
-    var bottomPadding: CGFloat { 26 * scale }
-    var headerSpacing: CGFloat { 12 * scale }
-    var headerTextSpacing: CGFloat { 2 * scale }
-    var logoSize: CGFloat { 36 * scale }
-    var logoTextSize: CGFloat { 16 * scale }
-    var brandFontSize: CGFloat { 16 * scale }
-    var badgeFontSize: CGFloat { 11 * scale }
-    var summarySpacing: CGFloat { 17 * scale }
-    var scoreSpacing: CGFloat { 13 * scale }
-    var scoreLabelSpacing: CGFloat { 4 * scale }
-    var scoreFontSize: CGFloat { 54 * scale }
-    var scoreLabelFontSize: CGFloat { 11 * scale }
-    var taglineFontSize: CGFloat { 15 * scale }
-    var deltaFontSize: CGFloat { 12 * scale }
-    var metricSpacing: CGFloat { 13 * scale }
-    var metricTextSpacing: CGFloat { 4 * scale }
-    var metricTitleFontSize: CGFloat { 10 * scale }
-    var metricValueFontSize: CGFloat { 18 * scale }
-    var metricCaptionFontSize: CGFloat { 10 * scale }
-    var footerFontSize: CGFloat { 11 * scale }
+    private func overlay(_ base: CGFloat) -> CGFloat {
+        base * overlayExportScale * scale
+    }
+
+    private func px(_ exportPixels: CGFloat) -> CGFloat {
+        exportPixels * scale
+    }
+
+    var safeMargin: CGFloat { horizontalPadding }
+
+    var compositionSpacing: CGFloat {
+        px(composition == .scoreOnly ? 48 : 24)
+    }
+
+    var heroStackSpacing: CGFloat { px(8) }
+
+    var horizontalPadding: CGFloat {
+        if composition.isScoreComposition {
+            return px(aspect == .story ? 96 : 72)
+        }
+        return overlay(28)
+    }
+    var topPadding: CGFloat { overlay(30) }
+    var bottomPadding: CGFloat { overlay(26) }
+    var headerSpacing: CGFloat { composition.isScoreComposition ? px(14) : overlay(12) }
+    var headerTextSpacing: CGFloat { composition.isScoreComposition ? px(2) : overlay(2) }
+    var logoSize: CGFloat { composition.isScoreComposition ? px(52) : overlay(36) }
+    var logoTextSize: CGFloat { composition.isScoreComposition ? px(32) : overlay(16) }
+    var brandFontSize: CGFloat { composition.isScoreComposition ? px(32) : overlay(16) }
+    var badgeFontSize: CGFloat { composition.isScoreComposition ? px(22) : overlay(11) }
+    var summarySpacing: CGFloat { composition.isScoreComposition ? px(20) : overlay(17) }
+    var scoreSpacing: CGFloat { composition.isScoreComposition ? px(12) : overlay(13) }
+    var scoreLabelSpacing: CGFloat { composition.isScoreComposition ? px(6) : overlay(4) }
+    var scoreFontSize: CGFloat {
+        switch composition {
+        case .visualOverlay:
+            return overlay(54)
+        case .scoreOnly:
+            return px(min(aspect.pixelSize.height * 0.24, 360))
+        case .scoreWithDetails:
+            return px(min(aspect.pixelSize.height * 0.16, 240))
+        }
+    }
+    var scoreLabelFontSize: CGFloat { composition.isScoreComposition ? px(24) : overlay(11) }
+    var taglineFontSize: CGFloat { composition.isScoreComposition ? px(30) : overlay(15) }
+    var deltaFontSize: CGFloat { composition.isScoreComposition ? px(24) : overlay(12) }
+    var metricSpacing: CGFloat { composition.isScoreComposition ? px(16) : overlay(13) }
+    var metricTextSpacing: CGFloat { composition.isScoreComposition ? px(4) : overlay(4) }
+    var metricTitleFontSize: CGFloat { composition.isScoreComposition ? px(16) : overlay(10) }
+    var metricValueFontSize: CGFloat { composition.isScoreComposition ? px(34) : overlay(18) }
+    var metricCaptionFontSize: CGFloat { composition.isScoreComposition ? px(16) : overlay(10) }
+    var footerFontSize: CGFloat { composition.isScoreComposition ? px(22) : overlay(11) }
 
     var visualTopOffset: CGFloat {
         switch aspect {
@@ -487,7 +679,7 @@ struct ShareCardLayout {
         return max(0, min(baseHeight, maximumBottom - visualTopOffset))
     }
 
-    var textVisualGap: CGFloat { max(10 * scale, size.height * 0.018) }
+    var textVisualGap: CGFloat { max(overlay(10), size.height * 0.018) }
 
     var estimatedSummaryContentHeight: CGFloat {
         let scoreLabelStack = scoreLabelFontSize + taglineFontSize * 2.6 + deltaFontSize + scoreLabelSpacing * 3
@@ -535,6 +727,25 @@ struct ShareCardLayout {
         case .story:
             return size.height * 0.28
         }
+    }
+}
+
+struct BodyScoreSharePreviewChrome: View {
+    let payload: BodyScoreSharePayload
+    let aspect: BodyScoreShareAspect
+    let options: BodyScoreShareOptions
+    let artworkSize: CGSize
+
+    var body: some View {
+        BodyScoreShareCardView(payload: payload, aspect: aspect, options: options)
+            .frame(width: artworkSize.width, height: artworkSize.height)
+            .padding(BodyScoreSharePreviewGeometry.outset)
+            .background(Color.white.opacity(0.16))
+            .overlay(
+                Rectangle()
+                    .strokeBorder(Color.white.opacity(0.88), lineWidth: 1)
+            )
+            // An identifier here replaces the card's own accessibility identifier.
     }
 }
 
@@ -832,12 +1043,16 @@ struct BodyScoreShareSheet: View {
                 width: geometry.size.width,
                 height: max(0, geometry.size.height - verticalInset * 2)
             )
-            let size = fittedSize(for: availableSize, target: selectedAspect.pixelSize)
+            let artwork = BodyScoreSharePreviewGeometry.artworkSize(in: availableSize, aspect: selectedAspect)
 
-            BodyScoreShareCardView(payload: payload, aspect: selectedAspect, options: shareOptions)
-                .frame(width: size.width, height: size.height)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .padding(.vertical, verticalInset)
+            BodyScoreSharePreviewChrome(
+                payload: payload,
+                aspect: selectedAspect,
+                options: shareOptions,
+                artworkSize: artwork
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .padding(.vertical, verticalInset)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(height: height)
@@ -870,15 +1085,6 @@ struct BodyScoreShareSheet: View {
         .background(theme.colors.interactive)
         .clipShape(Capsule())
         .accessibilityHint("Renders a card containing \(shareOptions.includedSummary)")
-    }
-
-    private func fittedSize(for container: CGSize, target: CGSize) -> CGSize {
-        guard container.width > 0, container.height > 0 else {
-            return target
-        }
-
-        let scale = min(container.width / target.width, container.height / target.height)
-        return CGSize(width: target.width * scale, height: target.height * scale)
     }
 
     private func invalidatePrivateExport() {
