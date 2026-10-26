@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "ruby-native-cache-matches-runtime-build",
+    "correction": "PR #1577: Merge-group Unit CI failed before native compilation because an exact Ruby-version cache restored date_core.bundle with an unavailable _rb_cFalseClass symbol. A Ruby version alone does not identify a compatible native gem build.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40270455941",
+    "mechanization": "Extend the shared Ruby/Bundler setup action with a new cache namespace bound to Ruby build configuration, executable location, platform, runner architecture and environment. Clear persistent bundle leftovers before restoring and require native gems during setup verification. The existing required Mac Runner Routing Tests execute the real identity and cleanup steps and reject incompatible cache prefixes and unloadable gems. All three regressions failed against the prior action and pass after repair; native execution still requires macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared setup action constructs cache identities from the active interpreter build and runner identity, preventing incompatible native cache reuse by construction. Clearing leftover bundles ensures a cache miss cannot inherit stale native artifacts."
+      }
+    },
+    "guard": {
+      "path": ".github/actions/setup-ruby-bundler/action.yml",
+      "anchor": "identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, File.realpath(RbConfig.ruby), RbConfig::CONFIG.sort]"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
     "correction": "PR #1537: Resolve the origin/main correction-ledger conflict by retaining the Sentry identity and StoreKit cleanup receipts alongside main's recurrence, measurement-freshness and release receipts.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1537",
