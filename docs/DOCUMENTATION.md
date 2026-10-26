@@ -53,6 +53,8 @@ lifecycle scripts, verifies it with a frozen offline pass, then stages the
 lockfile and source map. It refuses unresolved source conflicts, unstaged
 dependency or projection edits, and pinned-source drift. It requires registry
 access for uncached resolutions; commit hooks and CI keep frozen installation.
+If dependency resolution or frozen verification fails, the helper restores the
+original lockfile and leaves the index and projection unchanged, allowing retry.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the

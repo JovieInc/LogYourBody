@@ -79,11 +79,21 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False):
         # Explicit repair only: normal commit hooks and CI retain frozen installs.
         if refresh_lockfile:
             modes.insert(0, ["--no-frozen-lockfile"])
-        for mode in modes:
-            subprocess.run(
-                ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
-                cwd=root, check=True,
-            )
+        lockfile = repository_docs.local(root, "pnpm-lock.yaml")
+        original_lockfile = lockfile.read_bytes() if lockfile.exists() else None
+        try:
+            for mode in modes:
+                subprocess.run(
+                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
+                    cwd=root, check=True,
+                )
+        except (OSError, subprocess.CalledProcessError):
+            # Restore failed repairs so dirty-input protection still permits retry.
+            if original_lockfile is None:
+                lockfile.unlink(missing_ok=True)
+            else:
+                lockfile.write_bytes(original_lockfile)
+            raise
     errors = repository_docs.run(root, write=True)
     if errors:
         raise ValueError("; ".join(errors))
