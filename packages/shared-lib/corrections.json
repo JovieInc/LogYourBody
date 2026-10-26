@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1556 / LYB-241: Repeated red-check repairs must preserve merged feature work and fix the actual Launch Quality failure. Run 40398373660 killed a cold build-for-testing at 600 seconds while app sources were still compiling, before XCTest began.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40398373660/job/121837659685",
+    "mechanization": "Extend the existing launch-quality dispatcher with a bounded 900-second full-build budget while retaining the fixed diagnostic 600-second budget, test timeouts, coverage, selectors and evidence checks. Extend its required runner-routing fixtures to model elapsed cold compilation and prove one build, failure/timeout propagation, explicit budget overrides and no tests after a failed build. The new cold-build regression returns 124 before the repair and reaches the unit command afterward. Merge origin/main first using the existing staged docs and classified-ledger resolvers; preserve the project and composed audit hash fences. The harness owns pushing and PR edits. Native build/test execution remains required on macOS.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner can apply a separate bounded compile budget to every full qualification invocation, preventing premature termination of cold builds without retrying compiler errors or weakening test/evidence gates. Its dispatcher regression enforces failure propagation and the independent diagnostic budget."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_full_launch_build_budget_allows_cold_compile_and_preserves_failures"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "healthkit-timezone-policy-without-source-identity",
     "correction": "PR #1567: Launch Quality failed the two cross-day timezone assertions in HealthImportIdempotencyTests. Selecting the sample-local day must not depend on having a complete source-scoped identity.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1567",
@@ -1247,7 +1265,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
     "classification": {
       "codebase": {
         "feasible": true,

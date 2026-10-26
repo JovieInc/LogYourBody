@@ -29,7 +29,10 @@ MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-
 # killed healthy runs. 1020s still stops a hung simulator well inside the step
 # budget. A command timeout is not retried; see is_simulator_infra_failure.
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
-BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"
+# PR #1556's uncached hosted build was still compiling app sources at 600s.
+# Allow one 15-minute compile within the existing step budget; never retry it.
+# The fixed diagnostic subset retains its separate 600s budget below.
+BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then

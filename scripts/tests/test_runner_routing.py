@@ -1397,7 +1397,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
+        '7eb5aae9cb2b0ff0854bc76baff952ecca8601021fbff98efa2ef8eabf0042f2'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1497,6 +1497,8 @@ name=pathlib.Path(sys.argv[0]).name
 args=sys.argv[1:]
 with open(os.environ['FAKE_CALLS'],'a') as f:f.write(json.dumps([name,*args])+'\\n')
 if name=='fake-timeout':
+    if 'build-for-testing' in args and int(os.environ.get('BUILD_ELAPSED_SECONDS','0')) >= int(args[1].removesuffix('s')):
+        sys.exit(124)
     sys.exit(subprocess.call(args[2:]))
 if name=='xcrun':
     if args[:3]==['xcresulttool','get','test-results']:
@@ -1539,6 +1541,31 @@ sys.exit(int(os.environ.get('UI_EXIT','0')))
     calls = (tmp_path / 'calls').read_text().splitlines() if (tmp_path / 'calls').exists() else []
     receipt = tmp_path / 'artifacts/diagnostic-receipt.json'
     return result, calls, json.loads(receipt.read_text()) if receipt.exists() else None
+
+
+def test_full_launch_build_budget_allows_cold_compile_and_preserves_failures(tmp_path: Path) -> None:
+    # Model elapsed compile time at the real dispatcher's timeout boundary without sleeping.
+    cases = [
+        ({'BUILD_ELAPSED_SECONDS': '700'}, 88),  # build completes; fixture stops at the unit command
+        ({'BUILD_ELAPSED_SECONDS': '901'}, 124),
+        ({'BUILD_EXIT': '65'}, 65),
+        ({'BUILD_FOR_TESTING_TIMEOUT_SECONDS': '120', 'BUILD_ELAPSED_SECONDS': '121'}, 124),
+    ]
+    for index, (overrides, status) in enumerate(cases):
+        result, calls, receipt = _run_diagnostic_dispatch(tmp_path / str(index), mode='', **overrides)
+        assert result.returncode == status, result.stdout + result.stderr
+        commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
+        timed = [json.loads(c) for c in calls if c.startswith('["fake-timeout"') and 'build-for-testing' in c]
+        assert len(timed) == 1  # neither compiler failures nor timeouts authorize a retry
+        assert timed[0][2] == overrides.get('BUILD_FOR_TESTING_TIMEOUT_SECONDS', '900') + 's'
+        assert sum('build-for-testing' in c for c in commands) == (status != 124)
+        assert any('test-without-building' in c for c in commands) == (status == 88)
+        assert receipt is None
+        if status == 124:
+            assert 'build-for-testing timed out after' in result.stdout
+    result, calls, receipt = _run_diagnostic_dispatch(tmp_path / 'diagnostic', BUILD_ELAPSED_SECONDS='700')
+    assert result.returncode == 124 and receipt['status'] == 'failed'
+    assert not any('test-without-building' in c for c in calls)
 
 
 def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_never_qualifies(tmp_path: Path) -> None:
@@ -1607,7 +1634,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'" in source
+    assert "REVIEWED_AUDIT_SHA256 = '7eb5aae9cb2b0ff0854bc76baff952ecca8601021fbff98efa2ef8eabf0042f2'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -1843,7 +1870,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
+    expected = '7eb5aae9cb2b0ff0854bc76baff952ecca8601021fbff98efa2ef8eabf0042f2'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
