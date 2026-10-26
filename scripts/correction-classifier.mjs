@@ -164,7 +164,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         ? args.length === 2 && !args[1].startsWith('-')
         : (args.length <= 1 ||
             (args.length === 3 && args[1] === '--merge' && !args[2].startsWith('-'))) &&
-          !args[0]?.startsWith('-'),
+            !args[0]?.startsWith('-'),
       'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository | --check-merge repository',
     );
     let path;
@@ -178,9 +178,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       const root = git('rev-parse', '--show-toplevel').trim();
       path = resolve(root, LEDGER_PATH);
       if (checkingMerge) {
-        const parents = ['HEAD', 'MERGE_HEAD'].map((ref) => git('rev-parse', '--verify', ref).trim());
+        const parents = ['HEAD', 'MERGE_HEAD'].map((ref) =>
+          git('rev-parse', '--verify', ref).trim(),
+        );
         const receipts = JSON.parse(git('show', `:0:${LEDGER_PATH}`));
-        assert.deepEqual(receipts, classifyLedger(receipts), 'staged merge ledger must be classified');
+        assert.deepEqual(
+          receipts,
+          classifyLedger(receipts),
+          'staged merge ledger must be classified',
+        );
         const current = guardCoverageReport(receipts, (guard) => git('show', `:0:${guard}`), {
           requireClassification: true,
         });
@@ -200,7 +206,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         classifyLedger(JSON.parse(git('show', `:${stage}:${LEDGER_PATH}`))),
       );
       result = classifyLedger(
-        mergeCorrectionLedgers(...stages, (guard) => readSource(guard, { root })),
+        // Keep incoming order, then append branch-only receipts so future main
+        // prepends do not collide with the same branch receipt on every repair.
+        mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
+          readSource(guard, { root }),
+        ),
       );
       readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
     } else {

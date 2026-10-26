@@ -290,11 +290,13 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     };
     const run = (...args) =>
       spawnSync(process.execPath, [script, ...args], { cwd: tmpdir(), encoding: 'utf8' });
+    const writeLedger = (receipts) =>
+      writeFileSync(ledger, `${JSON.stringify(receipts, null, 2)}\n`);
     git('init', '--initial-branch=left');
     for (const { guard } of rows.filter(({ guard }) => guard)) {
       writeFileSync(join(repository, guard.path), guard.anchor);
     }
-    writeFileSync(ledger, JSON.stringify([rows[0]]));
+    writeLedger([rows[0]]);
     writeFileSync(join(repository, 'unrelated.txt'), 'committed\n');
     git('add', '.');
     git('commit', '-m', 'test: base ledger');
@@ -303,13 +305,13 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     const ours = ['ours-edit', 'concurrent'].includes(scenario)
       ? { ...rows[0], correction: 'Clarified evidence on the feature branch.' }
       : rows[0];
-    writeFileSync(ledger, JSON.stringify(scenario === 'deleted' ? [rows[1]] : [ours, rows[1]]));
+    writeLedger(scenario === 'deleted' ? [rows[1]] : [rows[1], ours]);
     git('commit', '-am', 'test: left receipt');
     git('switch', 'right');
     const shared = ['theirs-edit', 'concurrent'].includes(scenario)
       ? { ...rows[0], correction: 'Clarified evidence on main.' }
       : rows[0];
-    writeFileSync(ledger, JSON.stringify(classifyLedger([shared, ...rows.slice(2)])));
+    writeLedger(classifyLedger([...rows.slice(2), shared]));
     git('commit', '-am', 'test: right receipts');
     git('switch', 'left');
     git('merge', '--no-commit', 'right');
@@ -330,7 +332,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       assert.match(result.stderr, /concurrent receipt edits|removed receipt|missing guard anchor/);
       assert.equal(readFileSync(ledger, 'utf8'), before);
     } else {
-      const expected = [scenario === 'ours-edit' ? ours : shared, ...rows.slice(1)];
+      const expected = [...rows.slice(2), scenario === 'ours-edit' ? ours : shared, rows[1]];
       assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), classifyLedger(expected));
       const resolved = readFileSync(ledger, 'utf8');
       assert.equal(run('--resolve-merge', repository).status, 0);
@@ -373,6 +375,34 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
     assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
     assert.match(git('diff', '--name-only'), /unrelated.txt/);
+    if (scenario === 'additions') {
+      git('commit', '-m', 'test: resolved ledger');
+      git('switch', 'right');
+      const nextReceipt = {
+        ...rows[2],
+        fingerprint: 'next-main-receipt',
+        source: `${rows[2].source}#next-main`,
+      };
+      writeLedger(classifyLedger([nextReceipt, ...rows.slice(2), shared]));
+      git('commit', '-am', 'test: next main receipt');
+      git('switch', 'left');
+      const nextMerge = spawnSync('git', ['merge', '--no-commit', 'right'], {
+        cwd: repository,
+        encoding: 'utf8',
+      });
+      assert.equal(
+        nextMerge.status,
+        0,
+        `next main prepend must merge cleanly: ${nextMerge.stderr}`,
+      );
+      assert.deepEqual(
+        JSON.parse(readFileSync(ledger, 'utf8')),
+        classifyLedger([nextReceipt, ...rows.slice(2), shared, rows[1]]),
+      );
+      const checked = run('--check-merge', repository);
+      assert.equal(checked.status, 0, checked.stderr);
+      assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
+    }
     assert.match(run('--resolve-merge').stderr, /usage:/);
     assert.match(run('--resolve-merge', '--unknown').stderr, /usage:/);
     assert.match(run('--resolve-merge', repository, 'extra').stderr, /usage:/);

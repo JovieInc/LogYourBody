@@ -232,3 +232,41 @@ The worktree began detached, so the local repair branch is
 its required body line remains `Machine: built scripts/correction-classifier.mjs`.
 GBrain search, `put lyb-153-merge-repair` and same-slug `get_page` each failed to
 connect to `127.0.0.1:7801`; neither write nor readback persistence is verified.
+
+## Recurring prepend conflict repair, 2026-10-26
+
+Merged `origin/main` at `a0155f618e994cb63ccdd543c7e4aed1f0dc2c9f` without
+rebasing. The only conflict was the correction ledger. Extended the existing
+classifier resolver to retain incoming order and append branch-only receipts,
+then used `--resolve-merge .` to preserve all 57 receipts. This moves this PR's
+repair receipt away from main's insertion point. The existing required regression
+now uses formatted, prepended receipts and proves a subsequent main prepend
+merges cleanly while preserving unrelated edits and staged guard coverage. The
+incoming-order assertion failed on the previous resolver and passes with the fix.
+Native source and target membership are unchanged from the supplied PR head.
+
+Validation on Linux with Node 22.23.2 and pnpm 10.34.1:
+
+- `corepack pnpm install --frozen-lockfile --prefer-offline`, `corepack pnpm lint`,
+  `corepack pnpm typecheck`, `corepack pnpm test`: passed. Turbo reused unchanged
+  tasks; the shared-lib suite executed for this repair.
+- The standalone classifier suite passed all 11 cases with
+  `--experimental-test-coverage`, `--test-coverage-include=scripts/correction-classifier.mjs`
+  and all three `--test-coverage-{lines,branches,functions}=100` gates.
+- Correction coverage against both `6f97302fc2f697b774e4dcc6fe921aad8aee3c0e`
+  and `origin/main`, guard references, correction ratchets, repository source
+  parity and `git diff --check`: passed. The 11 existing claims findings remain
+  baseline warnings.
+- `node --test .github/scripts/detect-changes.test.mjs`: all 32 cases passed.
+- `node scripts/correction-classifier.mjs --check-merge .`: passed against both
+  staged merge parents. Staged URL drift and whitespace checks also passed.
+- `gh run view 40311836646 --repo JovieInc/LogYourBody --log-failed` could not
+  return logs because that head's CI run was still in progress. The repaired head
+  requires the configured CI gates, including native execution on macOS.
+
+The checkout began detached; the local branch is
+`fix/lyb-153-pr1544-conflict-20261026t1128`. Git writes and subprocess tests needed
+sandbox escalation. The harness owns pushing and the PR-body update, whose
+required single machine line is `Machine: built scripts/correction-classifier.mjs`.
+GBrain search, `put lyb-153-merge-repair` and same-slug `get_page` each failed to
+connect to `127.0.0.1:7801`; write and readback persistence remain unverified.

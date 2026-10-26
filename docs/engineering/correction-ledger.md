@@ -80,7 +80,9 @@ There is no implicit prose or human fallback for missing or malformed assessment
 For additive ledger conflicts during a merge, run
 `node scripts/correction-classifier.mjs --resolve-merge .` from the repository
 root. This classifies all three immutable Git index stages and reuses the coverage
-tool's `mergeCorrectionLedgers` policy. It preserves independent additions and
+tool's `mergeCorrectionLedgers` policy. It retains incoming order and appends
+branch-only receipts, allowing later main-side prepends to merge without
+repeating the same conflict. It preserves independent additions and
 one-sided edits, rejects deletions, duplicate identities and divergent concurrent
 edits, and validates retained guards before writing the classified result.
 Missing conflict stages fail without writing.

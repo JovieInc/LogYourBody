@@ -1,18 +1,62 @@
 [
   {
-    "fingerprint": "merge-correction-ledgers-before-classification",
-    "correction": "PR #1544: Repeated origin/main repairs must preserve both merge parents' correction receipts and classify their union instead of resolving the ledger by choosing one side.",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1544",
-    "mechanization": "Extend the existing correction classifier with --merge and --resolve-merge. Git resolution classifies all three immutable index stages and delegates to the existing correction-coverage mergeCorrectionLedgers policy, preserving independent additions and one-sided edits while rejecting deletions, duplicate identities, concurrent edits and missing guards before writing. --check-merge and pre-commit verify staged retention against both parents. Used for this repair. The required shared-lib runner exercises real conflicting repositories at 100% classifier coverage; the one-sided-edit regression failed on the previous resolver and passes with this extension.",
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",
+    "mechanization": "Regenerate the existing source projection after reviewing the TruffleHog workflow version bump. The required projection checker failed before regeneration and passes afterward; retain the required Detect Changes and CI Summary gates and their existing regression rejecting a missing or skippable parity step.",
     "classification": {
       "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
         "feasible": true,
-        "rationale": "The existing classifier can construct the complete union before writing, preserving distinct source receipts by construction and refusing contradictory duplicates without changing either input on failure."
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
       }
     },
     "guard": {
-      "path": "scripts/correction-classifier.mjs",
-      "anchor": "assert.deepEqual(merged.get(key), normalized, `conflicting merge receipt: ${key}`);"
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "lint-correction-checks-warn-then-harden",
+    "correction": "LYB-307: Emit new checks only for lint/typecheck/CI classifications. The first receipt warns with exit 0; a distinct repeat hardens the same check. Codebase, prose and human-review classifications emit no new check.",
+    "source": "https://linear.app/jovie/issue/LYB-307",
+    "mechanization": "The existing required shared-lib test task runs real scanner and CLI fixtures proving warning exit 0, repeated violation exit 1, clean recurrent checks, duplicate receipt deduplication and no emitted checks for the other levels. Existing hard gates and finding-baseline ratchets retain their runners.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot enforce repository correction routing or the exit status of newly emitted lint and CI checks."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib suite can execute classified fixture receipts through the check emitter and assert diagnostics, recurrence, no-check routes and actual process exit statuses."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-checks.behavior.mjs",
+      "anchor": "lint-level violation warns at recurrence zero and fails at recurrence one or more"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "generated-source-map-conflict-repair",
+    "correction": "PR #1582: Repeated merges of origin/main conflict only in the generated ci.yml fingerprint. Regenerate from the merged sources instead of choosing either parent hash.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1582",
+    "mechanization": "Wrap the existing pinned repository_docs generator with a reusable merge resolver that refuses other unresolved files and pinned-source drift, then regenerates and stages only the configured output. Required Detect Changes tests exercise real conflicting Git branches, both parent edits, idempotence, unstaged edit preservation and refusal paths. Use the resolver for this merge.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The merge resolver constructs the projection from already merged sources using the pinned generator, preventing selection of a stale parent fingerprint. It refuses unresolved source conflicts before writing or staging."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "resolve source conflicts first: "
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -1052,68 +1096,6 @@
     "ruleId": "ci-invariant"
   },
   {
-    "fingerprint": "swiftui-reduce-motion-environment-is-read-only",
-    "correction": "PR #1544: The workout scrubber's large-type preview wrote SwiftUI's get-only accessibilityReduceMotion environment property, preventing both Launch Quality and StoreKit Purchase and Restore from compiling.",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40167662977/job/121092153045",
-    "mechanization": "Remove the invalid preview override and inherit the system preference. The required JavaScript/TypeScript shared-lib suite rejects read-only Reduce Motion environment writes throughout native app source, including previews, while permitting reads and writable Dynamic Type overrides. The source regression failed on TrainingNumericScrub.swift before this repair. Existing native compilation and acceptance gates remain required.",
-    "classification": {
-      "codebase": {
-        "feasible": false,
-        "rationale": "Runtime app logic cannot prevent future source edits from invoking an unsupported SwiftUI modifier, including within debug-only preview code."
-      },
-      "static": {
-        "feasible": true,
-        "rationale": "A deterministic source regression in the existing required shared-lib test task detects the unsupported environment write on Linux before the native compiler independently rejects it on macOS."
-      }
-    },
-    "guard": {
-      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
-      "anchor": "keeps native views and previews free of read-only Reduce Motion writes (LYB-153)"
-    },
-    "level": "static",
-    "ruleId": "ci-invariant"
-  },
-  {
-    "fingerprint": "generated-source-map-conflict-repair",
-    "correction": "PR #1582: Repeated merges of origin/main conflict only in the generated ci.yml fingerprint. Regenerate from the merged sources instead of choosing either parent hash.",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1582",
-    "mechanization": "Wrap the existing pinned repository_docs generator with a reusable merge resolver that refuses other unresolved files and pinned-source drift, then regenerates and stages only the configured output. Required Detect Changes tests exercise real conflicting Git branches, both parent edits, idempotence, unstaged edit preservation and refusal paths. Use the resolver for this merge.",
-    "classification": {
-      "codebase": {
-        "feasible": true,
-        "rationale": "The merge resolver constructs the projection from already merged sources using the pinned generator, preventing selection of a stale parent fingerprint. It refuses unresolved source conflicts before writing or staging."
-      }
-    },
-    "guard": {
-      "path": "scripts/resolve-repository-docs.py",
-      "anchor": "resolve source conflicts first: "
-    },
-    "level": "codebase",
-    "ruleId": "code-prevention"
-  },
-  {
-    "fingerprint": "lint-correction-checks-warn-then-harden",
-    "correction": "LYB-307: Emit new checks only for lint/typecheck/CI classifications. The first receipt warns with exit 0; a distinct repeat hardens the same check. Codebase, prose and human-review classifications emit no new check.",
-    "source": "https://linear.app/jovie/issue/LYB-307",
-    "mechanization": "The existing required shared-lib test task runs real scanner and CLI fixtures proving warning exit 0, repeated violation exit 1, clean recurrent checks, duplicate receipt deduplication and no emitted checks for the other levels. Existing hard gates and finding-baseline ratchets retain their runners.",
-    "classification": {
-      "codebase": {
-        "feasible": false,
-        "rationale": "Application runtime logic cannot enforce repository correction routing or the exit status of newly emitted lint and CI checks."
-      },
-      "static": {
-        "feasible": true,
-        "rationale": "The required shared-lib suite can execute classified fixture receipts through the check emitter and assert diagnostics, recurrence, no-check routes and actual process exit statuses."
-      }
-    },
-    "guard": {
-      "path": "packages/shared-lib/scripts/correction-checks.behavior.mjs",
-      "anchor": "lint-level violation warns at recurrence zero and fails at recurrence one or more"
-    },
-    "level": "static",
-    "ruleId": "ci-invariant"
-  },
-  {
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
@@ -1148,5 +1130,45 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-correction-ledgers-before-classification",
+    "correction": "PR #1544: Repeated origin/main repairs must preserve both merge parents' correction receipts and classify their union instead of resolving the ledger by choosing one side.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1544",
+    "mechanization": "Extend the existing correction classifier with --merge and --resolve-merge. Git resolution classifies all three immutable index stages and delegates to the existing correction-coverage mergeCorrectionLedgers policy, preserving incoming order and appending branch-only receipts so subsequent main-side prepends merge cleanly. It preserves independent additions and one-sided edits while rejecting deletions, duplicate identities, concurrent edits and missing guards before writing. --check-merge and pre-commit verify staged retention against both parents. Used for this repair. The required shared-lib runner exercises real conflicting repositories and a subsequent clean main merge at 100% classifier coverage; the incoming-order regression failed on the previous resolver and passes with this extension.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing classifier can construct the complete union before writing, preserving distinct source receipts by construction and refusing contradictory duplicates without changing either input on failure."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "assert.deepEqual(merged.get(key), normalized, `conflicting merge receipt: ${key}`);"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swiftui-reduce-motion-environment-is-read-only",
+    "correction": "PR #1544: The workout scrubber's large-type preview wrote SwiftUI's get-only accessibilityReduceMotion environment property, preventing both Launch Quality and StoreKit Purchase and Restore from compiling.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40167662977/job/121092153045",
+    "mechanization": "Remove the invalid preview override and inherit the system preference. The required JavaScript/TypeScript shared-lib suite rejects read-only Reduce Motion environment writes throughout native app source, including previews, while permitting reads and writable Dynamic Type overrides. The source regression failed on TrainingNumericScrub.swift before this repair. Existing native compilation and acceptance gates remain required.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime app logic cannot prevent future source edits from invoking an unsupported SwiftUI modifier, including within debug-only preview code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic source regression in the existing required shared-lib test task detects the unsupported environment write on Linux before the native compiler independently rejects it on macOS."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
+      "anchor": "keeps native views and previews free of read-only Reduce Motion writes (LYB-153)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
