@@ -37,12 +37,6 @@ and use real-time subscription dates with explicit expiration/refund. Unit
 excludes this new simulator integration suite; its other selectors and coverage
 floors are unchanged.
 
-Cleanup deletes the existing transaction IDs once, then waits for both
-`SKTestSession.allTransactions()` and `Transaction.all` to become empty. This
-includes expired and refunded history, which is absent from current entitlements.
-Setup, teardown and warm-up share this bounded cleanup; a timeout throws before
-another purchase can start. No repeated global clear can erase a later purchase.
-
 On a Mac with the repo's Xcode toolchain, from a clean checkout:
 
 ```bash

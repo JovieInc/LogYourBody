@@ -71,46 +71,30 @@ jobs:
           RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
         run: .github/scripts/pin-ios-release-tag.sh
 
-  # Poll on Linux. A macos runner held only for this wait delays the
-  # StoreKit job CI Summary is waiting on.
   validate-release:
     name: Validate Release
     needs: pin-release-tag
-    runs-on: ubuntu-latest
-    # Must exceed validate-release-source.sh's RELEASE_CHECK_TIMEOUT_SECONDS (9101s).
-    timeout-minutes: 165
+    runs-on: macos-26
+    # Must exceed validate-release-source.sh's RELEASE_CHECK_TIMEOUT_SECONDS (2700s):
+    # CI Summary only completes after the ~30-minute iOS quality gate on iOS merges.
+    timeout-minutes: 50
     permissions:
       contents: read
       checks: read
       statuses: read
       actions: read
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-
-      - name: Validate release source
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
-        run: .github/scripts/validate-release-source.sh
-
-  bind-release-version:
-    name: Bind Release Version
-    needs: [pin-release-tag, validate-release]
-    runs-on: macos-26
-    timeout-minutes: 20
-    permissions:
-      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       build_number: ${{ steps.version.outputs.build_number }}
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Validate release source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
+        run: .github/scripts/validate-release-source.sh
 
       - uses: pnpm/action-setup@v6
 
@@ -141,7 +125,7 @@ jobs:
           # version from build settings before passing it to downstream jobs.
           # The release tag was already named from the project file; the
           # binary must use that same version and the build number pinned
-          # before release validation waited on CI.
+          # before this job waited on CI.
           VERSION=$(xcodebuild \
             -project LogYourBody.xcodeproj \
             -scheme LogYourBody \
@@ -194,7 +178,7 @@ jobs:
 
   build-release:
     name: Build Release
-    needs: [bind-release-version, check-existing-build]
+    needs: [validate-release, check-existing-build]
     if: needs.check-existing-build.outputs.has_artifact != 'true'
     runs-on: macos-26
     timeout-minutes: 30
@@ -284,7 +268,7 @@ jobs:
           cd apps/ios
 
           # Update build number
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ needs.bind-release-version.outputs.build_number }}" LogYourBody/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ needs.validate-release.outputs.build_number }}" LogYourBody/Info.plist
 
           echo "📱 Building iOS app for release..."
 
@@ -327,20 +311,20 @@ jobs:
 
   deploy-testflight:
     name: Deploy to TestFlight
-    needs: [bind-release-version, build-release]
+    needs: [validate-release, build-release]
     if: github.event.inputs.release_type != 'app_store'
     permissions:
       contents: write
     uses: ./.github/workflows/ios-testflight-deploy.yml
     with:
       distribution_group: alpha
-      build_number: ${{ needs.bind-release-version.outputs.build_number }}
-      version_name: ${{ needs.bind-release-version.outputs.version }}
+      build_number: ${{ needs.validate-release.outputs.build_number }}
+      version_name: ${{ needs.validate-release.outputs.version }}
       artifact_name: ios-release-build
       environment: production-testflight
       release_notes: |
-        Version ${{ needs.bind-release-version.outputs.version }}
-        Build ${{ needs.bind-release-version.outputs.build_number }}
+        Version ${{ needs.validate-release.outputs.version }}
+        Build ${{ needs.validate-release.outputs.build_number }}
 
         This is a production release candidate.
 
@@ -353,7 +337,7 @@ jobs:
 
   deploy-app-store:
     name: Deploy to App Store
-    needs: [bind-release-version, build-release]
+    needs: [validate-release, build-release]
     if: github.event.inputs.release_type == 'app_store'
     runs-on: macos-26
     timeout-minutes: 30
@@ -497,7 +481,7 @@ jobs:
 
   create-release:
     name: Create Release
-    needs: [bind-release-version, deploy-testflight, deploy-app-store]
+    needs: [validate-release, deploy-testflight, deploy-app-store]
     if: always() && (needs.deploy-testflight.result == 'success' || needs.deploy-app-store.result == 'success')
     runs-on: ubuntu-latest
     permissions:
@@ -510,8 +494,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TYPE: ${{ github.event.inputs.release_type || 'testflight' }}
-          RELEASE_VERSION: ${{ needs.bind-release-version.outputs.version }}
-          RELEASE_BUILD: ${{ needs.bind-release-version.outputs.build_number }}
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          RELEASE_BUILD: ${{ needs.validate-release.outputs.build_number }}
           RELEASE_ACTOR: ${{ github.actor }}
         run: .github/scripts/create-ios-github-release.sh
 

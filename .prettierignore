@@ -10,6 +10,3 @@ packages/jovie-ui/atoms/input.tsx
 packages/jovie-ui/atoms/spinner.tsx
 packages/jovie-ui/lib/utils.ts
 packages/design-tokens/web/jovie-colors.json
-
-# Exact upstream oracle fixture bytes, verified by the launch manifest tests.
-scripts/fixtures/lyb-certification/

@@ -348,7 +348,6 @@ struct LogYourBodyApp: App {
         scheduleDeferredMaintenance()
 
         AppServicePorts.errorTracker.start()
-        ErrorTrackingService.shared.updateUserId(authManager.currentUser?.id)
 
         AppServicePorts.analyticsTracker.start()
         AppServicePorts.analyticsTracker.track(event: "app_open")

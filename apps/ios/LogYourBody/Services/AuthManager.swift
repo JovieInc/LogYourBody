@@ -311,13 +311,7 @@ final class AuthManager: NSObject, ObservableObject {
         return manager
     }()
 
-    @Published var currentUser: LocalUser? {
-        didSet {
-            if oldValue?.id != currentUser?.id {
-                ErrorTrackingService.shared.updateUserId(currentUser?.id)
-            }
-        }
-    }
+    @Published var currentUser: LocalUser?
     @Published var authSession: ProductAuthSession? {
         didSet {
             // Every replacement invalidates work, including A → B → A and logout

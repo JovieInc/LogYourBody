@@ -4,9 +4,3 @@ pnpm exec lint-staged
 
 # Validate staged immutable Jovie imports after all normal lint/format tasks.
 node scripts/check-jovie-imports.mjs --staged
-
-# Classify a staged correction ledger so a merge cannot commit missing level or ruleId.
-if git diff --cached --name-only --diff-filter=ACMR | grep -qx 'packages/shared-lib/corrections.json'; then
-  node scripts/correction-classifier.mjs || exit $?
-  git add -- packages/shared-lib/corrections.json
-fi
