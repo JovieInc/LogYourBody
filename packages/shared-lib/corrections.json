@@ -1,21 +1,25 @@
 [
   {
-    "fingerprint": "storekit-lifecycles-isolate-simulator-state",
-    "correction": "PR #1593 merge-group run 40300882343: the fourth StoreKit lifecycle purchased successfully but restore returned no entitlement. The shared session and scoped cleanup still allowed cases to share the same StoreKit test server.",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300882343",
-    "mechanization": "Extend the existing StoreKit runner to create a fresh compatible simulator and process for every required lifecycle and delete its owned devices on success or failure. Keep all four native assertions, source checks, coverage exports and exact-case evidence validation. The required runner-routing suite executes the runner with fake native tools and the real evidence validator, rejecting shared devices, skipped/duplicate cases, failed tests or coverage, dirty source and missing cleanup. The isolation regression fails against the prior runner and passes after the change. Native behavior remains subject to macOS merge-group CI.",
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",
+    "mechanization": "Regenerate the existing source projection after reviewing the TruffleHog workflow version bump. The required projection checker failed before regeneration and passes afterward; retain the required Detect Changes and CI Summary gates and their existing regression rejecting a missing or skippable parity step.",
     "classification": {
       "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
         "feasible": true,
-        "rationale": "The existing runner can construct independent simulator test environments for every lifecycle, preventing earlier expiration, refund and cleanup operations from affecting a later case by construction."
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
       }
     },
     "guard": {
-      "path": "scripts/ios/storekit-purchase-restore.sh",
-      "anchor": "SIMULATOR_ID=$(xcrun simctl create"
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
     },
-    "level": "codebase",
-    "ruleId": "code-prevention"
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "lint-correction-checks-warn-then-harden",
@@ -59,24 +63,6 @@
   },
   {
     "fingerprint": "ruby-native-cache-matches-runtime-build",
-    "correction": "PR #1593: Resolve the Ruby setup merge conflict without losing executable/shared-library cache fingerprints, persistent bundle cleanup, or post-Bundler checks for date, psych, json and ffi.",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1593",
-    "mechanization": "Combine both parents in the existing shared Ruby setup action and extend its offline real-Bundler regression to load all four locked gems and reject each individual load failure. The existing runner-routing suite checks byte-level runtime rebuilds, runner/cache isolation and persistent bundle cleanup; running the combined regressions against either unmerged parent fails. Validate the merged correction ledger against both immutable parents with the existing multi-parent coverage guard.",
-    "classification": {
-      "codebase": {
-        "feasible": true,
-        "rationale": "The shared setup action constructs cache identities from the active interpreter build and runner identity, preventing incompatible native cache reuse by construction. Clearing leftover bundles ensures a cache miss cannot inherit stale native artifacts."
-      }
-    },
-    "guard": {
-      "path": ".github/actions/setup-ruby-bundler/action.yml",
-      "anchor": "identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, File.realpath(RbConfig.ruby), RbConfig::CONFIG.sort]"
-    },
-    "level": "codebase",
-    "ruleId": "code-prevention"
-  },
-  {
-    "fingerprint": "ruby-native-cache-matches-runtime-build",
     "correction": "PR #1577: Merge-group Unit CI failed before native compilation because an exact Ruby-version cache restored date_core.bundle with an unavailable _rb_cFalseClass symbol. A Ruby version alone does not identify a compatible native gem build.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40270455941",
     "mechanization": "Extend the shared Ruby/Bundler setup action with a new cache namespace bound to Ruby build configuration, executable location, platform, runner architecture and environment. Clear persistent bundle leftovers before restoring and require native gems during setup verification. The existing required Mac Runner Routing Tests execute the real identity and cleanup steps and reject incompatible cache prefixes and unloadable gems. All three regressions failed against the prior action and pass after repair; native execution still requires macOS CI.",
@@ -92,72 +78,6 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
-  },
-  {
-    "fingerprint": "correction-ledger-retains-source-and-recurrence",
-    "correction": "PR #1593: Resolve the origin/main correction-ledger conflict without losing the Ruby runtime cache and Bundler load-order receipts or the incoming Sentry and StoreKit receipts.",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1593",
-    "mechanization": "Extend the existing required correction coverage guard to accept repeated immutable --base-ref arguments. Its normal shared-lib behavior suite proves that checking one parent can silently lose the other parent's source, while checking both rejects the loss and preserves recurrence. The new regression fails before the extension and passes afterward. Validate this merged ledger against both actual merge-parent SHAs in one invocation.",
-    "classification": {
-      "codebase": {
-        "feasible": false,
-        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
-      },
-      "static": {
-        "feasible": true,
-        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
-      }
-    },
-    "guard": {
-      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
-      "anchor": "correction ledger regression: removed receipt for"
-    },
-    "level": "static",
-    "ruleId": "ci-invariant"
-  },
-  {
-    "fingerprint": "ruby-native-verification-loads-after-bundler",
-    "correction": "PR #1593: Launch Quality failed in Verify Ruby setup because command-line -rdate activated Ruby's default date 3.2.2 before Bundler selected the locked date 3.6.0.",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40266780512/job/121390909536",
-    "mechanization": "Require date and psych inside the bundled Ruby script after Bundler setup. The existing required Mac Runner Routing Tests execute the action command against an offline vendor bundle using the real Bundler and gem loader, reproduce the runner's preload order, and verify that default-gem conflicts are avoided while individual date and psych load failures remain fatal. The regression fails with the old command and passes with the fix.",
-    "classification": {
-      "codebase": {
-        "feasible": false,
-        "rationale": "Application runtime code cannot control native gem verification in the CI setup action before the application builds."
-      },
-      "static": {
-        "feasible": true,
-        "rationale": "The existing required runner-routing suite can execute the actual verification command with real Bundler setup, isolated locked gems, the failing preload order and individual load failures."
-      }
-    },
-    "guard": {
-      "path": "scripts/tests/test_runner_routing.py",
-      "anchor": "def test_ruby_setup_loads_locked_native_gems_after_bundler_setup"
-    },
-    "level": "static",
-    "ruleId": "ci-invariant"
-  },
-  {
-    "fingerprint": "ruby-native-gem-cache-runtime-isolation",
-    "correction": "LYB-295: Post-merge Launch Quality failed during self-hosted Ruby setup after restoring cached date/psych native extensions with a missing _rb_cFalseClass symbol. Ruby version alone does not identify a compatible native gem cache.",
-    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40261816170/job/121375622829",
-    "mechanization": "Version the Ruby cache namespace and bind exact and fallback keys to runner OS, architecture, environment and the Ruby configuration/executable/shared-library fingerprint. The existing required Mac Runner Routing Tests execute the action's runtime probe and native-load verification and reject legacy or foreign cache restores. All three regressions fail on the previous action and pass with the fix; date/psych load failures remain fatal.",
-    "classification": {
-      "codebase": {
-        "feasible": false,
-        "rationale": "Application runtime code cannot prevent the CI setup action from restoring native gems compiled for another Ruby build before the app is built."
-      },
-      "static": {
-        "feasible": true,
-        "rationale": "The existing required runner-routing suite can evaluate both cache lookup paths and execute the actual action commands with changed Ruby build bytes and native-load failures."
-      }
-    },
-    "guard": {
-      "path": "scripts/tests/test_runner_routing.py",
-      "anchor": "def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys"
-    },
-    "level": "static",
-    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -1210,5 +1130,107 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "storekit-lifecycles-isolate-simulator-state",
+    "correction": "PR #1593 merge-group run 40300882343: the fourth StoreKit lifecycle purchased successfully but restore returned no entitlement. The shared session and scoped cleanup still allowed cases to share the same StoreKit test server.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300882343",
+    "mechanization": "Extend the existing StoreKit runner to create a fresh compatible simulator and process for every required lifecycle and delete its owned devices on success or failure. Keep all four native assertions, source checks, coverage exports and exact-case evidence validation. The required runner-routing suite executes the runner with fake native tools and the real evidence validator, rejecting shared devices, skipped/duplicate cases, failed tests or coverage, dirty source and missing cleanup. The isolation regression fails against the prior runner and passes after the change. Native behavior remains subject to macOS merge-group CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner can construct independent simulator test environments for every lifecycle, preventing earlier expiration, refund and cleanup operations from affecting a later case by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/storekit-purchase-restore.sh",
+      "anchor": "SIMULATOR_ID=$(xcrun simctl create"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "ruby-native-cache-matches-runtime-build",
+    "correction": "PR #1593: Resolve the Ruby setup merge conflict without losing executable/shared-library cache fingerprints, persistent bundle cleanup, or post-Bundler checks for date, psych, json and ffi.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1593",
+    "mechanization": "Combine both parents in the existing shared Ruby setup action and extend its offline real-Bundler regression to load all four locked gems and reject each individual load failure. The existing runner-routing suite checks byte-level runtime rebuilds, runner/cache isolation and persistent bundle cleanup; running the combined regressions against either unmerged parent fails. Validate the merged correction ledger against both immutable parents with the existing multi-parent coverage guard.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared setup action constructs cache identities from the active interpreter build and runner identity, preventing incompatible native cache reuse by construction. Clearing leftover bundles ensures a cache miss cannot inherit stale native artifacts."
+      }
+    },
+    "guard": {
+      "path": ".github/actions/setup-ruby-bundler/action.yml",
+      "anchor": "identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, File.realpath(RbConfig.ruby), RbConfig::CONFIG.sort]"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1593: Resolve the origin/main correction-ledger conflict without losing the Ruby runtime cache and Bundler load-order receipts or the incoming Sentry and StoreKit receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1593",
+    "mechanization": "Extend the existing required correction coverage guard to accept repeated immutable --base-ref arguments. Its normal shared-lib behavior suite proves that checking one parent can silently lose the other parent's source, while checking both rejects the loss and preserves recurrence. The new regression fails before the extension and passes afterward. Validate this merged ledger against both actual merge-parent SHAs in one invocation.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "ruby-native-verification-loads-after-bundler",
+    "correction": "PR #1593: Launch Quality failed in Verify Ruby setup because command-line -rdate activated Ruby's default date 3.2.2 before Bundler selected the locked date 3.6.0.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40266780512/job/121390909536",
+    "mechanization": "Require date and psych inside the bundled Ruby script after Bundler setup. The existing required Mac Runner Routing Tests execute the action command against an offline vendor bundle using the real Bundler and gem loader, reproduce the runner's preload order, and verify that default-gem conflicts are avoided while individual date and psych load failures remain fatal. The regression fails with the old command and passes with the fix.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot control native gem verification in the CI setup action before the application builds."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite can execute the actual verification command with real Bundler setup, isolated locked gems, the failing preload order and individual load failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_ruby_setup_loads_locked_native_gems_after_bundler_setup"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "ruby-native-gem-cache-runtime-isolation",
+    "correction": "LYB-295: Post-merge Launch Quality failed during self-hosted Ruby setup after restoring cached date/psych native extensions with a missing _rb_cFalseClass symbol. Ruby version alone does not identify a compatible native gem cache.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40261816170/job/121375622829",
+    "mechanization": "Version the Ruby cache namespace and bind exact and fallback keys to runner OS, architecture, environment and the Ruby configuration/executable/shared-library fingerprint. The existing required Mac Runner Routing Tests execute the action's runtime probe and native-load verification and reject legacy or foreign cache restores. All three regressions fail on the previous action and pass with the fix; date/psych load failures remain fatal.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot prevent the CI setup action from restoring native gems compiled for another Ruby build before the app is built."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite can evaluate both cache lookup paths and execute the actual action commands with changed Ruby build bytes and native-load failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
