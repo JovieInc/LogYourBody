@@ -46,16 +46,15 @@ runs:
       id: ruby-version
       shell: bash
       run: |
-        echo "version=$(ruby -v | awk '{print $2}')" >> "$GITHUB_OUTPUT"
-        # Native gems depend on the Ruby build, including Homebrew revisions
-        # that keep the same Ruby version. Fingerprint its executable/library.
         ruby -rrbconfig -rdigest -e '
+          puts "version=#{RUBY_VERSION}p#{RUBY_PATCHLEVEL}"
+          identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, File.realpath(RbConfig.ruby), RbConfig::CONFIG.sort]
+          # Homebrew rebuilds can change native compatibility at the same path/version.
           files = [RbConfig.ruby]
           library = File.join(RbConfig::CONFIG.fetch("libdir"), RbConfig::CONFIG.fetch("LIBRUBY_SO"))
           files << library if File.file?(library)
-          identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, RbConfig::CONFIG.sort,
-                      files.map { |path| [path, Digest::SHA256.file(path).hexdigest] }]
-          puts "runtime=#{Digest::SHA256.hexdigest(identity.inspect)}"
+          identity << files.map { |path| [path, Digest::SHA256.file(path).hexdigest] }
+          puts "abi=#{Digest::SHA256.hexdigest(Marshal.dump(identity))}"
         ' >> "$GITHUB_OUTPUT"
 
     - name: Get Gemfile.lock hash
@@ -70,16 +69,22 @@ runs:
           echo "hash=none" >> $GITHUB_OUTPUT
         fi
 
+    # Self-hosted workspaces can retain gems even when no cache matches.
+    - name: Clear stale bundle before cache restore
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        rm -rf vendor/bundle
+
     - name: Cache Ruby dependencies
       uses: actions/cache@v4
       id: bundler-cache
       with:
         path: ${{ inputs.working-directory }}/vendor/bundle
-        # v2 excludes the old cache containing incompatible date/psych binaries.
-        # Restore across lockfile changes only within the exact same runtime.
-        key: v2-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.ruby-version.outputs.runtime }}-${{ steps.gemfile-hash.outputs.hash }}
+        # v2 cannot restore old caches that mixed Homebrew and hosted Ruby builds.
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ inputs.cache-key-prefix }}-ruby-v2-${{ steps.ruby-version.outputs.version }}-${{ steps.ruby-version.outputs.abi }}-${{ steps.gemfile-hash.outputs.hash }}
         restore-keys: |
-          v2-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.ruby-version.outputs.runtime }}-
+          ${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ inputs.cache-key-prefix }}-ruby-v2-${{ steps.ruby-version.outputs.version }}-${{ steps.ruby-version.outputs.abi }}-
 
     - name: Install Bundler
       shell: bash
@@ -114,4 +119,4 @@ runs:
         echo "Bundle path: $(bundle config get path)"
         # bundle check validates gem presence, not native-extension loadability.
         # Require after Bundler setup so Ruby cannot activate default gems first.
-        bundle exec ruby -e 'require "date"; require "psych"; puts "Ruby native dependencies loaded"'
+        bundle exec ruby -e 'require "date"; require "psych"; require "json"; require "ffi"; puts "Ruby native dependencies loaded"'

@@ -593,6 +593,112 @@ def test_wrong_run_identity_or_job_attestation_degrades_to_hosted(
         assert outputs["health"] == "down"
 
 
+def _ruby_setup_step(name: str) -> str:
+    action = (_REPO_ROOT / '.github/actions/setup-ruby-bundler/action.yml').read_text()
+    return action.split(f'    - name: {name}\n', 1)[1].split('\n    - name:', 1)[0]
+
+
+def _ruby_setup_body(name: str) -> str:
+    body = _ruby_setup_step(name).split('      run: ', 1)[1]
+    return textwrap.dedent(body[2:]) if body.startswith('|\n') else body
+
+
+def test_ruby_bundle_cache_separates_runtime_builds_and_runner_platforms(tmp_path: Path) -> None:
+    import re
+
+    # Execute the action's real Ruby identity calculation, including two Ruby
+    # builds with the same version but different native extension configuration.
+    def identity(label: str, config_change: str = '') -> dict[str, str]:
+        output = tmp_path / f'{label}.output'
+        preload = tmp_path / f'{label}.rb'
+        preload.write_text('require "rbconfig"\n' + config_change)
+        result = subprocess.run(
+            ['bash', '-e', '-o', 'pipefail', '-c', _ruby_setup_body('Get Ruby version')],
+            env={**os.environ, 'GITHUB_OUTPUT': str(output), 'RUBYOPT': f'-r{preload}'},
+            text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+        )
+        assert result.returncode == 0, result.stderr
+        return dict(line.split('=', 1) for line in output.read_text().splitlines())
+
+    current = identity('current')
+    assert current == identity('repeat')
+    assert re.fullmatch('[0-9a-f]{64}', current['abi'])
+    for index, setting in enumerate(['arch', 'configure_args']):
+        changed = identity(str(index), f'RbConfig::CONFIG["{setting}"] += "-other-build"\n')
+        assert current['version'] == changed['version']
+        assert current['abi'] != changed['abi']
+
+    cache = _ruby_setup_step('Cache Ruby dependencies')
+    key = cache.split('        key: ', 1)[1].splitlines()[0]
+    restore = cache.split('        restore-keys: |\n', 1)[1].strip().splitlines()
+    values = {
+        'runner.os': 'macOS', 'runner.arch': 'ARM64', 'runner.environment': 'self-hosted',
+        'inputs.cache-key-prefix': 'ios-gems', 'steps.ruby-version.outputs.version': current['version'],
+        'steps.ruby-version.outputs.abi': current['abi'], 'steps.gemfile-hash.outputs.hash': 'lock-a',
+    }
+
+    def render(template: str, overrides: dict[str, str]) -> str:
+        context = {**values, **overrides}
+        return re.sub(r'\$\{\{\s*(.*?)\s*\}\}', lambda match: context[match[1]], template)
+
+    current_key = render(key, {})
+    prefixes = [render(template, {}) for template in restore]
+    assert prefixes and all(current_key.startswith(prefix) for prefix in prefixes)
+    for field, other in [
+        ('runner.os', 'Linux'), ('runner.arch', 'X64'), ('runner.environment', 'github-hosted'),
+        ('steps.ruby-version.outputs.version', 'other-version'),
+        ('steps.ruby-version.outputs.abi', 'other-build'),
+    ]:
+        assert not any(render(key, {field: other}).startswith(prefix) for prefix in prefixes)
+    # A changed lock can reuse only a compatible runtime cache; the rejected
+    # pre-ABI cache from the merge-group log must never match a restore prefix.
+    assert any(render(key, {'steps.gemfile-hash.outputs.hash': 'lock-b'}).startswith(prefix)
+               for prefix in prefixes)
+    legacy = 'macOS-ios-gems-ruby-3.1.7p261-7236275de00f433e3174f60973f80e2325ceef9f'
+    assert not any(legacy.startswith(prefix) for prefix in prefixes)
+
+
+def test_ruby_bundle_restore_clears_persistent_native_gems_only(tmp_path: Path) -> None:
+    bundle = tmp_path / 'vendor/bundle/ruby/3.1.0/gems/date/lib'
+    bundle.mkdir(parents=True)
+    (bundle / 'date_core.bundle').write_text('incompatible cached native extension')
+    retained = tmp_path / 'vendor/JovieKit/Package.swift'
+    retained.parent.mkdir()
+    retained.write_text('retained vendored package')
+    result = subprocess.run(
+        ['bash', '-e', '-c', _ruby_setup_body('Clear stale bundle before cache restore')],
+        cwd=tmp_path, text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+    )
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / 'vendor/bundle').exists()
+    assert retained.read_text() == 'retained vendored package'
+    action = (_REPO_ROOT / '.github/actions/setup-ruby-bundler/action.yml').read_text()
+    assert action.index('Clear stale bundle before cache restore') < action.index('Cache Ruby dependencies')
+    assert 'working-directory: ${{ inputs.working-directory }}' in _ruby_setup_step(
+        'Clear stale bundle before cache restore')
+
+
+def test_ruby_bundle_verification_rejects_unloadable_native_extensions(tmp_path: Path) -> None:
+    fake_bundle = tmp_path / 'bundle'
+    fake_bundle.write_text('''#!/usr/bin/env bash
+if [[ "$1" == exec ]]; then
+  [[ "$*" == *'require "date"'* && "$*" == *'require "psych"'* && "$*" == *'require "json"'* ]] || exit 99
+  if [[ "$BROKEN_NATIVE_GEM" == true ]]; then
+    echo 'LoadError: date_core.bundle: Symbol not found: _rb_cFalseClass' >&2
+    exit 1
+  fi
+fi
+''')
+    fake_bundle.chmod(0o755)
+    for broken in ['true', 'false']:
+        result = subprocess.run(
+            ['bash', '-e', '-o', 'pipefail', '-c', _ruby_setup_body('Verify Ruby setup')],
+            env={**os.environ, 'PATH': f'{tmp_path}:{os.environ["PATH"]}', 'BROKEN_NATIVE_GEM': broken},
+            text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+        )
+        assert result.returncode == (1 if broken == 'true' else 0), result.stderr
+
+
 _MAC_LANE_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "mac-lane.sh"
 _SELF_HOSTED_MAC = 'fromJSON(\'["self-hosted","macOS","ARM64","jovie-mac"]\')'
 _MANUAL_QUALITY_DISPATCH = "github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))"
@@ -1043,16 +1149,6 @@ def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
     assert "create-config-files: 'false'" in canary
 
 
-def _ruby_setup_step(name: str) -> str:
-    action = (_REPO_ROOT / '.github/actions/setup-ruby-bundler/action.yml').read_text()
-    return action.split(f'    - name: {name}\n', 1)[1].split('\n    - name:', 1)[0]
-
-
-def _ruby_setup_command(name: str) -> str:
-    body = _ruby_setup_step(name).split('      run: ', 1)[1]
-    return textwrap.dedent(body[2:]) if body.startswith('|\n') else body.splitlines()[0]
-
-
 def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys() -> None:
     step = _ruby_setup_step('Cache Ruby dependencies')
     key = step.split('        key: ', 1)[1].splitlines()[0]
@@ -1060,7 +1156,7 @@ def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys() -> N
     context = {'runner.os': 'macOS', 'runner.arch': 'ARM64',
                'runner.environment': 'self-hosted', 'inputs.cache-key-prefix': 'ios-gems',
                'steps.ruby-version.outputs.version': '3.1.7p261',
-               'steps.ruby-version.outputs.runtime': 'a' * 64,
+               'steps.ruby-version.outputs.abi': 'a' * 64,
                'steps.gemfile-hash.outputs.hash': 'lock-a'}
 
     def render(template: str, **changes: str) -> str:
@@ -1077,7 +1173,7 @@ def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys() -> N
     for field, value in [('runner.os', 'Linux'), ('runner.arch', 'X64'),
                          ('runner.environment', 'github-hosted'),
                          ('steps.ruby-version.outputs.version', '3.1.6p260'),
-                         ('steps.ruby-version.outputs.runtime', 'b' * 64)]:
+                         ('steps.ruby-version.outputs.abi', 'b' * 64)]:
         assert not can_restore(render(key, **{field: value})), field
 
 
@@ -1099,7 +1195,7 @@ def test_ruby_cache_identity_changes_with_runtime_build_and_native_library(tmp_p
 
     def probe(arch: str = 'arm64-darwin-25') -> str:
         output.write_text('')
-        result = subprocess.run(['bash', '-e', '-c', _ruby_setup_command('Get Ruby version')],
+        result = subprocess.run(['bash', '-e', '-c', _ruby_setup_body('Get Ruby version')],
                                 env={**os.environ, 'GITHUB_OUTPUT': str(output),
                                      'RUBYOPT': f'-r{preload}', 'FIXTURE_RUBY': str(binary),
                                      'FIXTURE_ARCH': arch}, text=True, capture_output=True,
@@ -1107,8 +1203,8 @@ def test_ruby_cache_identity_changes_with_runtime_build_and_native_library(tmp_p
         assert result.returncode == 0, result.stderr
         values = dict(line.split('=', 1) for line in output.read_text().splitlines())
         assert values['version']
-        assert re.fullmatch('[0-9a-f]{64}', values['runtime'])
-        return values['runtime']
+        assert re.fullmatch('[0-9a-f]{64}', values['abi'])
+        return values['abi']
 
     initial = probe()
     assert probe() == initial
@@ -1136,7 +1232,7 @@ def test_ruby_setup_fails_when_cached_date_or_psych_cannot_load(tmp_path: Path) 
     bundle.chmod(0o755)
     marker = tmp_path / 'native-load-calls'
     for status in [0, 1]:
-        result = subprocess.run(['bash', '-e', '-c', _ruby_setup_command('Verify Ruby setup')],
+        result = subprocess.run(['bash', '-e', '-c', _ruby_setup_body('Verify Ruby setup')],
                                 env={**os.environ, 'PATH': f'{tmp_path}:{os.environ["PATH"]}',
                                      'NATIVE_LOAD_CALLS': str(marker), 'NATIVE_LOAD_STATUS': str(status)},
                                 text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
@@ -1152,7 +1248,7 @@ def test_ruby_setup_loads_locked_native_gems_after_bundler_setup(tmp_path: Path)
     )
     cache = tmp_path / 'vendor/bundle/ruby' / ruby_api
     (cache / 'specifications').mkdir(parents=True)
-    for name in ['date', 'psych']:
+    for name in ['date', 'psych', 'json', 'ffi']:
         library = cache / 'gems' / f'{name}-99.0.0' / 'lib'
         library.mkdir(parents=True)
         (cache / 'specifications' / f'{name}-99.0.0.gemspec').write_text(textwrap.dedent(f'''\
@@ -1168,13 +1264,15 @@ def test_ruby_setup_loads_locked_native_gems_after_bundler_setup(tmp_path: Path)
             f'puts "Bundled {name} loaded"\n'
         )
     (tmp_path / 'Gemfile').write_text(
-        'source "https://rubygems.org"\ngem "date", "99.0.0"\ngem "psych", "99.0.0"\n'
+        'source "https://rubygems.org"\ngem "date", "99.0.0"\ngem "psych", "99.0.0"\ngem "json", "99.0.0"\ngem "ffi", "99.0.0"\n'
     )
     (tmp_path / 'Gemfile.lock').write_text(textwrap.dedent('''\
         GEM
           remote: https://rubygems.org/
           specs:
             date (99.0.0)
+            ffi (99.0.0)
+            json (99.0.0)
             psych (99.0.0)
 
         PLATFORMS
@@ -1182,6 +1280,8 @@ def test_ruby_setup_loads_locked_native_gems_after_bundler_setup(tmp_path: Path)
 
         DEPENDENCIES
           date (= 99.0.0)
+          ffi (= 99.0.0)
+          json (= 99.0.0)
           psych (= 99.0.0)
     '''))
     bundle = tmp_path / 'bundle'
@@ -1204,9 +1304,9 @@ def test_ruby_setup_loads_locked_native_gems_after_bundler_setup(tmp_path: Path)
         echo 'fixture bundle config'
     '''))
     bundle.chmod(0o755)
-    for broken in ['', 'date', 'psych']:
+    for broken in ['', 'date', 'psych', 'json', 'ffi']:
         result = subprocess.run(
-            ['bash', '-e', '-c', _ruby_setup_command('Verify Ruby setup')], cwd=tmp_path,
+            ['bash', '-e', '-c', _ruby_setup_body('Verify Ruby setup')], cwd=tmp_path,
             env={**os.environ, 'PATH': f'{tmp_path}:{os.environ["PATH"]}', 'RUBYOPT': '',
                  'BUNDLE_GEMFILE': str(tmp_path / 'Gemfile'), 'BUNDLE_PATH': str(tmp_path / 'vendor/bundle'),
                  'BUNDLE_IGNORE_CONFIG': 'true', 'BUNDLE_DEPLOYMENT': 'true', 'BUNDLE_FROZEN': 'true',
@@ -1219,7 +1319,7 @@ def test_ruby_setup_loads_locked_native_gems_after_bundler_setup(tmp_path: Path)
             assert 'Ruby native dependencies loaded' not in result.stdout
         else:
             assert result.returncode == 0, result.stderr
-            assert 'Bundled date loaded\nBundled psych loaded\nRuby native dependencies loaded' in result.stdout
+            assert 'Bundled date loaded\nBundled psych loaded\nBundled json loaded\nBundled ffi loaded\nRuby native dependencies loaded' in result.stdout
 
 
 def test_invalid_awaiter_bounds_and_missing_helper_fall_back(tmp_path: Path) -> None:
