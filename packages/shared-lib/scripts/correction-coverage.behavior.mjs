@@ -328,6 +328,20 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
   assert.equal(readFileSync(path, 'utf8'), before, 'unresolved guard leaves ledger untouched');
   writeFileSync(join(root, guard.path), anchor);
   git(['add', guard.path]);
+  git(['config', 'color.ui', 'always']);
+  for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
+    writeFileSync(join(root, guard.path), `${anchor}\n${marker}\n`);
+    git(['add', guard.path]);
+    writeFileSync(join(root, guard.path), anchor);
+    const index = git(['ls-files', '--stage']);
+    assert.throws(
+      () => runCoverage(['--merge-ledger'], { root, env: {} }),
+      /ledger merge: resolve staged conflict markers first/,
+    );
+    assert.equal(git(['ls-files', '--stage']), index, 'refusal preserves the colored index');
+    assert.equal(readFileSync(path, 'utf8'), before, 'refusal preserves the repaired ledger');
+  }
+  git(['add', guard.path]);
   stages[2] = [];
   stage();
   writeFileSync(path, marker);

@@ -12,6 +12,7 @@
 
     # Use manual signing with the sigh profile
     update_code_signing_settings(
+      targets: ["LogYourBody"],
       use_automatic_signing: false,
       team_id: ENV["APPLE_TEAM_ID"],
       bundle_identifier: ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
@@ -128,9 +129,23 @@
     bundle_identifier = ENV["APP_IDENTIFIER"] || "com.logyourbody.app"
     release_profile = ENV["PROVISIONING_PROFILE_SPECIFIER"].to_s
     release_profile = "match AppStore com.logyourbody.app 1780400349" if release_profile.empty?
+    rest_bundle_identifier = "#{bundle_identifier}.rest-timer"
+    rest_profile = ENV["REST_TIMER_PROVISIONING_PROFILE_SPECIFIER"].to_s
+    rest_profile = "match AppStore #{rest_bundle_identifier}" if rest_profile.empty?
 
     if ENV["MATCH_GIT_URL"] && ENV["MATCH_PASSWORD"]
       setup_provisioning(type: "appstore", readonly: true)
+    end
+
+    # Each embedded executable requires its own profile. A command-line profile override
+    # would also apply the app profile to the extension and make the archive unsignable.
+    { "LogYourBody" => [bundle_identifier, release_profile],
+      "LogYourBodyRestTimer" => [rest_bundle_identifier, rest_profile] }.each do |target, (identifier, profile)|
+      update_code_signing_settings(
+        path: project, targets: [target], use_automatic_signing: false,
+        team_id: ENV["APPLE_TEAM_ID"], bundle_identifier: identifier,
+        profile_name: profile, code_sign_identity: "Apple Distribution"
+      )
     end
 
     build_app(
@@ -142,7 +157,8 @@
       export_options: {
         teamID: ENV["APPLE_TEAM_ID"],
         provisioningProfiles: {
-          bundle_identifier => release_profile
+          bundle_identifier => release_profile,
+          rest_bundle_identifier => rest_profile
         },
         compileBitcode: false,
         uploadBitcode: false,
@@ -156,7 +172,7 @@
       disable_package_automatic_updates: true,
       cloned_source_packages_path: "SourcePackages",
       skip_profile_detection: true,
-      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM='#{ENV["APPLE_TEAM_ID"]}' CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='#{release_profile}' PROVISIONING_PROFILE=''"
+      xcargs: "-allowProvisioningUpdates DEVELOPMENT_TEAM='#{ENV["APPLE_TEAM_ID"]}' CODE_SIGN_STYLE=Manual"
     )
 
     # The production release path (build_release -> upload_testflight) never uploaded dSYMs,
@@ -335,7 +351,8 @@
         # Build match parameters
         match_params = {
           type: match_type,
-          app_identifier: [ENV["APP_IDENTIFIER"] || "com.logyourbody.app"],
+          app_identifier: [ENV["APP_IDENTIFIER"] || "com.logyourbody.app",
+                           "#{ENV["APP_IDENTIFIER"] || "com.logyourbody.app"}.rest-timer"],
           readonly: readonly,
           git_url: ENV["MATCH_GIT_URL"],
           git_branch: ENV["MATCH_GIT_BRANCH"].to_s.empty? ? "main" : ENV["MATCH_GIT_BRANCH"],
