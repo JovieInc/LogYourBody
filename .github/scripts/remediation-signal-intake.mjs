@@ -61,6 +61,7 @@ async function main() {
   }
   const recurrence = await runCorrectionRecurrence({
     env, eventName: env.GITHUB_EVENT_NAME, event: readGithubEvent(env),
+    dryRun: false,
   });
   console.log(JSON.stringify({ correctionRecurrence: recurrence }));
   if (!recurrence.ok) {
