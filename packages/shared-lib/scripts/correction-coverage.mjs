@@ -1,7 +1,19 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { posix, resolve } from 'node:path';
+import {
+  appendFileSync,
+  closeSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  readSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, posix, resolve } from 'node:path';
+import { StringDecoder } from 'node:string_decoder';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { planCorrectionIssues } from './correction-recurrence.mjs';
@@ -254,6 +266,54 @@ export function renderCoverage(report) {
   ].join('\n');
 }
 
+function stagedDiffHasConflictMarker(root) {
+  // A merge can import more than execFileSync's pipe limit. Spool the diff and
+  // scan bounded chunks, retaining only the current added-line marker prefix.
+  const directory = mkdtempSync(join(tmpdir(), 'lyb-ledger-diff-'));
+  let fd;
+  try {
+    fd = openSync(join(directory, 'staged.diff'), 'w+', 0o600);
+    execFileSync(
+      'git',
+      ['diff', '--cached', '--no-ext-diff', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+      { cwd: root, stdio: ['ignore', fd, 'pipe'] },
+    );
+    const buffer = Buffer.alloc(64 * 1024);
+    const decoder = new StringDecoder('utf8');
+    let state = 'start';
+    let marker = '';
+    let count = 0;
+    let position = 0;
+    for (;;) {
+      const bytes = readSync(fd, buffer, 0, buffer.length, position);
+      position += bytes;
+      const chunk = bytes ? decoder.write(buffer.subarray(0, bytes)) : decoder.end();
+      for (const character of chunk) {
+        if ('\n\r\u2028\u2029'.includes(character)) {
+          if (state === 'marker' && count >= 7) return true;
+          state = 'start';
+        } else if (state === 'start') {
+          state = character === '+' ? 'added' : 'skip';
+        } else if (state === 'added') {
+          marker = character;
+          count = 1;
+          state = '<|=>'.includes(character) ? 'marker' : 'skip';
+        } else if (state === 'marker') {
+          if (character === marker) count = Math.min(count + 1, 7);
+          else {
+            if (character === ' ' && count >= 7) return true;
+            state = 'skip';
+          }
+        }
+      }
+      if (!bytes) return state === 'marker' && count >= 7;
+    }
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 export function assertLedgerMergeReady(root) {
   const otherConflicts = execFileSync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
     cwd: root,
@@ -267,15 +327,10 @@ export function assertLedgerMergeReady(root) {
     0,
     `ledger merge: resolve other conflicts first: ${otherConflicts.join(', ')}`,
   );
-  const staged = execFileSync(
-    'git',
-    ['diff', '--cached', '--no-ext-diff', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
-    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-  );
   // Staging a file does not prove its conflict markers were resolved.
-  assert.doesNotMatch(
-    staged,
-    /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,
+  assert.equal(
+    stagedDiffHasConflictMarker(root),
+    false,
     'ledger merge: resolve staged conflict markers first',
   );
 }

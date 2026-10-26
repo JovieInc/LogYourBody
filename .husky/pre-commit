@@ -1,6 +1,6 @@
 echo "Husky: running pre-commit (lint-staged)..."
 
-pnpm exec lint-staged
+node scripts/pre-commit-lint.mjs || exit $?
 
 # Validate staged immutable Jovie imports after all normal lint/format tasks.
 node scripts/check-jovie-imports.mjs --staged

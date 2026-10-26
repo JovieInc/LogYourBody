@@ -113,6 +113,9 @@ jobs:
       - name: Test release check enclosing budget
         run: node --test .github/scripts/release-check-budget.test.mjs
 
+      - name: Test merge-aware local lint scope
+        run: node --test scripts/pre-commit-lint.test.mjs
+
       - name: Verify repository merge queue policy
         run: node --test .github/scripts/verify-merge-queue-policy.test.mjs
 

@@ -1589,5 +1589,41 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-imports-local-lint-scope",
+    "correction": "PR #1481: merging current main into a dependency-only branch selected hundreds of already-integrated files for pre-commit lint, requiring SwiftLint on a Linux web repair and preventing source publication. Check the real branch and resolution delta when importing verified main.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1481",
+    "mechanization": "The existing pre-commit hook uses a merge-aware lint-staged wrapper. For a single incoming fetched-main ancestor it compares that commit with the immutable index tree, retaining branch changes and conflict resolutions while excluding identical imported main files. Ordinary and unverified merges keep full staged checks, unresolved indexes fail closed, and lint failures propagate. Required Detect Changes runs real Git fixture tests for imported native source, resolution edits, unstaged edits, fallback, conflicts and failure propagation.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The local hook can derive the exact reviewed merge source delta without changing hosted CI, native test requirements or merge queue gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/pre-commit-lint.mjs",
+      "anchor": "Only a fetched main ancestor can supply already-integrated source."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-large-merge-diff",
+    "correction": "PR #1535: correction-ledger merge readiness crashed with spawnSync git ENOBUFS after integrating a large main diff, preventing an otherwise valid repair from preserving its correction receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Stream the complete staged Git diff through an owner-private temporary file and inspect bounded UTF-8 chunks for added conflict-marker lines. Preserve all existing marker boundary semantics and fail closed on Git/read errors; remove the spool on all exits. The existing required correction-coverage behavior suite checks a diff larger than the former pipe limit, all four trailing marker variants, and ordinary marker-like text.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Bounded streaming preserves the full marker guard while removing a size-dependent failure from large main integrations."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.behavior.mjs",
+      "anchor": "merge readiness scans large staged imports and still rejects trailing conflict markers"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

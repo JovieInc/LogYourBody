@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  assertLedgerMergeReady,
   assertNoRegression,
   coverageReport,
   LEDGER_PATH,
@@ -160,6 +161,42 @@ function fixtureRepo(t, receipts) {
   return { root, ref: git(['rev-parse', 'HEAD']) };
 }
 
+test('merge readiness scans large staged imports and still rejects trailing conflict markers', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const source = join(root, 'large-source.txt');
+  const content = 'already reviewed upstream source\n'.repeat(50_000);
+  const stage = (suffix, prefix = content) => {
+    writeFileSync(source, prefix + suffix);
+    execFileSync('git', ['add', 'large-source.txt'], { cwd: root });
+  };
+  stage('resolved source\n');
+  assert.doesNotThrow(() => assertLedgerMergeReady(root));
+  for (const marker of ['<<<<<<< ours', '||||||| base', '=======', '>>>>>>>> theirs']) {
+    stage(marker + '\n');
+    assert.throws(() => assertLedgerMergeReady(root), /resolve staged conflict markers/);
+  }
+  stage('=======ordinary content\n');
+  assert.doesNotThrow(() => assertLedgerMergeReady(root));
+
+  // Position a marker across a 64KiB scanner boundary, including the diff header.
+  stage('<<<<<<< ours\n', 'x\n');
+  const initialDiff = execFileSync('git', ['diff', '--cached', '--no-ext-diff', '--unified=0'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  const markerOffset = initialDiff.indexOf('+<<<<<<< ours');
+  assert.ok(markerOffset > 0);
+  stage('<<<<<<< ours\n', 'x'.repeat(1 + 64 * 1024 - 4 - markerOffset) + '\n');
+  assert.throws(() => assertLedgerMergeReady(root), /resolve staged conflict markers/);
+
+  // Neither a giant ordinary line nor a marker run needs unbounded retained text.
+  const giantLine = 'x'.repeat(2 * 1024 * 1024) + '\n';
+  stage('resolved source\n', giantLine);
+  assert.doesNotThrow(() => assertLedgerMergeReady(root));
+  stage('||||||| base\n', giantLine);
+  assert.throws(() => assertLedgerMergeReady(root), /resolve staged conflict markers/);
+});
+
 test('ledger merge retains independent receipts and one-sided edits without mutating inputs', () => {
   const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
   const base = [row('kept')];
@@ -248,7 +285,10 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
     ['update-index', '--index-info'],
     [1, 2, 3].map((index) => `100644 ${blob} ${index}\t${guard.path}\n`).join(''),
   );
-  writeFileSync(join(root, guard.path), `<<<<<<< ours\n${anchor}\n=======\n${anchor}\n>>>>>>> theirs\n`);
+  writeFileSync(
+    join(root, guard.path),
+    `<<<<<<< ours\n${anchor}\n=======\n${anchor}\n>>>>>>> theirs\n`,
+  );
   assert.throws(
     () => runCoverage(['--merge-ledger'], { root, env: {} }),
     /ledger merge: resolve other conflicts first: guard.mjs/,
