@@ -9,6 +9,7 @@ enum HealthKitDefaultsKey: String {
     case authorizationConfirmed = "hasConfirmedHealthKitAuthorization"
     case readProbeRecord = "healthKitReadProbeRecord"
     case lastObserverSyncDate = "lastHealthKitObserverSyncDate"
+    case lastSuccessfulSync = "lastSuccessfulHealthKitMetricSourceSync"
     case fullSyncCompleted = "hasPerformedFullHealthKitSync"
     case smartScaleWeightAnchor = "healthKitSmartScaleWeightAnchor"
     case smartScaleBodyFatAnchor = "healthKitSmartScaleBodyFatAnchor"
@@ -251,6 +252,7 @@ class HealthKitManager: ObservableObject {
     var anchoredSampleQuery: ((HealthAnchorSampleKind, Data?) async throws -> HealthAnchoredSamplePage)?
     /// Tests replace the per-day step total used when an anchored step page names a day.
     var stepDayTotalQuery: ((Date) async throws -> Int?)?
+    var metricSourceSyncGuard: @MainActor () throws -> Void = {}
 
     init(
         userDefaults: UserDefaults = .standard,

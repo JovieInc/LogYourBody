@@ -46,10 +46,11 @@ extension HealthKitManager {
         let committed = try await commitAnchoredBodyMetrics(
             weightPage, bodyFatPage: bodyFatPage, ownership: ownership
         )
-        guard committed else { return }
+        guard committed else { throw HealthKitError.syncFailed }
         let store = anchorStore()
         store.advance(weightPage.newAnchor, for: .weight, userId: userId, commitSucceeded: true)
         store.advance(bodyFatPage.newAnchor, for: .bodyFat, userId: userId, commitSucceeded: true)
+        await recordSuccessfulMetricSourceSync(for: ownership)
     }
 
     func commitAnchoredBodyMetrics(
@@ -68,11 +69,13 @@ extension HealthKitManager {
             )
         }
         if !weightSamples.isEmpty || !bodyFatSamples.isEmpty {
-            let result = await processBatchHealthKitData(
-                weightHistory: weightSamples, bodyFatHistory: bodyFatSamples, ownership: ownership
+            var batchFailed = false
+            _ = await processBatchHealthKitData(
+                weightHistory: weightSamples, bodyFatHistory: bodyFatSamples, ownership: ownership,
+                onFailure: { batchFailed = true }
             )
             try await requireImportOwnership(ownership)
-            if result.failed > 0 { return false }
+            if batchFailed { return false }
         }
         return try await applyAnchoredBodyMetricDeletions(
             weightPage.deleted + bodyFatPage.deleted, ownership: ownership

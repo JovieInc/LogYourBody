@@ -53,7 +53,7 @@ final class HealthSyncPipelineAnchoredFetchTests: XCTestCase {
         store.advance(Data([7]), for: .bodyFat, userId: userId, commitSucceeded: true)
 
         manager.scheduleObservedBodyMetricSync(for: userId, debounce: 0.05)
-        try await waitUntil(probe.recorded().count >= 2)
+        try await waitUntil(store.anchor(for: .bodyFat, userId: userId) == Data([8]))
         manager.syncDebounceTimer?.invalidate()
 
         let requestedAnchors = probe.recorded().map(\.1)
@@ -61,6 +61,25 @@ final class HealthSyncPipelineAnchoredFetchTests: XCTestCase {
         XCTAssertEqual(weightQueries, 0)
         XCTAssertEqual(store.anchor(for: .weight, userId: userId), Data([8]))
         XCTAssertEqual(store.anchor(for: .bodyFat, userId: userId), Data([8]))
+    }
+
+    func testAnchoredWeightSyncRecordsSuccessfulCompletion() async throws {
+        let userId = "anchor-completion-\(UUID().uuidString)"
+        let probe = AnchoredSampleFetchProbe()
+        let manager = try makeManager(userId: userId, probe: probe)
+        let store = HealthAnchorStore(defaults: defaults)
+        store.advance(Data([7]), for: .weight, userId: userId, commitSucceeded: true)
+        store.advance(Data([7]), for: .bodyFat, userId: userId, commitSucceeded: true)
+        let initialSync = await manager.lastSuccessfulSync
+        XCTAssertNil(initialSync)
+
+        try await manager.syncWeightFromHealthKit()
+
+        let completed = await manager.lastSuccessfulSync
+        XCTAssertNotNil(completed)
+        XCTAssertEqual(store.anchor(for: .weight, userId: userId), Data([9]))
+        XCTAssertEqual(store.anchor(for: .bodyFat, userId: userId), Data([9]))
+        XCTAssertEqual(weightQueries, 0)
     }
 
     func testFailedCommitDoesNotAdvanceTheStoredAnchor() async throws {
@@ -78,8 +97,16 @@ final class HealthSyncPipelineAnchoredFetchTests: XCTestCase {
         let store = HealthAnchorStore(defaults: defaults)
         store.advance(Data([7]), for: .weight, userId: userId, commitSucceeded: true)
         store.advance(Data([7]), for: .bodyFat, userId: userId, commitSucceeded: true)
+        let previousSync = Date(timeIntervalSince1970: 123)
+        defaults.set(previousSync, forKey: HealthKitDefaultsKey.lastSuccessfulSync.scoped(with: userId))
 
-        try await manager.importAnchoredBodyMetrics()
+        do {
+            try await manager.syncWeightFromHealthKit()
+            XCTFail("An anchored persistence failure must fail the sync")
+        } catch HealthKitError.syncFailed {
+            let afterFailure = await manager.lastSuccessfulSync
+            XCTAssertEqual(afterFailure, previousSync)
+        }
 
         XCTAssertFalse(probe.recorded().isEmpty)
         XCTAssertEqual(store.anchor(for: .weight, userId: userId), Data([7]))

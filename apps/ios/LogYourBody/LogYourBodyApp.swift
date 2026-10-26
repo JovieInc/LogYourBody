@@ -5,6 +5,7 @@
 import SwiftUI
 import AppIntents
 import CoreData
+import UIKit
 
 enum LogYourBodyDeepLink {
     enum Destination: Equatable {
@@ -223,6 +224,11 @@ struct LogYourBodyApp: App {
         LaunchMetrics.begin()
         LogYourBodyAppShortcuts.updateAppShortcutParameters()
         #if DEBUG
+        // Replay fixtures verify terminal states and identity, independently of
+        // animation timing. iOS 26 can leave XCTest waiting 60s per transition.
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestChatReplayFixture") {
+            UIView.setAnimationsEnabled(false)
+        }
         FrameHitchMonitor.shared.start()
         #endif
     }
@@ -234,6 +240,12 @@ struct LogYourBodyApp: App {
                 appContent
 #if DEBUG
                 .modifier(UITestViewportModifier())
+                .transaction { transaction in
+                    if ProcessInfo.processInfo.arguments.contains("-lybUITestChatReplayFixture") {
+                        transaction.animation = nil
+                        transaction.disablesAnimations = true
+                    }
+                }
 #endif
                 .environment(\.managedObjectContext, persistenceController.viewContext)
                 .environmentObject(authManager)
@@ -348,6 +360,7 @@ struct LogYourBodyApp: App {
         scheduleDeferredMaintenance()
 
         AppServicePorts.errorTracker.start()
+        ErrorTrackingService.shared.updateUserId(authManager.currentUser?.id)
 
         AppServicePorts.analyticsTracker.start()
         AppServicePorts.analyticsTracker.track(event: "app_open")
