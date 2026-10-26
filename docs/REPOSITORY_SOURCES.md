@@ -26,7 +26,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `06ee02d964e6aa3f4b01b00a39a0112d2296b0dc2a213ba1873d437bf0b302ae`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
-- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
+- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
 - `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `dd323f3ea0204109819f935290edeb15d73ccb20d8c04ca3ad234cbbee51aad7`)
 
