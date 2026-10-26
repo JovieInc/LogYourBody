@@ -18,6 +18,7 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
 
     private enum SetUpError: Error {
         case storeKitConfigurationMissing
+        case storeKitStateDidNotSettle
     }
 
     private static func session() throws -> SKTestSession {
@@ -33,37 +34,41 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         let session = try Self.session()
-        await warmUpStoreKitTestSession(session)
+        try await warmUpStoreKitTestSession(session)
         try await resetToCleanStoreKitState(session)
     }
 
     override func tearDown() async throws {
         if let session = Self.sharedSession {
-            session.clearTransactions()
-            session.resetToDefaultState()
+            try await resetToCleanStoreKitState(session)
         }
         try await super.tearDown()
     }
 
-    /// Reset the shared session, then wait (bounded) until StoreKit really reports no transactions or entitlements
-    /// before the test starts, so one test's cleanup can never land inside the next test. This is a readiness
-    /// gate, not an assertion: a state that never settles fails the test with a clear message.
+    /// Delete only existing transaction IDs, then wait for both StoreKit views of history to empty.
+    /// Repeated global clears can race a later purchase; scoped deletion cannot erase a future transaction.
     private func resetToCleanStoreKitState(_ session: SKTestSession) async throws {
+        session.resetToDefaultState()
+        session.disableDialogs = true
+        session.timeRate = .realTime
+        for transaction in session.allTransactions() {
+            // Deleting an original transaction also removes its restored/renewal children.
+            guard session.allTransactions().contains(where: { $0.identifier == transaction.identifier }) else { continue }
+            try session.deleteTransaction(identifier: transaction.identifier)
+        }
         for _ in 0..<50 {
-            session.resetToDefaultState()
-            session.clearTransactions()
-            if session.allTransactions().isEmpty, !(await hasStoreKitEntitlement()) {
-                session.disableDialogs = true
-                session.timeRate = .realTime
+            if session.allTransactions().isEmpty, !(await hasStoreKitHistory()) {
                 return
             }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         XCTFail("StoreKit test session did not reach a clean state within 5 seconds")
+        throw SetUpError.storeKitStateDidNotSettle
     }
 
-    private func hasStoreKitEntitlement() async -> Bool {
-        for await _ in StoreKit.Transaction.currentEntitlements { return true }
+    private func hasStoreKitHistory() async -> Bool {
+        // Expired/refunded transactions are absent from currentEntitlements but still need cleanup.
+        for await _ in StoreKit.Transaction.all { return true }
         return false
     }
 
@@ -73,16 +78,10 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
     /// purchase before the real lifecycle checks, retrying only this warm-up (at most `warmUpMaxRetries` times)
     /// and surfacing every retry as a warning. It asserts nothing, so a real StoreKit failure still fails the
     /// lifecycle tests below, which are unchanged.
-    private func warmUpStoreKitTestSession(_ session: SKTestSession) async {
+    private func warmUpStoreKitTestSession(_ session: SKTestSession) async throws {
         guard !Self.storeKitWarmedUp else { return }
-        session.resetToDefaultState()
-        session.clearTransactions()
-        session.disableDialogs = true
-        defer {
-            session.clearTransactions()
-            session.resetToDefaultState()
-        }
         for attempt in 0...Self.warmUpMaxRetries {
+            try await resetToCleanStoreKitState(session)
             var failure = "no purchase result"
             do {
                 let products = try await Product.products(for: [ProductRegistry.Paywall.annualProductID])
@@ -104,9 +103,6 @@ final class StoreKitPurchaseRestoreTests: XCTestCase {
             } catch {
                 failure = "purchase threw: \(error)"
             }
-            session.clearTransactions()
-            session.resetToDefaultState()
-            session.disableDialogs = true
             let attempts = Self.warmUpMaxRetries + 1
             NSLog("%@", "::warning::STOREKIT_WARMUP_RETRY attempt \(attempt + 1)/\(attempts): \(failure)")
             try? await Task.sleep(nanoseconds: 2_000_000_000)

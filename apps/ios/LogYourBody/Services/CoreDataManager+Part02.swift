@@ -131,12 +131,111 @@ func fetchVisibleBodyMetrics(
 
 // MARK: - HealthKit Raw Sample Operations
 
-    func hkSampleExists(hkUUID: String) async -> Bool {
+    /// Identity lookup, admission and mutation share one context turn. Include
+    /// tombstones so an anchor reset cannot resurrect a deliberately deleted import.
+    func saveHealthKitBodyMetricsAndWait(
+        _ metric: BodyMetrics, allowStandaloneBodyFat: Bool = true, writeAdmission: @escaping WriteAdmission
+    ) async throws {
+        let context = viewContext
+        try await context.perform {
+            try MainActor.assumeIsolated { try writeAdmission() }
+            guard let incoming = metric.sourceMetadata, incoming.healthKitSampleKey != nil else {
+                throw HealthKitImportIdentityError.alreadyRecorded
+            }
+            let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
+            let recordID = incoming.healthKitRecordID(userId: metric.userId) ?? metric.id
+            var identities = [incoming.sampleId, incoming.healthKitContext["sync_identifier"]].compactMap { $0 }
+            identities.append(recordID)
+            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "userId == %@ AND dataSource == %@", metric.userId, BodyMetricSource.healthKit.rawValue),
+                NSCompoundPredicate(orPredicateWithSubpredicates: identities.map {
+                    // Match the stored JSON representation even for quoted/escaped sync IDs.
+                    NSPredicate(
+                        format: "sourceMetadataJSON CONTAINS %@ OR id == %@",
+                        BodyMetricSourceMetadata.jsonFragment(for: $0), $0
+                    )
+                })
+            ])
+            let rows = try context.fetch(request)
+            let match = rows.first { row in
+                guard let metadata = BodyMetricSourceMetadata(jsonString: row.sourceMetadataJSON) else { return false }
+                return Self.matchesHealthKitImport(incoming, previous: metadata) ||
+                    (metric.weight == nil && metadata.pairedHealthKitBodyFat.map {
+                        Self.matchesHealthKitImport(incoming, previous: $0)
+                    } == true)
+            }
+            if match == nil, rows.contains(where: { $0.id == recordID }) {
+                // Corrupt provenance must not create a second row with the same stable ID.
+                throw HealthKitImportIdentityError.alreadyRecorded
+            }
+            if match == nil, metric.weight == nil, !allowStandaloneBodyFat {
+                throw HealthKitImportIdentityError.alreadyRecorded
+            }
+            let cached = match ?? CachedBodyMetrics(context: context)
+            let previous = BodyMetricSourceMetadata(jsonString: cached.sourceMetadataJSON)
+            let editsPairedFat = metric.weight == nil && previous?.pairedHealthKitBodyFat.map {
+                Self.matchesHealthKitImport(incoming, previous: $0)
+            } == true
+            let priorSample = editsPairedFat ? previous?.pairedHealthKitBodyFat : previous
+            if let priorSample {
+                guard !cached.isMarkedDeleted, priorSample.sampleId != incoming.sampleId,
+                      !priorSample.replacedHealthKitSampleIDs.contains(incoming.sampleId ?? ""),
+                      incoming.healthKitSyncVersion >= priorSample.healthKitSyncVersion else {
+                    throw HealthKitImportIdentityError.alreadyRecorded
+                }
+            }
+            var metadata = priorSample.map { incoming.replacingHealthKitSample($0) } ?? incoming
+            if match == nil {
+                cached.id = recordID
+                cached.userId = metric.userId
+                cached.createdAt = metric.createdAt
+                cached.dataSource = BodyMetricSource.healthKit.rawValue
+                cached.notes = metric.notes
+            }
+            if editsPairedFat, let previous {
+                metadata = previous.pairingHealthKitBodyFat(metadata)
+            } else {
+                cached.date = metric.date
+                cached.localDate = metric.localDate
+                if let weight = metric.weight, previous?.entrySource(for: .weight) != .manual {
+                    cached.weight = weight
+                    cached.weightUnit = metric.weightUnit
+                }
+                if metadata.pairedHealthKitBodyFat == nil, let paired = previous?.pairedHealthKitBodyFat {
+                    metadata = metadata.pairingHealthKitBodyFat(paired)
+                }
+                metadata = metadata.restoringEntrySources(from: previous, fields: Set(BodyMetricField.allCases))
+            }
+            if let fat = metric.bodyFatPercentage, previous?.entrySource(for: .bodyFat) != .manual {
+                cached.bodyFatPercentage = fat
+                cached.bodyFatMethod = metric.bodyFatMethod
+            }
+            cached.sourceMetadataJSON = metadata.jsonString
+            cached.updatedAt = metric.updatedAt
+            cached.lastModified = Date()
+            cached.isSynced = false
+            cached.syncStatus = "pending"
+            try context.save()
+        }
+    }
+
+    private static func matchesHealthKitImport(
+        _ incoming: BodyMetricSourceMetadata, previous: BodyMetricSourceMetadata
+    ) -> Bool {
+        guard incoming.sourceBundleId == previous.sourceBundleId else { return false }
+        return incoming.healthKitSampleKey == previous.healthKitSampleKey ||
+            previous.replacedHealthKitSampleIDs.contains(incoming.sampleId ?? "") ||
+            (incoming.healthKitSyncKey != nil && incoming.healthKitSyncKey == previous.healthKitSyncKey)
+    }
+
+    func hkSampleExists(hkUUID: String, sourceBundleId: String, userId: String) async -> Bool {
         let context = viewContext
 
         return await context.perform {
             let request: NSFetchRequest<CachedHKSample> = CachedHKSample.fetchRequest()
-            request.predicate = NSPredicate(format: "hkUUID == %@", hkUUID)
+            request.predicate = NSPredicate(
+                format: "hkUUID == %@ AND sourceBundleId == %@ AND userId == %@", hkUUID, sourceBundleId, userId
+            )
             request.fetchLimit = 1
 
             do {
@@ -157,58 +256,90 @@ func saveHKSample(_ sample: HKRawSample) async {
 func saveHKSamples(_ samples: [HKRawSample]) async {
         guard !samples.isEmpty else { return }
 
-        let context = persistentContainer.newBackgroundContext()
+        // Keep raw imports off the main queue while serializing lookup and save.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            saveQueue.async {
+                let context = self.persistentContainer.newBackgroundContext()
+                context.performAndWait {
+                    for sample in samples {
+                        let request: NSFetchRequest<CachedHKSample> = CachedHKSample.fetchRequest()
+                        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                            NSPredicate(format: "userId == %@ AND quantityType == %@", sample.userId, sample.quantityType),
+                            sample.sourceBundleId.map { NSPredicate(format: "sourceBundleId == %@", $0) }
+                                ?? NSPredicate(format: "sourceBundleId == nil")
+                        ])
+                        let syncID = sample.metadata?[HKMetadataKeySyncIdentifier].flatMap { $0.isEmpty ? nil : $0 }
+                        let existing = (try? context.fetch(request))?.first { row in
+                            if row.hkUUID == sample.hkUUID { return true }
+                            guard let syncID, let data = row.metadataJSON,
+                                  let metadata = try? JSONDecoder().decode([String: String].self, from: data) else {
+                                return false
+                            }
+                            return metadata[HKMetadataKeySyncIdentifier] == syncID ||
+                                metadata["LYBReplacedSampleUUIDs"]?.components(separatedBy: ",").contains(sample.hkUUID) == true
+                        }
 
-        await context.perform {
-            for sample in samples {
-                let request: NSFetchRequest<CachedHKSample> = CachedHKSample.fetchRequest()
-                request.predicate = NSPredicate(format: "hkUUID == %@ AND userId == %@", sample.hkUUID, sample.userId)
-                request.fetchLimit = 1
+                        let cached: CachedHKSample
+                        var metadata = sample.metadata ?? [:]
 
-                let cached: CachedHKSample
+                        if let existing {
+                            if existing.hkUUID == sample.hkUUID { continue }
+                            let prior = existing.metadataJSON.flatMap {
+                                try? JSONDecoder().decode([String: String].self, from: $0)
+                            } ?? [:]
+                            let retired = (prior["LYBReplacedSampleUUIDs"] ?? "").components(separatedBy: ",")
+                            guard !retired.contains(sample.hkUUID),
+                                  (Int(metadata[HKMetadataKeySyncVersion] ?? "") ?? 0) >=
+                                    (Int(prior[HKMetadataKeySyncVersion] ?? "") ?? 0) else { continue }
+                            metadata["LYBReplacedSampleUUIDs"] = (retired + [existing.hkUUID].compactMap { $0 })
+                                .filter { !$0.isEmpty }.joined(separator: ",")
+                            cached = existing
+                        } else {
+                            cached = CachedHKSample(context: context)
+                            cached.id = BodyMetricSourceMetadata(
+                                sourceBundleId: sample.sourceBundleId, sampleId: sample.hkUUID, quantityType: sample.quantityType
+                            ).recordingHealthKitContext([
+                                "sync_identifier": syncID ?? ""
+                            ]).healthKitRecordID(userId: sample.userId) ?? sample.id
+                            cached.createdAt = sample.createdAt
+                        }
 
-                if let existing = try? context.fetch(request).first {
-                    cached = existing
-                } else {
-                    cached = CachedHKSample(context: context)
-                    cached.id = sample.id
-                    cached.hkUUID = sample.hkUUID
-                    cached.createdAt = sample.createdAt
+                        cached.hkUUID = sample.hkUUID
+                        cached.userId = sample.userId
+                        cached.quantityType = sample.quantityType
+                        cached.value = sample.value
+                        cached.unit = sample.unit
+                        cached.startDate = sample.startDate
+                        cached.endDate = sample.endDate
+                        cached.sourceName = sample.sourceName
+                        cached.sourceBundleId = sample.sourceBundleId
+                        cached.deviceManufacturer = sample.deviceManufacturer
+                        cached.deviceModel = sample.deviceModel
+                        cached.deviceHardwareVersion = sample.deviceHardwareVersion
+                        cached.deviceFirmwareVersion = sample.deviceFirmwareVersion
+                        cached.deviceSoftwareVersion = sample.deviceSoftwareVersion
+                        cached.deviceLocalIdentifier = sample.deviceLocalIdentifier
+                        cached.deviceUDI = sample.deviceUDI
+                        cached.updatedAt = sample.updatedAt
+
+                        if !metadata.isEmpty, let data = try? JSONEncoder().encode(metadata) {
+                            cached.metadataJSON = data
+                        } else {
+                            cached.metadataJSON = nil
+                        }
+                    }
+
+                    do {
+                        if context.hasChanges {
+                            try context.save()
+                        }
+                    } catch {
+                        #if DEBUG
+                        // print("Failed to save HK samples: \\(error)")
+                        #endif
+                    }
                 }
-
-                cached.userId = sample.userId
-                cached.quantityType = sample.quantityType
-                cached.value = sample.value
-                cached.unit = sample.unit
-                cached.startDate = sample.startDate
-                cached.endDate = sample.endDate
-                cached.sourceName = sample.sourceName
-                cached.sourceBundleId = sample.sourceBundleId
-                cached.deviceManufacturer = sample.deviceManufacturer
-                cached.deviceModel = sample.deviceModel
-                cached.deviceHardwareVersion = sample.deviceHardwareVersion
-                cached.deviceFirmwareVersion = sample.deviceFirmwareVersion
-                cached.deviceSoftwareVersion = sample.deviceSoftwareVersion
-                cached.deviceLocalIdentifier = sample.deviceLocalIdentifier
-                cached.deviceUDI = sample.deviceUDI
-                cached.updatedAt = sample.updatedAt
-
-                if let metadata = sample.metadata,
-                   let data = try? JSONEncoder().encode(metadata) {
-                    cached.metadataJSON = data
-                } else {
-                    cached.metadataJSON = nil
-                }
-            }
-
-            do {
-                if context.hasChanges {
-                    try context.save()
-                }
-            } catch {
-                #if DEBUG
-                // print("Failed to save HK samples: \\(error)")
-                #endif
+                continuation.resume()
             }
         }
     }

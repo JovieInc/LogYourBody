@@ -8,6 +8,7 @@ import 'server-only';
 
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import type {
+  NativeBodyMetricConflict,
   NativeBodyMetricPushInput,
   NativeBodyMetricSyncRecord,
   NativeBodyMetricsSyncPort,
@@ -170,49 +171,136 @@ export function createNeonNativeBodyMetricsSync(
   ) {
     const accepted: NativeBodyMetricSyncRecord[] = [];
     const rejectedIds: string[] = [];
+    const conflicts: NativeBodyMetricConflict[] = [];
     const queries: NativeMutationQuery[] = [];
     const submittedIds: string[] = [];
 
     for (const record of records) {
       queries.push(
         database.query(
-          `insert into public.body_metrics (
-             id, user_subject, date, measured_at, local_date, origin,
-             weight, weight_unit, body_fat_percentage, body_fat_method,
-             muscle_mass, bone_mass, waist, hip, waist_unit, notes, photo_url,
-             data_source, source_metadata, client_created_at, client_updated_at,
-             deleted_at, is_excluded, corrected_value
-           ) values (
-             $1, $2, $3::date, $4::timestamptz, $3::date, 'native',
-             $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-             $16, $17::jsonb, $18::timestamptz, $19::timestamptz, null, coalesce($20, false), $21::jsonb
+          `with incoming as (
+             select
+               $1::uuid as id,
+               $2::text as user_subject,
+               $3::date as local_date,
+               $4::timestamptz as measured_at,
+               $5::numeric as weight,
+               $6::text as weight_unit,
+               $7::numeric as body_fat_percentage,
+               $8::text as body_fat_method,
+               $9::numeric as muscle_mass,
+               $10::numeric as bone_mass,
+               $11::numeric as waist,
+               $12::numeric as hip,
+               $13::text as waist_unit,
+               $14::text as notes,
+               $15::text as photo_url,
+               $16::text as data_source,
+               $17::jsonb as source_metadata,
+               $18::timestamptz as client_created_at,
+               $19::timestamptz as client_updated_at,
+               $20::boolean as is_excluded,
+               $21::jsonb as corrected_value,
+               $22::boolean as has_corrected_value
+           ),
+           current_row as (
+             select user_subject, ${columns}
+             from public.body_metrics
+             where id = (select id from incoming)
+           ),
+           decision as (
+             select case
+               when current_row.id is null then 'insert'
+               when current_row.user_subject is distinct from incoming.user_subject then 'foreign'
+               when current_row.deleted_at is not null then 'tombstone'
+               when incoming.client_updated_at > current_row.client_updated_at then 'accept'
+               when current_row.weight is not distinct from incoming.weight
+                 and current_row.weight_unit is not distinct from incoming.weight_unit
+                 and current_row.measured_at is not distinct from incoming.measured_at
+                 and current_row.local_date is not distinct from incoming.local_date
+                 and (incoming.is_excluded is null or current_row.is_excluded is not distinct from incoming.is_excluded)
+                 and (not incoming.has_corrected_value or current_row.corrected_value is not distinct from incoming.corrected_value) then 'replay'
+               when current_row.client_updated_at > incoming.client_updated_at then 'stale_write'
+               else 'payload_conflict'
+             end as outcome
+             from incoming
+             left join current_row on true
+           ),
+           upserted as (
+             insert into public.body_metrics (
+               id, user_subject, date, measured_at, local_date, origin,
+               weight, weight_unit, body_fat_percentage, body_fat_method,
+               muscle_mass, bone_mass, waist, hip, waist_unit, notes, photo_url,
+               data_source, source_metadata, client_created_at, client_updated_at,
+               deleted_at, is_excluded, corrected_value
+             )
+             select
+               incoming.id, incoming.user_subject, incoming.local_date, incoming.measured_at,
+               incoming.local_date, 'native',
+               incoming.weight, incoming.weight_unit, incoming.body_fat_percentage, incoming.body_fat_method,
+               incoming.muscle_mass, incoming.bone_mass, incoming.waist, incoming.hip, incoming.waist_unit,
+               incoming.notes, incoming.photo_url, incoming.data_source, incoming.source_metadata,
+               incoming.client_created_at, incoming.client_updated_at, null,
+               coalesce(incoming.is_excluded, false), incoming.corrected_value
+             from incoming
+             where (select outcome from decision) in ('insert', 'accept', 'replay')
+             on conflict (id) do update set
+               date = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.date else public.body_metrics.date end,
+               measured_at = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.measured_at else public.body_metrics.measured_at end,
+               local_date = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.local_date else public.body_metrics.local_date end,
+               origin = case when excluded.client_updated_at > public.body_metrics.client_updated_at then 'native' else public.body_metrics.origin end,
+               weight = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.weight else public.body_metrics.weight end,
+               weight_unit = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.weight_unit else public.body_metrics.weight_unit end,
+               body_fat_percentage = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.body_fat_percentage else public.body_metrics.body_fat_percentage end,
+               body_fat_method = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.body_fat_method else public.body_metrics.body_fat_method end,
+               muscle_mass = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.muscle_mass else public.body_metrics.muscle_mass end,
+               bone_mass = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.bone_mass else public.body_metrics.bone_mass end,
+               waist = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.waist else public.body_metrics.waist end,
+               hip = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.hip else public.body_metrics.hip end,
+               waist_unit = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.waist_unit else public.body_metrics.waist_unit end,
+               notes = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.notes else public.body_metrics.notes end,
+               photo_url = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.photo_url else public.body_metrics.photo_url end,
+               data_source = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.data_source else public.body_metrics.data_source end,
+               source_metadata = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.source_metadata else public.body_metrics.source_metadata end,
+               is_excluded = case when excluded.client_updated_at > public.body_metrics.client_updated_at
+                 then coalesce($20, public.body_metrics.is_excluded) else public.body_metrics.is_excluded end,
+               corrected_value = case when excluded.client_updated_at > public.body_metrics.client_updated_at and $22::boolean
+                 then excluded.corrected_value else public.body_metrics.corrected_value end,
+               client_updated_at = case when excluded.client_updated_at > public.body_metrics.client_updated_at then excluded.client_updated_at else public.body_metrics.client_updated_at end,
+               updated_at = case when excluded.client_updated_at > public.body_metrics.client_updated_at then now() else public.body_metrics.updated_at end,
+               revision = case
+                 when excluded.client_updated_at > public.body_metrics.client_updated_at
+                   and (
+                     public.body_metrics.weight is distinct from excluded.weight
+                     or public.body_metrics.weight_unit is distinct from excluded.weight_unit
+                     or public.body_metrics.measured_at is distinct from excluded.measured_at
+                     or public.body_metrics.local_date is distinct from excluded.local_date
+                   )
+                 then public.body_metrics.revision + 1
+                 else public.body_metrics.revision
+               end
+             where public.body_metrics.user_subject = excluded.user_subject
+               and public.body_metrics.deleted_at is null
+               and (
+                 excluded.client_updated_at > public.body_metrics.client_updated_at
+                 or (
+                   public.body_metrics.weight is not distinct from excluded.weight
+                   and public.body_metrics.weight_unit is not distinct from excluded.weight_unit
+                   and public.body_metrics.measured_at is not distinct from excluded.measured_at
+                   and public.body_metrics.local_date is not distinct from excluded.local_date
+                   and ($20::boolean is null or public.body_metrics.is_excluded is not distinct from excluded.is_excluded)
+                   and (not $22::boolean or public.body_metrics.corrected_value is not distinct from excluded.corrected_value)
+                 )
+               )
+             returning ${columns}
            )
-           on conflict (id) do update set
-             date = excluded.date,
-             measured_at = excluded.measured_at,
-             local_date = excluded.local_date,
-             origin = 'native',
-             weight = excluded.weight,
-             weight_unit = excluded.weight_unit,
-             body_fat_percentage = excluded.body_fat_percentage,
-             body_fat_method = excluded.body_fat_method,
-             muscle_mass = excluded.muscle_mass,
-             bone_mass = excluded.bone_mass,
-             waist = excluded.waist,
-             hip = excluded.hip,
-             waist_unit = excluded.waist_unit,
-             notes = excluded.notes,
-             photo_url = excluded.photo_url,
-             data_source = excluded.data_source,
-             source_metadata = excluded.source_metadata,
-             is_excluded = coalesce($20, public.body_metrics.is_excluded),
-             corrected_value = case when $22::boolean then excluded.corrected_value
-               else public.body_metrics.corrected_value end,
-             client_updated_at = excluded.client_updated_at,
-             deleted_at = null,
-             updated_at = now()
-           where public.body_metrics.user_subject = excluded.user_subject
-           returning ${columns}`,
+           select upserted.*, (select outcome from decision) as push_outcome
+           from upserted
+           union all
+           select ${columns}, (select outcome from decision) as push_outcome
+           from current_row
+           where (select outcome from decision) in ('tombstone', 'stale_write', 'payload_conflict')
+             and not exists (select 1 from upserted)`,
           pushParams(subject, record),
         ),
       );
@@ -220,13 +308,28 @@ export function createNeonNativeBodyMetricsSync(
     }
     const results = await executeNativeMutationQueries(database, admission, queries);
     for (const [index, result] of results.entries()) {
-      const rows = result as NativeBodyMetricRow[];
-
-      if (rows[0]) accepted.push(mapRecord(rows[0]));
-      else rejectedIds.push(submittedIds[index]!);
+      const rows = result as Array<NativeBodyMetricRow & { push_outcome?: string }>;
+      const row = rows[0];
+      const id = submittedIds[index]!;
+      if (!row) {
+        rejectedIds.push(id);
+        continue;
+      }
+      const outcome = row.push_outcome ?? 'accept';
+      if (outcome === 'insert' || outcome === 'accept' || outcome === 'replay') {
+        accepted.push(mapRecord(row));
+      } else if (
+        outcome === 'tombstone' ||
+        outcome === 'stale_write' ||
+        outcome === 'payload_conflict'
+      ) {
+        conflicts.push({ id: row.id, code: outcome, record: mapRecord(row) });
+      } else {
+        rejectedIds.push(id);
+      }
     }
 
-    return { records: accepted, rejected_ids: rejectedIds };
+    return { records: accepted, rejected_ids: rejectedIds, conflicts };
   }
 
   return {
