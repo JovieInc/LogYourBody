@@ -256,6 +256,18 @@ export function renderCoverage(report) {
 
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
   if (argv.length === 1 && argv[0] === '--merge-ledger') {
+    const otherConflicts = execFileSync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+      .split('\0')
+      .filter((path) => path && path !== LEDGER_PATH);
+    assert.equal(
+      otherConflicts.length,
+      0,
+      `ledger merge: resolve other conflicts first: ${otherConflicts.join(', ')}`,
+    );
     const stages = [1, 2, 3].map((stage) =>
       JSON.parse(
         execFileSync('git', ['show', `:${stage}:${LEDGER_PATH}`], {
