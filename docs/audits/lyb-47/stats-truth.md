@@ -120,3 +120,49 @@ The existing share Date switch also removes comparison endpoint dates. Its
 undated trend still states first-to-last observation and the observation mean;
 it does not leave hidden dates in the Trend field. A native PNG truth regression
 covers Date off with Trend on.
+
+## PR #1535 repair, 2026-10-26
+
+Merged `origin/main` at `84a6f229c` without rebasing (`7c9405b17`). Retained
+both registry exemptions, regenerated the endpoint output, and verified that
+every correction receipt from both merge parents remains in the ledger.
+
+Read failed run `40153848379` with `gh run view --log-failed`. Its StoreKit and
+launch-quality builds exposed misplaced `synchronizationText` state and unbound
+chart instance helper calls in the unequal-date test. The view now owns its sync
+context; the existing native test constructs that view and verifies its sync
+text and statistics. The preprocessor retains its date-only initializer.
+
+The added Stats truth UI selector changed the audit checksum. Reviewed that
+single-selector diff and refreshed the diagnostic policy and routing witnesses
+to SHA-256 `c50dbf251859a4ccc3da3285cb8881232df0816befbc4b0d6ef2912531a18c06`.
+The real trusted CLI regression also rejects the previous audit bytes. All
+seven dependency pins, admission rules, and native quality gates are retained.
+
+Local repair evidence, using Node 22.23.2 and pnpm 10.34.1:
+
+- `python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q`:
+  reproduced 2 failures and 39 passes before repair; all 41 pass after.
+- Root `pnpm lint` and `pnpm typecheck` pass (four Turbo tasks each, three cached).
+- `VITEST_MAX_WORKERS=1 pnpm test --env-mode=loose --concurrency=1` passes all
+  eight Turbo tasks (six cached). Subprocess checks run outside the sandbox
+  because its Node child-process calls return `EPERM`.
+- `pnpm lint:swift --cache-path /tmp/pr1535-swiftlint-cache` reports zero
+  violations in 474 files. `pnpm product:generate` and `pnpm product:check` pass.
+- `python3 scripts/ios/test_launch_ui_regression_audit.py` passes all 12 tests;
+  `python3 scripts/ios/launch-ui-regression-audit.py --artifact-dir
+/tmp/pr1535-launch-ui-audit` passes the real source audit.
+- `node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main`
+  and `node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main`
+  pass. `python3 scripts/repository_docs.py`, `bash -n
+scripts/ios/launch-quality-audit.sh` and `git diff --check` pass. The 11 existing
+  claims baseline warnings remain unchanged.
+- Both `xcodebuild` build-for-testing and test attempts return 127: Xcode is
+  absent. Native compilation, XCTest, UI/PNG/OCR, StoreKit and coverage still
+  require receipts from the real Mac runner on the harness-pushed head.
+- GBrain query, `put lyb-47-pr1535-ci-repair` and same-slug `get` each time out
+  after 30 seconds outside the sandbox (curl 28 at localhost:7801). Neither
+  write persistence nor readback is verified; this note retains the findings.
+
+The harness retains push and PR ownership. The repair preserves the rollout
+gate, observation calculations and neutral trend semantics.

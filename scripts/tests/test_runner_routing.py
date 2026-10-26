@@ -1291,7 +1291,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
+        'c50dbf251859a4ccc3da3285cb8881232df0816befbc4b0d6ef2912531a18c06'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1501,7 +1501,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'c50dbf251859a4ccc3da3285cb8881232df0816befbc4b0d6ef2912531a18c06'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -1737,7 +1737,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
+    expected = 'c50dbf251859a4ccc3da3285cb8881232df0816befbc4b0d6ef2912531a18c06'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
@@ -1745,6 +1745,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert hashlib.sha256(reviewed).hexdigest() == expected
+    previous_reviewed = reviewed.replace(
+        b'  "LogYourBodyUITests/testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance"\n', b'', 1)
+    assert hashlib.sha256(previous_reviewed).hexdigest() == '79189eccda44db2b518a7294649e22df287a29078263c09b90df6427beb4fa01'
     # Recover exact old V16 only as inert bytes, to prove real CLI refusal of it.
     legacy = unlanded.decode()
     start = legacy.index('# An unknown mode must fail')
@@ -1780,7 +1783,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'previous-reviewed', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink']
     for scenario in fixtures:
@@ -1799,6 +1802,8 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
         if scenario == 'unlanded-candidate':
             audit.write_bytes(unlanded)
+        elif scenario == 'previous-reviewed':
+            audit.write_bytes(previous_reviewed)
         elif scenario == 'legacy-v16':
             audit.write_bytes(legacy_bytes)
         elif scenario == 'marker-only':

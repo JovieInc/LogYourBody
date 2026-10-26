@@ -1,5 +1,45 @@
 [
   {
+    "fingerprint": "stats-truth-chart-sync-ownership-and-native-test-compilation",
+    "correction": "PR #1535: Keep synchronization context on FullMetricChartView rather than ChartSeriesPreprocessor, and invoke chart instance helpers through a chart fixture.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40153848379/job/121050903458",
+    "mechanization": "Move the stored sync property to the view that initializes and displays it. The existing unequal-date native regression now constructs the real chart, verifies its separate sync context, and compares instance statistics with the observation summary. Existing preprocessor tests retain their date-only initializer; the required native build rejects the original property and scope errors.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The view owns synchronization state by construction; compiled native fixtures reject misplaced state and unbound instance helper calls."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/DashboardMetricFormattingTests.swift",
+      "anchor": "XCTAssertEqual(chart.synchronizationText, \"Cloud sync: Yesterday\")"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-audit-pin-matches-reviewed-selector-change",
+    "correction": "PR #1535: Adding the Stats truth UI selector changed the launch audit bytes without refreshing the exact reviewed diagnostic checksum, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40153848379/job/121050839614",
+    "mechanization": "Review the single added required UI selector and refresh its exact SHA-256 in the diagnostic policy and routing witnesses. The existing required routing suite fails on the previous pin and passes after the update. Its trusted CLI fixture now also rejects the previous audit bytes, retaining all seven dependency pins and all trust checks.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot maintain a separately reviewed workflow checksum; deriving the pin dynamically from candidate bytes would remove its trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required runner-routing suite compares the exact audit and dependency digests and exercises trusted CLI admission and refusal before candidate tools can run."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "fixtures = ['positive', 'previous-reviewed', 'unlanded-candidate'"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "stats-truth-neutral-direction-and-observation-windows",
     "correction": "LYB-47: Stats must distinguish observation, sync, display and comparison dates; insufficient samples and direction alone cannot imply unchanged health or goal progress.",
     "source": "https://linear.app/jovie/issue/LYB-47",
