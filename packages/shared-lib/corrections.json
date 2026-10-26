@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "self-hosted-ruby-rebuilds-native-gems",
+    "correction": "PR #1552 merge-group CI failed before native compilation because the restored date_core.bundle required a Ruby symbol absent from the self-hosted Homebrew interpreter. Rebuild native gems locally instead of sharing hosted binary bundles.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40256430731",
+    "mechanization": "The existing Ruby setup action clears only vendor/bundle on self-hosted Macs and restores binary caches only on hosted runners. Required shared-lib tests execute the actual cleanup and install shell steps against incompatible-extension fixtures, retain the sibling vendored package, preserve hosted cache behavior and propagate installation failures. All three self-hosted cases failed before the action fix.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot repair native tool dependencies loaded before the iOS compiler or tests start."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib suite can execute the setup action's shell steps against stale workspace and cache fixtures and fail if incompatible native gems reach Bundler."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/ruby-bundler-cache.test.ts",
+      "anchor": "rebuilds self-hosted native gems without restoring incompatible cache"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
     "fingerprint": "recurring-corrections-escalate-or-report-guard-failure",
     "correction": "LYB-252: Repeated corrections after a prose fix must request stronger enforcement once per rule; a correction recurring after mechanization is a guard failure rather than an ordinary repeat.",
     "source": "https://linear.app/jovie/issue/LYB-252",
@@ -105,7 +127,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "photo-filmstrip-shares-owned-timeline-selection",
@@ -121,7 +145,9 @@
     "guard": {
       "path": "apps/ios/LogYourBody/Views/HomeV2/HomeV2PhotoTimelineRuler.swift",
       "anchor": "HomeV2Filmstrip(photoURLs: photoURLs, selected: selected)"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "product-registry-generated-endpoints-match-source",
@@ -141,7 +167,9 @@
     "guard": {
       "path": "packages/product-registry/scripts/generate.mjs",
       "anchor": "is stale; run pnpm product:generate"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
