@@ -40,83 +40,6 @@ const classification = (chosen) =>
     ]),
   );
 
-test('ledger merge retains both branches and base receipts, deduplicating canonical identities', () => {
-  const original = receipt('retained', 'static', { guard });
-  const revised = { ...original, mechanization: 'Updated deterministic guard evidence.' };
-  const ours = receipt('branch-rule', 'static', { guard });
-  const theirs = receipt('main-rule', 'static', { guard });
-  const repeated = { ...original, source: 'https://example.com/second-receipt' };
-  const alias = {
-    ...theirs,
-    fingerprint: ' MAIN RULE ',
-    source: theirs.source.replace('github.com', 'GITHUB.com:443'),
-  };
-  // Identity spelling changes are still a change to the same receipt, not a new receipt.
-  assert.deepEqual(
-    mergeCorrectionLedgers([original], [original, ours, repeated], [revised, theirs, theirs]),
-    [revised, ours, repeated, theirs],
-  );
-  assert.deepEqual(mergeCorrectionLedgers([original], [], [revised]), [revised]);
-  assert.deepEqual(mergeCorrectionLedgers([original], [revised], []), [revised]);
-  assert.deepEqual(mergeCorrectionLedgers([original], [], []), [original]);
-  assert.deepEqual(mergeCorrectionLedgers([], [theirs], [theirs]), [theirs]);
-  assert.deepEqual(mergeCorrectionLedgers([theirs], [theirs], [alias]), [alias]);
-});
-
-test('ledger merge refuses ambiguous edits and invalid or inconsistent receipts', () => {
-  const original = receipt('retained', 'static', { guard });
-  const first = { ...original, correction: 'First revised lesson.' };
-  const second = { ...original, correction: 'A different revised lesson.' };
-  for (const base of [[], [original]]) {
-    assert.throws(() => mergeCorrectionLedgers(base, [first], [second]), /ambiguous receipt/);
-  }
-  assert.throws(() => mergeCorrectionLedgers([], [first, second], []), /duplicate receipt/);
-  assert.throws(() => mergeCorrectionLedgers({}, [], []), /array/);
-  assert.throws(
-    () => mergeCorrectionLedgers([], [{ ...original, source: 'http://example.com' }], []),
-    /source/,
-  );
-  assert.throws(
-    () =>
-      mergeCorrectionLedgers(
-        [],
-        [original],
-        [
-          {
-            ...original,
-            source: 'https://example.com/second',
-            guard: { ...guard, anchor: 'a different deterministic guard' },
-          },
-        ],
-      ),
-    /conflicting coverage annotations/,
-  );
-});
-
-test('ledger merge CLI reads immutable Git inputs without editing the working ledger', (t) => {
-  const original = receipt('retained', 'static', {
-    guard,
-    classification: classification('static'),
-  });
-  const added = receipt('added', 'static', { guard, classification: classification('static') });
-  const { root, ref } = fixtureRepo(t, [original]);
-  writeFileSync(join(root, LEDGER_PATH), JSON.stringify([original, added]));
-  execFileSync('git', ['add', LEDGER_PATH], { cwd: root });
-  execFileSync('git', ['commit', '-m', 'add receipt'], { cwd: root, stdio: 'pipe' });
-  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-  writeFileSync(join(root, LEDGER_PATH), 'unresolved conflict');
-  assert.deepEqual(runCoverage(['--merge-ledger', ref, head, ref], { root, env: {} }), [
-    original,
-    added,
-  ]);
-  assert.equal(readFileSync(join(root, LEDGER_PATH), 'utf8'), 'unresolved conflict');
-  assert.throws(
-    () => runCoverage(['--merge-ledger', ref, head, 'HEAD;echo unsafe'], { root }),
-    /invalid baseline/,
-  );
-  assert.throws(() => runCoverage(['--merge-ledger', ref, head], { root }), /usage/);
-});
-
 test('classifier chooses the first feasible level and retains reasons for every lower level', () => {
   for (const level of pyramid) {
     const value = report([receipt('route', undefined, { classification: classification(level) })]);
@@ -236,6 +159,112 @@ function fixtureRepo(t, receipts) {
   ]);
   return { root, ref: git(['rev-parse', 'HEAD']) };
 }
+
+test('ledger merge retains independent receipts and one-sided edits without mutating inputs', () => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const base = [row('kept')];
+  const edited = { ...base[0], correction: 'Clarify the retained invariant.' };
+  const ours = [row('ours'), edited];
+  const theirs = [row('theirs'), base[0]];
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, ours, theirs, () => anchor),
+    [ours[0], edited, theirs[0]],
+  );
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, base, [edited], () => anchor),
+    [edited],
+  );
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, [edited], [edited], () => anchor),
+    [edited],
+  );
+  assert.equal(base[0].correction, 'Keep the deterministic guard in place.');
+  const repeated = { ...base[0], source: 'https://example.com/second-receipt' };
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, [...base, repeated], base, () => anchor),
+    [base[0], repeated],
+  );
+});
+
+test('ledger merge refuses deletions, divergent edits, duplicates and lost guards', () => {
+  const base = [receipt('kept', 'static', { guard, classification: classification('static') })];
+  const edited = { ...base[0], correction: 'An independent change.' };
+  for (const [ours, theirs, error] of [
+    [[], base, /removed receipt/],
+    [base, [], /removed receipt/],
+    [[edited], [{ ...edited, correction: 'A conflicting change.' }], /concurrent receipt edits/],
+    [[...base, base[0]], base, /duplicate receipt/],
+    [[{ ...base[0], guard: undefined }], base, /guard coverage/],
+    [
+      [
+        {
+          ...base[0],
+          level: 'prose',
+          guard: undefined,
+          classification: classification('prose'),
+          proseOnlyReason: 'Editorial judgment.',
+        },
+      ],
+      base,
+      /regression/,
+    ],
+  ]) {
+    assert.throws(() => mergeCorrectionLedgers(base, ours, theirs, () => anchor), error);
+  }
+  assert.throws(() => mergeCorrectionLedgers({}, base, base), /array/);
+  assert.throws(() => mergeCorrectionLedgers([], base, base, () => ''), /guard coverage/);
+});
+
+test('ledger merge CLI uses all three Git conflict stages and leaves refused merges untouched', (t) => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const { root } = fixtureRepo(t, [row('kept')]);
+  const git = (args, input) => execFileSync('git', args, { cwd: root, encoding: 'utf8', input });
+  const path = join(root, LEDGER_PATH);
+  const marker = 'unresolved conflict';
+  writeFileSync(path, marker);
+  const stages = [[], [row('ours')], [row('theirs')]].map((added) => [row('kept'), ...added]);
+  const stage = () => {
+    git(['update-index', '--force-remove', LEDGER_PATH]);
+    const entries = stages
+      .map((rows, index) => {
+        const hash = git(['hash-object', '-w', '--stdin'], JSON.stringify(rows)).trim();
+        return `100644 ${hash} ${index + 1}\t${LEDGER_PATH}\n`;
+      })
+      .join('');
+    git(['update-index', '--index-info'], entries);
+  };
+  stage();
+  assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), [
+    row('kept'),
+    row('theirs'),
+    row('ours'),
+  ]);
+  assert.equal(git(['ls-files', '-u']).trim().split('\n').length, 3, 'staging remains explicit');
+  const before = readFileSync(path, 'utf8');
+  const blob = git(['hash-object', '-w', '--stdin'], anchor).trim();
+  git(['update-index', '--force-remove', guard.path]);
+  git(
+    ['update-index', '--index-info'],
+    [1, 2, 3].map((index) => `100644 ${blob} ${index}\t${guard.path}\n`).join(''),
+  );
+  writeFileSync(join(root, guard.path), `<<<<<<< ours\n${anchor}\n=======\n${anchor}\n>>>>>>> theirs\n`);
+  assert.throws(
+    () => runCoverage(['--merge-ledger'], { root, env: {} }),
+    /ledger merge: resolve other conflicts first: guard.mjs/,
+  );
+  assert.equal(readFileSync(path, 'utf8'), before, 'unresolved guard leaves ledger untouched');
+  writeFileSync(join(root, guard.path), anchor);
+  git(['add', guard.path]);
+  stages[2] = [];
+  stage();
+  writeFileSync(path, marker);
+  assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }), /removed receipt/);
+  assert.equal(readFileSync(path, 'utf8'), marker);
+  git(['update-index', '--force-remove', LEDGER_PATH]);
+  assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }));
+  assert.equal(readFileSync(path, 'utf8'), marker);
+});
 
 test('counts distinct rules, all four pyramid levels and unclassified receipts honestly', () => {
   const rows = [

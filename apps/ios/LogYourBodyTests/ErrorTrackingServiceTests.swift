@@ -11,6 +11,10 @@ import SwiftUI
 import UIKit
 @testable import LogYourBody
 
+#if canImport(Sentry)
+import Sentry
+#endif
+
 
 final class ErrorTrackingServiceTests: XCTestCase {
     private final class FakeErrorTrackingVendor: ErrorTrackingVendor {
@@ -42,6 +46,13 @@ final class ErrorTrackingServiceTests: XCTestCase {
             tags.append((value, key))
         }
 
+        private(set) var userIDs: [String] = []
+
+        func setUser(id: String) {
+            record("user:\(id)")
+            userIDs.append(id)
+        }
+
         func setExtra(value: String, key: String) {
             record("extra:\(key)=\(value)")
             extras.append((value, key))
@@ -70,7 +81,7 @@ final class ErrorTrackingServiceTests: XCTestCase {
 
     private func makeService() -> (ErrorTrackingService, FakeErrorTrackingVendor) {
         let vendor = FakeErrorTrackingVendor()
-        return (ErrorTrackingService(vendor: vendor), vendor)
+        return (ErrorTrackingService(vendor: vendor, installID: { "i_test-install" }), vendor)
     }
 
     private func tagValues(_ vendor: FakeErrorTrackingVendor, forKey key: String) -> [String] {
@@ -151,6 +162,28 @@ final class ErrorTrackingServiceTests: XCTestCase {
         XCTAssertEqual(tagValues(vendor, forKey: "userId"), ["[Filtered]"])
     }
 
+    func testUpdateUserIdSendsOnlyAnOpaqueHashedUser() throws {
+        let (service, vendor) = makeService()
+
+        service.updateUserId("user-9")
+
+        let id = try XCTUnwrap(vendor.userIDs.first)
+        XCTAssertTrue(id.hasPrefix("u_"))
+        XCTAssertEqual(id.count, 18)
+        XCTAssertFalse(id.contains("user-9"))
+        XCTAssertEqual(id, ErrorTrackingIdentity.anonymousID(for: "user-9"))
+        XCTAssertNotEqual(id, ErrorTrackingIdentity.anonymousID(for: "user-10"))
+    }
+
+    func testSignedOutSessionsReportTheInstallIdSoImpactIsNeverZeroUsers() {
+        let (service, vendor) = makeService()
+
+        service.updateUserId(nil)
+        service.updateUserId("")
+
+        XCTAssertEqual(vendor.userIDs, ["i_test-install", "i_test-install"])
+    }
+
     func testUpdateUserIdFallsBackToNoneForNilOrEmpty() {
         let (service, vendor) = makeService()
 
@@ -206,7 +239,10 @@ final class ErrorTrackingServiceTests: XCTestCase {
         await fulfillment(of: [delivered], timeout: 2)
 
         await MainActor.run {
-            XCTAssertEqual(vendor.calls, ["start", "tag:userId=[Filtered]", "breadcrumb"])
+            XCTAssertEqual(vendor.calls.count, 4)
+            XCTAssertEqual(vendor.calls.first, "start")
+            XCTAssertTrue(vendor.calls[1].hasPrefix("user:u_"))
+            XCTAssertEqual(Array(vendor.calls.suffix(2)), ["tag:userId=[Filtered]", "breadcrumb"])
             XCTAssertTrue(vendor.callsWereOnMain.allSatisfy { $0 })
             XCTAssertEqual(vendor.startCallCount, 1)
             XCTAssertEqual(vendor.breadcrumbMessages, ["[Filtered]"])
@@ -248,6 +284,47 @@ final class ErrorTrackingServiceTests: XCTestCase {
             }
         }
     }
+
+    #if canImport(Sentry)
+    func testRedactorPreservesOpaqueUserIdentityAndRemovesPersonalFields() throws {
+        let accountID = try XCTUnwrap(ErrorTrackingIdentity.anonymousID(for: "user-9"))
+        for id in [accountID, "i_12345678-1234-4234-8234-123456789abc"] {
+            let event = Sentry.Event(level: .error)
+            let user = Sentry.User(userId: id)
+            user.email = "person@example.com"
+            user.username = "private-username"
+            user.name = "Private Name"
+            user.ipAddress = "192.0.2.1"
+            user.data = ["account_id": "user-9"]
+            event.user = user
+
+            let redacted = try XCTUnwrap(ErrorTrackingRedactor.redact(event: event))
+            let redactedUser = try XCTUnwrap(redacted.user)
+
+            XCTAssertEqual(redactedUser.userId, id)
+            XCTAssertNil(redactedUser.email)
+            XCTAssertNil(redactedUser.username)
+            XCTAssertNil(redactedUser.name)
+            XCTAssertNil(redactedUser.ipAddress)
+            XCTAssertNil(redactedUser.data)
+        }
+    }
+
+    func testRedactorDropsUsersWithoutAnIdentity() throws {
+        let missingIDs: [String?] = [nil, ""]
+        for id in missingIDs {
+            let event = Sentry.Event(level: .error)
+            let user = Sentry.User()
+            user.userId = id
+            user.email = "person@example.com"
+            event.user = user
+
+            let redacted = try XCTUnwrap(ErrorTrackingRedactor.redact(event: event))
+
+            XCTAssertNil(redacted.user)
+        }
+    }
+    #endif
 
     func testRedactorFiltersEmailHealthValuesAndIdentifiers() {
         XCTAssertEqual(

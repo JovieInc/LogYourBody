@@ -64,6 +64,10 @@ metadata as well as classification and guard anchors.
 Run from the repository root:
 
 ```sh
+# Resolve a corrections.json conflict from Git's base/ours/theirs index stages.
+# Retains incoming order, validates coverage, and leaves review/staging explicit.
+# Deletions or divergent edits fail without writing; resolve those manually.
+node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger
 # Seed a new baseline, or remove findings fixed in this PR (review the diff).
 node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main --update-baselines
 # Read-only verification, using the PR's exact base SHA in CI.
@@ -97,17 +101,10 @@ apply. When the lanes harness owns pushing and PR creation, hand it the commits
 and validation evidence. Do not enable the retired Codex Auto-Fix workflow or
 start a second PR owner.
 
-When both branches append to `corrections.json`, use the existing coverage tool
-to generate a three-way merge from immutable Git snapshots:
-
-```sh
-node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger <base-sha> <ours-sha> <theirs-sha>
-```
-
-It prints candidate JSON without editing the ledger. It preserves every receipt
-from the base and both branches, groups identity by normalized fingerprint and
-canonical source URL, and keeps one-sided metadata updates. Conflicting edits to
-the same receipt or incompatible rule annotations fail without emitting JSON.
-Review the result before saving it, run `node scripts/correction-classifier.mjs`
-to classify imported receipts, then run coverage and ratchets against the exact
-base as usual. This generator does not replace either required gate.
+For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
+merges and classifies the correction ledger after other conflicts are resolved.
+The shared readiness check also rejects newly added conflict markers in the index,
+including diff3 base markers, before writing or staging the ledger. The pre-commit
+`--check-merge` path and staged retries use the same check; cleaning only the working
+file cannot hide an unresolved staged source. Resolve and stage the source, then
+retry the same command. Unrelated unstaged edits remain untouched.

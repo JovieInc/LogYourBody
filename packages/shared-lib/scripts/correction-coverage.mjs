@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, readFileSync, realpathSync } from 'node:fs';
+import { appendFileSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
@@ -32,36 +32,6 @@ export function readSource(path, { root = ROOT, ref } = {}) {
 
 function fraction(mechanized, total) {
   return { mechanized, total, percent: total ? (100 * mechanized) / total : null };
-}
-
-export function mergeCorrectionLedgers(base, ours, theirs) {
-  const indexes = [base, ours, theirs].map((rows) => {
-    planCorrectionIssues(rows);
-    const index = new Map();
-    for (const row of rows) {
-      const fingerprint = row.fingerprint.trim().toLowerCase().replace(/\s+/g, '-');
-      const key = `${fingerprint}\n${new URL(row.source).href}`;
-      assert.ok(
-        !index.has(key) || isDeepStrictEqual(index.get(key), row),
-        `duplicate receipt has different contents: ${fingerprint}`,
-      );
-      index.set(key, row);
-    }
-    return index;
-  });
-  const [before, left, right] = indexes;
-  const merged = [...new Set([...left.keys(), ...right.keys(), ...before.keys()])].map((key) => {
-    const original = before.get(key);
-    // Ledger history is append-only: a missing row cannot delete a receipt.
-    const first = left.get(key) ?? original;
-    const second = right.get(key) ?? original;
-    if (isDeepStrictEqual(first, second) || isDeepStrictEqual(second, original)) return first;
-    if (isDeepStrictEqual(first, original)) return second;
-    throw new Error(`ambiguous receipt edits require review: ${key}`);
-  });
-  // Validate shared rule annotations across receipts before returning any output.
-  coverageReport(merged);
-  return merged;
 }
 
 export function coverageReport(
@@ -199,6 +169,41 @@ export function assertNoRegression(current, baseline) {
   }
 }
 
+export function mergeCorrectionLedgers(base, ours, theirs, readGuard = readSource) {
+  const reports = [base, ours, theirs].map((rows) => coverageReport(rows, readGuard));
+  const [original, left, right] = [base, ours, theirs].map((rows) => {
+    const indexed = new Map();
+    for (const row of rows) {
+      const key = JSON.stringify([
+        row.fingerprint.trim().toLowerCase().replace(/\s+/g, '-'),
+        new URL(row.source).href,
+      ]);
+      assert.ok(!indexed.has(key), `ledger merge: duplicate receipt ${key}`);
+      indexed.set(key, row);
+    }
+    return indexed;
+  });
+  for (const key of original.keys()) {
+    assert.ok(left.has(key) && right.has(key), `ledger merge: removed receipt ${key}`);
+  }
+  const merged = [...new Set([...left.keys(), ...right.keys()])].map((key) => {
+    const a = left.get(key);
+    const b = right.get(key);
+    if (!a) return b;
+    if (!b || isDeepStrictEqual(a, b)) return a;
+    // Independent additions merge; concurrent receipt edits require explicit resolution.
+    if (isDeepStrictEqual(a, original.get(key))) return b;
+    assert.ok(
+      isDeepStrictEqual(b, original.get(key)),
+      `ledger merge: concurrent receipt edits ${key}`,
+    );
+    return a;
+  });
+  const report = guardCoverageReport(merged, readGuard, { requireClassification: true });
+  for (const parent of reports) assertNoRegression(report, parent);
+  return merged;
+}
+
 export function renderCoverage(report) {
   const cell = (value) =>
     value
@@ -249,15 +254,54 @@ export function renderCoverage(report) {
   ].join('\n');
 }
 
+export function assertLedgerMergeReady(root) {
+  const otherConflicts = execFileSync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+    .split('\0')
+    .filter((path) => path && path !== LEDGER_PATH);
+  assert.equal(
+    otherConflicts.length,
+    0,
+    `ledger merge: resolve other conflicts first: ${otherConflicts.join(', ')}`,
+  );
+  const staged = execFileSync(
+    'git',
+    ['diff', '--cached', '--no-ext-diff', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  // Staging a file does not prove its conflict markers were resolved.
+  assert.doesNotMatch(
+    staged,
+    /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,
+    'ledger merge: resolve staged conflict markers first',
+  );
+}
+
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
-  if (argv.length === 4 && argv[0] === '--merge-ledger') {
-    return mergeCorrectionLedgers(
-      ...argv.slice(1).map((ref) => JSON.parse(readSource(LEDGER_PATH, { root, ref }))),
+  if (argv.length === 1 && argv[0] === '--merge-ledger') {
+    assertLedgerMergeReady(root);
+    const stages = [1, 2, 3].map((stage) =>
+      JSON.parse(
+        execFileSync('git', ['show', `:${stage}:${LEDGER_PATH}`], {
+          cwd: root,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }),
+      ),
     );
+    const merged = mergeCorrectionLedgers(stages[0], stages[2], stages[1], (path) =>
+      readSource(path, { root }),
+    );
+    readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+    writeFileSync(resolve(root, LEDGER_PATH), `${JSON.stringify(merged, null, 2)}\n`);
+    argv = [];
   }
   assert.ok(
     argv.length === 0 || (argv.length === 2 && argv[0] === '--base-ref'),
-    'usage: correction-coverage.mjs [--base-ref <sha|origin/main> | --merge-ledger <base-sha> <ours-sha> <theirs-sha>]',
+    'usage: correction-coverage.mjs [--base-ref <sha|origin/main> | --merge-ledger]',
   );
   const current = guardCoverageReport(
     JSON.parse(readSource(LEDGER_PATH, { root })),

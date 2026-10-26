@@ -16,7 +16,7 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `0867193bc637aba23126e1230619ab29030f8e54c3f2de30565cf8660c3f6f35`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `acb8b5c2875c788f8c0068ddf387f75c9b8483a9eb5a80697e643831d23a8cec`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
@@ -26,9 +26,9 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
 - `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `06ee02d964e6aa3f4b01b00a39a0112d2296b0dc2a213ba1873d437bf0b302ae`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
-- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
+- `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `dd323f3ea0204109819f935290edeb15d73ccb20d8c04ca3ad234cbbee51aad7`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a183af06f3cd7aa4838eb62ebef999b56621f7d027c2ab25374486b6eb48790b`)
 
 ### `apps/web/package.json`: engines
 
@@ -79,9 +79,9 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@jovie/ui": "workspace:*",
   "@jovieinc/product-registry": "workspace:*",
   "@neondatabase/serverless": "1.0.2",
-  "@radix-ui/react-accordion": "^1.2.20",
+  "@radix-ui/react-accordion": "^1.2.21",
   "@radix-ui/react-alert-dialog": "^1.1.23",
-  "@radix-ui/react-aspect-ratio": "^1.1.15",
+  "@radix-ui/react-aspect-ratio": "^1.2.0",
   "@radix-ui/react-avatar": "^1.3.1",
   "@radix-ui/react-checkbox": "^1.3.11",
   "@radix-ui/react-collapsible": "^1.1.20",
@@ -100,10 +100,10 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-separator": "^1.1.15",
   "@radix-ui/react-slider": "^1.4.7",
   "@radix-ui/react-slot": "^1.3.3",
-  "@radix-ui/react-switch": "^1.3.7",
+  "@radix-ui/react-switch": "^1.3.8",
   "@radix-ui/react-tabs": "^1.1.21",
   "@radix-ui/react-toast": "^1.2.23",
-  "@radix-ui/react-toggle": "^1.1.18",
+  "@radix-ui/react-toggle": "^1.2.1",
   "@radix-ui/react-toggle-group": "^1.1.19",
   "@radix-ui/react-tooltip": "^1.3.0",
   "@radix-ui/react-visually-hidden": "^1.2.11",
@@ -151,7 +151,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "tailwindcss-animate": "^1.0.7",
   "vaul": "^1.1.2",
   "ws": "8.21.0",
-  "zod": "^4.6.6"
+  "zod": "^4.6.7"
 }
 ```
 
@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `b3cbe42a378587a81873e7ff3a35e74125223a31bee5b9a8cd984859f88cebf8`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0c3e6a93be883d68b0a7623e60d2154c4bcdbe0cae88b8eeb78beb9d1532852e`)
 
 ### `package.json`: packageManager
 
@@ -257,7 +257,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "ai": "^7.0.114",
   "eve": "0.27.13",
-  "zod": "^4.6.6"
+  "zod": "^4.6.7"
 }
 ```
 
@@ -381,7 +381,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `20607bbc13e8980c10505ef9a781cac117da83d3d5f3441f5e143562c3d415e9`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `520c656b41eff6ffa8ad351ca3ecd2f23a09adf384791df3893971b53dcf462a`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `a6d5ea5bb81278060607b3f2b3504ac87b6683ceeb979e248ff8fe39de169987`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
