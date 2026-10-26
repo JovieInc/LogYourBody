@@ -33,6 +33,13 @@ map from the merged sources. This wraps the pinned generator and refuses to
 write while any other file is unmerged or a shared import fails parity. It
 stages only the generated output; review the source diff before committing.
 
+Pre-commit runs the same resolver with `--staged` after formatting. It refreshes
+and stages the map for staged sources and repairs stale maps from committed bot
+updates when inputs are clean. Unstaged documentation inputs must be staged or
+stashed first if a registered source is staged; unrelated commits with worktree
+source edits leave the map alone. Dependency bots that omit hooks can use the
+same resolver during repair. Required CI parity remains the merge gate.
+
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
 exact upstream bytes. Only listed imports and generated output are written;

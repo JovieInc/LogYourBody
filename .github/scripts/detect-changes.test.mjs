@@ -714,3 +714,202 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
     }
   });
 }
+
+function stagedSourceMap() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'source-map-staged-'));
+  git(root, 'init', '-q', '-b', 'main');
+  const output = 'docs/SOURCES.md';
+  const manifest = 'apps/web/package.json';
+  commit(
+    root,
+    {
+      'README.md': 'Local instructions\n',
+      'repository-docs.json': JSON.stringify({
+        schemaVersion: 1,
+        repository: 'example/app',
+        entrypoints: ['README.md'],
+        sources: [{ path: manifest, purpose: 'Web dependencies' }],
+        imports: [],
+        output,
+      }),
+      [manifest]: JSON.stringify({ dependencies: { '@radix-ui/react-separator': '^1.1.15' } }),
+    },
+    'base sources',
+  );
+  execFileSync(
+    'python3',
+    [path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write'],
+    { env: gitEnv },
+  );
+  git(root, 'add', '.');
+  git(root, 'commit', '-q', '-m', 'base projection');
+  fs.writeFileSync(
+    path.join(root, manifest),
+    JSON.stringify({
+      dependencies: { '@radix-ui/react-separator': '^1.1.16' },
+    }),
+  );
+  git(root, 'add', '--', manifest);
+  const resolve = () =>
+    spawnSync(
+      'python3',
+      [
+        path.join(scriptDir, '../../scripts/resolve-repository-docs.py'),
+        '--root',
+        root,
+        '--staged',
+      ],
+      { env: gitEnv, encoding: 'utf8' },
+    );
+  return { root, output, manifest, resolve };
+}
+
+test('pre-commit regenerates and stages the projection for a dependency bump without a merge', () => {
+  const fx = stagedSourceMap();
+  try {
+    fs.mkdirSync(path.join(fx.root, 'scripts'));
+    fs.symlinkSync(
+      path.join(scriptDir, '../../scripts/resolve-repository-docs.py'),
+      path.join(fx.root, 'scripts/resolve-repository-docs.py'),
+    );
+    fs.writeFileSync(path.join(fx.root, 'scripts/check-jovie-imports.mjs'), '');
+    const bin = path.join(fx.root, 'bin');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(
+      path.join(bin, 'pnpm'),
+      '#!/bin/sh\nprintf "\\n" >> apps/web/package.json\ngit add -- apps/web/package.json\n',
+      { mode: 0o755 },
+    );
+    fs.writeFileSync(path.join(fx.root, 'notes.txt'), 'Unstaged local edit\n');
+    const source = git(fx.root, 'show', `:${fx.manifest}`);
+    const result = spawnSync('sh', [path.join(scriptDir, '../../.husky/pre-commit')], {
+      cwd: fx.root,
+      env: { ...gitEnv, PATH: `${bin}:${gitEnv.PATH}` },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const projection = git(fx.root, 'show', `:${fx.output}`);
+    assert.match(projection, /"@radix-ui\/react-separator": "\^1\.1\.16"/);
+    assert.equal(git(fx.root, 'show', `:${fx.manifest}`), source);
+    assert.deepEqual(git(fx.root, 'diff', '--cached', '--name-only').split('\n'), [
+      fx.manifest,
+      fx.output,
+    ]);
+    const parity = spawnSync(
+      'python3',
+      [path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', fx.root],
+      { env: gitEnv, encoding: 'utf8' },
+    );
+    assert.equal(parity.status, 0, "projection must include the formatter's final bytes");
+    assert.equal(fx.resolve().status, 0, 'staged repair is idempotent');
+    assert.equal(git(fx.root, 'show', `:${fx.output}`), projection);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'notes.txt'), 'utf8'), 'Unstaged local edit\n');
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('staged source-map repair skips unrelated commits without staging a worktree-only bump', () => {
+  const fx = stagedSourceMap();
+  try {
+    git(fx.root, 'reset', '-q', 'HEAD', '--', fx.manifest);
+    fs.appendFileSync(path.join(fx.root, 'repository-docs.json'), '\n');
+    fs.writeFileSync(path.join(fx.root, 'notes.txt'), 'Staged unrelated edit\n');
+    git(fx.root, 'add', '--', 'notes.txt');
+    const index = git(fx.root, 'ls-files', '--stage');
+    const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('staged source-map repair refreshes a committed bot bump without staged source edits', () => {
+  const fx = stagedSourceMap();
+  try {
+    git(fx.root, 'commit', '-q', '-m', 'dependency bot bump without hooks');
+    fs.writeFileSync(path.join(fx.root, 'notes.txt'), 'Staged repair notes\n');
+    git(fx.root, 'add', '--', 'notes.txt');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      git(fx.root, 'show', `:${fx.output}`),
+      /"@radix-ui\/react-separator": "\^1\.1\.16"/,
+    );
+    assert.deepEqual(git(fx.root, 'diff', '--cached', '--name-only').split('\n'), [
+      fx.output,
+      'notes.txt',
+    ]);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const dirty of ['apps/web/package.json', 'repository-docs.json', 'docs/SOURCES.md']) {
+  test(`staged source-map repair refuses unstaged ${dirty} without changing files or index`, () => {
+    const fx = stagedSourceMap();
+    try {
+      fs.appendFileSync(path.join(fx.root, dirty), '\n');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const source = fs.readFileSync(path.join(fx.root, dirty), 'utf8');
+      const result = fx.resolve();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /stage or stash documentation inputs first:/);
+      assert.ok(result.stderr.includes(dirty), result.stderr);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(fs.readFileSync(path.join(fx.root, dirty), 'utf8'), source);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('staged source-map repair refuses a registered source absent from the index', () => {
+  const fx = stagedSourceMap();
+  try {
+    const registry = path.join(fx.root, 'repository-docs.json');
+    const config = JSON.parse(fs.readFileSync(registry, 'utf8'));
+    config.sources.push({ path: 'untracked.yml', purpose: 'New workflow' });
+    fs.writeFileSync(registry, JSON.stringify(config));
+    fs.writeFileSync(path.join(fx.root, 'untracked.yml'), 'Unstaged new source\n');
+    git(fx.root, 'add', '--', 'repository-docs.json');
+    const index = git(fx.root, 'ls-files', '--stage');
+    const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const result = fx.resolve();
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(result.stderr, /stage or stash documentation inputs first: untracked.yml/);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('staged source-map repair refuses unstaged bytes behind a source symlink', () => {
+  const fx = stagedSourceMap();
+  try {
+    const source = path.join(fx.root, fx.manifest);
+    const target = 'apps/web/dependencies.json';
+    fs.renameSync(source, path.join(fx.root, target));
+    fs.symlinkSync('dependencies.json', source);
+    git(fx.root, 'add', '--', fx.manifest, target);
+    fs.appendFileSync(path.join(fx.root, target), '\n');
+    const index = git(fx.root, 'ls-files', '--stage');
+    const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const result = fx.resolve();
+    assert.notEqual(result.status, 0, result.stdout);
+    assert.match(
+      result.stderr,
+      /stage or stash documentation inputs first: apps\/web\/dependencies.json/,
+    );
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
