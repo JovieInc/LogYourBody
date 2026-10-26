@@ -1416,5 +1416,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-context-edit-sheet-visible-host",
+    "correction": "PR #1554 Launch Quality: testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates reached a hittable Edit entry button but the editor never appeared after the tap.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40373465167/job/121750360725",
+    "mechanization": "Extend the existing sheet-host guard to require exactly one edit presenter on the visible Context navigation destination instead of the covered timeline root. Run the guard against this instance: the production-source regression fails before relocating the presenter and passes afterward; mutations also reject root placement and duplicate presenters. Include the Swift presenter in existing Turbo test inputs. Preserve the native UI assertions and account ownership checks. Move callback diagnostics before ownership admission and record rejection so the next native receipt distinguishes a rejected callback from failed presentation. The failed artifact shows Context remaining visible but does not establish callback admission or prove the root cause. Native execution and coverage remain required in CI; this Linux host has no Xcode. Harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching the existing edit sheet to the navigation destination that contains its initiating control keeps its presenter in the visible view lifetime by construction. The existing required static sheet-host guard prevents moving it back or adding competing presenters."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/daily-reminder-sheet-host.test.ts",
+      "anchor": "keeps the edit-entry presenter on the visible Context destination"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
