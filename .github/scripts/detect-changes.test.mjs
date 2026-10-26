@@ -705,7 +705,7 @@ test('source-map dependency repair refreshes the lockfile and projection togethe
   }
 });
 
-for (const failure of ['source-conflict', 'pinned-drift', 'pnpm-failure']) {
+for (const failure of ['source-conflict', 'pinned-drift', 'pnpm-failure', 'incompatible-modes']) {
   test(`source-map dependency repair refuses ${failure} before staging`, () => {
     const fx = dependencyRepairFixture({ sourceConflict: failure === 'source-conflict' });
     try {
@@ -718,12 +718,14 @@ for (const failure of ['source-conflict', 'pinned-drift', 'pnpm-failure']) {
       }
       const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
       const index = git(fx.root, 'ls-files', '--stage');
-      const result = fx.resolve(['--refresh-lockfile'], { ...fx.env, LYB_TEST_PNPM_FAIL: '1' });
+      const args = failure === 'incompatible-modes' ? ['--refresh-lockfile', '--staged'] : ['--refresh-lockfile'];
+      const result = fx.resolve(args, { ...fx.env, LYB_TEST_PNPM_FAIL: '1' });
       assert.notEqual(result.status, 0);
       assert.match(result.stderr, {
         'source-conflict': /resolve source conflicts first: workflow.yml/,
         'pinned-drift': /pinned copy missing or changed: policy.md/,
         'pnpm-failure': /exit status 42/,
+        'incompatible-modes': /not allowed with argument --refresh-lockfile/,
       }[failure]);
       assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
       assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), 'stale lockfile\n');
@@ -785,6 +787,100 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
       }[failure]);
       assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
       assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+function stagedSourceMap() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'source-map-staged-'));
+  git(root, 'init', '-q', '-b', 'main');
+  const output = 'docs/SOURCES.md';
+  const config = {
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+    sources: [{ path: 'package.json', purpose: 'Dependencies' }], imports: [], output,
+  };
+  commit(root, {
+    'README.md': 'Local instructions\n',
+    'repository-docs.json': JSON.stringify(config),
+    'package.json': JSON.stringify({ dependencies: { switch: '1.3.7' } }),
+    'policy.md': 'Pinned policy\n',
+  }, 'base sources');
+  execFileSync('python3', [
+    path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write',
+  ], { env: gitEnv });
+  git(root, 'add', output);
+  git(root, 'commit', '-q', '-m', 'base projection');
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ dependencies: { switch: '1.3.8' } }));
+  git(root, 'add', 'package.json');
+  const resolve = () => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root, '--staged',
+  ], { env: gitEnv, encoding: 'utf8' });
+  return { root, output, config, resolve };
+}
+
+test('commit source-map repair uses staged dependencies and preserves unstaged source edits', () => {
+  const fx = stagedSourceMap();
+  try {
+    const unstaged = JSON.stringify({ dependencies: { switch: '1.3.9' } });
+    fs.writeFileSync(path.join(fx.root, 'package.json'), unstaged);
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged local instructions\n');
+    const staged = git(fx.root, 'show', ':package.json');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    const projection = git(fx.root, 'show', `:${fx.output}`);
+    assert.match(projection, /"switch": "1\.3\.8"/);
+    assert.doesNotMatch(projection, /1\.3\.7|1\.3\.9/);
+    assert.equal(git(fx.root, 'show', ':package.json'), staged);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'package.json'), 'utf8'), unstaged);
+    assert.equal(git(fx.root, 'show', ':README.md'), 'Local instructions');
+    assert.equal(git(fx.root, 'diff', '--cached', '--name-only'), `${fx.output}\npackage.json`);
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.resolve().status, 0, 'commit repair is idempotent');
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
+    assert.match(hook, /\npython3 scripts\/resolve-repository-docs\.py --staged(?:\n|$)/);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['unstaged-output', 'untracked-output', 'pinned-drift', 'missing-source', 'unsafe-output']) {
+  test(`commit source-map repair refuses ${failure} without changing the projection or index`, () => {
+    const fx = stagedSourceMap();
+    try {
+      if (failure === 'unstaged-output') fs.appendFileSync(path.join(fx.root, fx.output), 'Local note\n');
+      if (failure === 'untracked-output') {
+        fx.config.output = 'docs/LOCAL.md';
+        fs.writeFileSync(path.join(fx.root, fx.config.output), 'Local note\n');
+      }
+      if (failure === 'pinned-drift') {
+        fx.config.imports = [{
+          repository: 'example/policy', revision: 'a'.repeat(40),
+          path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+        }];
+      }
+      if (failure === 'missing-source') git(fx.root, 'rm', '--cached', 'package.json');
+      if (failure === 'unsafe-output') fx.config.output = '../escape.md';
+      fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+      git(fx.root, 'add', 'repository-docs.json');
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, {
+        'unstaged-output': /unstaged projection edits/,
+        'untracked-output': /unstaged projection edits/,
+        'pinned-drift': /pinned copy missing or changed: policy.md/,
+        'missing-source': /package.json/,
+        'unsafe-output': /unsafe repository path/,
+      }[failure]);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      if (failure === 'untracked-output') {
+        assert.equal(fs.readFileSync(path.join(fx.root, fx.config.output), 'utf8'), 'Local note\n');
+      }
     } finally {
       fs.rmSync(fx.root, { recursive: true, force: true });
     }

@@ -40,6 +40,12 @@ contact the package registry and leaves dependency edits unstaged for review.
 Then run `corepack pnpm install --frozen-lockfile` and the relevant checks;
 the repair command does not install dependencies or replace validation.
 
+The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
+after formatting and correction classification. It refreshes the projection
+from indexed sources, preserves unstaged source edits, and refuses unstaged
+projection edits or pinned-source drift. Bot commits created outside local
+hooks still need this refresh during repair; CI continues to reject stale output.
+
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
 exact upstream bytes. Only listed imports and generated output are written;
