@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "diagnostic-audit-pin-matches-reviewed-runner",
+    "correction": "PR #1554: The bounded cold-build repair changed the launch-quality audit bytes without refreshing the trusted diagnostic SHA-256 pin, failing Mac Runner Routing Tests and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40392549503/job/121817018662",
+    "mechanization": "Review the five-line cold-build diff and refresh the exact audit pin and its test expectations. Extend the existing required runner-routing trusted CLI regression to reject the previously approved audit bytes before candidate execution, retaining all seven dependency pins and existing admission/refusal cases. The suite reproduces two failures with the old pin and passes with the reviewed pin. Harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot synchronize a separately reviewed trusted workflow pin; deriving an accepted digest from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite compares the fixed reviewed audit digest with actual bytes and executes the trusted CLI against accepted current tooling and rejected previous, modified, dirty, missing or symlinked tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "healthkit-timezone-policy-without-source-identity",
     "correction": "PR #1567: Launch Quality failed the two cross-day timezone assertions in HealthImportIdempotencyTests. Selecting the sample-local day must not depend on having a complete source-scoped identity.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1567",
