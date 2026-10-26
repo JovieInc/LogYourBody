@@ -877,6 +877,9 @@ struct ChatTabView: View {
                     readinessEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
                         flagKey: TrainingReadinessPolicy.featureGate
                     ),
+                    restTimerEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
+                        flagKey: TrainingRestPolicy.featureGate
+                    ),
                     numericScrubEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
                         flagKey: TrainingNumericDimension.featureGate
                     ),
