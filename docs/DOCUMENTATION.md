@@ -44,8 +44,9 @@ For dependency PRs with a stale lockfile, stage the reviewed manifests and run
 repair uses the pinned pnpm through Corepack to regenerate the lockfile without
 lifecycle scripts, verifies it with a frozen offline pass, then stages the
 lockfile and source map. It refuses unresolved source conflicts, unstaged
-dependency or projection edits, and pinned-source drift. It requires registry
-access for uncached resolutions; commit hooks and CI keep frozen installation.
+dependency or projection edits, untracked dependency inputs, and pinned-source
+drift. It requires registry access for uncached resolutions; commit hooks and CI
+keep frozen installation.
 
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
