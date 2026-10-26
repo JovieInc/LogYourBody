@@ -1378,6 +1378,104 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "weight-lifecycle-verifiers-track-account-erasure-schema",
+    "correction": "PR #1555: The required training mutation verifier still expected five cleanup statements and stubbed body_metrics after manual weight lifecycle added receipts, audit, and grants to account erasure.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189270062/job/121156652050",
+    "mechanization": "Load the real body-metric and weight migrations in both transaction verifiers and assert all eight exact subject-scoped cleanup statements. The required mutation verifier exercises a committed weight receipt, audit, grant and metric, rollback after a later delete failure, successful retry and isolation of another owner. The original verifier reproduces the reported failure; the repaired verifier must pass on disposable PostgreSQL16.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application schema and erasure logic cannot update the separately maintained PostgreSQL verifier fixture or its expected SQL inventory."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required JavaScript/TypeScript check executes the verifier against real migrations and production erasure SQL, rejecting missing cleanup or incomplete rollback and owner isolation."
+      }
+    },
+    "guard": {
+      "path": "apps/web/db/tests/verify-training-mutations.py",
+      "anchor": "weight account erasure rolls back on failure, retries completely, and preserves the other owner"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "weight-intent-initializes-identity-before-wrapped-parameters",
+    "correction": "PR #1555: StoreKit compilation rejected LogWeightIntent because assigning the wrapped unit parameter used self before recordId and operationId were initialized.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189270062/job/121156652049",
+    "mechanization": "Initialize both immutable invocation IDs before setting the wrapped unit parameter. Swift definite initialization rejects the original ordering, and the retained App Intent retry regression verifies stable record and operation identity. Native compilation and execution remain required in CI; Linux lint does not prove them.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Initializing both immutable stored IDs before invoking the property-wrapper setter satisfies Swift definite initialization while preserving identity for intent retries."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/BodyMetricAppIntentsTests.swift",
+      "anchor": "func testLogWeightIntentRetryKeepsTheSameRecordAndOperation()"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "weight-sync-assertions-await-before-xctest-autoclosures",
+    "correction": "PR #1555: Launch Quality compilation rejected three sync regression assertions because XCTAssertTrue and XCTUnwrap use synchronous autoclosures that cannot await an asynchronous call.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189270062/job/121156652284",
+    "mechanization": "Await the in-flight placeholder update and cached metric reads into local values before asserting or unwrapping them. Preserve the conflict and tombstone behavior assertions. The existing required native build compiles these test files and rejects await inside synchronous XCTest autoclosures; native execution remains unverified on Linux.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Product runtime code cannot enforce how asynchronous reads are evaluated inside separately compiled XCTest assertions."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Launch Quality native compiler checks every retained sync regression before execution and rejects asynchronous calls inside synchronous XCTest autoclosures."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/SyncIntegrationRemotePayloadTests.swift",
+      "anchor": "func testUpdateOrCreateBodyMetric_AppliesANewerServerTombstone()"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-ledger-conflict-staging",
+    "correction": "PR #1555: Repeated conflict-only repairs must merge origin/main without dropping either parent's correction receipts, losing classification, or staging unrelated edits.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1555",
+    "mechanization": "Extend the existing correction classifier resolver with opt-in --stage. Validate staged guard sources, classification and retained receipts against both immutable merge parents before writing or staging only the ledger. A retry verifies the staged result without mutation. The existing required shared-lib suite exercises real conflicting Git branches, concurrent-edit and guard-conflict refusals, staged guard failure, index preservation and idempotence. The new staging regression fails before the extension and passes with unchanged 100% classifier coverage. Use the extension for this merge; the harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct, validate and stage the classified three-way ledger union in one opt-in operation, preserving both parents and unrelated edits by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "Validate staged guards and both parents before writing or staging anything."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-retries-only-before-xctest-starts",
+    "correction": "PR #1555: The chat replay failure/retry test hit repeated 60-second animation idle waits, exceeded its 180-second allowance, and the generic XCTest restart message retried the full UI suite until the required 52-minute step timed out.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40364152724/job/121717476981",
+    "mechanization": "Extend the existing launch-quality runner to retry only explicit simulator startup failures before any XCTest suite or case starts. Command timeouts return immediately even when earlier log lines contain launch errors; generic crash/timeout restart summaries cannot authorize retries. The existing required shared-lib and native evidence behavior suite executes the real shell functions against startup, timeout, started-case and started-suite logs, preserving failed bundles and the two-attempt startup bound. The new negative cases fail before the repair and pass after it. Disable UIKit and SwiftUI animations only for DEBUG chat replay fixtures while retaining every native terminal-state, retry identity and relaunch assertion and the existing execution cap; native CI must verify the animation-stall repair.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner can prevent full-suite retries after execution by construction, and the existing DEBUG fixture setup can isolate state replay from animation timing without changing production behavior or any test assertion."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_shell_does_not_retry_timeouts_or_started_tests(self):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "native-merge-duplicate-environment-binding",
     "correction": "PR #1554 conflict repair: preserve approved training cards alongside main training review, numeric scrubbing, acknowledgement and undo behavior. Independent SwiftUI changes silently duplicated the dynamicTypeSize environment property during the merge.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1554",
@@ -1431,6 +1529,24 @@
     "guard": {
       "path": "packages/shared-lib/src/daily-reminder-sheet-host.test.ts",
       "anchor": "keeps the edit-entry presenter on the visible Context destination"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-staged-merge-conflicts",
+    "correction": "PR #1554 repeated conflict repair: a classified staged ledger must not let merge verification or a staged resolver retry report success while another Git path is unresolved.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1554",
+    "mechanization": "Extend the existing correction classifier resolver so the shared unresolved-path preflight runs before both merge verification and staged retries. The existing required shared-lib classifier suite creates a real ledger and unrelated-file conflict, stages a valid ledger, and requires both modes to refuse without changing the ledger, unrelated file or index. This regression fails with the previous early return and passes with the repair. Use --resolve-merge . --stage for this instance, retaining both immutable parents and every guard. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge resolver can reject every unresolved non-ledger path before any success return, preventing a partial conflict repair from being reported as verified by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "Verify the whole merge is conflict-free, including staged retries."
     },
     "level": "codebase",
     "ruleId": "code-prevention"

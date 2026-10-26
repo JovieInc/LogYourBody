@@ -99,6 +99,15 @@ those source conflicts first, even when their files still contain guard anchors.
 Review the result, stage the ledger, and run the coverage check against both
 merge parents. The command leaves the index and unrelated edits untouched.
 
+For unattended repairs, use
+`node scripts/correction-classifier.mjs --resolve-merge . --stage`. This opts in
+to staging only the resolved ledger after validating its classification, staged
+guard sources and receipt retention against both merge parents. A failed
+validation preserves the ledger and index. Retrying after staging runs the
+read-only merge check; it does not restage files or overwrite unrelated edits.
+Both the merge check and staged retry refuse any other unresolved Git path,
+even when the staged ledger and all of its guard sources are valid.
+
 After staging the resolution, run
 `node scripts/correction-classifier.mjs --check-merge .`. This read-only mode
 verifies the staged ledger's classification, receipts and staged guard sources
