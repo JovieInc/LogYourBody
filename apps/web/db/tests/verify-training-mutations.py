@@ -75,8 +75,10 @@ def main():
             def sql(statement):
                 return run(client + ['-c', statement])
 
-            sql("create table schema_migrations(version text primary key); create table chat_usage_limits(user_subject text); create table chat_conversations(user_subject text); create table body_metrics(user_subject text);")
+            sql("create table schema_migrations(version text primary key); create table chat_usage_limits(user_subject text); create table chat_conversations(user_subject text);")
             for migration in ['20260714183000_create_app_users.sql','20260714213000_add_app_user_profile.sql',
+                              '20260715040000_create_body_metrics.sql','20260813120000_native_body_metrics_sync.sql',
+                              '20261025120000_weight_lifecycle.sql',
                               '20260813130000_native_product_records.sql','20260927102000_training_record_collections.sql']:
                 run(client + ['-f', str(web/'db/migrations'/migration)])
             run(client + ['-f', str(args.migration or web / 'db/migrations/20261010090000_training_revision_foundation.sql')])
@@ -250,7 +252,17 @@ def main():
             import re
             adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
             statements=re.findall(r'database`([^`]+)`',adapter)
-            assert len(statements)==5 and all(s.strip().startswith('delete from') for s in statements)
+            expected_cleanup = [
+                'delete from public.chat_usage_limits where user_subject = ${subject}',
+                'delete from public.chat_conversations where user_subject = ${subject}',
+                'delete from public.weight_operation_receipts where user_subject = ${subject}',
+                'delete from public.body_metric_audit where user_subject = ${subject}',
+                'delete from public.metrics_agent_grants where user_subject = ${subject}',
+                'delete from public.body_metrics where user_subject = ${subject}',
+                'delete from public.native_records where user_subject = ${subject}',
+                "delete from public.app_users where identity_provider = 'jovie' and identity_subject = ${subject}",
+            ]
+            assert [re.sub(r'\s+', ' ', s).strip() for s in statements] == expected_cleanup
             guard_source=(web/'src/lib/neon/native-account-admission.ts').read_text()
             guards=re.findall(r"database.query\('(select public.lyb_native_account_admit\(\$1, \$2::uuid\))'",guard_source)
             assert len(guards)==1, 'Expected the unique actual account guard SQL'
@@ -260,6 +272,34 @@ def main():
                 assert owner_id
                 guard=guards[0].replace('$1',quote(subject)).replace('$2',quote(owner_id))
                 return guard+';'+ ';'.join(s.replace('${subject}',quote(subject)) for s in statements)+';'
+
+            def seed_weight(subject):
+                owner_id=sql(f"select id from app_users where identity_subject={quote(subject)};")
+                sql(f"insert into metrics_agent_grants(user_subject,owner_id,connected,consent_granted,entitled) values({quote(subject)},{quote(owner_id)},true,true,true);")
+                body=dict(action='create', operation_id=str(uuid.uuid4()), record_id=str(uuid.uuid4()),
+                    request_hash='synthetic-weight', now='2026-10-25T12:00:00Z', weight_kg='81.600000',
+                    input_value='81.6', input_unit='kg', measured_at='2026-10-25T12:00:00Z',
+                    utc_offset_minutes=0, local_date='2026-10-25', iana_zone='UTC', provenance={})
+                result=json.loads(sql(f"select weight_lifecycle_command({quote(subject)},{quote(owner_id)},{quote(json.dumps(body))}::jsonb);"))
+                assert result['outcome']=='committed'
+
+            def weight_counts(subject):
+                tables=['weight_operation_receipts','body_metric_audit','metrics_agent_grants','body_metrics']
+                return [int(sql(f'select count(*) from {table} where user_subject={quote(subject)};')) for table in tables]
+
+            subject,other=owner(),owner()
+            seed_weight(subject); seed_weight(other)
+            assert weight_counts(subject)==weight_counts(other)==[1,1,1,1]
+            sql(f"create function fail_weight_cleanup() returns trigger language plpgsql as $$ begin if old.user_subject={quote(subject)} then raise exception 'injected weight cleanup failure'; end if; return old; end; $$; create trigger injected_weight_cleanup before delete on body_metrics for each row execute function fail_weight_cleanup();")
+            try: sql('begin;'+deletion(subject)+'commit;'); raise AssertionError('expected weight cleanup failure')
+            except RuntimeError as error: assert 'injected weight cleanup failure' in str(error)
+            assert weight_counts(subject)==weight_counts(other)==[1,1,1,1]
+            assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='1'
+            sql('drop trigger injected_weight_cleanup on body_metrics;')
+            sql('begin;'+deletion(subject)+'commit;')
+            assert weight_counts(subject)==[0,0,0,0] and weight_counts(other)==[1,1,1,1]
+            assert sql(f"select count(*) from app_users where identity_subject={quote(subject)};")=='0'
+            check('weight account erasure rolls back on failure, retries completely, and preserves the other owner')
 
             for boundary in ['revoke','delete']:
                 for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert','set_correct','recovery_trial']:

@@ -29,11 +29,15 @@ import {
   type SetLog,
 } from '@/lib/training/types';
 import { poundsToKg } from '@/lib/voice/intent-parser';
+import type { WeightLifecyclePort } from '@/lib/metrics/weight-lifecycle';
 import { LYB_MCP_SCOPES, type LybMcpScope } from './contract';
+import { weightMcpTools } from './weight-tools';
 
 export type McpToolDependencies = {
   revisions?: TrainingRevisionsPort;
   delegatedEnabled?: () => boolean;
+  metricsEnabled?: () => boolean;
+  weight?: WeightLifecyclePort;
   records: NativeProductRecordsPort;
   now: () => Date;
   createId: () => string;
@@ -45,13 +49,16 @@ export type McpToolResult = {
   isError?: boolean;
 };
 
-type ToolDefinition = {
+export type ToolDefinition = {
   delegated?: boolean;
+  gate?: 'metrics';
   name: string;
   title: string;
   description: string;
   scope: LybMcpScope;
   readOnly: boolean;
+  destructive?: boolean;
+  idempotent?: boolean;
   input: z.ZodType<Record<string, unknown>>;
   inputSchema: Record<string, unknown>;
   run(subject: string, args: never, deps: McpToolDependencies): Promise<McpToolResult>;
@@ -1053,27 +1060,34 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
   },
 ];
 
-export function listTools(delegatedEnabled = false) {
-  return LYB_MCP_TOOLS.filter((tool) => !tool.delegated || delegatedEnabled).map((tool) => {
-    const securitySchemes = [{ type: 'oauth2', scopes: [tool.scope] }];
-    return {
-      name: tool.name,
-      title: tool.title,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-      annotations: {
+function everyTool(): ToolDefinition[] {
+  return [...LYB_MCP_TOOLS, ...weightMcpTools()];
+}
+
+export function listTools(delegatedEnabled = false, metricsEnabled = false) {
+  return everyTool()
+    .filter((tool) => !tool.delegated || delegatedEnabled)
+    .filter((tool) => tool.gate !== 'metrics' || metricsEnabled)
+    .map((tool) => {
+      const securitySchemes = [{ type: 'oauth2', scopes: [tool.scope] }];
+      return {
+        name: tool.name,
         title: tool.title,
-        readOnlyHint: tool.readOnly,
-        destructiveHint: false,
-        openWorldHint: false,
-        idempotentHint: tool.readOnly,
-      },
-      securitySchemes,
-      _meta: { securitySchemes },
-    };
-  });
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: {
+          title: tool.title,
+          readOnlyHint: tool.readOnly,
+          destructiveHint: tool.destructive === true,
+          openWorldHint: false,
+          idempotentHint: tool.idempotent ?? tool.readOnly,
+        },
+        securitySchemes,
+        _meta: { securitySchemes },
+      };
+    });
 }
 
 export function findTool(name: unknown): ToolDefinition | undefined {
-  return LYB_MCP_TOOLS.find((tool) => tool.name === name);
+  return everyTool().find((tool) => tool.name === name);
 }

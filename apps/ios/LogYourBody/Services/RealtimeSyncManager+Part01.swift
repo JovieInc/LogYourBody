@@ -361,8 +361,10 @@ nonisolated func syncBodyMetricsBatch(_ metrics: [PendingBodyMetricSyncItem], to
             }
 
             let response = try await productAPIClient.upsertBodyMetricsBatch(metricsData, token: token)
-            let syncedIds = Set(response.compactMap { $0["id"] as? String })
+            let conflictIds = Set(response.conflicts.map(\.id))
+            let syncedIds = Set(response.records.compactMap { $0["id"] as? String }).subtracting(conflictIds)
             await coreDataManager.markAsSynced(entityName: "CachedBodyMetrics", ids: syncedIds)
+            await coreDataManager.markBodyMetricsConflicted(ids: conflictIds)
         }
     }
 
