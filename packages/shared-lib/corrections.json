@@ -1247,7 +1247,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1668,5 +1668,27 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1565 / LYB-240: Launch Quality compared normalized sourceBundleId to an unsaved HealthKit sample's empty bundle identifier and failed nil versus Optional(\"\"). Native provenance fixtures must respect blank-to-nil metadata normalization while preserving real source identifiers.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40408213055/job/121871680195",
+    "mechanization": "Extend the existing healthkit-sync-metadata scanner and its required correction ratchet to reject direct XCTest equality between normalized source fields and raw HealthKit source fields, in either operand order. Run it on the original assertion to reproduce the finding, normalize the fixture expectation, and run it again cleanly. Shared-lib exercises violating and permitted source snapshots; native cases cover nil, empty, whitespace, real bundle IDs and serialization. The existing empty baseline stays strict. Native execution remains required in CI; the lanes harness owns push and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Production metadata already normalizes blank source identifiers correctly. HealthKit owns sourceRevision for unsaved samples, so app types cannot require a nonempty SDK-provided source or prevent a test from comparing the raw string directly."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing HealthKit source scanner can reject direct XCTAssertEqual comparisons of normalized sourceBundleId/sourceName with raw sourceRevision fields before native execution, using the strict existing correction ratchet."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/healthkit-sync-metadata.mjs",
+      "anchor": "HealthKit's unsaved source can be empty; metadata normalizes blanks to nil."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

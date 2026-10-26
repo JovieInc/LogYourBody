@@ -106,15 +106,67 @@ export function analyze(path, source) {
   return findings;
 }
 
+function sourceAssertionFindings(path, source) {
+  if (!source.includes('sourceRevision') || !source.includes('XCTAssertEqual')) return [];
+  // Ignore examples in comments/strings while retaining Swift member expressions.
+  let code = '';
+  let index = 0;
+  while (index < source.length) {
+    if (source.startsWith('//', index)) {
+      const end = source.indexOf('\n', index);
+      index = end < 0 ? source.length : end;
+      code += ' ';
+    } else if (source.startsWith('/*', index)) {
+      const end = source.indexOf('*/', index + 2);
+      index = end < 0 ? source.length : end + 2;
+      code += ' ';
+    } else if (source[index] === '"') {
+      index = skipString(source, index);
+      code += '""';
+    } else {
+      code += source[index++];
+    }
+  }
+  const member = String.raw`[A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)+`;
+  const equality = new RegExp(
+    String.raw`\bXCTAssertEqual\s*\(\s*(${member})\s*,\s*(${member})\s*(?=[,)])`,
+    'gu',
+  );
+  const fields = [
+    ['sourceBundleId', 'bundleIdentifier'],
+    ['sourceName', 'name'],
+  ];
+  const findings = [];
+  // HealthKit's unsaved source can be empty; metadata normalizes blanks to nil.
+  for (const match of code.matchAll(equality)) {
+    const operands = match.slice(1).map((operand) => operand.replace(/\s+/gu, ''));
+    for (const [normalized, raw] of fields) {
+      if (
+        [operands, [...operands].reverse()].some(
+          ([left, right]) =>
+            left.endsWith(`.${normalized}`) && right.endsWith(`.sourceRevision.source.${raw}`),
+        )
+      ) {
+        findings.push({
+          path,
+          key: `normalize empty HealthKit ${raw} before comparing ${normalized}: ${operands.join(' == ')}`,
+        });
+      }
+    }
+  }
+  return findings;
+}
+
 export function scan({ files, readSource }) {
   return files
     .filter((path) => path.endsWith('.swift'))
-    .flatMap((path) =>
-      analyze(path, readSource(path)).map(({ path: findingPath, key }) => ({
-        path: findingPath,
-        key,
-      })),
-    );
+    .flatMap((path) => {
+      const source = readSource(path);
+      return [
+        ...analyze(path, source).map(({ path: findingPath, key }) => ({ path: findingPath, key })),
+        ...sourceAssertionFindings(path, source),
+      ];
+    });
 }
 
 function repairSpan(source, start, end) {
