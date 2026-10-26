@@ -13,7 +13,9 @@
     "guard": {
       "path": ".github/actions/setup-ruby-bundler/action.yml",
       "anchor": "bundle config set --local path vendor/bundle/${{ steps.ruby-version.outputs.identity }}"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "recurring-corrections-escalate-or-report-guard-failure",
@@ -33,7 +35,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-recurrence.behavior.mjs",
       "anchor": "new corrections to an already mechanized rule fail without filing or hiding the guard"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -53,7 +57,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
@@ -73,7 +79,9 @@
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -93,7 +101,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -113,7 +123,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "photo-filmstrip-shares-owned-timeline-selection",
@@ -129,7 +141,9 @@
     "guard": {
       "path": "apps/ios/LogYourBody/Views/HomeV2/HomeV2PhotoTimelineRuler.swift",
       "anchor": "HomeV2Filmstrip(photoURLs: photoURLs, selected: selected)"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "product-registry-generated-endpoints-match-source",
@@ -149,7 +163,9 @@
     "guard": {
       "path": "packages/product-registry/scripts/generate.mjs",
       "anchor": "is stale; run pnpm product:generate"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -169,7 +185,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
@@ -189,7 +207,9 @@
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -209,7 +229,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "training-cycle-delegation-merge-parity",
@@ -225,7 +247,9 @@
     "guard": {
       "path": "apps/web/src/app/api/auth/mobile/training/v1/__tests__/revisions.node.test.ts",
       "anchor": "keeps cycle revisions reachable with delegated programming enabled=%s"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "web-sentry-runtime-env-declarations",
@@ -245,7 +269,9 @@
     "guard": {
       "path": "packages/product-registry/scripts/env-surface.test.mjs",
       "anchor": "Web: process.env keys read in apps/web/src"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "sentry-web-sdk-runtime-and-release-compatibility",
@@ -261,7 +287,9 @@
     "guard": {
       "path": "apps/web/src/lib/adapters/__tests__/sentry.node.test.ts",
       "anchor": "disables automatic sensitive data collection with the installed SDK"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -281,7 +309,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "share-preview-chrome-preserves-card-accessibility",
@@ -297,7 +327,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
       "anchor": "Share card must remain accessibility-discoverable inside the overlay"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "share-avatar-probe-matches-rendered-blue",
@@ -317,7 +349,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift",
       "anchor": "The logo and a non-avatar photo must not satisfy the avatar probe"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
@@ -337,7 +371,9 @@
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -357,7 +393,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "adaptive-recovery-proposals-are-bounded-and-reviewed",
@@ -373,7 +411,9 @@
     "guard": {
       "path": "apps/web/src/lib/training/recovery.test.ts",
       "anchor": "applies a persisted proposal to the next prescription, survives session replay, and restores future work on revert"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -393,7 +433,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "app-store-privacy-matches-native-collection",
@@ -416,7 +458,9 @@
       "ratchet": {
         "baseline": "packages/shared-lib/app-privacy-baseline.json"
       }
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "chart-playhead-preparation-and-label-mapping",
@@ -432,7 +476,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/HomeV2MetricEditorialTests.swift",
       "anchor": "func testPlayheadSelectsLatestDailyReadingRegardlessOfValueOrInputOrder()"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "workout-readiness-uses-canonical-durable-feedback",
@@ -448,7 +494,9 @@
     "guard": {
       "path": "apps/ios/LogYourBody/Services/TrainingSessionDraft.swift",
       "anchor": "guard response.matches(pending.request) else { throw TrainingServiceError.invalidResponse }"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "claims-lint-covers-public-web-copy",
@@ -471,7 +519,9 @@
       "ratchet": {
         "baseline": "scripts/knowledge/web-claims-baseline.json"
       }
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "dependabot-transitive-security-floors",
@@ -487,7 +537,9 @@
     "guard": {
       "path": "packages/shared-lib/src/dependency-security.test.ts",
       "anchor": "%s has no vulnerable locked copies below %s"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -507,7 +559,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "storekit-tests-share-one-session-and-wait-for-clean-state",
@@ -523,7 +577,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
       "anchor": "private static func session() throws -> SKTestSession"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "storekit-warmup-diagnostics-respect-swiftlint",
@@ -543,7 +599,9 @@
     "guard": {
       "path": "apps/ios/.swiftlint.yml",
       "anchor": "no_print_statements:"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "correction-baselines-only-shrink",
@@ -563,7 +621,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-ratchet.behavior.mjs",
       "anchor": "baseline edits cannot grandfather new violations"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "waitlist-public-write-rate-limit",
@@ -579,7 +639,9 @@
     "guard": {
       "path": "apps/web/src/app/api/waitlist/route.ts",
       "anchor": "const limit = await reserveWaitlistRequest(request.headers);"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "web-production-deploy-requires-smoke",
@@ -595,7 +657,9 @@
     "guard": {
       "path": ".github/scripts/web-production-smoke.mjs",
       "anchor": "export async function runWebProductionSmoke"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "retire-placeholder-store-redirect-and-route-logs",
@@ -615,7 +679,9 @@
     "guard": {
       "path": "packages/shared-lib/src/web-surface-cleanup.test.ts",
       "anchor": "retires the unused store redirect and unpublished Android listing"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "web-deploy-rejects-sensitive-public-env-placeholder",
@@ -631,7 +697,9 @@
     "guard": {
       "path": ".github/scripts/verify-public-build-env.mjs",
       "anchor": "export function checkPulledEnv"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "web-deploy-injects-validated-statsig-client-key",
@@ -647,7 +715,9 @@
     "guard": {
       "path": ".github/scripts/verify-public-build-env.mjs",
       "anchor": "if (failures.length === 0 && contents !== original) writeFileSync(paths[0], contents);"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -667,7 +737,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "sidebar-swipe-preserves-first-row-tap",
@@ -683,7 +755,9 @@
     "guard": {
       "path": "apps/ios/LogYourBody/Views/HomeV2/HomeV2SidebarView.swift",
       "anchor": "recognizer.delaysTouchesEnded = false"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "public-page-self-referencing-canonicals",
@@ -703,7 +777,9 @@
     "guard": {
       "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
       "anchor": "public route metadata contract (LYB-223)"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "sentry-next-config-build-entrypoint",
@@ -719,7 +795,9 @@
     "guard": {
       "path": "apps/web/src/lib/adapters/__tests__/sentry-config.node.test.ts",
       "anchor": "const actual = jest.requireActual('@sentry/nextjs/config');"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "marketing-sitemap-shares-public-route-inventory",
@@ -735,7 +813,9 @@
     "guard": {
       "path": "apps/web/src/app/sitemap.ts",
       "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "guard-reference-paths-exist",
@@ -755,7 +835,53 @@
     "guard": {
       "path": "packages/shared-lib/scripts/guard-reference.behavior.mjs",
       "anchor": "deleted guard fails with the entry id and path"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1557: Merge-group CI rejects receipts introduced by main when their saved classifier level and ruleId are missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40209479290/job/121217537825",
+    "mechanization": "Run the existing deterministic classifier after merging main. The required shared-lib test compares the complete committed ledger with classifier output and verifies default CLI idempotence; it fails on the merged unclassified receipts and passes after classification.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1557: Merge-group CI rejects receipts introduced by main when their saved classifier level and ruleId are missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40232010306/job/121285634603",
+    "mechanization": "Run the existing deterministic classifier after merging main. The required shared-lib test compares the complete committed ledger with classifier output and verifies default CLI idempotence; it fails on the merged unclassified receipts and passes after classification.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "release-validation-encloses-main-ci",
@@ -775,6 +901,8 @@
     "guard": {
       "path": ".github/scripts/release-check-budget.test.mjs",
       "anchor": "enclosing release budget preserves native caps"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
