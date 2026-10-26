@@ -147,3 +147,50 @@ subprocess restrictions cause EPERM. Xcode is unavailable on this host; required
 native execution remains for CI. The harness owns pushing and the PR-body update
 with the machine line above. GBrain's local service remains unavailable, so
 durable write and readback are unverified.
+
+## Merge retention guard repair, 2026-10-26
+
+Merged `origin/main` at `d25896651e9bd5c74c3fd65382987dd058c5c2da` without
+rebasing. Used `node scripts/correction-classifier.mjs --resolve-merge .` for the
+only conflict, retaining all 54 correction receipts. Extended that same machine
+with `--check-merge .` and used it to verify the staged result against both
+immutable parents. Pre-commit now runs the read-only check for every merge,
+including when the ledger has no diff against `HEAD`.
+
+The regression failed on the previous CLI's usage check and now passes. It
+rejects lost receipts from either parent, stale classification, malformed staged
+JSON and missing staged guard anchors while preserving the index, working tree,
+parents and unrelated edits. The existing normal shared-lib runner executes all
+11 classifier cases with 100% line, branch and function coverage. Its wrapper
+now uses the existing child process's 30-second deadline after the expanded suite
+exceeded Vitest's default five seconds under concurrent execution.
+
+Commands run on Linux:
+
+- `corepack pnpm install --frozen-lockfile --prefer-offline`,
+  `corepack pnpm lint`, `corepack pnpm typecheck`, `corepack pnpm test`: passed.
+  Turbo reused unchanged package tasks; shared-lib tests executed for this repair.
+- `node --test --experimental-test-coverage
+--test-coverage-include=scripts/correction-classifier.mjs
+--test-coverage-lines=100 --test-coverage-branches=100
+--test-coverage-functions=100 scripts/correction-classifier.test.mjs`: passed.
+- `node scripts/correction-classifier.mjs --check-merge .`: passed against the
+  staged ledger and guards. Correction coverage also passed with `--base-ref`
+  set separately to `c32f8c69961b221240a0292051bb0a9874ee306b` and
+  `d25896651e9bd5c74c3fd65382987dd058c5c2da`.
+- Guard references, correction ratchets, URL drift, `python3 scripts/repository_docs.py`,
+  `bash -n .husky/pre-commit`, and staged/worktree `git diff --check`: passed.
+  The existing 11 claims-baseline findings remain warnings.
+- `gh run view 40301840766 --repo JovieInc/LogYourBody --log-failed`: returned
+  no failed logs for the supplied PR head. Required checks must run on the new head.
+
+Git/subprocess checks required sandbox escalation. Native sources, target
+membership and the diagnostic workflow are unchanged from the supplied PR head;
+Xcode is unavailable here and native acceptance remains unverified. The worktree
+started detached with the PR branch in use elsewhere, so the local repair uses
+`fix/lyb-153-pr1544-merge-repair`. The harness owns pushing and the PR-body update:
+
+`Machine: built scripts/correction-classifier.mjs`
+
+GBrain query, write and same-slug readback could not connect to its local service;
+durable persistence remains unverified.

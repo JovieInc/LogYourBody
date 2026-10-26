@@ -199,6 +199,10 @@ test('pre-commit classifies a staged correction ledger', () => {
   assert.match(hook, /packages\/shared-lib\/corrections\.json/);
   assert.match(hook, /node scripts\/correction-classifier\.mjs \|\| exit \$\?/);
   assert.match(hook, /git add -- packages\/shared-lib\/corrections\.json/);
+  assert.match(
+    hook,
+    /if git rev-parse -q --verify MERGE_HEAD >\/dev\/null; then\s+node scripts\/correction-classifier\.mjs --check-merge \. \|\| exit \$\?/,
+  );
 });
 
 test('CLI merges parent ledgers without losing receipts or accepting conflicting evidence', (t) => {
@@ -255,7 +259,8 @@ test('committed ledger is classified and the default CLI run is idempotent', () 
 test('CLI resolves Git ledger conflicts from both index stages without staging other edits', (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'lyb-classifier-git-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const rows = fixture();
+  const rows = fixture().slice(0, 4);
+  rows.push({ ...rows[0], source: `${rows[0].source}#another-receipt` });
   for (const contradictory of [false, true]) {
     const repository = join(directory, `repository with spaces ${contradictory}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
@@ -278,10 +283,14 @@ test('CLI resolves Git ledger conflicts from both index stages without staging o
     const run = (...args) =>
       spawnSync(process.execPath, [script, ...args], { cwd: tmpdir(), encoding: 'utf8' });
     git('init', '--initial-branch=left');
+    for (const { guard } of rows.filter(({ guard }) => guard)) {
+      writeFileSync(join(repository, guard.path), guard.anchor);
+    }
     writeFileSync(ledger, JSON.stringify([rows[0]]));
     writeFileSync(join(repository, 'unrelated.txt'), 'committed\n');
     git('add', '.');
     git('commit', '-m', 'test: base ledger');
+    assert.equal(run('--check-merge', repository).status, 1, 'a merge must be active');
     git('branch', 'right');
     writeFileSync(ledger, JSON.stringify(rows.slice(0, 2)));
     git('commit', '-am', 'test: left receipt');
@@ -294,6 +303,7 @@ test('CLI resolves Git ledger conflicts from both index stages without staging o
     const before = readFileSync(ledger, 'utf8');
     assert.match(before, /<<<<<<< HEAD/);
     const stages = git('ls-files', '-u');
+    assert.equal(run('--check-merge', repository).status, 1, 'the ledger must be staged');
     const parents = git('rev-parse', 'HEAD', 'MERGE_HEAD');
     const unrelated = join(repository, 'unrelated.txt');
     writeFileSync(unrelated, 'uncommitted user edit\n');
@@ -311,6 +321,37 @@ test('CLI resolves Git ledger conflicts from both index stages without staging o
       git('add', 'packages/shared-lib/corrections.json');
       assert.equal(run('--resolve-merge', repository).status, 1, 'refuse an already staged ledger');
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      const index = git('ls-files', '--stage');
+      const checked = run('--check-merge', repository);
+      assert.equal(checked.status, 0, checked.stderr);
+      assert.equal(git('ls-files', '--stage'), index, 'verification never stages files');
+      assert.equal(readFileSync(ledger, 'utf8'), resolved);
+
+      // A correct worktree cannot hide lost receipts or stale metadata in the index.
+      for (const [contents, diagnostic] of [
+        [JSON.stringify(classifyLedger(rows.slice(0, 2))), /removed rule/],
+        [JSON.stringify(classifyLedger([rows[0], ...rows.slice(2)])), /removed rule/],
+        [JSON.stringify(classifyLedger(rows.slice(0, -1))), /removed receipt/],
+        [JSON.stringify(rows), /staged merge ledger must be classified/],
+        ['{invalid json', /correction-classifier:/],
+      ]) {
+        writeFileSync(ledger, contents);
+        git('add', 'packages/shared-lib/corrections.json');
+        writeFileSync(ledger, resolved);
+        const staged = git('show', ':0:packages/shared-lib/corrections.json');
+        const refused = run('--check-merge', repository);
+        assert.equal(refused.status, 1);
+        assert.match(refused.stderr, diagnostic);
+        assert.equal(git('show', ':0:packages/shared-lib/corrections.json'), staged);
+        assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      }
+      git('add', 'packages/shared-lib/corrections.json');
+      writeFileSync(join(repository, rows[0].guard.path), 'missing guard');
+      git('add', rows[0].guard.path);
+      writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
+      assert.match(run('--check-merge', repository).stderr, /missing guard anchor/);
+      git('add', rows[0].guard.path);
+      assert.equal(run('--check-merge', repository).status, 0);
     }
     assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
     assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
@@ -318,6 +359,9 @@ test('CLI resolves Git ledger conflicts from both index stages without staging o
     assert.match(run('--resolve-merge').stderr, /usage:/);
     assert.match(run('--resolve-merge', '--unknown').stderr, /usage:/);
     assert.match(run('--resolve-merge', repository, 'extra').stderr, /usage:/);
+    assert.match(run('--check-merge').stderr, /usage:/);
+    assert.match(run('--check-merge', '--unknown').stderr, /usage:/);
+    assert.match(run('--check-merge', repository, 'extra').stderr, /usage:/);
     assert.equal(run('--resolve-merge', directory).status, 1, 'refuse a non-repository');
   }
 });

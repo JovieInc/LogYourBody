@@ -18,4 +18,4 @@ it('runs correction classifier fixtures and CLI behavior through the normal scri
   );
   expect(output).toContain('# fail 0');
   console.log(output.slice(output.indexOf('# start of coverage report')));
-});
+}, 30_000);

@@ -4,7 +4,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  assertNoRegression,
   coverageReport,
+  guardCoverageReport,
   LEDGER_PATH,
   LEVELS,
   ROOT,
@@ -154,23 +156,41 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     const args = process.argv.slice(2);
     const resolvingMerge = args[0] === '--resolve-merge';
+    const checkingMerge = args[0] === '--check-merge';
     assert.ok(
-      resolvingMerge
+      resolvingMerge || checkingMerge
         ? args.length === 2 && !args[1].startsWith('-')
         : (args.length <= 1 ||
             (args.length === 3 && args[1] === '--merge' && !args[2].startsWith('-'))) &&
           !args[0]?.startsWith('-'),
-      'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository',
+      'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository | --check-merge repository',
     );
     let path;
     let result;
-    if (resolvingMerge) {
+    if (resolvingMerge || checkingMerge) {
       const git = (...gitArgs) =>
         execFileSync('git', ['-C', args[1], ...gitArgs], {
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
         });
       path = resolve(git('rev-parse', '--show-toplevel').trim(), LEDGER_PATH);
+      if (checkingMerge) {
+        const parents = ['HEAD', 'MERGE_HEAD'].map((ref) => git('rev-parse', '--verify', ref).trim());
+        const receipts = JSON.parse(git('show', `:0:${LEDGER_PATH}`));
+        assert.deepEqual(receipts, classifyLedger(receipts), 'staged merge ledger must be classified');
+        const current = guardCoverageReport(receipts, (guard) => git('show', `:0:${guard}`), {
+          requireClassification: true,
+        });
+        for (const ref of parents) {
+          const baseline = coverageReport(
+            JSON.parse(git('show', `${ref}:${LEDGER_PATH}`)),
+            (guard) => git('show', `${ref}:${guard}`),
+          );
+          assertNoRegression(current, baseline);
+        }
+        console.log('correction-classifier: verified staged ledger against both merge parents');
+        process.exit(0);
+      }
       // Read both immutable conflict stages, never the marker-filled worktree.
       // Missing stages and contradictory evidence fail before any write.
       result = mergeLedgers(

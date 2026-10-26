@@ -77,6 +77,15 @@ evidence or guard annotations. Missing conflict stages fail without writing.
 Review the result, stage the ledger, and run the coverage check against both
 merge parents. The command leaves the index and unrelated edits untouched.
 
+After staging the resolution, run
+`node scripts/correction-classifier.mjs --check-merge .`. This read-only mode
+verifies the staged ledger's classification, receipts and staged guard sources
+against both immutable merge parents using the existing coverage nonregression
+policy. It rejects a lost rule or source, a missing guard, or unclassified
+metadata even when the working tree is correct. Pre-commit runs this check for
+every merge, including merges whose staged ledger has no diff against `HEAD`.
+An absent merge or an unstaged ledger conflict fails without writing files.
+
 For exported parent snapshots, `node scripts/correction-classifier.mjs left.json
 --merge right.json` writes the validated union to `left.json` without changing
 the second input. Conflicting edits to the same receipt require explicit
@@ -98,6 +107,32 @@ entry. Repeated runs preserve unchanged file bytes. Unknown fields, levels, rule
 IDs or assessment shapes fail with a diagnostic. Classification adds routing
 metadata; the existing coverage check still verifies retained guard evidence
 and compares it with the immutable Git base.
+
+For new lint/typecheck/CI source checks (LYB-307), pass classified receipts to
+`emitCorrectionChecks` in
+[`correction-checks.mjs`](../../packages/shared-lib/scripts/correction-checks.mjs).
+It emits one check per `static` fingerprint and no check for `codebase`, `prose`
+or `human`. The guard must export the existing side-effect-free
+`scan({ files, readSource })` interface and return `{ path, key }` findings.
+The emitter routes reviewed checks; it does not translate lesson text into a
+scanner or add the domain checks owned by LYB-188/189.
+
+Run those new checks from the source repository, using a ledger containing their
+classified receipts:
+
+```sh
+node packages/shared-lib/scripts/correction-checks.mjs classified-checks.json
+```
+
+The CLI reports each violation and prints the emitted checks and findings as
+JSON without writing files. At zero distinct repeats, violations emit warnings
+and exit 0; at one or more repeats, the same scanner emits errors and exits 1.
+Clean checks exit 0 at either severity. Recurrence uses the ledger's canonical
+source identity, so replaying one receipt cannot harden a check. Invalid input,
+missing guards and broken scanners fail regardless of severity. Existing hard
+checks retain their own invocations; guards with finding-baseline ratchets must
+use the existing ratchet runner and cannot be wrapped by this emitter. The normal
+shared-lib test task runs the CLI regression fixtures and emitter coverage gate.
 
 The JSON report and existing CI/owner tables expose sources, lessons, selected
 levels, guards and recurrence. Required coverage CI compares against the exact

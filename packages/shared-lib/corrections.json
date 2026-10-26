@@ -3,7 +3,7 @@
     "fingerprint": "merge-correction-ledgers-before-classification",
     "correction": "PR #1544: Repeated origin/main repairs must preserve both merge parents' correction receipts and classify their union instead of resolving the ledger by choosing one side.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1544",
-    "mechanization": "Extend the existing correction classifier with --merge and --resolve-merge to validate both parent ledgers, deduplicate canonical fingerprint/source identities and reject conflicting evidence before writing. The latter reads immutable Git conflict stages directly and leaves staging and unrelated edits untouched. Used for this repair. The normal required shared-lib suite runs real conflicting Git repositories at the existing 100% coverage gates; the new regression failed on the previous CLI and passes with the extension.",
+    "mechanization": "Extend the existing correction classifier with --merge and --resolve-merge to validate both parent ledgers, deduplicate canonical fingerprint/source identities and reject conflicting evidence before writing. --check-merge verifies the staged ledger and guard sources against both immutable merge parents using the existing coverage nonregression policy. Pre-commit runs this read-only check for every merge, even when the ledger has no diff against HEAD. Used for this repair. The normal required shared-lib suite runs real conflicting Git repositories at the existing 100% coverage gates; the new regression failed on the previous CLI and passes with the extension.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1090,5 +1090,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lint-correction-checks-warn-then-harden",
+    "correction": "LYB-307: Emit new checks only for lint/typecheck/CI classifications. The first receipt warns with exit 0; a distinct repeat hardens the same check. Codebase, prose and human-review classifications emit no new check.",
+    "source": "https://linear.app/jovie/issue/LYB-307",
+    "mechanization": "The existing required shared-lib test task runs real scanner and CLI fixtures proving warning exit 0, repeated violation exit 1, clean recurrent checks, duplicate receipt deduplication and no emitted checks for the other levels. Existing hard gates and finding-baseline ratchets retain their runners.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot enforce repository correction routing or the exit status of newly emitted lint and CI checks."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required shared-lib suite can execute classified fixture receipts through the check emitter and assert diagnostics, recurrence, no-check routes and actual process exit statuses."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-checks.behavior.mjs",
+      "anchor": "lint-level violation warns at recurrence zero and fails at recurrence one or more"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
