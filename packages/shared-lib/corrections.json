@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-update-regenerates-source-projection",
+    "correction": "PR #1596 / fix-red-1423773703: The alert-dialog 1.1.24 manifest bump left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must extend the existing generator instead of requiring another manual refresh.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300090002/job/121495546561",
+    "mechanization": "Extend the existing source-map repair helper with an index-only mode and invoke it from the pre-commit hook after formatting and classification. Required Detect Changes tests exercise dependency regeneration, idempotence, partial staging, unstaged output protection, missing and symlinked inputs, unsafe paths and pinned-source drift in real Git repositories. The dependency regression fails without the new mode and passes with it; use the same mode for this repair.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing commit hook can generate and stage the derived map from exactly the committed source snapshot by construction. The generator retains immutable import validation and refuses unstaged output edits before mutation; required CI continues checking committed parity."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "def resolve_staged(root):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",

@@ -714,3 +714,92 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
     }
   });
 }
+
+function stagedSourceMap() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'source-map-staged-'));
+  git(root, 'init', '-q', '-b', 'main');
+  const output = 'docs/SOURCES.md';
+  const config = {
+    schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+    sources: [{ path: 'package.json', purpose: 'Dependencies' }], imports: [], output,
+  };
+  commit(root, {
+    'README.md': 'Local instructions\n',
+    'repository-docs.json': JSON.stringify(config),
+    'package.json': JSON.stringify({ dependencies: { dialog: '1.1.23' } }),
+  }, 'base sources');
+  execFileSync('python3', [
+    path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write',
+  ], { env: gitEnv });
+  git(root, 'add', output);
+  git(root, 'commit', '-q', '-m', 'base projection');
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ dependencies: { dialog: '1.1.24' } }));
+  git(root, 'add', 'package.json');
+  const resolve = () => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root, '--staged',
+  ], { env: gitEnv, encoding: 'utf8' });
+  return { root, output, config, resolve };
+}
+
+test('pre-commit regenerates dependency source maps from the index and preserves unstaged edits', () => {
+  const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
+  assert.match(hook, /python3 scripts\/resolve-repository-docs\.py --staged \|\| exit \$\?/);
+  assert.ok(hook.indexOf('resolve-repository-docs.py') > hook.indexOf('node scripts/correction-classifier.mjs'));
+  const fx = stagedSourceMap();
+  try {
+    const staged = git(fx.root, 'show', ':package.json');
+    fs.writeFileSync(path.join(fx.root, 'package.json'), '{"dependencies":{"dialog":"unstaged"}}');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    const projection = git(fx.root, 'show', `:${fx.output}`);
+    assert.match(projection, /"dialog": "1.1.24"/);
+    assert.doesNotMatch(projection, /unstaged/);
+    assert.equal(git(fx.root, 'show', ':package.json'), staged);
+    assert.match(fs.readFileSync(path.join(fx.root, 'package.json'), 'utf8'), /unstaged/);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8').trim(), projection);
+    assert.equal(fx.resolve().status, 0, 'staged regeneration is idempotent');
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['dirty-output', 'missing-input', 'symlink-input', 'unsafe-output', 'pinned-drift']) {
+  test(`staged source-map repair refuses ${failure} without changing the projection or index`, () => {
+    const fx = stagedSourceMap();
+    try {
+      if (failure === 'dirty-output') fs.appendFileSync(path.join(fx.root, fx.output), 'Local edit\n');
+      if (failure === 'missing-input') git(fx.root, 'rm', 'README.md');
+      if (failure === 'symlink-input') {
+        fs.unlinkSync(path.join(fx.root, 'package.json'));
+        fs.symlinkSync('README.md', path.join(fx.root, 'package.json'));
+        git(fx.root, 'add', 'package.json');
+      }
+      if (failure === 'unsafe-output') fx.config.output = '../escape.md';
+      if (failure === 'pinned-drift') {
+        fx.config.imports = [{
+          repository: 'example/policy', revision: 'a'.repeat(40), path: 'policy.md',
+          destination: 'policy.md', sha256: '0'.repeat(64),
+        }];
+        fs.writeFileSync(path.join(fx.root, 'policy.md'), 'changed pinned source');
+        git(fx.root, 'add', 'policy.md');
+      }
+      fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+      git(fx.root, 'add', 'repository-docs.json');
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, {
+        'dirty-output': /unstaged projection edits/,
+        'missing-input': /missing staged input/,
+        'symlink-input': /staged input must be a regular file/,
+        'unsafe-output': /unsafe repository path/,
+        'pinned-drift': /pinned copy missing or changed: policy.md/,
+      }[failure]);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
