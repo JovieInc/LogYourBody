@@ -33,6 +33,12 @@ map from the merged sources. This wraps the pinned generator and refuses to
 write while any other file is unmerged or a shared import fails parity. It
 stages only the generated output; review the source diff before committing.
 
+The pre-commit hook also runs this resolver with `--if-staged` after formatting.
+Staged manifests, workflows, shared imports or the projection trigger a refresh.
+Unrelated commits are left alone. Partially staged inputs or projection edits
+must be staged or restored first so the generated document matches the commit.
+Dependabot does not run local hooks; use the resolver when repairing its branches.
+
 The default check verifies local copies against declared hashes offline. It does
 not claim that upstream pins are latest. Update-time Git readback verifies the
 exact upstream bytes. Only listed imports and generated output are written;

@@ -714,3 +714,140 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
     }
   });
 }
+
+function dependencyProjection() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dependency-projection-'));
+  git(root, 'init', '-q', '-b', 'main');
+  const output = 'docs/SOURCES.md';
+  const manifest = (version) => JSON.stringify({ dependencies: { zod: version } });
+  commit(root, {
+    'README.md': 'Local instructions\n',
+    'repository-docs.json': JSON.stringify({
+      schemaVersion: 1, repository: 'example/app', entrypoints: ['README.md'],
+      sources: ['package.json', 'apps/web/package.json'].map((source) => ({ path: source, purpose: 'Manifest' })),
+      imports: [], output,
+    }),
+    'package.json': manifest('4.6.6'),
+    'apps/web/package.json': manifest('4.6.6'),
+  }, 'base dependencies');
+  execFileSync('python3', [path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write']);
+  git(root, 'add', output);
+  git(root, 'commit', '-q', '-m', 'base projection');
+  const refresh = () => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root, '--if-staged',
+  ], { env: gitEnv, encoding: 'utf8' });
+  return { root, output, manifest, refresh };
+}
+
+test('staged dependency updates refresh and stage their projection through the pre-commit hook', () => {
+  const fx = dependencyProjection();
+  try {
+    const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
+    assert.match(hook, /^python3 scripts\/resolve-repository-docs.py --if-staged$/m);
+    for (const name of ['package.json', 'apps/web/package.json']) {
+      fs.writeFileSync(path.join(fx.root, name), fx.manifest('4.6.7'));
+      git(fx.root, 'add', name);
+    }
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged local edit\n');
+    assert.equal(fx.refresh().status, 0);
+    const projection = git(fx.root, 'show', `:${fx.output}`);
+    assert.equal((projection.match(/"zod": "4.6.7"/g) ?? []).length, 2);
+    assert.doesNotMatch(projection, /4\.6\.6/);
+    assert.equal(git(fx.root, 'show', ':README.md'), 'Local instructions');
+    assert.equal(spawnSync('python3', [
+      path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', fx.root,
+    ], { encoding: 'utf8' }).status, 0);
+    const before = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.refresh().status, 0);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), before, 'refresh is idempotent');
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test('projection refresh skips unrelated commits and preserves unstaged source edits', () => {
+  const fx = dependencyProjection();
+  try {
+    fs.writeFileSync(path.join(fx.root, 'package.json'), fx.manifest('4.6.7'));
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Staged prose edit\n');
+    git(fx.root, 'add', 'README.md');
+    const before = git(fx.root, 'ls-files', '--stage');
+    const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const result = fx.refresh();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), before);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+    assert.equal(fs.readFileSync(path.join(fx.root, 'package.json'), 'utf8'), fx.manifest('4.6.7'));
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const partiallyStaged of ['package.json', 'repository-docs.json', 'docs/SOURCES.md']) {
+  test(`projection refresh refuses unstaged ${partiallyStaged} without writing or staging`, () => {
+    const fx = dependencyProjection();
+    try {
+      fs.writeFileSync(path.join(fx.root, 'package.json'), fx.manifest('4.6.7'));
+      git(fx.root, 'add', 'package.json');
+      fs.appendFileSync(path.join(fx.root, partiallyStaged), '\n ');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const result = fx.refresh();
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /stage or restore projection inputs first:/);
+      assert.ok(result.stderr.includes(partiallyStaged), result.stderr);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('projection refresh requires staged imports and retains pinned-source verification', () => {
+  for (const staged of [false, true]) {
+    const fx = dependencyProjection();
+    try {
+      const registry = path.join(fx.root, 'repository-docs.json');
+      const config = JSON.parse(fs.readFileSync(registry, 'utf8'));
+      config.imports = [{
+        repository: 'example/policy', revision: 'a'.repeat(40),
+        path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+      }];
+      fs.writeFileSync(registry, JSON.stringify(config));
+      fs.writeFileSync(path.join(fx.root, 'policy.md'), 'Unverified policy\n');
+      git(fx.root, 'add', 'repository-docs.json');
+      if (staged) git(fx.root, 'add', 'policy.md');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const result = fx.refresh();
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, staged ? /pinned copy missing or changed: policy.md/ : /stage or restore projection inputs first: policy.md/);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('unstaged registry changes cannot hide a staged projection source', () => {
+  const fx = dependencyProjection();
+  try {
+    fs.writeFileSync(path.join(fx.root, 'package.json'), fx.manifest('4.6.7'));
+    git(fx.root, 'add', 'package.json');
+    const registry = path.join(fx.root, 'repository-docs.json');
+    const config = JSON.parse(fs.readFileSync(registry, 'utf8'));
+    config.sources = config.sources.filter((source) => source.path !== 'package.json');
+    fs.writeFileSync(registry, JSON.stringify(config));
+    const before = git(fx.root, 'ls-files', '--stage');
+    const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const result = fx.refresh();
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /stage or restore projection inputs first: repository-docs.json/);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), before);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});

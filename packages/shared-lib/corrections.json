@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "staged-source-projection-refresh",
+    "correction": "PR #1602: The Zod 4.6.7 dependency update left the source projection stale, failing Detect Changes, CI Summary and shadow parity. Repeated repair work must extend the existing machine and use it for this branch.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1602",
+    "mechanization": "Extend the existing merge resolver with --if-staged and invoke it after formatting in the pre-commit hook. Refresh and stage the projection whenever its inputs change, skip unrelated commits, and refuse unstaged or untracked inputs before writing. The existing required Detect Changes suite reproduces dependency bumps, idempotence, partial staging, missing imports and pinned drift. New regressions failed before implementation and pass afterward; use the resolver to regenerate this PR's projection.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The pre-commit hook generates and stages the projection from staged sources automatically. Refusing unstaged inputs prevents the committed document from describing a different source snapshot. Dependabot branches use the same resolver during repair because remote bot commits do not execute local hooks."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "stage or restore projection inputs first: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",
