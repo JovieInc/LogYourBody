@@ -42,20 +42,25 @@ function referenceStatus(path, root) {
 }
 
 export function ledgerGuardReferences(receipts) {
-  planCorrectionIssues(receipts);
+  // Path conflicts belong to this check. Recurrence grouping also rejects a
+  // disagreeing guard, but as a coverage-annotation conflict. Report the path
+  // conflict first so that more specific failure stays visible.
   const rules = new Map();
-  for (const receipt of receipts) {
-    const id = entryId(receipt.fingerprint);
-    const claimed = receipt.guard != null;
-    const path = claimed && typeof receipt.guard.path === 'string' ? receipt.guard.path : null;
-    const reference = { id, claimed, path: claimed ? path : null };
-    const previous = rules.get(id);
-    assert.ok(
-      !previous || (previous.claimed === reference.claimed && previous.path === reference.path),
-      `conflicting guard reference: ${id}`,
-    );
-    rules.set(id, reference);
+  if (Array.isArray(receipts)) {
+    for (const receipt of receipts) {
+      const id = entryId(receipt.fingerprint);
+      const claimed = receipt.guard != null;
+      const path = claimed && typeof receipt.guard.path === 'string' ? receipt.guard.path : null;
+      const reference = { id, claimed, path: claimed ? path : null };
+      const previous = rules.get(id);
+      assert.ok(
+        !previous || (previous.claimed === reference.claimed && previous.path === reference.path),
+        `conflicting guard reference: ${id}`,
+      );
+      rules.set(id, reference);
+    }
   }
+  planCorrectionIssues(receipts);
   return [...rules.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
 
