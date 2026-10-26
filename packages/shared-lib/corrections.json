@@ -1312,5 +1312,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "slow-chat-fixtures-wait-for-explicit-cancellation",
+    "correction": "PR #1593: Launch Quality cancellation UI test lost its partial answer because the slow fixture completed after 30 seconds while XCTest waited 60 seconds for animations after Send.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40316118527/job/121550248994",
+    "mechanization": "Both DEBUG slow fixture paths use the same cancellable suspension loop, so elapsed time cannot emit a terminal success. Extend the already-required native cancellation case with an injected tick advancing past 60 seconds, then verify the partial stream, pending journal, cancellation and immediate same-ID retry fencing. The existing required Mac Runner Routing Tests reject a finite delay in either path; that guard fails against the prior source and passes with the repair. Native XCTest execution remains unverified on this Linux host.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A shared cancellation-only loop prevents both ephemeral and replay slow fixtures from reaching completion merely because wall-clock time elapsed. The injected main-actor tick makes the former 30-second boundary testable without adding real-time waits."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/ChatService.swift",
+      "anchor": "private func waitForCancellation() async throws {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

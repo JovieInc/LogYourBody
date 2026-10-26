@@ -1513,6 +1513,26 @@ def test_chat_corpus_selects_public_turns_and_requires_exact_unit_and_ui_passes(
                 evidence.validate_cases(negative, required)
 
 
+def test_slow_chat_fixture_cannot_complete_before_explicit_cancellation() -> None:
+    source = (_REPO_ROOT / 'apps/ios/LogYourBody/Services/ChatService.swift').read_text()
+    fixture = source.split('struct FixtureChatService: ChatServicing {', 1)[1].split('\n#endif', 1)[0]
+    # Both the ephemeral and replay fixture must outlive XCTest's 60s idle wait.
+    slow_paths = [fixture.split('case .slow:', 1)[1].split('\n                }', 1)[0],
+                  fixture.split('if mode == .slow && row.attempts == 1 && !replayed {', 1)[1]
+                  .split('\n            }', 1)[0]]
+    for path in slow_paths:
+        assert 'try await waitForCancellation()' in path
+        assert 'Task.sleep' not in path, 'One elapsed delay cannot end a cancellation fixture'
+    wait = fixture.split('private func waitForCancellation() async throws {', 1)[1].split('\n    }', 1)[0]
+    assert 'while true {' in wait
+    assert 'try Task.checkCancellation()' in wait
+    assert 'try await slowTick()' in wait
+    assert 'try?' not in wait and 'break' not in wait and 'return' not in wait
+    native = (_REPO_ROOT / 'apps/ios/LogYourBodyTests/ChatServiceTests.swift').read_text()
+    assert 'elapsedSeconds == 61' in native
+    assert 'Slow fixture must remain pending past XCTest quiescence' in native
+
+
 def verify_coverage(report: Path) -> None:
     suites = json.loads(report.read_text())
     assert list(suites) == ['mac-runner-routing'], 'Unexpected or stale coverage suite'
