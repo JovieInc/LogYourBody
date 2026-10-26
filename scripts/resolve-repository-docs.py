@@ -75,11 +75,21 @@ def resolve(root, refresh_lockfile=False):
         if errors and errors != ["source projection stale: " + output]:
             raise ValueError("; ".join(errors))
         # Explicit repair only: normal commit hooks and CI retain frozen installs.
-        for mode in (["--no-frozen-lockfile"], ["--frozen-lockfile", "--offline"]):
-            subprocess.run(
-                ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
-                cwd=root, check=True,
-            )
+        lockfile = root / "pnpm-lock.yaml"
+        original = lockfile.read_bytes() if lockfile.exists() else None
+        try:
+            for mode in (["--no-frozen-lockfile"], ["--frozen-lockfile", "--offline"]):
+                subprocess.run(
+                    ["corepack", "pnpm", "install", "--lockfile-only", "--ignore-scripts", *mode],
+                    cwd=root, check=True,
+                )
+        except (OSError, subprocess.CalledProcessError):
+            # Restore failed repairs so the next attempt accepts the same inputs.
+            if original is None:
+                lockfile.unlink(missing_ok=True)
+            else:
+                lockfile.write_bytes(original)
+            raise
     errors = repository_docs.run(root, write=True)
     if errors:
         raise ValueError("; ".join(errors))
