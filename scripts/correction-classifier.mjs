@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -152,21 +153,47 @@ function mergeLedgers(left, right) {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const args = process.argv.slice(2);
+    const resolvingMerge = args[0] === '--resolve-merge';
     assert.ok(
-      (args.length <= 1 ||
-        (args.length === 3 && args[1] === '--merge' && !args[2].startsWith('-'))) &&
-        !args[0]?.startsWith('-'),
-      'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]]',
+      resolvingMerge
+        ? args.length === 2 && !args[1].startsWith('-')
+        : (args.length <= 1 ||
+            (args.length === 3 && args[1] === '--merge' && !args[2].startsWith('-'))) &&
+          !args[0]?.startsWith('-'),
+      'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository',
     );
-    const path = args[0] ?? resolve(ROOT, LEDGER_PATH);
+    let path;
+    let result;
+    if (resolvingMerge) {
+      const git = (...gitArgs) =>
+        execFileSync('git', ['-C', args[1], ...gitArgs], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      path = resolve(git('rev-parse', '--show-toplevel').trim(), LEDGER_PATH);
+      // Read both immutable conflict stages, never the marker-filled worktree.
+      // Missing stages and contradictory evidence fail before any write.
+      result = mergeLedgers(
+        JSON.parse(git('show', `:2:${LEDGER_PATH}`)),
+        JSON.parse(git('show', `:3:${LEDGER_PATH}`)),
+      );
+    } else {
+      path = args[0] ?? resolve(ROOT, LEDGER_PATH);
+      const receipts = JSON.parse(readFileSync(path, 'utf8'));
+      result =
+        args.length === 3
+          ? mergeLedgers(receipts, JSON.parse(readFileSync(args[2], 'utf8')))
+          : classifyLedger(receipts);
+    }
     const original = readFileSync(path, 'utf8');
-    const result =
-      args.length === 3
-        ? mergeLedgers(JSON.parse(original), JSON.parse(readFileSync(args[2], 'utf8')))
-        : classifyLedger(JSON.parse(original));
+    const formatted = `${JSON.stringify(result, null, 2)}\n`;
     // Validate the entire ledger before writing; a repeat run preserves bytes.
-    if (JSON.stringify(JSON.parse(original)) !== JSON.stringify(result)) {
-      writeFileSync(path, `${JSON.stringify(result, null, 2)}\n`);
+    if (
+      resolvingMerge
+        ? original !== formatted
+        : JSON.stringify(JSON.parse(original)) !== JSON.stringify(result)
+    ) {
+      writeFileSync(path, formatted);
     }
     console.log(`correction-classifier: classified ${result.length} receipts`);
   } catch (error) {

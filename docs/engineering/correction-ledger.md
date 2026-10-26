@@ -68,15 +68,19 @@ then stages the classified bytes so a commit cannot land missing level or ruleId
 feasible level; incidental keywords cannot override a rejected assessment.
 There is no implicit prose or human fallback for missing or malformed assessments.
 
-For additive ledger conflicts, export each immutable merge parent's ledger to a
-temporary JSON file, then run `node scripts/correction-classifier.mjs left.json
---merge right.json`. The command writes the classified union to `left.json`
-only after validating every receipt. It deduplicates canonical fingerprint/source
-identities and rejects disagreements in their evidence or guard annotations.
-Copy the reviewed result back to the tracked ledger and run the coverage check
-against both merge parents. The second input is never changed. Conflicting
-edits to the same receipt require explicit resolution; this mode does not choose
-one parent's evidence over the other.
+For additive ledger conflicts during a merge, run
+`node scripts/correction-classifier.mjs --resolve-merge .` from the repository
+root. This reads both immutable Git index stages and writes their classified
+union to the tracked ledger only after validating every receipt. It deduplicates
+canonical fingerprint/source identities and rejects disagreements in their
+evidence or guard annotations. Missing conflict stages fail without writing.
+Review the result, stage the ledger, and run the coverage check against both
+merge parents. The command leaves the index and unrelated edits untouched.
+
+For exported parent snapshots, `node scripts/correction-classifier.mjs left.json
+--merge right.json` writes the validated union to `left.json` without changing
+the second input. Conflicting edits to the same receipt require explicit
+resolution; neither mode chooses one parent's evidence over the other.
 
 | Rule ID                  | Saved level | Matching rule within the reviewed feasible level                                     |
 | ------------------------ | ----------- | ------------------------------------------------------------------------------------ |

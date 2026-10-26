@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -250,4 +250,74 @@ test('committed ledger is classified and the default CLI run is idempotent', () 
   const result = spawnSync(process.execPath, [script], { cwd: tmpdir(), encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(readFileSync(path, 'utf8'), before);
+});
+
+test('CLI resolves Git ledger conflicts from both index stages without staging other edits', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'lyb-classifier-git-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const rows = fixture();
+  for (const contradictory of [false, true]) {
+    const repository = join(directory, `repository with spaces ${contradictory}`);
+    const ledger = join(repository, 'packages/shared-lib/corrections.json');
+    mkdirSync(join(repository, 'packages/shared-lib'), { recursive: true });
+    const git = (...args) => {
+      const result = spawnSync('git', args, {
+        cwd: repository,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Ledger fixture',
+          GIT_AUTHOR_EMAIL: 'fixture@example.test',
+          GIT_COMMITTER_NAME: 'Ledger fixture',
+          GIT_COMMITTER_EMAIL: 'fixture@example.test',
+        },
+      });
+      assert.equal(result.status, args[0] === 'merge' ? 1 : 0, result.stderr);
+      return result.stdout;
+    };
+    const run = (...args) =>
+      spawnSync(process.execPath, [script, ...args], { cwd: tmpdir(), encoding: 'utf8' });
+    git('init', '--initial-branch=left');
+    writeFileSync(ledger, JSON.stringify([rows[0]]));
+    writeFileSync(join(repository, 'unrelated.txt'), 'committed\n');
+    git('add', '.');
+    git('commit', '-m', 'test: base ledger');
+    git('branch', 'right');
+    writeFileSync(ledger, JSON.stringify(rows.slice(0, 2)));
+    git('commit', '-am', 'test: left receipt');
+    git('switch', 'right');
+    const shared = contradictory ? { ...rows[0], correction: 'Contradictory evidence.' } : rows[0];
+    writeFileSync(ledger, JSON.stringify(classifyLedger([shared, ...rows.slice(2)])));
+    git('commit', '-am', 'test: right receipts');
+    git('switch', 'left');
+    git('merge', '--no-commit', 'right');
+    const before = readFileSync(ledger, 'utf8');
+    assert.match(before, /<<<<<<< HEAD/);
+    const stages = git('ls-files', '-u');
+    const parents = git('rev-parse', 'HEAD', 'MERGE_HEAD');
+    const unrelated = join(repository, 'unrelated.txt');
+    writeFileSync(unrelated, 'uncommitted user edit\n');
+    const result = run('--resolve-merge', repository);
+    assert.equal(result.status, contradictory ? 1 : 0, result.stderr);
+    assert.equal(git('ls-files', '-u'), stages, 'resolution does not stage files');
+    if (contradictory) {
+      assert.match(result.stderr, /conflicting merge receipt/);
+      assert.equal(readFileSync(ledger, 'utf8'), before);
+    } else {
+      assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), classifyLedger(rows));
+      const resolved = readFileSync(ledger, 'utf8');
+      assert.equal(run('--resolve-merge', repository).status, 0);
+      assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      git('add', 'packages/shared-lib/corrections.json');
+      assert.equal(run('--resolve-merge', repository).status, 1, 'refuse an already staged ledger');
+      assert.equal(readFileSync(ledger, 'utf8'), resolved);
+    }
+    assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
+    assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
+    assert.match(git('diff', '--name-only'), /unrelated.txt/);
+    assert.match(run('--resolve-merge').stderr, /usage:/);
+    assert.match(run('--resolve-merge', '--unknown').stderr, /usage:/);
+    assert.match(run('--resolve-merge', repository, 'extra').stderr, /usage:/);
+    assert.equal(run('--resolve-merge', directory).status, 1, 'refuse a non-repository');
+  }
 });

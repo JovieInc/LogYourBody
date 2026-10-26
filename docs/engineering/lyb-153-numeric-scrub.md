@@ -105,3 +105,45 @@ Repair validation on Linux:
 The harness retains push and PR ownership. Its PR-body handoff line is
 `Machine: built scripts/correction-classifier.mjs`. GBrain query, write and
 readback could not connect to its local service; persistence is unverified.
+
+## Subsequent merge repair, 2026-10-26
+
+Merged `origin/main` at `ae6cf8e23f63606b77c10abce547a14972d4fb19` without
+rebasing. The only conflict was the correction ledger. Extended the existing
+classifier with `--resolve-merge repository` and used
+`node scripts/correction-classifier.mjs --resolve-merge .` to read both Git
+conflict stages and retain all 53 receipts. Updated the existing repair receipt
+and command guide. Native source and target membership are unchanged from the
+PR parent `83508799ed311e42400c133d42cc3c7d651d4cf8`.
+
+The new regression creates real conflicting Git branches. It failed against the
+previous CLI's usage check, then passed with the extension. It verifies receipt
+retention, contradictory-evidence rejection without writes, idempotence,
+missing-stage refusal, paths containing spaces, and preservation of the index,
+parents and unrelated edits. All 11 classifier cases passed with 100% line,
+branch and function coverage through the existing required shared-lib runner.
+
+Commands run for this repair on Linux:
+
+- `corepack pnpm install --frozen-lockfile --prefer-offline`;
+  `corepack pnpm lint`; `corepack pnpm typecheck`; `corepack pnpm test`: passed.
+- `node --test --experimental-test-coverage
+--test-coverage-include=scripts/correction-classifier.mjs
+--test-coverage-lines=100 --test-coverage-branches=100
+--test-coverage-functions=100 scripts/correction-classifier.test.mjs`: passed.
+- `node --test .github/scripts/detect-changes.test.mjs`: 32 passed.
+- `node packages/shared-lib/scripts/correction-coverage.mjs --base-ref
+83508799ed311e42400c133d42cc3c7d651d4cf8` and the same command against
+  `ae6cf8e23f63606b77c10abce547a14972d4fb19`: passed.
+- `node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main`;
+  `node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main`;
+  `python3 scripts/repository_docs.py`; `git diff --check`: passed.
+  The 11 existing claims findings remain baseline warnings.
+- `gh run view 40172790796 --repo JovieInc/LogYourBody --log-failed`: returned
+  no failed logs. That run covers an earlier PR head, not this repaired commit.
+
+Tests and Git-based validation needed execution outside the sandbox because its
+subprocess restrictions cause EPERM. Xcode is unavailable on this host; required
+native execution remains for CI. The harness owns pushing and the PR-body update
+with the machine line above. GBrain's local service remains unavailable, so
+durable write and readback are unverified.
