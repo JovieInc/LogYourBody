@@ -618,3 +618,99 @@ test('Launch Quality static audits run on ubuntu and are gated by CI Summary', (
     assert.notEqual(runSummaryGate({ ...ok, staticResult }), 0, staticResult);
   }
 });
+
+function sourceMapConflict({ sourceConflict = false } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'source-map-merge-'));
+  git(root, 'init', '-q', '-b', 'main');
+  const source = 'first\n' + 'context\n'.repeat(10) + 'last\n';
+  const output = 'docs/SOURCES.md';
+  const config = {
+    schemaVersion: 1,
+    repository: 'example/app',
+    entrypoints: ['README.md'],
+    sources: [{ path: 'workflow.yml', purpose: 'Workflow' }],
+    imports: [],
+    output,
+  };
+  commit(root, {
+    'README.md': 'Local instructions\n',
+    'repository-docs.json': JSON.stringify(config),
+    'workflow.yml': source,
+  }, 'base sources');
+  const generate = () => execFileSync('python3', [
+    path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', root, '--write',
+  ], { env: gitEnv });
+  const checkpoint = (contents, message) => {
+    fs.writeFileSync(path.join(root, 'workflow.yml'), contents);
+    generate();
+    git(root, 'add', '.');
+    git(root, 'commit', '-q', '-m', message);
+  };
+  checkpoint(source, 'base projection');
+  git(root, 'checkout', '-q', '-b', 'feature');
+  checkpoint(source.replace('first', 'feature'), 'feature workflow');
+  git(root, 'checkout', '-q', 'main');
+  checkpoint(source.replace(sourceConflict ? 'first' : 'last', 'main'), 'main workflow');
+  git(root, 'checkout', '-q', 'feature');
+  assert.throws(() => git(root, 'merge', '--no-commit', 'main'), 'fixture must conflict');
+  const resolve = () => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root,
+  ], { env: gitEnv, encoding: 'utf8' });
+  return { root, output, config, resolve };
+}
+
+test('source-map merge repair regenerates from both parents and stages only the projection', () => {
+  const fx = sourceMapConflict();
+  try {
+    const mergedSource = fs.readFileSync(path.join(fx.root, 'workflow.yml'), 'utf8');
+    assert.match(mergedSource, /^feature\n/);
+    assert.match(mergedSource, /\nmain\n$/);
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged local edit\n');
+    const stagedSource = git(fx.root, 'show', ':workflow.yml');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(git(fx.root, 'diff', '--name-only', '--diff-filter=U'), '');
+    assert.equal(git(fx.root, 'show', ':workflow.yml'), stagedSource);
+    assert.equal(git(fx.root, 'show', ':README.md'), 'Local instructions');
+    const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    assert.doesNotMatch(projection, /<<<<<<<|=======|>>>>>>>/);
+    assert.equal(git(fx.root, 'show', `:${fx.output}`), projection.trim());
+    const parity = spawnSync('python3', [
+      path.join(scriptDir, '../../scripts/repository_docs.py'), '--root', fx.root,
+    ], { env: gitEnv, encoding: 'utf8' });
+    assert.equal(parity.status, 0, parity.stderr);
+    assert.equal(fx.resolve().status, 0, 'repair is idempotent');
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
+  test(`source-map merge repair refuses ${failure} without changing the projection or index`, () => {
+    const fx = sourceMapConflict({ sourceConflict: failure === 'source-conflict' });
+    try {
+      if (failure === 'pinned-drift') {
+        fx.config.imports = [{
+          repository: 'example/policy', revision: 'a'.repeat(40),
+          path: 'policy.md', destination: 'policy.md', sha256: '0'.repeat(64),
+        }];
+      }
+      if (failure === 'unsafe-output') fx.config.output = '../escape.md';
+      fs.writeFileSync(path.join(fx.root, 'repository-docs.json'), JSON.stringify(fx.config));
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, {
+        'source-conflict': /resolve source conflicts first: workflow.yml/,
+        'pinned-drift': /pinned copy missing or changed: policy.md/,
+        'unsafe-output': /unsafe repository path/,
+      }[failure]);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}

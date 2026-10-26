@@ -1,5 +1,143 @@
 [
   {
+    "fingerprint": "generated-source-map-conflict-repair",
+    "correction": "PR #1582: Repeated merges of origin/main conflict only in the generated ci.yml fingerprint. Regenerate from the merged sources instead of choosing either parent hash.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1582",
+    "mechanization": "Wrap the existing pinned repository_docs generator with a reusable merge resolver that refuses other unresolved files and pinned-source drift, then regenerates and stages only the configured output. Required Detect Changes tests exercise real conflicting Git branches, both parent edits, idempotence, unstaged edit preservation and refusal paths. Use the resolver for this merge.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The merge resolver constructs the projection from already merged sources using the pinned generator, preventing selection of a stale parent fingerprint. It refuses unresolved source conflicts before writing or staging."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "resolve source conflicts first: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "ruby-native-cache-matches-runtime-build",
+    "correction": "PR #1577: Merge-group Unit CI failed before native compilation because an exact Ruby-version cache restored date_core.bundle with an unavailable _rb_cFalseClass symbol. A Ruby version alone does not identify a compatible native gem build.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40270455941",
+    "mechanization": "Extend the shared Ruby/Bundler setup action with a new cache namespace bound to Ruby build configuration, executable location, platform, runner architecture and environment. Clear persistent bundle leftovers before restoring and require native gems during setup verification. The existing required Mac Runner Routing Tests execute the real identity and cleanup steps and reject incompatible cache prefixes and unloadable gems. All three regressions failed against the prior action and pass after repair; native execution still requires macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The shared setup action constructs cache identities from the active interpreter build and runner identity, preventing incompatible native cache reuse by construction. Clearing leftover bundles ensures a cache miss cannot inherit stale native artifacts."
+      }
+    },
+    "guard": {
+      "path": ".github/actions/setup-ruby-bundler/action.yml",
+      "anchor": "identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, File.realpath(RbConfig.ruby), RbConfig::CONFIG.sort]"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1537: Resolve the origin/main correction-ledger conflict by retaining the Sentry identity and StoreKit cleanup receipts alongside main's recurrence, measurement-freshness and release receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1537",
+    "mechanization": "Preserve complete receipts from both immutable merge parents. The existing required correction coverage check rejects removed or reassigned source receipts, and its behavior tests exercise those failures. Verify the resolved ledger against both parents without changing the Sentry implementation or any required gate.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "storekit-cleanup-deletes-only-captured-history",
+    "correction": "PR #1537: Launch Quality again lost the monthly subscription during restore despite a shared SKTestSession (one transaction before restore, no entitlement or latest transaction afterward). Cleanup must not issue global clears that can affect later purchases, or treat missing active entitlements as proof that expired/refunded history has been removed.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40167822205/job/121092440195",
+    "mechanization": "Setup, teardown and warm-up use one cleanup routine that deletes only captured existing transaction IDs, polls both StoreKit history views without further mutation, and throws on timeout. The shared-lib regression rejects global clears and entitlement-only readiness; it failed against the original fixture. All four native purchase/restore/expiration/refund cases and required gates remain intact. Native runtime confirmation requires the repaired head on macOS.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Deleting only captured transaction IDs prevents delayed cleanup from targeting a transaction created by a later test. A bounded full-history barrier prevents setup from proceeding while old expired/refunded transactions remain visible."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
+      "anchor": "try session.deleteTransaction(identifier: transaction.identifier)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "sentry-user-type-is-module-qualified",
+    "correction": "PR #1537: Both native CI jobs failed because User(userId:) resolved to LogYourBody.User instead of Sentry.User. The ErrorReporter test vendor also lacked the new setUser(id:) protocol requirement.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40157276257",
+    "mechanization": "Qualify both SDK user constructors with Sentry and complete the test vendor conformance. The existing required native build checks enforce the SDK argument type and every ErrorTrackingVendor conformance. ErrorTrackingServiceTests additionally exercises account and install identity preservation, personal-field removal, and missing or empty identity removal through the real SDK redactor. The original CI logs prove the unqualified build fails; native execution of the repaired head remains required on macOS.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Module-qualified SDK types prevent the app model from shadowing either constructor by construction. Swift protocol conformance requires every vendor implementation, including test fakes, to implement setUser(id:)."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/ErrorTrackingService.swift",
+      "anchor": "SentrySDK.setUser(Sentry.User(userId: id))"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1537: Merge-group CI rejected the retained Sentry identity and StoreKit cleanup receipts because their saved classifier level and ruleId were missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40263628787/job/121381212964",
+    "mechanization": "Run the existing deterministic classifier after retaining both merge parents. The required shared-lib idempotence regression reproduces the three missing annotations before classification and passes afterward without changing the guard or its 100% coverage thresholds.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1590: Adding installed-build xcresult test cache inputs left the generated Turbo manifest fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40238447521/job/121304913985",
+    "mechanization": "Regenerate the existing source projection after reviewing the three installed-build xcresult cache inputs. The projection checker failed before regeneration locally and in CI and passes afterward; retain the required Detect Changes gate and its regression rejecting stale projection evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
     "fingerprint": "recurring-corrections-escalate-or-report-guard-failure",
     "correction": "LYB-252: Repeated corrections after a prose fix must request stronger enforcement once per rule; a correction recurring after mechanization is a guard failure rather than an ordinary repeat.",
     "source": "https://linear.app/jovie/issue/LYB-252",
@@ -17,7 +155,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-recurrence.behavior.mjs",
       "anchor": "new corrections to an already mechanized rule fail without filing or hiding the guard"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -37,7 +177,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
@@ -57,7 +199,9 @@
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -77,7 +221,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -97,7 +243,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
@@ -117,7 +265,9 @@
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -137,7 +287,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "training-cycle-delegation-merge-parity",
@@ -153,7 +305,9 @@
     "guard": {
       "path": "apps/web/src/app/api/auth/mobile/training/v1/__tests__/revisions.node.test.ts",
       "anchor": "keeps cycle revisions reachable with delegated programming enabled=%s"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "web-sentry-runtime-env-declarations",
@@ -173,7 +327,9 @@
     "guard": {
       "path": "packages/product-registry/scripts/env-surface.test.mjs",
       "anchor": "Web: process.env keys read in apps/web/src"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "sentry-web-sdk-runtime-and-release-compatibility",
@@ -189,7 +345,9 @@
     "guard": {
       "path": "apps/web/src/lib/adapters/__tests__/sentry.node.test.ts",
       "anchor": "disables automatic sensitive data collection with the installed SDK"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -209,7 +367,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "share-preview-chrome-preserves-card-accessibility",
@@ -225,7 +385,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
       "anchor": "Share card must remain accessibility-discoverable inside the overlay"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "share-avatar-probe-matches-rendered-blue",
@@ -245,7 +407,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift",
       "anchor": "The logo and a non-avatar photo must not satisfy the avatar probe"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
@@ -265,7 +429,9 @@
     "guard": {
       "path": "scripts/tests/test_runner_routing.py",
       "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -285,7 +451,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "adaptive-recovery-proposals-are-bounded-and-reviewed",
@@ -301,7 +469,9 @@
     "guard": {
       "path": "apps/web/src/lib/training/recovery.test.ts",
       "anchor": "applies a persisted proposal to the next prescription, survives session replay, and restores future work on revert"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
@@ -321,7 +491,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "correction ledger regression: removed receipt for"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "app-store-privacy-matches-native-collection",
@@ -344,7 +516,9 @@
       "ratchet": {
         "baseline": "packages/shared-lib/app-privacy-baseline.json"
       }
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "chart-playhead-preparation-and-label-mapping",
@@ -360,7 +534,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/HomeV2MetricEditorialTests.swift",
       "anchor": "func testPlayheadSelectsLatestDailyReadingRegardlessOfValueOrInputOrder()"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "workout-readiness-uses-canonical-durable-feedback",
@@ -376,7 +552,9 @@
     "guard": {
       "path": "apps/ios/LogYourBody/Services/TrainingSessionDraft.swift",
       "anchor": "guard response.matches(pending.request) else { throw TrainingServiceError.invalidResponse }"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   },
   {
     "fingerprint": "claims-lint-covers-public-web-copy",
@@ -399,7 +577,9 @@
       "ratchet": {
         "baseline": "scripts/knowledge/web-claims-baseline.json"
       }
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "dependabot-transitive-security-floors",
@@ -415,7 +595,9 @@
     "guard": {
       "path": "packages/shared-lib/src/dependency-security.test.ts",
       "anchor": "%s has no vulnerable locked copies below %s"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -435,7 +617,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "storekit-tests-share-one-session-and-wait-for-clean-state",
@@ -451,7 +635,9 @@
     "guard": {
       "path": "apps/ios/LogYourBodyTests/StoreKitPurchaseRestoreTests.swift",
       "anchor": "private static func session() throws -> SKTestSession"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "storekit-warmup-diagnostics-respect-swiftlint",
@@ -471,7 +657,9 @@
     "guard": {
       "path": "apps/ios/.swiftlint.yml",
       "anchor": "no_print_statements:"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "correction-baselines-only-shrink",
@@ -491,7 +679,9 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-ratchet.behavior.mjs",
       "anchor": "baseline edits cannot grandfather new violations"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "waitlist-public-write-rate-limit",
@@ -507,7 +697,9 @@
     "guard": {
       "path": "apps/web/src/app/api/waitlist/route.ts",
       "anchor": "const limit = await reserveWaitlistRequest(request.headers);"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "web-production-deploy-requires-smoke",
@@ -523,7 +715,9 @@
     "guard": {
       "path": ".github/scripts/web-production-smoke.mjs",
       "anchor": "export async function runWebProductionSmoke"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "retire-placeholder-store-redirect-and-route-logs",
@@ -543,7 +737,9 @@
     "guard": {
       "path": "packages/shared-lib/src/web-surface-cleanup.test.ts",
       "anchor": "retires the unused store redirect and unpublished Android listing"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "web-deploy-rejects-sensitive-public-env-placeholder",
@@ -559,7 +755,9 @@
     "guard": {
       "path": ".github/scripts/verify-public-build-env.mjs",
       "anchor": "export function checkPulledEnv"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "web-deploy-injects-validated-statsig-client-key",
@@ -575,7 +773,9 @@
     "guard": {
       "path": ".github/scripts/verify-public-build-env.mjs",
       "anchor": "if (failures.length === 0 && contents !== original) writeFileSync(paths[0], contents);"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "repository-source-projection-blocks-merge",
@@ -595,7 +795,9 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "required CI rejects a stale repository source projection"
-    }
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   },
   {
     "fingerprint": "sidebar-swipe-preserves-first-row-tap",
@@ -611,7 +813,9 @@
     "guard": {
       "path": "apps/ios/LogYourBody/Views/HomeV2/HomeV2SidebarView.swift",
       "anchor": "recognizer.delaysTouchesEnded = false"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "public-page-self-referencing-canonicals",
@@ -631,7 +835,9 @@
     "guard": {
       "path": "apps/web/src/app/__tests__/public-metadata.node.test.ts",
       "anchor": "public route metadata contract (LYB-223)"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "sentry-next-config-build-entrypoint",
@@ -647,7 +853,9 @@
     "guard": {
       "path": "apps/web/src/lib/adapters/__tests__/sentry-config.node.test.ts",
       "anchor": "const actual = jest.requireActual('@sentry/nextjs/config');"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "marketing-sitemap-shares-public-route-inventory",
@@ -663,7 +871,9 @@
     "guard": {
       "path": "apps/web/src/app/sitemap.ts",
       "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
-    }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   },
   {
     "fingerprint": "guard-reference-paths-exist",
@@ -683,7 +893,53 @@
     "guard": {
       "path": "packages/shared-lib/scripts/guard-reference.behavior.mjs",
       "anchor": "deleted guard fails with the entry id and path"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1557: Merge-group CI rejects receipts introduced by main when their saved classifier level and ruleId are missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40209479290/job/121217537825",
+    "mechanization": "Run the existing deterministic classifier after merging main. The required shared-lib test compares the complete committed ledger with classifier output and verifies default CLI idempotence; it fails on the merged unclassified receipts and passes after classification.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-classifier-covers-merged-receipts",
+    "correction": "PR #1557: Merge-group CI rejects receipts introduced by main when their saved classifier level and ruleId are missing. Classify the complete merged ledger before committing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40232010306/job/121285634603",
+    "mechanization": "Run the existing deterministic classifier after merging main. The required shared-lib test compares the complete committed ledger with classifier output and verifies default CLI idempotence; it fails on the merged unclassified receipts and passes after classification.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot populate saved metadata on repository ledger receipts introduced by a Git merge."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib regression compares every committed receipt with the deterministic classifier output and rejects missing or stale routing metadata."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "committed ledger is classified and the default CLI run is idempotent"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   },
   {
     "fingerprint": "release-validation-encloses-main-ci",
@@ -703,6 +959,8 @@
     "guard": {
       "path": ".github/scripts/release-check-budget.test.mjs",
       "anchor": "enclosing release budget preserves native caps"
-    }
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
