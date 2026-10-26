@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import subprocess
 import textwrap
@@ -1040,6 +1041,108 @@ def test_heartbeat_is_secretless_and_setup_canary_is_manual() -> None:
     assert 'uses: ./.github/actions/setup-ios-build' in canary
     assert 'bundle check' in canary
     assert "create-config-files: 'false'" in canary
+
+
+def _ruby_setup_step(name: str) -> str:
+    action = (_REPO_ROOT / '.github/actions/setup-ruby-bundler/action.yml').read_text()
+    return action.split(f'    - name: {name}\n', 1)[1].split('\n    - name:', 1)[0]
+
+
+def _ruby_setup_command(name: str) -> str:
+    body = _ruby_setup_step(name).split('      run: ', 1)[1]
+    return textwrap.dedent(body[2:]) if body.startswith('|\n') else body.splitlines()[0]
+
+
+def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys() -> None:
+    step = _ruby_setup_step('Cache Ruby dependencies')
+    key = step.split('        key: ', 1)[1].splitlines()[0]
+    restores = textwrap.dedent(step.split('        restore-keys: |\n', 1)[1]).splitlines()
+    context = {'runner.os': 'macOS', 'runner.arch': 'ARM64',
+               'runner.environment': 'self-hosted', 'inputs.cache-key-prefix': 'ios-gems',
+               'steps.ruby-version.outputs.version': '3.1.7p261',
+               'steps.ruby-version.outputs.runtime': 'a' * 64,
+               'steps.gemfile-hash.outputs.hash': 'lock-a'}
+
+    def render(template: str, **changes: str) -> str:
+        values = {**context, **changes}
+        return re.sub(r'\$\{\{\s*(.*?)\s*\}\}', lambda match: values[match[1]], template)
+
+    def can_restore(candidate: str) -> bool:
+        return candidate == render(key) or any(candidate.startswith(render(prefix)) for prefix in restores)
+
+    assert can_restore(render(key))
+    # A lockfile update may reuse native gems only from the same runtime.
+    assert can_restore(render(key, **{'steps.gemfile-hash.outputs.hash': 'lock-b'}))
+    assert not can_restore('macOS-ios-gems-ruby-3.1.7p261-lock-a')
+    for field, value in [('runner.os', 'Linux'), ('runner.arch', 'X64'),
+                         ('runner.environment', 'github-hosted'),
+                         ('steps.ruby-version.outputs.version', '3.1.6p260'),
+                         ('steps.ruby-version.outputs.runtime', 'b' * 64)]:
+        assert not can_restore(render(key, **{field: value})), field
+
+
+def test_ruby_cache_identity_changes_with_runtime_build_and_native_library(tmp_path: Path) -> None:
+    binary = tmp_path / 'ruby'
+    library = tmp_path / 'libruby.so'
+    binary.write_text('ruby build one')
+    library.write_text('ruby library one')
+    preload = tmp_path / 'rbconfig-fixture.rb'
+    preload.write_text(textwrap.dedent('''\
+        require 'rbconfig'
+        require 'digest'
+        RbConfig.define_singleton_method(:ruby) { ENV.fetch('FIXTURE_RUBY') }
+        RbConfig::CONFIG['libdir'] = File.dirname(ENV.fetch('FIXTURE_RUBY'))
+        RbConfig::CONFIG['LIBRUBY_SO'] = 'libruby.so'
+        RbConfig::CONFIG['arch'] = ENV.fetch('FIXTURE_ARCH')
+    '''))
+    output = tmp_path / 'github-output'
+
+    def probe(arch: str = 'arm64-darwin-25') -> str:
+        output.write_text('')
+        result = subprocess.run(['bash', '-e', '-c', _ruby_setup_command('Get Ruby version')],
+                                env={**os.environ, 'GITHUB_OUTPUT': str(output),
+                                     'RUBYOPT': f'-r{preload}', 'FIXTURE_RUBY': str(binary),
+                                     'FIXTURE_ARCH': arch}, text=True, capture_output=True,
+                                check=False, pass_fds=_coverage_fds())
+        assert result.returncode == 0, result.stderr
+        values = dict(line.split('=', 1) for line in output.read_text().splitlines())
+        assert values['version']
+        assert re.fullmatch('[0-9a-f]{64}', values['runtime'])
+        return values['runtime']
+
+    initial = probe()
+    assert probe() == initial
+    assert probe('x86_64-darwin-25') != initial
+    binary.write_text('ruby build two')
+    rebuilt = probe()
+    assert rebuilt != initial
+    library.write_text('ruby library two')
+    assert probe() != rebuilt
+    # Statically linked Ruby has no separate shared library to fingerprint.
+    library.unlink()
+    assert probe() == probe()
+
+
+def test_ruby_setup_fails_when_cached_date_or_psych_cannot_load(tmp_path: Path) -> None:
+    bundle = tmp_path / 'bundle'
+    bundle.write_text(textwrap.dedent('''\
+        #!/usr/bin/env bash
+        if [[ "$1" == exec ]]; then
+          printf '%s\\n' "$*" >> "$NATIVE_LOAD_CALLS"
+          exit "$NATIVE_LOAD_STATUS"
+        fi
+        echo 'fixture bundle config'
+    '''))
+    bundle.chmod(0o755)
+    marker = tmp_path / 'native-load-calls'
+    for status in [0, 1]:
+        result = subprocess.run(['bash', '-e', '-c', _ruby_setup_command('Verify Ruby setup')],
+                                env={**os.environ, 'PATH': f'{tmp_path}:{os.environ["PATH"]}',
+                                     'NATIVE_LOAD_CALLS': str(marker), 'NATIVE_LOAD_STATUS': str(status)},
+                                text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
+        assert result.returncode == status, result.stderr
+    assert len(marker.read_text().splitlines()) == 2
+    assert all('exec ruby -rdate -rpsych' in line for line in marker.read_text().splitlines())
 
 
 def test_invalid_awaiter_bounds_and_missing_helper_fall_back(tmp_path: Path) -> None:

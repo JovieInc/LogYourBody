@@ -45,7 +45,18 @@ runs:
     - name: Get Ruby version
       id: ruby-version
       shell: bash
-      run: echo "version=$(ruby -v | awk '{print $2}')" >> $GITHUB_OUTPUT
+      run: |
+        echo "version=$(ruby -v | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+        # Native gems depend on the Ruby build, including Homebrew revisions
+        # that keep the same Ruby version. Fingerprint its executable/library.
+        ruby -rrbconfig -rdigest -e '
+          files = [RbConfig.ruby]
+          library = File.join(RbConfig::CONFIG.fetch("libdir"), RbConfig::CONFIG.fetch("LIBRUBY_SO"))
+          files << library if File.file?(library)
+          identity = [RUBY_DESCRIPTION, RUBY_PLATFORM, RbConfig::CONFIG.sort,
+                      files.map { |path| [path, Digest::SHA256.file(path).hexdigest] }]
+          puts "runtime=#{Digest::SHA256.hexdigest(identity.inspect)}"
+        ' >> "$GITHUB_OUTPUT"
 
     - name: Get Gemfile.lock hash
       id: gemfile-hash
@@ -64,9 +75,11 @@ runs:
       id: bundler-cache
       with:
         path: ${{ inputs.working-directory }}/vendor/bundle
-        key: ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.gemfile-hash.outputs.hash }}
+        # v2 excludes the old cache containing incompatible date/psych binaries.
+        # Restore across lockfile changes only within the exact same runtime.
+        key: v2-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.ruby-version.outputs.runtime }}-${{ steps.gemfile-hash.outputs.hash }}
         restore-keys: |
-          ${{ runner.os }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-
+          v2-${{ runner.os }}-${{ runner.arch }}-${{ runner.environment }}-${{ inputs.cache-key-prefix }}-ruby-${{ steps.ruby-version.outputs.version }}-${{ steps.ruby-version.outputs.runtime }}-
 
     - name: Install Bundler
       shell: bash
@@ -99,3 +112,5 @@ runs:
         echo "Ruby: $(ruby --version)"
         echo "Bundler: $(bundle --version)"
         echo "Bundle path: $(bundle config get path)"
+        # bundle check validates gem presence, not native-extension loadability.
+        bundle exec ruby -rdate -rpsych -e 'puts "Ruby native dependencies loaded"'

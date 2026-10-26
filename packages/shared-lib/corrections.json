@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "ruby-native-gem-cache-runtime-isolation",
+    "correction": "LYB-295: Post-merge Launch Quality failed during self-hosted Ruby setup after restoring cached date/psych native extensions with a missing _rb_cFalseClass symbol. Ruby version alone does not identify a compatible native gem cache.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40261816170/job/121375622829",
+    "mechanization": "Version the Ruby cache namespace and bind exact and fallback keys to runner OS, architecture, environment and the Ruby configuration/executable/shared-library fingerprint. The existing required Mac Runner Routing Tests execute the action's runtime probe and native-load verification and reject legacy or foreign cache restores. All three regressions fail on the previous action and pass with the fix; date/psych load failures remain fatal.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot prevent the CI setup action from restoring native gems compiled for another Ruby build before the app is built."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite can evaluate both cache lookup paths and execute the actual action commands with changed Ruby build bytes and native-load failures."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_ruby_gem_cache_rejects_foreign_native_extensions_and_legacy_keys"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "recurring-corrections-escalate-or-report-guard-failure",
     "correction": "LYB-252: Repeated corrections after a prose fix must request stronger enforcement once per rule; a correction recurring after mechanization is a guard failure rather than an ordinary repeat.",
     "source": "https://linear.app/jovie/issue/LYB-252",
