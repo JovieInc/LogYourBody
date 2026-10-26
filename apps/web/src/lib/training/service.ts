@@ -5,7 +5,11 @@ import {
   commitTrainingMutation,
 } from './mutation-admission';
 import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
-import { TRAINING_BASELINE_POLICY, type RevisionContextToken } from './revision-contract';
+import {
+  TRAINING_BASELINE_POLICY,
+  TRAINING_CYCLE_POLICY,
+  type RevisionContextToken,
+} from './revision-contract';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type {
@@ -13,7 +17,11 @@ import type {
   NativeProductRecordCollection,
   NativeProductRecordsPort,
 } from '@/lib/ports/native-product-records';
-import { catalogVariantById } from './catalog';
+import { adaptiveRecoveryEnabled } from '@/lib/flags/adaptive-recovery';
+import { cycleBlock, cyclePhase, completedCycleSessions } from './cycle-lifecycle';
+import { catalogVariantById, isEligibleVariant, resolveAvailableEquipment } from './catalog';
+import { appliedRecoveryNextAction, applyRecoveryTrials } from './recovery-application';
+import { readRecoveryTrials } from './recovery-contract';
 import {
   evaluateTrajectory,
   type ControllerReceipt,
@@ -23,7 +31,9 @@ import {
 import {
   buildMicrocycle,
   buildSession,
-  createMesoBlock,
+  createProgramBlock,
+  completedTrainingSession,
+  sessionWorkLogged,
   isProgramSetup,
   progressionForExercise,
   validTrainingFeedback,
@@ -31,11 +41,14 @@ import {
 import {
   MUSCLE_GROUPS,
   type ExercisePrescription,
+  type CyclePhase,
   type Session,
   type SetLog,
   type TrainingFeedback,
   type TrainingProgramSetup,
 } from './types';
+import { DELEGATED_POLICY, delegatedSetupSchema } from './delegation-contract';
+import { eligibleForProgram, validateProgram } from './delegated-planning';
 
 const EPOCH = '1970-01-01T00:00:00.000Z';
 
@@ -48,12 +61,19 @@ export function stableTrainingUuid(...parts: string[]): string {
 }
 
 export type TrainingRecordsSnapshot = {
+  sourceRecords: NativeProductRecord[];
   setup: TrainingProgramSetup | null;
   sessions: NativeProductRecord[];
   swaps: ExerciseSwapRecord[];
   logs: SetLog[];
   feedback: TrainingFeedback[];
 };
+
+/** A schedule edit never reinterprets weeks already completed under an older
+ * revision. Open weeks use the newly accepted schedule. */
+export function plannedSessionCount(setup: TrainingProgramSetup, week: number): number {
+  return setup.delegated?.completedWeeks[String(week)] ?? setup.sessionsPerWeek;
+}
 
 /** Persists one exercise substitution for the rest of a mesocycle block. The
  * original exercise keeps its history; the variant starts from its own. */
@@ -132,6 +152,50 @@ export function applyExerciseSwaps(
   return changed ? { ...session, exercises } : session;
 }
 
+export function applyConfiguredVariants(
+  session: Session,
+  setup: TrainingProgramSetup,
+  logs: SetLog[],
+): Session {
+  if (!setup.cycle && !setup.excludedVariantIds?.length) return session;
+  const variants = new Map(
+    (setup.cycle?.retainedVariants ?? []).map((item) => [item.fromExerciseId, item.toVariantId]),
+  );
+  const exercises = session.exercises.map((exercise) => {
+    const id = variants.get(exercise.id);
+    const result = id ? swappedPrescription(exercise, id, logs, exercise.targetRir) : exercise;
+    const variant = result ? catalogVariantById(result.id) : undefined;
+    if (
+      !result ||
+      setup.excludedVariantIds?.includes(result.id) ||
+      (id &&
+        (!variant ||
+          !isEligibleVariant(variant, {
+            available: resolveAvailableEquipment({
+              profile: setup.equipment,
+              declared: setup.declaredEquipment,
+            }),
+          })))
+    )
+      throw new Error('training_variant_requires_review');
+    // Deload never requests a load increase, including for a retained variant.
+    return session.week === setup.cycle?.weekCount
+      ? {
+          ...result,
+          progression: 'hold' as const,
+          targetLoadKg:
+            [...logs]
+              .filter((log) => log.exerciseId === result.id)
+              .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))[0]?.loadKg ??
+            null,
+          targetReps: result.repRange.min,
+          loadInstruction: null,
+        }
+      : result;
+  });
+  return { ...session, exercises };
+}
+
 export async function pullAllTrainingRecords(
   records: NativeProductRecordsPort,
   subject: string,
@@ -199,6 +263,11 @@ export async function loadTrainingRecords(
     .filter((record) => recordType(record) === 'program_setup' && isProgramSetup(record))
     .sort((a, b) => Date.parse(String(b.startedAt)) - Date.parse(String(a.startedAt)))[0];
   return {
+    sourceRecords: [
+      ...sessions.map((row) => ({ ...row, collection: 'training_sessions' })),
+      ...sets.map((row) => ({ ...row, collection: 'logged_sets' })),
+      ...feedbackRows.map((row) => ({ ...row, collection: 'training_feedback' })),
+    ].filter(active),
     setup: setupRecord ? (setupRecord as unknown as TrainingProgramSetup) : null,
     sessions: sessions.filter(active).filter((record) => recordType(record) === 'workout_session'),
     swaps: sessions
@@ -217,9 +286,12 @@ export async function loadTrainingRecords(
 
 export type NextWorkoutResult =
   | { kind: 'not_enrolled' }
+  | { kind: 'block_complete'; setup: TrainingProgramSetup }
   | {
       kind: 'week_complete';
       week: number;
+      phase?: CyclePhase;
+      weekCount?: number;
       weeklyFractionalVolume: Record<string, number>;
       decision: ControllerReceipt;
     }
@@ -228,6 +300,7 @@ export type NextWorkoutResult =
       session: Session & { loggedSets: SetLog[] };
       week: number;
       weekCount: number;
+      phase?: CyclePhase;
       weeklyFractionalVolume: Record<string, number>;
       decision: ControllerReceipt;
     };
@@ -284,6 +357,8 @@ type SessionRecord = NativeProductRecord & {
   prescription?: Session;
   initialPrescription?: unknown;
   startedAt?: string;
+  recoveryTrialIds?: string[];
+  recoveryExerciseIds?: string[];
 };
 
 export async function getOrCreateNextWorkout(input: {
@@ -296,6 +371,7 @@ export async function getOrCreateNextWorkout(input: {
   trajectory?: GoalTrajectory | null;
   constraints?: SituationalConstraint[];
   admission?: TrainingMutationAdmission;
+  recoveryEnabled?: boolean;
 }): Promise<NextWorkoutResult> {
   const persist = input.persist ?? true;
   const admission =
@@ -306,17 +382,80 @@ export async function getOrCreateNextWorkout(input: {
   const setup = snapshot.setup;
   if (!setup) return { kind: 'not_enrolled' };
   if (admission) requireAdmittedSetup(admission, setup);
-  if (setup.programRevisionId && setup.programPolicyVersion !== TRAINING_BASELINE_POLICY)
+  if (
+    setup.programRevisionId &&
+    setup.programPolicyVersion !== TRAINING_BASELINE_POLICY &&
+    setup.programPolicyVersion !== TRAINING_CYCLE_POLICY &&
+    setup.programPolicyVersion !== DELEGATED_POLICY
+  )
+    throw new Error('training_program_policy_requires_review');
+  if (
+    setup.programPolicyVersion === DELEGATED_POLICY &&
+    (!delegatedSetupSchema.safeParse(setup).success ||
+      !setup.delegated ||
+      validateProgram(setup.delegated))
+  )
     throw new Error('training_program_policy_requires_review');
 
-  const block = createMesoBlock(setup.startedAt, input.now.toISOString());
+  let block = cycleBlock(setup, snapshot.sessions, snapshot.logs, input.now);
+  if (setup.delegated) {
+    const completed = (week: number, slot: number) =>
+      snapshot.sessions.some(
+        (s) =>
+          s.programSetupId === setup.id &&
+          s.blockId === block.id &&
+          s.weekNumber === week &&
+          s.slot === slot &&
+          s.status === 'completed' &&
+          snapshot.logs.some((l) => l.sessionId === s.id),
+      );
+    const firstIncomplete = Array.from({ length: block.weekCount }, (_, index) => index + 1).find(
+      (week) =>
+        Array.from({ length: plannedSessionCount(setup, week) }, (_, slot) => slot).some(
+          (slot) => !completed(week, slot),
+        ),
+    );
+    if (firstIncomplete === undefined) return { kind: 'block_complete', setup };
+    block.currentWeek = Math.min(block.currentWeek, firstIncomplete);
+    block.targetRir = block.currentWeek === block.weekCount ? 4 : 3;
+  }
+  const recoveryEnabled = input.recoveryEnabled ?? adaptiveRecoveryEnabled();
+  const recoveryTrials = recoveryEnabled ? readRecoveryTrials(snapshot.sourceRecords) : [];
+  const applyRecovery = (session: Session) => {
+    const substituted = applyExerciseSwaps(session, blockSwaps, completedLogs);
+    const reviewed = applyRecoveryTrials(substituted, recoveryTrials, {
+      setupId: setup.id,
+      blockId: block.id,
+      now: input.now,
+    });
+    if (reviewed === substituted) return session;
+    // Retain engine ids in the initial snapshot. Only the set allocation is
+    // projected back from the actual reviewed variant; its load history stays separate.
+    return {
+      ...session,
+      explanation: reviewed.explanation,
+      evidenceIds: reviewed.evidenceIds,
+      exercises: session.exercises.map((exercise, index) => {
+        const sets = reviewed.exercises[index]?.sets ?? exercise.sets;
+        return {
+          ...exercise,
+          sets,
+          substitutions: exercise.substitutions.map((item) => ({ ...item, sets })),
+        };
+      }),
+    };
+  };
   const blockSwaps = snapshot.swaps.filter(
-    (swap) => swap.programSetupId === setup.id && swap.blockId === block.id,
+    (swap) =>
+      swap.programSetupId === setup.id &&
+      swap.blockId === block.id &&
+      (!setup.delegated || eligibleForProgram(swap.toVariantId, setup.delegated.inputs)),
   );
   let periodSessions = snapshot.sessions as SessionRecord[];
+  const historyIds = new Set([setup.id, ...(setup.cycle?.historyProgramIds ?? [])]);
   const programSessionIds = new Set(
     periodSessions
-      .filter((record) => record.programSetupId === setup.id)
+      .filter((record) => historyIds.has(String(record.programSetupId)))
       .map((record) => record.id),
   );
   const programLogs = snapshot.logs.filter((log) => programSessionIds.has(log.sessionId));
@@ -342,23 +481,12 @@ export async function getOrCreateNextWorkout(input: {
     persist &&
     activeRecord &&
     activePrescription &&
-    !activePrescription.safetyStop &&
-    activePrescription.exercises.length > 0 &&
-    activePrescription.exercises.every((exercise) =>
-      Array.from({ length: exercise.sets }, (_, index) => index + 1).every((setNumber) =>
-        programLogs.some(
-          (log) =>
-            log.sessionId === activePrescription.id &&
-            log.exerciseId === exercise.id &&
-            log.setNumber === setNumber,
-        ),
-      ),
-    )
+    sessionWorkLogged(activePrescription, programLogs)
   ) {
     // Recover a final set that was acknowledged before the completion write failed.
     const completed = {
       ...activeRecord,
-      status: 'completed',
+      status: completedTrainingSession(activePrescription, programLogs) ? 'completed' : 'ended',
       completedAt: input.now.toISOString(),
     };
     await commitTrainingMutation(
@@ -373,13 +501,20 @@ export async function getOrCreateNextWorkout(input: {
     );
     activeRecord = undefined;
   }
-  const completedThisWeek = periodSessions.filter(
-    (record) =>
-      record.programSetupId === setup.id &&
-      record.blockId === block.id &&
-      record.weekNumber === block.currentWeek &&
-      record.status === 'completed',
-  );
+  if (!setup.delegated) block = cycleBlock(setup, periodSessions, programLogs, input.now);
+  const completedThisWeek = setup.cycle
+    ? completedCycleSessions(setup, periodSessions, programLogs).slice(
+        (block.currentWeek - 1) * setup.sessionsPerWeek,
+        block.currentWeek * setup.sessionsPerWeek,
+      )
+    : periodSessions.filter(
+        (record) =>
+          record.programSetupId === setup.id &&
+          record.blockId === block.id &&
+          record.weekNumber === block.currentWeek &&
+          record.status === 'completed' &&
+          (!setup.delegated || snapshot.logs.some((log) => log.sessionId === record.id)),
+      );
 
   // Progression for a new session uses completed workouts, never its own unfinished sets.
   const completedSessionIds = new Set(
@@ -417,11 +552,64 @@ export async function getOrCreateNextWorkout(input: {
         block.id,
         String(block.currentWeek),
         String(slot),
+        ...(setup.cycle ? [setup.programRevisionId ?? setup.id] : []),
+        ...(setup.delegated
+          ? [
+              String(
+                periodSessions.filter(
+                  (row) =>
+                    row.blockId === block.id &&
+                    row.weekNumber === block.currentWeek &&
+                    row.slot === slot &&
+                    row.status === 'completed' &&
+                    !programLogs.some((log) => log.sessionId === row.id),
+                ).length,
+              ),
+            ]
+          : ((attempt) => (attempt > 0 ? [`attempt-${attempt}`] : []))(
+              periodSessions.filter(
+                (row) =>
+                  row.programSetupId === setup.id &&
+                  row.blockId === block.id &&
+                  row.weekNumber === block.currentWeek &&
+                  row.slot === slot,
+              ).length,
+            )),
       ),
     ),
     logs: completedLogs,
     feedback: programFeedback,
   });
+  microcycle.sessions = microcycle.sessions.map(applyRecovery);
+  // Report fractional work from the actual prescriptions, including compound overlap.
+  if (recoveryTrials.some((trial) => trial.state === 'applied')) {
+    microcycle.plannedFractionalVolume = Object.fromEntries(
+      MUSCLE_GROUPS.map((muscle) => [
+        muscle,
+        microcycle.sessions.reduce(
+          (total, session) =>
+            total +
+            session.exercises.reduce(
+              (sum, exercise) => sum + exercise.sets * (exercise.muscleContribution[muscle] ?? 0),
+              0,
+            ),
+          0,
+        ),
+      ]),
+    ) as Record<(typeof MUSCLE_GROUPS)[number], number>;
+  }
+
+  const phase = cyclePhase(block, programFeedback);
+  if (block.phase === 'review' && !activeRecord) {
+    return {
+      kind: 'week_complete',
+      week: block.currentWeek,
+      weekCount: block.weekCount,
+      phase: 'review',
+      weeklyFractionalVolume: microcycle.plannedFractionalVolume,
+      decision,
+    };
+  }
 
   if (activeRecord?.prescription) {
     const existing = activeRecord.prescription;
@@ -438,6 +626,7 @@ export async function getOrCreateNextWorkout(input: {
         },
         week: existing.week,
         weekCount: block.weekCount,
+        phase,
         weeklyFractionalVolume: microcycle.plannedFractionalVolume,
         decision: {
           ...decision,
@@ -473,7 +662,9 @@ export async function getOrCreateNextWorkout(input: {
       Number.isFinite(Date.parse(activeRecord.startedAt))
         ? activeRecord.startedAt
         : input.now.toISOString();
-    const originalBlock = createMesoBlock(setup.startedAt, startedAt);
+    const originalBlock = setup.cycle
+      ? { ...block, currentWeek: existing.week }
+      : createProgramBlock(setup, startedAt);
     const adjusted = buildSession({
       setup,
       block: {
@@ -490,14 +681,34 @@ export async function getOrCreateNextWorkout(input: {
       // Keep the prescribed targets; only the engine's current recovery set count changes.
       adjusted.exercises = initial.exercises.map((exercise) => ({
         ...exercise,
-        sets:
+        sets: Math.min(
           adjusted.exercises.find((current) => current.id === exercise.id)?.sets ?? exercise.sets,
+          activeRecord.recoveryExerciseIds?.includes(exercise.id) ? exercise.sets : Infinity,
+        ),
       }));
+      const recoveryAction = appliedRecoveryNextAction(initial);
+      if (recoveryAction) {
+        adjusted.explanation = recoveryAction;
+        adjusted.evidenceIds = [...new Set([...adjusted.evidenceIds, ...initial.evidenceIds])];
+      }
     }
     // The retained snapshot stays on engine exercise ids so set counts still match.
     // Block swaps are applied after that and own the variant's progression.
     const initialPrescription = initial ?? (!adjusted.safetyStop ? adjusted : undefined);
-    const prescribed = applyExerciseSwaps(adjusted, blockSwaps, completedLogs);
+    const prescribed = applyConfiguredVariants(
+      applyExerciseSwaps(
+        adjusted,
+        snapshot.swaps.filter(
+          (swap) =>
+            swap.programSetupId === setup.id &&
+            swap.blockId === activeRecord!.blockId &&
+            (!setup.delegated || eligibleForProgram(swap.toVariantId, setup.delegated.inputs)),
+        ),
+        completedLogs,
+      ),
+      setup,
+      completedLogs,
+    );
     if (persist) {
       await commitTrainingMutation(input.records, input.subject, admission!, 'session_update', {
         ...activeRecord,
@@ -514,12 +725,14 @@ export async function getOrCreateNextWorkout(input: {
       },
       week: existing.week,
       weekCount: block.weekCount,
+      phase,
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
-      decision,
+      decision: withRecoveryNextAction(decision, prescribed),
     };
   }
 
-  if (completedThisWeek.length >= setup.sessionsPerWeek) {
+  const sessionsThisWeek = plannedSessionCount(setup, block.currentWeek);
+  if (completedThisWeek.length >= sessionsThisWeek) {
     return {
       kind: 'week_complete',
       week: block.currentWeek,
@@ -528,7 +741,11 @@ export async function getOrCreateNextWorkout(input: {
     };
   }
 
-  const slot = completedThisWeek.length;
+  const slot = setup.delegated
+    ? (Array.from({ length: setup.sessionsPerWeek }, (_, slot) => slot).find(
+        (slot) => !completedThisWeek.some((s) => s.slot === slot),
+      ) ?? completedThisWeek.length)
+    : completedThisWeek.length;
   const planned = microcycle.sessions[slot];
   if (!planned)
     return {
@@ -537,7 +754,11 @@ export async function getOrCreateNextWorkout(input: {
       weeklyFractionalVolume: microcycle.plannedFractionalVolume,
       decision,
     };
-  const session = applyExerciseSwaps(planned, blockSwaps, completedLogs);
+  const session = applyConfiguredVariants(
+    applyExerciseSwaps(planned, blockSwaps, completedLogs),
+    setup,
+    completedLogs,
+  );
   const sessionRecord = {
     id: session.id,
     record_type: 'workout_session',
@@ -545,12 +766,38 @@ export async function getOrCreateNextWorkout(input: {
     ...(setup.programRevisionId ? { programRevisionId: setup.programRevisionId } : {}),
     blockId: block.id,
     weekNumber: block.currentWeek,
+    ...(setup.delegated ? { plannedSessionsPerWeek: sessionsThisWeek } : {}),
     slot,
     status: session.safetyStop ? 'paused' : 'in_progress',
     prescription: session,
     // Engine ids stay in the snapshot; swaps are reapplied on the next read.
     ...(!planned.safetyStop ? { initialPrescription: planned } : {}),
     startedAt: input.now.toISOString(),
+    ...(recoveryEnabled
+      ? {
+          recoveryTrialIds: recoveryTrials
+            .filter(
+              (trial) =>
+                trial.state === 'applied' &&
+                trial.blockId === block.id &&
+                trial.programSetupId === setup.id,
+            )
+            .map((trial) => trial.id),
+          recoveryExerciseIds: recoveryTrials
+            .filter(
+              (trial) =>
+                trial.state === 'applied' &&
+                trial.blockId === block.id &&
+                trial.programSetupId === setup.id,
+            )
+            .flatMap((trial) => [
+              trial.exerciseId,
+              ...blockSwaps
+                .filter((swap) => swap.toVariantId === trial.exerciseId)
+                .map((swap) => swap.fromExerciseId),
+            ]),
+        }
+      : {}),
   };
   if (persist) {
     await commitTrainingMutation(
@@ -566,9 +813,15 @@ export async function getOrCreateNextWorkout(input: {
     session: { ...session, loggedSets: programLogs.filter((log) => log.sessionId === session.id) },
     week: block.currentWeek,
     weekCount: block.weekCount,
+    phase,
     weeklyFractionalVolume: microcycle.plannedFractionalVolume,
-    decision,
+    decision: withRecoveryNextAction(decision, session),
   };
+}
+
+function withRecoveryNextAction(decision: ControllerReceipt, session: Session): ControllerReceipt {
+  const nextAction = appliedRecoveryNextAction(session);
+  return nextAction ? { ...decision, nextAction } : decision;
 }
 
 export async function storeProgramSetup(input: {

@@ -4,6 +4,13 @@ Server-side reviewable proposals support the two- through six-day dumbbell/full-
 
 LYB-111 preserves the two- and three-day full-body A/B plans. Four days uses upper/lower A/B; five uses push/pull/legs A then upper/lower B; six uses push/pull/legs A/B. The engine partitions its existing exercises by muscle contribution, using a squat and hinge on both lower sessions. Each new split supplies four fractional weekly sets per muscle (the existing detectable-change reference, below the high-volume caution), with two exposures per muscle. Extra days distribute work without multiplying the weekly dose. Recovery reductions and symptom stops take precedence over that baseline. The iOS schedule picker offers 2–6 days behind the existing `hypertrophy_coach_v1` Statsig gate; API rollout remains default-off.
 
+The [LYB-115 cycle lifecycle extension](training-cycle-lifecycle.md) adds configured
+blocks and existing-program revisions through this same admission path. The
+foundation scope and original verification below describe the initial slice.
+This document describes version 1. [Delegated programming](delegated-programming.md)
+extends this same ledger and transaction with version 2 proposals, existing-plan
+steering and automatic next-block preparation.
+
 ## API and authority
 
 The authenticated `/api/auth/mobile/training/v1/program-proposals` endpoint uses the existing default-off `LYB_HYPERTROPHY_COACH_API_ENABLED` flag, bearer/cookie identity, and training rate limit. GET returns context generation and supported intent, or an owned proposal by UUID `id`; reads do not enroll or create state. POST accepts a UUID request ID, expected generation, reason, and strict `initial_enrollment` intent with explicit adult/safety confirmations and supported equipment/frequency. Unknown intent/authority/constraints fail closed. Canonical profile DOB must satisfy the existing adult check.

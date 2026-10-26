@@ -75,7 +75,10 @@ export async function handleMcpRequest(input: {
     case 'ping':
       return { status: 200, body: rpcOk(id, {}) };
     case 'tools/list':
-      return { status: 200, body: rpcOk(id, { tools: listTools() }) };
+      return {
+        status: 200,
+        body: rpcOk(id, { tools: listTools(deps.delegatedEnabled?.() === true) }),
+      };
     case 'tools/call':
       return { status: 200, body: rpcOk(id, await callTool(message.params, principal, deps)) };
     default:

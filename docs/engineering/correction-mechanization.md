@@ -18,6 +18,20 @@ turn existing security, privacy, auth, billing, data, native evidence, or other
 hard gates into warning-only checks. Prefer an existing suitable guard over
 creating a parallel implementation.
 
+For an additive correction-ledger merge conflict, export both Git parents and
+use the existing classifier to retain and classify their union:
+
+```sh
+git show HEAD:packages/shared-lib/corrections.json > /tmp/lyb-ledger-head.json
+git show origin/main:packages/shared-lib/corrections.json > /tmp/lyb-ledger-main.json
+node scripts/correction-classifier.mjs --merge /tmp/lyb-ledger-head.json /tmp/lyb-ledger-main.json packages/shared-lib/corrections.json
+```
+
+The merger deduplicates identical receipts by normalized fingerprint and source.
+Changed evidence for the same receipt, incompatible annotations and invalid
+parents require review and leave the output untouched. It resolves only additive
+ledger conflicts; application conflicts still require implementation review.
+
 For a deterministic source scanner, add an optional `ratchet` to its existing
 ledger guard. Example (illustrative, not an installed guard):
 

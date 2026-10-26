@@ -1,6 +1,7 @@
 import {
   buildMicrocycle,
   buildSession,
+  configuredMesoBlock,
   createMesoBlock,
   evaluateDeload,
   evaluateNextSetReadiness,
@@ -54,6 +55,49 @@ function permutations<T>(items: T[]): T[][] {
 }
 
 describe('deterministic training engine', () => {
+  it.each([4, 5, 6] as const)(
+    'retains split prescriptions through configured %i-week cycles and planned deloads',
+    (weekCount) => {
+      for (const sessionsPerWeek of [4, 5, 6] as const) {
+        const splitSetup = { ...setup, sessionsPerWeek };
+        const input = {
+          setup: splitSetup,
+          sessionIds: Array.from({ length: sessionsPerWeek }, (_, slot) => `session-${slot}`),
+          logs: [],
+          feedback: [],
+        };
+        const baseline = buildMicrocycle({
+          ...input,
+          block: configuredMesoBlock(setup.startedAt, weekCount, 0, sessionsPerWeek),
+        });
+        const deload = buildMicrocycle({
+          ...input,
+          block: configuredMesoBlock(
+            setup.startedAt,
+            weekCount,
+            (weekCount - 1) * sessionsPerWeek,
+            sessionsPerWeek,
+          ),
+        });
+        expect(deload.sessions.map((session) => session.title)).toEqual(
+          baseline.sessions.map((session) => session.title),
+        );
+        expect(
+          deload.sessions.map((session) => session.exercises.map((exercise) => exercise.id)),
+        ).toEqual(
+          baseline.sessions.map((session) => session.exercises.map((exercise) => exercise.id)),
+        );
+        for (const muscle of MUSCLE_GROUPS) {
+          expect(baseline.plannedFractionalVolume[muscle]).toBe(4);
+          expect(deload.plannedFractionalVolume[muscle]).toBe(2);
+        }
+        for (const exercise of deload.sessions.flatMap((session) => session.exercises)) {
+          expect(exercise).toMatchObject({ sets: 1, targetRir: 5, progression: 'hold' });
+        }
+      }
+    },
+  );
+
   it.each([2, 3, 4, 5, 6])('recognizes a %i-day stored program', (sessionsPerWeek) => {
     expect(isProgramSetup({ ...setup, sessionsPerWeek })).toBe(true);
   });
