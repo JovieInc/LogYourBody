@@ -96,6 +96,9 @@ Missing conflict stages fail without writing.
 Both resolver entrypoints share a preflight that refuses other unresolved Git
 paths before reading guard evidence or writing the ledger. Resolve and stage
 those source conflicts first, even when their files still contain guard anchors.
+The preflight reads raw staged changes with binary hiding and text conversions
+disabled, so diff attributes cannot conceal unresolved conflict markers. Both
+resolution and pre-commit merge verification refuse those markers without writes.
 If the generated repository source map also conflicts, run
 `python3 scripts/resolve-repository-docs.py --staged` before the ledger resolver.
 It reconstructs only the generated output from staged inputs, leaving unrelated
@@ -110,6 +113,9 @@ to staging only the resolved ledger after validating its classification, staged
 guard sources and receipt retention against both merge parents. A failed
 validation preserves the ledger and index. Retrying after staging runs the
 read-only merge check; it does not restage files or overwrite unrelated edits.
+A staged retry refuses any unstaged ledger edits rather than reporting success
+while ignoring new receipts. Review and stage those edits explicitly before
+retrying; refusal preserves both the index and working file.
 
 After staging the resolution, run
 `node scripts/correction-classifier.mjs --check-merge .`. This read-only mode

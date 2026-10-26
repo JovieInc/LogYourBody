@@ -357,7 +357,12 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
     if (scenario === 'staged-marker') {
-      writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`);
+      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
+      git('add', '.gitattributes');
+      writeFileSync(
+        join(repository, rows[0].guard.path),
+        `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`,
+      );
       git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
@@ -386,15 +391,52 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       );
       assert.equal(git('ls-files', '--stage'), index);
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      const edited = JSON.parse(resolved);
+      edited.push({ ...rows[1], source: `${rows[1].source}#unstaged-receipt` });
+      writeLedger(edited);
+      const unstaged = readFileSync(ledger, 'utf8');
+      for (const args of [
+        ['--resolve-merge', repository, '--stage'],
+        ['--check-merge', repository],
+      ]) {
+        const retry = run(...args);
+        assert.equal(
+          retry.status,
+          1,
+          'merge verification must not silently ignore unstaged receipts',
+        );
+        assert.match(retry.stderr, /staged retry refuses unstaged ledger edits/);
+        assert.equal(git('ls-files', '--stage'), index, 'refused verification preserves the index');
+        assert.equal(
+          readFileSync(ledger, 'utf8'),
+          unstaged,
+          'refused verification preserves edits',
+        );
+      }
+      writeFileSync(ledger, resolved);
+      assert.equal(run('--resolve-merge', repository, '--stage').status, 0);
       // A clean worktree cannot hide conflict markers already staged as resolved.
-      for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
+      git('config', 'diff.conceal.textconv', 'echo hidden-by-textconv');
+      for (const [attribute, marker] of [
+        ['', '<<<<<<< HEAD'],
+        ['', '||||||| base'],
+        ['', '======='],
+        ['', '>>>>>>> incoming'],
+        ['-diff', '<<<<<<< HEAD'],
+        ['diff=conceal', '<<<<<<< HEAD'],
+      ]) {
+        writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} ${attribute}\n`);
+        git('add', '.gitattributes');
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
         git('add', rows[0].guard.path);
         writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
         const staged = git('ls-files', '--stage');
-        for (const args of [['--check-merge', repository], ['--resolve-merge', repository, '--stage']]) {
+        for (const args of [
+          ['--check-merge', repository],
+          ['--resolve-merge', repository, '--stage'],
+        ]) {
           const rejected = run(...args);
-          assert.equal(rejected.status, 1);
+          assert.equal(rejected.status, 1, `attributes must not hide staged markers: ${attribute}`);
           assert.match(rejected.stderr, /staged conflict markers/);
           assert.equal(git('ls-files', '--stage'), staged);
           assert.equal(readFileSync(ledger, 'utf8'), resolved);
