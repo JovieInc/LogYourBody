@@ -1211,7 +1211,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1417,6 +1417,24 @@
     "guard": {
       "path": "scripts/correction-classifier.mjs",
       "anchor": "Validate staged guards and both parents before writing or staging anything."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-retries-only-before-xctest-starts",
+    "correction": "PR #1555: The chat replay failure/retry test hit repeated 60-second animation idle waits, exceeded its 180-second allowance, and the generic XCTest restart message retried the full UI suite until the required 52-minute step timed out.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40364152724/job/121717476981",
+    "mechanization": "Extend the existing launch-quality runner to retry only explicit simulator startup failures before any XCTest suite or case starts. Command timeouts return immediately even when earlier log lines contain launch errors; generic crash/timeout restart summaries cannot authorize retries. The existing required shared-lib and native evidence behavior suite executes the real shell functions against startup, timeout, started-case and started-suite logs, preserving failed bundles and the two-attempt startup bound. The new negative cases fail before the repair and pass after it. Disable UIKit and SwiftUI animations only for DEBUG chat replay fixtures while retaining every native terminal-state, retry identity and relaunch assertion and the existing execution cap; native CI must verify the animation-stall repair.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner can prevent full-suite retries after execution by construction, and the existing DEBUG fixture setup can isolate state replay from animation timing without changing production behavior or any test assertion."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_shell_does_not_retry_timeouts_or_started_tests(self):"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
