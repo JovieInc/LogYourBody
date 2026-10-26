@@ -81,3 +81,32 @@ and return focus, and verify loading has no action. Repeat with Switch Control.
 Check loading and state transitions with Reduce Motion on/off, including toggling
 it while the screen is mounted. At AX sizes confirm the hidden chart's latest
 value, date/timeframe and source remain spoken, with one “No change”.
+
+## Conflict repair (2026-10-26)
+
+Merged origin/main at 1db992b00 without rebasing. The only conflict was the
+correction ledger; the existing resolver retained both parents' receipts and
+classified their union. Metric identity, state actions, fixture routing and
+native test methods remain present after the merge.
+
+Extended `scripts/correction-classifier.mjs` so a staging retry refuses unstaged
+ledger edits, preserving both the working file and index. The new real-Git
+regression failed against the previous resolver, then passed with all 11
+classifier tests and 100% line, branch and function coverage. Used the extended
+resolver's staging and read-only retry modes for this merge. The shared-lib
+suite retains the existing required classifier coverage gate.
+
+Local validation passed: the frozen dependency bootstrap, root `pnpm lint`,
+`pnpm typecheck` and `pnpm test`, correction coverage and ratchets against
+origin/main, and strict SwiftLint on all nine PR Swift files. Linux SwiftLint
+skipped five SourceKit-dependent rules. The latest prior-head CI run
+40220881168 passed and `gh run view --log-failed` returned no failed steps.
+The merged commit still needs the repository's native CI; this host has no
+`xcodebuild`, simulator, VoiceOver or Switch Control session.
+
+GBrain write and readback for `lyb-43-pr1550-ledger-conflict-repair` both failed:
+the local service at 127.0.0.1:7801 refused connection. Persistence is unverified.
+
+The harness owns pushing and PR updates. Its PR body must include this line:
+
+`Machine: built scripts/correction-classifier.mjs`
