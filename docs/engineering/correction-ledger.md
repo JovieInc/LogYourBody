@@ -57,6 +57,13 @@ A different rule id leaves the earlier count unchanged. This step does not emit
 or change checks. Coverage and the recurrence intake still derive repeat counts
 from distinct source URLs per fingerprint.
 
+For a merge conflict in the ledger, run
+`node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger` before
+staging it. The resolver retains receipts from both Git conflict stages and
+rejects deletions or divergent edits. Resolve other files first: unresolved
+guard source cannot establish valid coverage. Refused merges leave the ledger
+untouched; successful resolution leaves staging explicit.
+
 Inspect and verify the ledger from the repository root:
 
 ```sh
@@ -86,6 +93,9 @@ repeating the same conflict. It preserves independent additions and
 one-sided edits, rejects deletions, duplicate identities and divergent concurrent
 edits, and validates retained guards before writing the classified result.
 Missing conflict stages fail without writing.
+Both resolver entrypoints share a preflight that refuses other unresolved Git
+paths before reading guard evidence or writing the ledger. Resolve and stage
+those source conflicts first, even when their files still contain guard anchors.
 Review the result, stage the ledger, and run the coverage check against both
 merge parents. The command leaves the index and unrelated edits untouched.
 

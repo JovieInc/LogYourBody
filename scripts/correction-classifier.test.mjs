@@ -268,8 +268,9 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     'concurrent',
     'deleted',
     'missing-guard',
+    'guard-conflict',
   ]) {
-    const refused = ['concurrent', 'deleted', 'missing-guard'].includes(scenario);
+    const refused = ['concurrent', 'deleted', 'missing-guard', 'guard-conflict'].includes(scenario);
     const repository = join(directory, `repository with spaces ${scenario}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
     mkdirSync(join(repository, 'packages/shared-lib'), { recursive: true });
@@ -301,17 +302,26 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       ? { ...rows[0], correction: 'Clarified evidence on the feature branch.' }
       : rows[0];
     writeLedger(scenario === 'deleted' ? [rows[1]] : [rows[1], ours]);
+    if (scenario === 'guard-conflict') {
+      writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\nleft\n`);
+    }
     git('commit', '-am', 'test: left receipt');
     git('switch', 'right');
     const shared = ['theirs-edit', 'concurrent'].includes(scenario)
       ? { ...rows[0], correction: 'Clarified evidence on main.' }
       : rows[0];
     writeLedger(classifyLedger([...rows.slice(2), shared]));
+    if (scenario === 'guard-conflict') {
+      writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\nright\n`);
+    }
     git('commit', '-am', 'test: right receipts');
     git('switch', 'left');
     git('merge', '--no-commit', 'right');
     const before = readFileSync(ledger, 'utf8');
     assert.match(before, /<<<<<<< HEAD/);
+    if (scenario === 'guard-conflict') {
+      assert.match(readFileSync(join(repository, rows[0].guard.path), 'utf8'), /<<<<<<< HEAD/);
+    }
     const stages = git('ls-files', '-u');
     assert.equal(run('--check-merge', repository).status, 1, 'the ledger must be staged');
     const parents = git('rev-parse', 'HEAD', 'MERGE_HEAD');
@@ -324,7 +334,10 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     assert.equal(result.status, refused ? 1 : 0, `${scenario}: ${result.stderr}`);
     assert.equal(git('ls-files', '-u'), stages, 'resolution does not stage files');
     if (refused) {
-      assert.match(result.stderr, /concurrent receipt edits|removed receipt|missing guard anchor/);
+      assert.match(
+        result.stderr,
+        /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first/,
+      );
       assert.equal(readFileSync(ledger, 'utf8'), before);
     } else {
       const expected = [...rows.slice(2), scenario === 'ours-edit' ? ours : shared, rows[1]];

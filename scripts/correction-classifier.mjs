@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  assertLedgerMergeReady,
   assertNoRegression,
   coverageReport,
   guardCoverageReport,
@@ -200,6 +201,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         console.log('correction-classifier: verified staged ledger against both merge parents');
         process.exit(0);
       }
+      assertLedgerMergeReady(root);
       // Reuse the coverage tool's three-way policy rather than a second resolver.
       // Classify snapshots first so derived metadata cannot look like concurrent edits.
       const stages = [1, 2, 3].map((stage) =>
