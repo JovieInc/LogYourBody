@@ -209,10 +209,12 @@ struct TrainingEnrollmentView: View {
 
                 Section("Schedule") {
                     Picker("Sessions each week", selection: $sessionsPerWeek) {
-                        Text("2 days").tag(2)
-                        Text("3 days").tag(3)
+                        ForEach(2...6, id: \.self) { days in
+                            Text("\(days) days").tag(days)
+                        }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier("training_enroll_sessions_picker")
                     Picker("Equipment", selection: $equipment) {
                         Text("Dumbbells").tag("dumbbells")
                         Text("Full gym").tag("full_gym")
@@ -346,6 +348,7 @@ enum TrainingCompletionMotionPolicy {
 struct TrainingLiveSessionView: View {
     let voiceEnabled: Bool
     let readinessEnabled: Bool
+    let numericScrubEnabled: Bool
     let progressEnabled: Bool
     let progressDecision: TrainingProgressDecision?
     let onLoadProgress: (() async throws -> TrainingProgressResponse)?
@@ -359,7 +362,11 @@ struct TrainingLiveSessionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @AppStorage(Constants.preferredMeasurementSystemKey)
+    private var measurementSystemRaw = MeasurementSystem.localeDefault.rawValue
     @StateObject private var draft: TrainingSessionDraft
+    @StateObject private var restAlerts: TrainingRestAlerts
     @StateObject private var progress: TrainingProgressModel
     @State private var voiceCapture = VoiceCaptureService()
     @State private var soreness = 0
@@ -385,6 +392,9 @@ struct TrainingLiveSessionView: View {
         ownerId: String,
         voiceEnabled: Bool,
         readinessEnabled: Bool = false,
+        restTimerEnabled: Bool = false,
+        restAlertClient: TrainingRestAlerting? = nil,
+        numericScrubEnabled: Bool = false,
         progressEnabled: Bool = false,
         progressDecision: TrainingProgressDecision? = nil,
         draftStore: TrainingDraftStore = .shared,
@@ -401,6 +411,7 @@ struct TrainingLiveSessionView: View {
     ) {
         self.voiceEnabled = voiceEnabled
         self.readinessEnabled = readinessEnabled
+        self.numericScrubEnabled = numericScrubEnabled
         self.progressEnabled = progressEnabled
         self.progressDecision = progressDecision
         self.onLoadProgress = onLoadProgress
@@ -410,8 +421,10 @@ struct TrainingLiveSessionView: View {
         self.onWorkoutAction = onWorkoutAction
         self.onVoiceIntent = onVoiceIntent
         self.onFeedback = onFeedback
+        _restAlerts = StateObject(wrappedValue: TrainingRestAlerts(client: restAlertClient))
         _draft = StateObject(wrappedValue: TrainingSessionDraft(
-            session: session, ownerId: ownerId, store: draftStore, isCurrent: isCurrent
+            session: session, ownerId: ownerId, store: draftStore, isCurrent: isCurrent,
+            restTimerEnabled: restTimerEnabled
         ))
         _progress = StateObject(wrappedValue: TrainingProgressModel(isCurrent: isCurrent))
     }
@@ -421,6 +434,7 @@ struct TrainingLiveSessionView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: JovieTokens.screenInset) {
                     sessionHeader
+                    if draft.restTimerEnabled { restState }
                     if hasSafetyStop {
                         safetyCard
                     } else if draft.session.executionPaused == true {
@@ -435,7 +449,7 @@ struct TrainingLiveSessionView: View {
                             TrainingExerciseHistoryRow(exerciseId: next.exercise.id, model: progress)
                                 .accessibilityIdentifier("training_history_up_next_\(next.exercise.id)")
                         }
-                        restState
+                        if !draft.restTimerEnabled { restState }
                     } else {
                         completeCard
                     }
@@ -493,7 +507,13 @@ struct TrainingLiveSessionView: View {
         }
         .interactiveDismissDisabled(isSaving || draft.isSaving)
         .task(id: progressRefreshKey) { await refreshProgress() }
-        .onDisappear { voiceCapture.cancel() }
+        .onDisappear {
+            voiceCapture.cancel()
+            restAlerts.cancel()
+        }
+        .onChange(of: draft.rest.countdown, initial: true) { _, countdown in
+            restAlerts.synchronize(countdown, isCurrent: { draft.ownsSession })
+        }
         .onChange(of: draft.lastSaveReceipt) { _, receipt in
             guard let receipt else { return }
             if !TrainingCompletionMotionPolicy.shouldAnimate(reduceMotion: effectiveReduceMotion) {
@@ -584,37 +604,45 @@ struct TrainingLiveSessionView: View {
                     .font(.footnote)
                     .foregroundStyle(theme.colors.textSecondary)
             }
-            HStack(spacing: JovieTokens.itemGap) {
-                labeledField(
-                    "REPS",
-                    placeholder: "Reps",
-                    text: repsBinding(for: exercise, setNumber: position.setNumber),
-                    keyboard: .numberPad,
-                    id: "training_reps_\(exercise.id)_\(position.setNumber)"
-                )
-                labeledField(
-                    "LOAD KG",
-                    placeholder: "Load kg",
-                    text: loadBinding(for: exercise, setNumber: position.setNumber),
-                    keyboard: .decimalPad,
-                    id: "training_load_\(exercise.id)_\(position.setNumber)"
-                )
+            if numericScrubEnabled {
+                scrubFields(position)
+                    .id(position.id)
+                    .disabled(draft.isSaving || row.pendingRequest != nil)
+            } else {
+                HStack(spacing: JovieTokens.itemGap) {
+                    labeledField(
+                        "REPS",
+                        placeholder: "Reps",
+                        text: repsBinding(for: exercise, setNumber: position.setNumber),
+                        keyboard: .numberPad,
+                        id: "training_reps_\(exercise.id)_\(position.setNumber)"
+                    )
+                    labeledField(
+                        "LOAD KG",
+                        placeholder: "Load kg",
+                        text: loadBinding(for: exercise, setNumber: position.setNumber),
+                        keyboard: .decimalPad,
+                        id: "training_load_\(exercise.id)_\(position.setNumber)"
+                    )
+                }
+                .disabled(draft.isSaving || row.pendingRequest != nil)
             }
-            .disabled(draft.isSaving || row.pendingRequest != nil)
             if !TrainingLoadInputPolicy.isValid(row.loadText) {
                 Text(TrainingLoadInputPolicy.invalidMessage)
                     .font(.footnote)
                     .foregroundStyle(Color.appWarning)
                     .accessibilityIdentifier("training_load_error_\(exercise.id)_\(position.setNumber)")
             }
-            Stepper(
-                "\(row.rir) reps in reserve",
-                value: rirBinding(for: exercise, setNumber: position.setNumber),
-                in: 0...6
-            )
-            .font(.system(size: 13))
-            .disabled(draft.isSaving || row.pendingRequest != nil)
-            .accessibilityIdentifier("training_rir_\(exercise.id)_\(position.setNumber)")
+            if !numericScrubEnabled {
+                Stepper(
+                    "\(row.rir) reps in reserve",
+                    value: rirBinding(for: exercise, setNumber: position.setNumber),
+                    in: 0...6
+                )
+                .font(.system(size: 13))
+                .disabled(draft.isSaving || row.pendingRequest != nil)
+                .accessibilityIdentifier("training_rir_\(exercise.id)_\(position.setNumber)")
+            }
             Button(row.pendingRequest == nil ? "Log set" : "Retry set") {
                 Task { await log(exercise, setNumber: position.setNumber) }
             }
@@ -666,7 +694,11 @@ struct TrainingLiveSessionView: View {
     }
 
     @ViewBuilder private var restState: some View {
-        if let restUntil = draft.restUntil {
+        if draft.restTimerEnabled {
+            if let countdown = draft.rest.countdown {
+                TrainingRestTimerView(countdown: countdown, onAdjust: draft.adjustRest, onSkip: draft.cancelRest)
+            }
+        } else if let restUntil = draft.restUntil {
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let remaining = max(0, Int(restUntil.timeIntervalSince(context.date).rounded(.up)))
                 Text(remaining > 0 ? "Rest · \(remaining)s" : "Timer elapsed · readiness not assessed")
@@ -864,6 +896,43 @@ struct TrainingLiveSessionView: View {
         .background(theme.colors.surface, in: RoundedRectangle(cornerRadius: JovieTokens.cardRadius))
     }
 
+    private func scrubFields(_ position: TrainingSetPosition, correction: Bool = false) -> some View {
+        let exercise = position.exercise
+        let unit = MeasurementSystem.fromStored(rawValue: measurementSystemRaw)
+        let suffix = correction ? "" : "_\(exercise.id)_\(position.setNumber)"
+        let prefix = correction ? "training_correction_" : "training_"
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: JovieTokens.itemGap))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: JovieTokens.itemGap))
+        return VStack(alignment: .leading, spacing: JovieTokens.itemGap) {
+            layout {
+                TrainingNumericScrub(
+                    title: "Reps", text: repsBinding(for: exercise, setNumber: position.setNumber),
+                    dimension: .reps, identifier: prefix + "reps" + suffix
+                )
+                TrainingNumericScrub(
+                    title: "Load \(unit.weightUnit)", text: loadBinding(for: exercise, setNumber: position.setNumber),
+                    dimension: .load(unit), identifier: prefix + "load" + suffix
+                )
+            }
+            TrainingNumericScrub(
+                title: "Reps in reserve",
+                text: Binding(
+                    get: { String(rirBinding(for: exercise, setNumber: position.setNumber).wrappedValue) },
+                    set: { value in
+                        if let rir = Int(value), (0...6).contains(rir) {
+                            rirBinding(for: exercise, setNumber: position.setNumber).wrappedValue = rir
+                        }
+                    }
+                ),
+                dimension: .rir, identifier: prefix + "rir" + suffix
+            )
+            Text("Drag up for fine control. Drag down to cancel. Tap to type.")
+                .font(.caption)
+                .foregroundStyle(theme.colors.textSecondary)
+        }
+    }
+
     private func labeledField(
         _ label: String,
         placeholder: String,
@@ -887,22 +956,27 @@ struct TrainingLiveSessionView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("\(position.exercise.name) · set \(position.setNumber)")
                     .font(.system(size: 18, weight: .semibold))
-                HStack {
-                    labeledField(
-                        "REPS", placeholder: "Reps",
-                        text: repsBinding(for: position.exercise, setNumber: position.setNumber),
-                        keyboard: .numberPad, id: "training_correction_reps"
-                    )
-                    labeledField(
-                        "LOAD KG", placeholder: "Load kg",
-                        text: loadBinding(for: position.exercise, setNumber: position.setNumber),
-                        keyboard: .decimalPad, id: "training_correction_load"
+                if numericScrubEnabled {
+                    ScrollView { scrubFields(position, correction: true) }
+                        .disabled(draft.isSaving || draft.rows[position.id]?.pendingCorrection != nil)
+                } else {
+                    HStack {
+                        labeledField(
+                            "REPS", placeholder: "Reps",
+                            text: repsBinding(for: position.exercise, setNumber: position.setNumber),
+                            keyboard: .numberPad, id: "training_correction_reps"
+                        )
+                        labeledField(
+                            "LOAD KG", placeholder: "Load kg",
+                            text: loadBinding(for: position.exercise, setNumber: position.setNumber),
+                            keyboard: .decimalPad, id: "training_correction_load"
+                        )
+                    }
+                    Stepper(
+                        "\(rirBinding(for: position.exercise, setNumber: position.setNumber).wrappedValue) reps in reserve",
+                        value: rirBinding(for: position.exercise, setNumber: position.setNumber), in: 0...6
                     )
                 }
-                Stepper(
-                    "\(rirBinding(for: position.exercise, setNumber: position.setNumber).wrappedValue) reps in reserve",
-                    value: rirBinding(for: position.exercise, setNumber: position.setNumber), in: 0...6
-                )
                 Button("Save correction") { Task { await saveCorrection(position) } }
                     .buttonStyle(.borderedProminent)
                     .disabled(draft.isSaving)
@@ -1388,6 +1462,13 @@ struct VoiceSetReviewView: View {
 }
 
 #if DEBUG
+@MainActor
+private final class TrainingFixtureRestAlerts: TrainingRestAlerting {
+    func start(_ countdown: TrainingRestCountdown) async {}
+    func stop(cancelNotification: Bool) {}
+    func playCompletionHaptic() {}
+}
+
 /// Uses the production live view with isolated synthetic acknowledgments; never contacts a service.
 struct TrainingLiveSessionFixtureView: View {
     private static let defaults = UserDefaults(suiteName: "lyb.training.ui-fixture")!
@@ -1411,6 +1492,11 @@ struct TrainingLiveSessionFixtureView: View {
             Self.defaults.removeObject(forKey: "savedSets")
             Self.defaults.removeObject(forKey: "submissionCount")
             try? Self.draftStore.purge(ownerId: "fixture-training-owner")
+        }
+        if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingScrub") {
+            let unit: MeasurementSystem = ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingScrubImperial")
+                ? .imperial : .metric
+            UserDefaults.standard.set(unit.rawValue, forKey: Constants.preferredMeasurementSystemKey)
         }
         if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingExpiredRest"),
            Self.defaults.data(forKey: "savedSets") == nil {
@@ -1493,6 +1579,9 @@ struct TrainingLiveSessionFixtureView: View {
             TrainingLiveSessionView(
                 session: session, ownerId: "fixture-training-owner", voiceEnabled: true,
                 readinessEnabled: true,
+                restTimerEnabled: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingRestTimer"),
+                restAlertClient: TrainingFixtureRestAlerts(),
+                numericScrubEnabled: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingScrub"),
                 progressEnabled: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingProgress"),
                 draftStore: Self.draftStore,
                 isCurrent: { true }, onLogSet: { exercise, number, reps, load, rir in

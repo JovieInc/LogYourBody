@@ -442,7 +442,7 @@ platform :ios do
     end
     
     # Get the actual build and version numbers for logging
-    version = get_version_number(xcodeproj: project_path)
+    version = get_version_number(xcodeproj: project_path, target: "LogYourBody")
     build = get_build_number(xcodeproj: project_path)
     UI.message("Building version #{version} (#{build})")
     
@@ -521,7 +521,9 @@ platform :ios do
         build_options[:export_options][:signingStyle] = "manual"
         build_options[:export_options][:teamID] = ENV["APPLE_TEAM_ID"]
         build_options[:export_options][:provisioningProfiles] = {
-          app_id => sigh_uuid
+          app_id => sigh_uuid,
+          "#{app_id}.rest-timer" => ENV["REST_TIMER_PROVISIONING_PROFILE_SPECIFIER"].to_s.empty? ?
+            "match AppStore #{app_id}.rest-timer" : ENV["REST_TIMER_PROVISIONING_PROFILE_SPECIFIER"]
         }
       else
         UI.important("No sigh profile - skipping manual signing configuration")
@@ -543,6 +545,7 @@ platform :ios do
       UI.message("Updating code signing settings to use manual profile")
       update_code_signing_settings(
         path: build_options[:project],
+        targets: ["LogYourBody"],
         use_automatic_signing: false,
         team_id: ENV["APPLE_TEAM_ID"],
         bundle_identifier: app_id,

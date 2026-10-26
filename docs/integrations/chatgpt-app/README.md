@@ -126,6 +126,48 @@ It must never use a shared service token to log on a user's behalf. Tracked in L
 
 ## What stays out
 
-GLP-1 data, body composition, photos and anything medical stay out of this server until a
-reviewed decision says otherwise. OpenAI bans protected health information, limits
-sensitive data to what the app strictly needs, and lists Ozempic under prohibited commerce.
+GLP-1 data, body-fat and other body composition, photos and anything medical stay out of
+this server. The one bounded exception is manual weight in the
+[first implementation slice](#first-implementation-slice-manual-weight-lifecycle).
+OpenAI bans protected health information, limits sensitive data to what the app strictly
+needs, and lists Ozempic under prohibited commerce.
+
+## First implementation slice: manual weight lifecycle
+
+LYB-162, the first slice of LYB-161. Product HTTP and the official MCP client share one
+domain action for `create_weight_entry`, `list_weight_entries`, `correct_weight_entry`,
+and `delete_weight_entry`. Native and Siri use the same validation, record identity,
+revision, and operation id through `BodyMetricLoggingService` and `LogWeightIntent`.
+There is no second Siri runtime. Body-fat intents stay out of this slice.
+
+The actions default off. `LYB_METRICS_AGENT_ENABLED` and `LYB_CHATGPT_MCP_ENABLED` must
+both be true, and either `LYB_METRICS_AGENT_GATE_OVERRIDE=on` or an injected Statsig
+evaluation of `metrics_agent_weight_lifecycle` must be open. A missing evaluation stays
+closed. `lyb:training.read` and `lyb:training.write` do not authorize these tools.
+`lyb:metrics.read` and `lyb:metrics.write` are enforced on every call and are not
+registered at the Jovie issuer until JOV-7796 is extended. Each call also requires an
+explicit `metrics_agent_grants` row for that subject: connected, consented, entitled,
+not revoked, and not deleted. A missing row is unconnected. Tokens are resource-bound
+to the MCP audience. There is no shared service identity.
+
+Input is an explicit number plus `kg` or `lb`. The server does not guess a unit or
+round a pound value to two decimals. Pounds use `0.45359237` in integer milli-units.
+The measured timestamp must carry an offset, and `utc_offset_minutes`, `local_date`,
+and the IANA zone must describe that same instant. Same-day rows stay distinct.
+Create, correct, and delete take a stable operation UUID. The same operation and
+payload replay the original receipt. A different payload for that operation conflicts
+and writes nothing. Correct and delete require `expected_revision`. A stale revision
+conflicts. A delete leaves a tombstone. A later read of that id returns the tombstone;
+a list of live rows does not.
+
+A native push does not assign `deleted_at = null`. A push onto a tombstone, a stale
+payload, or a different payload at the same client time is a conflict. A strictly
+newer client time is kept as an offline edit. The HTTP and MCP receipt reports
+`cloud.status = committed` and `device.healthkit = not_claimed`. It does not say an
+Apple Health sample was written, corrected, or deleted.
+
+HTTP lives at `POST/GET /api/metrics/weight`, `POST /api/metrics/weight/corrections`,
+and `POST /api/metrics/weight/deletions`. The gate answers 404 before authentication.
+Account deletion removes `weight_operation_receipts`, `body_metric_audit`, and
+`metrics_agent_grants` before `body_metrics`. Acceptance is
+[agent parity acceptance — October 13, 2026](../../USER_JOURNEYS.md#agent-parity-acceptance--october-13-2026).
