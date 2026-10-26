@@ -193,6 +193,7 @@ export const logYourBody = {
       { value: 'https://linear.app/jovie/issue/LYB-112', reason: 'LYB-112 source evidence for bounded adaptive recovery learning and the correction ledger.' },
       { value: 'https://linear.app/jovie/issue/LYB-129', reason: 'LYB-129 source evidence for canonical durable workout readiness integration.' },
       { value: 'https://linear.app/jovie/issue/LYB-173', reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.' },
+      { value: 'https://linear.app/jovie/issue/LYB-189', reason: 'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.' },
       { value: 'https://linear.app/jovie/issue/LYB-194', reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.' },
       { value: 'https://linear.app/jovie/issue/LYB-204', reason: 'LYB-204 source evidence for the correction ledger, retained receipts and recurrence contract.' },
       { value: 'https://linear.app/jovie/issue/LYB-208/lyb-auto-mechanize-with-warn-then-ratchet', reason: 'LYB-208 source evidence for the correction ledger and shrink-only guard baseline contract.' },

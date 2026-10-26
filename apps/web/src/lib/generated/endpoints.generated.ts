@@ -399,6 +399,11 @@ export const endpoints = {
       reason: 'Canonical automatic-first product behavior, reconciled in LYB-179.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-189',
+      reason:
+        'LYB-189 source evidence and Tim/legal review handoff for the Apple Health privacy disclosure.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-194',
       reason: 'LYB-194 source evidence for App Store privacy disclosure drift protection.',
     },
