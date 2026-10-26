@@ -502,6 +502,9 @@
 		3C8D01B01A2EBFA3C3EB73CD /* InterTight.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E0666550EE3D136A64FEB833 /* InterTight.ttf */; };
 		AB92EB88BB101CE4C08FF99D /* InterTight-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = C804289887C0B000A09DC147 /* InterTight-OFL.txt */; };
 		BFED20261016000100000001 /* HomeV2EntryEditorLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */; };
+		E26220261025000100000001 /* MeasurementValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000002 /* MeasurementValue.swift */; };
+		E26220261025000100000003 /* MeasurementValueConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000004 /* MeasurementValueConstants.swift */; };
+		E26220261025000100000005 /* MeasurementValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000006 /* MeasurementValueTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1094,6 +1097,9 @@
 		E0666550EE3D136A64FEB833 /* InterTight.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "InterTight.ttf"; sourceTree = "<group>"; };
 		C804289887C0B000A09DC147 /* InterTight-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "InterTight-OFL.txt"; sourceTree = "<group>"; };
 		BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2EntryEditorLayout.swift; sourceTree = "<group>"; };
+		E26220261025000100000002 /* MeasurementValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValue.swift; sourceTree = "<group>"; };
+		E26220261025000100000004 /* MeasurementValueConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueConstants.swift; sourceTree = "<group>"; };
+		E26220261025000100000006 /* MeasurementValueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1346,6 +1352,7 @@
 				006434E8EF977B41ED40B4EA /* ReportedMeasurementsMigrationTests.swift */,
 				C4240D5F0129EC16E29C2259 /* DexaReportedMeasurementsPersistenceTests.swift */,
 				C099761C4FC8CFBB0454CC70 /* ReportedMeasurementsTests.swift */,
+				E26220261025000100000006 /* MeasurementValueTests.swift */,
 				060DD24271B0B2120CB0AA33 /* BulkProgressPhotoImportPolicyTests.swift */,
 				AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */,
 				AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */,
@@ -1476,6 +1483,8 @@
 				ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */,
 				ADA600212ED2594200088042 /* DexaResult.swift */,
 				B1F2A97E0DC1E8AB1DB030D6 /* ReportedMeasurements.swift */,
+				E26220261025000100000004 /* MeasurementValueConstants.swift */,
+				E26220261025000100000002 /* MeasurementValue.swift */,
 				AD050C422EBFFEE50082A313 /* DashboardDisplayMode.swift */,
 				ADDC48642E2D8A33003C97E7 /* LogYourBody.xcdatamodeld */,
 				AD85525F2E19DC44003552EE /* Changelog.swift */,
@@ -2251,6 +2260,7 @@
 				91EF9EABCFA5B86B70872411 /* ReportedMeasurementsMigrationTests.swift in Sources */,
 				7F3682C47FFCDC96AC7171E2 /* DexaReportedMeasurementsPersistenceTests.swift in Sources */,
 				377F3B5263A3F5C8274A0BD4 /* ReportedMeasurementsTests.swift in Sources */,
+				E26220261025000100000005 /* MeasurementValueTests.swift in Sources */,
 				46D2D60CC0C168272E5B0A14 /* BulkProgressPhotoImportPolicyTests.swift in Sources */,
 				AD9E00112F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift in Sources */,
 				AD9E00132F20001100ABCDEF /* BulkImportManagerBoundsTests.swift in Sources */,
@@ -2570,6 +2580,8 @@
 				ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */,
 				ADA600222ED2594300088042 /* DexaResult.swift in Sources */,
 				2DB2C8F582E3823A58973EC9 /* ReportedMeasurements.swift in Sources */,
+				E26220261025000100000003 /* MeasurementValueConstants.swift in Sources */,
+				E26220261025000100000001 /* MeasurementValue.swift in Sources */,
 				AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */,
 				AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */,
 				ADF1F6B82ED4C63900745F33 /* GlobalTimelineHeader.swift in Sources */,
