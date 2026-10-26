@@ -3,22 +3,13 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 jest.mock('@next/bundle-analyzer', () => () => (config: unknown) => config);
-jest.mock('@sentry/nextjs/config', () => ({
-  withSentryConfig: jest.fn((config: unknown) => config),
-}));
+// Exercise the installed wrapper so a mock cannot invent a missing SDK export.
+jest.mock('@sentry/nextjs/config', () => {
+  const actual = jest.requireActual('@sentry/nextjs/config');
+  return { ...actual, withSentryConfig: jest.fn(actual.withSentryConfig) };
+});
 
 describe('Sentry build configuration', () => {
-  // The mock above hides the real package surface, which let a v11 upgrade ship a next.config that
-  // imported withSentryConfig from the root entry (undefined at build time, production undeployed).
-  it('imports withSentryConfig from a specifier the real package exports', () => {
-    const fs = require('node:fs');
-    const source = fs.readFileSync(path.join(__dirname, '../../../../next.config.ts'), 'utf8');
-    const specifier = /import \{ withSentryConfig \} from '([^']+)'/.exec(source)?.[1];
-    expect(specifier).toBeDefined();
-    const actual = jest.requireActual(specifier as string);
-    expect(typeof actual.withSentryConfig).toBe('function');
-  });
-
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -38,7 +29,7 @@ describe('Sentry build configuration', () => {
   });
 
   it.each(['commit', 'explicit', 'version'])(
-    'uses the same %s release for events and sourcemaps',
+    'loads the installed SDK configuration with the %s release',
     (source) => {
       if (source !== 'version') process.env.VERCEL_GIT_COMMIT_SHA = 'deployed-commit';
       if (source === 'explicit') process.env.NEXT_PUBLIC_SENTRY_RELEASE = 'explicit-release';
@@ -54,7 +45,9 @@ describe('Sentry build configuration', () => {
 
       expect(config.env.NEXT_PUBLIC_SENTRY_RELEASE).toBe(release);
       expect(withSentryConfig).toHaveBeenCalledWith(
-        config,
+        expect.objectContaining({
+          env: expect.objectContaining({ NEXT_PUBLIC_SENTRY_RELEASE: release }),
+        }),
         expect.objectContaining({
           release: { name: release },
           sourcemaps: { deleteSourcemapsAfterUpload: true },

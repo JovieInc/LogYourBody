@@ -1,6 +1,5 @@
 import type { NextConfig } from 'next';
 import bundleAnalyzer from '@next/bundle-analyzer';
-// @sentry/nextjs 11 exports withSentryConfig from the /config subpath only; the root entry does not.
 import { withSentryConfig } from '@sentry/nextjs/config';
 import { version } from './package.json';
 import { logYourBody } from '@jovieinc/product-registry';
