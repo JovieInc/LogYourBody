@@ -200,12 +200,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
           assertNoRegression(current, baseline);
         }
       };
+      assertLedgerMergeReady(root);
       if (checkingMerge || (stagingMerge && !git('ls-files', '--unmerged', '--', LEDGER_PATH))) {
         verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
         console.log('correction-classifier: verified staged ledger against both merge parents');
         process.exit(0);
       }
-      assertLedgerMergeReady(root);
       // Reuse the coverage tool's three-way policy rather than a second resolver.
       // Classify snapshots first so derived metadata cannot look like concurrent edits.
       const stages = [1, 2, 3].map((stage) =>

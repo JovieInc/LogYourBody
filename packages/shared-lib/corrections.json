@@ -1476,6 +1476,64 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "training-rest-extension-noninteractive-version-target",
+    "correction": "LYB-116 PR #1540: Adding the rest Live Activity extension made get_version_number prompt for a target, failing iOS Unit merge-group validation in noninteractive Fastlane before compilation.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40189003309",
+    "mechanization": "The shared build lane explicitly reads the LogYourBody target's marketing version. The existing required shared-lib suite executes the real lane with separate app and extension versions, rejects an absent target in noninteractive mode, and verifies the app target remains selected for both the app and Unit-tier schemes. The regression fails before the target selection and passes after it; native compilation and coverage still require the real macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Passing the stable main app target to Fastlane eliminates interactive target selection from every caller of the shared build lane, regardless of the requested build scheme or the extension target."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/fastlane/Fastfile",
+      "anchor": "get_version_number(xcodeproj: project_path, target: \"LogYourBody\")"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "training-rest-timer-keeps-native-source-pins-current",
+    "correction": "LYB-116 PR #1540: The rest Live Activity changes the Xcode project, so refresh its diagnostic dependency pin and regenerate the repository source projection before handing off the repair.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40161023824",
+    "mechanization": "Retain the existing required routing regression that compares all seven diagnostic dependency pins with source bytes and exercises the trusted CLI's acceptance and rejection cases. The existing required Detect Changes projection check rejects stale source-map fingerprints. Both checks reproduced the reported failures before this repair; update the project pin and generated map without relaxing either guard.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The workflow's trusted source hashes and generated documentation describe build inputs outside the app runtime. Application code cannot keep those source artifacts synchronized."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The installed routing regression and source projection checker deterministically reject stale hashes in the existing required CI jobs without new tooling or a weaker gate."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1540: Recurring conflict repairs must merge origin/main, preserve both feature branches and correction receipts, and reject conflict markers accidentally staged as resolved.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1540",
+    "mechanization": "Extend the existing ledger merge readiness check to reject newly staged conflict markers before resolving, staging, retrying or verifying a merge. The existing pre-commit merge check and required shared-lib Git-fixture tests exercise the same check. The staged-marker regression fails before this extension and passes after it, including a clean worktree hiding a broken index, all four marker forms, index and ledger preservation on refusal, and a clean retry. Use the resolver with --resolve-merge . --stage for this merge; the lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "home-header-swipe-preserves-menu-taps",
     "correction": "PR #1556 / LYB-241: Launch Quality failed after a single Open Menu tap left Today visible and home_v2_sidebar_scrim absent. The failure hierarchy confirms that the sidebar never opened; preserve header button taps while retaining navigation swipes.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40192826999/job/121167380080",
