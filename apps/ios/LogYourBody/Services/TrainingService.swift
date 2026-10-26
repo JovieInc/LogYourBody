@@ -160,14 +160,6 @@ struct TrainingMuscleFeedbackRequest: Codable, Equatable, Sendable {
     let performance: String?
 }
 
-struct TrainingSetUndoRequest: Codable, Equatable, Sendable {
-    let sessionId: String
-    let exerciseId: String
-    let setNumber: Int
-    let undoId: String
-    let expectedRevision: Int
-}
-
 struct TrainingSetCorrectionRequest: Codable, Equatable, Sendable {
     let sessionId: String
     let exerciseId: String
@@ -367,20 +359,15 @@ enum TrainingServiceError: LocalizedError, Equatable {
         case .invalidResponse:
             return "The training response could not be read. Please try again."
         case .server(let code):
-            switch code {
-            case "not_found":
-                return "Training coaching is not enabled for this account yet."
-            case "set_conflict":
-                return "This set changed since that action. Review it before trying again."
-            case "undo_unavailable":
-                return "This set cannot be undone. Correct it instead."
-            case "delayed_active_workout":
+            if code == "delayed_active_workout" {
                 return "Finish or end your current workout before applying this plan."
-            case "stale_context":
-                return "Your training changed. Refresh the draft before applying it."
-            default:
-                return "Training is temporarily unavailable. Please try again."
             }
+            if code == "stale_context" {
+                return "Your training changed. Refresh the draft before applying it."
+            }
+            return code == "not_found"
+                ? "Training coaching is not enabled for this account yet."
+                : "Training is temporarily unavailable. Please try again."
         }
     }
 }
@@ -389,9 +376,8 @@ protocol TrainingServicing {
     func loadNext(accessToken: String) async throws -> TrainingNextResponse
     func loadProgress(accessToken: String) async throws -> TrainingProgressResponse
     func enroll(accessToken: String, sessionsPerWeek: Int, equipment: String) async throws -> TrainingProgramResponse
-    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws -> TrainingSavedSet
+    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws
     func correctSet(accessToken: String, request: TrainingSetCorrectionRequest) async throws -> TrainingSavedSet
-    func undoSet(accessToken: String, request: TrainingSetUndoRequest) async throws -> TrainingSavedSet
     func applyAction(accessToken: String, request: TrainingWorkoutActionRequest) async throws -> TrainingSession
     func recordFeedback(accessToken: String, request: TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse
     func revoke(accessToken: String) async throws -> TrainingRevokeResponse
@@ -427,7 +413,7 @@ final class URLSessionTrainingService: TrainingServicing {
         )
     }
 
-    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws -> TrainingSavedSet {
+    func logSet(accessToken: String, request: TrainingSetLogRequest) async throws {
         let response: TrainingSetLogResponse = try await send(
             path: "log-set",
             method: "POST",
@@ -443,23 +429,6 @@ final class URLSessionTrainingService: TrainingServicing {
               log.loadKg == request.loadKg,
               log.rir == request.rir
         else { throw TrainingServiceError.invalidResponse }
-        return log
-    }
-
-    func undoSet(accessToken: String, request: TrainingSetUndoRequest) async throws -> TrainingSavedSet {
-        let response: TrainingSetCorrectionResponse = try await send(
-            path: "undo-set",
-            method: "POST",
-            accessToken: accessToken,
-            body: request
-        )
-        guard response.log.sessionId == request.sessionId,
-              response.log.exerciseId == request.exerciseId,
-              response.log.setNumber == request.setNumber,
-              response.log.revision == request.expectedRevision + 1,
-              response.log.corrections?.contains(where: { $0.id == request.undoId }) == true
-        else { throw TrainingServiceError.invalidResponse }
-        return response.log
     }
 
     func correctSet(
