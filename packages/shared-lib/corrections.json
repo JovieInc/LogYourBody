@@ -91,6 +91,24 @@
   },
   {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1614: The Radix Aspect Ratio 1.2.0 manifest update retained a 1.1.15 workspace lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Repair the dependency artifacts together and extend the existing repair machine.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1614",
+    "mechanization": "Extend the existing explicit lockfile/source-map repair helper to reject untracked dependency inputs before invoking pnpm. Three real Git fixture cases for an untracked workspace manifest, workspace configuration and npmrc failed before the extension and pass afterward; all 50 required change-detection/helper cases pass. The guard preserves local input bytes, the lockfile, projection and index. Use the extended helper to regenerate this PR's lockfile, verify frozen offline resolution and stage source parity while retaining the existing CI gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1609: The web Zod 4.6.7 manifest update retained a 4.6.6 workspace lockfile and stale source projection, failing Vercel frozen installation, Detect Changes, parity and CI Summary. Repair dependency artifacts together with a reusable helper.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1609",
     "mechanization": "Extend the existing repository source resolver with an explicit lockfile refresh. It refuses unstaged dependency edits and pinned drift, regenerates through pinned Corepack pnpm with lifecycle scripts disabled, verifies frozen offline installation, and stages the lockfile with the projection only after success. The existing required Detect Changes suite exercises command execution, dirty inputs, idempotence, resolver and frozen-check failures. Six initial cases fail before the extension and pass afterward. Use the extended helper on this PR and retain all frozen install and source parity gates.",
