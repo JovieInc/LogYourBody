@@ -110,3 +110,43 @@ the local service at 127.0.0.1:7801 refused connection. Persistence is unverifie
 The harness owns pushing and PR updates. Its PR body must include this line:
 
 `Machine: built scripts/correction-classifier.mjs`
+
+## Conflict repair refresh (2026-10-26, main c56aa3a48)
+
+Merged `origin/main` into head `40b2ce541` without rebasing. Resolved the
+classifier test conflict by retaining both parents' unstaged-receipt and
+staged-marker regressions. Used `--resolve-merge . --stage` to retain all 79
+correction receipts, then ran `--check-merge .` and the staging retry.
+The metric implementation, native fixture and native test selectors are retained.
+
+Extended the same machine for recurring repair class `fix-red-e3b0c44298`:
+`--check-merge` now compares the working ledger with the index, matching the
+staging retry. Its real-Git regression first failed because verification silently
+accepted an unstaged receipt. Both commands now reject the edit while preserving
+the working file and index. All 11 classifier tests passed with 100% line,
+branch and function coverage. The existing required shared-lib suite and
+pre-commit merge verifier execute the extension; no CI configuration changed.
+
+Validation on this merged tree:
+
+- `bash scripts/codex-setup.sh` passed with frozen dependencies and pnpm 10.34.1.
+- `bash scripts/codex-setup.sh --run lint`, `--run typecheck` and `--run test`
+  passed. Turbo executed the changed shared-lib tasks and reused unchanged tasks.
+- The classifier's Node test command with 100% line/branch/function coverage
+  thresholds passed; the new regression failed before the extension.
+- Correction coverage and ratchets passed against `origin/main`; the metric
+  control-owner ratchet has zero findings. The existing claims baseline retains
+  eleven warnings.
+- Strict, uncached SwiftLint passed all nine PR Swift files, with the same five
+  SourceKit-dependent rules unavailable on Linux. `git diff --check` and
+  `python3 scripts/repository_docs.py` passed.
+- `gh run view 40393700166 --repo JovieInc/LogYourBody --log-failed` returned no
+  failed steps; GitHub reported successful checks for pre-merge head `40b2ce541`.
+
+`xcodebuild ... build-for-testing` could not start (`command not found`). Native
+execution, coverage and device VoiceOver/Switch Control acceptance on the merged
+commit remain for CI and the acceptance procedure above. Local Git mutations and
+child-process checks required sandbox escalation. GBrain put and get for
+`lyb-43-pr1550-ledger-conflict-repair` both failed with connection refused at
+127.0.0.1:7801; writeback and readback remain unverified. No push or PR edit was
+performed; the harness must add the machine line above to the PR body.
