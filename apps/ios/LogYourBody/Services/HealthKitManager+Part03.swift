@@ -3,6 +3,7 @@ import HealthKit
 
 extension HealthKitManager {
 func observeStepChanges() {
+        guard capabilities.pushEvents else { return }
         guard isAuthorized else { return }
 
         // Stop any existing step observer queries
@@ -45,6 +46,7 @@ func observeStepChanges() {
     }
 
 func enableBackgroundStepDelivery() async {
+        guard capabilities.pushEvents else { return }
         guard isAuthorized else { return }
 
         do {
@@ -128,6 +130,7 @@ func fetchStepCountHistory(days: Int = 30) async throws -> [(stepCount: Int, dat
     }
 
 func setupStepCountBackgroundDelivery() async throws {
+        guard capabilities.pushEvents else { return }
         guard isAuthorized else {
             throw HealthKitError.notAuthorized
         }

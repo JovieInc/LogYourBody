@@ -1,0 +1,80 @@
+"""Check the actual Xcode graph used to build and embed the rest Live Activity."""
+import json
+import pathlib
+import plistlib
+import re
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+
+
+def read_project(path):
+    # OpenStep plist grammar; comments and quoted paths are tokenized before parsing.
+    pattern = r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|[{}()=;,]|[^{}()=;,\s]+'
+    tokens = iter(
+        match.group() for match in re.finditer(pattern, path.read_text(), re.S)
+        if not match.group().startswith(('//', '/*'))
+    )
+
+    def value(token):
+        if token == '{':
+            result = {}
+            while (key := next(tokens)) != '}':
+                assert next(tokens) == '='
+                assert key not in result, f'Duplicate project key: {key}'
+                result[key] = value(next(tokens))
+                assert next(tokens) == ';'
+            return result
+        if token == '(':
+            result = []
+            while (item := next(tokens)) != ')':
+                if item != ',':
+                    result.append(value(item))
+            return result
+        return json.loads(token) if token.startswith('"') else token
+
+    result = value(next(tokens))
+    assert next(tokens, None) is None
+    return result
+
+
+def check_project(path):
+    project = read_project(path)
+    objects = project['objects']
+    targets = {objects[key]['name']: objects[key] for key in objects[project['rootObject']]['targets']}
+    app = targets['LogYourBody']
+    extension = targets['LogYourBodyRestTimer']
+    assert any(objects[item]['target'] in objects[project['rootObject']]['targets'] and
+               objects[objects[item]['target']]['name'] == 'LogYourBodyRestTimer'
+               for item in app['dependencies']), 'App must build the extension'
+
+    def source_refs(target):
+        return {objects[item]['fileRef']
+                for phase in target['buildPhases'] if objects[phase]['isa'] == 'PBXSourcesBuildPhase'
+                for item in objects[phase]['files'] if 'fileRef' in objects[item]}
+
+    app_refs = source_refs(app)
+    extension_refs = source_refs(extension)
+    paths = {objects[key]['path'] for key in extension_refs}
+    assert paths == {'Models/TrainingRestActivityAttributes.swift', 'TrainingRestLiveActivity.swift'}
+    shared = app_refs & extension_refs
+    assert {objects[key]['path'] for key in shared} == {'Models/TrainingRestActivityAttributes.swift'}
+    for path in ['Services/TrainingRestTimer.swift', 'Services/TrainingRestAlerts.swift', 'Views/TrainingRestTimerView.swift']:
+        assert any(objects[key]['path'] == path for key in app_refs), f'Not compiled in app: {path}'
+    assert any(objects[phase]['isa'] == 'PBXCopyFilesBuildPhase' and objects[phase]['dstSubfolderSpec'] == '13' and
+               any(objects[item]['fileRef'] == extension['productReference'] for item in objects[phase]['files'])
+               for phase in app['buildPhases']), 'App must embed the extension product'
+    for configuration in objects[extension['buildConfigurationList']]['buildConfigurations']:
+        settings = objects[configuration]['buildSettings']
+        assert settings['PRODUCT_BUNDLE_IDENTIFIER'] == 'com.logyourbody.app.rest-timer'
+        assert settings['APPLICATION_EXTENSION_API_ONLY'] == 'YES'
+        assert settings['SKIP_INSTALL'] == 'YES'
+    with (ROOT / 'apps/ios/LogYourBody/Info.plist').open('rb') as source:
+        assert plistlib.load(source)['NSSupportsLiveActivities'] is True
+    with (ROOT / 'apps/ios/LogYourBodyWidget/Info.plist').open('rb') as source:
+        assert plistlib.load(source)['NSExtension']['NSExtensionPointIdentifier'] == 'com.apple.widgetkit-extension'
+
+
+if __name__ == '__main__':
+    check_project(pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'apps/ios/LogYourBody.xcodeproj/project.pbxproj')
+    print('Rest Live Activity project graph passed')
