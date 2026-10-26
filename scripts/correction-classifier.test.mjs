@@ -269,12 +269,14 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     'deleted',
     'missing-guard',
     'guard-conflict',
+    'staged-marker',
   ].map((scenario) => [scenario, false]);
   scenarios.push(
     ['additions', true],
     ['concurrent', true],
     ['missing-index-guard', true],
     ['guard-conflict', true],
+    ['staged-marker', true],
   );
   for (const [scenario, stageMerge] of scenarios) {
     const refused = [
@@ -283,6 +285,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       'missing-guard',
       'missing-index-guard',
       'guard-conflict',
+      'staged-marker',
     ].includes(scenario);
     const repository = join(directory, `repository with spaces ${scenario} ${stageMerge}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
@@ -353,6 +356,11 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
+    if (scenario === 'staged-marker') {
+      writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`);
+      git('add', rows[0].guard.path);
+      writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
+    }
     const indexBefore = git('ls-files', '--stage');
     const result = run('--resolve-merge', repository, ...(stageMerge ? ['--stage'] : []));
     assert.equal(result.status, refused ? 1 : 0, `${scenario}: ${result.stderr}`);
@@ -378,6 +386,22 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       );
       assert.equal(git('ls-files', '--stage'), index);
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      // A clean worktree cannot hide conflict markers already staged as resolved.
+      for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
+        writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
+        git('add', rows[0].guard.path);
+        writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
+        const staged = git('ls-files', '--stage');
+        for (const args of [['--check-merge', repository], ['--resolve-merge', repository, '--stage']]) {
+          const rejected = run(...args);
+          assert.equal(rejected.status, 1);
+          assert.match(rejected.stderr, /staged conflict markers/);
+          assert.equal(git('ls-files', '--stage'), staged);
+          assert.equal(readFileSync(ledger, 'utf8'), resolved);
+        }
+      }
+      git('add', rows[0].guard.path);
+      assert.equal(run('--check-merge', repository).status, 0);
       continue;
     }
     assert.equal(git('ls-files', '-u'), stages, 'resolution does not stage files');
@@ -385,7 +409,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       assert.equal(git('ls-files', '--stage'), indexBefore, 'failed repair preserves the index');
       assert.match(
         result.stderr,
-        /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first/,
+        /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first|staged conflict markers/,
       );
       assert.equal(readFileSync(ledger, 'utf8'), before);
     } else {
