@@ -176,3 +176,91 @@ unverified until the harness runs the required checks.
 
 GBrain search, write to `lyb-40-pr1532-aspect-fit`, and readback failed with
 connection refused at `127.0.0.1:7801`. No durable write/readback occurred.
+
+## PR #1532 conflict repair (2026-10-26)
+
+Merged `origin/main` at `84a6f229cc5ab99db7645946b8bd2749453e7f6e` into
+`fix/lyb-40-pr1532-conflict-20261026`, preserving both parents without rebasing.
+The harness checkout was detached, so the repair uses a local fix branch.
+Resolved five conflicts by retaining both Xcode target additions, both endpoint
+allowlist entries and every correction receipt, then regenerated the registry
+outputs and repository source projection. Main's share-card artwork changes
+remain integrated with this branch's export coordinator.
+
+Extended the existing correction coverage guard to compare against HEAD and all
+parents of branch merges since the immutable CI base. Shallow checkouts fetch the
+exact head's missing history first. Its real Git-history regression failed with
+`Missing expected exception` before the extension and passes afterward, including
+an uncommitted repair, a lossy merge hidden by a later commit and a depth-one clone.
+The same guard checked this repair's ledger against both immutable parents.
+
+The diagnostic positive fixture initially failed its SHA assertion after main
+updated the reviewed project pin. Refreshed only the compressed offline fixture
+from main's exact project bytes; all seven policy pins and the changed-project
+refusal remain enforced. The root test also caught four retained share-export
+receipts missing main's newly required saved classifier metadata. Ran the existing
+classifier on the full merged ledger; its idempotence regression now passes with
+100% line, branch and function coverage. Both findings are recorded in the ledger.
+
+Validation used Node 22.23.2 and pnpm 10.34.1:
+
+```sh
+bash scripts/codex-setup.sh
+bash scripts/codex-setup.sh --run product:generate
+bash scripts/codex-setup.sh --run lint
+bash scripts/codex-setup.sh --run typecheck
+bash scripts/codex-setup.sh --run product:check
+bash scripts/codex-setup.sh --run --filter logyourbody test:ci
+python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q
+node --test packages/shared-lib/scripts/correction-coverage.behavior.mjs packages/shared-lib/scripts/correction-ratchet.behavior.mjs
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
+node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
+python3 scripts/repository_docs.py --write
+python3 scripts/repository_docs.py
+git diff --check
+```
+
+These checks passed: routing 41 cases; shared-lib 160 Vitest and 122 Node tests;
+web 136 suites / 1,336 Jest cases plus three voice-adapter cases. The full web
+build also passed as a dependency of root tests. The new guard retained 100%
+line, branch and function coverage in the required coverage wrapper. The existing
+claims ratchet reported its unchanged 11 baseline warnings.
+
+Two default root test attempts timed out in the unchanged canvas interaction test
+at its existing five-second limit. The serial web CI script passed. The final
+root test passed all eight Turbo tasks (seven cached) using bounded host affinity,
+without changing tests, timeouts, config or gates:
+
+```sh
+python3 - <<'ROOT_TEST'
+import os
+cpus = sorted(os.sched_getaffinity(0))[:2]
+os.sched_setaffinity(0, cpus)  # CPUs 0 and 1 on this host.
+os.execvp('bash', ['bash', 'scripts/codex-setup.sh', '--run', 'test'])
+ROOT_TEST
+```
+
+Strict changed-file SwiftLint passed with zero violations:
+
+```sh
+swiftlint lint --strict --no-cache --config apps/ios/.swiftlint.yml apps/ios/LogYourBody/Components/BodyScoreShareCard.swift apps/ios/LogYourBody/Services/BodyScoreShareExport.swift apps/ios/LogYourBodyTests/BodyScoreShareExportTests.swift
+```
+
+Five SourceKit rules were unavailable on Linux. `xcodebuild -version` returned
+command not found; native execution, native coverage and device acceptance remain
+unverified pending the harness's required native checks. The marketing asset
+build's timestamp-only side effect was discarded.
+
+The harness owns push and PR mutation. Add exactly this line to the PR body:
+
+Machine: built packages/shared-lib/scripts/correction-coverage.mjs
+
+`gh run view 40158507283 --repo JovieInc/LogYourBody --log-failed` returned no
+failed logs; the original PR checks were green. This repair addresses merge
+conflicts and the integration failures found locally.
+
+GBrain query, write to `lyb-40-pr1532-conflict-20261026`, and readback failed
+with connection refused at `127.0.0.1:7801` in the sandbox. Each elevated retry
+timed out after 30 seconds without a response. No successful write or matching
+readback was verified; persistence remains unconfirmed.

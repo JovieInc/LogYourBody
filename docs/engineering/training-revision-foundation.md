@@ -1,5 +1,12 @@
 # Initial training enrollment revision foundation
 
+The [LYB-115 cycle lifecycle extension](training-cycle-lifecycle.md) adds configured
+blocks and existing-program revisions through this same admission path. The
+foundation scope and original verification below describe the initial slice.
+This document describes version 1. [Delegated programming](delegated-programming.md)
+extends this same ledger and transaction with version 2 proposals, existing-plan
+steering and automatic next-block preparation.
+
 This slice adds server-side reviewable proposals for the **existing** two- or three-day dumbbell/full-gym baseline. It is not the full LYB-37/LYB-130 training contract: no new exercise catalogue, goals, schedule personalization, program editing, trainer authority, numerical progression policy, MCP tools, or client onboarding is introduced.
 
 ## API and authority

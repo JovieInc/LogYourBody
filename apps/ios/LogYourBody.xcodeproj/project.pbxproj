@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		B04020261025000000000001 /* BodyScoreShareExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04020261025000000000002 /* BodyScoreShareExport.swift */; };
 		B04020261025000000000003 /* BodyScoreShareExportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04020261025000000000004 /* BodyScoreShareExportTests.swift */; };
+		B26920261025000000000002 /* BackwardPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000001 /* BackwardPlanner.swift */; };
+		B26920261025000000000004 /* BackwardPlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000003 /* BackwardPlannerTests.swift */; };
+		B26920261025000000000006 /* lyb-launch-contract.json in Resources */ = {isa = PBXBuildFile; fileRef = B26920261025000000000005 /* lyb-launch-contract.json */; };
 		A19900000000000000000001 /* StoreKitPurchaseRestoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */; };
 		A16800000000000000000001 /* ContextualMetricShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16800000000000000000002 /* ContextualMetricShare.swift */; };
 		5AAEA63151156B8F114A0B83 /* BodyRecordReviewConsumerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */; };
@@ -428,11 +431,16 @@
 		E251E204A77F2161E880A19E /* RevenueCatSubscriptionAnalyticsTransitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F1996527170EC15B242FF4B /* RevenueCatSubscriptionAnalyticsTransitionTests.swift */; };
 		E389C2EFF4E7B92EE0A9A997 /* RealtimeSyncManager+Part01.swift in Sources */ = {isa = PBXBuildFile; fileRef = D557A5B9E670DD0A6A8BA893 /* RealtimeSyncManager+Part01.swift */; };
 		E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C001 /* TrainingService.swift */; };
+		E11020261025000100000002 /* TrainingProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11020261025000100000001 /* TrainingProgress.swift */; };
 		F00720261007000100000002 /* TrainingDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000001 /* TrainingDraftStore.swift */; };
 		F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000003 /* TrainingSessionDraft.swift */; };
 		F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00720261007000100000005 /* TrainingSessionDraftTests.swift */; };
+		E11020261025000100000006 /* TrainingProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11020261025000100000005 /* TrainingProgressTests.swift */; };
+		E41302026025000000000004 /* DelegatedTrainingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41302026025000000000003 /* DelegatedTrainingTests.swift */; };
 		E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4172D019C9F4A30A881C003 /* TrainingViews.swift */; };
+		E11020261025000100000004 /* TrainingProgressViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E11020261025000100000003 /* TrainingProgressViews.swift */; };
 		E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000001 /* MesocycleCanvas.swift */; };
+		E41302026025000000000002 /* DelegatedTrainingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41302026025000000000001 /* DelegatedTrainingView.swift */; };
 		E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */; };
 		E4C0A5110000000000000006 /* MesocycleCanvasUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */; };
 		E4C0A5110000000000000008 /* MesocycleCanvasSequence.json in Resources */ = {isa = PBXBuildFile; fileRef = E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */; };
@@ -493,6 +501,9 @@
 		3C8D01B01A2EBFA3C3EB73CD /* InterTight.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E0666550EE3D136A64FEB833 /* InterTight.ttf */; };
 		AB92EB88BB101CE4C08FF99D /* InterTight-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = C804289887C0B000A09DC147 /* InterTight-OFL.txt */; };
 		BFED20261016000100000001 /* HomeV2EntryEditorLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */; };
+		E26220261025000100000001 /* MeasurementValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000002 /* MeasurementValue.swift */; };
+		E26220261025000100000003 /* MeasurementValueConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000004 /* MeasurementValueConstants.swift */; };
+		E26220261025000100000005 /* MeasurementValueTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26220261025000100000006 /* MeasurementValueTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -515,6 +526,9 @@
 /* Begin PBXFileReference section */
 		B04020261025000000000002 /* BodyScoreShareExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreShareExport.swift; sourceTree = "<group>"; };
 		B04020261025000000000004 /* BodyScoreShareExportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyScoreShareExportTests.swift; sourceTree = "<group>"; };
+		B26920261025000000000001 /* BackwardPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackwardPlanner.swift; sourceTree = "<group>"; };
+		B26920261025000000000003 /* BackwardPlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackwardPlannerTests.swift; sourceTree = "<group>"; };
+		B26920261025000000000005 /* lyb-launch-contract.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "Fixtures/lyb-launch-contract.json"; sourceTree = "<group>"; };
 		A19900000000000000000002 /* StoreKitPurchaseRestoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitPurchaseRestoreTests.swift; sourceTree = "<group>"; };
 		A16800000000000000000002 /* ContextualMetricShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContextualMetricShare.swift; path = Components/ContextualMetricShare.swift; sourceTree = "<group>"; };
 		533DB3BAF9F9485A218812BA /* BodyRecordReviewConsumerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyRecordReviewConsumerTests.swift; sourceTree = "<group>"; };
@@ -1004,11 +1018,16 @@
 		E2715F4BF0E82E86A99821E3 /* PhotoLibraryScannerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhotoLibraryScannerTests.swift; sourceTree = "<group>"; };
 		E2AC3C23E6923176F103B414 /* StepsIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StepsIndicator.swift; path = DesignSystem/Molecules/StepsIndicator.swift; sourceTree = "<group>"; };
 		E4172D019C9F4A30A881C001 /* TrainingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingService.swift; sourceTree = "<group>"; };
+		E11020261025000100000001 /* TrainingProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgress.swift; sourceTree = "<group>"; };
 		F00720261007000100000001 /* TrainingDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingDraftStore.swift; sourceTree = "<group>"; };
 		F00720261007000100000003 /* TrainingSessionDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraft.swift; sourceTree = "<group>"; };
 		F00720261007000100000005 /* TrainingSessionDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingSessionDraftTests.swift; sourceTree = "<group>"; };
+		E11020261025000100000005 /* TrainingProgressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgressTests.swift; sourceTree = "<group>"; };
+		E41302026025000000000003 /* DelegatedTrainingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DelegatedTrainingTests.swift; sourceTree = "<group>"; };
 		E4172D019C9F4A30A881C003 /* TrainingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingViews.swift; sourceTree = "<group>"; };
+		E11020261025000100000003 /* TrainingProgressViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainingProgressViews.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000001 /* MesocycleCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvas.swift; sourceTree = "<group>"; };
+		E41302026025000000000001 /* DelegatedTrainingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DelegatedTrainingView.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasTests.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000005 /* MesocycleCanvasUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MesocycleCanvasUITests.swift; sourceTree = "<group>"; };
 		E4C0A5110000000000000007 /* MesocycleCanvasSequence.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = MesocycleCanvasSequence.json; sourceTree = "<group>"; };
@@ -1076,6 +1095,9 @@
 		E0666550EE3D136A64FEB833 /* InterTight.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "InterTight.ttf"; sourceTree = "<group>"; };
 		C804289887C0B000A09DC147 /* InterTight-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "InterTight-OFL.txt"; sourceTree = "<group>"; };
 		BFED20261016000100000002 /* HomeV2EntryEditorLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeV2EntryEditorLayout.swift; sourceTree = "<group>"; };
+		E26220261025000100000002 /* MeasurementValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValue.swift; sourceTree = "<group>"; };
+		E26220261025000100000004 /* MeasurementValueConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueConstants.swift; sourceTree = "<group>"; };
+		E26220261025000100000006 /* MeasurementValueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementValueTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1304,6 +1326,8 @@
 		AD723ACF2E15FA5C002376C6 /* LogYourBodyTests */ = {
 			isa = PBXGroup;
 			children = (
+				B26920261025000000000003 /* BackwardPlannerTests.swift */,
+				B26920261025000000000005 /* lyb-launch-contract.json */,
 				896E3815B745A313FCD93C78 /* DesignSystem */,
 				8631504046C70A4EE432C9B8 /* AccountDeletionAndShareCardTests.swift */,
 				AB992727D1333B365F93F30E /* AccountDeletionCleanupServiceTests.swift */,
@@ -1326,6 +1350,7 @@
 				006434E8EF977B41ED40B4EA /* ReportedMeasurementsMigrationTests.swift */,
 				C4240D5F0129EC16E29C2259 /* DexaReportedMeasurementsPersistenceTests.swift */,
 				C099761C4FC8CFBB0454CC70 /* ReportedMeasurementsTests.swift */,
+				E26220261025000100000006 /* MeasurementValueTests.swift */,
 				060DD24271B0B2120CB0AA33 /* BulkProgressPhotoImportPolicyTests.swift */,
 				AD9E00102F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift */,
 				AD9E00122F20001100ABCDEF /* BulkImportManagerBoundsTests.swift */,
@@ -1455,6 +1480,8 @@
 				ADA6003D2ED2BC9100088042 /* Glp1DoseLog.swift */,
 				ADA600212ED2594200088042 /* DexaResult.swift */,
 				B1F2A97E0DC1E8AB1DB030D6 /* ReportedMeasurements.swift */,
+				E26220261025000100000004 /* MeasurementValueConstants.swift */,
+				E26220261025000100000002 /* MeasurementValue.swift */,
 				AD050C422EBFFEE50082A313 /* DashboardDisplayMode.swift */,
 				ADDC48642E2D8A33003C97E7 /* LogYourBody.xcdatamodeld */,
 				AD85525F2E19DC44003552EE /* Changelog.swift */,
@@ -1493,9 +1520,11 @@
 		AD723AED2E15FA5C002376C6 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				B26920261025000000000001 /* BackwardPlanner.swift */,
 				C7A700012F20000000C0A701 /* ChatService.swift */,
 				D0C0DE000000000000000002 /* VoiceCaptureService.swift */,
 				E4172D019C9F4A30A881C001 /* TrainingService.swift */,
+				E11020261025000100000001 /* TrainingProgress.swift */,
 				F00720261007000100000001 /* TrainingDraftStore.swift */,
 				F00720261007000100000003 /* TrainingSessionDraft.swift */,
 				AD8F12F42ED7C987003C4559 /* BugReportManager.swift */,
@@ -1637,7 +1666,9 @@
 				AD723B032E15FA5C002376C6 /* LoginView.swift */,
 				AD723B052E15FA5C002376C6 /* MainTabView.swift */,
 				E4172D019C9F4A30A881C003 /* TrainingViews.swift */,
+				E11020261025000100000003 /* TrainingProgressViews.swift */,
 				E4C0A5110000000000000001 /* MesocycleCanvas.swift */,
+				E41302026025000000000001 /* DelegatedTrainingView.swift */,
 				8E3A26E632164AACAA5D77FD /* MainTabViewPolicies.swift */,
 				AD723B062E15FA5C002376C6 /* PreferencesView.swift */,
 				AD3147A12F0B000100ABCDEF /* PreferenceGoalEditing.swift */,
@@ -1744,6 +1775,8 @@
 				C7A700032F20000000C0A703 /* ChatServiceTests.swift */,
 				E4C0A5110000000000000003 /* MesocycleCanvasTests.swift */,
 				F00720261007000100000005 /* TrainingSessionDraftTests.swift */,
+				E11020261025000100000005 /* TrainingProgressTests.swift */,
+				E41302026025000000000003 /* DelegatedTrainingTests.swift */,
 				FE06A6A600000000000000F6 /* Glp1CardAndCatalogTests.swift */,
 				FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */,
 				A62E114302EC00A5A0070102 /* SyncQueueRetentionPreparedTests.swift */,
@@ -2165,6 +2198,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B26920261025000000000006 /* lyb-launch-contract.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2182,9 +2216,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B26920261025000000000004 /* BackwardPlannerTests.swift in Sources */,
 				C7A700042F20000000C0A704 /* ChatServiceTests.swift in Sources */,
 				E4C0A5110000000000000004 /* MesocycleCanvasTests.swift in Sources */,
 				F00720261007000100000006 /* TrainingSessionDraftTests.swift in Sources */,
+				E11020261025000100000006 /* TrainingProgressTests.swift in Sources */,
+				E41302026025000000000004 /* DelegatedTrainingTests.swift in Sources */,
 				FE06A6A600000000000000B6 /* Glp1CardAndCatalogTests.swift in Sources */,
 				FE04A4A400000000000000B4 /* SyncIntervalAndChunkingTests.swift in Sources */,
 				A62E114302EC00A5A0070101 /* SyncQueueRetentionPreparedTests.swift in Sources */,
@@ -2221,6 +2258,7 @@
 				91EF9EABCFA5B86B70872411 /* ReportedMeasurementsMigrationTests.swift in Sources */,
 				7F3682C47FFCDC96AC7171E2 /* DexaReportedMeasurementsPersistenceTests.swift in Sources */,
 				377F3B5263A3F5C8274A0BD4 /* ReportedMeasurementsTests.swift in Sources */,
+				E26220261025000100000005 /* MeasurementValueTests.swift in Sources */,
 				46D2D60CC0C168272E5B0A14 /* BulkProgressPhotoImportPolicyTests.swift in Sources */,
 				AD9E00112F20001000ABCDEF /* ProgressPhotoCarouselPreloadRangeTests.swift in Sources */,
 				AD9E00132F20001100ABCDEF /* BulkImportManagerBoundsTests.swift in Sources */,
@@ -2359,6 +2397,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B26920261025000000000002 /* BackwardPlanner.swift in Sources */,
 				AD8F12EA2ED6AA76003C4559 /* AnalyticsService.swift in Sources */,
 				FE13A3A300000000000000C1 /* FeatureReleasePolicy.swift in Sources */,
 				ADE146462EBF090D00B64DA0 /* ProgressTimelineView.swift in Sources */,
@@ -2384,10 +2423,13 @@
 				C7A700022F20000000C0A702 /* ChatService.swift in Sources */,
 				D0C0DE000000000000000001 /* VoiceCaptureService.swift in Sources */,
 				E4172D019C9F4A30A881C002 /* TrainingService.swift in Sources */,
+				E11020261025000100000002 /* TrainingProgress.swift in Sources */,
 				F00720261007000100000002 /* TrainingDraftStore.swift in Sources */,
 				F00720261007000100000004 /* TrainingSessionDraft.swift in Sources */,
 				E4172D019C9F4A30A881C004 /* TrainingViews.swift in Sources */,
+				E11020261025000100000004 /* TrainingProgressViews.swift in Sources */,
 				E4C0A5110000000000000002 /* MesocycleCanvas.swift in Sources */,
+				E41302026025000000000002 /* DelegatedTrainingView.swift in Sources */,
 				AD3145A22F0A000100ABCDEF /* ProgressPhotoAttachSheet.swift in Sources */,
 				AD3145C12F0A010100ABCDEF /* DashboardViewLiquid+PhotoTimelineHUD.swift in Sources */,
 				AD3145C22F0A010200ABCDEF /* DashboardViewLiquid+PhotoTimelineAnalytics.swift in Sources */,
@@ -2534,6 +2576,8 @@
 				ADA4B7592ED0E7D700F4262A /* DashboardPrimaryMetricCard.swift in Sources */,
 				ADA600222ED2594300088042 /* DexaResult.swift in Sources */,
 				2DB2C8F582E3823A58973EC9 /* ReportedMeasurements.swift in Sources */,
+				E26220261025000100000003 /* MeasurementValueConstants.swift in Sources */,
+				E26220261025000100000001 /* MeasurementValue.swift in Sources */,
 				AD8872A42EB946BE0041C426 /* DSAuthLink.swift in Sources */,
 				AD8872A82EB946BE0041C426 /* UserHeaderSection.swift in Sources */,
 				ADF1F6B82ED4C63900745F33 /* GlobalTimelineHeader.swift in Sources */,

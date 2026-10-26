@@ -181,6 +181,133 @@ test('counts distinct rules, all four pyramid levels and unclassified receipts h
   assert.match(renderCoverage(value), /Overall \| 2\/6 \| 33.33%/);
 });
 
+test('ledger reports lessons, guards and recurrence from chat, review, Linear and revert receipts', () => {
+  const sources = [
+    'https://example.com/memory/tim-correction',
+    'https://github.com/JovieInc/LogYourBody/pull/42#discussion_r123',
+    'https://linear.app/jovie/issue/LYB-204#comment-123',
+    `https://github.com/JovieInc/LogYourBody/commit/${'a'.repeat(40)}`,
+  ];
+  const rows = sources.map((source) =>
+    receipt(' Retain Evidence ', 'static', {
+      source,
+      correction: 'Keep <lesson> | evidence\nintact.',
+      guard,
+    }),
+  );
+  const value = report([...rows, { ...rows[0], fingerprint: 'retain-evidence' }]);
+  const [rule] = value.rules;
+  assert.equal(value.total, 1);
+  assert.equal(rule.level, 'static');
+  assert.deepEqual(rule.guard, guard);
+  assert.deepEqual(rule.recurrence, { receiptCount: 4, repeatCount: 3 });
+  assert.deepEqual(
+    rule.receipts,
+    rows
+      .map(({ source, correction, mechanization }) => ({ source, correction, mechanization }))
+      .sort((a, b) => a.source.localeCompare(b.source)),
+  );
+  assert.deepEqual(report([...rows].reverse()), value);
+  const rendered = renderCoverage(value);
+  for (const source of sources) assert.ok(rendered.includes(source));
+  assert.match(rendered, /Keep &lt;lesson&gt; &#124; evidence intact\./);
+  assert.match(rendered, /guard.mjs/);
+  assert.match(rendered, /enforce the retained invariant/);
+  assert.match(rendered, /4 receipts; 3 repeats/);
+  assert.deepEqual(report([rows[0]]).rules[0].recurrence, { receiptCount: 1, repeatCount: 0 });
+});
+
+test('ledger CI retains each source against Git even when rule coverage and receipt count stay equal', (t) => {
+  const first = receipt('retained', 'static', {
+    guard,
+    classification: classification('static'),
+  });
+  const second = { ...first, source: 'https://example.com/second-receipt' };
+  const extra = { ...first, source: 'https://example.com/third-receipt' };
+  const { root, ref } = fixtureRepo(t, [first, second]);
+  for (const rows of [
+    [first],
+    [first, extra],
+    [first, { ...second, fingerprint: 'different-rule' }],
+  ]) {
+    writeFileSync(join(root, LEDGER_PATH), JSON.stringify(rows));
+    assert.throws(() => runCoverage(['--base-ref', ref], { root, env: {} }), /removed receipt/);
+  }
+  // Duplicate replays, canonical URL spelling, new receipts and guard promotions are allowed.
+  const revised = [second, first, first, extra].map((row) => ({
+    ...row,
+    fingerprint: ' RETAINED ',
+    level: 'codebase',
+    classification: classification('codebase'),
+    correction: 'Clarified lesson without losing the original evidence.',
+    source: row.source.replace('https://example.com/', 'https://EXAMPLE.com:443/'),
+  }));
+  writeFileSync(join(root, LEDGER_PATH), JSON.stringify(revised));
+  const value = runCoverage(['--base-ref', ref], { root, env: {} });
+  assert.deepEqual(value.rules[0].recurrence, { receiptCount: 3, repeatCount: 2 });
+});
+
+test('merge repair retains receipts from both parents and earlier branch merges', (t) => {
+  const first = receipt('retained', 'static', {
+    guard,
+    classification: classification('static'),
+  });
+  const branch = { ...first, source: 'https://example.com/branch-receipt' };
+  const main = { ...first, source: 'https://example.com/main-receipt' };
+  const { root, ref } = fixtureRepo(t, [first]);
+  const git = (...args) =>
+    execFileSync(
+      'git',
+      ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', ...args],
+      {
+        cwd: root,
+        encoding: 'utf8',
+      },
+    ).trim();
+  const writeLedger = (rows) => writeFileSync(join(root, LEDGER_PATH), JSON.stringify(rows));
+  writeLedger([first, branch]);
+  git('add', '.');
+  git('commit', '-qm', 'branch receipt');
+  const branchRef = git('rev-parse', 'HEAD');
+  git('checkout', '-qb', 'updated-main', ref);
+  writeLedger([first, main]);
+  git('add', '.');
+  git('commit', '-qm', 'main receipt');
+  const mainRef = git('rev-parse', 'HEAD');
+  const mainTree = git('rev-parse', 'HEAD^{tree}');
+
+  // Before committing a merge, comparing only main misses a dropped branch receipt.
+  git('checkout', '--detach', '-q', branchRef);
+  writeLedger([first, main]);
+  assert.throws(() => runCoverage(['--base-ref', mainRef], { root, env: {} }), /removed receipt/);
+
+  // A later commit must not hide a lossy resolution in an earlier merge either.
+  const merge = git('commit-tree', mainTree, '-p', branchRef, '-p', mainRef, '-m', 'lossy merge');
+  git('reset', '--hard', '-q', merge);
+  git('commit', '--allow-empty', '-qm', 'later repair work');
+  assert.throws(() => runCoverage(['--base-ref', mainRef], { root, env: {} }), /removed receipt/);
+
+  // Exercise Actions' depth-one checkout against a local remote, without network access.
+  const shallowRoot = mkdtempSync(join(tmpdir(), 'lyb-coverage-shallow-'));
+  t.after(() => rmSync(shallowRoot, { recursive: true, force: true }));
+  execFileSync('git', ['clone', '-q', '--depth=1', `file://${root}`, shallowRoot], {
+    stdio: 'pipe',
+  });
+  const isShallow = () =>
+    execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+      cwd: shallowRoot,
+      encoding: 'utf8',
+    }).trim();
+  assert.equal(isShallow(), 'true');
+  assert.throws(
+    () => runCoverage(['--base-ref', mainRef], { root: shallowRoot, env: {} }),
+    /removed receipt/,
+  );
+  assert.equal(isShallow(), 'false');
+  writeLedger([first, branch, main]);
+  assert.equal(runCoverage(['--base-ref', mainRef], { root, env: {} }).rules[0].receipts.length, 3);
+});
+
 test('empty ledger is N/A and proposed or absent guards earn no credit', () => {
   assert.equal(report([]).percent, null);
   assert.match(renderCoverage(report([])), /N\/A \(no rules\)/);

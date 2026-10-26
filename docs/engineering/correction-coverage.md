@@ -13,7 +13,8 @@ The metric reads `packages/shared-lib/corrections.json`, retaining the receipt
 contract and recurrence behavior from [LYB-209](correction-recurrence.md). Count
 one rule per normalized fingerprint, regardless of how many correction receipts
 it has. This ledger is also the LYB lesson inventory; do not copy Jovie's lesson
-ledger into it. Each current receipt must include a reviewed classification
+ledger into it. The [capture guide](correction-ledger.md) covers chat/memory,
+review, Linear and revert sources. Each current receipt must include a reviewed classification
 (LYB-205) and a retained guard or explicit prose-only reason (LYB-206):
 
 ```json
@@ -87,11 +88,20 @@ regression guard. These are
 reviewed source-linkage metrics, not proof that the guards executed or that every
 historical correction has been captured.
 
+Each rule's JSON output also retains its `guard` (or `proseOnlyReason`), sorted
+`receipts` with source, lesson and mechanization, and derived `recurrence`:
+`receiptCount` counts distinct canonical source URLs and `repeatCount` excludes
+the first receipt. Duplicate replays count once, matching the recurrence intake.
+The existing owner report and CI summary show those sources, lessons, guard
+locations and counts alongside the enforcement level.
+
 Run from the repository root:
 
 ```sh
 node packages/shared-lib/scripts/correction-coverage.mjs
 node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
+node --test packages/shared-lib/scripts/guard-reference.behavior.mjs
 node packages/shared-lib/scripts/jovie-separation.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
@@ -106,6 +116,16 @@ CI rejects any decrease in the unrounded overall or nonempty per-level ratio,
 removal of a retained rule, loss of a mechanized guard, or movement of an already
 mechanized rule from codebase to static/prose/human. Moving all rules out of a
 level by promoting them is allowed; an empty level has no percentage to compare.
+It also rejects removal, replacement or reassignment of any retained source
+URL within its fingerprint, even when aggregate coverage and receipt counts
+stay equal. Clarifying lesson text, removing duplicate replays, adding new
+receipts and canonical URL spelling changes remain allowed.
+The same command also compares against the current Git HEAD and every parent of
+branch merges since the base. This preserves both sides during conflict repair,
+including before committing the merge, and catches a dropped branch receipt even
+when later commits hide the merge from HEAD. In shallow checkouts it fetches the
+remaining history from origin first; missing parent evidence or a failed fetch
+fails closed.
 New unmechanized rules can lower coverage and must be addressed in the same PR.
 Empty baselines establish no percentage floor. Existing quality gates remain in
 place.
@@ -114,6 +134,16 @@ place.
 guards on this same every-diff path. Their existing violations warn against
 finding baselines that can only shrink; this is separate from, and does not
 relax, the coverage ratio or retained-guard requirements above.
+
+LYB-254 checks claimed guard paths on that same step. A receipt that names a
+guard fails when its test, lint-rule, or CI file is missing, and the failure
+names the ledger entry id and path. Receipts with no guard reference warn.
+Their ids are the sorted `unguarded` list in
+`packages/shared-lib/guard-reference-baseline.json`
+(`lyb.guard-reference/v1`). That list must match the ledger. Against the exact
+Git base it can only shrink; adding an id fails CI. A missing base file is an
+empty allowance, so the first baseline cannot grandfather unguarded entries.
+This is not a coverage-percentage baseline and does not relax retained anchors.
 
 The same required change-detection job runs the Jovie separation grep on every
 diff, including docs-only PRs. It scans tracked and new nonignored code under
