@@ -14,8 +14,13 @@ it('runs correction classifier fixtures and CLI behavior through the normal scri
       '--test-coverage-functions=100',
       'scripts/correction-classifier.test.mjs',
     ],
-    { cwd: fileURLToPath(new URL('../../..', import.meta.url)), encoding: 'utf8', timeout: 30_000 },
+    {
+      cwd: fileURLToPath(new URL('../../..', import.meta.url)),
+      encoding: 'utf8',
+      timeout: 30_000,
+      env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
+    },
   );
   expect(output).toContain('# fail 0');
   console.log(output.slice(output.indexOf('# start of coverage report')));
-});
+}, 30_000);

@@ -1,5 +1,41 @@
 [
   {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1609: The web Zod 4.6.7 manifest update retained a 4.6.6 workspace lockfile and stale source projection, failing Vercel frozen installation, Detect Changes, parity and CI Summary. Repair dependency artifacts together with a reusable helper.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1609",
+    "mechanization": "Extend the existing repository source resolver with an explicit lockfile refresh. It refuses unstaged dependency edits and pinned drift, regenerates through pinned Corepack pnpm with lifecycle scripts disabled, verifies frozen offline installation, and stages the lockfile with the projection only after success. The existing required Detect Changes suite exercises command execution, dirty inputs, idempotence, resolver and frozen-check failures. Six initial cases fail before the extension and pass afterward. Use the extended helper on this PR and retain all frozen install and source parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "staged-dependency-source-map-refresh",
+    "correction": "PR #1603: Dependabot's Radix Switch 1.3.8 manifest bump left the generated source map stale, failing Detect Changes, documentation parity and CI Summary. Repeated source-map repairs need a reusable commit-time refresh.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1603",
+    "mechanization": "Extend the existing source-map resolver with an index-backed staged mode and run it after formatting and correction classification in pre-commit. Existing required Detect Changes tests prove staged dependency projection, preservation of partial staging, idempotence, and refusal of unstaged output, missing sources, unsafe paths and pinned drift. The new cases fail before the extension and pass afterward. Use the extended resolver to repair this PR while retaining all CI parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct and stage generated documentation directly from the Git index at local commit time, preventing stale manifest fingerprints by construction while preserving unstaged edits. GitHub-created bot commits remain protected by the required parity check and use the same resolver during repair."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Render the index, so partially staged manifests cannot leak into the commit."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1595: Updating @radix-ui/react-accordion from 1.2.20 to 1.2.21 left the generated web manifest dependency and fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40299950152/job/121495099134",
@@ -1149,6 +1185,104 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "Independent additions merge; concurrent receipt edits require explicit resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "healthkit-types-disclosed-in-privacy-health-data",
+    "correction": "LYB-189: The privacy policy's Health Data bullet disclosed only steps/activity while native HealthKit paths read weight, body fat percentage, height, steps, date of birth and biological sex, and write weight/body fat.",
+    "source": "https://linear.app/jovie/issue/LYB-189",
+    "mechanization": "Extend the existing app-privacy scanner, already executed by the required Detect Changes correction ratchet on every diff, to compare native definitions, explicit identifiers, characteristic getters and HealthKit usage strings with the canonical Health Data bullet. Shared-lib mutation regressions reject the original steps-only wording and each omitted type. Tim/legal retains final prose review; source checks do not grant legal approval.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Privacy wording is authored legal/product truth. Generating it from native declarations would replace the requested Tim/legal prose review and cannot prevent an incomplete authored disclosure."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required snapshot scanner can fail on undisclosed native HealthKit identifiers and permission-string types without accessing HealthKit, ASC or credentials."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/app-privacy.mjs",
+      "anchor": "LYB-189: require each native HealthKit type in the policy's Health Data bullet."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "correction-ledger-conflict-safe-merge",
+    "correction": "PR #1545 conflict repair: retain both parents' correction receipts and resolve other source conflicts before validating guards during an automatic ledger merge.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1545",
+    "mechanization": "Extend the existing --merge-ledger resolver to reject other unresolved Git paths before reading guard evidence or writing the ledger. The existing required shared-lib Git-fixture regression fails without this check and passes with it, preserving the ledger on refusal. Use the resolver on the actual PR conflict, retaining the HealthKit disclosure receipt and all main receipts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing ledger tool can construct a lossless three-way merge from Git conflict stages and refuse ambiguous edits before writing, replacing repeated manual append-conflict repair with one deterministic operation."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Independent additions merge; concurrent receipt edits require explicit resolution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "merge-correction-ledgers-before-classification",
+    "correction": "PR #1544: Repeated origin/main repairs must preserve both merge parents' correction receipts and classify their union instead of resolving the ledger by choosing one side.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1544",
+    "mechanization": "Extend the existing correction classifier with --merge and --resolve-merge. Git resolution classifies all three immutable index stages and delegates to the existing correction-coverage mergeCorrectionLedgers policy, preserving incoming order and appending branch-only receipts so subsequent main-side prepends merge cleanly. It preserves independent additions and one-sided edits while rejecting deletions, duplicate identities, concurrent edits and missing guards before writing. --check-merge and pre-commit verify staged retention against both parents. Used for this repair. The required shared-lib runner exercises real conflicting repositories and a subsequent clean main merge at 100% classifier coverage; the incoming-order regression failed on the previous resolver and passes with this extension. Both Git resolver entrypoints share assertLedgerMergeReady to refuse other unresolved source paths before guard validation or ledger writes. A real conflicting-guard regression fails without this preflight and passes with it, preserving the unresolved ledger and index. Reused for the current origin/main merge.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing classifier can construct the complete union before writing, preserving distinct source receipts by construction and refusing contradictory duplicates without changing either input on failure."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "assert.deepEqual(merged.get(key), normalized, `conflicting merge receipt: ${key}`);"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swiftui-reduce-motion-environment-is-read-only",
+    "correction": "PR #1544: The workout scrubber's large-type preview wrote SwiftUI's get-only accessibilityReduceMotion environment property, preventing both Launch Quality and StoreKit Purchase and Restore from compiling.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40167662977/job/121092153045",
+    "mechanization": "Remove the invalid preview override and inherit the system preference. The required JavaScript/TypeScript shared-lib suite rejects read-only Reduce Motion environment writes throughout native app source, including previews, while permitting reads and writable Dynamic Type overrides. The source regression failed on TrainingNumericScrub.swift before this repair. Existing native compilation and acceptance gates remain required.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Runtime app logic cannot prevent future source edits from invoking an unsupported SwiftUI modifier, including within debug-only preview code."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "A deterministic source regression in the existing required shared-lib test task detects the unsupported environment write on Linux before the native compiler independently rejects it on macOS."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
+      "anchor": "keeps native views and previews free of read-only Reduce Motion writes (LYB-153)"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "git-fixture-local-identity",
+    "correction": "PR #1544: The classifier merge regression supplied an identity to its Git helper but omitted it from a later merge, failing required CI on a runner without global Git identity.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40316539014/job/121551681050",
+    "mechanization": "Configure a local user.name and user.email in each disposable fixture repository so every Git command has an identity. The existing required shared-lib runner disables global and system Git configuration for this suite. The unchanged merge regression fails with the original fixture under that environment and passes with local configuration, retaining all 100% classifier coverage thresholds.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Repository-local fixture configuration supplies an identity to every Git subprocess by construction without changing the CI runner or developer configuration."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "git('config', 'user.name', 'Ledger fixture');"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
