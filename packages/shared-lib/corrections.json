@@ -22,6 +22,28 @@
     "ruleId": "ci-invariant"
   },
   {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1590: Adding installed-build xcresult test cache inputs left the generated Turbo manifest fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40238447521/job/121304913985",
+    "mechanization": "Regenerate the existing source projection after reviewing the three installed-build xcresult cache inputs. The projection checker failed before regeneration locally and in CI and passes afterward; retain the required Detect Changes gate and its regression rejecting stale projection evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
     "fingerprint": "recurring-corrections-escalate-or-report-guard-failure",
     "correction": "LYB-252: Repeated corrections after a prose fix must request stronger enforcement once per rule; a correction recurring after mechanization is a guard failure rather than an ordinary repeat.",
     "source": "https://linear.app/jovie/issue/LYB-252",
