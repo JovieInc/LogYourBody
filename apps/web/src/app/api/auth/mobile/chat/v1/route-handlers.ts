@@ -34,6 +34,11 @@ type ChatStreamOutcome =
   | 'failure_persistence_error';
 
 type ChatRouteDependencies = {
+  proposeTrainingSteering?: (input: {
+    subject: string;
+    requestId: string;
+    utterance: string;
+  }) => Promise<{ content: string; proposalId?: string } | null>;
   authenticate: (request: NextRequest) => Promise<JovieUserInfo | null>;
   conversations: ChatConversationPort;
   bodyMetrics: BodyMetricsPort;
@@ -202,15 +207,22 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
       const guardrailsEnabled = coachPersonaGuardrailsEnabled();
       const holdForReview = holdCoachReplyForReview(trainingTurn, guardrailsEnabled);
       let trainingOutput: NextWorkoutResult | null = null;
+      let trainingSteering: { content: string; proposalId?: string } | null = null;
       try {
         abortController.signal.throwIfAborted();
+        trainingSteering =
+          (await dependencies.proposeTrainingSteering?.({
+            subject: identity.sub,
+            requestId: input.clientMessageId,
+            utterance: input.message,
+          })) ?? null;
         const [user, metrics] = await Promise.all([
           dependencies.users.getUser(identity.sub),
           dependencies.bodyMetrics.list(identity.sub, 30),
         ]);
         abortController.signal.throwIfAborted();
         trainingOutput =
-          trainingTurn && dependencies.getTrainingOutput
+          trainingTurn && !trainingSteering && dependencies.getTrainingOutput
             ? await dependencies.getTrainingOutput(identity.sub)
             : null;
         abortController.signal.throwIfAborted();
@@ -221,7 +233,14 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
           trainingOutput,
           voiceMode: input.voiceMode,
         });
-        model = dependencies.createModel();
+        const steering = trainingSteering;
+        model = steering
+          ? {
+              async *streamText() {
+                yield { type: 'text_delta' as const, text: steering.content };
+              },
+            }
+          : dependencies.createModel();
       } catch {
         request.signal.removeEventListener('abort', abortFromRequest);
         const cancelled = abortController.signal.aborted;
@@ -255,6 +274,14 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
           );
 
           reportStreamOutcome('started');
+          if (trainingSteering?.proposalId)
+            controller.enqueue(
+              event('plan_proposal', {
+                version: CHAT_PROTOCOL_VERSION,
+                proposalId: trainingSteering.proposalId,
+                applied: false,
+              }),
+            );
           let content = '';
           let persistingCompletion = false;
           let inputTokens: number | null = null;
@@ -288,7 +315,9 @@ export function createChatRouteHandlers(dependencies: ChatRouteDependencies) {
             abortController.signal.throwIfAborted();
             if (!content.trim()) throw new Error('CHAT_EMPTY_RESPONSE');
             const trainingSafe =
-              trainingTurn && hasUnauthorizedTrainingQuantity(content, trainingOutput)
+              trainingTurn &&
+              !trainingSteering &&
+              hasUnauthorizedTrainingQuantity(content, trainingOutput)
                 ? TRAINING_NUMBER_FALLBACK
                 : content;
             const deliveredContent = applyClinicalGuardrail(trainingSafe, guardrailsEnabled);

@@ -1,6 +1,8 @@
 import type { TrainingMutationsPort } from '@/lib/ports/training-mutations';
 import { isProgramSetup } from './engine';
 import type { TrainingProgramSetup } from './types';
+import { recoveryRecordBasis } from './recovery-records';
+import { trainingRequestHash } from './revisions';
 import {
   NATIVE_PRODUCT_RECORD_COLLECTIONS,
   type NativeProductRecord,
@@ -24,6 +26,50 @@ export class MemoryTrainingRecords implements NativeProductRecordsPort {
     this.owners.set(subject, { id, generation: 0 });
   }
   readonly trainingMutations: TrainingMutationsPort = {
+    commitRecoveryTrial: async ({
+      subject,
+      admission,
+      expectedRecords,
+      expectedRevision,
+      record,
+    }) => {
+      const owner = this.owners.get(subject);
+      const setup = this.data.training_feedback.get(admission.setupId);
+      if (!owner) return { kind: 'owner_missing' };
+      if (
+        owner.id !== admission.ownerId ||
+        owner.generation !== admission.generation ||
+        !setup ||
+        setup.deleted_at !== null ||
+        (setup.programRevisionId ?? null) !== admission.revisionId
+      )
+        return { kind: 'stale_admission' };
+      const rows = ['training_sessions', 'logged_sets', 'training_feedback'].flatMap((collection) =>
+        [...this.data[collection as NativeProductRecordCollection].values()]
+          .filter((row) => row.user_id === subject && row.deleted_at === null)
+          .map((row) => ({ ...row, collection })),
+      );
+      if (trainingRequestHash(recoveryRecordBasis(rows)) !== trainingRequestHash(expectedRecords))
+        return { kind: 'record_conflict' };
+      const prior = this.data.training_feedback.get(String(record.id));
+      if (
+        (prior ? Number(prior.revision) : null) !== expectedRevision ||
+        record.record_type !== 'recovery_trial' ||
+        record.programSetupId !== setup.id ||
+        record.programRevisionId !== (setup.programRevisionId ?? null)
+      )
+        return { kind: 'record_conflict' };
+      // No suspension between the source check and the single CAS write.
+      const stored = {
+        ...record,
+        id: String(record.id),
+        user_id: subject,
+        deleted_at: null,
+        server_updated_at: String(record.updatedAt),
+      } as NativeProductRecord;
+      this.data.training_feedback.set(stored.id, stored);
+      return { kind: 'saved', record: stored };
+    },
     captureAdmission: async (subject) => {
       const owner = this.owners.get(subject);
       const setup = [...this.data.training_feedback.values()]

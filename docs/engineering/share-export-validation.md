@@ -176,3 +176,91 @@ unverified until the harness runs the required checks.
 
 GBrain search, write to `lyb-40-pr1532-aspect-fit`, and readback failed with
 connection refused at `127.0.0.1:7801`. No durable write/readback occurred.
+
+## PR #1532 conflict repair (2026-10-26)
+
+Started `git merge --no-commit origin/main` at `84a6f229c` before repair edits.
+The harness checkout was detached at `676cfaa67`; its named branch was occupied
+by another worktree, so this checkout uses
+`fix/lyb-40-pr1532-conflicts-20261026`. Push and PR mutations remain owned by the
+harness.
+
+Resolved the Xcode and registry conflicts by retaining both sets of additions.
+Regenerated the endpoint projection with `product:generate` and the repository
+source map with `python3 scripts/repository_docs.py --write`. The automatic share
+card merge keeps main's artwork and preview changes alongside this branch's
+export coordinator. No additional product behavior or workflow policy was
+authored in this repair.
+
+Extended `packages/shared-lib/scripts/correction-coverage.mjs` with the read-only
+`--merge-ledger <base-sha> <ours-sha> <theirs-sha>` generator and used it on the
+real merge inputs, retaining upstream ordering. It merges canonical receipt
+identities, preserves base and both branch histories, accepts one-sided updates,
+and refuses ambiguous edits or incompatible annotations. The existing required
+shared-lib suite executes its regressions. Classified the resulting ledger with
+`node scripts/correction-classifier.mjs`, including the repair receipts.
+
+Routing tests reproduced 1 failure / 40 passes: main's reviewed project digest
+had advanced beyond this branch's compressed fixture. Refreshed the fixture from
+the immutable reviewed main snapshot after verifying its digest against the
+unchanged diagnostic policy. All 41 cases then passed, retaining actual trusted
+CLI acceptance and changed-project refusal. The resolved candidate project is
+still distinct from the frozen reviewed diagnostic project.
+
+Local source verification used Node 22.23.2 and pnpm 10.34.1 through
+`bash scripts/codex-setup.sh --run`. The frozen dependency bootstrap was rerun
+after merging main; an initial root test attempt had stale Sentry dependencies.
+Lint and typecheck passed. Product generation and `product:check` passed.
+Scoped strict SwiftLint with `--no-cache` passed for the five changed native
+files with zero violations; five SourceKit rules were unavailable on Linux.
+Xcode object IDs were unique and both branches' added sources retained their
+build-phase memberships. The marketing generator's timestamp-only side effect
+was discarded.
+
+Additional commands:
+
+```sh
+python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref 676cfaa674f92e350bd0ffb93f49c1ea5d21b9e3
+node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
+node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
+node --test scripts/correction-classifier.test.mjs
+python3 scripts/repository_docs.py
+node scripts/check-jovie-imports.mjs
+git diff --check
+```
+
+The existing correction-tool coverage command (all five production include
+paths, 90% lines / 85% branches / 100% functions floors) passed all 38 behavioral
+cases at 100% on each measure. Ratchets retained the 11 existing public-copy
+warnings without growing their baseline; all 35 guard references resolved.
+
+The retention regression also rejects a temporary mutation that returns only
+our branch's ledger, then passes with the merge implementation restored.
+Root `test` and the isolated shared-lib suite were attempted repeatedly. The
+root run reached seven successful Turbo tasks, including 1,336 passing web
+tests, but shared-lib's existing five-second limits timed out in the correction
+coverage wrapper and/or the web ESLint fixture. Retries used CPU affinity and
+then the supported `VITEST_MAX_WORKERS=1` setting (passed through Turbo with
+`--env-mode=loose`); the final isolated command was:
+
+```sh
+VITEST_MAX_WORKERS=1 bash scripts/codex-setup.sh --run --filter @logyourbody/shared-lib test
+```
+
+It finished with 158 passing cases and two timeout failures. The guard's nested
+behavioral assertions and coverage still passed, and its direct run passed
+separately. No timeout, test, CI configuration or coverage floor was changed.
+Local root test success is not claimed; the harness must obtain fresh required
+CI results on the committed merge.
+
+`xcodebuild -version` returned command not found. Exact-head native tests,
+coverage, Launch Quality and device acceptance remain unverified until the
+harness runs the required Mac checks. The prior PR head's CI run
+`40158507283` was green and `gh run view --log-failed` had no current failures;
+the older failed run `40154055343` described the already-fixed thumbnail issue.
+
+GBrain query, write to `lyb-pr1532-conflict-repair`, and readback failed. Sandbox
+requests were refused at `127.0.0.1:7801`; the network-enabled write/readback
+attempts each timed out after 30 seconds. Durable persistence is unverified.

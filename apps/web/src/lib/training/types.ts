@@ -1,5 +1,17 @@
 export const TRAINING_CONSENT_VERSION = 'hypertrophy-coach-v1';
 export const MESOCYCLE_WEEKS = 4;
+export type CycleLength = 4 | 5 | 6;
+export type CyclePhase =
+  'accumulation' | 'adjustment' | 'planned_deload' | 'reactive_deload' | 'review' | 'next_block';
+
+export type CycleConfiguration = {
+  blockId?: string;
+  weekCount: CycleLength;
+  temporaryPriorities: MuscleGroup[];
+  temporaryConstraints: Array<{ muscle: MuscleGroup; reason: string }>;
+  retainedVariants: Array<{ fromExerciseId: string; toVariantId: string; reason: string }>;
+  historyProgramIds: string[];
+};
 
 export const MUSCLE_GROUPS = [
   'chest',
@@ -22,9 +34,10 @@ export type ProgressionAction = 'hold' | 'add_reps' | 'increase_load';
 export type MesoBlock = {
   id: string;
   startDate: string;
-  weekCount: typeof MESOCYCLE_WEEKS;
+  weekCount: CycleLength;
   currentWeek: number;
   targetRir: number;
+  phase?: CyclePhase;
 };
 
 export type Microcycle = {
@@ -175,11 +188,16 @@ export type TrainingProgramSetup = {
   consentVersion: typeof TRAINING_CONSENT_VERSION;
   adultConfirmed: true;
   safetyConfirmed: true;
-  sessionsPerWeek: 2 | 3;
+  sessionsPerWeek: 2 | 3 | 4 | 5 | 6;
   equipment: Equipment;
   startedAt: string;
   programRevisionId?: string;
   programPolicyVersion?: string;
+  cycle?: CycleConfiguration;
+  /** Enduring exclusions are independent of a block's temporary goals. */
+  excludedVariantIds?: string[];
+  declaredEquipment?: string[];
+  delegated?: import('./delegation-contract').DelegatedProgram;
 };
 
 export type TrainingFeedback = {

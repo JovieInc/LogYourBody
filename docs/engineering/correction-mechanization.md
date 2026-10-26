@@ -96,3 +96,18 @@ that automatic path on; all required checks, deployments and queue rules still
 apply. When the lanes harness owns pushing and PR creation, hand it the commits
 and validation evidence. Do not enable the retired Codex Auto-Fix workflow or
 start a second PR owner.
+
+When both branches append to `corrections.json`, use the existing coverage tool
+to generate a three-way merge from immutable Git snapshots:
+
+```sh
+node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger <base-sha> <ours-sha> <theirs-sha>
+```
+
+It prints candidate JSON without editing the ledger. It preserves every receipt
+from the base and both branches, groups identity by normalized fingerprint and
+canonical source URL, and keeps one-sided metadata updates. Conflicting edits to
+the same receipt or incompatible rule annotations fail without emitting JSON.
+Review the result before saving it, run `node scripts/correction-classifier.mjs`
+to classify imported receipts, then run coverage and ratchets against the exact
+base as usual. This generator does not replace either required gate.
