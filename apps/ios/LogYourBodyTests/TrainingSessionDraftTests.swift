@@ -41,6 +41,82 @@ final class TrainingSessionDraftTests: XCTestCase {
         TrainingSessionDraft(session: session(), ownerId: owner, store: store, isCurrent: { true })
     }
 
+    func testScrubCommitsOnlyToDraftAndOfflineRetryRetainsCanonicalSetIdentity() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        var edit = try XCTUnwrap(TrainingNumericScrubEdit(
+            original: "60", dimension: .load(.imperial), increment: 2.5
+        ))
+        for pixel in 1...60 { edit.move(horizontal: Double(pixel), vertical: 0) }
+        XCTAssertTrue(draft.rows.isEmpty, "Provisional frames must not write the journal")
+        XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: "fixture-session").isEmpty)
+        let canonical = try XCTUnwrap(edit.committedText(current: "60"))
+        draft.update(exercise, setNumber: 1) { $0.loadText = canonical; $0.repsText = "12"; $0.rir = 2 }
+        let restored = model(store)
+        XCTAssertEqual(restored.row(for: exercise, setNumber: 1).loadText, canonical)
+        XCTAssertTrue(restored.loggedSets.isEmpty, "Scrubbing never records a set")
+        var attempts: [TrainingSetLogRequest] = []
+        await restored.save(exercise, setNumber: 1) { request in
+            attempts.append(request)
+            throw URLError(.notConnectedToInternet)
+        }
+        let retry = model(store)
+        retry.update(exercise, setNumber: 1) { $0.loadText = "500" }
+        XCTAssertEqual(retry.row(for: exercise, setNumber: 1).loadText, canonical, "Pending requests stay immutable")
+        await retry.save(exercise, setNumber: 1) { attempts.append($0) }
+        await retry.save(exercise, setNumber: 1) { attempts.append($0) }
+        XCTAssertEqual(attempts.count, 2)
+        XCTAssertEqual(attempts.first, attempts.last)
+        XCTAssertEqual(attempts.last?.loadKg, Double(canonical))
+        XCTAssertEqual(attempts.last?.reps, 12)
+        XCTAssertEqual(attempts.last?.rir, 2)
+        XCTAssertEqual(retry.loggedSets.count, 1)
+        let readback = TrainingSessionDraft(
+            session: session(saved: Array(retry.loggedSets.values)), ownerId: "owner-A", store: store, isCurrent: { true }
+        )
+        XCTAssertEqual(readback.row(for: exercise, setNumber: 1).loadText, canonical)
+    }
+
+    func testScrubCorrectionUsesExistingDurableIdentityAndCancellingNeverWrites() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        await draft.save(exercise, setNumber: 1) { _ in }
+        let position = try XCTUnwrap(draft.allPositions.first)
+        draft.beginCorrection(position)
+        let before = draft.row(for: exercise, setNumber: 1)
+        var cancelled = try XCTUnwrap(TrainingNumericScrubEdit(
+            original: before.repsText, dimension: .reps, increment: 1
+        ))
+        cancelled.move(horizontal: 36, vertical: 0)
+        cancelled.move(horizontal: 36, vertical: 90)
+        XCTAssertNil(cancelled.committedText(current: before.repsText))
+        XCTAssertEqual(draft.row(for: exercise, setNumber: 1), before)
+        var edit = try XCTUnwrap(TrainingNumericScrubEdit(original: before.repsText, dimension: .reps, increment: 1))
+        edit.move(horizontal: 24, vertical: 0)
+        let reps = try XCTUnwrap(edit.committedText(current: before.repsText))
+        draft.update(exercise, setNumber: 1) { $0.repsText = reps }
+        XCTAssertEqual(draft.row(for: exercise, setNumber: 1).correctionBase, before.correctionBase)
+        var corrections = 0
+        await draft.correct(position) { request in
+            corrections += 1
+            XCTAssertEqual(request.sessionId, "fixture-session")
+            XCTAssertEqual(request.exerciseId, self.exercise.id)
+            XCTAssertEqual(request.setNumber, 1)
+            return TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: request.reps, loadKg: request.loadKg, rir: request.rir, revision: request.expectedRevision + 1
+            )
+        }
+        await draft.correct(position) { _ in XCTFail("A scrub correction cannot submit twice"); throw URLError(.cancelled) }
+        XCTAssertEqual(corrections, 1)
+        XCTAssertEqual(draft.loggedSets.count, 1)
+        XCTAssertEqual(draft.loggedSets[position.id]?.reps, 12)
+    }
+
     func testFeedbackRequestEncodesOptionalMuscleDetailAndTouchSource() throws {
         let request = TrainingFeedbackRequest(
             sessionId: "fixture-session",
@@ -800,6 +876,268 @@ final class TrainingSessionDraftTests: XCTestCase {
         XCTAssertEqual(restored.loggedSets[position.id]?.revision, 1)
         XCTAssertTrue(try store.load(ownerId: "owner-A", sessionId: "fixture-session").isEmpty)
     }
+
+    func testFreshLogHasNoUndoAndALaterAcknowledgementCannotEraseACorrection() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        let draft = model(store)
+        var undoSends = 0
+        await draft.undo { _ in
+            undoSends += 1
+            throw URLError(.cancelled)
+        }
+        XCTAssertEqual(undoSends, 0)
+        XCTAssertNil(draft.undoAffordance)
+
+        draft.update(exercise, setNumber: 1) { $0.repsText = "12"; $0.loadText = "60"; $0.rir = 2 }
+        let audited = TrainingSavedSet(
+            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 1,
+            reps: 12, loadKg: 60, rir: 2, revision: 2,
+            corrections: [
+                TrainingSetCorrectionAudit(
+                    id: UUID().uuidString,
+                    correctedAt: "2026-10-12T00:00:00.000Z",
+                    previous: .init(reps: 10, loadKg: 60, rir: 3)
+                )
+            ]
+        )
+        await draft.saveAcknowledged(exercise, setNumber: 1) { request in
+            TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: request.reps, loadKg: request.loadKg, rir: request.rir,
+                revision: audited.revision, corrections: audited.corrections
+            )
+        }
+        XCTAssertEqual(draft.loggedSets["fixture_press-1"]?.revision, 2)
+        XCTAssertEqual(draft.loggedSets["fixture_press-1"]?.corrections?.count, 1)
+
+        let again = model(TrainingDraftStore(rootURL: directory))
+        again.update(exercise, setNumber: 2) { $0.repsText = "8"; $0.loadText = "60"; $0.rir = 1 }
+        let corrected = TrainingSavedSet(
+            sessionId: "fixture-session", exerciseId: exercise.id, setNumber: 2,
+            reps: 10, loadKg: 60, rir: 1, revision: 2, corrections: audited.corrections
+        )
+        await again.saveAcknowledged(exercise, setNumber: 2) { request in
+            again.replaceSession(self.session(saved: [corrected]))
+            return TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: request.reps, loadKg: request.loadKg, rir: request.rir, revision: 0, corrections: []
+            )
+        }
+        XCTAssertEqual(again.loggedSets["fixture_press-2"]?.revision, 2)
+        XCTAssertEqual(again.loggedSets["fixture_press-2"]?.reps, 10)
+    }
+
+    func testUndoReceiptSurvivesRelaunchUntilExpiryAndRetriesOneId() async throws {
+        let directory = root()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = TrainingDraftStore(rootURL: directory)
+        var clock = Date(timeIntervalSince1970: 1_700_000_000)
+        let original = TrainingSavedSet(
+            sessionId: sessionId, exerciseId: exercise.id, setNumber: 1,
+            reps: 12, loadKg: 60, rir: 2, revision: 0, corrections: []
+        )
+        try store.cacheActiveSession(session(id: sessionId, saved: [original]), ownerId: "owner-A")
+        let draft = TrainingSessionDraft(
+            session: try XCTUnwrap(store.activeSession(ownerId: "owner-A")), ownerId: "owner-A", store: store,
+            isCurrent: { true }, now: { clock }
+        )
+        let position = try XCTUnwrap(draft.lastCompletedPosition)
+        draft.beginCorrection(position)
+        draft.update(exercise, setNumber: 1) { $0.repsText = "10" }
+        await draft.correct(position) { request in
+            TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: request.reps, loadKg: request.loadKg, rir: request.rir,
+                revision: request.expectedRevision + 1,
+                corrections: [
+                    TrainingSetCorrectionAudit(
+                        id: request.correctionId,
+                        correctedAt: "2026-10-12T00:00:00.000Z",
+                        previous: .init(reps: 12, loadKg: 60, rir: 2)
+                    )
+                ]
+            )
+        }
+        let corrected = try XCTUnwrap(draft.loggedSets[position.id])
+        XCTAssertEqual(try store.activeSession(ownerId: "owner-A")?.loggedSets, [corrected])
+        let receipt = try XCTUnwrap(draft.undoAffordance)
+        XCTAssertEqual(receipt.reps, 12)
+        XCTAssertEqual(receipt.expectedRevision, 1)
+        XCTAssertFalse(receipt.submitted)
+
+        clock = clock.addingTimeInterval(31)
+        let hidden = TrainingSessionDraft(
+            session: try XCTUnwrap(store.activeSession(ownerId: "owner-A")), ownerId: "owner-A", store: store,
+            isCurrent: { true }, now: { clock }
+        )
+        XCTAssertNil(hidden.undoAffordance)
+        var hiddenSends = 0
+        await hidden.undo { _ in
+            hiddenSends += 1
+            throw URLError(.cancelled)
+        }
+        XCTAssertEqual(hiddenSends, 0)
+        clock = clock.addingTimeInterval(-31)
+
+        let reloaded = TrainingSessionDraft(
+            session: try XCTUnwrap(store.activeSession(ownerId: "owner-A")), ownerId: "owner-A", store: store,
+            isCurrent: { true }, now: { clock }
+        )
+        XCTAssertEqual(reloaded.undoAffordance?.id, receipt.id)
+        XCTAssertNil(
+            TrainingSessionDraft(
+                session: try XCTUnwrap(store.activeSession(ownerId: "owner-A")), ownerId: "owner-B", store: store,
+                isCurrent: { true }, now: { clock }
+            ).undoAffordance
+        )
+
+        var ids: [String] = []
+        await reloaded.undo { request in
+            ids.append(request.undoId)
+            throw URLError(.networkConnectionLost)
+        }
+        XCTAssertEqual(ids, [receipt.id])
+        XCTAssertEqual(reloaded.undoAffordance?.submitted, true)
+        clock = clock.addingTimeInterval(31)
+        let expired = TrainingSessionDraft(
+            session: try XCTUnwrap(store.activeSession(ownerId: "owner-A")), ownerId: "owner-A", store: store,
+            isCurrent: { true }, now: { clock }
+        )
+        XCTAssertEqual(expired.undoAffordance?.id, receipt.id, "A queued undo still retries after the fuse")
+        await expired.undo { request in
+            ids.append(request.undoId)
+            return TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: 12, loadKg: 60, rir: 2, revision: request.expectedRevision + 1,
+                corrections: corrected.corrections! + [
+                    TrainingSetCorrectionAudit(
+                        id: request.undoId,
+                        correctedAt: "2026-10-12T00:00:01.000Z",
+                        previous: .init(reps: 10, loadKg: 60, rir: 2)
+                    )
+                ]
+            )
+        }
+        XCTAssertEqual(ids, [receipt.id, receipt.id])
+        XCTAssertEqual(expired.loggedSets[position.id]?.reps, 12)
+        XCTAssertEqual(expired.loggedSets[position.id]?.revision, 2)
+        XCTAssertNil(expired.undoAffordance)
+        var extra = 0
+        await expired.undo { _ in
+            extra += 1
+            throw URLError(.cancelled)
+        }
+        XCTAssertEqual(extra, 0)
+
+        let undone = try XCTUnwrap(expired.loggedSets[position.id])
+        XCTAssertEqual(try store.activeSession(ownerId: "owner-A")?.loggedSets, [undone])
+        let unsent = TrainingSessionDraft(
+            session: try XCTUnwrap(store.activeSession(ownerId: "owner-A")), ownerId: "owner-A", store: store,
+            isCurrent: { true }, now: { clock }
+        )
+        XCTAssertNil(unsent.undoAffordance, "A successful undo does not leave a second compact receipt")
+    }
+}
+
+@MainActor
+private final class TrainingCycleServiceFixture: TrainingCycleServicing {
+    var requests: [TrainingCycleProposalRequest] = []
+    var decisions: [TrainingCycleDecisionRequest] = []
+    var failure: Error?
+    var hold: TrainingHeldResponse?
+
+    func cycleContext(accessToken: String) async throws -> TrainingCycleContext {
+        try JSONDecoder().decode(TrainingCycleContext.self, from: Data("""
+        {"version":1,"generation":3,"setup":null,"cycle":null,"reuseOptions":[]}
+        """.utf8))
+    }
+
+    func proposeCycle(accessToken: String, request: TrainingCycleProposalRequest) async throws -> TrainingCycleDraft {
+        requests.append(request)
+        if let hold { await hold.wait() }
+        if let failure { throw failure }
+        return try JSONDecoder().decode(TrainingCycleDraft.self, from: Data("""
+        {"id":"draft","reason":"Review length","assumptions":[],"schedule":[],"plan":{"sessions":[]}}
+        """.utf8))
+    }
+
+    func decideCycle(accessToken: String, request: TrainingCycleDecisionRequest) async throws {
+        decisions.append(request)
+        if let failure { throw failure }
+    }
+}
+
+extension TrainingSessionDraftTests {
+    func testCycleDraftRequiresExplicitApplyAndRetainsRetryIdentity() async throws {
+        let service = TrainingCycleServiceFixture()
+        let model = TrainingCycleReviewModel(service: service, isCurrent: { true }, accessToken: { "fixture" })
+        await model.load()
+        let intent = TrainingCycleIntent(kind: "initial_enrollment", weekCount: 6)
+        service.failure = URLError(.networkConnectionLost)
+        await model.propose(intent: intent)
+        XCTAssertNil(model.draft)
+        XCTAssertTrue(service.decisions.isEmpty)
+        service.failure = nil
+        await model.propose(intent: intent)
+        XCTAssertEqual(service.requests[0].requestId, service.requests[1].requestId)
+        XCTAssertNotNil(model.draft)
+        XCTAssertTrue(service.decisions.isEmpty)
+        service.failure = URLError(.networkConnectionLost)
+        let failed = await model.decide("apply")
+        XCTAssertFalse(failed)
+        XCTAssertNotNil(model.draft)
+        service.failure = nil
+        let applied = await model.decide("apply")
+        XCTAssertTrue(applied)
+        XCTAssertEqual(service.decisions[0].requestId, service.decisions[1].requestId)
+        XCTAssertNil(model.draft)
+    }
+
+    func testHeldCycleDraftCannotCrossAccountBoundary() async {
+        let service = TrainingCycleServiceFixture()
+        service.hold = TrainingHeldResponse()
+        var ownsAccount = true
+        let model = TrainingCycleReviewModel(service: service, isCurrent: { ownsAccount }, accessToken: { "fixture" })
+        await model.load()
+        let pending = Task { await model.propose(intent: TrainingCycleIntent(kind: "revise_cycle", weekCount: 5)) }
+        while service.requests.isEmpty { await Task.yield() }
+        ownsAccount = false
+        service.hold?.release()
+        await pending.value
+        XCTAssertNil(model.context)
+        XCTAssertNil(model.draft)
+        XCTAssertTrue(service.decisions.isEmpty)
+    }
+
+    func testCycleApplyReceiptMustIdentifyTheReviewedDraftAndRevision() throws {
+        let data = Data("""
+        {"version":1,"receipt":{"proposalId":"other","requestId":"request","status":"applied",
+          "decision":"apply","revisionId":"revision","setup":{"id":"program","equipment":"dumbbells","sessionsPerWeek":2}}}
+        """.utf8)
+        let response = try JSONDecoder().decode(TrainingCycleDecisionResponse.self, from: data)
+        XCTAssertFalse(response.matches(.init(requestId: "request", proposalId: "reviewed", decision: "apply")))
+        XCTAssertTrue(response.matches(.init(requestId: "request", proposalId: "other", decision: "apply")))
+    }
+
+    func testCycleIntentKeepsVariantIdentityAndReasonsWithoutAuthoringPrescriptions() throws {
+        let intent = TrainingCycleIntent(
+            kind: "repeat_cycle", weekCount: 5,
+            keepVariants: [.init(
+                fromExerciseId: "machine_chest_press", toVariantId: "smith_incline_press", reason: "Comfortable setup"
+            )],
+            renewPriorities: false, renewConstraints: true
+        )
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(intent)) as? [String: Any])
+        XCTAssertEqual(object["weekCount"] as? Int, 5)
+        XCTAssertEqual(object["renewPriorities"] as? Bool, false)
+        let variants = try XCTUnwrap(object["keepVariants"] as? [[String: String]])
+        XCTAssertEqual(variants.first?["toVariantId"], "smith_incline_press")
+        XCTAssertEqual(variants.first?["reason"], "Comfortable setup")
+        XCTAssertNil(object["sets"])
+        XCTAssertNil(object["targetRir"])
+    }
 }
 
 extension TrainingSessionDraftTests {
@@ -895,6 +1233,16 @@ extension TrainingSessionDraftTests {
         XCTAssertEqual(receipt.sessionId, session.id)
         XCTAssertEqual(receipt.exerciseId, pending.exerciseId)
         XCTAssertEqual(receipt.setNumber, 1)
+        await reopened.saveAcknowledged(cached.exercises[0], setNumber: 2) { request in
+            TrainingSavedSet(
+                sessionId: request.sessionId, exerciseId: request.exerciseId, setNumber: request.setNumber,
+                reps: request.reps, loadKg: request.loadKg, rir: request.rir, revision: 2
+            )
+        }
+        let acknowledged = try XCTUnwrap(reopenedStore.activeSession(ownerId: "owner-a")?.loggedSets?.last)
+        XCTAssertEqual(acknowledged.setNumber, 2)
+        XCTAssertEqual(acknowledged.revision, 2, "Offline cards retain the acknowledged revision")
+        XCTAssertEqual(try reopenedStore.activeSession(ownerId: "owner-a")?.loggedSets?.count, 2)
         XCTAssertTrue(try reopenedStore.load(ownerId: "owner-a", sessionId: session.id).isEmpty)
     }
 

@@ -6,6 +6,50 @@ export const DELEGATED_POLICY = 'delegated-canvas-v1';
 const uuid = z.string().uuid();
 const time = z.string().datetime({ offset: true });
 const variants = z.array(z.string().min(1).max(100)).max(100);
+export const revisionActorSchema = z
+  .object({ kind: z.enum(['user', 'coach', 'trainer']), subject: z.string().min(1) })
+  .strict();
+export type RevisionActor = z.infer<typeof revisionActorSchema>;
+export const programSteeringRecordSchema = z
+  .object({
+    revisionId: uuid,
+    priorityFocus: z
+      .object({
+        muscles: z.array(z.enum(MUSCLE_GROUPS)).min(1).max(MUSCLE_GROUPS.length),
+        upperChest: z.boolean(),
+      })
+      .strict()
+      .nullable(),
+    constraintId: z.string().trim().min(1).max(200).nullable(),
+    actor: revisionActorSchema,
+    rationale: z.string().trim().min(1).max(500),
+  })
+  .strict();
+export type ProgramSteeringRecord = z.infer<typeof programSteeringRecordSchema>;
+
+// Policy supplies these qualitative LYB-113 constraints; steering never infers them.
+export const steeringHealthDecisionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('allow') }).strict(),
+  z.object({ kind: z.literal('review_required'), reason: z.string().min(1) }).strict(),
+  z
+    .object({
+      kind: z.literal('movement_constraint'),
+      constraintId: z.string().min(1),
+      constraint: z.union([
+        z.object({ maxTrunkDemand: z.enum(['low', 'moderate', 'high']) }).strict(),
+        z.object({ excludedConcerns: z.array(z.string().min(1)).min(1) }).strict(),
+      ]),
+    })
+    .strict(),
+]);
+export type SteeringHealthDecision = z.infer<typeof steeringHealthDecisionSchema>;
+const recordedSteeringIntentSchema = z
+  .object({
+    kind: z.literal('record_steering'),
+    record: programSteeringRecordSchema,
+    healthDecision: steeringHealthDecisionSchema,
+  })
+  .strict();
 export const planningInputsSchema = z
   .object({
     goal: z.string().trim().min(1).max(500),
@@ -43,6 +87,7 @@ export const delegatedProgramSchema = z
       })
       .nullable(),
     completedWeeks: z.record(z.string(), z.number().int().min(2).max(6)).default({}),
+    steering: programSteeringRecordSchema.optional(),
     authority: z
       .object({
         trainerSubject: z.string().min(1).max(200).nullable(),
@@ -127,10 +172,6 @@ export const steeringRequestSchema = z
   .strict()
   .refine((v) => Boolean(v.intent) !== Boolean(v.utterance));
 
-export const revisionActorSchema = z
-  .object({ kind: z.enum(['user', 'coach', 'trainer']), subject: z.string().min(1) })
-  .strict();
-export type RevisionActor = z.infer<typeof revisionActorSchema>;
 export const delegatedProposalSchema = z
   .object({
     version: z.literal(2),
@@ -146,7 +187,8 @@ export const delegatedProposalSchema = z
     }),
     actor: revisionActorSchema,
     authority: z.enum(['user_review', 'trainer_grant', 'coach_delegation']),
-    intent: steeringIntentSchema,
+    // Internal structured writes are not accepted by the conversational request schema.
+    intent: z.union([steeringIntentSchema, recordedSteeringIntentSchema]),
     reason: z.string(),
     priorState: priorSetupSchema.nullable(),
     proposedState: delegatedProgramSchema,

@@ -925,26 +925,31 @@ final class ChatServiceTests: XCTestCase {
     }
 
     func testTrainingEnrollmentSendsExplicitAdultAndSafetyOptIn() async throws {
-        let session = makeSession()
-        ChatURLProtocol.handler = { request in
-            XCTAssertEqual(request.httpMethod, "POST")
-            XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/enroll")
-            let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
-            XCTAssertEqual(body["adultConfirmed"] as? Bool, true)
-            XCTAssertEqual(body["safetyConfirmed"] as? Bool, true)
-            XCTAssertEqual(body["sessionsPerWeek"] as? Int, 2)
-            XCTAssertEqual(body["equipment"] as? String, "dumbbells")
-            return (201, ["Content-Type": "application/json"], Data("""
-              {"version":1,"program":{
-                "id":"setup-id","consentVersion":"hypertrophy-coach-v1",
-                "sessionsPerWeek":2,"equipment":"dumbbells"
-              }}
-            """.utf8))
-        }
+        for sessionsPerWeek in 2...6 {
+            let session = makeSession()
+            ChatURLProtocol.handler = { request in
+                XCTAssertEqual(request.httpMethod, "POST")
+                XCTAssertEqual(request.url?.path, "\(TrainingAPIContract.rootPath)/enroll")
+                let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: self.requestBody(request)) as? [String: Any])
+                XCTAssertEqual(body["adultConfirmed"] as? Bool, true)
+                XCTAssertEqual(body["safetyConfirmed"] as? Bool, true)
+                XCTAssertEqual(body["sessionsPerWeek"] as? Int, sessionsPerWeek)
+                XCTAssertEqual(body["equipment"] as? String, "dumbbells")
+                return (201, ["Content-Type": "application/json"], Data("""
+                  {"version":1,"program":{
+                    "id":"setup-id","consentVersion":"hypertrophy-coach-v1",
+                    "sessionsPerWeek":\(sessionsPerWeek),"equipment":"dumbbells"
+                  }}
+                """.utf8))
+            }
 
-        let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
-        let output = try await service.enroll(accessToken: "access-token", sessionsPerWeek: 2, equipment: "dumbbells")
-        XCTAssertEqual(output.program.consentVersion, TrainingAPIContract.consentVersion)
+            let service = URLSessionTrainingService(urlSession: session, baseURL: URL(string: ProductRegistry.Hosts.api)!)
+            let output = try await service.enroll(
+                accessToken: "access-token", sessionsPerWeek: sessionsPerWeek, equipment: "dumbbells"
+            )
+            XCTAssertEqual(output.program.consentVersion, TrainingAPIContract.consentVersion)
+            XCTAssertEqual(output.program.sessionsPerWeek, sessionsPerWeek)
+        }
     }
 
     func testTrainingSetLogUsesTheEngineSessionRouteAndUserValues() async throws {
