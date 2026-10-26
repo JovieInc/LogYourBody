@@ -1,23 +1,5 @@
 [
   {
-    "fingerprint": "healthkit-anchored-sync-preserves-completion-contract",
-    "correction": "PR #1566 / LYB-238 repair: Merge persisted per-type anchors with main's source identity admission and metric-source completion contract. Anchored writes must propagate failure, keep cursors and prior completion unchanged on failure, and stamp successful syncs.",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1566",
-    "mechanization": "Reuse the canonical batch importer and its onFailure callback for anchored pages, throw syncFailed before advancing cursors after a failed commit, and record metric-source completion only after success. Extend the registered HealthSyncPipelineAnchoredFetchTests with successful completion and failed-write cursor/completion assertions. XCTest execution, failing/passing regression receipts and native coverage remain unverified on this Linux host without Xcode; required native CI must provide them.",
-    "classification": {
-      "codebase": {
-        "feasible": true,
-        "rationale": "Reusing the canonical importer and rejecting failed commits before cursor advancement prevents the merge from treating failed anchored persistence as a successful sync by construction."
-      }
-    },
-    "guard": {
-      "path": "apps/ios/LogYourBodyTests/HealthSyncPipelineTests.swift",
-      "anchor": "func testFailedCommitDoesNotAdvanceTheStoredAnchor()"
-    },
-    "level": "codebase",
-    "ruleId": "type-or-schema"
-  },
-  {
     "fingerprint": "healthkit-timezone-policy-without-source-identity",
     "correction": "PR #1567: Launch Quality failed the two cross-day timezone assertions in HealthImportIdempotencyTests. Selecting the sample-local day must not depend on having a complete source-scoped identity.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1567",
@@ -1265,7 +1247,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1552,6 +1534,81 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "metric-fixture-read-only-reduce-motion-environment",
+    "correction": "PR #1550: Both native CI gates fail to compile because the metric fixture writes SwiftUI's read-only accessibilityReduceMotion environment value. Preserve deterministic reduced-motion coverage without assigning that key path.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40180773280/job/121131293839",
+    "mechanization": "A shared metric motion policy combines the system setting with the existing DEBUG-only UI-test launch argument for both the card and its button style. The required shared-lib suite rejects the original read-only environment write; the new regression fails on the pre-fix source and passes after repair. Native policy cases cover the system setting, fixture opt-in and unrelated arguments; native execution remains required in CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Read the system environment and resolve the DEBUG fixture override in a shared policy, removing the invalid writable-key-path requirement while preserving the real system preference and release behavior."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/metric-card-control-owner.behavior.mjs",
+      "anchor": "metric fixture does not write the read-only SwiftUI Reduce Motion environment"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "metric-state-actions-have-one-native-control-owner",
+    "correction": "LYB-43: MetricSummaryCard ignores actionable children, relies on external button wrapping, and can advertise actions without an executable owner. Preserve metric/state/context and expose the same actual handler to touch and accessibility.",
+    "source": "https://linear.app/jovie/issue/LYB-43",
+    "mechanization": "The card resolves one actual handler before constructing its native Button, suppresses loading actions and gives state actions precedence over detail navigation. The existing required correction ratchet rejects external button wrappers across all native app Swift sources with an empty baseline. The shared-lib suite executes its negative fixture and source regressions. This avoids relying on Turbo cache invalidation for source outside the package. Native contract tests cover action selection/hints, and the UI fixture tests all four metric families and states at standard/AX3 sizes, invocation counts, navigation and Reduce Motion. Native execution, VoiceOver and Switch Control device acceptance remain separate, unverified evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Own the native Button in the metric primitive and pass explicit executable actions from callers so a wrapper flag cannot invent interactivity or hide a nested state control."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/metric-card-control-owner.mjs",
+      "anchor": "LYB-43: keep metric controls inside the card, never inside an external Button.",
+      "ratchet": {
+        "baseline": "packages/shared-lib/metric-card-control-owner-baseline.json"
+      }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-merge-retry-ignores-unstaged-receipts",
+    "correction": "PR #1550: Conflict repairs must preserve both parents' receipts. Both a staged resolver retry and the pre-commit merge verifier must refuse unstaged ledger edits rather than reporting success while ignoring new receipts.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1550",
+    "mechanization": "Extend the existing correction-classifier working/index comparison to --check-merge as well as --resolve-merge --stage. The existing required shared-lib classifier suite exercises a real merge, adds an unstaged receipt, proves both commands refuse it without changing the index or working file, and verifies a restored retry succeeds. The verifier regression fails against the previous helper and passes after this extension. Retain both parents' adjacent staged-marker and unstaged-receipt regressions. Use the extended resolver to resolve and stage this PR's ledger, then verify both read-only modes; the lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can compare the working ledger and index before returning success, preventing silent omission of unstaged receipts by construction without changing either snapshot on refusal."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "staged retry refuses unstaged ledger edits; review and stage them explicitly"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "healthkit-anchored-sync-preserves-completion-contract",
+    "correction": "PR #1566 / LYB-238 repair: Merge persisted per-type anchors with main's source identity admission and metric-source completion contract. Anchored writes must propagate failure, keep cursors and prior completion unchanged on failure, and stamp successful syncs.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1566",
+    "mechanization": "Reuse the canonical batch importer and its onFailure callback for anchored pages, throw syncFailed before advancing cursors after a failed commit, and record metric-source completion only after success. Extend the registered HealthSyncPipelineAnchoredFetchTests with successful completion and failed-write cursor/completion assertions. XCTest execution, failing/passing regression receipts and native coverage remain unverified on this Linux host without Xcode; required native CI must provide them.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Reusing the canonical importer and rejecting failed commits before cursor advancement prevents the merge from treating failed anchored persistence as a successful sync by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/HealthSyncPipelineTests.swift",
+      "anchor": "func testFailedCommitDoesNotAdvanceTheStoredAnchor()"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
     "fingerprint": "xctest-await-outside-assertion-autoclosures",
     "correction": "PR #1566 / LYB-238: Launch Quality could not compile HealthSyncPipelineTests because three XCTAssertEqual autoclosures contained async Core Data reads. Await the results before asserting, preserving all regression assertions.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40202309384/job/121195979947",
@@ -1616,5 +1673,23 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "correction-merge-overwrites-manual-resolution",
+    "correction": "PR #1566 / LYB-238: Repeated merge repairs must retain both parents and manual receipts. The index-stage resolver must refuse to overwrite a valid, unstaged manual ledger resolution that differs from its computed merge.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1566",
+    "mechanization": "Extend the existing correction-classifier resolver to compare a valid working ledger with its computed result before writing or staging. The existing required shared-lib classifier suite exercises real Git merges in both staging modes, proves refusal preserves the ledger and index, and verifies an explicitly staged manual receipt passes both read-only checks. The new fixture fails against the previous resolver and passes after this extension. Use the extended --resolve-merge . --stage path for this conflict, preserving all 83 parent receipts before adding this receipt. The harness retains push and PR-body ownership; its required line is Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can refuse a differing completed working resolution before any write or stage, preventing loss of manual receipts by construction while retaining both-parent coverage verification."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "resolve-merge refuses to overwrite a manually resolved ledger; review and stage it explicitly"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

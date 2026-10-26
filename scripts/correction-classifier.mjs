@@ -203,6 +203,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       assertLedgerMergeReady(root);
       if (checkingMerge || (stagingMerge && !git('ls-files', '--unmerged', '--', LEDGER_PATH))) {
         verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
+        assert.equal(
+          readSource(LEDGER_PATH, { root }),
+          git('show', `:0:${LEDGER_PATH}`),
+          'staged retry refuses unstaged ledger edits; review and stage them explicitly',
+        );
         console.log('correction-classifier: verified staged ledger against both merge parents');
         process.exit(0);
       }
@@ -234,6 +239,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     }
     const original = readFileSync(path, 'utf8');
     const formatted = `${JSON.stringify(result, null, 2)}\n`;
+    if (resolvingMerge) {
+      let workingReceipts;
+      try {
+        workingReceipts = JSON.parse(original);
+      } catch {
+        // Unresolved Git conflict markers are not valid JSON.
+      }
+      assert.ok(
+        workingReceipts === undefined || JSON.stringify(workingReceipts) === JSON.stringify(result),
+        'resolve-merge refuses to overwrite a manually resolved ledger; review and stage it explicitly',
+      );
+    }
     // Validate the entire ledger before writing; a repeat run preserves bytes.
     if (
       resolvingMerge
