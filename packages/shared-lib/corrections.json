@@ -1625,5 +1625,26 @@
     },
     "level": "codebase",
     "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "metric-state-actions-have-one-native-control-owner",
+    "correction": "PR #1535 Detect Changes rejected the Stats truth card because it wrapped MetricSummaryCard in an external Button and passed the removed isButtonContext argument. Pass navigation through the card-owned detailAction API, preserving the selected metric and Stats observation context.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Reuse the existing metric-card-control-owner ratchet and required shared-lib production-caller regression. The actual Stats truth wrapper fails the existing correction-ratchet CLI test before the fix and passes afterward; the same guard rejects external owners across all native callers with its unchanged empty baseline. Keep the card as the single touch and accessibility action owner. Native build, UI execution and coverage remain required on the real runner. The lanes harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Own the native Button in the metric primitive and pass explicit executable actions from callers so a wrapper flag cannot invent interactivity or hide a nested state control."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/metric-card-control-owner.mjs",
+      "anchor": "LYB-43: keep metric controls inside the card, never inside an external Button.",
+      "ratchet": {
+        "baseline": "packages/shared-lib/metric-card-control-owner-baseline.json"
+      }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

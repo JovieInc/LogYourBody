@@ -88,16 +88,17 @@ struct DashboardMetricsSection: View {
     }
 
     private func truthMetricCard(_ snapshot: ContextualMetricSnapshot, summary: MetricObservationSummary) -> some View {
-        Button {
-            switch snapshot.kind {
-            case .steps: selectedMetricType = .steps
-            case .weight: selectedMetricType = .weight
-            case .bodyFat: selectedMetricType = .bodyFat
-            case .ffmi: selectedMetricType = .ffmi
-            case .bodyScore: selectedMetricType = .bodyScore
+        Group {
+            let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
+                switch snapshot.kind {
+                case .steps: selectedMetricType = .steps
+                case .weight: selectedMetricType = .weight
+                case .bodyFat: selectedMetricType = .bodyFat
+                case .ffmi: selectedMetricType = .ffmi
+                case .bodyScore: selectedMetricType = .bodyScore
+                }
+                isMetricDetailActive = true
             }
-            isMetricDetailActive = true
-        } label: {
             MetricSummaryCard(
                 icon: truthIcon(for: snapshot.kind),
                 accentColor: truthAccent(for: snapshot.kind),
@@ -115,7 +116,8 @@ struct DashboardMetricsSection: View {
                         .compactMap { $0 }.joined(separator: "\n"),
                     chartPeriod: "\(summary.periodLabel) · Observations; gaps unfilled",
                     chartInterval: summary.displayInterval
-                )), isButtonContext: true
+                )),
+                detailAction: detailAction
             )
         }
         .buttonStyle(MetricCardButtonStyle())
