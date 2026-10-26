@@ -1458,6 +1458,24 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "launch-quality-cold-build-budget",
+    "correction": "PR #1554 red-check repair: With every Swift package cache missing, Launch Quality killed build-for-testing at 600 seconds while test targets were still compiling, before XCTest execution began.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40388372132/job/121803920594",
+    "mechanization": "Extend the existing launch-quality runner's separate build budget to a bounded 900-second single attempt. Extend its existing required shared-lib and native evidence behavior suite with a virtual elapsed-clock regression: a cold build exceeding the former 600-second cap must proceed, compiler errors and over-budget builds must stop before native tests, overrides remain effective, build arguments and compiler logs survive, and no build retry is permitted. The cold-build case fails with exit 124 before the repair and passes afterward. Preserve all XCTest selectors, per-test and command limits, native coverage/evidence checks, diagnostic-seven bounds and the outer workflow cap. The harness retains push and PR ownership; exact-head native CI remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner already separates compilation from test execution, so its reusable bounded build budget can admit a cold compile without altering any native assertion or creating a retry loop."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "Bound the one cold build independently of XCTest execution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "launch-quality-retries-only-before-xctest-starts",
     "correction": "PR #1555: The chat replay failure/retry test hit repeated 60-second animation idle waits, exceeded its 180-second allowance, and the generic XCTest restart message retried the full UI suite until the required 52-minute step timed out.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40364152724/job/121717476981",
