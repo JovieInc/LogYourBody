@@ -201,6 +201,34 @@ final class HealthImportIdempotencyTests: XCTestCase {
         }
     }
 
+    func testTimezonePolicyDoesNotRequireSourceIdentity() async throws {
+        let importer = manager()
+        for enabled in [true, false] {
+            let instant = enabled ? "2026-06-10T06:58:00Z" : "2026-06-11T06:58:00Z"
+            let sampleDate = try XCTUnwrap(ISO8601DateFormatter().date(from: instant))
+            let source = BodyMetricSourceMetadata(
+                vendor: "apple_health", sampleId: "missing-source-\(enabled)",
+                quantityType: HKQuantityTypeIdentifier.bodyMass.rawValue
+            ).recordingHealthKitContext(["time_zone": "America/Los_Angeles"])
+            XCTAssertNil(source.healthKitSampleKey)
+            let sample = HealthKitWeightImportSample(weight: 80, date: sampleDate, sourceMetadata: source)
+            let result = await importer.processBatchHealthKitData(
+                weightHistory: [sample], bodyFatHistory: [], sampleIdentityPolicy: enabled
+            )
+            XCTAssertEqual(result.imported, 1)
+            let rows = try await durableRows()
+            let row = try XCTUnwrap(rows.first { $0.sourceMetadata?.sampleId == source.sampleId })
+            let expectedDay = enabled ? "2026-06-09" : BodyMetricLocalDate.key(for: sampleDate)
+            XCTAssertEqual(row.localDate, expectedDay)
+            XCTAssertEqual(row.date, sampleDate)
+            let repeated = await importer.processBatchHealthKitData(
+                weightHistory: [sample], bodyFatHistory: [], sampleIdentityPolicy: enabled
+            )
+            XCTAssertEqual(repeated.imported, 0)
+            XCTAssertEqual(repeated.skipped, 1)
+        }
+    }
+
     func testEditedSampleReplacesSameSyncVersionAndRejectsOldUUIDReplay() async throws {
         for (index, kind) in [HKQuantityTypeIdentifier.bodyMass, .bodyFatPercentage].enumerated() {
             var context = ["sync_identifier": "edit-\(index)", "sync_version": "1", "time_zone": "Asia/Tokyo"]

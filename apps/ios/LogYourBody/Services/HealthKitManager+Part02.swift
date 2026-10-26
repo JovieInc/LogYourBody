@@ -678,7 +678,9 @@ func processBatchHealthKitData(
         for sample in weightHistory {
             guard await ownsImport(ownership) else { return (imported, skipped) }
             // Check if entry exists within the same hour
-            let localDate = BodyMetricLocalDate.key(for: sample.date)
+            let localDate = usesSampleIdentity
+                ? sample.sourceMetadata?.healthKitLocalDate(for: sample.date) ?? BodyMetricLocalDate.key(for: sample.date)
+                : BodyMetricLocalDate.key(for: sample.date)
             let hourKey = "\(localDate)-\(BodyMetricLocalDate.hourKey(for: sample.date))"
             let identified = usesSampleIdentity && sample.sourceMetadata?.healthKitSampleKey != nil
 
@@ -689,7 +691,7 @@ func processBatchHealthKitData(
                 do {
                     let storedBodyFat = try await saveHealthKitWeightSample(
                         sample, bodyFatSample: bodyFatSample, ownership: ownership,
-                        enforceCombinedIdentity: importsBodyFatOnly || identified, useSampleIdentity: identified
+                        enforceCombinedIdentity: importsBodyFatOnly || identified, useSampleIdentity: usesSampleIdentity
                     )
                     imported += 1
                     if storedBodyFat, let bodyFatID = bodyFatSample?.sourceMetadata?.sampleId {
