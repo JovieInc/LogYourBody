@@ -714,3 +714,81 @@ for (const failure of ['source-conflict', 'pinned-drift', 'unsafe-output']) {
     }
   });
 }
+
+function stagedSourceMap() {
+  const fx = sourceMapConflict();
+  git(fx.root, 'merge', '--abort');
+  const manifest = { devDependencies: { '@types/lodash': '^4.17.25' } };
+  fx.config.sources.push({ path: 'package.json', purpose: 'Dependencies' });
+  commit(fx.root, {
+    'package.json': JSON.stringify(manifest),
+    'repository-docs.json': JSON.stringify(fx.config),
+  }, 'dependency source');
+  assert.equal(fx.resolve().status, 0);
+  git(fx.root, 'commit', '-q', '-m', 'source projection');
+  const resolve = () => spawnSync('python3', [
+    path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', fx.root, '--staged',
+  ], { env: gitEnv, encoding: 'utf8' });
+  const bump = () => {
+    manifest.devDependencies['@types/lodash'] = '^4.17.27';
+    fs.writeFileSync(path.join(fx.root, 'package.json'), JSON.stringify(manifest));
+    git(fx.root, 'add', 'package.json');
+  };
+  return { ...fx, resolve, bump };
+}
+
+test('staged source-map repair refreshes dependency bumps before commit and is idempotent', () => {
+  const hook = fs.readFileSync(path.join(scriptDir, '../../.husky/pre-commit'), 'utf8');
+  assert.match(hook, /python3 scripts\/resolve-repository-docs\.py --staged/);
+  const fx = stagedSourceMap();
+  try {
+    fx.bump();
+    fs.writeFileSync(path.join(fx.root, 'README.md'), 'Unstaged notes\n');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(git(fx.root, 'show', `:${fx.output}`), /"@types\/lodash": "\^4\.17\.27"/);
+    assert.equal(git(fx.root, 'show', ':README.md'), 'Local instructions');
+    assert.equal(git(fx.root, 'diff', '--cached', '--name-only'), `${fx.output}\npackage.json`);
+    const index = git(fx.root, 'ls-files', '--stage');
+    assert.equal(fx.resolve().status, 0);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+for (const dirty of ['package.json', 'repository-docs.json', 'docs/SOURCES.md']) {
+  test(`staged source-map repair refuses unstaged ${dirty} without changing files or index`, () => {
+    const fx = stagedSourceMap();
+    try {
+      fx.bump();
+      fs.appendFileSync(path.join(fx.root, dirty), '\n');
+      const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /stage or stash documentation inputs first/);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+test('staged source-map repair leaves unrelated commits and unstaged manifests alone', () => {
+  const fx = stagedSourceMap();
+  try {
+    fs.appendFileSync(path.join(fx.root, 'package.json'), '\n');
+    fs.writeFileSync(path.join(fx.root, 'notes.txt'), 'Unrelated commit\n');
+    git(fx.root, 'add', 'notes.txt');
+    const before = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+    const index = git(fx.root, 'ls-files', '--stage');
+    const result = fx.resolve();
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), before);
+    assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+  } finally {
+    fs.rmSync(fx.root, { recursive: true, force: true });
+  }
+});

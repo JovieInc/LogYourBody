@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "fix-red-1423773703",
+    "correction": "PR #1597: Dependency bumps update declared manifest sources without refreshing docs/REPOSITORY_SOURCES.md, failing Detect Changes, parity and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1597",
+    "mechanization": "Extend the existing source-map resolver with --staged and invoke it after lint-staged in the pre-commit hook. Regenerate and stage only the projection when declared inputs change; refuse unstaged inputs or output before mutation. Existing required Detect Changes tests cover dependency bumps, idempotence, unrelated commits and partial-staging refusal. Use the same resolver for this provider-created dependency PR, which bypassed local hooks.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Construct the source projection in the same local commit as manifest changes using the existing pinned generator. The resolver repairs provider-created commits too, while CI retains its read-only parity check."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "stage or stash documentation inputs first: "
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "repository-source-projection-blocks-merge",
     "correction": "PR #1594: Updating TruffleHog from 3.99.2 to 3.99.7 left the generated security-scan.yml fingerprint stale, failing Detect Changes, documentation parity and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40297334175/job/121486473810",
