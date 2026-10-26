@@ -204,22 +204,33 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       // A retry after explicit staging verifies the index without overwriting local edits.
       if (checkingMerge || !git('ls-files', '--unmerged', '--', LEDGER_PATH)) {
         verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
+        assert.equal(
+          readSource(LEDGER_PATH, { root }),
+          git('show', `:0:${LEDGER_PATH}`),
+          'staged retry refuses unstaged ledger edits; review and stage them explicitly',
+        );
         console.log('correction-classifier: verified staged ledger against both merge parents');
         process.exit(0);
       }
-      // Reuse the coverage tool's three-way policy rather than a second resolver.
-      // Classify snapshots first so derived metadata cannot look like concurrent edits.
-      const stages = [1, 2, 3].map((stage) =>
-        classifyLedger(JSON.parse(git('show', `:${stage}:${LEDGER_PATH}`))),
-      );
-      result = classifyLedger(
-        // Keep incoming order, then append branch-only receipts so future main
-        // prepends do not collide with the same branch receipt on every repair.
-        mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
-          readSource(guard, { root }),
-        ),
-      );
-      readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+      const working = readSource(LEDGER_PATH, { root }); // Refuse symlinked output.
+      if (!/^(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m.test(working)) {
+        // Preserve manually resolved receipts instead of rebuilding from the parents.
+        result = classifyLedger(JSON.parse(working));
+        verifyMerge(result);
+      } else {
+        // Reuse the coverage tool's three-way policy rather than a second resolver.
+        // Classify snapshots first so derived metadata cannot look like concurrent edits.
+        const stages = [1, 2, 3].map((stage) =>
+          classifyLedger(JSON.parse(git('show', `:${stage}:${LEDGER_PATH}`))),
+        );
+        result = classifyLedger(
+          // Keep incoming order, then append branch-only receipts so future main
+          // prepends do not collide with the same branch receipt on every repair.
+          mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
+            readSource(guard, { root }),
+          ),
+        );
+      }
       if (stagingMerge) {
         // Validate staged guards and both parents before writing or staging anything.
         verifyMerge(result);

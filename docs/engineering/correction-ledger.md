@@ -107,6 +107,15 @@ to staging only the resolved ledger after validating its classification, staged
 guard sources and receipt retention against both merge parents. A failed
 validation preserves the ledger and index. Retrying after staging runs the
 read-only merge check; it does not restage files or overwrite unrelated edits.
+A staged retry, with or without `--stage`, and `--check-merge` refuse any
+unstaged ledger edits, including formatting changes. Review and stage those
+edits explicitly before retrying; refusal preserves both the index and working
+file.
+If the working ledger is already resolved JSON while the index is still
+unmerged, the resolver classifies that resolution and validates it against both
+parents, preserving newly added receipts. Invalid JSON or missing parent
+receipts fail without writing or staging; the parent union is generated only
+while conflict markers remain.
 
 After staging the resolution, run
 `node scripts/correction-classifier.mjs --check-merge .`. This read-only mode
