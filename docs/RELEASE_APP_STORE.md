@@ -1,6 +1,6 @@
 # App Store Submission Runbook (v1.2.0)
 
-The engineering pipeline is fully automated. **One human step** stands between the current state and App Store revenue: a real TestFlight paywall purchase/restore. This runbook is the exact sequence.
+The engineering pipeline automates builds and submission. Human release evidence includes a real TestFlight paywall purchase/restore and the initial ASC App Privacy comparison below. This runbook is the exact sequence.
 
 ## Current state
 
@@ -28,10 +28,27 @@ These run inside `ios-release-loop.yml`'s `build-release` job and fail the lane 
 - `verify-app-store-subscriptions.rb` — subscription products exist and are in a submittable state
 - `verify_revenuecat_offerings.sh` — RevenueCat "main" offering resolves with monthly + annual packages
 - `ensure-app-store-free-pricing.rb` — base app price tier is Free (subscriptions carry the revenue)
-- `fastlane precheck` — metadata/screenshot compliance
+- `fastlane precheck` — metadata/screenshot compliance (`apps/ios/fastlane/Precheckfile`; in-app purchases excluded because precheck cannot read them with an API key, so IAP/subscription readiness comes from `app-store-connect-readiness.yml` and the build's subscription verification)
 - Metadata present in `apps/ios/fastlane/metadata/en-US/` (name, subtitle, description, keywords, privacy_url, support_url) and screenshots in `apps/ios/fastlane/screenshots/en-US/`
 
-## The one human step
+## App Privacy evidence before submission
+
+The versioned [ASC privacy questionnaire](compliance/app-store-privacy.json) and
+its [review instructions](compliance/app-store-privacy.md) cover HealthKit,
+photos, auth, subscriptions, analytics, diagnostics and coach content. The
+required Detect Changes correction ratchet rejects HealthKit/Info.plist drift
+on every diff; a green source check does not verify the live ASC answers.
+
+Before the first submission with this inventory, Tim must compare all ASC App
+Privacy answers with the questionnaire and record the date, questionnaire
+version, source commit, TestFlight build and redacted ASC readback in release
+evidence. The committed comparison is currently **pending**. Before later
+submissions, reconcile changed answers and the archive's SDK privacy report
+against that receipt. Required Reason API declarations in PrivacyInfo remain a
+separate review. Do not submit until both privacy evidence and paywall evidence
+are complete; `paywall_testflight_verified` attests only to the purchase/restore.
+
+## TestFlight purchase and restore
 
 1. **Wait for a fresh TestFlight build** from the latest `main`. Confirm it finished processing and appears in the intended tester group in App Store Connect → TestFlight.
 2. On a real device, install that TestFlight build and run the paid path end to end:

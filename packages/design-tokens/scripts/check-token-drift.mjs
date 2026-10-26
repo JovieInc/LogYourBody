@@ -326,7 +326,13 @@ function computeDrift(canonical, ios, web, map) {
 }
 
 function driftKey(entry) {
-  return `${entry.token}|${entry.platform}|${entry.target}`;
+  return JSON.stringify([
+    entry.token,
+    entry.platform,
+    entry.target,
+    normalizeValue(formatValue(entry.canonical)),
+    normalizeValue(formatValue(entry.actual)),
+  ]);
 }
 
 function formatDriftEntry(entry) {

@@ -52,10 +52,6 @@
       "purpose": "Local manifest or workflow; review related instructions when changed"
     },
     {
-      "path": ".github/workflows/web-release-loop.yml",
-      "purpose": "Local manifest or workflow; review related instructions when changed"
-    },
-    {
       "path": ".nvmrc",
       "purpose": "Local manifest or workflow; review related instructions when changed"
     },

@@ -22,9 +22,9 @@
         "promotionalText": "Track progress photos, weight, body fat, and Apple Health context from a private photo-first timeline.",
         "description": "LogYourBody is a focused body-composition tracker for people who want a private progress-photo timeline with weight, body-fat, and Apple Health context.\n\nStart with the essentials:\n\n- Add progress photos to a private, time-weighted body timeline\n- Log weight and body-fat context in pounds or kilograms\n- Review Stats for weight, body fat, FFMI, and steps\n- Optionally connect Apple Health for weight, body-fat, height, and step context\n- Sync entries to your account\n- Export your account data\n- Keep access managed through LogYourBody Pro\n\nLogYourBody is built for consistent body-composition tracking without noisy coaching. Your photos and entries stay available on device and sync to your account when you are signed in.\n\nLogYourBody is not a medical device and does not provide medical advice. Use it for personal fitness tracking and consult a qualified professional for medical decisions.",
         "releaseNotes": "LogYourBody Pro is a monthly or annual subscription, and each plan includes a 3-day free trial. This update also fixes a crash that could happen when sign-in resumed more than once.",
-        "supportUrl": "https://logyourbody.com/support",
-        "marketingUrl": "https://logyourbody.com",
-        "privacyUrl": "https://logyourbody.com/privacy"
+        "supportUrl": "https://www.logyourbody.com/support",
+        "marketingUrl": "https://www.logyourbody.com",
+        "privacyUrl": "https://www.logyourbody.com/privacy"
       }
     }
   ],
@@ -242,7 +242,7 @@
         "width": 1320,
         "height": 2868,
         "hasAlpha": false,
-        "gitBlobSha": "945a50cfcfe9b753f571c726012af0b580fa5e20",
+        "gitBlobSha": "e7c328781872119e016313f27467eec18ac478d4",
         "sourceKind": "ios-fastlane-capture",
         "truthStatus": "real-app-capture"
       },

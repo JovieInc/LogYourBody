@@ -94,6 +94,19 @@ enum HomeV2TimelinePolicy {
         }
     }
 
+    /// One civil day for Today. The result is the stored samples in their
+    /// existing order; nothing here rewrites imported measurements.
+    static func metrics(
+        onSameDayAs day: Date,
+        in metrics: [BodyMetrics],
+        owner: String?,
+        calendar: Calendar = .current
+    ) -> [BodyMetrics] {
+        metrics.filter { metric in
+            metric.userId == owner && calendar.isDate(metric.date, inSameDayAs: day)
+        }
+    }
+
     static func chronologicalIndices(in bodyMetrics: [BodyMetrics]) -> [Int] {
         bodyMetrics.indices.sorted {
             let first = bodyMetrics[$0], second = bodyMetrics[$1]

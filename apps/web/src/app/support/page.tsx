@@ -7,6 +7,7 @@ import { getPublicSupportOptions, logYourBody } from '@jovieinc/product-registry
 export const revalidate = false;
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/support' },
   title: 'Support',
   description: `Get help with ${logYourBody.identity.name}, your account, subscription, or data.`,
 };

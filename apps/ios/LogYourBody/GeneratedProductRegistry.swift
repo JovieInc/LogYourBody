@@ -69,7 +69,7 @@ enum ProductRegistry {
     enum Hosts {
         static let api = "https://www.logyourbody.com"
         static let apiHost = "www.logyourbody.com"
-        static let marketing = "https://logyourbody.com"
+        static let marketing = "https://www.logyourbody.com"
         static let status = "https://status.logyourbody.com"
     }
 

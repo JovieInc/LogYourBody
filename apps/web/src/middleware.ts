@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isLandingAudience, type LandingAudience } from '@/lib/marketing/landing-registry';
 import { authCookies } from '@/lib/auth/constants';
 import { prefersMarkdown, varyOnAccept } from '@/lib/marketing/accept-markdown';
 import {
@@ -9,7 +8,6 @@ import {
   PUBLIC_MARKDOWN_HEADER,
 } from '@/lib/marketing/public-markdown';
 
-const LANDING_AUDIENCE_COOKIE = 'lyb_landing_audience_v1';
 const protectedRoutePrefixes = [
   '/dashboard',
   '/log',
@@ -59,20 +57,6 @@ export function shouldUseProductAuthMiddleware(req: NextRequest) {
   );
 }
 
-function randomLandingAudience(): LandingAudience {
-  return Math.random() < 0.5 ? 'men' : 'women';
-}
-
-export function resolveLandingAudience(req: NextRequest) {
-  const requested = req.nextUrl.searchParams.get('audience');
-  if (isLandingAudience(requested)) return { audience: requested, source: 'campaign' as const };
-
-  const stored = req.cookies.get(LANDING_AUDIENCE_COOKIE)?.value;
-  if (isLandingAudience(stored)) return { audience: stored, source: 'returning' as const };
-
-  return { audience: randomLandingAudience(), source: 'experiment' as const };
-}
-
 export default async function middleware(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.delete(PUBLIC_MARKDOWN_HEADER);
@@ -100,26 +84,6 @@ export default async function middleware(req: NextRequest) {
       return markdownResponse(homepageMarkdown(), 200, req.method);
     }
     requestHeaders.set(PUBLIC_MARKDOWN_HEADER, '1');
-  }
-
-  if (
-    req.nextUrl.pathname === '/' &&
-    process.env.NEXT_PUBLIC_LYB_WAITLIST_V2 === '1' &&
-    !req.nextUrl.searchParams.has('_lyb_audience')
-  ) {
-    const assignment = resolveLandingAudience(req);
-    const rewrittenUrl = req.nextUrl.clone();
-    rewrittenUrl.searchParams.set('_lyb_audience', assignment.audience);
-    rewrittenUrl.searchParams.set('_lyb_assignment_source', assignment.source);
-    const response = NextResponse.rewrite(rewrittenUrl, { request: { headers: requestHeaders } });
-    response.cookies.set(LANDING_AUDIENCE_COOKIE, assignment.audience, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/',
-    });
-    return publicHeaders(response);
   }
 
   if (shouldUseProductAuthMiddleware(req)) {

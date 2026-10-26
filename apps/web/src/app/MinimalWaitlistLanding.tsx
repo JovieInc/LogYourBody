@@ -98,7 +98,7 @@ export function MinimalWaitlistLanding() {
                 {waitlistLandingCopy.subheading}
               </p>
               <div id="early-access" className={styles.heroForm}>
-                <WaitlistForm />
+                <WaitlistForm landingId="minimal_waitlist_v1" variant="waitlist_minimal" />
               </div>
             </div>
           </div>

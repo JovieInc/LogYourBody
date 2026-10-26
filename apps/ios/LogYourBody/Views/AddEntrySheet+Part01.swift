@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension AddEntrySheet {
 var currentSystem: MeasurementSystem {
@@ -83,6 +84,7 @@ var body: some View {
                         }
                     }
                     .accessibilityIdentifier(isHomeV2WeightEntry ? "home_v2_log_sheet_content" : "add_entry_content")
+                    .clipped()
                 }
 
                 entrySaveButton
@@ -146,6 +148,7 @@ var body: some View {
                 AppServicePorts.analyticsTracker.track(event: "add_entry_view")
             }
             .onChange(of: selectedTab) { _, _ in
+                accessibleBodyFatDateExpanded = false
                 loadGlp1MedicationsIfNeeded()
             }
         }
@@ -194,18 +197,30 @@ var body: some View {
     private var entryDatePicker: some View {
         Group {
             if isHomeV2WeightEntry {
+                // Compact only. A graphical calendar draws over the value.
                 DatePicker("Date", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
                     .font(.appBodySmall)
                     .foregroundStyle(Color.jovieTextSecondary)
                     .tint(.jovieText)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget, alignment: .leading)
                     .accessibilityIdentifier("home_v2_log_sheet_date")
             } else if usesAccessibleBodyFatLayout {
+                // The system compact calendar is a modal container. At the
+                // largest text size that container covers the sheet title, so
+                // the title tap never lands and the date picker's frame stays
+                // the container. Expand an inline calendar in the sheet
+                // instead, and collapse it when the title is tapped.
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Date")
                         .font(.appBodySmall)
                         .foregroundColor(.appTextSecondary)
-                    DatePicker("Date", selection: $selectedDate, in: ...Date(), displayedComponents: .date)
-                        .labelsHidden()
+                    AccessibleBodyFatDatePicker(
+                        date: $selectedDate,
+                        expanded: $accessibleBodyFatDateExpanded
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             } else {
                 HStack {
@@ -240,6 +255,9 @@ var body: some View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .fixedSize(horizontal: false, vertical: true)
+        } else if isHomeV2WeightEntry {
+            BaseButton(saveButtonText, configuration: configuration, action: saveEntry)
+                .keyboardShortcut(.defaultAction)
         } else {
             BaseButton(saveButtonText, configuration: configuration, action: saveEntry)
         }
@@ -602,18 +620,19 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
 
     private var homeV2WeightEntryView: some View {
         VStack(spacing: 24) {
-            VStack(spacing: 8) {
+            // Value and unit share one row so the reading cannot paint over the unit.
+            HStack(alignment: .center, spacing: 12) {
                 TextField("0.0", text: $weight)
                     .keyboardType(.decimalPad)
-                    .scaledSystemFont(size: 64, weight: .semibold, relativeTo: .largeTitle)
+                    .font(.system(.largeTitle, design: .rounded, weight: .semibold))
                     .monospacedDigit()
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(.trailing)
                     .textFieldStyle(.plain)
                     .foregroundStyle(Color.jovieText)
                     .tint(.jovieText)
-                    .frame(maxWidth: .infinity)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
                     .accessibilityLabel("Weight value")
                     .accessibilityHint("Enter your weight")
                     .accessibilityIdentifier("home_v2_log_sheet_value")
@@ -628,7 +647,8 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                 }
                 .pickerStyle(.menu)
                 .tint(.jovieTextSecondary)
-                .frame(minWidth: 64, minHeight: JovieTokens.minimumHitTarget)
+                .frame(minWidth: 72, minHeight: JovieTokens.minimumHitTarget)
+                .layoutPriority(1)
                 .accessibilityValue(weightUnit)
                 .accessibilityIdentifier("home_v2_log_sheet_unit")
                 .onChange(of: weightUnit) { previous, current in
@@ -796,35 +816,69 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
 
                 Group {
                     if usesAccessibleBodyFatLayout {
-                        Menu {
-                            bodyFatMethodPicker
-                        } label: {
-                            HStack(spacing: 16) {
-                                Text(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .multilineTextAlignment(.leading)
-                                Spacer(minLength: 0)
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .accessibilityHidden(true)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
-                        }
-                        .fixedSize(horizontal: false, vertical: true)
+                        accessibleBodyFatMethodSummary
                     } else {
                         bodyFatMethodPicker
                             .pickerStyle(MenuPickerStyle())
+                            .accessibilityLabel("Body fat measurement method")
+                            .accessibilityValue(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
+                            .accessibilityIdentifier("home_v2_body_fat_method")
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Body fat measurement method")
-                .accessibilityValue(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
-                .accessibilityIdentifier("home_v2_body_fat_method")
+
+                // A Menu around the picker draws only the current value at the
+                // largest text size, so DEXA is not a visible choice. List every
+                // method in the sheet, which already scrolls above Save.
+                if usesAccessibleBodyFatLayout {
+                    accessibleBodyFatMethodChoices
+                }
             }
 
             Spacer()
         }
         .padding(.horizontal)
+    }
+
+    private var accessibleBodyFatMethodSummary: some View {
+        Button {
+            // The rows below change the method. This row reports the current one.
+        } label: {
+            Text(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityLabel("Body fat measurement method")
+        .accessibilityValue(BodyFatEntryMethod.selectionTitle(bodyFatMethod))
+        .accessibilityHint("Measurement choices are listed below")
+        .accessibilityIdentifier("home_v2_body_fat_method")
+    }
+
+    private var accessibleBodyFatMethodChoices: some View {
+        ForEach(BodyFatEntryMethod.accessibleChoices(selected: bodyFatMethod)) { choice in
+            Button {
+                bodyFatMethod = choice.value
+            } label: {
+                HStack(spacing: 12) {
+                    Text(choice.title)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    if BodyFatEntryMethod.selectionTitle(bodyFatMethod) == choice.title {
+                        Image(systemName: "checkmark")
+                            .accessibilityHidden(true)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(choice.title)
+        }
     }
 
     private var bodyFatMethodPicker: some View {
@@ -836,5 +890,333 @@ func glp1DoseHistoryRow(_ log: Glp1DoseLog) -> some View {
                 Text(method.title).tag(Optional(method.rawValue))
             }
         }
+    }
+}
+
+/// Compact date control for the accessibility body-fat sheet.
+///
+/// UIDatePicker's compact style presents `_UIDatePickerContainerViewController`.
+/// At the largest text size that container is a modal whose frame is what
+/// XCUITest reports for the date picker, and it covers the sheet title so the
+/// title tap has no hit point. This control refuses that modal, expands an
+/// inline calendar in the sheet, and collapses it from the sheet's navigation
+/// bar (the title tap).
+private struct AccessibleBodyFatDatePicker: UIViewControllerRepresentable {
+    @Binding var date: Date
+    @Binding var expanded: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(date: $date)
+    }
+
+    func makeUIViewController(context: Context) -> AccessibleBodyFatDateController {
+        let controller = AccessibleBodyFatDateController()
+        controller.picker.addTarget(
+            context.coordinator,
+            action: #selector(Coordinator.dateChanged(_:)),
+            for: .valueChanged
+        )
+        return controller
+    }
+
+    func updateUIViewController(_ controller: AccessibleBodyFatDateController, context: Context) {
+        context.coordinator.date = $date
+        let expandedBinding = $expanded
+        controller.onExpand = { expandedBinding.wrappedValue = true }
+        controller.onCollapse = { expandedBinding.wrappedValue = false }
+        if !Calendar.current.isDate(controller.picker.date, inSameDayAs: date) {
+            controller.picker.date = date
+        }
+        let style: UIDatePickerStyle = expanded ? .inline : .compact
+        guard controller.picker.preferredDatePickerStyle != style else { return }
+        UIView.performWithoutAnimation {
+            controller.picker.preferredDatePickerStyle = style
+            controller.picker.layoutIfNeeded()
+        }
+        controller.syncCompactTapGuard()
+    }
+
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        uiViewController: AccessibleBodyFatDateController,
+        context: Context
+    ) -> CGSize? {
+        let width = proposal.width ?? uiViewController.view.bounds.width
+        let resolved = width > 1 ? width : 320
+        return CGSize(width: resolved, height: uiViewController.measuredHeight(for: resolved))
+    }
+
+    final class Coordinator: NSObject {
+        var date: Binding<Date>
+
+        init(date: Binding<Date>) {
+            self.date = date
+        }
+
+        @objc func dateChanged(_ picker: UIDatePicker) {
+            date.wrappedValue = picker.date
+        }
+    }
+}
+
+private final class AccessibleBodyFatDateTapProxy: NSObject {
+    weak var controller: AccessibleBodyFatDateController?
+
+    @objc func titleAreaTapped() {
+        controller?.collapseFromTitle()
+    }
+
+    @objc func compactControlTapped() {
+        controller?.userTappedCompactControl()
+    }
+}
+
+private final class AccessibleBodyFatDateController: UIViewController, UIGestureRecognizerDelegate {
+    let picker = UIDatePicker()
+    var onExpand: (() -> Void)?
+    var onCollapse: (() -> Void)?
+    private let tapProxy = AccessibleBodyFatDateTapProxy()
+
+    private var titleCollapseRecognizers: [UITapGestureRecognizer] = []
+    private var compactTapRecognizer: UITapGestureRecognizer?
+    private var suppressFollowUpsScheduled = false
+    private var showingInlineCalendar = false
+    private var lastCompactTouch = Date.distantPast
+    /// Set when the sheet title collapses the calendar so a late system
+    /// presentation cannot open it again before the reachability check.
+    private var collapsedByTitle = false
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        tapProxy.controller = self
+        view.backgroundColor = .clear
+        picker.preferredDatePickerStyle = .compact
+        picker.datePickerMode = .date
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        picker.maximumDate = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfToday)
+        picker.accessibilityLabel = "Date"
+        picker.translatesAutoresizingMaskIntoConstraints = false
+        picker.addTarget(self, action: #selector(editingBegan), for: .editingDidBegin)
+        view.addSubview(picker)
+        NSLayoutConstraint.activate([
+            picker.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            picker.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            picker.topAnchor.constraint(equalTo: view.topAnchor),
+            picker.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        syncCompactTapGuard()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        installTitleCollapseGestureIfNeeded()
+    }
+
+    override func willMove(toParent parent: UIViewController?) {
+        super.willMove(toParent: parent)
+        if parent == nil {
+            removeTitleCollapseGestures()
+        }
+    }
+
+    deinit {
+        for recognizer in titleCollapseRecognizers {
+            recognizer.view?.removeGestureRecognizer(recognizer)
+        }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        installTitleCollapseGestureIfNeeded()
+        syncCompactTapGuard()
+    }
+
+    func measuredHeight(for width: CGFloat) -> CGFloat {
+        let resolved = max(width, 1)
+        let measured = picker.systemLayoutSizeFitting(
+            CGSize(width: resolved, height: 0),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
+        let height = max(measured, picker.intrinsicContentSize.height)
+        return height.isFinite && height > 1 ? height : 44
+    }
+
+    override func present(
+        _ viewControllerToPresent: UIViewController,
+        animated flag: Bool,
+        completion: (() -> Void)? = nil
+    ) {
+        if Self.isSystemDateCalendar(viewControllerToPresent) {
+            if !collapsedByTitle {
+                suppressSystemCalendar()
+            }
+            completion?()
+            return
+        }
+        super.present(viewControllerToPresent, animated: flag, completion: completion)
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        true
+    }
+
+    private func suppressSystemCalendar() {
+        collapsedByTitle = false
+        showingInlineCalendar = true
+        UIView.performWithoutAnimation {
+            picker.preferredDatePickerStyle = .inline
+            picker.layoutIfNeeded()
+        }
+        onExpand?()
+        dismissSystemDateCalendars()
+        guard !suppressFollowUpsScheduled else { return }
+        suppressFollowUpsScheduled = true
+        for delay in [0.0, 0.35, 0.8] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.dismissSystemDateCalendars()
+            }
+        }
+    }
+
+    fileprivate func collapseFromTitle() {
+        guard showingInlineCalendar else { return }
+        collapsedByTitle = true
+        showingInlineCalendar = false
+        suppressFollowUpsScheduled = false
+        UIView.performWithoutAnimation {
+            picker.preferredDatePickerStyle = .compact
+            picker.layoutIfNeeded()
+        }
+        dismissSystemDateCalendars()
+        onCollapse?()
+        syncCompactTapGuard()
+    }
+
+    fileprivate func userTappedCompactControl() {
+        lastCompactTouch = Date()
+        collapsedByTitle = false
+        suppressSystemCalendar()
+    }
+
+    @objc private func editingBegan() {
+        guard !collapsedByTitle else { return }
+        guard Date().timeIntervalSince(lastCompactTouch) < 1 else { return }
+        guard picker.preferredDatePickerStyle == .compact else { return }
+        suppressSystemCalendar()
+    }
+
+    func syncCompactTapGuard() {
+        let wantsGuard = picker.preferredDatePickerStyle == .compact
+        if wantsGuard {
+            guard compactTapRecognizer == nil else { return }
+            let tap = UITapGestureRecognizer(
+                target: tapProxy,
+                action: #selector(AccessibleBodyFatDateTapProxy.compactControlTapped)
+            )
+            tap.cancelsTouchesInView = false
+            tap.delaysTouchesBegan = false
+            tap.delaysTouchesEnded = false
+            tap.delegate = self
+            picker.addGestureRecognizer(tap)
+            compactTapRecognizer = tap
+            return
+        }
+        if let tap = compactTapRecognizer {
+            tap.view?.removeGestureRecognizer(tap)
+            compactTapRecognizer = nil
+        }
+    }
+
+    private func removeTitleCollapseGestures() {
+        for recognizer in titleCollapseRecognizers {
+            recognizer.view?.removeGestureRecognizer(recognizer)
+        }
+        titleCollapseRecognizers = []
+    }
+
+    private func installTitleCollapseGestureIfNeeded() {
+        guard parent != nil, view.window != nil else { return }
+        var hosts: [UIView] = []
+        if let bar = sheetNavigationBar() {
+            hosts.append(bar)
+        }
+        if let window = view.window, let title = findView(in: window, identifier: "home_v2_log_sheet") {
+            title.isUserInteractionEnabled = true
+            if !hosts.contains(where: { $0 === title }) {
+                hosts.append(title)
+            }
+        }
+        let attached = titleCollapseRecognizers.compactMap(\.view)
+        let missing = hosts.contains { host in !attached.contains(where: { $0 === host }) }
+        guard missing || titleCollapseRecognizers.isEmpty else { return }
+        for recognizer in titleCollapseRecognizers {
+            recognizer.view?.removeGestureRecognizer(recognizer)
+        }
+        titleCollapseRecognizers = hosts.map { host in
+            let recognizer = UITapGestureRecognizer(
+                target: tapProxy,
+                action: #selector(AccessibleBodyFatDateTapProxy.titleAreaTapped)
+            )
+            recognizer.cancelsTouchesInView = false
+            recognizer.delaysTouchesBegan = false
+            recognizer.delaysTouchesEnded = false
+            recognizer.delegate = self
+            host.addGestureRecognizer(recognizer)
+            return recognizer
+        }
+    }
+
+    private func sheetNavigationBar() -> UINavigationBar? {
+        if let bar = navigationController?.navigationBar, bar.window != nil {
+            return bar
+        }
+        guard let window = view.window else { return nil }
+        return firstNavigationBar(in: window)
+    }
+
+    private func findView(in view: UIView, identifier: String) -> UIView? {
+        if view.accessibilityIdentifier == identifier { return view }
+        for subview in view.subviews {
+            if let match = findView(in: subview, identifier: identifier) { return match }
+        }
+        return nil
+    }
+
+    private func firstNavigationBar(in view: UIView) -> UINavigationBar? {
+        if let bar = view as? UINavigationBar { return bar }
+        for subview in view.subviews {
+            if let bar = firstNavigationBar(in: subview) { return bar }
+        }
+        return nil
+    }
+
+    private func dismissSystemDateCalendars() {
+        guard let root = view.window?.rootViewController else { return }
+        dismissSystemDateCalendars(from: root)
+    }
+
+    private func dismissSystemDateCalendars(from controller: UIViewController) {
+        if let presented = controller.presentedViewController {
+            if Self.isSystemDateCalendar(presented) {
+                presented.dismiss(animated: false)
+            } else {
+                dismissSystemDateCalendars(from: presented)
+            }
+        }
+        for child in controller.children where child !== self {
+            dismissSystemDateCalendars(from: child)
+        }
+    }
+
+    private static func isSystemDateCalendar(_ controller: UIViewController) -> Bool {
+        if NSStringFromClass(type(of: controller)).contains("_UIDatePicker") {
+            return true
+        }
+        return controller.children.contains(where: isSystemDateCalendar)
     }
 }

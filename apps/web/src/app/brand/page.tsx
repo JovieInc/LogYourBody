@@ -8,6 +8,7 @@ import { LANDING_BRAND_ASSET } from '@/lib/marketing/landing-registry';
 export const revalidate = false;
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/brand' },
   title: 'Brand',
   description: 'LogYourBody identity and brand assets.',
 };

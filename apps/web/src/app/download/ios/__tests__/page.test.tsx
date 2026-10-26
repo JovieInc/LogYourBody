@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { logYourBody } from '@jovieinc/product-registry';
+import { analytics } from '@/lib/analytics';
 import { LANDING_FLAGS } from '@/lib/flags/landing';
 import { LANDING_PRODUCT_PROOF } from '@/lib/marketing/landing-registry';
 import IOSDownloadPage, { metadata } from '../page';
@@ -17,7 +18,7 @@ const flags = LANDING_FLAGS as { APP_STORE_LIVE: boolean };
 
 describe('iOS download acquisition surface', () => {
   it('describes the iOS product without inherited superiority or Android availability claims', () => {
-    expect(metadata.title).toBe('LogYourBody for iPhone');
+    expect(metadata.title).toEqual({ absolute: `${logYourBody.identity.name} for iPhone` });
     expect(metadata.description).toBe(logYourBody.messages.landing.subheading);
     expect(JSON.stringify(metadata)).not.toMatch(/most advanced|Android/i);
   });
@@ -39,6 +40,15 @@ describe('iOS download acquisition surface', () => {
     expect(screen.getByAltText(LANDING_PRODUCT_PROOF.alt)).toHaveAttribute(
       'src',
       expect.stringContaining('weight-log'),
+    );
+  });
+
+  it('records the download page as its own landing, not the homepage', () => {
+    flags.APP_STORE_LIVE = false;
+    render(<IOSDownloadPage />);
+    expect(analytics.track).toHaveBeenCalledWith(
+      'web_landing_viewed',
+      expect.objectContaining({ landing_id: 'ios_download_v1', variant: 'waitlist_launch' }),
     );
   });
 

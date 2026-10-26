@@ -6,6 +6,7 @@ import { logYourBody } from '@jovieinc/product-registry';
 export const revalidate = false;
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/careers' },
   title: 'Careers',
   description: 'Contact LogYourBody about working together.',
 };

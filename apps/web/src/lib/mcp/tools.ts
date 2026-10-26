@@ -1,5 +1,12 @@
 import { captureTrainingAdmission } from '@/lib/training/mutation-admission';
 import { z } from 'zod';
+import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
+import {
+  createDelegatedProposal,
+  decideDelegatedProposal,
+} from '@/lib/training/delegated-revisions';
+import { steeringRequestSchema } from '@/lib/training/delegation-contract';
+import { decideProposalInputSchema } from '@/lib/training/revision-contract';
 import type { NativeProductRecordsPort } from '@/lib/ports/native-product-records';
 import { EXERCISE_CATALOG } from '@/lib/training/catalog';
 import {
@@ -22,9 +29,15 @@ import {
   type SetLog,
 } from '@/lib/training/types';
 import { poundsToKg } from '@/lib/voice/intent-parser';
+import type { WeightLifecyclePort } from '@/lib/metrics/weight-lifecycle';
 import { LYB_MCP_SCOPES, type LybMcpScope } from './contract';
+import { weightMcpTools } from './weight-tools';
 
 export type McpToolDependencies = {
+  revisions?: TrainingRevisionsPort;
+  delegatedEnabled?: () => boolean;
+  metricsEnabled?: () => boolean;
+  weight?: WeightLifecyclePort;
   records: NativeProductRecordsPort;
   now: () => Date;
   createId: () => string;
@@ -36,12 +49,16 @@ export type McpToolResult = {
   isError?: boolean;
 };
 
-type ToolDefinition = {
+export type ToolDefinition = {
+  delegated?: boolean;
+  gate?: 'metrics';
   name: string;
   title: string;
   description: string;
   scope: LybMcpScope;
   readOnly: boolean;
+  destructive?: boolean;
+  idempotent?: boolean;
   input: z.ZodType<Record<string, unknown>>;
   inputSchema: Record<string, unknown>;
   run(subject: string, args: never, deps: McpToolDependencies): Promise<McpToolResult>;
@@ -304,8 +321,55 @@ const swapInput = z
   .strict();
 
 const score = (description: string) => ({ type: 'integer', minimum: 0, maximum: 10, description });
+const planRevisionInput = z
+  .object({
+    action: z.enum(['read', 'propose', 'decide']),
+    proposal: steeringRequestSchema.optional(),
+    decision: decideProposalInputSchema.optional(),
+  })
+  .strict();
 
 export const LYB_MCP_TOOLS: ToolDefinition[] = [
+  {
+    name: 'revise_training_program',
+    title: 'Review or revise the training program',
+    description:
+      'Read the canonical plan and generation, propose typed or natural-language steering, or explicitly apply/reject a reviewed proposal. LYB builds prescriptions. Proposing is never applying. Repeat the persisted proposal diff and receipt; never claim a change from conversational text.',
+    delegated: true,
+    scope: LYB_MCP_SCOPES.trainingWrite,
+    readOnly: false,
+    input: planRevisionInput,
+    inputSchema: z.toJSONSchema(planRevisionInput),
+    async run(subject, raw: z.infer<typeof planRevisionInput>, deps) {
+      if (!deps.delegatedEnabled?.() || !deps.revisions)
+        return failure('Delegated programming is unavailable.');
+      if (raw.action === 'read') {
+        const context = await deps.revisions.readContext(subject);
+        return text('Current saved program. Propose a change before applying it.', {
+          generation: context?.generation,
+          headRevision: context?.headRevision,
+          setups: context?.legacySetups,
+        });
+      }
+      const input = {
+        records: deps.records,
+        revisions: deps.revisions,
+        subject,
+        actor: { kind: 'user' as const, subject },
+        now: deps.now(),
+      };
+      const result =
+        raw.action === 'propose'
+          ? await createDelegatedProposal({ ...input, body: raw.proposal })
+          : await decideDelegatedProposal({ ...input, body: raw.decision });
+      if (result.kind === 'stored')
+        return text('Review this saved proposal. It has not been applied.', { ...result });
+      if (result.kind === 'decided')
+        return text(`Revision ${result.receipt.status}.`, { ...result });
+      if (result.kind === 'question') return text(result.question, { ...result });
+      return failure(`Plan change was not applied: ${result.kind}.`);
+    },
+  },
   {
     name: 'get_todays_workout',
     title: "Get today's workout",
@@ -332,6 +396,10 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
           },
         );
       }
+      if (result.kind === 'block_complete')
+        return text('Your block is complete. Review the recommended next block in LogYourBody.', {
+          status: 'block_complete',
+        });
       const snapshot = await loadTrainingRecords(deps.records, subject);
       const payload = workoutPayload(result, snapshot.logs);
       return text(summarizeWorkout(payload), payload);
@@ -405,8 +473,10 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         admission,
       });
       if (workout.kind === 'not_enrolled') return failure(ENROLL_IN_APP);
-      if (workout.kind === 'week_complete')
-        return failure(`All sessions for week ${workout.week} are already complete.`);
+      if (workout.kind === 'week_complete' || workout.kind === 'block_complete')
+        return failure(
+          'The current training period is complete. Review the next plan before logging more work.',
+        );
       if (workout.session.safetyStop)
         return failure(workout.session.explanation ?? 'Training is paused after a pain report.');
       const match = matchExercise(workout.session, args.exercise);
@@ -524,7 +594,8 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         now: deps.now(),
       });
       if (workout.kind === 'not_enrolled') return failure(ENROLL_IN_APP);
-      if (workout.kind === 'week_complete') return failure('There is no active workout to update.');
+      if (workout.kind === 'week_complete' || workout.kind === 'block_complete')
+        return failure('There is no active workout to update.');
       const logs = workout.session.loggedSets;
       const current = workout.session.exercises.find((exercise) =>
         Array.from({ length: exercise.sets }, (_, index) => index + 1).some(
@@ -867,8 +938,10 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
         admission,
       });
       if (workout.kind === 'not_enrolled') return failure(ENROLL_IN_APP);
-      if (workout.kind === 'week_complete')
-        return failure(`All sessions for week ${workout.week} are already complete.`);
+      if (workout.kind === 'week_complete' || workout.kind === 'block_complete')
+        return failure(
+          'The current training period is complete. Review the next plan before logging more work.',
+        );
       if (workout.session.safetyStop)
         return failure(workout.session.explanation ?? 'Training is paused after a pain report.');
       const match = matchExercise(workout.session, args.exercise);
@@ -987,27 +1060,34 @@ export const LYB_MCP_TOOLS: ToolDefinition[] = [
   },
 ];
 
-export function listTools() {
-  return LYB_MCP_TOOLS.map((tool) => {
-    const securitySchemes = [{ type: 'oauth2', scopes: [tool.scope] }];
-    return {
-      name: tool.name,
-      title: tool.title,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-      annotations: {
+function everyTool(): ToolDefinition[] {
+  return [...LYB_MCP_TOOLS, ...weightMcpTools()];
+}
+
+export function listTools(delegatedEnabled = false, metricsEnabled = false) {
+  return everyTool()
+    .filter((tool) => !tool.delegated || delegatedEnabled)
+    .filter((tool) => tool.gate !== 'metrics' || metricsEnabled)
+    .map((tool) => {
+      const securitySchemes = [{ type: 'oauth2', scopes: [tool.scope] }];
+      return {
+        name: tool.name,
         title: tool.title,
-        readOnlyHint: tool.readOnly,
-        destructiveHint: false,
-        openWorldHint: false,
-        idempotentHint: tool.readOnly,
-      },
-      securitySchemes,
-      _meta: { securitySchemes },
-    };
-  });
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: {
+          title: tool.title,
+          readOnlyHint: tool.readOnly,
+          destructiveHint: tool.destructive === true,
+          openWorldHint: false,
+          idempotentHint: tool.idempotent ?? tool.readOnly,
+        },
+        securitySchemes,
+        _meta: { securitySchemes },
+      };
+    });
 }
 
 export function findTool(name: unknown): ToolDefinition | undefined {
-  return LYB_MCP_TOOLS.find((tool) => tool.name === name);
+  return everyTool().find((tool) => tool.name === name);
 }

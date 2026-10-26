@@ -46,6 +46,43 @@ where id = any ($1::uuid[])
 Do not send email addresses to product analytics. Conversion events remain
 free of contact traits; Neon is the system of record for invitation eligibility.
 
+## Abuse protection (LYB-225)
+
+`POST /api/waitlist` reserves one of five attempts per IP in a ten-minute
+window before reading the request body. This includes invalid requests,
+duplicates and honeypots. Excess attempts return `429`, `Cache-Control:
+no-store`, and a `Retry-After` in seconds, with the existing recoverable error
+copy. Storage failures fail closed with `500`.
+
+The server-only `WaitlistRateLimitPort` uses an atomic Neon upsert, shared
+across instances and cold starts. Anonymous counters use **`DATABASE_URL`**,
+so the existing product migration step applies
+`20261023150000_waitlist_rate_limits.sql` before deployment. They contain no
+email or raw IP; keys are domain-separated HMACs using the existing database
+connection secret. Rotating that secret resets the buckets. Waitlist emails
+remain exclusively in **`WAITLIST_DATABASE_URL`**.
+
+On Vercel, only the platform-supplied `x-vercel-forwarded-for` header identifies
+the client ([Vercel request headers](https://vercel.com/docs/headers/request-headers)).
+Other hosts must sanitize `x-forwarded-for` at their trusted ingress. Missing
+or invalid IP headers share a restrictive bucket. Equivalent IPv6 addresses
+are normalized. This limit is always enforced as a public-write security
+control; it has no client-controlled or default-off rollout bypass.
+
+Counters saturate after the first denied attempt and reset after expiry;
+denials do not extend the window. Each reservation also prunes up to 100 other
+counters expired for over one day. If no requests arrive, cleanup waits for
+the next request. The fixed window permits another five attempts after expiry.
+Each request still performs a small counter query, so edge filtering remains
+a separate option for volumetric protection.
+
+Count server-side rejections by summing `count` in the structured
+`[api/waitlist] rejected` logs, grouped by `status`. Honeypots are recorded
+with `status: 202, reason: 'honeypot'`; all HTTP errors, including `429`, emit
+one record per rejected request. These logs never include request bodies,
+email, IP, source, counter keys or exception details, and do not depend on
+browser analytics executing.
+
 ## Registration evidence
 
 `accept` returns an internal `{ created: boolean }` receipt only after the

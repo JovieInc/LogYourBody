@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { missingLinearKeyWarning } from './lib/linear-issue-intake.mjs';
 import { runRemediationIntake, skippedFilingMessage } from './remediation-signal.mjs';
 import { runCorrectionRecurrence } from '../../packages/shared-lib/scripts/correction-recurrence.mjs';
+import { runCoverageOwnerLoop } from '../../packages/shared-lib/scripts/correction-coverage-owner.mjs';
 
 function readText(path) {
   if (!path) return '';
@@ -60,6 +61,7 @@ async function main() {
   }
   const recurrence = await runCorrectionRecurrence({
     env, eventName: env.GITHUB_EVENT_NAME, event: readGithubEvent(env),
+    dryRun: false,
   });
   console.log(JSON.stringify({ correctionRecurrence: recurrence }));
   if (!recurrence.ok) {
@@ -67,6 +69,11 @@ async function main() {
     console.warn(`::warning::${line}`);
     if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, `${line}\n`);
   }
+  const coverage = await runCoverageOwnerLoop({
+    env, eventName: env.GITHUB_EVENT_NAME, event: readGithubEvent(env),
+  });
+  console.log(JSON.stringify({ correctionCoverage: coverage }));
+  if (!coverage.ok) console.warn(`::warning::${coverage.reason}`);
 }
 
 const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

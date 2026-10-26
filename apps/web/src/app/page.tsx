@@ -1,7 +1,14 @@
+import type { Metadata } from 'next';
+import { logYourBody } from '@jovieinc/product-registry';
 import { LaunchLanding } from './LaunchLanding';
 import { endpoints } from '@/lib/generated/endpoints.generated';
 import { LANDING_FLAGS } from '@/lib/flags/landing';
 import { readEditorialHomepageRollout } from '@/lib/flags/publicLanding.server';
+
+export const metadata: Metadata = {
+  title: { absolute: `${logYourBody.identity.name} — ${logYourBody.brand.slogan}` },
+  alternates: { canonical: '/' },
+};
 
 const marketingUrl = endpoints.hosts.marketing.url;
 

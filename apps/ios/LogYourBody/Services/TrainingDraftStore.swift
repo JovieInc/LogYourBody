@@ -16,6 +16,42 @@ struct TrainingSetDraft: Codable, Equatable {
     var key: String { "\(exerciseId)-\(setNumber)" }
 }
 
+struct TrainingFeedbackDraft: Codable, Equatable {
+    let request: TrainingFeedbackRequest
+    var response: TrainingFeedbackResponse?
+    var readinessHold: TrainingFeedbackResponse?
+
+    var recommendationReceipt: TrainingFeedbackResponse? {
+        guard let response else { return readinessHold }
+        if response.nextSetRecommendation.action == .symptomSafety ||
+            response.nextSetRecommendation.observationIds.contains(response.feedback.id) {
+            return response
+        }
+        // Performance-only feedback may return a decision based on an earlier readiness observation.
+        guard let readinessHold,
+              response.nextSetRecommendation.observationIds.contains(readinessHold.feedback.id)
+        else { return nil }
+        return TrainingFeedbackResponse(
+            version: response.version, feedback: readinessHold.feedback,
+            nextSetRecommendation: response.nextSetRecommendation
+        )
+    }
+}
+
+struct TrainingSetUndoReceipt: Codable, Equatable, Sendable {
+    let id: String
+    let sessionId: String
+    let exerciseId: String
+    let setNumber: Int
+    let expectedRevision: Int
+    let reps: Int
+    let loadKg: Double?
+    let rir: Int
+    let restoresCorrectionId: String
+    let issuedAt: Date
+    var submitted: Bool
+}
+
 enum TrainingDraftError: LocalizedError {
     case unavailable
     case changed
@@ -36,10 +72,58 @@ final class TrainingDraftStore {
     )
 
     private struct Journal: Codable {
-        let version: Int
-        let ownerId: String
-        let sessionId: String
+        var version: Int
+        var ownerId: String
+        var sessionId: String
         var rows: [String: TrainingSetDraft]
+        var feedback: TrainingFeedbackDraft?
+        var rest: TrainingRestDraft?
+        var undoReceipt: TrainingSetUndoReceipt?
+
+        private enum CodingKeys: String, CodingKey {
+            case version, ownerId, sessionId, rows, feedback, rest, undoReceipt
+        }
+
+        init(
+            version: Int,
+            ownerId: String,
+            sessionId: String,
+            rows: [String: TrainingSetDraft],
+            feedback: TrainingFeedbackDraft? = nil,
+            rest: TrainingRestDraft? = nil,
+            undoReceipt: TrainingSetUndoReceipt? = nil
+        ) {
+            self.version = version
+            self.ownerId = ownerId
+            self.sessionId = sessionId
+            self.rows = rows
+            self.feedback = feedback
+            self.rest = rest
+            self.undoReceipt = undoReceipt
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            version = try container.decode(Int.self, forKey: .version)
+            ownerId = try container.decode(String.self, forKey: .ownerId)
+            sessionId = try container.decode(String.self, forKey: .sessionId)
+            rows = try container.decode([String: TrainingSetDraft].self, forKey: .rows)
+            feedback = try container.decodeIfPresent(TrainingFeedbackDraft.self, forKey: .feedback)
+            rest = try container.decodeIfPresent(TrainingRestDraft.self, forKey: .rest)
+            // A missing or unreadable receipt is dropped. It must not fail the journal.
+            undoReceipt = try? container.decode(TrainingSetUndoReceipt.self, forKey: .undoReceipt)
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(version, forKey: .version)
+            try container.encode(ownerId, forKey: .ownerId)
+            try container.encode(sessionId, forKey: .sessionId)
+            try container.encode(rows, forKey: .rows)
+            try container.encodeIfPresent(feedback, forKey: .feedback)
+            try container.encodeIfPresent(rest, forKey: .rest)
+            try container.encodeIfPresent(undoReceipt, forKey: .undoReceipt)
+        }
     }
 
     private let rootURL: URL
@@ -53,18 +137,83 @@ final class TrainingDraftStore {
     }
 
     func load(ownerId: String, sessionId: String) throws -> [String: TrainingSetDraft] {
+        try loadJournal(ownerId: ownerId, sessionId: sessionId).rows
+    }
+
+    func loadFeedback(ownerId: String, sessionId: String) throws -> TrainingFeedbackDraft? {
+        try loadJournal(ownerId: ownerId, sessionId: sessionId).feedback
+    }
+
+    func loadRest(ownerId: String, sessionId: String) throws -> TrainingRestDraft {
+        try loadJournal(ownerId: ownerId, sessionId: sessionId).rest ?? TrainingRestDraft()
+    }
+
+    func saveRest(_ rest: TrainingRestDraft, ownerId: String, sessionId: String) throws {
+        var journal = try loadJournal(ownerId: ownerId, sessionId: sessionId)
+        journal.rest = rest
+        try persist(journal)
+    }
+
+    func loadUndo(ownerId: String, sessionId: String) throws -> TrainingSetUndoReceipt? {
+        try loadJournal(ownerId: ownerId, sessionId: sessionId).undoReceipt
+    }
+
+    func replaceUndo(
+        _ receipt: TrainingSetUndoReceipt?,
+        expecting previous: TrainingSetUndoReceipt?,
+        ownerId: String,
+        sessionId: String
+    ) throws -> Bool {
+        var journal = try loadJournal(ownerId: ownerId, sessionId: sessionId)
+        guard journal.undoReceipt == previous else { return false }
+        journal.undoReceipt = receipt
+        try persist(journal)
+        return true
+    }
+
+    func replaceFeedback(
+        _ feedback: TrainingFeedbackDraft,
+        expecting previous: TrainingFeedbackDraft?,
+        ownerId: String,
+        sessionId: String
+    ) throws -> Bool {
+        var journal = try loadJournal(ownerId: ownerId, sessionId: sessionId)
+        guard journal.feedback == previous else { return false }
+        journal.feedback = feedback
+        try persist(journal)
+        return true
+    }
+
+    private func loadJournal(ownerId: String, sessionId: String) throws -> Journal {
         let url = journalURL(ownerId: ownerId, sessionId: sessionId)
         let data: Data
         do {
             data = try Data(contentsOf: url)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            return [:]
+            return Journal(version: 1, ownerId: ownerId, sessionId: sessionId, rows: [:])
         }
-        let journal = try JSONDecoder().decode(Journal.self, from: data)
+        var journal = try JSONDecoder().decode(Journal.self, from: data)
         guard journal.version == 1, journal.ownerId == ownerId, journal.sessionId == sessionId,
               journal.rows.allSatisfy({ $0.key == $0.value.key && validStoredRow($0.value, sessionId: sessionId) })
         else { throw TrainingDraftError.unavailable }
-        return journal.rows
+        if let receipt = journal.undoReceipt, !Self.validUndoReceipt(receipt, sessionId: sessionId) {
+            journal.undoReceipt = nil
+        }
+        if let feedback = journal.feedback {
+            guard feedback.request.sessionId == sessionId, feedback.request.sourceObservationId != nil,
+                  feedback.response.map({ $0.matches(feedback.request) }) ?? true,
+                  feedback.readinessHold.map({
+                      $0.feedback.observation.sessionId == sessionId &&
+                          $0.matches($0.feedback.observation) && $0.nextSetRecommendation.action != .proceed
+                  }) ?? true
+            else { throw TrainingDraftError.unavailable }
+        }
+        if let rest = journal.rest {
+            guard rest.durations.values.allSatisfy(TrainingRestPolicy.durationRange.contains),
+                  rest.countdown.map({ TrainingRestPolicy.durationRange.contains($0.duration) }) ?? true
+            else { throw TrainingDraftError.unavailable }
+        }
+        return journal
     }
 
     func put(_ row: TrainingSetDraft, ownerId: String, sessionId: String) throws {
@@ -105,6 +254,14 @@ final class TrainingDraftStore {
     }
 
     private func persist(_ rows: [String: TrainingSetDraft], ownerId: String, sessionId: String) throws {
+        var journal = try loadJournal(ownerId: ownerId, sessionId: sessionId)
+        journal.rows = rows
+        try persist(journal)
+    }
+
+    private func persist(_ journal: Journal) throws {
+        let ownerId = journal.ownerId
+        let sessionId = journal.sessionId
         let ownerURL = ownerURL(ownerId)
         try FileManager.default.createDirectory(
             at: ownerURL, withIntermediateDirectories: true,
@@ -114,7 +271,7 @@ final class TrainingDraftStore {
         var resources = URLResourceValues()
         resources.isExcludedFromBackup = true
         try excludedURL.setResourceValues(resources)
-        let data = try JSONEncoder().encode(Journal(version: 1, ownerId: ownerId, sessionId: sessionId, rows: rows))
+        let data = try JSONEncoder().encode(journal)
         try writeData(
             data, journalURL(ownerId: ownerId, sessionId: sessionId),
             [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
@@ -123,6 +280,20 @@ final class TrainingDraftStore {
 
     private func ownerURL(_ ownerId: String) -> URL {
         rootURL.appendingPathComponent(digest(ownerId), isDirectory: true)
+    }
+
+    private static func validUndoReceipt(_ receipt: TrainingSetUndoReceipt, sessionId: String) -> Bool {
+        guard receipt.sessionId == sessionId,
+              UUID(uuidString: receipt.id) != nil,
+              !receipt.restoresCorrectionId.isEmpty,
+              !receipt.exerciseId.isEmpty,
+              receipt.setNumber > 0,
+              receipt.expectedRevision >= 0,
+              (1...50).contains(receipt.reps),
+              (0...6).contains(receipt.rir),
+              receipt.loadKg.map({ $0.isFinite && (0...500).contains($0) }) ?? true
+        else { return false }
+        return true
     }
 
     private func validStoredRow(_ row: TrainingSetDraft, sessionId: String) -> Bool {

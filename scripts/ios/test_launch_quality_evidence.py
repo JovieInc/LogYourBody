@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,22 @@ spec.loader.exec_module(evidence)
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_fixed_diagnostic_selectors_have_native_test_implementations(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / 'scripts/ios/launch-quality-audit.sh').read_text()
+        block = source.split('DIAGNOSTIC_SEVEN_TESTS=(', 1)[1].split('\n)', 1)[0]
+        selectors = re.findall(r'"(\w+/\w+)"', block)
+        self.assertEqual(len(selectors), 7)
+        self.assertEqual(len(set(selectors)), 7)
+        for selector in selectors:
+            suite, method = selector.split('/')
+            with self.subTest(selector=selector):
+                native_source = (root / f'apps/ios/LogYourBodyUITests/{suite}.swift').read_text()
+                self.assertIsNotNone(
+                    re.search(rf'\bfunc\s+{re.escape(method)}\s*\(\s*\)', native_source),
+                    f'Missing native diagnostic implementation: {selector}',
+                )
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -433,7 +450,7 @@ run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
         self.assertEqual(log.read_text().count('Running fixture (attempt '), 2)
         self.assertIn('first attempt evidence', (result_bundle.with_name('retry.attempt-1.xcresult') / 'receipt').read_text())
 
-    def test_shell_does_not_retry_xcodebuild_command_timeout(self):
+    def test_shell_does_not_retry_timeouts_or_started_tests(self):
         # Same probe stub as the retry test: simctl is outside this contract.
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         functions = source[source.index('is_simulator_infra_failure() {'):source.index('assert_xcresult_evidence() {')]
@@ -449,20 +466,37 @@ cleanup_booted_simulator_apps() { :; }
 sleep() { :; }
 run_with_timeout() {
   mkdir -p "$RESULT_BUNDLE"
-  echo 'xcodebuild command timed out after 720s'
-  return 124
+  printf '%s\n' "$FAILURE_LOG"
+  return "$FAILURE_STATUS"
 }
 """ + functions + r"""
 start_launch_probe() { :; }
 stop_launch_probe() { :; }
 run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
 """
-        result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                                env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
-        self.assertEqual(result.returncode, 124, result.stderr)
-        self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
-        self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
-        self.assertNotIn('Retrying fixture', log.read_text())
+        failures = [
+            (124, 'xcodebuild command timed out after 720s'),
+            (124, 'Failed to launch app\nxcodebuild command timed out after 720s'),
+            (65, "Test Case '-[ChatTests testRetry]' exceeded execution time allowance of 3 minutes.\n"
+                 'Restarting after unexpected exit, crash, or test timeout'),
+            (65, "Test Case '-[ChatTests testRetry]' started.\nFailed to launch app"),
+            (65, "Test Suite 'Selected tests' started at 2026-10-26.\nEarly unexpected exit"),
+            (65, 'Restarting after unexpected exit, crash, or test timeout'),
+        ]
+        for index, (status, failure_log) in enumerate(failures):
+            with self.subTest(status=status, failure_log=failure_log):
+                directory = self.root / str(index)
+                directory.mkdir()
+                result_bundle = directory / 'timeout.xcresult'
+                log = directory / 'timeout.log'
+                result = subprocess.run(
+                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
+                    env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log),
+                         'FAILURE_STATUS': str(status), 'FAILURE_LOG': failure_log})
+                self.assertEqual(result.returncode, status, result.stderr)
+                self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
+                self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
+                self.assertNotIn('Retrying fixture', log.read_text())
 
 
 if __name__ == '__main__':

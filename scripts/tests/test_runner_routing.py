@@ -592,6 +592,112 @@ def test_wrong_run_identity_or_job_attestation_degrades_to_hosted(
         assert outputs["health"] == "down"
 
 
+def _ruby_setup_step(name: str) -> str:
+    action = (_REPO_ROOT / '.github/actions/setup-ruby-bundler/action.yml').read_text()
+    return action.split(f'    - name: {name}\n', 1)[1].split('\n    - name:', 1)[0]
+
+
+def _ruby_setup_body(name: str) -> str:
+    body = _ruby_setup_step(name).split('      run: ', 1)[1]
+    return textwrap.dedent(body[2:]) if body.startswith('|\n') else body
+
+
+def test_ruby_bundle_cache_separates_runtime_builds_and_runner_platforms(tmp_path: Path) -> None:
+    import re
+
+    # Execute the action's real Ruby identity calculation, including two Ruby
+    # builds with the same version but different native extension configuration.
+    def identity(label: str, config_change: str = '') -> dict[str, str]:
+        output = tmp_path / f'{label}.output'
+        preload = tmp_path / f'{label}.rb'
+        preload.write_text('require "rbconfig"\n' + config_change)
+        result = subprocess.run(
+            ['bash', '-e', '-o', 'pipefail', '-c', _ruby_setup_body('Get Ruby version')],
+            env={**os.environ, 'GITHUB_OUTPUT': str(output), 'RUBYOPT': f'-r{preload}'},
+            text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+        )
+        assert result.returncode == 0, result.stderr
+        return dict(line.split('=', 1) for line in output.read_text().splitlines())
+
+    current = identity('current')
+    assert current == identity('repeat')
+    assert re.fullmatch('[0-9a-f]{64}', current['abi'])
+    for index, setting in enumerate(['arch', 'configure_args']):
+        changed = identity(str(index), f'RbConfig::CONFIG["{setting}"] += "-other-build"\n')
+        assert current['version'] == changed['version']
+        assert current['abi'] != changed['abi']
+
+    cache = _ruby_setup_step('Cache Ruby dependencies')
+    key = cache.split('        key: ', 1)[1].splitlines()[0]
+    restore = cache.split('        restore-keys: |\n', 1)[1].strip().splitlines()
+    values = {
+        'runner.os': 'macOS', 'runner.arch': 'ARM64', 'runner.environment': 'self-hosted',
+        'inputs.cache-key-prefix': 'ios-gems', 'steps.ruby-version.outputs.version': current['version'],
+        'steps.ruby-version.outputs.abi': current['abi'], 'steps.gemfile-hash.outputs.hash': 'lock-a',
+    }
+
+    def render(template: str, overrides: dict[str, str]) -> str:
+        context = {**values, **overrides}
+        return re.sub(r'\$\{\{\s*(.*?)\s*\}\}', lambda match: context[match[1]], template)
+
+    current_key = render(key, {})
+    prefixes = [render(template, {}) for template in restore]
+    assert prefixes and all(current_key.startswith(prefix) for prefix in prefixes)
+    for field, other in [
+        ('runner.os', 'Linux'), ('runner.arch', 'X64'), ('runner.environment', 'github-hosted'),
+        ('steps.ruby-version.outputs.version', 'other-version'),
+        ('steps.ruby-version.outputs.abi', 'other-build'),
+    ]:
+        assert not any(render(key, {field: other}).startswith(prefix) for prefix in prefixes)
+    # A changed lock can reuse only a compatible runtime cache; the rejected
+    # pre-ABI cache from the merge-group log must never match a restore prefix.
+    assert any(render(key, {'steps.gemfile-hash.outputs.hash': 'lock-b'}).startswith(prefix)
+               for prefix in prefixes)
+    legacy = 'macOS-ios-gems-ruby-3.1.7p261-7236275de00f433e3174f60973f80e2325ceef9f'
+    assert not any(legacy.startswith(prefix) for prefix in prefixes)
+
+
+def test_ruby_bundle_restore_clears_persistent_native_gems_only(tmp_path: Path) -> None:
+    bundle = tmp_path / 'vendor/bundle/ruby/3.1.0/gems/date/lib'
+    bundle.mkdir(parents=True)
+    (bundle / 'date_core.bundle').write_text('incompatible cached native extension')
+    retained = tmp_path / 'vendor/JovieKit/Package.swift'
+    retained.parent.mkdir()
+    retained.write_text('retained vendored package')
+    result = subprocess.run(
+        ['bash', '-e', '-c', _ruby_setup_body('Clear stale bundle before cache restore')],
+        cwd=tmp_path, text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+    )
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / 'vendor/bundle').exists()
+    assert retained.read_text() == 'retained vendored package'
+    action = (_REPO_ROOT / '.github/actions/setup-ruby-bundler/action.yml').read_text()
+    assert action.index('Clear stale bundle before cache restore') < action.index('Cache Ruby dependencies')
+    assert 'working-directory: ${{ inputs.working-directory }}' in _ruby_setup_step(
+        'Clear stale bundle before cache restore')
+
+
+def test_ruby_bundle_verification_rejects_unloadable_native_extensions(tmp_path: Path) -> None:
+    fake_bundle = tmp_path / 'bundle'
+    fake_bundle.write_text('''#!/usr/bin/env bash
+if [[ "$1" == exec ]]; then
+  [[ "$*" == *'require "date"'* && "$*" == *'require "psych"'* && "$*" == *'require "json"'* ]] || exit 99
+  if [[ "$BROKEN_NATIVE_GEM" == true ]]; then
+    echo 'LoadError: date_core.bundle: Symbol not found: _rb_cFalseClass' >&2
+    exit 1
+  fi
+fi
+''')
+    fake_bundle.chmod(0o755)
+    for broken in ['true', 'false']:
+        result = subprocess.run(
+            ['bash', '-e', '-o', 'pipefail', '-c', _ruby_setup_body('Verify Ruby setup')],
+            env={**os.environ, 'PATH': f'{tmp_path}:{os.environ["PATH"]}', 'BROKEN_NATIVE_GEM': broken},
+            text=True, capture_output=True, check=False, pass_fds=_coverage_fds(),
+        )
+        assert result.returncode == (1 if broken == 'true' else 0), result.stderr
+
+
 _MAC_LANE_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "mac-lane.sh"
 _SELF_HOSTED_MAC = 'fromJSON(\'["self-hosted","macOS","ARM64","jovie-mac"]\')'
 _MANUAL_QUALITY_DISPATCH = "github.event_name == 'workflow_dispatch' && startsWith(github.workflow_ref, format('{0}/.github/workflows/ios-quality.yml@', github.repository))"
@@ -1289,7 +1395,10 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
     guard = module['validate_tooling']
-    assert module['REVIEWED_AUDIT_SHA256'] == '63d78b82d9cffcce75fc7c329cdb3d9d4ceb14d2534574a6e1191dc1efe80392'  # exact reviewed candidate, never the main control audit
+    live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
+    assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
+        '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
+    )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
     expected = hashlib.sha256(script.read_bytes()).hexdigest()
@@ -1350,15 +1459,29 @@ def test_focused_diagnostic_actual_actor_guard_fails_before_checkout(tmp_path: P
     for permission in ['write', 'admin']:
         assert run({'PERMISSION': permission}).returncode == 0
     for overrides in [{'GITHUB_REPOSITORY': 'other/repo'}, {'GITHUB_REF': 'refs/heads/topic'},
-                      {'GITHUB_EVENT_NAME': 'push'}, {'CHECKOUT_REF': 'main'}, {'CHECKOUT_REF': 'A' * 40},
-                      {'GITHUB_RUN_ATTEMPT': '2'}, {'GITHUB_WORKFLOW_SHA': 'c' * 40},
-                      {'GITHUB_WORKFLOW_REF': 'candidate-workflow'}, {'PERMISSION': 'read'},
-                      {'API_FAIL': 'true'}, {'HEAD_PROVEN': 'false'}]:
+                      {'GITHUB_EVENT_NAME': 'push'}, {'CHECKOUT_REF': ''}, {'CHECKOUT_REF': 'main'},
+                      {'CHECKOUT_REF': 'A' * 40}, {'GITHUB_RUN_ATTEMPT': '2'},
+                      {'GITHUB_WORKFLOW_SHA': 'c' * 40}, {'GITHUB_WORKFLOW_REF': 'candidate-workflow'},
+                      {'PERMISSION': 'read'}, {'API_FAIL': 'true'}, {'HEAD_PROVEN': 'false'},
+                      {'GITHUB_EVENT_NAME': 'pull_request'}, {'GITHUB_EVENT_NAME': 'workflow_call'}]:
         assert run(overrides).returncode != 0
     # Distinct triggering actor gets its own permission check.
     assert run({'GITHUB_TRIGGERING_ACTOR': 'second-writer'}).returncode == 0
     calls = (tmp_path / 'calls').read_text()
     assert '/collaborators/second-writer/permission' in calls
+    # Push and schedule checkout github.sha only. A caller ref is refused, and gh is not consulted.
+    for event in ('push', 'schedule'):
+        assert run({'GITHUB_EVENT_NAME': event, 'CHECKOUT_REF': 'a' * 40}).returncode != 0
+        before = (tmp_path / 'calls').read_text()
+        result = run({'GITHUB_EVENT_NAME': event, 'CHECKOUT_REF': ''})
+        assert result.returncode == 0, result.stderr
+        assert (tmp_path / 'calls').read_text() == before
+    for overrides in [{'GITHUB_EVENT_NAME': 'push', 'CHECKOUT_REF': '', 'GITHUB_REF': 'refs/heads/topic'},
+                      {'GITHUB_EVENT_NAME': 'schedule', 'CHECKOUT_REF': '', 'GITHUB_WORKFLOW_SHA': 'c' * 40},
+                      {'GITHUB_EVENT_NAME': 'push', 'CHECKOUT_REF': '', 'GITHUB_RUN_ATTEMPT': '2'},
+                      {'GITHUB_EVENT_NAME': 'schedule', 'CHECKOUT_REF': '', 'GITHUB_SHA': 'main'},
+                      {'GITHUB_EVENT_NAME': 'pull_request', 'CHECKOUT_REF': ''}]:
+        assert run(overrides).returncode != 0
 
 
 def _run_diagnostic_dispatch(tmp_path: Path, *, mode: str = '--diagnostic-seven', **overrides: str):
@@ -1475,9 +1598,16 @@ def test_focused_diagnostic_one_ui_command_even_for_infrastructure_failure_and_d
 def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_preserves_pending_runs() -> None:
     source = (_WORKFLOWS / 'ios-ui-diagnostics.yml').read_text()
     assert '  queue: max\n' in source and '  cancel-in-progress: false\n' in source
+    assert source.count('concurrency:') == 1 and source.count('  group: lyb-ui-diagnostics-seven\n') == 1
+    assert source.index('concurrency:') < source.index('jobs:')
     assert source.count('      checkout-ref:\n') == 1
-    for forbidden in ['  push:', '  pull_request:', '  schedule:', '  workflow_call:', 'uses: ./', 'mac-lane', 'secrets.']:
+    for forbidden in ['  pull_request:', '  pull_request_target:', '  workflow_call:', '  workflow_run:', 'uses: ./', 'mac-lane', 'secrets.']:
         assert forbidden not in source
+    assert '  push:\n    branches: [main]\n    paths:\n      - .github/workflows/ios-ui-diagnostics.yml\n      - scripts/ios/launch-quality-audit.sh\n      - apps/ios/LogYourBodyUITests/HomeV2LayoutUITests.swift\n' in source
+    assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
+    assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
+    assert 'push and schedule refuse a caller checkout ref.' in source
+    assert "REVIEWED_AUDIT_SHA256 = '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -1713,13 +1843,16 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '63d78b82d9cffcce75fc7c329cdb3d9d4ceb14d2534574a6e1191dc1efe80392'
+    expected = '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
-    reviewed = _reviewed_diagnostic_candidate_bytes()
+    # The previous pin was the unlanded candidate. It stays a rejected fixture.
+    unlanded = _reviewed_diagnostic_candidate_bytes()
+    reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
+    assert hashlib.sha256(reviewed).hexdigest() == expected
     # Recover exact old V16 only as inert bytes, to prove real CLI refusal of it.
-    legacy = reviewed.decode()
+    legacy = unlanded.decode()
     start = legacy.index('# An unknown mode must fail')
     end = legacy.index('ROOT_DIR=', start)
     legacy = legacy[:start] + legacy[end:]
@@ -1753,7 +1886,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink']
     for scenario in fixtures:
@@ -1770,7 +1903,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'legacy-v16':
+        if scenario == 'unlanded-candidate':
+            audit.write_bytes(unlanded)
+        elif scenario == 'legacy-v16':
             audit.write_bytes(legacy_bytes)
         elif scenario == 'marker-only':
             audit.write_text('# diagnostic-seven capability marker is insufficient\n')

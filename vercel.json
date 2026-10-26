@@ -14,7 +14,11 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "main": false
+      "main": false,
+      "backup/**": false,
+      "archive/**": false,
+      "stash/**": false,
+      "gh-readonly-queue/**": false
     }
   },
   "github": {
@@ -23,10 +27,7 @@
   "routes": [
     {
       "src": "^/(?!api(?:/|$)|_next(?:/|$)|\\.well-known(?:/|$)|signin(?:/|$)|signup(?:/|$)|login(?:/|$)|dashboard(?:/|$)|log(?:/|$)|onboarding(?:/|$)|settings(?:/|$)|photos(?:/|$)|steps(?:/|$)|import(?:/|$)|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*",
-      "methods": [
-        "GET",
-        "HEAD"
-      ],
+      "methods": ["GET", "HEAD"],
       "missing": [
         {
           "type": "header",

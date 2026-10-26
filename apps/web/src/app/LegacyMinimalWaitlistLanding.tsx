@@ -54,7 +54,7 @@ export function LegacyMinimalWaitlistLanding() {
               <p className="mt-7 max-w-2xl text-pretty text-lg leading-8 tracking-[-0.015em] text-white/60 sm:text-xl sm:leading-9">
                 {waitlistLandingCopy.subheading}
               </p>
-              <WaitlistForm />
+              <WaitlistForm landingId="minimal_waitlist_v1" variant="waitlist_minimal" />
             </div>
 
             <div

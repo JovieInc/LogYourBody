@@ -119,7 +119,7 @@ func updateWeightUnit(from previous: String, to current: String) {
 var saveButtonText: String {
         switch selectedTab {
         case 0:
-            return "Save Weight"
+            return isHomeV2LogEntry ? "Save" : "Save Weight"
         case 1:
             return "Save Body Fat"
         case 2:
