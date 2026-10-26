@@ -256,13 +256,21 @@ test('committed ledger is classified and the default CLI run is idempotent', () 
   assert.equal(readFileSync(path, 'utf8'), before);
 });
 
-test('CLI resolves Git ledger conflicts from both index stages without staging other edits', (t) => {
+test('CLI resolves Git ledger conflicts from three stages without staging other edits', (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'lyb-classifier-git-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const rows = fixture().slice(0, 4);
   rows.push({ ...rows[0], source: `${rows[0].source}#another-receipt` });
-  for (const contradictory of [false, true]) {
-    const repository = join(directory, `repository with spaces ${contradictory}`);
+  for (const scenario of [
+    'additions',
+    'ours-edit',
+    'theirs-edit',
+    'concurrent',
+    'deleted',
+    'missing-guard',
+  ]) {
+    const refused = ['concurrent', 'deleted', 'missing-guard'].includes(scenario);
+    const repository = join(directory, `repository with spaces ${scenario}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
     mkdirSync(join(repository, 'packages/shared-lib'), { recursive: true });
     const git = (...args) => {
@@ -292,10 +300,15 @@ test('CLI resolves Git ledger conflicts from both index stages without staging o
     git('commit', '-m', 'test: base ledger');
     assert.equal(run('--check-merge', repository).status, 1, 'a merge must be active');
     git('branch', 'right');
-    writeFileSync(ledger, JSON.stringify(rows.slice(0, 2)));
+    const ours = ['ours-edit', 'concurrent'].includes(scenario)
+      ? { ...rows[0], correction: 'Clarified evidence on the feature branch.' }
+      : rows[0];
+    writeFileSync(ledger, JSON.stringify(scenario === 'deleted' ? [rows[1]] : [ours, rows[1]]));
     git('commit', '-am', 'test: left receipt');
     git('switch', 'right');
-    const shared = contradictory ? { ...rows[0], correction: 'Contradictory evidence.' } : rows[0];
+    const shared = ['theirs-edit', 'concurrent'].includes(scenario)
+      ? { ...rows[0], correction: 'Clarified evidence on main.' }
+      : rows[0];
     writeFileSync(ledger, JSON.stringify(classifyLedger([shared, ...rows.slice(2)])));
     git('commit', '-am', 'test: right receipts');
     git('switch', 'left');
@@ -307,14 +320,18 @@ test('CLI resolves Git ledger conflicts from both index stages without staging o
     const parents = git('rev-parse', 'HEAD', 'MERGE_HEAD');
     const unrelated = join(repository, 'unrelated.txt');
     writeFileSync(unrelated, 'uncommitted user edit\n');
+    if (scenario === 'missing-guard') {
+      writeFileSync(join(repository, rows[0].guard.path), 'missing guard');
+    }
     const result = run('--resolve-merge', repository);
-    assert.equal(result.status, contradictory ? 1 : 0, result.stderr);
+    assert.equal(result.status, refused ? 1 : 0, `${scenario}: ${result.stderr}`);
     assert.equal(git('ls-files', '-u'), stages, 'resolution does not stage files');
-    if (contradictory) {
-      assert.match(result.stderr, /conflicting merge receipt/);
+    if (refused) {
+      assert.match(result.stderr, /concurrent receipt edits|removed receipt|missing guard anchor/);
       assert.equal(readFileSync(ledger, 'utf8'), before);
     } else {
-      assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), classifyLedger(rows));
+      const expected = [scenario === 'ours-edit' ? ours : shared, ...rows.slice(1)];
+      assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), classifyLedger(expected));
       const resolved = readFileSync(ledger, 'utf8');
       assert.equal(run('--resolve-merge', repository).status, 0);
       assert.equal(readFileSync(ledger, 'utf8'), resolved);

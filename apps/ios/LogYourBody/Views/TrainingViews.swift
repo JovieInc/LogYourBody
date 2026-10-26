@@ -209,10 +209,12 @@ struct TrainingEnrollmentView: View {
 
                 Section("Schedule") {
                     Picker("Sessions each week", selection: $sessionsPerWeek) {
-                        Text("2 days").tag(2)
-                        Text("3 days").tag(3)
+                        ForEach(2...6, id: \.self) { days in
+                            Text("\(days) days").tag(days)
+                        }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier("training_enroll_sessions_picker")
                     Picker("Equipment", selection: $equipment) {
                         Text("Dumbbells").tag("dumbbells")
                         Text("Full gym").tag("full_gym")

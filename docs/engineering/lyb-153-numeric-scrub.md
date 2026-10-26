@@ -194,3 +194,41 @@ started detached with the PR branch in use elsewhere, so the local repair uses
 
 GBrain query, write and same-slug readback could not connect to its local service;
 durable persistence remains unverified.
+
+## Three-way resolver integration, 2026-10-26
+
+Merged `origin/main` at `62b058a3ff774243d92f8b54f3b2d1b93d5e3f8c` without
+rebasing. Extended the classifier's `--resolve-merge` to classify all three Git
+conflict stages and reuse main's `mergeCorrectionLedgers` implementation. Used
+that command for the only conflict, preserving all 56 receipts. The resolver now
+accepts one-sided receipt edits and refuses deletions, concurrent edits and
+missing guard anchors before writing. The regression failed against the prior
+resolver, then passed with the extension through the existing required runner.
+The scrub primitive and its target membership are unchanged from the PR parent.
+
+Validation on Linux with Node 22.23.2 and pnpm 10.34.1:
+
+- `corepack pnpm install --frozen-lockfile --prefer-offline`, `corepack pnpm lint`,
+  `corepack pnpm typecheck`, `corepack pnpm test`: passed. The first root test
+  invocation failed in the classifier child while source formatting was being
+  changed; the final unchanged-source run passed, including all 174 shared-lib
+  tests and the web build and tests.
+- The standalone classifier command with `--test --experimental-test-coverage`,
+  `--test-coverage-include=scripts/correction-classifier.mjs` and all three
+  `--test-coverage-{lines,branches,functions}=100` gates passed all 11 cases.
+- `node scripts/correction-classifier.mjs --check-merge .` passed on the staged
+  ledger and guards. Correction coverage passed separately against
+  `d1d3e93ac794670010c4d61fa1cd33fe1bad7589` and `origin/main`. Guard references,
+  correction ratchets, URL drift, repository source parity, hook shell syntax and
+  `git diff --check` passed. The 11 existing claims findings remain warnings.
+- Strict SwiftLint with `--no-cache` on the three incoming Swift files passed
+  with zero violations; five SourceKit rules remain unavailable on Linux.
+- `gh run view 40307728635 --repo JovieInc/LogYourBody --log-failed` could not
+  return logs because the old head's native launch-quality job was still running.
+  Required native execution on the new head remains for macOS CI.
+
+The worktree began detached, so the local repair branch is
+`fix/pr1544-main-merge-20261026t1053`. The harness retains push and PR ownership;
+its required body line remains `Machine: built scripts/correction-classifier.mjs`.
+GBrain search, `put lyb-153-merge-repair` and same-slug `get_page` each failed to
+connect to `127.0.0.1:7801`; neither write nor readback persistence is verified.

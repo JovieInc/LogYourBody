@@ -9,6 +9,8 @@ import {
   guardCoverageReport,
   LEDGER_PATH,
   LEVELS,
+  mergeCorrectionLedgers,
+  readSource,
   ROOT,
 } from '../packages/shared-lib/scripts/correction-coverage.mjs';
 
@@ -173,7 +175,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
         });
-      path = resolve(git('rev-parse', '--show-toplevel').trim(), LEDGER_PATH);
+      const root = git('rev-parse', '--show-toplevel').trim();
+      path = resolve(root, LEDGER_PATH);
       if (checkingMerge) {
         const parents = ['HEAD', 'MERGE_HEAD'].map((ref) => git('rev-parse', '--verify', ref).trim());
         const receipts = JSON.parse(git('show', `:0:${LEDGER_PATH}`));
@@ -191,12 +194,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         console.log('correction-classifier: verified staged ledger against both merge parents');
         process.exit(0);
       }
-      // Read both immutable conflict stages, never the marker-filled worktree.
-      // Missing stages and contradictory evidence fail before any write.
-      result = mergeLedgers(
-        JSON.parse(git('show', `:2:${LEDGER_PATH}`)),
-        JSON.parse(git('show', `:3:${LEDGER_PATH}`)),
+      // Reuse the coverage tool's three-way policy rather than a second resolver.
+      // Classify snapshots first so derived metadata cannot look like concurrent edits.
+      const stages = [1, 2, 3].map((stage) =>
+        classifyLedger(JSON.parse(git('show', `:${stage}:${LEDGER_PATH}`))),
       );
+      result = classifyLedger(
+        mergeCorrectionLedgers(...stages, (guard) => readSource(guard, { root })),
+      );
+      readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
     } else {
       path = args[0] ?? resolve(ROOT, LEDGER_PATH);
       const receipts = JSON.parse(readFileSync(path, 'utf8'));

@@ -48,6 +48,15 @@ The [existing recurrence intake](correction-recurrence.md) files its deduplicate
 mechanization task at two distinct receipts. The first receipt already requires
 a guard where feasible.
 
+Recording uses the classifier's `ruleId` as the correction identity
+(`recordCorrection` in
+[`packages/shared-lib/src/correction-ledger.ts`](../../packages/shared-lib/src/correction-ledger.ts)).
+The first record for a rule id stays at `recurrence` 0. A later correction with
+that same rule id increments that record by one and does not add a second row.
+A different rule id leaves the earlier count unchanged. This step does not emit
+or change checks. Coverage and the recurrence intake still derive repeat counts
+from distinct source URLs per fingerprint.
+
 Inspect and verify the ledger from the repository root:
 
 ```sh
@@ -70,10 +79,11 @@ There is no implicit prose or human fallback for missing or malformed assessment
 
 For additive ledger conflicts during a merge, run
 `node scripts/correction-classifier.mjs --resolve-merge .` from the repository
-root. This reads both immutable Git index stages and writes their classified
-union to the tracked ledger only after validating every receipt. It deduplicates
-canonical fingerprint/source identities and rejects disagreements in their
-evidence or guard annotations. Missing conflict stages fail without writing.
+root. This classifies all three immutable Git index stages and reuses the coverage
+tool's `mergeCorrectionLedgers` policy. It preserves independent additions and
+one-sided edits, rejects deletions, duplicate identities and divergent concurrent
+edits, and validates retained guards before writing the classified result.
+Missing conflict stages fail without writing.
 Review the result, stage the ledger, and run the coverage check against both
 merge parents. The command leaves the index and unrelated edits untouched.
 
@@ -88,8 +98,9 @@ An absent merge or an unstaged ledger conflict fails without writing files.
 
 For exported parent snapshots, `node scripts/correction-classifier.mjs left.json
 --merge right.json` writes the validated union to `left.json` without changing
-the second input. Conflicting edits to the same receipt require explicit
-resolution; neither mode chooses one parent's evidence over the other.
+the second input. Without a common ancestor, conflicting edits to the same
+receipt require explicit resolution. The Git resolver accepts one-sided edits
+only when the other parent matches the immutable common ancestor.
 
 | Rule ID                  | Saved level | Matching rule within the reviewed feasible level                                     |
 | ------------------------ | ----------- | ------------------------------------------------------------------------------------ |

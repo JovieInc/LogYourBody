@@ -382,6 +382,10 @@ export const endpoints = {
       reason: 'LYB-95, secrets-policy and AGENTS.md reference for Doppler plus GitHub and Vercel.',
     },
     {
+      value: 'https://linear.app/jovie/issue/LYB-111',
+      reason: 'LYB-111 source evidence for bounded weekly training splits and enrollment parity.',
+    },
+    {
       value: 'https://linear.app/jovie/issue/LYB-112',
       reason:
         'LYB-112 source evidence for bounded adaptive recovery learning and the correction ledger.',
