@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getAllTags, getPostsByTag } from '@/lib/blog';
@@ -5,6 +6,21 @@ import { MarketingPage } from '@/components/MarketingPage';
 export const revalidate = false;
 export async function generateStaticParams() {
   return (await getAllTags()).map((tag) => ({ tag: tag.toLowerCase().replace(/\s+/g, '-') }));
+}
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ tag: string }>;
+}): Promise<Metadata> {
+  const { tag } = await params;
+  const exactTag = (await getAllTags()).find(
+    (value) => value.toLowerCase().replace(/\s+/g, '-') === tag,
+  );
+  if (!exactTag) notFound();
+  return {
+    title: `${exactTag} articles`,
+    alternates: { canonical: `/blog/tag/${encodeURIComponent(tag)}` },
+  };
 }
 export default async function TagPage({ params }: { params: Promise<{ tag: string }> }) {
   const { tag } = await params;

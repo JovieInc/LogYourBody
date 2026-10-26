@@ -64,28 +64,130 @@ const RULES = [
   },
 ];
 
+// Marketing-audit regressions require copy-owner review, even without an
+// explicit guarantee. Keep these rules off assistant/evidence transcripts.
+const WEB_RULES = [
+  ...RULES,
+  { id: 'free-trial-claim', pattern: /\bfree trial\b(?!\s+eligibility)|\bdays?\s+free\b/gi },
+  { id: 'genetic-potential-claim', pattern: /\bgenetic potential\b/gi },
+  {
+    id: 'quantified-outcome',
+    pattern:
+      /\b(?:lose|lost|gain|gained|drop|dropped|build|built|burn|burned)\s+(?:up to\s+)?\d+(?:\.\d+)?\s*(?:%|(?:pounds?|lbs?|kg|kilograms?|inches?|cm)\b)/gi,
+  },
+];
+const WEB_BASELINE = 'scripts/knowledge/web-claims-baseline.json';
+const WEB_ROOTS = [
+  'apps/web/src/app',
+  'apps/web/src/components',
+  'apps/web/src/constants',
+  'apps/web/src/lib',
+  'apps/web/content/blog',
+  'shared/legal',
+  'packages/product-registry/src/products',
+];
+
 function isNegated(text, index) {
   const prefix = text.slice(Math.max(0, index - 80), index);
   return (
-    /\bnot\s+(?:(?:a|an|the)\s+)?$/i.test(prefix) ||
+    /\b(?:not|no)\s+(?:(?:a|an|the)\s+)?$/i.test(prefix) ||
     /\b(?:do not|don't|does not|doesn't|did not|didn't|must not|should not|cannot|can't|never|avoid|without)\s+(?:[\w'-]+\s+){0,5}$/i.test(
       prefix,
     )
   );
 }
 
-export function scanClaimText(text) {
+function claimIssues(text, rules) {
   const violations = [];
-  for (const rule of RULES) {
+  for (const rule of rules) {
     rule.pattern.lastIndex = 0;
     for (const match of text.matchAll(rule.pattern)) {
       if (isNegated(text, match.index)) continue;
       if (rule.requiresMedicationContext && !rule.requiresMedicationContext.test(text)) continue;
       const line = text.slice(0, match.index).split('\n').length;
-      violations.push({ rule: rule.id, line });
+      violations.push({
+        rule: rule.id,
+        line,
+        index: match.index,
+        end: match.index + match[0].length,
+      });
     }
   }
   return violations;
+}
+
+export function scanClaimText(text) {
+  return claimIssues(text, RULES).map(({ rule, line }) => ({ rule, line }));
+}
+
+// Variant annotations are setup descriptions, never clinical assurances or
+// universal loading claims. Keep these stricter rules scoped to the catalog.
+const EXERCISE_RULES = [
+  {
+    id: 'exercise-medical-claim',
+    pattern:
+      /\b(?:treat(?:s|ment|ing)?|cur(?:e[sd]?|ing)|diagnos\w*|heal\w*|rehabilitat\w*|therapeutic)\b|\b(?:prevent\w*|reliev\w*|eliminat\w*|reduc\w*|fix\w*)\s+(?:(?:your|the|joint|back|shoulder|knee|risk of)\s+){0,3}(?:pain|injur\w*|discomfort)\b|\b(?:pain|injury|risk)\s+free\b|\bsafe\s+for\s+(?:(?:your|the)\s+)?(?:back|spine|joints|knees|shoulders)\b/gi,
+  },
+  {
+    id: 'zero-axial-load',
+    pattern:
+      /\b(?:zero|no|0)\s+(?:(?:axial|spinal|trunk|back)\s+){1,2}(?:load(?:ing)?|fatigue|demand|stress)\b|\b(?:axial|spinal|trunk)\s+(?:load|fatigue|stress)\s+(?:is\s+)?(?:zero|0|free)\b|\btrunk\s+carries\s+nothing\b/gi,
+  },
+  {
+    id: 'numeric-sfr',
+    pattern:
+      /\b(?:sfr|stimulus\s+to\s+fatigue(?:\s+ratio)?)(?:\s+(?:score|ratio|is|of))?\s*[:=]?\s*\d|\b\d+(?:\.\d+)?(?:\s*\/\s*\d+)?\s+(?:sfr|stimulus\s+to\s+fatigue)\b/gi,
+  },
+];
+
+export function scanExerciseVariantText(text) {
+  // Also inspect snake_case and hyphenated tags as readable words.
+  const normalized = text.replace(/[_-]+/g, ' ');
+  return [
+    ...scanClaimText(text),
+    ...claimIssues(normalized, EXERCISE_RULES).map(({ rule, line }) => ({ rule, line })),
+  ];
+}
+
+function isWebCopyFile(file) {
+  if (
+    /\/(?:__tests__|__fixtures__|fixtures)\//.test(file) ||
+    /\.(?:test|spec|stories|example)\./.test(file) ||
+    file.startsWith('apps/web/src/app/api/')
+  )
+    return false;
+  return (
+    /^apps\/web\/src\/(?:app|components|constants)\/.*\.(?:[cm]?[jt]sx?|mdx?)$/.test(file) ||
+    file === 'apps/web/src/lib/load-legal-docs.ts' ||
+    /^apps\/web\/content\/blog\/.*\.md$/.test(file) ||
+    /^shared\/legal\/(?:privacy-policy|terms-of-service|health-disclosure)\.md$/.test(file) ||
+    file === 'packages/product-registry/src/products/logyourbody.mjs'
+  );
+}
+
+function webFindings({ files, readSource }) {
+  return files.filter(isWebCopyFile).flatMap((file) => {
+    const text = readSource(file);
+    if (file.startsWith('apps/web/content/blog/')) {
+      const frontmatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+      if (frontmatter && /^draft:\s*true\s*$/m.test(frontmatter[1])) return [];
+    }
+    return claimIssues(text, WEB_RULES).map(({ rule, line, index, end }) => {
+      const start = text.lastIndexOf('\n', index - 1) + 1;
+      const nextLine = text.indexOf('\n', end);
+      const statement = text
+        .slice(start, nextLine < 0 ? text.length : nextLine)
+        .trim()
+        .replace(/\s+/g, ' ');
+      return { path: file, key: '[' + rule + '] ' + statement, rule, line };
+    });
+  });
+}
+
+// The correction ratchet calls this on both immutable base and working-tree
+// snapshots before dependencies are installed. Never read/import app code here.
+export function scan(snapshot) {
+  return webFindings(snapshot).map(({ path, key }) => ({ path, key }));
 }
 
 function textValue(value) {
@@ -258,8 +360,71 @@ export async function run(root = ROOT) {
       );
   }
 
+  const variantSeedPath = 'apps/web/src/lib/training/catalog-variant-seed.json';
+  let variantFields = [];
+  try {
+    const seed = JSON.parse(await readFile(path.join(root, variantSeedPath), 'utf8'));
+    variantFields = stringFields(seed);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  for (const { field, text } of variantFields) {
+    for (const issue of scanExerciseVariantText(text))
+      violations.push(variantSeedPath + ':' + field + ' [' + issue.rule + ']');
+  }
+
+  const webFiles = (
+    await Promise.all(WEB_ROOTS.map((directory) => filesUnder(path.join(root, directory))))
+  )
+    .flat()
+    .map((file) => path.relative(root, file).split(path.sep).join('/'))
+    .filter(isWebCopyFile);
+  const webSources = new Map(
+    await Promise.all(
+      webFiles.map(async (file) => [file, await readFile(path.join(root, file), 'utf8')]),
+    ),
+  );
+  const findings = webFindings({ files: webFiles, readSource: (file) => webSources.get(file) });
+  let baseline = { schema: 'lyb.correction-ratchet/v1', findings: [] };
+  try {
+    baseline = JSON.parse(await readFile(path.join(root, WEB_BASELINE), 'utf8'));
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  if (baseline.schema !== 'lyb.correction-ratchet/v1' || !Array.isArray(baseline.findings))
+    throw new Error('Invalid web claims baseline');
+  const allowed = new Map();
+  for (const finding of baseline.findings) {
+    if (
+      Object.keys(finding).sort().join(',') !== 'key,path' ||
+      typeof finding.path !== 'string' ||
+      typeof finding.key !== 'string'
+    )
+      throw new Error('Invalid web claims baseline finding');
+    const key = JSON.stringify([finding.path, finding.key]);
+    allowed.set(key, (allowed.get(key) ?? 0) + 1);
+  }
+  for (const finding of findings) {
+    const key = JSON.stringify([finding.path, finding.key]);
+    const location = finding.path + ':' + finding.line + ' [' + finding.rule + ']';
+    if (allowed.get(key) > 0) {
+      allowed.set(key, allowed.get(key) - 1);
+      process.stderr.write(
+        '::warning::Existing web claim ' +
+          location +
+          '; copy owner: docs/compliance/web-claims-owner-handoff.md\n',
+      );
+    } else violations.push(location);
+  }
+  if ([...allowed.values()].some((count) => count > 0))
+    violations.push('Stale web claims baseline; remove resolved findings from ' + WEB_BASELINE);
+
   if (violations.length)
-    throw new Error('Claims lint failed:\n' + [...new Set(violations)].join('\n'));
+    throw new Error(
+      'Claims lint failed:\n' +
+        [...new Set(violations)].join('\n') +
+        '\nRoute web findings to the copy owner via docs/compliance/web-claims-owner-handoff.md; do not rewrite copy as part of lint maintenance.',
+    );
   process.stdout.write(
     'Claims lint passed; scanned ' +
       skillFiles.length +
@@ -269,7 +434,11 @@ export async function run(root = ROOT) {
       transcriptCount +
       ' assistant eval outputs, and ' +
       storefrontSources.length +
-      ' storefront text fields/files.\n',
+      ' storefront text fields/files, ' +
+      variantFields.length +
+      ' exercise variant text fields, and ' +
+      webFiles.length +
+      ' web copy sources.\n',
   );
 }
 

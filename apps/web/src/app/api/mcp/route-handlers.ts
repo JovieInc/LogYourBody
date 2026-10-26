@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
 import type { ChatRateLimitResult } from '@/lib/ports/chat-conversations';
 import type { NativeProductRecordsPort } from '@/lib/ports/native-product-records';
+import type { TrainingRevisionsPort } from '@/lib/ports/training-revisions';
+import type { WeightLifecyclePort } from '@/lib/metrics/weight-lifecycle';
 import { verifyAccessToken, type JwksSource } from '@/lib/mcp/access-token';
 import { mcpResourceUrl, protectedResourceMetadata } from '@/lib/mcp/contract';
 import { handleMcpRequest, unauthenticatedResult, type McpHttpResult } from '@/lib/mcp/handler';
 
 type McpRouteDependencies = {
+  revisions?: TrainingRevisionsPort;
+  delegatedEnabled?: () => boolean;
+  metricsEnabled?: () => boolean;
+  weight?: WeightLifecyclePort;
   enabled: () => boolean;
   issuer: string;
   /** Pinned in production so token audiences never follow a request Host header. */
@@ -59,6 +65,10 @@ export function createMcpRouteHandlers(dependencies: McpRouteDependencies) {
           deps: {
             resourceUrl,
             records: dependencies.records,
+            revisions: dependencies.revisions,
+            delegatedEnabled: dependencies.delegatedEnabled,
+            metricsEnabled: dependencies.metricsEnabled,
+            weight: dependencies.weight,
             reserveRequest: dependencies.reserveRequest,
             now: dependencies.now,
             createId: dependencies.createId,
@@ -83,6 +93,7 @@ export function createMcpRouteHandlers(dependencies: McpRouteDependencies) {
         protectedResourceMetadata({
           resourceUrl: resourceFor(request),
           issuer: dependencies.issuer,
+          metrics: dependencies.metricsEnabled?.() === true,
         }),
         { headers: { ...CORS, 'cache-control': 'no-store' } },
       );

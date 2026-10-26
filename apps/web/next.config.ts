@@ -1,12 +1,17 @@
 import type { NextConfig } from 'next';
 import bundleAnalyzer from '@next/bundle-analyzer';
+import { withSentryConfig } from '@sentry/nextjs/config';
 import { version } from './package.json';
+import { logYourBody } from '@jovieinc/product-registry';
 import { cspReportOnlyDirectives } from './src/lib/generated/csp.generated';
 
 // Bundle analyzer configuration
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });
+
+const sentryRelease =
+  process.env.NEXT_PUBLIC_SENTRY_RELEASE || process.env.VERCEL_GIT_COMMIT_SHA || version;
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@jovie/ui'],
@@ -55,6 +60,24 @@ const nextConfig: NextConfig = {
   // Environment variables
   env: {
     NEXT_PUBLIC_APP_VERSION: version,
+    // Release identity for Sentry events and sourcemap upload: the deployed commit.
+    NEXT_PUBLIC_SENTRY_RELEASE: sentryRelease,
+    // Lets browser analytics derive its tier from the Vercel environment.
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? '',
+  },
+
+  async redirects() {
+    return [
+      {
+        // The Vercel domain redirect answers the apex with 307 before this app
+        // runs. When a request does reach Next, send that host to www with 308.
+        // Dots are escaped because `has` host values are regexes.
+        source: '/:path*',
+        has: [{ type: 'host', value: logYourBody.identity.domain.replace(/\./g, '\\.') }],
+        destination: `${logYourBody.links.home}/:path*`,
+        permanent: true,
+      },
+    ];
   },
 
   // RFC 9728 protected-resource metadata for the MCP server (see src/lib/mcp/contract.ts).
@@ -138,4 +161,23 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withBundleAnalyzer(nextConfig);
+const configWithAnalyzer = withBundleAnalyzer(nextConfig);
+
+// Sourcemaps are uploaded to Sentry only when the build has upload credentials
+// (Vercel build env: SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT). Without them
+// the runtime SDK still reports, just with minified frames.
+const shouldUploadSourcemaps = Boolean(
+  process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT,
+);
+
+export default shouldUploadSourcemaps
+  ? withSentryConfig(configWithAnalyzer, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: true,
+      release: { name: sentryRelease },
+      sourcemaps: { deleteSourcemapsAfterUpload: true },
+      telemetry: false,
+    })
+  : configWithAnalyzer;

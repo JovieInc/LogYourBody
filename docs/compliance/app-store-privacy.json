@@ -1,0 +1,347 @@
+{
+  "schema": "lyb.app-store-privacy/v1",
+  "version": 1,
+  "reviewedAt": "2026-10-25",
+  "reviewedNativeSourceCommit": "3a6516fb61f6bdc2af76b5a980553640a33679e9",
+  "ascComparison": {
+    "status": "pending",
+    "evidence": null
+  },
+  "dataCollected": true,
+  "dataUsedForTracking": false,
+  "dataTypes": [
+    {
+      "type": "Health",
+      "data": "Weight, body fat percentage, height, body measurements, goals, imported body-composition results, medication logs and training pain/safety feedback and associated sample/source metadata. Health information supplied to the coach or included in submitted feedback can also leave the device.",
+      "purposes": ["App Functionality", "Product Personalization"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "First-party APIs hosted on Vercel; Neon stores account-owned product records.",
+        "OpenAI receives minimized authorized coach context through the first-party chat adapter.",
+        "Sentry receives submitted bug-report text or screenshots that may contain health information; automatic errors apply the error redactor. Health values are not approved analytics properties."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/HealthKitManager+Part01.swift",
+        "apps/ios/LogYourBody/Services/ProductAPIClient.swift",
+        "apps/ios/LogYourBody/Models/BodyMetrics.swift",
+        "apps/web/src/lib/chat/context.ts",
+        "apps/web/src/lib/adapters/openai-chat-model-adapter.ts",
+        "apps/ios/LogYourBody/Services/BugReportManager.swift",
+        "apps/ios/LogYourBody/Services/TrainingService.swift"
+      ]
+    },
+    {
+      "type": "Fitness",
+      "data": "Step counts from Apple Health; activity level and engine-led training plans, sessions and completed sets.",
+      "purposes": ["App Functionality", "Product Personalization"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "First-party APIs hosted on Vercel; Neon stores account-owned product records.",
+        "OpenAI receives authorized coach context through the first-party adapter; the deterministic engine owns prescriptions."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/HealthKitManager+Part01.swift",
+        "apps/ios/LogYourBody/Services/ProductAPIClient.swift",
+        "apps/ios/LogYourBody/Services/VoiceCaptureService.swift",
+        "apps/web/src/lib/chat/context.ts",
+        "apps/ios/LogYourBody/Services/TrainingService.swift"
+      ]
+    },
+    {
+      "type": "Sensitive Info",
+      "data": "Training enrollment safety confirmation includes an aggregate attestation of no pregnancy/postpartum, eating-disorder risk or medical restriction. Disclosed conservatively as sensitive information even though the native API sends a combined safetyConfirmed boolean, not a condition-by-condition history.",
+      "purposes": ["App Functionality"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "First-party training APIs hosted on Vercel and Neon retain the account-owned enrollment setup. The safety attestation is not an approved analytics property."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Views/TrainingViews.swift",
+        "apps/ios/LogYourBody/Services/TrainingService.swift",
+        "apps/web/src/lib/training/types.ts"
+      ]
+    },
+    {
+      "type": "Name",
+      "data": "Account/profile display name, including Sign in with Apple when provided; name attached to submitted bug reports.",
+      "purposes": ["App Functionality"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Jovie Better Auth handles sign-in; Neon stores the profile through first-party APIs.",
+        "Sentry receives the name with explicitly submitted feedback."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/AuthManager.swift",
+        "apps/ios/LogYourBody/Services/ProductAPIClient.swift",
+        "apps/ios/LogYourBody/Services/BugReportManager.swift"
+      ]
+    },
+    {
+      "type": "Email Address",
+      "data": "Account email, including Apple private relay addresses; email attached to submitted bug reports.",
+      "purposes": ["App Functionality"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Jovie Better Auth handles sign-in; Neon stores account contact information.",
+        "Sentry receives the email with explicitly submitted feedback."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/AuthManager.swift",
+        "apps/ios/LogYourBody/Services/BugReportManager.swift"
+      ]
+    },
+    {
+      "type": "Photos or Videos",
+      "data": "Uploaded progress photos and optional screenshots attached to submitted bug reports; photo date/orientation and record associations. No blanket collection of the photo library.",
+      "purposes": ["App Functionality"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Cloudflare R2 stores synced photos through first-party upload URLs; Neon stores record associations.",
+        "Sentry receives screenshots when the user submits a report with the attachment selected."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/PhotoUploadManager.swift",
+        "apps/ios/LogYourBody/Services/BugReportManager.swift",
+        "shared/legal/privacy-policy.md"
+      ]
+    },
+    {
+      "type": "User ID",
+      "data": "Jovie subject/account identifier, profile IDs and RevenueCat app user ID used for account ownership and entitlement reconciliation.",
+      "purposes": ["App Functionality"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Jovie Better Auth, first-party APIs/Neon and RevenueCat use account IDs for authentication, sync and subscriptions.",
+        "AnalyticsService sends no app-supplied account identity to Statsig; ErrorTrackingService redacts account identity on automatic error events."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/AuthManager.swift",
+        "apps/ios/LogYourBody/Services/RevenueCatManager+Lifecycle.swift",
+        "apps/ios/LogYourBody/Services/AnalyticsService.swift",
+        "apps/ios/LogYourBody/Services/ErrorTrackingService.swift"
+      ]
+    },
+    {
+      "type": "Device ID",
+      "data": "Statsig SDK-generated stable installation identifier; device/source identifiers carried with synced HealthKit samples. Do not equate an anonymous SDK identifier with de-identified data.",
+      "purposes": ["App Functionality", "Analytics"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Statsig uses its stable ID for feature assignment, exposures and product analytics even with userID nil.",
+        "First-party APIs/Neon store health sample source/device metadata. Review bundled diagnostic and subscription SDK metadata with the archive."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/AnalyticsService.swift",
+        "apps/ios/LogYourBody/Models/BodyMetrics.swift",
+        "apps/ios/LogYourBody/Services/HealthKitManager+Part01.swift"
+      ]
+    },
+    {
+      "type": "Purchase History",
+      "data": "Subscription purchases, restores, entitlement status and subscription phase transitions; no payment card or bank details.",
+      "purposes": ["App Functionality", "Analytics"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Apple StoreKit and RevenueCat process subscriptions and entitlements.",
+        "Statsig receives allowlisted purchase/restore markers and fixed subscription-phase enums, without transaction receipts or account IDs."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/RevenueCatManager.swift",
+        "apps/ios/LogYourBody/Services/RevenueCatManager+Lifecycle.swift",
+        "apps/ios/LogYourBody/Services/RevenueCatManager+Part02.swift",
+        "apps/ios/LogYourBody/Services/AnalyticsService.swift"
+      ]
+    },
+    {
+      "type": "Product Interaction",
+      "data": "Allowlisted app launches, screen/flow actions, onboarding and purchase/restore markers, plus SDK feature-gate exposures and SDK-supplied interaction metadata. No numeric health values, free text, photo contents or app-supplied identity in app event properties.",
+      "purposes": ["App Functionality", "Analytics"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Statsig evaluates gates, records exposures and analyzes app events. The enum allowlist applies to app event payloads, not all SDK metadata.",
+        "Sentry breadcrumbs may record technical screen/operation context for troubleshooting."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/AnalyticsService.swift",
+        "apps/ios/LogYourBody/Services/ErrorTrackingService.swift"
+      ]
+    },
+    {
+      "type": "Crash Data",
+      "data": "Crash reports and captured application errors; automatic events apply the error redactor, disable default PII and clear event.user.",
+      "purposes": ["App Functionality"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Sentry processes crash/error reports. Linkage is conservatively Yes because clearing account fields alone does not prove SDK/device de-identification."
+      ],
+      "sources": ["apps/ios/LogYourBody/Services/ErrorTrackingService.swift"]
+    },
+    {
+      "type": "Performance Data",
+      "data": "Sampled traces and technical performance measurements when SENTRY_TRACES_SAMPLE_RATE is enabled; disclose for the supported release configuration.",
+      "purposes": ["App Functionality"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Sentry processes enabled performance traces. A zero sample rate in one environment does not justify omitting a configurable release path."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/ErrorTrackingService.swift",
+        "apps/ios/LogYourBody/Info.plist"
+      ]
+    },
+    {
+      "type": "Other Diagnostic Data",
+      "data": "App version/build, OS/device context, technical operation tags, redacted breadcrumbs, SDK initialization/network diagnostics and retained service security logs (including IP addresses when retained). No IP-based location inference is asserted.",
+      "purposes": ["App Functionality", "Analytics"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Sentry processes diagnostic events; Statsig SDK diagnostics support gate delivery and analytics.",
+        "First-party hosting/auth processors may retain security and service logs."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/ErrorTrackingService.swift",
+        "apps/ios/LogYourBody/Services/AnalyticsService.swift",
+        "shared/legal/privacy-policy.md"
+      ]
+    },
+    {
+      "type": "Customer Support",
+      "data": "User-submitted bug-report message, associated name/email and optional screenshot. Disclosed without relying on Apple's optional support-form exception.",
+      "purposes": ["App Functionality"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "Sentry receives user-initiated feedback through SentryFeedback, separately from automatic error-event redaction."
+      ],
+      "sources": ["apps/ios/LogYourBody/Services/BugReportManager.swift"]
+    },
+    {
+      "type": "Other User Content",
+      "data": "Saved metric notes, coach messages and voice transcripts; response text sent for requested voice playback. Raw microphone audio is not sent by the native first-party voice API.",
+      "purposes": ["App Functionality", "Product Personalization"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "First-party APIs hosted on Vercel; Neon stores account-owned product records.",
+        "OpenAI processes coach messages/context through the first-party model adapter.",
+        "Configured ElevenLabs or Fish Audio speech adapter receives response text only for requested playback; submitted support text is sent to Sentry."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Models/BodyMetrics.swift",
+        "apps/ios/LogYourBody/Services/ChatService.swift",
+        "apps/ios/LogYourBody/Services/VoiceCaptureService.swift",
+        "apps/web/src/lib/adapters/openai-chat-model-adapter.ts",
+        "apps/web/src/lib/voice/providers/elevenlabs.ts",
+        "apps/web/src/lib/voice/providers/fish-audio.ts"
+      ]
+    },
+    {
+      "type": "Other Data Types",
+      "data": "Date of birth (including optional Apple Health import), gender, profile preferences and consent timestamps. These are account profile fields; no inference of immutable aesthetic preferences is authorized.",
+      "purposes": ["App Functionality"],
+      "linkedToUser": true,
+      "tracking": false,
+      "thirdPartyUse": [
+        "First-party APIs hosted on Vercel; Neon stores account-owned product records."
+      ],
+      "sources": [
+        "apps/ios/LogYourBody/Services/HealthKitManager+Part01.swift",
+        "apps/ios/LogYourBody/Services/ProductAPIClient.swift",
+        "apps/ios/LogYourBody/Services/AuthManager.swift"
+      ]
+    }
+  ],
+  "healthKit": [
+    {
+      "variable": "weightType",
+      "kind": "Quantity",
+      "identifier": "bodyMass",
+      "read": true,
+      "write": true,
+      "dataType": "Health"
+    },
+    {
+      "variable": "bodyFatType",
+      "kind": "Quantity",
+      "identifier": "bodyFatPercentage",
+      "read": true,
+      "write": true,
+      "dataType": "Health"
+    },
+    {
+      "variable": "heightType",
+      "kind": "Quantity",
+      "identifier": "height",
+      "read": true,
+      "write": false,
+      "dataType": "Health"
+    },
+    {
+      "variable": "dateOfBirthType",
+      "kind": "Characteristic",
+      "identifier": "dateOfBirth",
+      "read": true,
+      "write": false,
+      "dataType": "Other Data Types"
+    },
+    {
+      "variable": "stepCountType",
+      "kind": "Quantity",
+      "identifier": "stepCount",
+      "read": true,
+      "write": false,
+      "dataType": "Fitness"
+    }
+  ],
+  "usageDescriptions": {
+    "NSHealthShareUsageDescription": {
+      "text": "LogYourBody uses HealthKit to read your weight and body composition data and sync it with your profile.",
+      "dataTypes": ["Health", "Fitness", "Other Data Types"]
+    },
+    "NSHealthUpdateUsageDescription": {
+      "text": "LogYourBody uses HealthKit to save your weight and body fat measurements.",
+      "dataTypes": ["Health"]
+    },
+    "NSMicrophoneUsageDescription": {
+      "text": "Voice input uses the microphone so you can talk to your coach.",
+      "dataTypes": ["Other User Content"]
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "text": "Speech recognition turns your voice into text for your coach.",
+      "dataTypes": ["Other User Content"]
+    },
+    "NSFaceIDUsageDescription": {
+      "text": "LogYourBody uses Face ID to secure your personal health data and progress photos.",
+      "dataTypes": ["On-device only"]
+    },
+    "NSCameraUsageDescription": {
+      "text": "LogYourBody uses the camera to capture progress photos for tracking your fitness journey.",
+      "dataTypes": ["Photos or Videos"]
+    },
+    "NSPhotoLibraryUsageDescription": {
+      "text": "LogYourBody needs access to scan your photo library for progress photos to import.",
+      "dataTypes": ["Photos or Videos"]
+    },
+    "NSPhotoLibraryAddUsageDescription": {
+      "text": "LogYourBody saves your shared body score images to your photo library.",
+      "dataTypes": ["On-device only"]
+    },
+    "NSSiriUsageDescription": {
+      "text": "LogYourBody uses Siri to log and read your body metrics when you ask.",
+      "dataTypes": ["Health"]
+    }
+  }
+}

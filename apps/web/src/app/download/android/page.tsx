@@ -6,6 +6,7 @@ import { MarketingPage } from '@/components/MarketingPage';
 export const revalidate = false;
 
 export const metadata: Metadata = {
+  alternates: { canonical: '/download/android' },
   title: 'Android availability',
   description: 'LogYourBody is an iPhone app. There is no Android release available.',
 };

@@ -1,14 +1,10 @@
-import type { Metadata } from 'next'
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Download LogYourBody',
-  description: 'Download LogYourBody - The most advanced body composition tracking app. Available on iOS and Android.',
-}
+  description:
+    'Download LogYourBody - The most advanced body composition tracking app. Available on iOS and Android.',
+};
 
-export default function DownloadLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return children
+export default function DownloadLayout({ children }: { children: React.ReactNode }) {
+  return children;
 }

@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, readFileSync, realpathSync } from 'node:fs';
+import { appendFileSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { planCorrectionIssues } from './correction-recurrence.mjs';
+import { classifyCorrection, LEVELS } from './correction-classification.mjs';
 
 export const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 export const LEDGER_PATH = 'packages/shared-lib/corrections.json';
-export const LEVELS = ['codebase', 'static', 'prose', 'human', 'unclassified'];
+export { LEVELS } from './correction-classification.mjs';
 
 export function readSource(path, { root = ROOT, ref } = {}) {
   assert.equal(typeof path, 'string', 'invalid guard path');
@@ -32,13 +34,18 @@ function fraction(mechanized, total) {
   return { mechanized, total, percent: total ? (100 * mechanized) / total : null };
 }
 
-export function coverageReport(receipts, readGuard = readSource) {
+export function coverageReport(
+  receipts,
+  readGuard = readSource,
+  { requireClassification = false } = {},
+) {
   // Share the existing receipt contract and recurrence fingerprint identity.
   planCorrectionIssues(receipts);
   const rules = new Map();
   for (const receipt of receipts) {
     const fingerprint = receipt.fingerprint.trim().toLowerCase().replace(/\s+/g, '-');
-    const level = receipt.level ?? 'unclassified';
+    const classification = classifyCorrection(receipt, requireClassification);
+    const { level } = classification;
     assert.ok(LEVELS.includes(level), 'invalid correction level');
     const guard = receipt.guard ?? null;
     if (guard) {
@@ -52,8 +59,9 @@ export function coverageReport(receipts, readGuard = readSource) {
       );
     }
     const annotation = JSON.stringify({
-      level,
-      guard: guard && { path: guard.path, anchor: guard.anchor },
+      ...classification,
+      guard: guard && { path: guard.path, anchor: guard.anchor, ratchet: guard.ratchet },
+      proseOnlyReason: receipt.proseOnlyReason ?? null,
     });
     const previous = rules.get(fingerprint);
     assert.ok(
@@ -69,9 +77,30 @@ export function coverageReport(receipts, readGuard = readSource) {
         mechanized = false;
       }
     }
-    rules.set(fingerprint, { fingerprint, level, mechanized, annotation });
+    const receipts = previous?.receipts ?? new Map();
+    const source = new URL(receipt.source).href;
+    receipts.set(source, {
+      source,
+      correction: receipt.correction.trim(),
+      mechanization: receipt.mechanization.trim(),
+    });
+    rules.set(fingerprint, {
+      fingerprint,
+      ...classification,
+      mechanized,
+      annotation,
+      guard,
+      proseOnlyReason: receipt.proseOnlyReason ?? null,
+      receipts,
+    });
   }
-  const entries = [...rules.values()].sort((a, b) => a.fingerprint.localeCompare(b.fingerprint));
+  const entries = [...rules.values()]
+    .sort((a, b) => a.fingerprint.localeCompare(b.fingerprint))
+    .map(({ annotation: _annotation, receipts, ...rule }) => ({
+      ...rule,
+      receipts: [...receipts.values()].sort((a, b) => a.source.localeCompare(b.source)),
+      recurrence: { receiptCount: receipts.size, repeatCount: receipts.size - 1 },
+    }));
   return {
     schema: 'lyb.correction-coverage/v1',
     repository: 'JovieInc/LogYourBody',
@@ -83,8 +112,31 @@ export function coverageReport(receipts, readGuard = readSource) {
         return [level, fraction(members.filter((rule) => rule.mechanized).length, members.length)];
       }),
     ),
-    rules: entries.map(({ annotation: _annotation, ...rule }) => rule),
+    rules: entries,
   };
+}
+
+export function guardCoverageReport(receipts, readGuard = readSource, options) {
+  const report = coverageReport(receipts, readGuard, options);
+  for (const receipt of receipts) {
+    const fingerprint = receipt.fingerprint.trim().toLowerCase().replace(/\s+/g, '-');
+    const rule = report.rules.find((entry) => entry.fingerprint === fingerprint);
+    if (receipt.guard) {
+      assert.ok(rule.mechanized, `guard coverage: missing guard anchor for ${fingerprint}`);
+      assert.ok(
+        receipt.proseOnlyReason == null,
+        `guard coverage: guarded lesson cannot be prose-only: ${fingerprint}`,
+      );
+    } else {
+      assert.ok(
+        ['prose', 'human'].includes(rule.level) &&
+          typeof receipt.proseOnlyReason === 'string' &&
+          receipt.proseOnlyReason.trim(),
+        `guard coverage: guard or prose-only reason required for ${fingerprint}`,
+      );
+    }
+  }
+  return report;
 }
 
 export function assertNoRegression(current, baseline) {
@@ -103,6 +155,12 @@ export function assertNoRegression(current, baseline) {
   for (const before of baseline.rules) {
     const after = current.rules.find((rule) => rule.fingerprint === before.fingerprint);
     assert.ok(after, `correction coverage regression: removed rule ${before.fingerprint}`);
+    for (const receipt of before.receipts) {
+      assert.ok(
+        after.receipts.some(({ source }) => source === receipt.source),
+        `correction ledger regression: removed receipt for ${before.fingerprint}`,
+      );
+    }
     if (before.mechanized)
       assert.ok(
         after.mechanized && LEVELS.indexOf(after.level) <= LEVELS.indexOf(before.level),
@@ -111,7 +169,49 @@ export function assertNoRegression(current, baseline) {
   }
 }
 
+export function mergeCorrectionLedgers(base, ours, theirs, readGuard = readSource) {
+  const reports = [base, ours, theirs].map((rows) => coverageReport(rows, readGuard));
+  const [original, left, right] = [base, ours, theirs].map((rows) => {
+    const indexed = new Map();
+    for (const row of rows) {
+      const key = JSON.stringify([
+        row.fingerprint.trim().toLowerCase().replace(/\s+/g, '-'),
+        new URL(row.source).href,
+      ]);
+      assert.ok(!indexed.has(key), `ledger merge: duplicate receipt ${key}`);
+      indexed.set(key, row);
+    }
+    return indexed;
+  });
+  for (const key of original.keys()) {
+    assert.ok(left.has(key) && right.has(key), `ledger merge: removed receipt ${key}`);
+  }
+  const merged = [...new Set([...left.keys(), ...right.keys()])].map((key) => {
+    const a = left.get(key);
+    const b = right.get(key);
+    if (!a) return b;
+    if (!b || isDeepStrictEqual(a, b)) return a;
+    // Independent additions merge; concurrent receipt edits require explicit resolution.
+    if (isDeepStrictEqual(a, original.get(key))) return b;
+    assert.ok(
+      isDeepStrictEqual(b, original.get(key)),
+      `ledger merge: concurrent receipt edits ${key}`,
+    );
+    return a;
+  });
+  const report = guardCoverageReport(merged, readGuard, { requireClassification: true });
+  for (const parent of reports) assertNoRegression(report, parent);
+  return merged;
+}
+
 export function renderCoverage(report) {
+  const cell = (value) =>
+    value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('|', '&#124;')
+      .replace(/\s+/g, ' ');
   const row = (name, value) =>
     `| ${name} | ${value.mechanized}/${value.total} | ${value.percent === null ? 'N/A (no rules)' : `${value.percent.toFixed(2)}%`} |`;
   return [
@@ -126,16 +226,87 @@ export function renderCoverage(report) {
     'Only codebase/static rules with a retained source anchor count as mechanized.',
     'Source linkage is not proof of guard execution. An empty ledger is N/A.',
     '',
+    '| Fingerprint | Route | Assessment in priority order | Guard or prose-only reason | Recurrence |',
+    '| --- | --- | --- | --- | --- |',
+    ...report.rules.map(
+      (rule) =>
+        `| ${rule.fingerprint} | ${rule.level} | ${cell(
+          rule.considered.length
+            ? rule.considered
+                .map(
+                  ({ level, feasible, rationale }) =>
+                    `${level} (${feasible ? 'feasible' : 'not feasible'}): ${rationale}`,
+                )
+                .join('; ')
+            : 'Historical annotation; no feasibility assessment.',
+        )} | ${cell(rule.guard ? `${rule.guard.path}: ${rule.guard.anchor}` : (rule.proseOnlyReason ?? 'No retained guard.'))} | ${rule.recurrence.receiptCount} receipts; ${rule.recurrence.repeatCount} repeats |`,
+    ),
+    '',
+    '| Fingerprint | Lesson | Source |',
+    '| --- | --- | --- |',
+    ...report.rules.flatMap((rule) =>
+      rule.receipts.map(
+        (receipt) =>
+          `| ${rule.fingerprint} | ${cell(receipt.correction)} | ${cell(receipt.source)} |`,
+      ),
+    ),
+    '',
   ].join('\n');
 }
 
+export function assertLedgerMergeReady(root) {
+  const otherConflicts = execFileSync('git', ['diff', '--name-only', '--diff-filter=U', '-z'], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+    .split('\0')
+    .filter((path) => path && path !== LEDGER_PATH);
+  assert.equal(
+    otherConflicts.length,
+    0,
+    `ledger merge: resolve other conflicts first: ${otherConflicts.join(', ')}`,
+  );
+  const staged = execFileSync(
+    'git',
+    ['diff', '--cached', '--no-ext-diff', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  // Staging a file does not prove its conflict markers were resolved.
+  assert.doesNotMatch(
+    staged,
+    /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,
+    'ledger merge: resolve staged conflict markers first',
+  );
+}
+
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
+  if (argv.length === 1 && argv[0] === '--merge-ledger') {
+    assertLedgerMergeReady(root);
+    const stages = [1, 2, 3].map((stage) =>
+      JSON.parse(
+        execFileSync('git', ['show', `:${stage}:${LEDGER_PATH}`], {
+          cwd: root,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }),
+      ),
+    );
+    const merged = mergeCorrectionLedgers(stages[0], stages[2], stages[1], (path) =>
+      readSource(path, { root }),
+    );
+    readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+    writeFileSync(resolve(root, LEDGER_PATH), `${JSON.stringify(merged, null, 2)}\n`);
+    argv = [];
+  }
   assert.ok(
     argv.length === 0 || (argv.length === 2 && argv[0] === '--base-ref'),
-    'usage: correction-coverage.mjs [--base-ref <sha|origin/main>]',
+    'usage: correction-coverage.mjs [--base-ref <sha|origin/main> | --merge-ledger]',
   );
-  const current = coverageReport(JSON.parse(readSource(LEDGER_PATH, { root })), (path) =>
-    readSource(path, { root }),
+  const current = guardCoverageReport(
+    JSON.parse(readSource(LEDGER_PATH, { root })),
+    (path) => readSource(path, { root }),
+    { requireClassification: true },
   );
   if (argv.length) {
     const ref = argv[1];

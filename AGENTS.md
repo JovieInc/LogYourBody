@@ -583,6 +583,23 @@ For iOS tests, see "Working with the iOS App" section above.
 
 ## Working with AI Agents
 
+### Mechanize corrections in the same PR (LYB-208)
+
+For every LYB correction, record its source and classification in
+`packages/shared-lib/corrections.json`. On the first receipt, cloud agents must
+implement a codebase fix or deterministic lint/test/CI guard when that level is
+feasible, wire it into the existing required check, and prove a regression fails
+without the change and passes with it. Do not wait for a repeated correction.
+Prose/human-only corrections require the explicit rationale enforced by coverage CI.
+
+If a new guard finds existing violations, warn on a reviewed baseline and fail
+new violations immediately. Baselines may only shrink against the exact Git base;
+remove resolved findings in the same PR. Use the executable guard contract in
+[`docs/engineering/correction-mechanization.md`](docs/engineering/correction-mechanization.md).
+Never downgrade an existing hard gate to warnings. Keep mechanization PRs ready
+for the existing automatic merge queue once required checks pass. A harness that
+owns push/PR operations retains that ownership; do not create a second shipper.
+
 ### Context Files
 
 - Reference this `agents.md` for _all_ AI-assistant guidance. Other docs (e.g., `CLAUDE.md`, `.windsurf/rules/ios-rules.md`) now simply point back here.

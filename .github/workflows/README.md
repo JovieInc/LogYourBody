@@ -9,7 +9,7 @@ This directory supports fast trunk-based shipping. Required checks should prove 
 Primary pull request workflow for `main`.
 
 - Pull requests target `main`; `preview`, `production`, and `dev` are not active development branches. Pull requests and merge groups targeting `production` also run so the active "Production" ruleset's required `CI Summary` check cannot deadlock.
-- `Detect Changes`: path filter for web/package and iOS changes (`.github/scripts/detect-changes.sh`, tested by `detect-changes.test.mjs`). A merge group diffs against its own base (the previous group's head), so a web-only group never inherits a queued iOS PR; iOS runs only when a file the iOS jobs read changed, and an unknown diff selects everything. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`.
+- `Detect Changes`: path filter for web/package and iOS changes (`.github/scripts/detect-changes.sh`, tested by `detect-changes.test.mjs`). A merge group diffs against its own base (the previous group's head), so a web-only group never inherits a queued iOS PR; iOS runs only when a file the iOS jobs read changed, and an unknown diff selects everything. Also audits the live repository branch rulesets (`verify-ruleset-targets.mjs`) so quoted or missing ref targets cannot silently unprotect `main`/`production`. On every pull request, merge group, and main push it runs `python3 scripts/repository_docs.py` with no `continue-on-error`, so a stale `docs/REPOSITORY_SOURCES.md` fails CI Summary. The shadow workflow remains the nonblocking coverage qualification and is not weakened.
 - `JavaScript/TypeScript`: runs `pnpm install`, `pnpm lint`, `pnpm typecheck`, and `pnpm test:ci` when web, package, or CI harness files change. The job uses no privileged data-provider configuration, so pull request CI can verify buildability without credentials.
 - `iOS` (Unit) and `iOS Launch Quality Gate`: each runs once, where it still gates the merge. Launch Quality runs on the PR head once the PR is ready for review (drafts defer it; `ready_for_review` reruns CI). Unit runs in the merge group, on the exact tree that lands; the group also runs Launch Quality when the entry's PR head has no passing Launch Quality run (e.g. entries enqueued before this split). While the `post-merge-lq-red` issue is open (see `ios-post-merge-quality.yml`), iOS merge groups run Launch Quality too, and an unknown hold state counts as held. A web-only change runs neither.
 - `CI Summary`: aggregate required status. Branch protection should depend on this stable aggregate name rather than individual implementation jobs.
@@ -82,9 +82,13 @@ Historically it opened a repair pull request when the primary `CI` workflow fail
 
 Runs after changes land on `main`. The web job installs, validates, builds, and deploys a prebuilt Vercel production artifact from GitHub Actions. Vercel Git deployments stay disabled on `main`, while non-main branches can produce the required Preview deployments through the existing GitHub integration.
 
-### `web-release-loop.yml`
+Before migrations and the build, `.github/scripts/verify-public-build-env.mjs env .vercel/.env.production.local` fails the deploy if any `NEXT_PUBLIC_*` value in the pulled environment is the Vercel sensitive-variable placeholder `[SENSITIVE]` (`vercel pull` writes that literal for sensitive variables, and public values are inlined into browser code), or if `NEXT_PUBLIC_STATSIG_CLIENT_KEY` is missing, empty or a placeholder. After `vercel build`, the same script (`bundle .vercel/output/static apps/web/.next/static`) scans the built client output for `[SENSITIVE]` before anything is deployed. Failures name the variable or file and never print values. Fix by making the variable non-sensitive in Vercel or injecting it from a GitHub secret; public client keys must not be marked sensitive.
 
-Reusable/manual web release loop. This is no longer the automatic main-branch release path.
+For the GitHub build, set the repository Actions secret `NEXT_PUBLIC_STATSIG_CLIENT_KEY` to the web project's Statsig **client SDK key** (`client-` prefix). Deploy passes it only to the environment guard, which replaces the pulled Statsig definitions in `.vercel/.env.production.local` after validating the full effective environment. This prevents Vercel's later dotenv load from restoring the redacted value. An unset secret retains the pulled Vercel value; a missing, placeholder, server or console key still blocks deployment. No key values are logged or passed as command arguments. The bundle guard remains blocking. After redeploy, capture `/` and `/download/ios` in a browser and require Statsig initialize and `rgstr` HTTP 200 with no `log_event_failed` or `sdk_exception` requests before closing LYB-232/LYB-226.
+
+After deployment, `.github/scripts/web-production-smoke.mjs` checks the Vercel deployment URL and the production host from the product registry, following redirects. Both must return 200 for `/`, `/privacy`, `/terms`, `/health-disclosure`, `/support`, `/download/ios`, `/robots.txt`, and `/sitemap.xml`. Public pages must have a product title and a production canonical URL. The waitlist POST sends only a filled `website` honeypot (no email) and requires 202 with `success: true`, without persisting a registration. Each check has three attempts with bounded backoff and a 10-second request timeout; results appear in the run summary.
+
+Smoke failure fails Deploy and is filed to Linear as `remediation:web-deploy` by the existing `remediation-signal.yml` router, subject to its intake switch and credential availability. The unused `web-release-loop.yml` was removed; `deploy.yml` owns the production path. To rerun the smoke locally: `DEPLOYMENT_URL=https://your-deployment.vercel.app node .github/scripts/web-production-smoke.mjs`.
 
 ### `ios-release-loop.yml`
 
@@ -120,9 +124,13 @@ Main-branch push and manual secret, dependency, and SBOM scanning. No clock. Git
 
 Attempts to auto-merge Dependabot patch/minor updates after CI passes.
 
+### `signing-expiry.yml`
+
+Daily read-only check (13:17 UTC) for the Apple Distribution certificate, active App Store profiles, and the App Store Connect API key. Under 30 days it files or reopens one LYB issue, `remediation:signing-expiry`. Under 7 days that issue is Urgent. It never creates, revokes, or nukes signing material. Renew before nuke: `docs/engineering/signing-expiry.md`. Manual dispatch supports `dry_run`.
+
 ### `regenerate-certificates.yml`
 
-Manual iOS certificate regeneration. No schedule. The job fails immediately unless the dispatch confirm is `NUKE-AND-REGENERATE` (LYB-74). Slack runs only when repository variable `CERT_REGEN_SLACK_ENABLED` is `true`.
+Manual iOS certificate regeneration. No schedule. The job fails immediately unless the dispatch confirm is `NUKE-AND-REGENERATE` (LYB-74). Prefer the match refresh in `docs/engineering/signing-expiry.md` (LYB-141). Slack runs only when repository variable `CERT_REGEN_SLACK_ENABLED` is `true`.
 
 ## Blocking vs Advisory
 

@@ -9,6 +9,7 @@ import {
   assertNoRegression,
   coverageReport,
   LEDGER_PATH,
+  mergeCorrectionLedgers,
   readSource,
   renderCoverage,
   runCoverage,
@@ -27,6 +28,116 @@ const receipt = (fingerprint, level, extra = {}) => ({
   ...extra,
 });
 const report = (receipts) => coverageReport(receipts, () => anchor);
+const pyramid = ['codebase', 'static', 'prose', 'human'];
+const classification = (chosen) =>
+  Object.fromEntries(
+    pyramid.map((level) => [
+      level,
+      {
+        feasible: pyramid.indexOf(level) >= pyramid.indexOf(chosen),
+        rationale: `Reason for ${level}`,
+      },
+    ]),
+  );
+
+test('classifier chooses the first feasible level and retains reasons for every lower level', () => {
+  for (const level of pyramid) {
+    const value = report([receipt('route', undefined, { classification: classification(level) })]);
+    const [rule] = value.rules;
+    assert.equal(rule.level, level);
+    assert.equal(rule.rationale, `Reason for ${level}`);
+    assert.deepEqual(
+      rule.considered.map((item) => item.level),
+      pyramid.slice(0, pyramid.indexOf(level) + 1),
+    );
+    assert.equal(rule.mechanized, false);
+    assert.equal(value.levels[level].total, 1);
+    assert.match(renderCoverage(value), new RegExp(`Reason for ${level}`));
+  }
+  // Wording and an attached check cannot overrule the feasibility assessment.
+  const [rule] = report([
+    receipt('route', undefined, {
+      correction: 'Ask a human to review the prose and lint result.',
+      classification: classification('codebase'),
+      guard,
+    }),
+  ]).rules;
+  assert.equal(rule.level, 'codebase');
+  assert.equal(rule.mechanized, true);
+});
+
+test('classifier rejects missing assessments, unsupported fallbacks and conflicting annotations', () => {
+  const valid = classification('human');
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { ...valid, codebase: undefined },
+    { ...valid, codebase: { feasible: 'false', rationale: 'Not possible' } },
+    { ...valid, codebase: { feasible: false, rationale: ' ' } },
+    { ...valid, human: { feasible: false, rationale: 'No suitable reviewer' } },
+    { ...valid, typo: { feasible: true, rationale: 'Unknown level' } },
+  ]) {
+    assert.throws(
+      () => report([receipt('invalid', undefined, { classification: invalid })]),
+      /classification|assessment|enforceable/,
+    );
+  }
+  assert.throws(
+    () => report([receipt('conflict', 'human', { classification: classification('static') })]),
+    /lowest enforceable/,
+  );
+  assert.throws(
+    () =>
+      report([
+        receipt(' Same Rule ', undefined, { classification: valid }),
+        receipt('same-rule', undefined, { classification: classification('prose') }),
+      ]),
+    /conflicting/,
+  );
+  const revised = structuredClone(valid);
+  revised.codebase.rationale = 'A different reason';
+  assert.throws(
+    () =>
+      report([
+        receipt('same-rule', undefined, { classification: valid }),
+        receipt('same-rule', undefined, { classification: revised }),
+      ]),
+    /conflicting/,
+  );
+});
+
+test('current ledger requires classification while historical baselines remain readable', (t) => {
+  const legacy = receipt('retained', 'static', { guard });
+  const { root, ref } = fixtureRepo(t, [legacy]);
+  assert.throws(() => runCoverage([], { root, env: {} }), /classification required/);
+  writeFileSync(
+    join(root, LEDGER_PATH),
+    JSON.stringify([{ ...legacy, classification: classification('static') }]),
+  );
+  const value = runCoverage(['--base-ref', ref], { root, env: {} });
+  assert.equal(value.percent, 100);
+  assert.equal(value.rules[0].rationale, 'Reason for static');
+  // One unclassified receipt must fail even if an earlier receipt was classified.
+  writeFileSync(
+    join(root, LEDGER_PATH),
+    JSON.stringify([{ ...legacy, classification: classification('static') }, legacy]),
+  );
+  assert.throws(() => runCoverage([], { root, env: {} }), /classification required/);
+});
+
+test('route explanations are safe to render in the owner report table', () => {
+  const assessed = classification('static');
+  assessed.codebase.rationale = 'Needs <owner> | code\nchange';
+  assessed.static.rationale = '  Reject the invalid config  ';
+  const value = report([receipt('route', undefined, { classification: assessed })]);
+  assert.equal(value.rules[0].rationale, 'Reject the invalid config');
+  assert.match(
+    renderCoverage(value),
+    /codebase \(not feasible\): Needs &lt;owner&gt; &#124; code change/,
+  );
+  assert.match(renderCoverage(value), /static \(feasible\): Reject the invalid config/);
+});
 
 function fixtureRepo(t, receipts) {
   const root = mkdtempSync(join(tmpdir(), 'lyb-coverage-'));
@@ -49,6 +160,112 @@ function fixtureRepo(t, receipts) {
   return { root, ref: git(['rev-parse', 'HEAD']) };
 }
 
+test('ledger merge retains independent receipts and one-sided edits without mutating inputs', () => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const base = [row('kept')];
+  const edited = { ...base[0], correction: 'Clarify the retained invariant.' };
+  const ours = [row('ours'), edited];
+  const theirs = [row('theirs'), base[0]];
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, ours, theirs, () => anchor),
+    [ours[0], edited, theirs[0]],
+  );
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, base, [edited], () => anchor),
+    [edited],
+  );
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, [edited], [edited], () => anchor),
+    [edited],
+  );
+  assert.equal(base[0].correction, 'Keep the deterministic guard in place.');
+  const repeated = { ...base[0], source: 'https://example.com/second-receipt' };
+  assert.deepEqual(
+    mergeCorrectionLedgers(base, [...base, repeated], base, () => anchor),
+    [base[0], repeated],
+  );
+});
+
+test('ledger merge refuses deletions, divergent edits, duplicates and lost guards', () => {
+  const base = [receipt('kept', 'static', { guard, classification: classification('static') })];
+  const edited = { ...base[0], correction: 'An independent change.' };
+  for (const [ours, theirs, error] of [
+    [[], base, /removed receipt/],
+    [base, [], /removed receipt/],
+    [[edited], [{ ...edited, correction: 'A conflicting change.' }], /concurrent receipt edits/],
+    [[...base, base[0]], base, /duplicate receipt/],
+    [[{ ...base[0], guard: undefined }], base, /guard coverage/],
+    [
+      [
+        {
+          ...base[0],
+          level: 'prose',
+          guard: undefined,
+          classification: classification('prose'),
+          proseOnlyReason: 'Editorial judgment.',
+        },
+      ],
+      base,
+      /regression/,
+    ],
+  ]) {
+    assert.throws(() => mergeCorrectionLedgers(base, ours, theirs, () => anchor), error);
+  }
+  assert.throws(() => mergeCorrectionLedgers({}, base, base), /array/);
+  assert.throws(() => mergeCorrectionLedgers([], base, base, () => ''), /guard coverage/);
+});
+
+test('ledger merge CLI uses all three Git conflict stages and leaves refused merges untouched', (t) => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const { root } = fixtureRepo(t, [row('kept')]);
+  const git = (args, input) => execFileSync('git', args, { cwd: root, encoding: 'utf8', input });
+  const path = join(root, LEDGER_PATH);
+  const marker = 'unresolved conflict';
+  writeFileSync(path, marker);
+  const stages = [[], [row('ours')], [row('theirs')]].map((added) => [row('kept'), ...added]);
+  const stage = () => {
+    git(['update-index', '--force-remove', LEDGER_PATH]);
+    const entries = stages
+      .map((rows, index) => {
+        const hash = git(['hash-object', '-w', '--stdin'], JSON.stringify(rows)).trim();
+        return `100644 ${hash} ${index + 1}\t${LEDGER_PATH}\n`;
+      })
+      .join('');
+    git(['update-index', '--index-info'], entries);
+  };
+  stage();
+  assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
+  assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), [
+    row('kept'),
+    row('theirs'),
+    row('ours'),
+  ]);
+  assert.equal(git(['ls-files', '-u']).trim().split('\n').length, 3, 'staging remains explicit');
+  const before = readFileSync(path, 'utf8');
+  const blob = git(['hash-object', '-w', '--stdin'], anchor).trim();
+  git(['update-index', '--force-remove', guard.path]);
+  git(
+    ['update-index', '--index-info'],
+    [1, 2, 3].map((index) => `100644 ${blob} ${index}\t${guard.path}\n`).join(''),
+  );
+  writeFileSync(join(root, guard.path), `<<<<<<< ours\n${anchor}\n=======\n${anchor}\n>>>>>>> theirs\n`);
+  assert.throws(
+    () => runCoverage(['--merge-ledger'], { root, env: {} }),
+    /ledger merge: resolve other conflicts first: guard.mjs/,
+  );
+  assert.equal(readFileSync(path, 'utf8'), before, 'unresolved guard leaves ledger untouched');
+  writeFileSync(join(root, guard.path), anchor);
+  git(['add', guard.path]);
+  stages[2] = [];
+  stage();
+  writeFileSync(path, marker);
+  assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }), /removed receipt/);
+  assert.equal(readFileSync(path, 'utf8'), marker);
+  git(['update-index', '--force-remove', LEDGER_PATH]);
+  assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }));
+  assert.equal(readFileSync(path, 'utf8'), marker);
+});
+
 test('counts distinct rules, all four pyramid levels and unclassified receipts honestly', () => {
   const rows = [
     receipt('invariant', 'codebase', { guard }),
@@ -69,6 +286,72 @@ test('counts distinct rules, all four pyramid levels and unclassified receipts h
     assert.equal(value.levels[level].percent, 0);
   assert.match(renderCoverage(value), /\| codebase \| 1\/2 \| 50.00% \|/);
   assert.match(renderCoverage(value), /Overall \| 2\/6 \| 33.33%/);
+});
+
+test('ledger reports lessons, guards and recurrence from chat, review, Linear and revert receipts', () => {
+  const sources = [
+    'https://example.com/memory/tim-correction',
+    'https://github.com/JovieInc/LogYourBody/pull/42#discussion_r123',
+    'https://linear.app/jovie/issue/LYB-204#comment-123',
+    `https://github.com/JovieInc/LogYourBody/commit/${'a'.repeat(40)}`,
+  ];
+  const rows = sources.map((source) =>
+    receipt(' Retain Evidence ', 'static', {
+      source,
+      correction: 'Keep <lesson> | evidence\nintact.',
+      guard,
+    }),
+  );
+  const value = report([...rows, { ...rows[0], fingerprint: 'retain-evidence' }]);
+  const [rule] = value.rules;
+  assert.equal(value.total, 1);
+  assert.equal(rule.level, 'static');
+  assert.deepEqual(rule.guard, guard);
+  assert.deepEqual(rule.recurrence, { receiptCount: 4, repeatCount: 3 });
+  assert.deepEqual(
+    rule.receipts,
+    rows
+      .map(({ source, correction, mechanization }) => ({ source, correction, mechanization }))
+      .sort((a, b) => a.source.localeCompare(b.source)),
+  );
+  assert.deepEqual(report([...rows].reverse()), value);
+  const rendered = renderCoverage(value);
+  for (const source of sources) assert.ok(rendered.includes(source));
+  assert.match(rendered, /Keep &lt;lesson&gt; &#124; evidence intact\./);
+  assert.match(rendered, /guard.mjs/);
+  assert.match(rendered, /enforce the retained invariant/);
+  assert.match(rendered, /4 receipts; 3 repeats/);
+  assert.deepEqual(report([rows[0]]).rules[0].recurrence, { receiptCount: 1, repeatCount: 0 });
+});
+
+test('ledger CI retains each source against Git even when rule coverage and receipt count stay equal', (t) => {
+  const first = receipt('retained', 'static', {
+    guard,
+    classification: classification('static'),
+  });
+  const second = { ...first, source: 'https://example.com/second-receipt' };
+  const extra = { ...first, source: 'https://example.com/third-receipt' };
+  const { root, ref } = fixtureRepo(t, [first, second]);
+  for (const rows of [
+    [first],
+    [first, extra],
+    [first, { ...second, fingerprint: 'different-rule' }],
+  ]) {
+    writeFileSync(join(root, LEDGER_PATH), JSON.stringify(rows));
+    assert.throws(() => runCoverage(['--base-ref', ref], { root, env: {} }), /removed receipt/);
+  }
+  // Duplicate replays, canonical URL spelling, new receipts and guard promotions are allowed.
+  const revised = [second, first, first, extra].map((row) => ({
+    ...row,
+    fingerprint: ' RETAINED ',
+    level: 'codebase',
+    classification: classification('codebase'),
+    correction: 'Clarified lesson without losing the original evidence.',
+    source: row.source.replace('https://example.com/', 'https://EXAMPLE.com:443/'),
+  }));
+  writeFileSync(join(root, LEDGER_PATH), JSON.stringify(revised));
+  const value = runCoverage(['--base-ref', ref], { root, env: {} });
+  assert.deepEqual(value.rules[0].recurrence, { receiptCount: 3, repeatCount: 2 });
 });
 
 test('empty ledger is N/A and proposed or absent guards earn no credit', () => {
@@ -101,6 +384,21 @@ test('rejects malformed receipts, unknown levels and conflicting duplicate annot
   assert.throws(
     () => report([receipt('same rule', 'static'), receipt(' SAME RULE ', 'prose')]),
     /conflicting/,
+  );
+});
+
+test('duplicate receipts cannot disagree on a guard violation baseline', () => {
+  assert.throws(
+    () =>
+      report([
+        receipt('same-rule', 'static', {
+          guard: { ...guard, ratchet: { baseline: 'first.json' } },
+        }),
+        receipt('same-rule', 'static', {
+          guard: { ...guard, ratchet: { baseline: 'second.json' } },
+        }),
+      ]),
+    /conflicting coverage annotations/,
   );
 });
 
@@ -146,7 +444,9 @@ test('compares exact ratios overall and per level, allowing improvements and emp
 });
 
 test('CLI compares real Git snapshots; deleting a guard in head cannot lower its baseline', (t) => {
-  const { root, ref } = fixtureRepo(t, [receipt('kept', 'static', { guard })]);
+  const { root, ref } = fixtureRepo(t, [
+    receipt('kept', 'static', { guard, classification: classification('static') }),
+  ]);
   const summary = join(root, 'summary.md');
   assert.equal(
     runCoverage(['--base-ref', ref], { root, env: { GITHUB_STEP_SUMMARY: summary } }).percent,
@@ -154,7 +454,8 @@ test('CLI compares real Git snapshots; deleting a guard in head cannot lower its
   );
   assert.match(readFileSync(summary, 'utf8'), /LYB owner loop/);
   rmSync(join(root, guard.path));
-  assert.throws(() => runCoverage(['--base-ref', ref], { root, env: {} }), /regression/i);
+  assert.throws(() => runCoverage(['--base-ref', ref], { root, env: {} }), /guard coverage/i);
+  writeFileSync(join(root, guard.path), anchor);
   assert.throws(() => runCoverage(['--base-ref', 'f'.repeat(40)], { root, env: {} }));
   assert.throws(
     () => runCoverage(['--base-ref', 'HEAD;echo unsafe'], { root, env: {} }),
@@ -172,6 +473,42 @@ test('CLI compares real Git snapshots; deleting a guard in head cannot lower its
   });
   assert.equal(success.status, 0, success.stderr);
   assert.equal(JSON.parse(success.stdout).repository, 'JovieInc/LogYourBody');
+});
+
+test('CI rejects lessons without a retained guard or an explicit prose-only reason', (t) => {
+  for (const row of [
+    receipt('unclassified', undefined),
+    receipt('pending', 'static'),
+    receipt('pending-code', 'codebase'),
+    receipt('unexplained', 'prose'),
+    receipt('blank-reason', 'human', { proseOnlyReason: '  ' }),
+    receipt('stale-anchor', 'static', { guard: { ...guard, anchor: 'a deleted guard anchor' } }),
+    receipt('missing-file', 'codebase', { guard: { ...guard, path: 'missing.mjs' } }),
+    receipt('mechanized-excuse', 'static', { guard, proseOnlyReason: 'Use human review.' }),
+  ]) {
+    const { root } = fixtureRepo(t, [
+      { ...row, classification: classification(row.level ?? 'static') },
+    ]);
+    assert.throws(() => runCoverage([], { root, env: {} }), /guard coverage/i, row.fingerprint);
+  }
+});
+
+test('CI accepts guarded lessons and justified prose/human lessons without inflating coverage', (t) => {
+  const rows = [
+    receipt('code', 'codebase', { guard }),
+    receipt('lint', 'static', { guard }),
+    receipt('judgment', 'human', { proseOnlyReason: 'Requires account-owner legal attestation.' }),
+    receipt('writing', 'prose', { proseOnlyReason: 'Copy tone requires editorial judgment.' }),
+  ];
+  const { root } = fixtureRepo(
+    t,
+    rows.map(({ level, ...row }) => ({ ...row, classification: classification(level) })),
+  );
+  assert.equal(runCoverage([], { root, env: {} }).percent, 50);
+  assert.throws(
+    () => report([rows[3], { ...rows[3], proseOnlyReason: 'A different explanation.' }]),
+    /conflicting/,
+  );
 });
 
 const revision = 'a'.repeat(40);
@@ -356,7 +693,17 @@ test('real CI and intake entrypoints retain coverage checking and publication wi
   );
   assert.match(workflow, /git fetch --no-tags --depth=1 origin "\$BASE_SHA"/);
   assert.match(workflow, /correction-coverage.mjs --base-ref "\$BASE_SHA"/);
+  assert.match(
+    workflow,
+    /node --test packages\/shared-lib\/scripts\/correction-ratchet.behavior.mjs/,
+  );
+  assert.match(workflow, /correction-ratchet.mjs --base-ref "\$BASE_SHA"/);
   assert.match(workflow, /github.event.merge_group.base_sha/);
+  assert.match(
+    workflow,
+    /node --test packages\/shared-lib\/scripts\/jovie-separation.behavior.mjs/,
+  );
+  assert.match(workflow, /node packages\/shared-lib\/scripts\/jovie-separation.mjs/);
   assert.match(
     readFileSync(join(root, '.github/scripts/remediation-signal-intake.mjs'), 'utf8'),
     /await runCoverageOwnerLoop\(/,

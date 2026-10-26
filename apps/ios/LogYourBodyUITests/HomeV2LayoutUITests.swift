@@ -74,15 +74,17 @@ final class HomeV2LayoutUITests: XCTestCase {
 
         let unit = app.buttons["home_v2_log_sheet_unit"]
         XCTAssertTrue(unit.isHittable)
-        unit.tap()
-        app.buttons["kg"].tap()
+        XCTAssertLessThanOrEqual(
+            field.frame.maxX, unit.frame.minX + 1,
+            "The value and unit must sit side by side without drawing over each other"
+        )
+        XCTAssertEqual(app.buttons["home_v2_log_sheet_save"].label, "Save")
+        selectMenuOption("kg", from: unit, in: app)
         XCTAssertEqual(unit.value as? String, "kg")
-        unit.tap()
-        app.buttons["lbs"].tap()
+        selectMenuOption("lbs", from: unit, in: app)
         XCTAssertEqual(unit.value as? String, "lbs")
 
-        field.tap()
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 8) + "182.4")
+        replacePrefilledText("182.4", in: field)
         XCTAssertEqual(field.value as? String, "182.4")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         let save = app.buttons["home_v2_log_sheet_save"]
@@ -335,10 +337,7 @@ final class HomeV2LayoutUITests: XCTestCase {
             assertSheetControlReachable(method, in: app, screenshot: "body-fat-ax5-method-before-\(value)")
             XCTAssertEqual(method.value as? String, "Entered by you")
             if changesMethod {
-                method.tap()
-                let dexa = app.buttons["DEXA"]
-                XCTAssertTrue(dexa.waitForExistence(timeout: 5))
-                dexa.tap()
+                selectMenuOption("DEXA", from: method, in: app)
                 XCTAssertEqual(method.value as? String, "DEXA")
             }
             let field = app.textFields["Body fat percentage value"]
@@ -371,6 +370,10 @@ final class HomeV2LayoutUITests: XCTestCase {
     }
 
     private func assertBodyFatDateCanOpenWithoutChangingValue(in app: XCUIApplication) {
+        // The opened calendar must dismiss when the sheet title is tapped.
+        // The date picker's own frame must then fit above Save. The modal
+        // calendar container is not the Save button, and it must not remain
+        // the date picker's frame.
         let picker = app.datePickers.firstMatch
         assertSheetControlReachable(picker, in: app, screenshot: "body-fat-ax5-date-before")
         let originalValue = picker.value as? String
@@ -418,15 +421,124 @@ final class HomeV2LayoutUITests: XCTestCase {
         XCTAssertTrue(segment.isSelected)
     }
 
+    private func selectMenuOption(_ label: String, from control: XCUIElement, in app: XCUIApplication) {
+        XCTAssertTrue(control.isHittable)
+        // Accessibility text lists every method in the sheet. A popover menu
+        // at that size only showed the current value, then a scroll dismissed it.
+        let sheetChoice = app.scrollViews["add_entry_content"].buttons[label]
+        if sheetChoice.exists {
+            selectSheetChoice(sheetChoice, in: app)
+            return
+        }
+        control.tap()
+        let menu = app.collectionViews.containing(.button, identifier: label).firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        let option = menu.buttons[label]
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        // Native menus can extend below the window at large text sizes. Scroll
+        // inside their visible bounds before acting on the complete option.
+        let viewport = menu.frame.intersection(app.windows.firstMatch.frame).insetBy(dx: 0, dy: 8)
+        XCTAssertGreaterThan(viewport.height, 88)
+        let attempts = scrollToContain(option, in: viewport, app: app)
+        XCTAssertTrue(option.isEnabled)
+        XCTAssertGreaterThan(option.frame.width, 0)
+        XCTAssertGreaterThan(option.frame.height, 0)
+        XCTAssertTrue(viewport.contains(option.frame), attempts.joined(separator: "\n"))
+        // iOS 26 can vend an invalid activation point for a visible menu item.
+        // Use its verified native frame; the caller still checks the selection.
+        option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(menu.waitForNonExistence(timeout: 5))
+    }
+
+    private func selectSheetChoice(_ option: XCUIElement, in app: XCUIApplication) {
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        let scroll = app.scrollViews["add_entry_content"]
+        let save = app.buttons["home_v2_log_sheet_save"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 5))
+        let lowerBound = save.exists ? save.frame.minY : scroll.frame.maxY
+        let viewport = CGRect(
+            x: scroll.frame.minX, y: scroll.frame.minY, width: scroll.frame.width,
+            height: max(0, min(scroll.frame.maxY, lowerBound) - scroll.frame.minY)
+        )
+        XCTAssertGreaterThan(viewport.height, 88)
+        let attempts = scrollToContain(option, in: viewport, app: app)
+        XCTAssertTrue(option.isEnabled)
+        XCTAssertGreaterThan(option.frame.width, 0)
+        XCTAssertGreaterThan(option.frame.height, 0)
+        XCTAssertTrue(option.isHittable, attempts.joined(separator: "\n"))
+        XCTAssertTrue(viewport.contains(option.frame), attempts.joined(separator: "\n"))
+        option.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
+    private func replacePrefilledText(_ replacement: String, in field: XCUIElement) {
+        let existing = field.value as? String ?? ""
+        // The reading is trailing-aligned. A center tap leaves the caret before
+        // it, so delete keys do nothing and the next entry is prepended.
+        let trailing = field.coordinate(withNormalizedOffset: CGVector(dx: 0.99, dy: 0.5))
+        trailing.tap()
+        deletePrefilledText(existing, in: field)
+        if !isFieldCleared(field), !existing.isEmpty {
+            let leading = field.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5))
+            trailing.press(forDuration: 0.4, thenDragTo: leading)
+            deletePrefilledText(existing, in: field)
+        }
+        let cleared = field.value as? String ?? ""
+        XCTAssertTrue(
+            cleared.isEmpty || cleared == field.placeholderValue,
+            "The prefilled reading must be removed before typing the replacement: \(cleared)"
+        )
+        field.typeText(replacement)
+    }
+
+    private func deletePrefilledText(_ existing: String, in field: XCUIElement) {
+        guard !existing.isEmpty, existing != field.placeholderValue else { return }
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
+    }
+
+    private func isFieldCleared(_ field: XCUIElement) -> Bool {
+        let cleared = field.value as? String ?? ""
+        return cleared.isEmpty || cleared == field.placeholderValue
+    }
+
+    func testEditorialUnsupportedWeightKeepsRawValueAndReviewVisible() {
+        for largestText in [false, true] {
+            let app = launchEditorial(extra: ["-lybUITestHomeV2HistoricalOnlyFixture"], largestText: largestText)
+            XCTAssertTrue(app.descendants(matching: .any)["home_v2_day_zero"].waitForExistence(timeout: 30))
+            XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_review_graphic"].exists,
+                           "A 2018 import must not be drawn as Today")
+            XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_graphic"].exists)
+            XCTAssertFalse(app.descendants(matching: .any)["home_v2_weight_plot"].exists,
+                           "An unsupported source value must not be rendered as a supported trend")
+            XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists)
+            assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "weight-review-dock-\(largestText)")
+            // Today's details is empty for this historical import. Open the
+            // exact saved entry to inspect its original value and provenance.
+            app.buttons["photo_timeline_root_menu"].tap()
+            app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()
+            let rows = app.buttons.matching(identifier: "home_v2_entries_row")
+            let imported = rows.matching(NSPredicate(format: "label CONTAINS %@", "17.99 kg")).firstMatch
+            XCTAssertTrue(imported.waitForExistence(timeout: 8))
+            imported.tap()
+            let rawWeight = app.descendants(matching: .any).matching(identifier: "home_v2_context_row_weight")
+            XCTAssertTrue(rawWeight.element.waitForExistence(timeout: 8))
+            XCTAssertEqual(rawWeight.count, 1)
+            XCTAssertTrue(rawWeight.element.label.contains("17.99 kg"), rawWeight.element.label)
+            XCTAssertTrue(rawWeight.element.label.contains("Withings via Apple Health"), rawWeight.element.label)
+            XCTAssertTrue(rawWeight.element.label.contains(
+                "Outside the supported logging range. Source value kept unchanged."
+            ), rawWeight.element.label)
+            capture(app, named: "weight-review-context-\(largestText)")
+            app.terminate()
+        }
+    }
+
     func testHistoricalOnlyDataKeepsSourceReadingsReachableAtLargestText() {
         let app = launchEditorial(extra: ["-lybUITestHomeV2HistoricalOnlyFixture"], largestText: true)
 
-        XCTAssertTrue(app.descendants(matching: .any)["home_v2_editorial_card"].waitForExistence(timeout: 30))
-        XCTAssertFalse(app.descendants(matching: .any)["home_v2_day_zero"].exists)
-        let ruler = app.descendants(matching: .any)["home_v2_timeline_scrubber"]
-        XCTAssertTrue(ruler.waitForExistence(timeout: 8))
-        XCTAssertTrue(app.windows.firstMatch.frame.contains(ruler.frame))
-        assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "historical-only-selected-day")
+        XCTAssertTrue(app.descendants(matching: .any)["home_v2_day_zero"].waitForExistence(timeout: 30))
+        XCTAssertFalse(app.descendants(matching: .any)["home_v2_timeline_scrubber"].exists,
+                       "Today does not scrub 2018 samples")
+        assertDockVisible(in: app, identifier: "home_v2_log_weight", screenshot: "historical-only-today-empty")
 
         app.buttons["photo_timeline_root_menu"].tap()
         app.buttons.matching(NSPredicate(format: "label == %@", "Entries")).firstMatch.tap()

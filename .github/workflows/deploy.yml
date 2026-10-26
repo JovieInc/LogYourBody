@@ -29,6 +29,9 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'vercel.json'
               - 'apps/web/vercel.json'
+              - '.github/workflows/deploy.yml'
+              - '.github/scripts/web-production-smoke*.mjs'
+              - '.github/scripts/verify-public-build-env*.mjs'
             ios:
               - 'apps/ios/**'
 
@@ -67,6 +70,9 @@ jobs:
       - name: Build
         run: cd apps/web && pnpm build
 
+      - name: Verify no NEXT_PUBLIC_* Vercel variable is marked Sensitive
+        run: node .github/scripts/verify-public-build-env-types.mjs
+
       - name: Pull Vercel environment
         run: pnpm dlx vercel@latest pull --yes --environment=production --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
 
@@ -75,13 +81,21 @@ jobs:
           env_file=.vercel/.env.production.local
           test -f "$env_file"
           missing_variables=0
-          for required_variable in DATABASE_URL OPENAI_API_KEY CRON_SECRET; do
+          for required_variable in DATABASE_URL OPENAI_API_KEY CRON_SECRET LYB_AI_ZERO_RETENTION; do
             if ! grep -qE "^${required_variable}=" "$env_file"; then
               echo "::error::Missing required Vercel production variable: $required_variable"
               missing_variables=1
             fi
           done
           test "$missing_variables" -eq 0
+
+      # `vercel pull` writes the literal "[SENSITIVE]" for sensitive variables and
+      # NEXT_PUBLIC_* values are inlined into browser code (LYB-226: Statsig
+      # clientKey shipped as "[SENSITIVE]"). Fail before migrations or build.
+      - name: Verify public build environment is not a placeholder
+        env:
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
+        run: node .github/scripts/verify-public-build-env.mjs env .vercel/.env.production.local
 
       - name: Apply product database migrations
         env:
@@ -93,6 +107,9 @@ jobs:
       - name: Build Vercel output
         run: pnpm dlx vercel@latest build --prod --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
 
+      - name: Verify built client output has no sensitive-variable placeholder
+        run: node .github/scripts/verify-public-build-env.mjs bundle .vercel/output/static apps/web/.next/static
+
       - name: Deploy to Vercel
         id: vercel-deploy
         run: |
@@ -100,12 +117,20 @@ jobs:
           echo "url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
           echo "Deployed to $DEPLOYMENT_URL"
 
+      # A failure fails Deploy; remediation-signal.yml routes it to Linear
+      # as remediation:web-deploy with this run's smoke logs and summary.
+      - name: Smoke production deployment
+        timeout-minutes: 3
+        env:
+          DEPLOYMENT_URL: ${{ steps.vercel-deploy.outputs.url }}
+        run: node .github/scripts/web-production-smoke.mjs
+
       - name: Deploy info
         run: |
           {
             echo "## Web Deployment"
             echo ""
-            echo "✅ Build and production deploy completed successfully"
+            echo "✅ Build, production deploy, and smoke checks completed successfully"
             echo ""
             echo "URL: ${{ steps.vercel-deploy.outputs.url }}"
           } >> "$GITHUB_STEP_SUMMARY"

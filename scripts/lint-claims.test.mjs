@@ -1,9 +1,83 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { extractAssistantTexts, run, scanClaimText } from './lint-claims.mjs';
+import {
+  extractAssistantTexts,
+  run,
+  scan,
+  scanClaimText,
+  scanExerciseVariantText,
+} from './lint-claims.mjs';
+
+const variantSeedPath = 'apps/web/src/lib/training/catalog-variant-seed.json';
+
+function variantStrings(value) {
+  if (typeof value === 'string') return [value];
+  if (!value || typeof value !== 'object') return [];
+  return Object.values(value).flatMap(variantStrings);
+}
+
+test('all curated variant text passes the shared claims policy and exercise banned list', async () => {
+  const seed = JSON.parse(
+    await readFile(new URL('../' + variantSeedPath, import.meta.url), 'utf8'),
+  );
+  assert.equal(seed.length, 25);
+  for (const entry of seed) {
+    for (const text of variantStrings(entry)) {
+      assert.deepEqual(scanExerciseVariantText(text), [], entry.id + ': ' + text);
+    }
+  }
+});
+
+for (const [text, rule] of [
+  ['This coach can treat diabetes.', 'clinical-action'],
+  ['Treats shoulder pain.', 'exercise-medical-claim'],
+  ['Prevents joint injury.', 'exercise-medical-claim'],
+  ['Pain-free movement.', 'exercise-medical-claim'],
+  ['Safe for your spine.', 'exercise-medical-claim'],
+  ['Zero axial load.', 'zero-axial-load'],
+  ['no_spinal_loading', 'zero-axial-load'],
+  ['Axial load is 0.', 'zero-axial-load'],
+  ['Trunk carries nothing.', 'zero-axial-load'],
+  ['SFR: 9.5', 'numeric-sfr'],
+  ['SFR score = 8', 'numeric-sfr'],
+  ['9/10 SFR', 'numeric-sfr'],
+  ['Stimulus-to-fatigue ratio: 7', 'numeric-sfr'],
+]) {
+  test('exercise claims policy rejects ' + text, () => {
+    assert.ok(scanExerciseVariantText(text).some((entry) => entry.rule === rule));
+  });
+}
+
+test('exercise policy allows setup uncertainty without claiming comfort or a loading measurement', () => {
+  assert.deepEqual(
+    scanExerciseVariantText(
+      'Chest pad contact; bracing varies with execution. User selected shorter range. Joint discomfort is unspecified.',
+    ),
+    [],
+  );
+});
+
+test('claims lint scans decoded seed strings independently, including nested editable tags', async (t) => {
+  for (const entry of [
+    { romSetupCaveat: 'Treats shoulder pain.' },
+    { disclaimer: 'Do not claim', romSetupCaveat: 'Zero axial load.' },
+    { toleranceTags: { stability: ['SFR score: 8'] } },
+  ]) {
+    const root = await claimsFixture(t, { [variantSeedPath]: JSON.stringify([entry]) });
+    await assert.rejects(run(root), (error) => {
+      assert.ok(error.message.includes(variantSeedPath));
+      assert.match(error.message, /\[(?:exercise-medical-claim|zero-axial-load|numeric-sfr)\]/);
+      return true;
+    });
+  }
+  const root = await claimsFixture(t, {
+    [variantSeedPath]: '[{"romSetupCaveat":"Zero ax\\u0069al load."}]',
+  });
+  await assert.rejects(run(root), /\[zero-axial-load\]/);
+});
 
 test('rejects disease treatment and diagnosis claims', () => {
   assert.ok(
@@ -162,4 +236,144 @@ test('scans decoded storefront strings and keeps fields independent', async (t) 
     const root = await claimsFixture(t, { [file]: content });
     await assert.rejects(run(root), /\[disease-claim\]/);
   }
+});
+
+const webCopyPaths = [
+  'apps/web/src/app/launch-landing-copy.ts',
+  'apps/web/src/app/waitlist-copy.ts',
+  'apps/web/src/app/home-page-copy.ts',
+  'apps/web/src/app/page.tsx',
+  'apps/web/src/app/layout.tsx',
+  ...[
+    'about',
+    'support',
+    'security',
+    'privacy',
+    'terms',
+    'health-disclosure',
+    'signup',
+    'signin',
+  ].map((route) => `apps/web/src/app/${route}/page.tsx`),
+  'apps/web/src/app/download/ios/metadata.ts',
+  'apps/web/src/components/NewMarketingSection.tsx',
+  'apps/web/src/constants/app.ts',
+  'apps/web/src/lib/load-legal-docs.ts',
+  'packages/product-registry/src/products/logyourbody.mjs',
+  'shared/legal/health-disclosure.md',
+  'apps/web/content/blog/published.md',
+];
+
+for (const file of webCopyPaths) {
+  test('blocks prohibited claims in web copy source ' + file, async (t) => {
+    const root = await claimsFixture(t, { [file]: `\n${positiveClaim}\n` });
+    await assert.rejects(run(root), (error) => {
+      assert.ok(error.message.includes(file + ':2'));
+      assert.match(error.message, /\[disease-claim\]/);
+      assert.match(error.message, /\[regulatory-status-claim\]/);
+      assert.match(error.message, /copy owner/i);
+      return true;
+    });
+  });
+}
+
+for (const [label, file, content, rule] of [
+  [
+    'removed trial offer',
+    webCopyPaths[0],
+    "export const copy = { cta: 'Start your 3-day free trial' };",
+    'free-trial-claim',
+  ],
+  [
+    'numeric outcome in JSON-LD',
+    'apps/web/src/app/page.tsx',
+    "const jsonLd = { description: 'Lose 10 pounds in 30 days' };",
+    'quantified-outcome',
+  ],
+  [
+    'removed genetic potential claim',
+    'apps/web/src/app/layout.tsx',
+    "export const metadata = { description: 'Know your genetic potential' };",
+    'genetic-potential-claim',
+  ],
+]) {
+  test('rejects reintroduced ' + label, async (t) => {
+    const root = await claimsFixture(t, { [file]: content });
+    await assert.rejects(run(root), (error) => {
+      assert.ok(error.message.includes(file + ':1 [' + rule + ']'));
+      return true;
+    });
+  });
+}
+
+test('allows qualified pricing, measurement examples, and legal disclaimers', async (t) => {
+  const root = await claimsFixture(t, {
+    [webCopyPaths[0]]: `
+      Reference pricing: $9.99 a month or $69.99 a year (USD).
+      The App Store confirms your local price, any free trial eligibility, and terms.
+      A measured change of 2 kg over 30 days is not a promised result.
+      FFMI does not establish your genetic potential or diagnose health.
+      This app does not treat diabetes. No guaranteed outcomes.
+    `,
+    'shared/legal/health-disclosure.md':
+      '# No Guarantee of Accuracy\nWe do not guarantee accuracy.',
+  });
+  await run(root);
+});
+
+test('excludes web tests, API prompts, generated outputs, and unpublished blog drafts', async (t) => {
+  const root = await claimsFixture(t, {
+    'apps/web/src/app/__tests__/copy.ts': positiveClaim,
+    'apps/web/src/app/copy.test.ts': positiveClaim,
+    'apps/web/src/components/copy.spec.tsx': positiveClaim,
+    'apps/web/src/app/api/chat/route.ts': positiveClaim,
+    'apps/web/.next/server/app/page.js': positiveClaim,
+    'apps/web/content/blog/draft.md': '---\ndraft: true\n---\n' + positiveClaim,
+  });
+  await run(root);
+});
+
+test('web ratchet uses only supplied source and retains complete findings without line numbers', () => {
+  const file = webCopyPaths[0];
+  const copy = "const cta = 'Start your 3-day free trial';";
+  const snapshot = (text) => ({ files: [file], readSource: () => text });
+  const findings = scan(snapshot(copy));
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].path, file);
+  assert.ok(findings[0].key.includes(copy));
+  assert.deepEqual(scan(snapshot('\n\n' + copy)), findings);
+  assert.equal(scan(snapshot(copy + '\n' + copy)).length, 2);
+  assert.notDeepEqual(scan(snapshot(copy.replace('3-day', '7-day'))), findings);
+});
+
+test('existing web findings warn, but changed and additional claims block', async (t) => {
+  const warnings = [];
+  t.mock.method(process.stderr, 'write', (text) => {
+    warnings.push(text);
+    return true;
+  });
+  const file = webCopyPaths[0];
+  const copy = "const cta = 'Start your 3-day free trial';";
+  const findings = scan({ files: [file], readSource: () => copy });
+  const root = await claimsFixture(t, {
+    [file]: copy,
+    'scripts/knowledge/web-claims-baseline.json': JSON.stringify({
+      schema: 'lyb.correction-ratchet/v1',
+      findings,
+    }),
+  });
+  await run(root);
+  assert.match(warnings.join('\n'), /::warning::.*copy owner:.*web-claims-owner-handoff\.md/);
+  await writeFile(path.join(root, file), copy + '\n' + copy);
+  await assert.rejects(run(root), /\[free-trial-claim\]/);
+  await writeFile(path.join(root, file), copy.replace('3-day', '7-day'));
+  await assert.rejects(run(root), /\[free-trial-claim\]/);
+  await writeFile(path.join(root, file), 'Track your measurements.');
+  await assert.rejects(run(root), /Stale web claims baseline/);
+});
+
+test('a negated legal heading does not suppress a subsequent guaranteed outcome', () => {
+  assert.deepEqual(scanClaimText('No Guarantee of Accuracy.'), []);
+  assert.deepEqual(scanClaimText('No guarantee of accuracy. You will lose 10 pounds.'), [
+    { rule: 'guaranteed-outcome', line: 1 },
+  ]);
 });

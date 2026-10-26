@@ -6,7 +6,11 @@ import { logYourBody } from '@jovieinc/product-registry';
 
 export const revalidate = false;
 
-export const metadata: Metadata = { title: 'About', description: logYourBody.brand.description };
+export const metadata: Metadata = {
+  alternates: { canonical: '/about' },
+  title: 'About',
+  description: logYourBody.brand.description,
+};
 export default function AboutPage() {
   return (
     <MarketingPage>

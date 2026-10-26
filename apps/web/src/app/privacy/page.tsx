@@ -6,7 +6,8 @@ import { loadLegalDocument } from '@/lib/load-legal-docs';
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy - LogYourBody',
+  alternates: { canonical: '/privacy' },
+  title: 'Privacy Policy',
   description: 'LogYourBody privacy policy - Learn how we protect and handle your data.',
 };
 
