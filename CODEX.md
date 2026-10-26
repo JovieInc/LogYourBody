@@ -10,6 +10,13 @@ provisions services, or treats a build/test failure as successful setup.
 The current source pins Node 22.23.2 and pnpm 10.34.1. Keep the separate Eve
 Node 24 runner in `scripts/eve/run-node24.sh`; it has a different runtime role.
 
+For dependency PRs with stale generated artifacts, explicitly run
+`bash scripts/codex-setup.sh --repair-generated`. After verifying both runtime
+pins, this refreshes the lockfile without running install scripts, regenerates
+the source map with the existing pinned generator, then runs the normal frozen
+install. It stops on any failure and leaves changes unstaged for review. Normal
+setup and SessionStart continue to require the committed lockfile unchanged.
+
 `.codex/environments/environment.toml` supplies the desktop worktree setup,
 cleanup report, and common actions using the app's `script` and `[[actions]]`
 schema. `.codex/hooks.json` supplies SessionStart and Stop. Codex requires

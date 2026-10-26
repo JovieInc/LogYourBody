@@ -40,6 +40,127 @@ exit "\${INSTALL_STATUS:-0}"
   return { root, env: { PATH: `${join(root, 'bin')}:/usr/bin:/bin` } };
 }
 
+function repairFixture(t) {
+  const fx = fixture(t);
+  mkdirSync(join(fx.root, 'scripts'));
+  for (const name of ['codex-setup.sh', 'codex-setup.mjs', 'repository_docs.py'])
+    copyFileSync(resolve('scripts', name), join(fx.root, 'scripts', name));
+  writeFileSync(join(fx.root, 'README.md'), 'Local instructions\n');
+  writeFileSync(
+    join(fx.root, 'repository-docs.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      repository: 'example/app',
+      entrypoints: ['README.md'],
+      sources: [{ path: 'package.json', purpose: 'Dependencies' }],
+      imports: [],
+      output: 'docs/SOURCES.md',
+    }),
+  );
+  writeFileSync(
+    join(fx.root, 'bin/pnpm'),
+    `#!/bin/bash
+set -eu
+if [[ "$*" == '--version' ]]; then echo 9.15.9; exit 0; fi
+printf '%s\\n' "$*" >> calls
+if [[ "$*" == *'--lockfile-only'* ]]; then
+  if [[ "\${REPAIR_STATUS:-0}" != 0 ]]; then exit "$REPAIR_STATUS"; fi
+  cp package.json pnpm-lock.yaml
+else
+  cmp -s package.json pnpm-lock.yaml
+  test -f docs/SOURCES.md
+fi
+`,
+    { mode: 0o755 },
+  );
+  return fx;
+}
+
+test('explicit repair refreshes dependencies and real source projection before frozen install', (t) => {
+  const { root, env } = repairFixture(t);
+  assert.throws(() => bootstrap(root, env), /pnpm install failed/);
+  bootstrap(root, env, { repairGenerated: true });
+  const projection = readFileSync(join(root, 'docs/SOURCES.md'), 'utf8');
+  assert.match(projection, /pnpm@9\.15\.9/);
+  assert.equal(
+    readFileSync(join(root, 'pnpm-lock.yaml'), 'utf8'),
+    readFileSync(join(root, 'package.json'), 'utf8'),
+  );
+  assert.equal(readFileSync(join(root, '.env.local'), 'utf8'), 'preserve environment');
+  const calls = readFileSync(join(root, 'calls'), 'utf8');
+  assert.match(
+    calls,
+    /install --lockfile-only --no-frozen-lockfile --ignore-scripts --prefer-offline\ninstall --frozen-lockfile --prefer-offline\n$/,
+  );
+  bootstrap(root, env, { repairGenerated: true });
+  assert.equal(readFileSync(join(root, 'docs/SOURCES.md'), 'utf8'), projection);
+});
+
+test('repair stops on lockfile or pinned-source failure without attempting frozen install', (t) => {
+  for (const failure of ['lockfile', 'projection']) {
+    const { root, env } = repairFixture(t);
+    if (failure === 'projection') {
+      const config = JSON.parse(readFileSync(join(root, 'repository-docs.json'), 'utf8'));
+      config.imports = [
+        {
+          repository: 'example/policy',
+          revision: 'a'.repeat(40),
+          path: 'policy.md',
+          destination: 'policy.md',
+          sha256: '0'.repeat(64),
+        },
+      ];
+      writeFileSync(join(root, 'repository-docs.json'), JSON.stringify(config));
+    }
+    assert.throws(
+      () =>
+        bootstrap(
+          root,
+          { ...env, REPAIR_STATUS: failure === 'lockfile' ? '42' : '0' },
+          { repairGenerated: true },
+        ),
+      failure === 'lockfile'
+        ? /pnpm install failed \(42\)/
+        : /python3 scripts\/repository_docs.py failed/,
+    );
+    assert.doesNotMatch(readFileSync(join(root, 'calls'), 'utf8'), /--frozen-lockfile/);
+  }
+});
+
+test('repair wrapper works from another directory and rejects unsupported arguments', (t) => {
+  const { root, env } = repairFixture(t);
+  const script = join(root, 'scripts/codex-setup.sh');
+  const options = {
+    cwd: join(root, 'bin'),
+    encoding: 'utf8',
+    env: { ...env, NVM_DIR: join(root, 'missing') },
+  };
+  const result = spawnSync('bash', [script, '--repair-generated'], options);
+  assert.equal(result.status, 0, result.stderr);
+  for (const args of [['--unknown'], ['--repair-generated', '--codex-hook']]) {
+    assert.notEqual(spawnSync('bash', [script, ...args], options).status, 0);
+    const invalid = spawnSync(
+      process.execPath,
+      [resolve('scripts/codex-setup.mjs'), ...args],
+      options,
+    );
+    assert.notEqual(invalid.status, 0);
+    assert.match(invalid.stderr, /Usage: codex-setup.mjs/);
+  }
+});
+
+test('the real CLI verifies runtime pins before attempting normal setup or repair', (t) => {
+  const { env } = fixture(t);
+  for (const args of [[], ['--repair-generated']]) {
+    const result = spawnSync(process.execPath, [resolve('scripts/codex-setup.mjs'), ...args], {
+      env,
+      encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Expected Node|pnpm must resolve/);
+  }
+});
+
 test('installs frozen dependencies in the repository without touching environment or lockfiles', (t) => {
   const { root, env } = fixture(t);
   bootstrap(root, env);

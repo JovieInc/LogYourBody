@@ -18,6 +18,8 @@ if [[ "${1:-}" == "--codex-hook" ]]; then
   node "$ROOT/scripts/codex-setup.mjs" >&2
   printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Log Your Body secret-free dependencies prepared. Native iOS, signing, and authenticated runtime checks require their own environment."}}'
 else
-  if [[ $# -gt 0 ]]; then echo "Usage: $0 [--codex-hook|--run <pnpm command>]" >&2; exit 2; fi
-  exec node "$ROOT/scripts/codex-setup.mjs"
+  if [[ $# -gt 0 && ( $# -ne 1 || "$1" != "--repair-generated" ) ]]; then
+    echo "Usage: $0 [--codex-hook|--repair-generated|--run <pnpm command>]" >&2; exit 2
+  fi
+  exec node "$ROOT/scripts/codex-setup.mjs" "$@"
 fi

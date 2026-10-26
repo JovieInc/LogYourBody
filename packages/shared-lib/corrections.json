@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "dependency-generated-artifact-repair",
+    "correction": "PR #1613: The Separator 1.2.0 manifest bump retained the 1.1.15 lockfile importer and a stale source projection, failing frozen installation, Detect Changes, documentation parity and CI Summary. Repeated dependency repairs need one explicit reusable repair path.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1613",
+    "mechanization": "Extend the existing pinned dependency bootstrap with explicit --repair-generated mode: regenerate the lockfile without install scripts, refresh documentation with the pinned generator, then retain the normal frozen install. The existing required lifecycle coverage gate exercises success, idempotence, runtime pins, lockfile failure, pinned-source failure and CLI arguments. The three new repair regressions fail against the original bootstrap and pass with the extension. Use this mode for the Separator repair.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dependency bootstrap can construct both generated artifacts from the manifests in one explicit operation, then verify the frozen dependency installation before reporting success. Default setup and CI remain frozen."
+      }
+    },
+    "guard": {
+      "path": "scripts/codex-setup.mjs",
+      "anchor": "Repair bot-generated dependency artifacts, then retain the frozen install gate."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "staged-dependency-source-map-refresh",
     "correction": "PR #1603: Dependabot's Radix Switch 1.3.8 manifest bump left the generated source map stale, failing Detect Changes, documentation parity and CI Summary. Repeated source-map repairs need a reusable commit-time refresh.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1603",
