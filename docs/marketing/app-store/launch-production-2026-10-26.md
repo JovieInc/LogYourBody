@@ -73,7 +73,7 @@ state, never reuse a convenient screenshot for a different claim.
 
 Only these two Fastlane images are tracked:
 
-- `apps/ios/fastlane/screenshots/en-US/01_APP_IPHONE_65.png`: 1242 × 2688.
+- `apps/ios/fastlane/screenshots/en-US/01_APP_IPHONE_65.png`: 1320 × 2868 (PNG header; the filename retains a legacy size label).
 - `apps/ios/fastlane/screenshots/en-US/01_IPAD_PRO_3GEN_129.png`: 2048 × 2732.
 
 Visual inspection of the iPhone image shows a body-fat ring, an offline banner,
