@@ -98,13 +98,13 @@ function contextEditSheetHostProblem(source: string): string | null {
   const context = source
     .split('.navigationDestination(isPresented: $isHomeV2ContextPresented) {')[1]
     ?.split('.navigationDestination(isPresented: $isHomeV2EntriesPresented) {')[0];
-  const sheet = '.sheet(item: $homeV2EditingSession)';
   const visibleHost =
     /^\s*homeV2ContextView\s*\.sheet\(item: \$homeV2EditingSession\) \{ session in\s*homeV2EditEntrySheet\(for: session\)/;
   if (!context || !visibleHost.test(context)) {
     return 'Context must host its edit-entry sheet on the visible navigation destination';
   }
-  if (source.split(sheet).length !== 2) {
+  const presenters = [...source.matchAll(/\.sheet\s*\(\s*item\s*:\s*\$homeV2EditingSession\b/g)];
+  if (presenters.length !== 1) {
     return 'Context must have exactly one edit-entry sheet presenter';
   }
   return null;
@@ -145,6 +145,18 @@ it('accepts one edit-entry presenter owned by Context and rejects duplicates', (
   expect(contextEditSheetHostProblem(contextHost + contextHost)).toBe(
     'Context must have exactly one edit-entry sheet presenter',
   );
+});
+
+it.each([
+  '.sheet( item: $homeV2EditingSession)',
+  '.sheet(\n    item: $homeV2EditingSession\n)',
+  '.sheet(item: $homeV2EditingSession, onDismiss: resetEditSession)',
+])('rejects a second edit-entry presenter with alternate formatting: %s', (presenter) => {
+  expect(
+    contextEditSheetHostProblem(
+      contextHost + `${presenter} { session in homeV2EditEntrySheet(for: session) }`,
+    ),
+  ).toBe('Context must have exactly one edit-entry sheet presenter');
 });
 
 it('keeps the edit-entry presenter on the visible Context destination', () => {

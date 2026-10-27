@@ -1821,5 +1821,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-context-edit-sheet-visible-host",
+    "correction": "PR #1574 / LYB-249: Launch Quality passed workout reconciliation cases but failed testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates because the Edit entry sheet never appeared after tapping its hittable Context button.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40418206171/job/121905931074",
+    "mechanization": "Merge origin/main first to retain its visible Context sheet presenter repair and every native assertion. Extend the same required shared-lib sheet-host guard to count competing presenters independently of whitespace, multiline arguments or onDismiss. Three regression mutations reproduce false acceptance before the extension and pass afterward; run the extended guard against the merged production source. Retain the existing Turbo source input, selectors, timeouts, account ownership and photo-import exclusions. The failed native run proves the sheet did not appear, not the callback admission or root cause; exact-head native execution remains required on macOS. The lanes harness owns pushing and PR updates, including the Machine line supplied in the handoff.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching the existing edit sheet to the navigation destination that contains its initiating control keeps its presenter in the visible view lifetime by construction. The existing required static sheet-host guard prevents moving it back or adding competing presenters."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/daily-reminder-sheet-host.test.ts",
+      "anchor": "keeps the edit-entry presenter on the visible Context destination"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
