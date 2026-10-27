@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1568 / LYB-247: Launch Quality run 40589668494 failed before XCTest because a shell behavior fixture exhausted its 10-second child-process deadline on hosted macOS. Repair the recurring red-check class without relaxing native qualification.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40589668494/job/122490587152",
+    "mechanization": "Extend the existing launch-quality evidence behavior suite with one shared, bounded 60-second shell fixture executor and route every shell scenario through it. A virtual monotonic-clock regression executes real Bash children with eleven seconds of simulated host delay, preserves success, failure and timeout exit statuses plus both output streams, and rejects a hung fixture after sixty-one virtual seconds. All three delayed status cases fail with the former ten-second budget and pass after the repair. The existing required shared-lib wrapper and both native/static audit entrypoints execute the expanded 31-case suite; retain their existing outer deadlines and all native selectors, retry rules, assertions, evidence and coverage gates. The lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Product runtime logic cannot control hosted process scheduling or the independent shell fixture watchdog."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required evidence suite can share a bounded host-process executor and deterministically verify delayed completion, original failure statuses and hung-process rejection with a virtual clock."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_shell_fixture_allows_host_delay_but_preserves_failures_and_bounds_hangs"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "unit-tier-stale-simulator-testmanagerd-socket",
     "correction": "PR #1568 (fix-red-e3b0c44298): Merge-group run 40573016311 failed its Mac Unit lane because an already booted persistent simulator advertised a missing testmanagerd socket. Compilation passed; no test cases executed.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40573138074",
