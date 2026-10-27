@@ -134,6 +134,9 @@ Invalid options must leave the ledger, existing artifact and job summary intact.
 Ledger repair checks raw staged bytes, rejecting newly staged conflict markers
 even with forced Git colors, binary diff attributes or text conversion;
 an unstaged repair cannot hide markers still present in the index.
+The classifier's Git fixtures exercise binary attributes through ledger repair,
+staging, staged retries and merge verification, preserving the index and ledger
+when any mode refuses the unresolved source.
 
 The existing required CI path checks coverage on **every diff**, including
 changes outside the ledger. It fetches the event's exact base revision (PR base,
