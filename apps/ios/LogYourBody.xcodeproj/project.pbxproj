@@ -475,6 +475,8 @@
 		FE01A1A100000000000000B1 /* TimelineDataProviderScrubTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */; };
 		FE02A2A200000000000000B2 /* DashboardMetricFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE02A2A200000000000000F2 /* DashboardMetricFormattingTests.swift */; };
 		FE03A3A300000000000000B3 /* BatterySyncIntervalPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE03A3A300000000000000F3 /* BatterySyncIntervalPolicy.swift */; };
+		E1A2630100000000000000A2 /* EarnedWinDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A2630100000000000000A1 /* EarnedWinDetector.swift */; };
+		E1A2630100000000000000B2 /* EarnedWinDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A2630100000000000000B1 /* EarnedWinDetectorTests.swift */; };
 		FE04A4A400000000000000B4 /* SyncIntervalAndChunkingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */; };
 		A62E114302EC00A5A0070101 /* SyncQueueRetentionPreparedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E114302EC00A5A0070102 /* SyncQueueRetentionPreparedTests.swift */; };
 		FE05A5A500000000000000B5 /* Glp1DoseCardData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE05A5A500000000000000F5 /* Glp1DoseCardData.swift */; };
@@ -1104,6 +1106,8 @@
 		FE01A1A100000000000000F1 /* TimelineDataProviderScrubTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineDataProviderScrubTests.swift; sourceTree = "<group>"; };
 		FE02A2A200000000000000F2 /* DashboardMetricFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardMetricFormattingTests.swift; sourceTree = "<group>"; };
 		FE03A3A300000000000000F3 /* BatterySyncIntervalPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatterySyncIntervalPolicy.swift; sourceTree = "<group>"; };
+		E1A2630100000000000000A1 /* EarnedWinDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarnedWinDetector.swift; sourceTree = "<group>"; };
+		E1A2630100000000000000B1 /* EarnedWinDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarnedWinDetectorTests.swift; sourceTree = "<group>"; };
 		FE04A4A400000000000000F4 /* SyncIntervalAndChunkingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncIntervalAndChunkingTests.swift; sourceTree = "<group>"; };
 		A62E114302EC00A5A0070102 /* SyncQueueRetentionPreparedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncQueueRetentionPreparedTests.swift; sourceTree = "<group>"; };
 		FE05A5A500000000000000F5 /* Glp1DoseCardData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Glp1DoseCardData.swift; path = Components/Glp1DoseCardData.swift; sourceTree = "<group>"; };
@@ -1417,6 +1421,7 @@
 				1C1C56EE58FC0F4BEFDA1345 /* DashboardViewModelHealthSyncWiringTests.swift */,
 				B7E4D91A06C34815F02A6C31 /* DashboardStepPersistenceTests.swift */,
 				F51C80EB60F2EA0D7AFA62AB /* EditEntrySavePolicyTests.swift */,
+				E1A2630100000000000000B1 /* EarnedWinDetectorTests.swift */,
 				620823F9E8905856BB1B666D /* GlobalTimelineServiceTests.swift */,
 				9F7D800638256D10A5ACB992 /* Glp1DoseCoreDataTests.swift */,
 				0DBA8FB9B9980A35A865BCAA /* Glp1DoseHistoryFormatterTests.swift */,
@@ -1620,6 +1625,7 @@
 				AD933DFF2E249EA000801078 /* PhotoLibraryScanner.swift */,
 				AD8552552E19A5B5003552EE /* RealtimeSyncManager.swift */,
 				FE03A3A300000000000000F3 /* BatterySyncIntervalPolicy.swift */,
+				E1A2630100000000000000A1 /* EarnedWinDetector.swift */,
 				FE13A3A300000000000000C2 /* FeatureReleasePolicy.swift */,
 				AD8552932E1CC15B003552EE /* BackgroundRemovalService.swift */,
 				ADF5C1B32E1CDB9C00E3FB4D /* PhotoMetadataService.swift */,
@@ -2388,6 +2394,7 @@
 				93AEA1AF2FA4E6E91E7B482A /* LoadingManagerHealthSyncTests.swift in Sources */,
 				4C64677ABA2986677DDE1389 /* LogWeightFormValidatorTests.swift in Sources */,
 				FCE2872B32CFB9AD2CE87012 /* MetricChartDataPointPresenceTests.swift in Sources */,
+				E1A2630100000000000000B2 /* EarnedWinDetectorTests.swift in Sources */,
 				327C8C9174FEC7C23E350270 /* OnboardingFlowViewModelTests.swift in Sources */,
 				CCCD701F26CEB5C9F56AA8FB /* PaywallSavingsPolicyTests.swift in Sources */,
 				948778D2A40C5957E42E40CF /* PhaseInsightPolicyTests.swift in Sources */,
@@ -2585,6 +2592,7 @@
 				ADDC47BA2E2D89F3003C97E7 /* PhotoLibraryScanner.swift in Sources */,
 				ADDC47BC2E2D89F3003C97E7 /* RealtimeSyncManager.swift in Sources */,
 				FE03A3A300000000000000B3 /* BatterySyncIntervalPolicy.swift in Sources */,
+				E1A2630100000000000000A2 /* EarnedWinDetector.swift in Sources */,
 				ADDC47BD2E2D89F3003C97E7 /* BackgroundRemovalService.swift in Sources */,
 				ADDC47BE2E2D89F3003C97E7 /* PhotoMetadataService.swift in Sources */,
 				9B5611E2F8314E22A5BF7889 /* ImageCacheService.swift in Sources */,

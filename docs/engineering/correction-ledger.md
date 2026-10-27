@@ -97,7 +97,9 @@ Both resolver entrypoints share a preflight that refuses other unresolved Git
 paths before reading guard evidence or writing the ledger. Resolve and stage
 those source conflicts first, even when their files still contain guard anchors.
 The preflight reads raw staged changes with binary hiding and text conversions
-disabled, so diff attributes cannot conceal unresolved conflict markers. Both
+disabled, so diff attributes cannot conceal unresolved conflict markers. Git's
+marker check also honors per-path `conflict-marker-size` values below seven;
+whitespace policy remains with the existing lint gates. Both
 resolution and pre-commit merge verification refuse those markers without writes.
 The Git fixtures combine forced color with binary/textconv attributes and cover
 all four CRLF marker forms and wider markers, so composing protections during

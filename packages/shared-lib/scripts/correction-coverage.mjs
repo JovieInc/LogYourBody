@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -267,28 +267,47 @@ export function assertLedgerMergeReady(root) {
     0,
     `ledger merge: resolve other conflicts first: ${otherConflicts.join(', ')}`,
   );
-  const staged = execFileSync(
-    'git',
-    [
-      'diff',
-      '--cached',
-      '--no-ext-diff',
-      '--no-textconv',
-      '--no-color',
-      '--text',
-      '--unified=0',
-      '--',
-      '.',
-      `:!${LEDGER_PATH}`,
-    ],
-    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-  );
+  const diffArgs = [
+    '--cached',
+    '--no-ext-diff',
+    '--no-textconv',
+    '--no-color',
+    '--text',
+    '--unified=0',
+    '--',
+    '.',
+    `:!${LEDGER_PATH}`,
+  ];
+  const staged = execFileSync('git', ['diff', ...diffArgs], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
   // Staging a file does not prove its conflict markers were resolved.
   // Inspect raw staged bytes even when diff attributes hide or transform source.
   assert.doesNotMatch(
     staged,
     /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,
     'ledger merge: resolve staged conflict markers first',
+  );
+  // Git also recognizes per-path conflict-marker-size values below seven.
+  // Check only markers here; the repository's lint gates own whitespace policy.
+  const markerCheck = spawnSync(
+    'git',
+    [
+      '-c',
+      'core.whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab,-indent-with-non-tab,-tab-in-indent',
+      'diff',
+      '--check',
+      ...diffArgs,
+    ],
+    { cwd: root, encoding: 'utf8' },
+  );
+  assert.ifError(markerCheck.error);
+  assert.equal(
+    markerCheck.status,
+    0,
+    `ledger merge: resolve staged conflict markers first\n${markerCheck.stderr}${markerCheck.stdout}`,
   );
 }
 

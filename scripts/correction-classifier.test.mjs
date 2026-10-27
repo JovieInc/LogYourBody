@@ -272,6 +272,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     'staged-marker',
     'textconv-marker',
     'color-marker',
+    'narrow-marker',
   ].map((scenario) => [scenario, false]);
   scenarios.push(
     ['additions', true],
@@ -282,6 +283,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     ['staged-marker', true],
     ['textconv-marker', true],
     ['color-marker', true],
+    ['narrow-marker', true],
   );
   for (const [scenario, stageMerge] of scenarios) {
     const refused = [
@@ -293,6 +295,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       'staged-marker',
       'textconv-marker',
       'color-marker',
+      'narrow-marker',
     ].includes(scenario);
     const repository = join(directory, `repository with spaces ${scenario} ${stageMerge}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
@@ -403,8 +406,16 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       // User presentation settings cannot hide conflict markers from the resolver.
       git('config', 'color.ui', 'always');
     }
-    if (['staged-marker', 'textconv-marker', 'color-marker'].includes(scenario)) {
-      writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`);
+    if (scenario === 'narrow-marker') {
+      writeFileSync(
+        join(repository, '.gitattributes'),
+        `${rows[0].guard.path} conflict-marker-size=3\n`,
+      );
+      git('add', '.gitattributes');
+    }
+    if (['staged-marker', 'textconv-marker', 'color-marker', 'narrow-marker'].includes(scenario)) {
+      const marker = scenario === 'narrow-marker' ? '<<< HEAD' : '<<<<<<< HEAD';
+      writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
       git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
@@ -469,6 +480,10 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
         ['', '>>>>>>> incoming'],
         ['-diff', '<<<<<<< HEAD'],
         ['diff=conceal', '<<<<<<< HEAD'],
+        ['conflict-marker-size=1', '< HEAD'],
+        ['conflict-marker-size=3', '||| base'],
+        ['conflict-marker-size=3', '==='],
+        ['conflict-marker-size=6', '>>>>>> incoming'],
       ]) {
         writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} ${attribute}\n`);
         git('add', '.gitattributes');
@@ -489,6 +504,16 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       }
       git('add', rows[0].guard.path);
       assert.equal(run('--check-merge', repository).status, 0);
+      writeFileSync(
+        join(repository, rows[0].guard.path),
+        `${rows[0].guard.anchor}\nvalid source with trailing whitespace  \n`,
+      );
+      git('add', rows[0].guard.path);
+      assert.equal(
+        run('--check-merge', repository).status,
+        0,
+        'marker checks do not add a whitespace policy',
+      );
       continue;
     }
     assert.equal(git('ls-files', '-u'), stages, 'resolution does not stage files');
