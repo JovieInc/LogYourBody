@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a183af06f3cd7aa4838eb62ebef999b56621f7d027c2ab25374486b6eb48790b`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `dc723850d2e698cc17d03b2b13227bf3116b6b71da43cf0b2697170255ca8911`)
 
 ### `apps/web/package.json`: engines
 
@@ -112,7 +112,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@statsig/statsig-node-core": "0.23.1",
   "@tailwindcss/postcss": "^4.3.3",
   "@tailwindcss/typography": "^0.5.20",
-  "@tanstack/react-query": "^5.104.4",
+  "@tanstack/react-query": "^5.104.5",
   "@types/react-syntax-highlighter": "^15.5.13",
   "@vercel/analytics": "^1.6.1",
   "@vercel/speed-insights": "^1.3.1",
@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `0c3e6a93be883d68b0a7623e60d2154c4bcdbe0cae88b8eeb78beb9d1532852e`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a184d78ba6cf4c799260680b6c7c8ddd7d21c59147f871c01328184734818671`)
 
 ### `package.json`: packageManager
 
@@ -279,7 +279,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "lint-staged": "^15.5.2",
   "prettier": "^3.9.9",
   "prettier-plugin-tailwindcss": "^0.8.1",
-  "turbo": "^2.11.7",
+  "turbo": "^2.11.9",
   "typescript": "^5.9.3",
   "vitest": "^5.0.5"
 }
@@ -386,7 +386,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `ba5be6130767de026f0eae28bbbd5afa5b2095f527b6ec73a81da0dc25ad2e6f`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `f2cad6a577b0492bd6fb51b3b5678069b84824c2b9ca897722fbb57ce477ddb7`)
 - `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `1e7d727805b3918f54714fbd84407bd30d6441bff56ee89542027b0bc69a0eab`)
 
 ## Pinned shared sources
