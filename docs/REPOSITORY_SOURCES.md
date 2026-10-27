@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `742f67352d92f8d0b859e069774732054b42a07743132b59483bad8b39a43b08`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `27c79802b3a98a40b334ab98da6b6562a9d4400851a967c3e95ce30f8aa88b11`)
 
 ### `apps/web/package.json`: engines
 
@@ -79,7 +79,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@jovie/ui": "workspace:*",
   "@jovieinc/product-registry": "workspace:*",
   "@neondatabase/serverless": "1.0.2",
-  "@radix-ui/react-accordion": "^1.2.21",
+  "@radix-ui/react-accordion": "^1.3.1",
   "@radix-ui/react-alert-dialog": "^1.1.23",
   "@radix-ui/react-aspect-ratio": "^1.2.0",
   "@radix-ui/react-avatar": "^1.3.1",
