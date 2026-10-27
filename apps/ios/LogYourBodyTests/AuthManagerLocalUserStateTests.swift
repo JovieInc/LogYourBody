@@ -169,10 +169,7 @@ final class AuthManagerLocalUserStateTests: XCTestCase {
     }
 
     func testRefreshKeepsCompletedProfileForSameSubject() async throws {
-        try XCTSkipUnless(
-            KeychainAvailability.isAvailable(),
-            "Keychain unavailable on unsigned CI test host"
-        )
+        try KeychainAvailability.requireAvailable()
         ProfileRefreshStubURLProtocol.install { request in
             let path = request.url?.path ?? ""
             if path.contains("oauth2/token") {

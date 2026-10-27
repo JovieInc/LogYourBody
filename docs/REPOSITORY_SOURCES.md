@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5db80253b112a500bfd69fb48dcff21e0591a648856ec56486cd24cb622607e3`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a9865698e8b84fac33f67c5eb1303683a478d356745fd71c6ba4704f64756772`)
 
 ### `apps/web/package.json`: engines
 
@@ -55,8 +55,8 @@ A changed fingerprint requires review of its related documentation; it does not 
   "prepush": "pnpm run check",
   "start": "next start",
   "sync:marketing-assets": "node ../../scripts/marketing/sync-ios-marketing-assets.mjs",
-  "test": "jest && tsx --test scripts/voice-adapters.test.ts",
-  "test:ci": "jest --runInBand && tsx --test scripts/voice-adapters.test.ts",
+  "test": "jest --coverage && tsx --test scripts/voice-adapters.test.ts",
+  "test:ci": "jest --coverage --runInBand && tsx --test scripts/voice-adapters.test.ts",
   "test:coverage": "jest --coverage",
   "test:e2e": "playwright test",
   "test:e2e:ui": "playwright test --ui",
@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a184d78ba6cf4c799260680b6c7c8ddd7d21c59147f871c01328184734818671`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `e43edfe0dbd405c783fcdec0a83a3a8edb66dca8d38d016e576efc624c58cc20`)
 
 ### `package.json`: packageManager
 
@@ -245,6 +245,8 @@ A changed fingerprint requires review of its related documentation; it does not 
   "test": "turbo run test",
   "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
   "test:knowledge-lint": "node --test scripts/lint-no-specifics.test.mjs scripts/lint-claims.test.mjs",
+  "test:launch-e2e": "pnpm --filter logyourbody exec playwright test tests/e2e/launch-funnel.spec.ts --project=desktop --project=mobile-portrait --workers=1",
+  "test:mutation": "turbo run test:mutation --filter=@logyourbody/shared-lib",
   "typecheck": "turbo run typecheck",
   "web": "pnpm --filter logyourbody dev"
 }
@@ -349,7 +351,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1a02cb5943c081cef910b7c77664e20ea48becea75e105104c578db8c6a7408f`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c39ce2c9cad6bc69043562b674c80607520a06972f0bd1019a207e7c82c20315`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -358,6 +360,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "build": "tsc -p tsconfig.json",
   "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
   "test": "vitest run --maxWorkers=2 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs",
+  "test:mutation": "node ../../scripts/mutation/run.mjs",
   "typecheck": "tsc --noEmit -p tsconfig.json"
 }
 ```
@@ -386,7 +389,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `70f8746bd463c45099f16a47e1b64f18fc56000e3331756d06c09cacb5cc77ad`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `c82b649ce9cdc9046245a7eb109bd80b1d8c4e0a2250ccb3dc3c223219e3d6b5`)
 - `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `1e7d727805b3918f54714fbd84407bd30d6441bff56ee89542027b0bc69a0eab`)
 
 ## Pinned shared sources

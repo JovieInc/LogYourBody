@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "xctskip-diagnostics-use-public-message",
+    "correction": "PR #1618 (fix-red-5df69c1e5f): Launch Quality run 40454867112 failed six assertions in the injected Keychain capability tests because String(describing: error) did not expose XCTSkip's supplied diagnostic message.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40454867112/job/122025900952",
+    "mechanization": "Read the typed XCTSkip.message property and assert the complete operation, symbolic and raw status, and entitled-host qualification text for both allowed add/copy statuses. Extend the existing SwiftLint custom rules with xctskip_message to reject reflection after positive XCTSkip type assertions. The normal shared-lib suite exercises violating and permitted fixtures using the configured expression, scans both native test trees, and verifies their Turbo inputs. The new source regression fails against the original Keychain tests while the other 191 shared-lib cases pass. Native XCTest execution remains required in CI; no test, skip classification, cleanup check or gate is removed. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "XCTest owns XCTSkip's reflected representation. This receipt concerns test diagnostic assertions; no product runtime change can prevent future tests from depending on that representation."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required SwiftLint and shared-lib checks can reject reflection of a positively identified XCTSkip, while allowing its public message and descriptions of unrelated errors."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/.swiftlint.yml",
+      "anchor": "xctskip_message:"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "healthkit-timezone-policy-without-source-identity",
     "correction": "PR #1567: Launch Quality failed the two cross-day timezone assertions in HealthImportIdempotencyTests. Selecting the sample-local day must not depend on having a complete source-scoped identity.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1567",
@@ -94,24 +116,6 @@
     "correction": "PR #1601: Dependabot's Radix Aspect Ratio 1.2.0 update left the repository source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must verify valid bot lockfiles without re-resolving unrelated dependencies.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1601",
     "mechanization": "Extend the existing source resolver with --verify-lockfile: retain dirty-input and pinned-source checks, verify the existing lockfile through frozen offline Corepack pnpm with lifecycle scripts disabled, then stage only the regenerated projection. Four behavioral regressions in the existing required Detect Changes suite fail before the extension and pass afterward, proving successful repair and idempotence without re-resolution, frozen-check failure propagation, dirty-source refusal and pinned-drift refusal. Use the mode on this dependency update; retain every existing frozen-install and parity gate.",
-    "classification": {
-      "codebase": {
-        "feasible": true,
-        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
-      }
-    },
-    "guard": {
-      "path": "scripts/resolve-repository-docs.py",
-      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
-    },
-    "level": "codebase",
-    "ruleId": "code-prevention"
-  },
-  {
-    "fingerprint": "dependency-update-lockfile-and-source-parity",
-    "correction": "PR #1614: The Radix Aspect Ratio 1.2.0 manifest update retained a 1.1.15 workspace lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Repair the dependency artifacts together and extend the existing repair machine.",
-    "source": "https://github.com/JovieInc/LogYourBody/pull/1614",
-    "mechanization": "Extend the existing explicit lockfile/source-map repair helper to reject untracked dependency inputs before invoking pnpm. Three real Git fixture cases for an untracked workspace manifest, workspace configuration and npmrc failed before the extension and pass afterward; all 50 required change-detection/helper cases pass. The guard preserves local input bytes, the lockfile, projection and index. Use the extended helper to regenerate this PR's lockfile, verify frozen offline resolution and stage source parity while retaining the existing CI gates.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1230,7 +1234,7 @@
     },
     "guard": {
       "path": "apps/web/src/app/sitemap.ts",
-      "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
+      "anchor": "url: new URL(path, endpoints.hosts.marketing.url).href"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -1693,6 +1697,190 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "purchase-success-requires-active-entitlement",
+    "correction": "The launch audit found purchase success was emitted after SDK completion without an active entitlement, and cancellation outcomes were discarded.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/ios/LogYourBody/Services/RevenueCatManager+Part01.swift",
+    "mechanization": "Normalize cancellation at the adapter, capture the rollout policy once per attempt, and require an active entitlement before reporting success. Eight native regressions cover missing/inactive entitlements, restore recovery, cancellation and a policy change during purchase. Static audits pass; native red/green execution remains unverified until the real macOS runner executes this source. The billing verification gate remains default-off.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/RevenueCatPurchaseRestoreFlowTests.swift",
+      "anchor": "func testPurchaseWithoutEntitlementDoesNotReportSuccessAndCanRecoverByRestore()"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "analytics-sdk-failure-blocks-conversion",
+    "correction": "The launch audit found optional telemetry SDK failures could interrupt signup and prevent the other analytics adapter from receiving events.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/web/src/lib/statsigAnalyticsAdapter.ts",
+    "mechanization": "Catch synchronous SDK construction, initialization and method failures at the existing adapter boundary. Three failing-before regressions now pass, including fallback delivery through the real two-adapter composition. Retain existing payload allowlists.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/__tests__/statsigAnalyticsAdapter.test.ts",
+      "anchor": "keeps conversion usable and permits retry when SDK construction throws"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "waitlist-funnel-outcome-attribution",
+    "correction": "The editorial landing omitted attempted/outcome funnel stages and exposed obsolete duplicate-status copy; normal result events lacked attribution.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/web/src/app/ExperimentWaitlistLanding.tsx",
+    "mechanization": "Both existing form paths now emit bounded attribution on request outcomes. Editorial success uses the same non-enumerating acceptance response. Eight editorial/schema regressions and five normal-form assertions failed before the fixes and pass afterward. Accepted requests remain distinct from durable registrations.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/experiment-waitlist-landing.test.tsx",
+      "anchor": "records bounded funnel outcomes"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "growth-evidence-actionable-repair-plan",
+    "correction": "The private growth report identified missing evidence without giving an actionable repair plan for closed-loop iteration.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/packages/shared-lib/scripts/growth-report.mjs",
+    "mechanization": "Emit deterministic source commissioning/reconciliation/refresh actions and not-before dates for immature cohorts. Three new behavioral regressions failed before implementation; all 14 report tests then passed with 100% source line, branch and function coverage. No provider commissioning or customer-outcome evidence is fabricated.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/growth-report.behavior.mjs",
+      "anchor": "turns missing evidence into bounded source actions instead of an experiment verdict"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-storefront-subscription-truth-and-search",
+    "correction": "The launch audit found incomplete subscription disclosures, no weight keyword, and unsupported claims in obsolete marketing code.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/packages/product-registry/src/storefronts/logyourbody.mjs",
+    "mechanization": "Prepare and validate a held listing with truthful trial eligibility, renewal, cancellation, legal links and weight search intent, and remove unused misleading web copy. The disclosure assertions apply to the held proposal outside canonical generator inputs because main-branch Fastlane metadata changes automatically write App Store Connect. Canonical publication files remain unchanged; final native screenshots, publication authorization and live ASC readback remain unverified.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "packages/product-registry/scripts/storefront.test.mjs",
+      "anchor": "${locale.id} description needs the canonical Terms of Use link"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-published-article-discovery",
+    "correction": "Published blog posts were absent from the sitemap and article shares inherited homepage metadata.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/web/src/app/sitemap.ts",
+    "mechanization": "Reuse the existing publication boundary for sitemap entries and generate article-specific sharing metadata. Two new SEO regressions failed before repair; all 11 relevant cases passed afterward, including draft exclusion. Preserve the earlier public-route invariant and update its source anchor to the same canonical URL construction after adding posts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/marketing-discovery.test.tsx",
+      "anchor": "includes published article URLs with safely encoded slugs"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-policy-mutation-evidence",
+    "correction": "The launch goal requires deliberate code mutation testing; existing database mutation tests did not supply it.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/packages/shared-lib/package.json",
+    "mechanization": "Run isolated semantic mutants against actual growth/release policies through the required shared-lib suite. Reject survivors, invalid syntax, missing source coverage, timeouts and incomplete execution. Independent review reproduced empty-coverage and orphan-process bugs; both regression fixtures now pass after repair. All 14 curated mutants are killed by assertions; this is bounded policy evidence, not whole-app or native mutation coverage.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/mutation-quality.test.ts",
+      "anchor": "requires every curated launch mutant to be killed by actual assertions"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-browser-server-port-alignment",
+    "correction": "The launch browser harness expected port 5173 while Next.js started on 3000, leaving local end-to-end verification unable to connect.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/web/playwright.config.ts",
+    "mechanization": "Derive server and browser URLs from one validated port and pin prelaunch flags in a dedicated test server. New browser cases exercise six real public surfaces, canonical metadata, keyboard activation and signup failure/retry/acceptance. The first complete run passed 18 desktop/mobile cases after narrowing the alert selector. Intercepted signup responses do not prove database commissioning.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/web/tests/e2e/launch-funnel.spec.ts",
+      "anchor": "waitlist validates, recovers after failure, and accepts once"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "public-feature-flag-secret-scanner-false-positive",
+    "correction": "PR #1618: Required Gitleaks scanning identified a public billing feature flag assigned to a key-named constant as a generic API secret.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1618",
+    "mechanization": "Reproduced the exact Git-range finding with checksum-verified Gitleaks 8.30.1. Rename the constant and reference to gateName, retain the flag value and purchase behavior, and keep the existing required scanner unmodified. An independent temporary-file scan and the corrected source scan both report zero findings. Replace the task-owned single feature commit so the false positive is absent from the PR scan range; no credentials or scanner allowances are changed.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The flag identifier is intentionally public; entitlement behavior is unchanged and cannot prevent a scanner naming heuristic."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The unchanged required Gitleaks workflow detects flagged source additions. Use accurate constant naming instead of an exception or weaker scanner."
+      }
+    },
+    "guard": {
+      "path": ".github/workflows/security-scan.yml",
+      "anchor": "uses: JovieInc/ci/.github/workflows/secret-scan.yml@44105468cc7c271e5f117baec9effca295ebd13c"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1614: The Radix Aspect Ratio 1.2.0 manifest update retained a 1.1.15 workspace lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Repair the dependency artifacts together and extend the existing repair machine.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1614",
+    "mechanization": "Extend the existing explicit lockfile/source-map repair helper to reject untracked dependency inputs before invoking pnpm. Three real Git fixture cases for an untracked workspace manifest, workspace configuration and npmrc failed before the extension and pass afterward; all 50 required change-detection/helper cases pass. The guard preserves local input bytes, the lockfile, projection and index. Use the extended helper to regenerate this PR's lockfile, verify frozen offline resolution and stage source parity while retaining the existing CI gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "diagnostic-audit-pin-matches-reviewed-runner",
     "correction": "PR #1554: The bounded cold-build repair changed the launch-quality audit bytes without refreshing the trusted diagnostic SHA-256 pin, failing Mac Runner Routing Tests and CI Summary.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40392549503/job/121817018662",
@@ -1894,6 +2082,24 @@
     "guard": {
       "path": ".github/scripts/detect-changes.test.mjs",
       "anchor": "commit source-map repair uses staged dependencies and preserves unstaged source edits"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-keychain-capability-skip-classification",
+    "correction": "PR #1618 native qualification audit: all 50 Keychain-dependent skips used a capability probe that returned false for every raw Security failure and mismatched copied value, allowing unexpected failures to masquerade as an unsupported host.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1618",
+    "mechanization": "Replace the Boolean capability probe with a throwing test-only requirement. Only raw SecItemAdd or SecItemCopyMatching errSecMissingEntitlement and errSecNotAvailable results permit XCTSkip; unexpected statuses and missing, wrong-type or mismatched values fail. Always attempt deletion after a successful add, fail any cleanup error and retain the preceding error. Add 11 injected Security regressions in the already registered native test source for successful round-trip identity, both allowed statuses at add/copy, unexpected statuses, invalid data, cleanup and diagnostics without probe data or identifiers. Native failing/passing execution remains unverified on this Linux host. These helper regressions do not qualify the 50 product behavior cases: non-skipped entitled-host execution remains required. Product auth, Keychain behavior, signing and CI controls are unchanged; root retains commit, push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing raw Security test probe can classify capability failures before throwing XCTest skips, preventing unexpected operation and data-verification failures from becoming environment skips by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/KeychainAvailability.swift",
+      "anchor": "Only independently recognized host-capability failures may skip."
     },
     "level": "codebase",
     "ruleId": "code-prevention"
