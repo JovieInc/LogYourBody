@@ -275,7 +275,7 @@ function stagedDiffHasConflictMarker(root) {
     fd = openSync(join(directory, 'staged.diff'), 'w+', 0o600);
     execFileSync(
       'git',
-      ['diff', '--cached', '--no-ext-diff', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+      ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
       { cwd: root, stdio: ['ignore', fd, 'pipe'] },
     );
     const buffer = Buffer.alloc(64 * 1024);
