@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c4c0e34c8ddcccbb97fb1b1fbd184e0a8e68417c5e704ee67817a36930843161`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `742f67352d92f8d0b859e069774732054b42a07743132b59483bad8b39a43b08`)
 
 ### `apps/web/package.json`: engines
 
@@ -169,7 +169,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@testing-library/user-event": "^14.6.7",
   "@types/jest": "^30.0.0",
   "@types/js-yaml": "4.0.9",
-  "@types/lodash": "^4.17.25",
+  "@types/lodash": "^4.17.27",
   "@types/node": "^20.19.43",
   "@types/react": "^19.3.0",
   "@types/react-dom": "^19.3.0",
