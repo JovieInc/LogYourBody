@@ -33,6 +33,18 @@ map from the merged sources. This wraps the pinned generator and refuses to
 write while any other file is unmerged or a shared import fails parity. It
 stages only the generated output; review the source diff before committing.
 
+If both parents changed only the diagnostic workflow's project fingerprint,
+review the merged Xcode project diff and run
+`python3 scripts/resolve-repository-docs.py --reviewed-project-sha256 <SHA-256>`.
+This explicit merge repair requires the supplied digest to match the indexed and
+working project, and requires all three workflow versions to agree outside that
+one pin. It resolves and stages only that workflow conflict, preserving the audit
+pin and every other workflow byte. It refuses other workflow edits, unmerged
+projects, symlinked inputs and unstaged edits; a staging failure restores the
+original conflict. Then use `--staged` to regenerate the source map and the
+classified-ledger resolver for any remaining ledger conflict. No pin is refreshed
+implicitly by the commit hook or CI.
+
 The pre-commit hook runs `python3 scripts/resolve-repository-docs.py --staged`
 after formatting and correction classification. It refreshes the projection
 from indexed sources, preserves unstaged source edits, and refuses unstaged

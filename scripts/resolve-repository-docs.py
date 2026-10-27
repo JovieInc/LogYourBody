@@ -2,6 +2,7 @@
 """Refresh generated documentation from merged or staged sources with the pinned generator."""
 import argparse
 import json
+import re
 import subprocess
 import tempfile
 from contextlib import contextmanager
@@ -29,6 +30,67 @@ def staged_bytes(root, name):
     return subprocess.run(
         ["git", "show", ":" + name], cwd=root, check=True, capture_output=True,
     ).stdout
+
+
+def resolve_reviewed_project_pin(root, reviewed_sha256):
+    """Resolve only a pin conflict after an explicit review of the indexed project."""
+    root = Path(root).resolve()
+    project = "apps/ios/LogYourBody.xcodeproj/project.pbxproj"
+    workflow = ".github/workflows/ios-ui-diagnostics.yml"
+    if not re.fullmatch(r"[0-9a-f]{64}", reviewed_sha256):
+        raise ValueError("reviewed project SHA-256 must be 64 lowercase hex characters")
+    for name in (project, workflow):
+        source = root / name
+        if source.is_symlink() or source.resolve() != source:
+            raise ValueError("refusing symlinked project pin input: " + name)
+    project_bytes = staged_bytes(root, project)
+    if ((root / project).read_bytes() != project_bytes
+            or repository_docs.digest(project_bytes) != reviewed_sha256):
+        raise ValueError("reviewed project SHA-256 must match both index and working tree")
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=root, check=True, capture_output=True).stdout
+
+    # This opt-in never infers approval or changes a gate, audit pin or other dependency.
+    git("rev-parse", "--verify", "MERGE_HEAD")
+    pattern = re.compile(rb"(?m)^([ \t]*'" + re.escape(project.encode())
+                         + rb"': ')([0-9a-f]{64})(',\n)")
+
+    def repin(source):
+        matches = list(pattern.finditer(source))
+        if len(matches) != 1:
+            raise ValueError("expected exactly one diagnostic project pin")
+        match = matches[0]
+        return (source[:match.start(2)] + reviewed_sha256.encode() + source[match.end(2):],
+                match[0])
+
+    target = root / workflow
+    original = target.read_bytes()
+    if not git("ls-files", "--unmerged", "--", workflow):
+        indexed = staged_bytes(root, workflow)
+        if original != indexed or repin(indexed)[0] != indexed:
+            raise ValueError("staged project pin retry requires the reviewed pin and no unstaged edits")
+        print("repository-docs: verified staged reviewed project pin")
+        return
+    parents = [git("show", f":{stage}:{workflow}") for stage in (1, 2, 3)]
+    replacements = [repin(source) for source in parents]
+    if len({source for source, _ in replacements}) != 1:
+        raise ValueError("resolve non-pin workflow changes manually")
+    base, ours, theirs = [line for _, line in replacements]
+    conflict = (rb"(?m)^<{7}[^\n]*\n" + re.escape(ours)
+                + rb"(?:^\|{7}[^\n]*\n" + re.escape(base) + rb")?"
+                + rb"^={7}\n" + re.escape(theirs) + rb"^>{7}[^\n]*\n")
+    reviewed_line = repin(ours)[0]
+    resolved, count = re.subn(conflict, lambda _: reviewed_line, original)
+    if count != 1 or resolved != replacements[0][0]:
+        raise ValueError("expected only the project pin conflict; preserve and review other edits")
+    target.write_bytes(resolved)
+    try:
+        git("add", "--", workflow)
+    except (OSError, subprocess.CalledProcessError):
+        target.write_bytes(original)
+        raise
+    print("repository-docs: resolved and staged reviewed project pin " + reviewed_sha256)
 
 
 def resolve_staged(root):
@@ -141,9 +203,12 @@ def main():
     mode.add_argument("--staged", action="store_true", help="refresh from the Git index before commit")
     mode.add_argument("--refresh-lockfile", action="store_true", help="repair and verify the pnpm lockfile before refreshing docs")
     mode.add_argument("--verify-lockfile", action="store_true", help="verify the frozen pnpm lockfile offline before refreshing docs")
+    mode.add_argument("--reviewed-project-sha256", help="resolve only the diagnostic project pin conflict using an explicitly reviewed indexed project SHA-256")
     args = parser.parse_args()
     try:
-        if args.staged:
+        if args.reviewed_project_sha256:
+            resolve_reviewed_project_pin(args.root, args.reviewed_project_sha256)
+        elif args.staged:
             resolve_staged(args.root)
         else:
             resolve(args.root, args.refresh_lockfile, args.verify_lockfile)

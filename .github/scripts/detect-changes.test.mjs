@@ -2,6 +2,7 @@
 // runs detect-changes.sh against real git fixtures, then runs the gate's shell.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -658,6 +659,144 @@ function sourceMapConflict({ sourceConflict = false, ledgerConflict = false } = 
     path.join(scriptDir, '../../scripts/resolve-repository-docs.py'), '--root', root,
   ], { env: gitEnv, encoding: 'utf8' });
   return { root, output, config, resolve };
+}
+
+function projectPinConflict({
+  otherConflict = false,
+  projectConflict = false,
+  style = 'merge',
+} = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'project-pin-merge-'));
+  const project = 'apps/ios/LogYourBody.xcodeproj/project.pbxproj';
+  const workflow = '.github/workflows/ios-ui-diagnostics.yml';
+  const digest = (source) => createHash('sha256').update(source).digest('hex');
+  git(root, 'init', '-q', '-b', 'main');
+  git(root, 'config', 'merge.conflictStyle', style);
+  const source = 'first\n' + 'context\n'.repeat(10) + 'last\n';
+  const checkpoint = (contents, label) =>
+    commit(
+      root,
+      {
+        [project]: contents,
+        [workflow]:
+          `# Keep the reviewed audit fence\nDEPENDENCIES = {\n  '${project}': '${digest(contents)}',\n}\n` +
+          '\n'.repeat(10) +
+          (otherConflict ? label : 'unchanged') +
+          '\n',
+      },
+      label,
+    );
+  checkpoint(source, 'base');
+  git(root, 'checkout', '-q', '-b', 'feature');
+  checkpoint(source.replace('first', 'feature'), 'feature');
+  git(root, 'checkout', '-q', 'main');
+  checkpoint(source.replace(projectConflict ? 'first' : 'last', 'main'), 'main');
+  git(root, 'checkout', '-q', 'feature');
+  assert.throws(() => git(root, 'merge', '--no-commit', 'main'));
+  const resolve = (sha = digest(fs.readFileSync(path.join(root, project)))) =>
+    spawnSync(
+      'python3',
+      [
+        path.join(scriptDir, '../../scripts/resolve-repository-docs.py'),
+        '--root',
+        root,
+        '--reviewed-project-sha256',
+        sha,
+      ],
+      { env: gitEnv, encoding: 'utf8' },
+    );
+  return { root, project, workflow, digest, resolve };
+}
+
+for (const style of ['merge', 'diff3']) {
+  test(`reviewed project pin merge repair preserves both source parents and every other workflow byte (${style})`, () => {
+    const fx = projectPinConflict({ style });
+    try {
+      const project = fs.readFileSync(path.join(fx.root, fx.project));
+      assert.match(project.toString(), /^feature\n/);
+      assert.match(project.toString(), /\nmain\n$/);
+      const digest = fx.digest(project);
+      const original = git(fx.root, 'show', `:2:${fx.workflow}`);
+      const expected = original.replace(/'[a-f0-9]{64}'/, `'${digest}'`) + '\n';
+      const result = fx.resolve(digest);
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.workflow), 'utf8'), expected);
+      assert.deepEqual(fs.readFileSync(path.join(fx.root, fx.project)), project);
+      assert.equal(git(fx.root, 'diff', '--name-only', '--diff-filter=U'), '');
+      assert.equal(git(fx.root, 'show', `:${fx.workflow}`), expected.trim());
+      const index = git(fx.root, 'ls-files', '--stage');
+      assert.equal(fx.resolve(digest).status, 0, 'staged retries are idempotent');
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+
+for (const failure of [
+  'wrong-digest',
+  'invalid-digest',
+  'dirty-project',
+  'dirty-workflow',
+  'other-conflict',
+  'project-conflict',
+  'staged-drift',
+  'symlink-project',
+  'index-lock',
+]) {
+  test(`reviewed project pin merge repair refuses ${failure} without writing or staging`, () => {
+    const fx = projectPinConflict({
+      otherConflict: failure === 'other-conflict',
+      projectConflict: failure === 'project-conflict',
+    });
+    try {
+      const digest = fx.digest(fs.readFileSync(path.join(fx.root, fx.project)));
+      if (failure === 'dirty-project')
+        fs.appendFileSync(path.join(fx.root, fx.project), 'unstaged\n');
+      if (failure === 'dirty-workflow')
+        fs.appendFileSync(path.join(fx.root, fx.workflow), '# local edit\n');
+      if (failure === 'symlink-project') {
+        fs.renameSync(path.join(fx.root, fx.project), path.join(fx.root, 'saved-project'));
+        fs.symlinkSync(path.join(fx.root, 'saved-project'), path.join(fx.root, fx.project));
+      }
+      if (failure === 'index-lock')
+        fs.writeFileSync(path.join(fx.root, '.git/index.lock'), 'existing lock\n');
+      if (failure === 'staged-drift') {
+        assert.equal(fx.resolve(digest).status, 0);
+        fs.appendFileSync(path.join(fx.root, fx.workflow), '# local edit\n');
+      }
+      const workflow = fs.readFileSync(path.join(fx.root, fx.workflow));
+      const project = fs.readFileSync(path.join(fx.root, fx.project));
+      const index = git(fx.root, 'ls-files', '--stage');
+      const result = fx.resolve(
+        failure === 'wrong-digest'
+          ? '0'.repeat(64)
+          : failure === 'invalid-digest'
+            ? 'unreviewed'
+            : digest,
+      );
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(
+        result.stderr,
+        {
+          'wrong-digest': /must match both index and working tree/,
+          'invalid-digest': /must be 64 lowercase hex/,
+          'dirty-project': /must match both index and working tree/,
+          'dirty-workflow': /preserve and review other edits/,
+          'other-conflict': /resolve non-pin workflow changes manually/,
+          'project-conflict': /returned non-zero exit status/,
+          'staged-drift': /no unstaged edits/,
+          'symlink-project': /refusing symlinked/,
+          'index-lock': /returned non-zero exit status/,
+        }[failure],
+      );
+      assert.deepEqual(fs.readFileSync(path.join(fx.root, fx.workflow)), workflow);
+      assert.deepEqual(fs.readFileSync(path.join(fx.root, fx.project)), project);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
 }
 
 for (const failure of [null, 'source-conflict', 'pinned-drift']) {

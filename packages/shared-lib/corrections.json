@@ -521,6 +521,72 @@
   },
   {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1575 / LYB-261: Resolve the origin/main correction-ledger conflict by retaining both quick-action CI receipts and all backward-planner/main receipts with their original sources and guards.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1575",
+    "mechanization": "Preserve both sides of the additive ledger merge. The existing required correction coverage check compares immutable-base source identities and rejects discarded receipts; its behavioral regressions cover deleted, replaced and reassigned source receipts. Verify the resolved ledger against both pre-merge parents.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1575 / LYB-261: Adding QuickPillRanker, SignalFreshness and their tests to the Xcode targets changed the project manifest without refreshing its diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40206106690/job/121207262932",
+    "mechanization": "Refresh only the exact project manifest hash after reviewing the three source files and their target membership. Retain all seven dependency pins and the required trusted CLI regression, which fails with the old hash and passes with the refreshed hash while preserving rejection of changed, missing, symlinked, dirty and untracked tooling.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1575 / LYB-261: Quick-action Xcode target additions left the project manifest fingerprint stale in docs/REPOSITORY_SOURCES.md, failing Detect Changes, CI Summary and documentation parity.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40206106690/job/121207263418",
+    "mechanization": "Regenerate the existing source projection after reviewing the Xcode manifest diff. The required projection checker fails before regeneration and passes afterward; the existing Detect Changes regression continues to reject missing or skippable parity enforcement.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
     "correction": "PR #1560: Resolve the origin/main correction-ledger conflict by retaining the backward-planner CI receipts and the training-cycle merge receipt with their original sources and guards.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1560",
     "mechanization": "Preserve both sides of the additive ledger merge. The existing required correction coverage check compares immutable-base source identities and rejects discarded receipts; its behavioral regressions cover deleted, replaced and reassigned source receipts. Verify the resolved ledger against both pre-merge parents.",
@@ -1283,7 +1349,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -2016,6 +2082,24 @@
     "guard": {
       "path": "scripts/correction-classifier.mjs",
       "anchor": "Failed staging must preserve the original ledger for an unattended retry."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "reviewed-native-project-pin-merge-repair",
+    "correction": "PR #1556 / LYB-241 (fix-red-e3b0c44298): Repeated origin/main merges conflict in the diagnostic project SHA-256 pin and generated source map after independent native target registrations. Preserve both parents and repair the reviewed fingerprint through an existing machine.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1556#reviewed-project-pin",
+    "mechanization": "Extend the existing source repair helper with explicit --reviewed-project-sha256. Require the reviewed digest to match the indexed and working project and all three workflow versions to differ only in that project pin. Resolve only the exact pin conflict, preserve every other workflow byte, refuse dirty or symlinked inputs and unrelated conflicts, restore the original conflict on staging failure, and verify idempotent staged retries. The existing required Detect Changes suite runs real Git merge/diff3 success and refusal fixtures. The new success regression fails against the prior helper and passes with the extension. Use the extension for this merge after reviewing the additive target registrations, then regenerate the source map and verify the classified ledger using the existing resolvers. Preserve the audit trust fence and all CI gates. The harness owns push and PR body updates; supply its Machine line in the handoff. Native execution on the merged head remains required in macOS CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge repair helper can construct the single reviewed fingerprint conflict resolution from immutable Git stages, validate an explicitly supplied project digest, and stage only the intended workflow change without inferring approval for other tooling changes."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "def resolve_reviewed_project_pin(root, reviewed_sha256):"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
