@@ -82,6 +82,29 @@ class StatsCardCompositionTests(unittest.TestCase):
         path.write_text(path.read_text() + "\nlet legacyColor = Color.white\n")
         self.assert_rejected("dashboard.system_b_theme_tokens")
 
+    def test_provenance_sheet_requires_presenting_binding(self):
+        self.replace("Views/HomeV2/HomeV2MetricEditorial.swift", "@Binding var isPresented: Bool",
+                     "var isPresented: Bool")
+        self.assert_rejected("provenance.presenting_binding_dismissal")
+
+    def test_provenance_done_cannot_use_ambient_dismiss(self):
+        self.replace("Views/HomeV2/HomeV2MetricEditorial.swift",
+                     "Button(action: { isPresented = false }, label: {",
+                     "Button(action: { dismiss() }, label: {")
+        self.assert_rejected("provenance.presenting_binding_dismissal")
+
+    def test_progress_provenance_must_pass_its_presenting_binding(self):
+        self.replace("Views/HomeV2/HomeV2MetricEditorial.swift",
+                     "HomeV2ProvenanceSheet(detail: provenance, isPresented: $showsProvenance)",
+                     "HomeV2ProvenanceSheet(detail: provenance, isPresented: .constant(true))")
+        self.assert_rejected("provenance.presenting_binding_dismissal")
+
+    def test_today_provenance_must_pass_its_presenting_binding(self):
+        self.replace("Views/HomeV2/HomeV2Surface.swift",
+                     "HomeV2ProvenanceSheet(detail: detail, isPresented: $showsProvenance)",
+                     "HomeV2ProvenanceSheet(detail: detail, isPresented: .constant(true))")
+        self.assert_rejected("provenance.presenting_binding_dismissal")
+
 
 if __name__ == "__main__":
     result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(StatsCardCompositionTests))

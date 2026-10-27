@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 
-it('checks Stats composition and real card styling through the launch audit with executed coverage', () => {
+it('checks Stats composition, card styling and provenance dismissal through the launch audit with executed coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const coverage = mkdtempSync(`${tmpdir()}/lyb-ui-audit-coverage-`);
   try {
@@ -33,7 +33,7 @@ it('checks Stats composition and real card styling through the launch audit with
         .filter((line) => /launch-ui-regression-audit|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Launch UI audit behavior tests executed: 7');
+    expect(output).toContain('Launch UI audit behavior tests executed: 11');
     expect(output).toContain('launch-ui-regression-audit');
   } finally {
     rmSync(coverage, { recursive: true, force: true });

@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "provenance-sheet-presenting-binding-dismissal",
+    "correction": "PR #1576: Launch Quality run 40423455852 failed testProgressShareKeepsSelectedMetricAndVisibleValue because the FFMI provenance sheet remained visible after tapping Done.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40423455852/job/121923457975",
+    "mechanization": "Bind the shared provenance sheet to the same showsProvenance state used by its Today and Progress presenters, and clear that binding from Done. Extend the existing launch UI regression audit with presenting-binding checks and four mutation regressions, executed by the existing required shared-lib suite and static launch audit. The new audit failed with four violations against the original sources and passes after repair; all 11 audit behavior tests pass. Retain the native single-tap dismissal and restored Share/range/value assertions. This Linux host cannot execute XCTest; exact-head native execution and coverage remain required hosted-CI evidence. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Done directly clears its presenter-owned binding in both callers, so dismissal no longer depends on resolving an ambient SwiftUI dismiss action through nested presentation modifiers."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "provenance.presenting_binding_dismissal"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "healthkit-timezone-policy-without-source-identity",
     "correction": "PR #1567: Launch Quality failed the two cross-day timezone assertions in HealthImportIdempotencyTests. Selecting the sample-local day must not depend on having a complete source-scoped identity.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1567",
