@@ -139,6 +139,8 @@ function mergeLedgers(left, right) {
   // Classify the complete union before deduplication so incompatible guards,
   // missing assessments and attempted downgrades still fail closed.
   assert.ok(Array.isArray(left) && Array.isArray(right), 'merge ledgers must be arrays');
+  indexCorrectionReceipts(left);
+  indexCorrectionReceipts(right);
   const merged = new Map();
   for (const receipt of classifyLedger([...left, ...right])) {
     const normalized = {
@@ -236,6 +238,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     } else {
       path = args[0] ?? resolve(ROOT, LEDGER_PATH);
       const receipts = JSON.parse(readFileSync(path, 'utf8'));
+      // Ordinary commits must enforce the merge resolver's receipt identity policy.
+      indexCorrectionReceipts(receipts);
       result =
         args.length === 3
           ? mergeLedgers(receipts, JSON.parse(readFileSync(args[2], 'utf8')))

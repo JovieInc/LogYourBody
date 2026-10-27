@@ -254,6 +254,38 @@ test('CLI merges parent ledgers without losing receipts or accepting conflicting
   assert.match(run(left, '--merge', '--unknown').stderr, /usage:/);
 });
 
+test('ordinary CLI classification and file merges reject duplicate receipt identities without writes', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'lyb-classifier-duplicates-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const duplicated = join(directory, 'duplicated.json');
+  const valid = join(directory, 'valid.json');
+  const row = fixture()[0];
+  const validBefore = JSON.stringify([row]);
+  writeFileSync(valid, validBefore);
+  for (const duplicate of [
+    { ...row },
+    { ...row, fingerprint: ` ${row.fingerprint.toUpperCase()} ` },
+    { ...row, correction: 'Conflicting text under the same receipt identity.' },
+  ]) {
+    const before = JSON.stringify([row, duplicate]);
+    writeFileSync(duplicated, before);
+    for (const args of [
+      [duplicated],
+      [duplicated, '--merge', valid],
+      [valid, '--merge', duplicated],
+    ]) {
+      const result = runCli(args, directory);
+      assert.equal(result.status, 1, 'every input ledger must have unique receipt identities');
+      assert.match(result.stderr, /duplicate receipt/);
+      assert.equal(readFileSync(duplicated, 'utf8'), before);
+      assert.equal(readFileSync(valid, 'utf8'), validBefore);
+    }
+  }
+  writeFileSync(duplicated, validBefore);
+  assert.equal(runCli([duplicated], directory).status, 0, 'a corrected ledger is retryable');
+  assert.deepEqual(JSON.parse(readFileSync(duplicated, 'utf8')), classifyLedger([row]));
+});
+
 test('committed ledger is classified and the default CLI run is idempotent', () => {
   const path = join(root, 'packages/shared-lib/corrections.json');
   const before = readFileSync(path, 'utf8');
