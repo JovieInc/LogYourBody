@@ -289,6 +289,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     'staged-marker',
     'textconv-marker',
     'color-marker',
+    'binary-marker',
   ].map((scenario) => [scenario, false]);
   scenarios.push(
     ['additions', true],
@@ -299,6 +300,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     ['staged-marker', true],
     ['textconv-marker', true],
     ['color-marker', true],
+    ['binary-marker', true],
   );
   for (const [scenario, stageMerge] of scenarios) {
     const refused = [
@@ -310,6 +312,7 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       'staged-marker',
       'textconv-marker',
       'color-marker',
+      'binary-marker',
     ].includes(scenario);
     const repository = join(directory, `repository with spaces ${scenario} ${stageMerge}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
@@ -418,8 +421,16 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       // User presentation settings cannot hide conflict markers from the resolver.
       git('config', 'color.ui', 'always');
     }
-    if (['staged-marker', 'textconv-marker', 'color-marker'].includes(scenario)) {
-      writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`);
+    if (scenario === 'binary-marker') {
+      // Binary attributes must not conceal the actual staged merge contents.
+      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
+      git('add', '.gitattributes');
+    }
+    if (['staged-marker', 'textconv-marker', 'color-marker', 'binary-marker'].includes(scenario)) {
+      writeFileSync(
+        join(repository, rows[0].guard.path),
+        `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`,
+      );
       git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
@@ -474,6 +485,8 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       assert.equal(run('--resolve-merge', repository, '--stage').status, 0);
       // A clean worktree cannot hide conflict markers already staged as resolved.
       git('config', 'color.ui', 'always');
+      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
+      git('add', '.gitattributes');
       for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
         git('add', rows[0].guard.path);

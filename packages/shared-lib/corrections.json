@@ -1825,5 +1825,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1568 recurring conflict repair: merge origin/main without losing the attendance policy, bounded classifier fixtures or correction receipts, and reject staged conflict markers even when Git attributes mark the source as binary.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1568",
+    "mechanization": "Extend the existing ledger merge readiness guard with --text so binary attributes cannot hide staged conflict markers. The required shared-lib classifier suite uses real Git repositories with a -diff attribute and a clean worktree hiding a broken index. The regression reports success before the guard change and rejects the marker afterward; initial resolution, staging, verification and staged retries preserve the ledger and index on refusal, and clean retries pass. Reuse --resolve-merge . --stage and --check-merge . on this merge. Preserve all parent receipts, the existing test deadlines and 100 percent classifier coverage. The lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
