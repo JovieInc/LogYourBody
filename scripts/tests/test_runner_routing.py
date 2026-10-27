@@ -1670,7 +1670,12 @@ def _diagnostic_repository(tmp_path: Path) -> tuple[Path, str]:
     for name, code in {
         'bootstrap-local-config.sh': '#!/bin/bash\nprintf "bootstrap\\n" >> "$FAKE_CALLS"\n',
         'resolve-simulator-destination.sh': '#!/bin/bash\nprintf "destination\\n" >> "$FAKE_CALLS"\nprintf "platform=iOS Simulator,id=11111111-1111-1111-1111-111111111111\\n"\n',
-        'test_launch_quality_evidence.py': 'print("Ordinary evidence tests")\n',
+        'test_launch_quality_evidence.py': (
+            'import os, sys\n'
+            'with open(os.environ["FAKE_CALLS"], "a") as calls:\n'
+            '    calls.write("evidence-preflight\\n")\n'
+            'sys.exit(int(os.environ.get("PREFLIGHT_EXIT", "0")))\n'
+        ),
     }.items():
         (root / 'scripts/ios' / name).write_text(code)
     _diagnostic_git(root, 'init', '-q')
@@ -1688,7 +1693,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'
+        'd77acce04a7d6eff69ddadcf28e869a703ed3ae98b50921b3625878490c481a8'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1836,6 +1841,7 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     result, calls, receipt = _run_diagnostic_dispatch(tmp_path, BUILD_FOR_TESTING_TIMEOUT_SECONDS='1',
         DEFAULT_TEST_EXECUTION_TIME_ALLOWANCE='999', UI_XCODEBUILD_COMMAND_TIMEOUT_SECONDS='1')
     assert result.returncode == 0, result.stdout + result.stderr
+    assert 'evidence-preflight' not in calls
     commands = [json.loads(c) for c in calls if c.startswith('["xcodebuild"')]
     assert len(commands) == 2
     assert 'build-for-testing' in commands[0] and 'test-without-building' in commands[1]
@@ -1853,6 +1859,24 @@ def test_focused_diagnostic_real_dispatcher_builds_once_selects_only_seven_and_n
     assert receipt['unitWitnessCoverageRatchetPerformanceProtectedSignedPhysical'] == 'NOT_EXECUTED_OR_QUALIFIED'
     artifacts = tmp_path / 'artifacts'
     assert not list(artifacts.glob('*.evidence.json')) and not list(artifacts.glob('*.coverage.json'))
+
+
+def test_launch_quality_validator_preflight_finishes_before_simulator_boot_and_failure_stops_native_work(tmp_path: Path) -> None:
+    # Exercise the real dispatcher: a booted simulator must not compete with the
+    # validator's bounded shell fixtures, and failed preflight must stay fatal.
+    for status in (0, 65, 124):
+        result, calls, receipt = _run_diagnostic_dispatch(
+            tmp_path / str(status), mode='', DESTINATION='auto', PREFLIGHT_EXIT=str(status))
+        assert receipt is None
+        if status == 0:
+            assert result.returncode == 88, result.stdout + result.stderr
+            assert calls[:3] == ['evidence-preflight', 'bootstrap', 'destination']
+            assert calls.count('evidence-preflight') == 1
+            assert any('build-for-testing' in call for call in calls)
+            assert any('-only-testing:LogYourBodyTests' in call for call in calls)
+        else:
+            assert result.returncode == status, result.stdout + result.stderr
+            assert calls == ['evidence-preflight']
 
 
 def test_focused_diagnostic_dispatch_failure_timeout_and_missing_catalogue_never_pass_or_retry_after_tests(tmp_path: Path) -> None:
@@ -1898,7 +1922,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'd77acce04a7d6eff69ddadcf28e869a703ed3ae98b50921b3625878490c481a8'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -2134,7 +2158,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'
+    expected = 'd77acce04a7d6eff69ddadcf28e869a703ed3ae98b50921b3625878490c481a8'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
@@ -2142,8 +2166,16 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert hashlib.sha256(reviewed).hexdigest() == expected
-    # The previously approved audit is inert evidence, never an admitted fallback.
-    previous_reviewed = reviewed.replace(
+    # Previously approved audits are inert evidence, never admitted fallbacks.
+    previous_preflight = reviewed.replace(
+        b'  # Finish validator shell fixtures before simulator boot competes for host resources.\n'
+        b'  python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n', b'', 1)
+    previous_preflight = previous_preflight.replace(
+        b'\nbuild_for_testing_once\n\nCHAT_QUALIFICATION_UNIT_TESTS=(',
+        b'\npython3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n'
+        b'build_for_testing_once\n\nCHAT_QUALIFICATION_UNIT_TESTS=(', 1)
+    assert hashlib.sha256(previous_preflight).hexdigest() == '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'
+    previous_reviewed = previous_preflight.replace(
         b'# Bound the one cold build independently of XCTest execution. Run 40388372132\n'
         b'# missed every Swift package cache and was still compiling test targets at 600s.\n'
         b'# Allow 15m for compilation; keep test timeouts, retries and the outer step cap.\n'
@@ -2185,7 +2217,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink']
     for scenario in fixtures:
@@ -2202,7 +2234,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'previous-reviewed-audit':
+        if scenario == 'previous-preflight-audit':
+            audit.write_bytes(previous_preflight)
+        elif scenario == 'previous-reviewed-audit':
             audit.write_bytes(previous_reviewed)
         elif scenario == 'unlanded-candidate':
             audit.write_bytes(unlanded)

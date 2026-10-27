@@ -2317,5 +2317,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-validator-preflight-before-simulator-boot",
+    "correction": "PR #1593 / LYB-295: Launch Quality failed before native execution when the retry-preservation shell fixture exceeded its 10-second limit. The validator suite ran after a cold simulator boot and took 74 seconds on the hosted Mac despite simulator calls already being stubbed in the shell fixtures.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40575938406/job/122442566436",
+    "mechanization": "Run the existing validator preflight once before bootstrap and simulator destination resolution. Extend the existing required Mac Runner Routing Tests to execute the real audit dispatcher, prove successful validation precedes simulator boot and native build/test work, and prove failed or timed-out preflight stops all native work with its original status. Keep diagnostic-only dispatch separate, retain every validator assertion and timeout, and refresh only the exact audit digest while rejecting its previous bytes through the real trusted CLI. The ordering regression fails before the move and passes after it; hosted Mac execution remains required to verify whether isolating simulator startup resolves the observed timeout. The harness owns push and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot order CI validator preflight ahead of simulator startup; the failure occurs before native application execution."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite executes the actual audit dispatcher with controlled preflight statuses and records bootstrap, simulator and native-tool ordering without needing Xcode."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_launch_quality_validator_preflight_finishes_before_simulator_boot_and_failure_stops_native_work"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
