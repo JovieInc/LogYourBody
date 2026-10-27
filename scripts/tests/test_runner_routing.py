@@ -1397,7 +1397,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'
+        'df6b3b269a7810bf878f96375f5301dd603eba3770ee8084ad2061b4237c2fde'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1607,7 +1607,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'df6b3b269a7810bf878f96375f5301dd603eba3770ee8084ad2061b4237c2fde'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -1843,7 +1843,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'
+    expected = 'df6b3b269a7810bf878f96375f5301dd603eba3770ee8084ad2061b4237c2fde'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
@@ -1851,8 +1851,14 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert hashlib.sha256(reviewed).hexdigest() == expected
-    # The previously approved audit is inert evidence, never an admitted fallback.
-    previous_reviewed = reviewed.replace(
+    # The previous preflight order is inert evidence, never an admitted fallback.
+    previous_preflight = reviewed.replace(
+        b'  # Run shell fixtures before simulator boot competes for host resources.\n'
+        b'  python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n', b'', 1).replace(
+        b'fi\n\nbuild_for_testing_once\n',
+        b'fi\n\npython3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\nbuild_for_testing_once\n', 1)
+    assert hashlib.sha256(previous_preflight).hexdigest() == '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'
+    previous_reviewed = previous_preflight.replace(
         b'# Bound the one cold build independently of XCTest execution. Run 40388372132\n'
         b'# missed every Swift package cache and was still compiling test targets at 600s.\n'
         b'# Allow 15m for compilation; keep test timeouts, retries and the outer step cap.\n'
@@ -1894,7 +1900,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'previous-preflight-order', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink']
     for scenario in fixtures:
@@ -1911,7 +1917,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'previous-reviewed-audit':
+        if scenario == 'previous-preflight-order':
+            audit.write_bytes(previous_preflight)
+        elif scenario == 'previous-reviewed-audit':
             audit.write_bytes(previous_reviewed)
         elif scenario == 'unlanded-candidate':
             audit.write_bytes(unlanded)

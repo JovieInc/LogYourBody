@@ -402,6 +402,40 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(evidence.run_json('get', 'test-results', 'tests'), {})
         self.assertEqual(command.call_args.args[0], ['xcrun', 'xcresulttool', 'get', 'test-results', 'tests'])
 
+    def test_shell_evidence_preflight_runs_before_bootstrap_or_simulator(self):
+        # Exercise the real dispatcher with inert provider boundaries. A failed
+        # fixture check must stop before starting expensive native infrastructure.
+        script = Path(__file__).with_name('launch-quality-audit.sh').resolve()
+        calls = self.root / 'preflight-calls'
+        command = r'''
+set -euo pipefail
+git() { :; }
+bash() {
+  printf 'native:%s\n' "$*" >> "$CALLS"
+  if [[ "$1" == */resolve-simulator-destination.sh ]]; then return 73; fi
+}
+python3() {
+  printf 'python:%s\n' "$*" >> "$CALLS"
+  return "$PREFLIGHT_STATUS"
+}
+source "$AUDIT_SCRIPT"
+'''
+        for status in (37, 65, 0):
+            with self.subTest(status=status):
+                calls.write_text('')
+                result = subprocess.run(
+                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
+                    env={**os.environ, 'AUDIT_SCRIPT': str(script), 'CALLS': str(calls),
+                         'ARTIFACT_DIR': str(self.root / f'preflight-{status}'), 'DESTINATION': 'auto',
+                         'RUN_SWIFTLINT': 'false', 'RUN_STATIC_UI_REGRESSION_AUDIT': 'false',
+                         'RUN_OPTICAL_GRID_AUDIT': 'false', 'PREFLIGHT_STATUS': str(status)})
+                self.assertEqual(result.returncode, status or 73, result.stderr)
+                expected = [f'python:{script.with_name("test_launch_quality_evidence.py")}']
+                if status == 0:
+                    expected += [f'native:{script.with_name(name)}' for name in (
+                        'bootstrap-local-config.sh', 'resolve-simulator-destination.sh')]
+                self.assertEqual(calls.read_text().splitlines(), expected)
+
     def test_shell_rejects_nonempty_artifact_directory(self):
         script = Path(__file__).with_name('launch-quality-audit.sh')
         artifact = self.root / 'previous-proof'

@@ -44,7 +44,7 @@ it('rejects incomplete XCTest proof through the launch gate validator with execu
         .filter((line) => /launch-quality-evidence|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Evidence validator behavior tests executed: 30');
+    expect(output).toContain('Evidence validator behavior tests executed: 31');
     expect(output).toContain('launch-quality-evidence');
   } finally {
     rmSync(coverage, { recursive: true, force: true });

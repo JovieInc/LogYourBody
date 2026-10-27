@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "launch-quality-fixtures-before-simulator-boot",
+    "correction": "PR #1551 red-check repair (fix-red-5df69c1e5f): Launch Quality stopped before native execution when three evidence shell fixtures exceeded their unchanged 10-second deadlines after a 96-second simulator boot.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40458171296/job/122036406370",
+    "mechanization": "Extend the existing launch-quality preflight to execute its evidence behavior suite before native bootstrap and simulator resolution, removing competition with simulator startup. The new real-dispatcher regression fails against the old order and verifies that both validator failure statuses stop before native setup while success proceeds to bootstrap and resolution. All 31 evidence cases pass locally. Refresh the diagnostic script checksum and retain rejection fixtures for both previous approved scripts. Preserve all deadlines, retries, native selectors, evidence checks and coverage gates. Simulator contention is inferred from the failed-run ordering; exact-head native execution remains required on macOS. The harness owns pushing and PR edits.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing dispatcher can prevent its host-only shell fixtures from competing with simulator startup by running and checking the fixture preflight before invoking any native setup."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_shell_evidence_preflight_runs_before_bootstrap_or_simulator(self):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "healthkit-timezone-policy-without-source-identity",
     "correction": "PR #1567: Launch Quality failed the two cross-day timezone assertions in HealthImportIdempotencyTests. Selecting the sample-local day must not depend on having a complete source-scoped identity.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1567",
