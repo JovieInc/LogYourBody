@@ -137,6 +137,8 @@ an unstaged repair cannot hide markers still present in the index.
 The classifier's Git fixtures exercise binary attributes through ledger repair,
 staging, staged retries and merge verification, preserving the index and ledger
 when any mode refuses the unresolved source.
+One shared scenario list generates both repair modes; each presentation variant
+rejects all four marker forms without repeating scenario-independent CLI probes.
 
 The existing required CI path checks coverage on **every diff**, including
 changes outside the ledger. It fetches the event's exact base revision (PR base,
