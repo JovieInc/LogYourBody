@@ -59,6 +59,46 @@ that issue. Completed or canceled
 issues retain their state when old evidence is replayed; the intake never treats
 a green build as proof the mechanization task is complete.
 
+## Recurrence after a fix (LYB-252)
+
+The normalized `fingerprint` is the rule ID. The scanner shares the coverage
+classifier and requests the next stronger enforcement level: `prose -> static`.
+It preserves the existing two-receipt filing threshold;
+the third matching receipt and the third repeat both reuse that same issue.
+New source evidence or a higher recurrence count reopens a completed/canceled
+prose issue in Todo. Replaying the same evidence leaves it closed.
+
+By default, recurrence is derived from distinct source URLs after the first.
+An imported receipt may provide an optional nonnegative integer `recurrence`
+representing already recorded repeats. The scanner uses the greater of this
+count and distinct-source repeats, adds new sources against a supplied base,
+and returns the resulting `recurrence` totals without rewriting the ledger.
+Duplicate receipts and replays do not increment those totals.
+
+A recurrence against a retained codebase/static guard returns
+`ok: false`, `reason: correction_guard_failure`, and the rule, guard and new
+source URLs in `guardFailures`. It does not file an ordinary mechanization
+issue for that rule. Other eligible rules can still file. The main monitor
+exposes the failure in its warning and summary while preserving its existing
+nonfatal handling. The standalone scanner exits 1 for a guard failure.
+
+Use an immutable base to distinguish new evidence after an existing guard from
+historical receipts being replayed or a guard first installed in this change.
+Without a base the scanner audits all retained evidence, including historical
+guarded repeats. The tracked ledger remains the source of durable receipt identity.
+
+```sh
+# Preview only; no Linear requests, even with credentials configured.
+node packages/shared-lib/scripts/correction-recurrence.mjs --base-ref origin/main
+# Optional fixture/input ledger; --apply explicitly enables the existing Linear path.
+node packages/shared-lib/scripts/correction-recurrence.mjs --ledger /tmp/corrections.json
+```
+
+The runner and standalone CLI default to dry-run. The existing verified main
+intake explicitly opts into filing; the emergency stop still applies. Tests use
+a fake Linear sink and cover issue identity across retries, new evidence,
+terminal states, explicit counts and dry-run defaults.
+
 A stable caller-supplied issue UUID prevents duplicate creates across overlapping
 CI, Deploy, and scheduled intakes. Linear's `IssueCreateInput` GraphQL schema
 supports caller-supplied issue IDs.
