@@ -559,34 +559,41 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
     assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
     assert.match(git('diff', '--name-only'), /unrelated.txt/);
     if (scenario === 'additions') {
-      git('commit', '-m', 'test: resolved ledger');
-      git('switch', 'right');
-      const nextReceipt = {
-        ...rows[2],
-        fingerprint: 'next-main-receipt',
-        source: `${rows[2].source}#next-main`,
-      };
-      writeLedger(classifyLedger([nextReceipt, ...rows.slice(2), shared]));
-      git('commit', '-am', 'test: next main receipt');
-      git('switch', 'left');
-      const nextMerge = spawnSync('git', ['merge', '--no-commit', 'right'], {
-        cwd: repository,
-        encoding: 'utf8',
-        timeout: 5_000,
-      });
-      assert.ifError(nextMerge.error);
-      assert.equal(
-        nextMerge.status,
-        0,
-        `next main prepend must merge cleanly: ${nextMerge.stderr}`,
-      );
-      assert.deepEqual(
-        JSON.parse(readFileSync(ledger, 'utf8')),
-        classifyLedger([nextReceipt, ...rows.slice(2), shared, rows[1]]),
-      );
-      const checked = run('--check-merge', repository);
-      assert.equal(checked.status, 0, checked.stderr);
-      assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
+      // Future main receipts may arrive at either end of the ledger.
+      for (const placement of ['prepend', 'append']) {
+        git('commit', '-m', 'test: resolved ledger');
+        git('switch', 'right');
+        const incoming = JSON.parse(readFileSync(ledger, 'utf8'));
+        const nextReceipt = {
+          ...rows[2],
+          fingerprint: `next-main-${placement}`,
+          source: `${rows[2].source}#next-main-${placement}`,
+        };
+        const next =
+          placement === 'prepend' ? [nextReceipt, ...incoming] : [...incoming, nextReceipt];
+        writeLedger(classifyLedger(next));
+        git('commit', '-am', 'test: next main receipt');
+        git('switch', 'left');
+        const nextMerge = spawnSync('git', ['merge', '--no-commit', 'right'], {
+          cwd: repository,
+          encoding: 'utf8',
+          timeout: 5_000,
+        });
+        assert.ifError(nextMerge.error);
+        assert.equal(nextMerge.status, placement === 'prepend' ? 0 : 1, nextMerge.stderr);
+        if (placement === 'append') {
+          assert.match(readFileSync(ledger, 'utf8'), /<<<<<<< HEAD/);
+          const repaired = run('--resolve-merge', repository, '--stage');
+          assert.equal(repaired.status, 0, repaired.stderr);
+        }
+        assert.deepEqual(
+          JSON.parse(readFileSync(ledger, 'utf8')),
+          classifyLedger([...next, rows[1]]),
+        );
+        const checked = run('--check-merge', repository);
+        assert.equal(checked.status, 0, checked.stderr);
+        assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
+      }
     }
   }
 });
