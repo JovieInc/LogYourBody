@@ -24,11 +24,11 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b43be4748356308f2098e4cf6e44f935a66d842588cb822752f27a4fcff636cb`)
 - `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b4fd1ca380d561bdc4c40f552535e504de66696111a492000ad76220e472da31`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
-- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `06ee02d964e6aa3f4b01b00a39a0112d2296b0dc2a213ba1873d437bf0b302ae`)
+- `.github/workflows/native-merge-queue.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `0da0ffd7957ec102cdede4d1c0b27df75d8f0748ef5a6e51bc19d1ce5b2fde4b`)
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `245798ab668b9b5222cbcefcb7a5030f4bef892b55fc6a3d848acba84c4cc72d`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9f2d6250c747368c3f5da548cb0a1ed1ad7021f6b22ac17978f0b5aedcfda277`)
 
 ### `apps/web/package.json`: engines
 
@@ -85,7 +85,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-avatar": "^1.3.1",
   "@radix-ui/react-checkbox": "^1.3.11",
   "@radix-ui/react-collapsible": "^1.1.20",
-  "@radix-ui/react-context-menu": "^2.3.7",
+  "@radix-ui/react-context-menu": "^2.3.8",
   "@radix-ui/react-dialog": "^1.1.23",
   "@radix-ui/react-dropdown-menu": "^2.1.24",
   "@radix-ui/react-hover-card": "^1.1.23",
@@ -100,7 +100,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-separator": "^1.1.15",
   "@radix-ui/react-slider": "^1.4.7",
   "@radix-ui/react-slot": "^1.3.3",
-  "@radix-ui/react-switch": "^1.3.8",
+  "@radix-ui/react-switch": "^1.4.1",
   "@radix-ui/react-tabs": "^1.1.21",
   "@radix-ui/react-toast": "^1.2.23",
   "@radix-ui/react-toggle": "^1.2.1",
@@ -351,7 +351,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1fd866a8b104720bd4b6aab07898b13899e1df7ad8e85cfe546f1f020f03e151`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c39ce2c9cad6bc69043562b674c80607520a06972f0bd1019a207e7c82c20315`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -359,7 +359,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 {
   "build": "tsc -p tsconfig.json",
   "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
-  "test": "vitest run --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs",
+  "test": "vitest run --maxWorkers=2 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs",
   "test:mutation": "node ../../scripts/mutation/run.mjs",
   "typecheck": "tsc --noEmit -p tsconfig.json"
 }

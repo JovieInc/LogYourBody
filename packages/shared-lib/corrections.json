@@ -73,6 +73,24 @@
   },
   {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1606 (fix-red-1423773703): The Radix Switch 1.4.1 manifest-only bump failed Vercel frozen installation and repository source parity. Repeated dependency repairs need one command that preserves valid bot lockfiles and refreshes only outdated importers.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1606",
+    "mechanization": "Extend the existing --refresh-lockfile helper to run frozen offline verification first. Only ERR_PNPM_OUTDATED_LOCKFILE permits resolution, followed by a second frozen verification before staging the lockfile and source projection. Valid lockfiles stay unchanged; configuration, resolver and final verification failures stop without staging outputs. Six regressions in the existing required Detect Changes suite fail on the previous implementation and pass with the extension. Use the extended helper on this actual manifest-only update; retain all frozen-install and parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1601: Dependabot's Radix Aspect Ratio 1.2.0 update left the repository source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must verify valid bot lockfiles without re-resolving unrelated dependencies.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1601",
     "mechanization": "Extend the existing source resolver with --verify-lockfile: retain dirty-input and pinned-source checks, verify the existing lockfile through frozen offline Corepack pnpm with lifecycle scripts disabled, then stage only the regenerated projection. Four behavioral regressions in the existing required Detect Changes suite fail before the extension and pass afterward, proving successful repair and idempotence without re-resolution, frozen-check failure propagation, dirty-source refusal and pinned-drift refusal. Use the mode on this dependency update; retain every existing frozen-install and parity gate.",
@@ -1247,7 +1265,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1904,6 +1922,78 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "canvas-replay-original-test-deadline-restoration",
+    "correction": "PR #1591 remained in the merge queue after conversion to draft and landed a 30-second canvas replay test override. Restore the original five-second Jest deadline without changing the scenario or its assertions.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1591",
+    "mechanization": "Remove only the scenario-specific timeout argument so the existing Jest runner again enforces its original five-second default. Retain every replay, account, persistence and per-action assertion. An isolated six-second delay in the unchanged real replay passes under the expanded 30-second allowance but is rejected with Exceeded timeout of 5000ms under the restored default. After removing that injected delay, all 24 canvas, analytics and real-SDK Sentry tests pass on fresh main 1a29635d5. Product source is unchanged. Draft withdrawal from the native queue is handled by the separate queue-controller mechanism included in this PR; this receipt records deadline restoration.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Jest timeout owner enforces the original execution limit once the per-scenario expansion is removed; a slow or hung replay must fail under that limit rather than receiving a longer allowance."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/components/training/MesocycleCanvasBoard.test.tsx",
+      "anchor": "it('replays draft, review, split, swap, drag, reload, and undo on the board', async () => {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "draft-conversion-does-not-withdraw-native-queue-entry",
+    "correction": "PR #1591 merged at2026-10-27T01:15:12Z while marked draft: a readiness transition did not revoke its already-qualified native merge-queue entry. A draft hold is not proven until current queue membership is absent.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1591",
+    "mechanization": "Subscribe the existing checkout-free native queue controller to converted_to_draft. Read current exact-head/open-draft/main/same-repository queue state before the normal dequeue mutation, then require explicit-null fresh same-draft queue-absence readback before recording WITHDRAWN. Preserve the existing concurrency group and one running job with GitHub queue:max so later CI events cannot replace a pending withdrawal; GitHub bounds admission at100pending and failures remain visible. Keep ordinary enrollment and its CI proof unchanged. Stale events, changed readiness, merged/closed PRs and foreign heads cannot withdraw an entry. Permission errors, unknown membership and unverified removal fail explicitly. The production inline-script regressions initially failed11of61before the fix. Independent review fault injection removing queue retention and restoring falsey membership checks fails3of74cases; restored candidate passes the existing required queue-policy suite74of74. GitHub scheduling is asynchronous and dequeue has no atomic expected-head condition: operational holds still require live membership readback and cannot claim instantaneous or absolute safety.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing native controller can explicitly withdraw an already-enqueued draft through its normal repository-scoped GitHub operation and verify the resulting membership, instead of relying on draft eligibility checks that only prevent future enrollment."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/merge-queue-enrollment.test.mjs",
+      "anchor": "converting an already queued exact head to draft withdraws it and proves absence without CI"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "classifier-fixtures-do-not-repeat-global-cli-probes",
+    "correction": "PR #1551 CI times out the correction-classifier regression process at30seconds while all native checks pass. The suite repeats scenario-independent CLI probes inside13 realGit scenarios, and unrestricted parallel shared-lib workers contend while launching their own child processes.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40415085533/job/121896099093",
+    "mechanization": "Execute scenario-independent CLI probes once while retaining all13 realGit merge variants, parent/index/worktree integrity assertions, marker and receipt mutations, and100percent line/branch/function coverage. Bound each child CLI and Git command to5seconds with explicit spawn errors. Bound shared-lib Vitest to2workers so nested processes do not overwhelm the runner. Isolated covered-suite time falls from25.8seconds to14.0seconds. With all dependencies available, unrestricted suite load reproduces classifier30second and coverage5second timeouts;2workers passes both at14.5seconds and2.5seconds. All179 tests still run:163pass and16Ruby-dependent tests remain unverified because Ruby is absent locally. Existing outer deadlines remain unchanged. After ordinary integration with main b836060e, retain all18 current realGit variants including textconv/color and unrelated-conflict controls. Fresh frozen dependencies with available Ruby pass all186 shared-lib tests plus122 Node tests and the full8-task root test graph. The unchanged covered classifier runs in17.722seconds with100percent line/branch/function coverage; root lint and typecheck each pass4tasks. Earlier179-test/Ruby-gap measurements describe the original candidate, not current qualification.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The fixture structure can avoid redundant child processes by construction while process deadlines make a hung command fail explicitly. No production guard or outer qualification deadline needs weakening."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "These argument and repository failures do not depend on a merge scenario."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "staged-source-projection-refresh",
+    "correction": "PR #1600: The @radix-ui/react-context-menu 2.3.8 manifest bump left the generated source projection stale, failing Detect Changes, documentation parity and CI Summary. Repeated dependency repairs must refresh the projection automatically.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300944443/job/121498388010",
+    "mechanization": "Extend the existing source-map merge resolver with an indexed-source mode and invoke it after formatting in pre-commit. It regenerates and stages only the configured projection, preserves unstaged source edits, and refuses unresolved files, pinned drift or unstaged projection edits. The existing required Detect Changes tests execute real Git fixtures for these paths and enforce hook wiring.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct the projection automatically from indexed sources before a commit, preventing repeated manual regeneration while retaining the required parity gate for bot-created commits."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "commit source-map repair uses staged dependencies and preserves unstaged source edits"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
