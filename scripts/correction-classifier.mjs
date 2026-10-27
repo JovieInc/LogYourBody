@@ -8,6 +8,7 @@ import {
   assertNoRegression,
   coverageReport,
   guardCoverageReport,
+  indexCorrectionReceipts,
   LEDGER_PATH,
   LEVELS,
   mergeCorrectionLedgers,
@@ -184,6 +185,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         const parents = ['HEAD', 'MERGE_HEAD'].map((ref) =>
           git('rev-parse', '--verify', ref).trim(),
         );
+        // Staged retries enforce the same unique identities as three-way resolution.
+        indexCorrectionReceipts(receipts);
         assert.deepEqual(
           receipts,
           classifyLedger(receipts),

@@ -444,6 +444,29 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       );
       assert.equal(git('ls-files', '--stage'), index);
       assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      // Manual staging must obey the resolver's unique receipt identity policy.
+      for (const duplicate of [
+        expected[0],
+        { ...expected[0], correction: 'Conflicting text under the same receipt identity.' },
+      ]) {
+        writeLedger([...expected, duplicate]);
+        git('add', 'packages/shared-lib/corrections.json');
+        const duplicated = readFileSync(ledger, 'utf8');
+        const staged = git('ls-files', '--stage');
+        for (const args of [
+          ['--check-merge', repository],
+          ['--resolve-merge', repository, '--stage'],
+        ]) {
+          const rejected = run(...args);
+          assert.equal(rejected.status, 1, 'staged verification must reject duplicate receipts');
+          assert.match(rejected.stderr, /duplicate receipt/);
+          assert.equal(git('ls-files', '--stage'), staged);
+          assert.equal(readFileSync(ledger, 'utf8'), duplicated);
+        }
+      }
+      writeFileSync(ledger, resolved);
+      git('add', 'packages/shared-lib/corrections.json');
+      assert.equal(run('--check-merge', repository).status, 0);
       const edited = JSON.parse(resolved);
       edited.push({ ...rows[1], source: `${rows[1].source}#unstaged-receipt` });
       writeLedger(edited);

@@ -1265,7 +1265,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1743,6 +1743,42 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "canvas-replay-original-test-deadline-restoration",
+    "correction": "PR #1591 remained in the merge queue after conversion to draft and landed a 30-second canvas replay test override. Restore the original five-second Jest deadline without changing the scenario or its assertions.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1591",
+    "mechanization": "Remove only the scenario-specific timeout argument so the existing Jest runner again enforces its original five-second default. Retain every replay, account, persistence and per-action assertion. An isolated six-second delay in the unchanged real replay passes under the expanded 30-second allowance but is rejected with Exceeded timeout of 5000ms under the restored default. After removing that injected delay, all 24 canvas, analytics and real-SDK Sentry tests pass on fresh main 1a29635d5. Product source is unchanged. Draft withdrawal from the native queue is handled by the separate queue-controller mechanism included in this PR; this receipt records deadline restoration.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Jest timeout owner enforces the original execution limit once the per-scenario expansion is removed; a slow or hung replay must fail under that limit rather than receiving a longer allowance."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/components/training/MesocycleCanvasBoard.test.tsx",
+      "anchor": "it('replays draft, review, split, swap, drag, reload, and undo on the board', async () => {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "draft-conversion-does-not-withdraw-native-queue-entry",
+    "correction": "PR #1591 merged at2026-10-27T01:15:12Z while marked draft: a readiness transition did not revoke its already-qualified native merge-queue entry. A draft hold is not proven until current queue membership is absent.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1591",
+    "mechanization": "Subscribe the existing checkout-free native queue controller to converted_to_draft. Read current exact-head/open-draft/main/same-repository queue state before the normal dequeue mutation, then require explicit-null fresh same-draft queue-absence readback before recording WITHDRAWN. Preserve the existing concurrency group and one running job with GitHub queue:max so later CI events cannot replace a pending withdrawal; GitHub bounds admission at100pending and failures remain visible. Keep ordinary enrollment and its CI proof unchanged. Stale events, changed readiness, merged/closed PRs and foreign heads cannot withdraw an entry. Permission errors, unknown membership and unverified removal fail explicitly. The production inline-script regressions initially failed11of61before the fix. Independent review fault injection removing queue retention and restoring falsey membership checks fails3of74cases; restored candidate passes the existing required queue-policy suite74of74. GitHub scheduling is asynchronous and dequeue has no atomic expected-head condition: operational holds still require live membership readback and cannot claim instantaneous or absolute safety.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing native controller can explicitly withdraw an already-enqueued draft through its normal repository-scoped GitHub operation and verify the resulting membership, instead of relying on draft eligibility checks that only prevent future enrollment."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/merge-queue-enrollment.test.mjs",
+      "anchor": "converting an already queued exact head to draft withdraws it and proves absence without CI"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-5df69c1e5f",
     "correction": "PR #1556 / LYB-241: Repeated red-check repairs must preserve merged feature work and fix the actual Launch Quality failure. Run 40398373660 killed a cold build-for-testing at 600 seconds while app sources were still compiling, before XCTest began.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40398373660/job/121837659685",
@@ -1842,9 +1878,9 @@
   },
   {
     "fingerprint": "fix-red-e3b0c44298",
-    "correction": "PR #1556 / LYB-241: Repeated conflict-only repairs must retain both parents' correction receipts and refuse staged conflict markers even when Git attributes hide or transform the source diff. The subsequent main merge must compose binary/textconv hiding protection with forced-color protection instead of selecting either parent alone. The next merge must also reject staged markers shorter than seven characters when .gitattributes sets conflict-marker-size.",
+    "correction": "PR #1556 / LYB-241: Repeated conflict-only repairs must retain both parents' correction receipts and refuse staged conflict markers even when Git attributes hide or transform the source diff. The subsequent main merge must compose binary/textconv hiding protection with forced-color protection instead of selecting either parent alone. The next merge must also reject staged markers shorter than seven characters when .gitattributes sets conflict-marker-size. Staged verification must also reject duplicate normalized receipt identities, including conflicting lesson text, using the resolver policy.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1556",
-    "mechanization": "Extend the existing shared ledger merge preflight with --text and --no-textconv so it inspects raw staged changes independently of diff attributes. The existing required shared-lib classifier suite exercises real conflicting Git repositories, binary diff suppression and a concealing textconv driver, and proves refusal preserves the ledger and index across resolution, staged retries and pre-commit verification. The binary-attribute regression failed before the extension and passes afterward. Use the extended --resolve-merge . --stage resolver for this merge, retaining all 84 parent receipts. The harness owns pushing and PR edits. Compose --text, --no-textconv, --no-ext-diff and --no-color in the same readiness check. Extend the existing real Git matrix to combine forced color with binary/textconv attributes, all four CRLF marker forms and wider markers. The color-marker fixture accepts unresolved staged content without --no-color and rejects it with the composed guard. Resolve the current ledger with --resolve-merge . --stage, preserving all 93 parent receipts. Supply the machine body line to the lanes harness without editing the PR. Extend that same preflight with Git diff --check, honoring per-path conflict-marker-size while disabling whitespace diagnostics only in this supplemental marker check. The narrow-marker fixture accepts unresolved staged content before the extension and rejects it afterward. Cover widths 1, 3 and 6, all four marker forms, unchanged index and ledger bytes on refusal, staged retries, and permitted trailing whitespace. Regenerate the conflicted source map with the existing staged resolver, then run the extended classified merge verifier for this instance.",
+    "mechanization": "Extend the existing shared ledger merge preflight with --text and --no-textconv so it inspects raw staged changes independently of diff attributes. The existing required shared-lib classifier suite exercises real conflicting Git repositories, binary diff suppression and a concealing textconv driver, and proves refusal preserves the ledger and index across resolution, staged retries and pre-commit verification. The binary-attribute regression failed before the extension and passes afterward. Use the extended --resolve-merge . --stage resolver for this merge, retaining all 84 parent receipts. The harness owns pushing and PR edits. Compose --text, --no-textconv, --no-ext-diff and --no-color in the same readiness check. Extend the existing real Git matrix to combine forced color with binary/textconv attributes, all four CRLF marker forms and wider markers. The color-marker fixture accepts unresolved staged content without --no-color and rejects it with the composed guard. Resolve the current ledger with --resolve-merge . --stage, preserving all 93 parent receipts. Supply the machine body line to the lanes harness without editing the PR. Extend that same preflight with Git diff --check, honoring per-path conflict-marker-size while disabling whitespace diagnostics only in this supplemental marker check. The narrow-marker fixture accepts unresolved staged content before the extension and rejects it afterward. Cover widths 1, 3 and 6, all four marker forms, unchanged index and ledger bytes on refusal, staged retries, and permitted trailing whitespace. Regenerate the conflicted source map with the existing staged resolver, then run the extended classified merge verifier for this instance. Extract the existing unique-identity index into indexCorrectionReceipts and reuse it in --check-merge and staged retries, preventing manual staging from bypassing the resolver duplicate policy. The real Git regression accepted a duplicated staged ledger before the change. Verify identical and divergent-text duplicates fail without ledger or index writes, restore the valid ledger, and use the extended verifier for this origin/main merge retaining all 95 parent receipts.",
     "classification": {
       "codebase": {
         "feasible": true,
