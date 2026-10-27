@@ -1655,5 +1655,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "classifier-fixtures-do-not-repeat-global-cli-probes",
+    "correction": "PR #1551 CI times out the correction-classifier regression process at30seconds while all native checks pass. The suite repeats scenario-independent CLI probes inside13 realGit scenarios, and unrestricted parallel shared-lib workers contend while launching their own child processes.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40415085533/job/121896099093",
+    "mechanization": "Execute scenario-independent CLI probes once while retaining all13 realGit merge variants, parent/index/worktree integrity assertions, marker and receipt mutations, and100percent line/branch/function coverage. Bound each child CLI and Git command to5seconds with explicit spawn errors. Bound shared-lib Vitest to2workers so nested processes do not overwhelm the runner. Isolated covered-suite time falls from25.8seconds to14.0seconds. With all dependencies available, unrestricted suite load reproduces classifier30second and coverage5second timeouts;2workers passes both at14.5seconds and2.5seconds. All179 tests still run:163pass and16Ruby-dependent tests remain unverified because Ruby is absent locally. Existing outer deadlines remain unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The fixture structure can avoid redundant child processes by construction while process deadlines make a hung command fail explicitly. No production guard or outer qualification deadline needs weakening."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "These argument and repository failures do not depend on a merge scenario."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
