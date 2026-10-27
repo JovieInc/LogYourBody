@@ -89,15 +89,39 @@ final class MetricCorrectionTests: XCTestCase {
         XCTAssertTrue(readings.contains { $0.id == latest.id && $0.isExcluded })
         let current = await manager.fetchLatestBodyMetric(for: owner)
         XCTAssertEqual(current?.id, earlier.id)
-        let all = [earlier, excluded.metrics]
+        XCTAssertEqual(current?.weight, 81.234567)
+        let corrected = try await service.correct(earlier, to: .init(weight: 79.876543))
+        let restored = try await service.undo(corrected)
+        let cache = HeroMetricInterpolationCache()
+        // Exercise the same exclusion contract before correction, after correction,
+        // and after undo, including invalidation of the reused hero cache.
+        for (reading, expectedEstimate) in [(earlier, 81.2), (corrected.metrics, 79.9), (restored.metrics, 81.2)] {
+            try assertExcludedReadingIgnored(
+                excluded.metrics, eligible: reading, expectedEstimate: expectedEstimate, cache: cache
+            )
+        }
+        XCTAssertEqual(try cached(earlier.id).weight, 81.234567)
+        XCTAssertEqual(try cached(latest.id).weight, 150)
+    }
+
+    private func assertExcludedReadingIgnored(
+        _ excluded: BodyMetrics, eligible: BodyMetrics, expectedEstimate: Double,
+        cache: HeroMetricInterpolationCache, file: StaticString = #filePath, line: UInt = #line
+    ) throws {
+        let all = [eligible, excluded]
         let stats = try XCTUnwrap(computeRangeStats(metrics: all) { $0.weight })
-        XCTAssertEqual(stats.average, 81.234567)
-        let trend = MetricsInterpolationService.shared.estimateWeight(for: latest.date, metrics: all)
-        XCTAssertEqual(trend?.value, earlier.weight)
-        let hero = HeroMetricInterpolationCache().values(for: excluded.metrics, in: all, heightInches: nil)
-        XCTAssertEqual(hero.weight, earlier.weight)
+        XCTAssertEqual(stats.average, eligible.weight, file: file, line: line)
+        let estimate = MetricsInterpolationService.shared.estimateWeight(for: excluded.date, metrics: all)
+        // Estimates round to tenths; stored and effective measurements keep precision.
+        XCTAssertEqual(estimate?.value, expectedEstimate, file: file, line: line)
+        XCTAssertEqual(estimate?.isLastKnown, true, file: file, line: line)
+        let hero = cache.values(for: excluded, in: all, heightInches: nil)
+        XCTAssertEqual(hero.weight, expectedEstimate, file: file, line: line)
+        let measured = cache.values(for: eligible, in: all, heightInches: nil)
+        XCTAssertEqual(measured.weight, eligible.weight, file: file, line: line)
+        XCTAssertEqual(eligible.originalWeight, 81.234567, file: file, line: line)
         let snapshot = HomeV2TimelinePolicy.Snapshot(metrics: all, owner: owner)
-        XCTAssertEqual(snapshot.metrics.map(\.id), [earlier.id])
+        XCTAssertEqual(snapshot.metrics.map(\.id), [eligible.id], file: file, line: line)
     }
 
     func testStaleUndoCannotOverwriteANewerCorrection() async throws {

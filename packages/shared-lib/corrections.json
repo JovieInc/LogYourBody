@@ -1927,5 +1927,27 @@
     },
     "level": "codebase",
     "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "metric-exclusion-estimates-preserve-measurement-precision",
+    "correction": "PR #1564 / LYB-243: MetricCorrectionTests.swift compared rounded exclusion fallback estimates with the full-precision imported weight, causing two Launch Quality assertions to fail even though the original measurement remained intact.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40425013619/job/121928674249",
+    "mechanization": "Extend the existing native exclusion regression with a reusable calculation contract for original, corrected and undone fractional weights through the same hero cache. Keep rounded estimates separate from precise measurements. Require this exact case in the existing launch-quality evidence command so missing or skipped execution fails. The existing Python/shared-lib guard fails before this requirement and passes afterward, rejecting skipped, failed and absent native evidence. Repaired native execution and coverage still require the real macOS runner.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The defect is in a test oracle: application behavior intentionally rounds interpolation estimates while retaining precise measurements. Changing production rounding to satisfy that oracle would change the product contract."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required native test target can enforce both precision contracts across correction and undo using one reusable assertion helper and a table of fractional fixtures."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def test_unit_command_requires_passing_metric_overlay_regression(self):"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   }
 ]

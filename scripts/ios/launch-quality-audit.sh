@@ -562,7 +562,8 @@ run_xcodebuild_test \
   "$ARTIFACT_DIR/launch-quality-unit-tests.log" \
   -only-testing:LogYourBodyTests
 assert_xcresult_evidence \
-  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}"
+  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult" --require-biometric-coverage "${CHAT_UNIT_EVIDENCE_ARGS[@]}" \
+  --expected-test 'MetricCorrectionTests/testExcludedReadingsRemainInFetchButNotLatestStatsTrendOrHero()'
 
 python3 "$ROOT_DIR/scripts/ios/native-coverage-ratchet.py" \
   --coverage "$ARTIFACT_DIR/launch-quality-unit-tests.coverage.json" \

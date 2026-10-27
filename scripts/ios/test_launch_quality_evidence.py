@@ -270,6 +270,26 @@ class EvidenceTests(unittest.TestCase):
                                          'nodeIdentifier': 'Optional/testKeychain()'})
         self.assertEqual([case['result'] for case in self.validate()], ['Passed'] * len(evidence.REQUIRED_TESTS) + ['Skipped'])
 
+    def test_unit_command_requires_passing_metric_overlay_regression(self):
+        source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
+        start = source.index('assert_xcresult_evidence \\\n  "$ARTIFACT_DIR/launch-quality-unit-tests.xcresult"')
+        command = source[start:source.index('\n\npython3 ', start)]
+        output = subprocess.check_output(['bash', '-c',
+            'set -euo pipefail\nARTIFACT_DIR=/tmp\nCHAT_UNIT_EVIDENCE_ARGS=()\n'
+            'assert_xcresult_evidence() { printf "%s\\n" "$@"; }\n' + command], text=True).splitlines()
+        expected = [output[index + 1] for index, argument in enumerate(output) if argument == '--expected-test']
+        identifier = 'MetricCorrectionTests/testExcludedReadingsRemainInFetchButNotLatestStatsTrendOrHero()'
+        self.assertIn(identifier, expected, 'The repaired native regression must not be optional')
+        case = {'nodeType': 'Test Case', 'nodeIdentifier': identifier, 'result': 'Passed'}
+        payload = {'testNodes': [case]}
+        self.assertEqual(evidence.validate_cases(payload, expected)[0]['result'], 'Passed')
+        for result in ('Skipped', 'Failed', None):
+            case['result'] = result
+            with self.subTest(result=result), self.assertRaises(ValueError):
+                evidence.validate_cases(payload, expected)
+        with self.assertRaises(ValueError):
+            evidence.validate_cases({'testNodes': []}, expected)
+
     def test_every_capture_is_required(self):
         for group_index, group in enumerate(self.manifest):
             for index in range(len(group['attachments'])):
