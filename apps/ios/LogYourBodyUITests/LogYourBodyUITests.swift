@@ -29,6 +29,32 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["login_email_field"].exists)
     }
 
+    func testTrainingRestTimerAdjustsAndSkipSurvivesReopening() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingRestTimer"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let timer = app.staticTexts["training_rest_timer"]
+        XCTAssertFalse(timer.exists)
+        app.buttons["training_log_set_fixture_press_1"].tap()
+        XCTAssertTrue(timer.waitForExistence(timeout: 5))
+        let increase = app.buttons["training_rest_increase"]
+        if !increase.isHittable { app.swipeDown() }
+        increase.tap()
+        let seconds = Int(timer.label.components(separatedBy: " ")[0]) ?? 0
+        XCTAssertGreaterThan(seconds, 90)
+        XCTAssertLessThanOrEqual(seconds, 105)
+        app.buttons["training_rest_skip"].tap()
+        XCTAssertFalse(timer.exists)
+        app.buttons["Close"].tap()
+        app.buttons["training_fixture_open"].tap()
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
+        XCTAssertFalse(timer.exists, "Reopening must preserve Skip")
+    }
+
     func testTrainingStopConfirmationIncludesCancel() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
@@ -212,6 +238,46 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["training_fixture_submissions"].label, "Submissions: 2")
         XCTAssertEqual(app.staticTexts["training_fixture_saved_load"].label, "Saved load: 22.5")
         attachScreenshot(named: "training-response-loss-relaunch-exact-retry", from: app)
+    }
+
+    func testTrainingHistoryShowsRecordedPerformanceAtAccessibilityTextSize() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingProgress",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let history = app.descendants(matching: .any)["training_history_fixture_press"].firstMatch
+        XCTAssertTrue(history.waitForExistence(timeout: 5))
+        for _ in 0..<5 where !history.isHittable { app.swipeUp() }
+        XCTAssertTrue(history.label.contains("8 reps"))
+        XCTAssertTrue(history.label.contains("Heaviest recorded"))
+        XCTAssertTrue(history.label.contains("2 RIR"))
+        XCTAssertTrue(history.isHittable)
+        attachScreenshot(named: "training-history-accessibility-text", from: app)
+    }
+
+    func testUnavailableHistoryLeavesSetLoggingUsable() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture", "-lybUITestTrainingProgress",
+            "-lybUITestTrainingHistoryUnavailable"
+        ]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_open"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_open"].tap()
+        let log = app.buttons["training_log_set_fixture_press_1"]
+        XCTAssertTrue(log.waitForExistence(timeout: 5))
+        log.tap()
+        XCTAssertTrue(app.textFields["training_load_fixture_press_2"].waitForExistence(timeout: 5))
+        let retry = app.buttons["training_history_retry"]
+        for _ in 0..<8 where !retry.isHittable { app.swipeUp() }
+        XCTAssertTrue(retry.isHittable)
+        retry.tap()
+        XCTAssertTrue(app.staticTexts["training_history_error"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "training-history-unavailable-logging-works", from: app)
     }
 
     func testTrainingControllerKeepsNowDominantAndUpNextVisible() throws {
@@ -3266,6 +3332,8 @@ final class LogYourBodyUITests: XCTestCase {
     }
 
     func testHomeV2AskSyntheticFailedTurnRetriesOriginalIdentity() throws {
+        // Include failure, retry and persisted relaunch in the audit's existing cap.
+        executionTimeAllowance = 180
         let app = XCUIApplication()
         launchSyntheticChatReplay(app, extra: ["-lybUITestChatErrorFixture"])
         submitSyntheticChatQuestion(in: app)
@@ -4377,5 +4445,167 @@ final class LogYourBodyUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.descendants(matching: .any)["world_class_screen_settings"].exists)
+    }
+}
+
+// LYB-43: this fixture mounts the shipping card, not a separate accessible mock.
+extension LogYourBodyUITests {
+    func testMetricCardLegacyFixtureExposesTheMissingStateControl() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestMetricCardFixture", "-lybUITestMetricCardLegacy"]
+        app.launch()
+        for (state, expected) in [("loading", "Loading metric"), ("empty", "No data"), ("error", "Metric unavailable")] {
+            app.buttons["metric_fixture_state_\(state)"].tap()
+            resetMetricList(in: app)
+            for title in ["Steps", "Weight", "Body Fat", "FFMI"] {
+                let identifier = "metric_fixture_\(title)"
+                let card = app.staticTexts[identifier]
+                revealMetricCard(card, in: app)
+                XCTAssertTrue(card.waitForExistence(timeout: 8))
+                XCTAssertEqual(card.label, expected)
+                XCTAssertEqual(app.buttons.matching(identifier: identifier).count, 0)
+                XCTAssertEqual(card.descendants(matching: .button).count, 0)
+                XCTAssertEqual(app.staticTexts["metric_fixture_calls_\(title)"].label, "\(title) calls: 0")
+            }
+        }
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "metric-legacy-ignored-state-controls"
+        tree.lifetime = .keepAlways
+        add(tree)
+    }
+
+    func testMetricCardStateAccessibilityTreeAndActions() {
+        verifyMetricCardMatrix(accessibilitySize: false)
+    }
+
+    func testMetricCardAX3StateAccessibilityTreeAndActionsWithReduceMotion() {
+        verifyMetricCardMatrix(accessibilitySize: true)
+    }
+
+    func testMetricCardReducedMotionLoadingRemainsStill() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestMetricCardFixture", "-lybUITestReduceMotion"]
+        app.launch()
+        let card = app.staticTexts["metric_fixture_Steps"]
+        XCTAssertTrue(card.waitForExistence(timeout: 8))
+        let first = card.screenshot().pngRepresentation
+        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertEqual(first, card.screenshot().pngRepresentation, "Reduce Motion must stop the loading shimmer")
+        XCTAssertFalse(app.buttons["metric_fixture_Steps"].exists)
+    }
+
+    private func verifyMetricCardMatrix(accessibilitySize: Bool) {
+        executionTimeAllowance = 180
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestMetricCardFixture"]
+        if accessibilitySize {
+            app.launchArguments += ["-lybUITestMetricCardAX3", "-lybUITestReduceMotion"]
+        }
+        app.launch()
+        let states = [
+            ("loading", "Loading", false), ("empty", "No measurements yet", true),
+            ("error", "Unable to load measurements", true), ("permission", "Health access needed", true),
+            ("data", "No change, 1M", true), ("unavailable", "Measurements unavailable", false)
+        ]
+        for (state, status, actionable) in states {
+            app.buttons["metric_fixture_state_\(state)"].tap()
+            resetMetricList(in: app)
+            for title in ["Steps", "Weight", "Body Fat", "FFMI"] {
+                let identifier = "metric_fixture_\(title)"
+                let card = actionable ? app.buttons[identifier] : app.staticTexts[identifier]
+                revealMetricCard(card, in: app)
+                XCTAssertTrue(card.waitForExistence(timeout: 8), "\(title) \(state)")
+                XCTAssertTrue(card.label.contains(title), card.label)
+                XCTAssertTrue(card.label.contains(status), card.label)
+                XCTAssertFalse(card.label.contains("No change No change"), card.label)
+                XCTAssertEqual(app.buttons.matching(identifier: identifier).count, actionable ? 1 : 0)
+                XCTAssertEqual(card.descendants(matching: .button).count, 0, "The card has one control owner")
+                if state == "data" {
+                    for context in ["October 25 at 08:00", "last 30 days", "Latest value", "1M"] {
+                        XCTAssertTrue(card.label.contains(context), card.label)
+                    }
+                    XCTAssertTrue(card.label.contains(title == "FFMI" ? "Calculated from" : "Source: Apple Health"))
+                    XCTAssertEqual(card.label.components(separatedBy: "No change").count - 1, 1)
+                }
+                let tree = XCTAttachment(string: app.debugDescription)
+                tree.name = "metric-tree-\(title)-\(state)-AX3-\(accessibilitySize)"
+                tree.lifetime = .keepAlways
+                add(tree)
+                if actionable {
+                    let actionTitle = state == "error" ? "Retry" : state == "empty" ? "Add measurement"
+                        : state == "permission" ? "Review Health access" : "Show \(title) details"
+                    XCTAssertTrue(card.label.contains(actionTitle), "The action must be named even with hints disabled")
+                    XCTAssertTrue(card.isHittable, "\(title) \(state) must be reachable")
+                    card.tap()
+                    if state == "data" || state == "permission" {
+                        let detail = app.staticTexts["metric_fixture_detail"]
+                        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+                        XCTAssertTrue(detail.label.contains(title))
+                        if state == "permission" { XCTAssertTrue(detail.label.contains("Health access")) }
+                        app.navigationBars.buttons.firstMatch.tap()
+                    } else {
+                        let updated = app.buttons[identifier]
+                        XCTAssertTrue(updated.waitForExistence(timeout: 5))
+                        XCTAssertTrue(updated.label.contains("Latest value"), "The handler must change state")
+                    }
+                    XCTAssertEqual(app.staticTexts["metric_fixture_calls_\(title)"].label, "\(title) calls: 1")
+                }
+            }
+        }
+    }
+
+    private func revealMetricCard(_ card: XCUIElement, in app: XCUIApplication) {
+        let scroll = app.scrollViews.firstMatch
+        for _ in 0..<12 {
+            if card.exists && card.isHittable { return }
+            scroll.swipeUp(velocity: .slow)
+        }
+    }
+
+    private func resetMetricList(in app: XCUIApplication) {
+        let firstCard = app.descendants(matching: .any)["metric_fixture_Steps"]
+        for _ in 0..<8 {
+            if firstCard.exists && firstCard.isHittable { return }
+            app.scrollViews.firstMatch.swipeDown(velocity: .fast)
+        }
+    }
+}
+
+extension LogYourBodyUITests {
+    func testCycleReuseDraftRequiresReviewBeforeApply() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_cycle_review"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_cycle_review"].tap()
+        XCTAssertTrue(app.segmentedControls["training_cycle_length"].waitForExistence(timeout: 5))
+        app.segmentedControls["training_cycle_length"].buttons["5 weeks"].tap()
+        app.switches["Smith incline press"].switches.firstMatch.tap()
+        XCTAssertTrue(app.textFields["Why it worked"].exists)
+        app.swipeUp()
+        app.buttons["training_cycle_create_draft"].tap()
+        let apply = app.buttons["training_cycle_apply"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Week 5 · Deload · 1 set · 5 RIR"].exists)
+        attachScreenshot(named: "training-five-week-reuse-draft", from: app)
+        apply.tap()
+        XCTAssertTrue(app.staticTexts["training_fixture_cycle_applied"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["training_fixture_cycle_applied"].label, "Applied blocks: 1")
+    }
+
+    func testRejectingCycleDraftDoesNotApplyIt() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lybUITestTrainingFixture", "-lybUITestResetTrainingFixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["training_fixture_cycle_review"].waitForExistence(timeout: 10))
+        app.buttons["training_fixture_cycle_review"].tap()
+        XCTAssertTrue(app.segmentedControls["training_cycle_length"].waitForExistence(timeout: 5))
+        app.segmentedControls["training_cycle_length"].buttons["5 weeks"].tap()
+        app.swipeUp()
+        app.buttons["training_cycle_create_draft"].tap()
+        XCTAssertTrue(app.buttons["training_cycle_reject"].waitForExistence(timeout: 5))
+        app.buttons["training_cycle_reject"].tap()
+        app.buttons["Close"].tap()
+        XCTAssertEqual(app.staticTexts["training_fixture_cycle_applied"].label, "Applied blocks: 0")
     }
 }

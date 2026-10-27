@@ -226,15 +226,19 @@ func syncWeightFromHealthKit() async throws {
         }
 
         // Process recent data for immediate UI update
+        var batchFailed = false
         let (imported, _) = await processBatchHealthKitData(
             weightHistory: recentWeightHistory,
-            bodyFatHistory: recentBodyFatHistory, ownership: ownership
+            bodyFatHistory: recentBodyFatHistory, ownership: ownership,
+            onFailure: { batchFailed = true }
         )
 
         // print("📊 Recent sync: \(imported) imported, \(skipped) skipped")
 
         // Only trigger full historical sync if this is truly the first time and we have very little data
         try await requireImportOwnership(ownership)
+        guard !batchFailed else { throw HealthKitError.syncFailed }
+        await recordSuccessfulMetricSourceSync(for: ownership)
         await triggerFullHealthKitSyncIfNeeded(imported: imported, ownership: ownership)
     }
 
@@ -328,15 +332,21 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
         }
 
         // Process weight and body fat entries using shared batch logic
+        var batchFailed = false
         _ = await processBatchHealthKitData(
             weightHistory: weightHistory,
-            bodyFatHistory: bodyFatHistory, ownership: ownership
+            bodyFatHistory: bodyFatHistory, ownership: ownership,
+            onFailure: { batchFailed = true }
         )
         try await requireImportOwnership(ownership)
+        guard !batchFailed else { throw HealthKitError.syncFailed }
+        await recordSuccessfulMetricSourceSync(for: ownership)
     }
 
 @discardableResult
-    func syncAllHistoricalHealthKitData(ownership: AuthManager.ProfileSessionOwnership? = nil) async -> Bool {
+    func syncAllHistoricalHealthKitData(
+        ownership: AuthManager.ProfileSessionOwnership? = nil, from startDate: Date? = nil
+    ) async -> Bool {
         if ownership == nil {
             await claimAutomaticImportAccount()
         }
@@ -361,18 +371,23 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
         guard admitted else { return false }
 
         do {
-            let defaultHistoricalRange = TimeInterval(10 * 365 * 24 * 60 * 60)
-            let earliestWeightDate = try await getEarliestWeightDate()
-            try await requireImportOwnership(ownership)
-            let earliestBodyFatDate: Date?
-            if importsBodyFatOnly {
-                earliestBodyFatDate = try await getEarliestBodyFatDate()
-                try await requireImportOwnership(ownership)
+            let earliestDate: Date
+            if let startDate {
+                earliestDate = startDate
             } else {
-                earliestBodyFatDate = nil
+                let defaultHistoricalRange = TimeInterval(10 * 365 * 24 * 60 * 60)
+                let earliestWeightDate = try await getEarliestWeightDate()
+                try await requireImportOwnership(ownership)
+                let earliestBodyFatDate: Date?
+                if importsBodyFatOnly {
+                    earliestBodyFatDate = try await getEarliestBodyFatDate()
+                    try await requireImportOwnership(ownership)
+                } else {
+                    earliestBodyFatDate = nil
+                }
+                earliestDate = [earliestWeightDate, earliestBodyFatDate].compactMap { $0 }.min()
+                    ?? Date().addingTimeInterval(-defaultHistoricalRange)
             }
-            let earliestDate = [earliestWeightDate, earliestBodyFatDate].compactMap { $0 }.min()
-                ?? Date().addingTimeInterval(-defaultHistoricalRange)
             let (totalImported, totalSkipped) = try await processHistoricalHealthKitBatches(
                 earliestDate: earliestDate, endDate: Date(), ownership: ownership, operation: operation,
                 bodyFatOnlyPolicy: importsBodyFatOnly
@@ -382,6 +397,7 @@ func syncWeightFromHealthKitIncremental(days: Int = 30, startDate: Date? = nil) 
                 guard self.ownsHistoricalImport(ownership, operation: operation) else { return false }
                 importProgress = 1.0
                 importStatus = "Import complete! Imported \(totalImported) entries"
+                recordSuccessfulMetricSourceSync(for: ownership)
                 ErrorTrackingService.shared.addBreadcrumb(
                     message: "HealthKit full history import complete", category: "healthKit",
                     data: [
@@ -492,13 +508,16 @@ func processHistoricalHealthKitBatches(
                 .filter { $0.date < actualBatchEndDate }
 
             // Process this batch
+            var batchFailed = false
             let (imported, skipped) = await processBatchHealthKitData(
                 weightHistory: weightBatch,
                 bodyFatHistory: bodyFatBatch, ownership: ownership,
-                bodyFatOnlyPolicy: importsBodyFatOnly
+                bodyFatOnlyPolicy: importsBodyFatOnly,
+                onFailure: { batchFailed = true }
             )
 
             try await requireImportOwnership(ownership)
+            guard !batchFailed else { throw HealthKitError.syncFailed }
             totalImported += imported
             totalSkipped += skipped
 
@@ -593,18 +612,26 @@ func processBatchHealthKitData(
 func processBatchHealthKitData(
         weightHistory: [HealthKitWeightImportSample],
         bodyFatHistory: [HealthKitBodyFatImportSample],
-        ownership: AuthManager.ProfileSessionOwnership? = nil, bodyFatOnlyPolicy: Bool? = nil
+        ownership: AuthManager.ProfileSessionOwnership? = nil, bodyFatOnlyPolicy: Bool? = nil,
+        sampleIdentityPolicy: Bool? = nil, onFailure: (() -> Void)? = nil
     ) async -> (imported: Int, skipped: Int) {
         guard let ownership = await captureImportOwnership(ownership), await ownsImport(ownership) else {
             return (0, 0)
         }
         var imported = 0
         var skipped = 0
+        let usesSampleIdentity: Bool
+        if let sampleIdentityPolicy {
+            usesSampleIdentity = sampleIdentityPolicy
+        } else {
+            usesSampleIdentity = await HealthKitImportIdentityPolicy.isEnabled()
+        }
 
         // Create a dictionary of body fat data by logged local day
         var bodyFatByDate: [String: HealthKitBodyFatImportSample] = [:]
         for sample in bodyFatHistory {
-            bodyFatByDate[BodyMetricLocalDate.key(for: sample.date)] = sample
+            let key = healthKitPairingKey(sample.date, metadata: sample.sourceMetadata, identified: usesSampleIdentity)
+            bodyFatByDate[key] = sample
         }
 
         // Get existing entries for this date range to check for duplicates
@@ -647,27 +674,35 @@ func processBatchHealthKitData(
         } else {
             importsBodyFatOnly = await bodyFatOnlyImportEnabled()
         }
-        var newlyCombinedSampleIDs = Set<String>()
+        var newlyCombinedSampleIDs = Set<[String]>()
         for sample in weightHistory {
             guard await ownsImport(ownership) else { return (imported, skipped) }
             // Check if entry exists within the same hour
-            let localDate = BodyMetricLocalDate.key(for: sample.date)
+            let localDate = usesSampleIdentity
+                ? sample.sourceMetadata?.healthKitLocalDate(for: sample.date) ?? BodyMetricLocalDate.key(for: sample.date)
+                : BodyMetricLocalDate.key(for: sample.date)
             let hourKey = "\(localDate)-\(BodyMetricLocalDate.hourKey(for: sample.date))"
+            let identified = usesSampleIdentity && sample.sourceMetadata?.healthKitSampleKey != nil
 
-            if !existingEntriesByHour.contains(hourKey) {
-                let bodyFatSample = bodyFatByDate[localDate]
+            if identified || !existingEntriesByHour.contains(hourKey) {
+                let pairingKey = healthKitPairingKey(sample.date, metadata: sample.sourceMetadata, identified: usesSampleIdentity)
+                let bodyFatSample = bodyFatByDate[pairingKey]
 
                 do {
                     let storedBodyFat = try await saveHealthKitWeightSample(
                         sample, bodyFatSample: bodyFatSample, ownership: ownership,
-                        enforceCombinedIdentity: importsBodyFatOnly
+                        enforceCombinedIdentity: importsBodyFatOnly || identified, useSampleIdentity: usesSampleIdentity
                     )
                     imported += 1
                     if storedBodyFat, let bodyFatID = bodyFatSample?.sourceMetadata?.sampleId {
-                        newlyCombinedSampleIDs.insert(bodyFatID)
+                        let source = usesSampleIdentity ? bodyFatSample?.sourceMetadata?.sourceBundleId ?? "" : ""
+                        newlyCombinedSampleIDs.insert([source, bodyFatID])
                     }
                     existingEntriesByHour.insert(hourKey) // Add to set to prevent duplicates in same batch
+                } catch HealthKitImportIdentityError.alreadyRecorded {
+                    skipped += 1
                 } catch {
+                    onFailure?()
                     guard await ownsImport(ownership) else { return (imported, skipped) }
                     await captureHealthKitError(
                         error,
@@ -682,14 +717,18 @@ func processBatchHealthKitData(
             }
         }
 
-        if importsBodyFatOnly {
+        if importsBodyFatOnly || usesSampleIdentity {
             // Exclude only BF identities written by this batch. A skipped
             // weight does not prove its new BF sample was ever persisted.
             let unpaired = bodyFatHistory.filter { sample in
                 guard let id = sample.sourceMetadata?.sampleId else { return false }
-                return !newlyCombinedSampleIDs.contains(id)
+                let source = usesSampleIdentity ? sample.sourceMetadata?.sourceBundleId ?? "" : ""
+                return !newlyCombinedSampleIDs.contains([source, id])
             }
-            let result = await importBodyFatOnlySamples(unpaired, ownership: ownership)
+            let result = await importBodyFatOnlySamples(
+                unpaired, ownership: ownership, useSampleIdentity: usesSampleIdentity,
+                allowStandaloneBodyFat: importsBodyFatOnly, onFailure: onFailure
+            )
             imported += result.imported
             skipped += result.skipped
         }
@@ -716,7 +755,8 @@ func processBatchHealthKitData(
 
 func saveBodyMetrics(
         _ metrics: BodyMetrics, ownership: AuthManager.ProfileSessionOwnership? = nil,
-        bodyFatSampleID: String? = nil, matchCombinedBodyFatIdentity: Bool = true
+        bodyFatSampleID: String? = nil, matchCombinedBodyFatIdentity: Bool = true,
+        useSampleIdentity: Bool = false, allowStandaloneBodyFat: Bool = true
     ) async throws {
         guard let ownership = await captureImportOwnership(ownership), metrics.userId == ownership.subject else {
             throw HealthKitError.notAuthorized
@@ -728,8 +768,11 @@ func saveBodyMetrics(
                   (importAuthManager ?? .shared).ownsAccountSession(ownership) else {
                 throw HealthKitError.notAuthorized
             }
+            let fatMetadata = metrics.sourceMetadata?.pairedHealthKitBodyFat ?? metrics.sourceMetadata
             if let bodyFatSampleID, try hasRecordedBodyFatSample(
-                bodyFatSampleID, userId: ownership.subject, includeCombined: matchCombinedBodyFatIdentity
+                bodyFatSampleID, userId: ownership.subject, includeCombined: matchCombinedBodyFatIdentity,
+                sourceBundleId: useSampleIdentity ? fatMetadata?.sourceBundleId : nil,
+                syncKey: useSampleIdentity && metrics.weight != nil ? fatMetadata?.healthKitSyncKey : nil
             ) {
                 throw BodyFatImportAdmissionError.alreadyRecorded
             }
@@ -737,6 +780,10 @@ func saveBodyMetrics(
         try await withTaskCancellationHandler {
             if let metricImportStore {
                 try await metricImportStore(metrics, admission)
+            } else if useSampleIdentity, metrics.sourceMetadata?.healthKitSampleKey != nil {
+                try await (importCoreDataManager ?? .shared).saveHealthKitBodyMetricsAndWait(
+                    metrics, allowStandaloneBodyFat: allowStandaloneBodyFat, writeAdmission: admission
+                )
             } else {
                 try await (importCoreDataManager ?? .shared).saveBodyMetricsAndWait(
                     metrics, userId: ownership.subject, markAsSynced: false, writeAdmission: admission
@@ -761,11 +808,13 @@ func saveBodyMetrics(
     }
 
     private func healthKitWeightMetric(
-        _ sample: HealthKitWeightImportSample, bodyFatSample: HealthKitBodyFatImportSample?, userId: String
+        _ sample: HealthKitWeightImportSample, bodyFatSample: HealthKitBodyFatImportSample?, userId: String,
+        useSampleIdentity: Bool
     ) -> BodyMetrics {
         BodyMetrics(
             id: UUID().uuidString, userId: userId, date: sample.date,
-            localDate: BodyMetricLocalDate.key(for: sample.date), weight: sample.weight, weightUnit: "kg",
+            localDate: useSampleIdentity ? sample.sourceMetadata?.healthKitLocalDate(for: sample.date) : nil,
+            weight: sample.weight, weightUnit: "kg",
             bodyFatPercentage: bodyFatSample?.percentage,
             bodyFatMethod: bodyFatSample != nil ? "HealthKit" : nil, muscleMass: nil,
             boneMass: nil, notes: "Imported from HealthKit", photoUrl: nil,
@@ -779,26 +828,31 @@ func saveBodyMetrics(
 
     private func saveHealthKitWeightSample(
         _ sample: HealthKitWeightImportSample, bodyFatSample: HealthKitBodyFatImportSample?,
-        ownership: AuthManager.ProfileSessionOwnership, enforceCombinedIdentity: Bool
+        ownership: AuthManager.ProfileSessionOwnership, enforceCombinedIdentity: Bool, useSampleIdentity: Bool
     ) async throws -> Bool {
-        let metric = healthKitWeightMetric(sample, bodyFatSample: bodyFatSample, userId: ownership.subject)
+        let metric = healthKitWeightMetric(
+            sample, bodyFatSample: bodyFatSample, userId: ownership.subject, useSampleIdentity: useSampleIdentity
+        )
         do {
             try await saveBodyMetrics(
                 metric, ownership: ownership, bodyFatSampleID: bodyFatSample?.sourceMetadata?.sampleId,
-                matchCombinedBodyFatIdentity: enforceCombinedIdentity
+                matchCombinedBodyFatIdentity: enforceCombinedIdentity, useSampleIdentity: useSampleIdentity
             )
             return bodyFatSample != nil
         } catch BodyFatImportAdmissionError.alreadyRecorded {
             // Admission rejected before mutation. Preserve the existing BF row
             // (including tombstones) and write only the independently new weight.
-            let weightOnly = healthKitWeightMetric(sample, bodyFatSample: nil, userId: ownership.subject)
-            try await saveBodyMetrics(weightOnly, ownership: ownership)
+            let weightOnly = healthKitWeightMetric(
+                sample, bodyFatSample: nil, userId: ownership.subject, useSampleIdentity: useSampleIdentity
+            )
+            try await saveBodyMetrics(weightOnly, ownership: ownership, useSampleIdentity: useSampleIdentity)
             return false
         }
     }
 
     private func importBodyFatOnlySamples(
-        _ samples: [HealthKitBodyFatImportSample], ownership: AuthManager.ProfileSessionOwnership
+        _ samples: [HealthKitBodyFatImportSample], ownership: AuthManager.ProfileSessionOwnership,
+        useSampleIdentity: Bool, allowStandaloneBodyFat: Bool, onFailure: (() -> Void)? = nil
     ) async -> (imported: Int, skipped: Int) {
         var imported = 0
         var skipped = 0
@@ -810,21 +864,29 @@ func saveBodyMetrics(
                   sample.sourceMetadata?.quantityType == HKQuantityTypeIdentifier.bodyFatPercentage.rawValue else {
                 continue
             }
+            if !allowStandaloneBodyFat, sample.sourceMetadata?.healthKitSampleKey == nil { continue }
             let now = Date()
             let metric = BodyMetrics(
                 id: UUID().uuidString, userId: ownership.subject, date: sample.date,
-                localDate: BodyMetricLocalDate.key(for: sample.date), weight: nil, weightUnit: "kg",
+                localDate: useSampleIdentity ? sample.sourceMetadata?.healthKitLocalDate(for: sample.date) : nil,
+                weight: nil, weightUnit: "kg",
                 bodyFatPercentage: sample.percentage, bodyFatMethod: "HealthKit", muscleMass: nil,
                 boneMass: nil, notes: "Imported from HealthKit", photoUrl: nil,
                 dataSource: BodyMetricSource.healthKit.rawValue, sourceMetadata: sample.sourceMetadata,
                 createdAt: now, updatedAt: now
             )
             do {
-                try await saveBodyMetrics(metric, ownership: ownership, bodyFatSampleID: sampleID)
+                try await saveBodyMetrics(
+                    metric, ownership: ownership, bodyFatSampleID: sampleID, useSampleIdentity: useSampleIdentity,
+                    allowStandaloneBodyFat: allowStandaloneBodyFat
+                )
                 imported += 1
             } catch BodyFatImportAdmissionError.alreadyRecorded {
                 skipped += 1
+            } catch HealthKitImportIdentityError.alreadyRecorded {
+                skipped += 1
             } catch {
+                onFailure?()
                 guard await ownsImport(ownership) else { break }
                 await captureHealthKitError(
                     error, operation: "importBodyFatOnlySamples",
@@ -839,19 +901,40 @@ func saveBodyMetrics(
     /// tombstones and pending edits preserves exclusions and closes repeat races.
     @MainActor
     private func hasRecordedBodyFatSample(
-        _ sampleID: String, userId: String, includeCombined: Bool
+        _ sampleID: String, userId: String, includeCombined: Bool, sourceBundleId: String? = nil,
+        syncKey: [String]? = nil
     ) throws -> Bool {
         let request: NSFetchRequest<CachedBodyMetrics> = CachedBodyMetrics.fetchRequest()
-        request.predicate = NSPredicate(
-            format: "userId == %@ AND sourceMetadataJSON CONTAINS %@", userId, sampleID
-        )
+        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "userId == %@", userId),
+            NSCompoundPredicate(orPredicateWithSubpredicates: [sampleID, syncKey?.last].compactMap { $0 }.map {
+                NSPredicate(format: "sourceMetadataJSON CONTAINS %@", BodyMetricSourceMetadata.jsonFragment(for: $0))
+            })
+        ])
         return try (importCoreDataManager ?? .shared).viewContext.fetch(request).contains { metric in
             guard let metadata = BodyMetricSourceMetadata(jsonString: metric.sourceMetadataJSON) else { return false }
-            return (includeCombined && metadata.bodyFatSampleId == sampleID) || (
+            let pairedSource = metadata.pairedHealthKitBodyFat?.sourceBundleId ?? metadata.sourceBundleId
+            let matchesPairedSource = sourceBundleId == nil || sourceBundleId == pairedSource
+            let matchesSource = sourceBundleId == nil || sourceBundleId == metadata.sourceBundleId
+            if let syncKey, metadata.healthKitSyncKey == syncKey ||
+                (includeCombined && metadata.pairedHealthKitBodyFat?.healthKitSyncKey == syncKey) {
+                return true
+            }
+            return (includeCombined && matchesPairedSource && metadata.bodyFatSampleId == sampleID) || (
+                matchesSource &&
                 metadata.sampleId == sampleID &&
                 metadata.quantityType == HKQuantityTypeIdentifier.bodyFatPercentage.rawValue
             )
         }
+    }
+
+    private func healthKitPairingKey(
+        _ date: Date, metadata: BodyMetricSourceMetadata?, identified: Bool
+    ) -> String {
+        guard identified, let metadata, let source = metadata.sourceBundleId else {
+            return BodyMetricLocalDate.key(for: date)
+        }
+        return "\(source.utf8.count):\(source):\(metadata.healthKitLocalDate(for: date))"
     }
 
 func syncStepsFromHealthKit() async throws {
@@ -884,6 +967,7 @@ func syncSingleStepFromHistory(
     }
 
 func observeWeightChanges() {
+        guard capabilities.pushEvents else { return }
         guard isAuthorized else { return }
 
         if let existingQuery = weightObserverQuery {
@@ -904,6 +988,7 @@ func observeWeightChanges() {
     }
 
 func observeBodyFatChanges() {
+        guard capabilities.pushEvents else { return }
         guard isAuthorized else { return }
 
         if let existingQuery = bodyFatObserverQuery {
@@ -932,6 +1017,7 @@ func scheduleObservedBodyMetricSync() {
 
 @MainActor
     func scheduleObservedBodyMetricSync(for currentUserId: String?, debounce: TimeInterval = 5) {
+        guard capabilities.pushEvents else { return }
         // Legacy observers stay hourly. The smart-scale gate reconciles every delivery.
         let lastSyncKey = HealthKitDefaultsKey.lastObserverSyncDate.scoped(with: currentUserId)
         let smartScale = smartScaleSyncEnabled()
@@ -996,6 +1082,7 @@ func scheduleObservedBodyMetricSync() {
             let counts = try await persistSmartScaleAdmissions(admissions, ownership: ownership)
             try await requireImportOwnership(ownership)
             writeSmartScaleAnchors(queried.anchors, userId: ownership.subject)
+            recordSuccessfulMetricSourceSync(for: ownership)
             if counts.imported > 0 { await finishSmartScaleImport(ownership) }
             return HealthKitSmartScaleRefreshResult(
                 outcome: .refreshed, imported: counts.imported,
@@ -1061,7 +1148,7 @@ func scheduleObservedBodyMetricSync() {
             ? sample.quantity.doubleValue(for: HKUnit.gramUnit(with: .kilo))
             : sample.quantity.doubleValue(for: HKUnit.percent()) * 100
         return HealthKitSmartScaleSyncPolicy.makeSample(
-            sampleId: sample.uuid.uuidString, kind: kind, value: value,
+            sampleId: idempotencyKey(for: sample), kind: kind, value: value,
             date: sample.startDate, sourceName: sample.sourceRevision.source.name
         )
     }

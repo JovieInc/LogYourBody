@@ -5,6 +5,179 @@
 import XCTest
 @testable import LogYourBody
 
+// LYB-44: these policy tests also run from unchanged Swift source on Linux;
+// they do not substitute for SwiftUI/device frame and input-to-display receipts.
+extension HomeV2MetricEditorialTests {
+    private var interactionCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .gmt
+        return calendar
+    }
+
+    func testPlayheadSelectsLatestDailyReadingRegardlessOfValueOrInputOrder() {
+        let day = interactionCalendar.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
+        let morning = MetricChartDataPoint(date: day.addingTimeInterval(8 * 3_600), value: 170)
+        let evening = MetricChartDataPoint(date: day.addingTimeInterval(20 * 3_600), value: 190)
+        for daily in [[morning, evening], [evening, morning]] {
+            let plotted = HomeV2ChartIntegrity.plot(
+                points: [MetricChartDataPoint(date: day, value: 180)], dotPoints: daily,
+                anchorsToZero: false, keepsCarriedValues: true, calendar: interactionCalendar
+            )
+            let selected = HomeV2ChartIntegrity.nearest(to: day, in: plotted.selectionSamples)
+            XCTAssertEqual(selected?.value, 190, "The latest daily reading wins, even when its value is higher")
+            XCTAssertEqual(selected?.kind, .daily)
+            XCTAssertEqual(plotted.marks.count, 3, "All measurements and the separate average remain plotted")
+        }
+    }
+
+    func testPlayheadKeepsAverageFallbackAndEarlierMidpointAcrossGaps() throws {
+        let day = interactionCalendar.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
+        let later = day.addingTimeInterval(4 * 86_400)
+        let plotted = HomeV2ChartIntegrity.plot(
+            points: [.init(date: day, value: 180), .init(date: later, value: 182, presence: .interpolated)],
+            dotPoints: [.init(date: day, value: 180), .init(date: later, value: .nan)],
+            anchorsToZero: false, keepsCarriedValues: true, calendar: interactionCalendar
+        )
+        XCTAssertEqual(plotted.selectionSamples.count, 2)
+        XCTAssertEqual(plotted.runs.count, 2, "Scrubbing never fills a gap in the line")
+        XCTAssertEqual(plotted.nearest(to: day.addingTimeInterval(2 * 86_400))?.kind, .daily)
+        XCTAssertEqual(plotted.nearest(to: .distantPast)?.date, day)
+        let fallback = try XCTUnwrap(plotted.nearest(to: .distantFuture))
+        XCTAssertEqual(fallback.date, later)
+        XCTAssertEqual(fallback.value, 182)
+        XCTAssertEqual(fallback.kind, .sevenDayAverage)
+        XCTAssertTrue(HomeV2ChartIntegrity.tooltip(
+            date: fallback.date, valueText: "182", locale: Locale(identifier: "en_US"),
+            calendar: interactionCalendar, kind: fallback.kind
+        ).hasSuffix("182 · 7-day average"))
+        let empty = HomeV2ChartIntegrity.plot(points: [], anchorsToZero: false, keepsCarriedValues: false)
+        XCTAssertNil(empty.nearest(to: day))
+    }
+
+    func testPlayheadDuplicateTimestampTieIsStableAndDoesNotSelectInvalidReadings() {
+        let day = interactionCalendar.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
+        let readings: [MetricChartDataPoint] = [
+            .init(date: day, value: 190), .init(date: day, value: 170), .init(date: day, value: 170),
+            .init(date: day.addingTimeInterval(1), value: 200, presence: .lastKnown),
+            .init(date: day.addingTimeInterval(2), value: 210, presence: .missing),
+            .init(date: day.addingTimeInterval(3), value: .infinity),
+            .init(date: day.addingTimeInterval(4), value: -1)
+        ]
+        let forward = HomeV2ChartIntegrity.plot(
+            points: readings, anchorsToZero: false, keepsCarriedValues: false, calendar: interactionCalendar
+        )
+        let reversed = HomeV2ChartIntegrity.plot(
+            points: readings.reversed(), anchorsToZero: false, keepsCarriedValues: false, calendar: interactionCalendar
+        )
+        XCTAssertEqual(forward.selectionSamples, reversed.selectionSamples)
+        XCTAssertEqual(forward.selectionSamples.first?.value, 170)
+        XCTAssertEqual(forward.marks.count, 3)
+        XCTAssertEqual(Set(forward.marks.map(\.id)).count, 3)
+    }
+
+    func testPlayheadCacheReusesPreparationAndInvalidatesEveryRenderInput() {
+        let request = interactionRequest(count: 365)
+        let cache = HomeV2ChartIntegrity.PreparationCache()
+        let original = cache.value(for: request).plot
+        var reloaded = request
+        reloaded.daily = request.daily.map { .init(date: $0.date, value: $0.value, presence: $0.presence) }
+        _ = cache.value(for: reloaded)
+        XCTAssertEqual(cache.preparationCount, 1, "Equal reloaded histories also reuse preparation")
+        for index in 0..<1_000 {
+            let plot = cache.value(for: request).plot
+            let date = request.now.addingTimeInterval(-Double(index) * 3_600)
+            XCTAssertEqual(plot.nearest(to: date), HomeV2ChartIntegrity.nearest(to: date, in: original.selectionSamples))
+        }
+        XCTAssertEqual(cache.preparationCount, 1, "Scrubs must not sort or normalize the history again")
+
+        let edits: [(inout HomeV2ChartIntegrity.Request) -> Void] = [
+            { $0.daily[0] = .init(date: $0.daily[0].date, value: 220) },
+            { $0.trend[0] = .init(date: $0.trend[0].date, value: 220) },
+            { $0.daily[0] = .init(date: $0.daily[0].date, value: 180, presence: .missing) },
+            { $0.daily.removeAll() }, { $0.range = .month1 },
+            { $0.now = $0.now.addingTimeInterval(86_400) },
+            { $0.calendar.timeZone = TimeZone(secondsFromGMT: -8 * 3_600) ?? .gmt },
+            { $0.showsDots.toggle() }, { $0.usesSevenDayAverage.toggle() }, { $0.anchorsToZero.toggle() }
+        ]
+        for edit in edits {
+            var changed = request
+            edit(&changed)
+            let previous = cache.preparationCount
+            _ = cache.value(for: changed)
+            XCTAssertEqual(cache.preparationCount, previous + 1)
+            _ = cache.value(for: request)
+        }
+        var invalid = request
+        invalid.daily.append(.init(date: request.now, value: .nan))
+        _ = cache.value(for: invalid)
+        let count = cache.preparationCount
+        _ = cache.value(for: invalid)
+        XCTAssertEqual(cache.preparationCount, count, "A retained NaN must not invalidate every frame")
+    }
+
+    func testPlayheadGateOffRetainsLegacySameDaySelection() {
+        var request = interactionRequest(count: 1)
+        request.daily = [.init(date: request.now, value: 170),
+                         .init(date: request.now.addingTimeInterval(1), value: 190)]
+        let legacy = HomeV2ChartIntegrity.prepare(request, prefersLatestReading: false)
+        let responsive = HomeV2ChartIntegrity.PreparationCache().value(for: request)
+        XCTAssertEqual(legacy.plot.selectionSamples.first?.value, 170)
+        XCTAssertEqual(responsive.plot.selectionSamples.first?.value, 190)
+    }
+
+    func testChartPreparationAndPlayheadPolicyLatencyBudgets() throws {
+        // Debug exercises a year of daily data; Release also stress-tests ten years.
+        // User input-to-display budgets are measured on the Release device build.
+        #if DEBUG
+        let request = interactionRequest(count: 365)
+        #else
+        let request = interactionRequest(count: 3_650)
+        #endif
+        let cache = HomeV2ChartIntegrity.PreparationCache()
+        var cold: [Double] = []
+        var scrub: [Double] = []
+        var tooltip: [Double] = []
+        for _ in 0..<25 {
+            let start = ProcessInfo.processInfo.systemUptime
+            _ = HomeV2ChartIntegrity.PreparationCache().value(for: request)
+            cold.append((ProcessInfo.processInfo.systemUptime - start) * 1_000)
+        }
+        _ = cache.value(for: request)
+        for index in 0..<250 {
+            let start = ProcessInfo.processInfo.systemUptime
+            let plot = cache.value(for: request).plot
+            let selected = try XCTUnwrap(plot.nearest(to: request.now.addingTimeInterval(-Double(index) * 3_600)))
+            scrub.append((ProcessInfo.processInfo.systemUptime - start) * 1_000)
+            let labelStart = ProcessInfo.processInfo.systemUptime
+            _ = HomeV2ChartIntegrity.tooltip(
+                date: selected.date, valueText: String(format: "%.1f", selected.value),
+                locale: Locale(identifier: "en_US"), calendar: interactionCalendar, kind: selected.kind
+            )
+            tooltip.append((ProcessInfo.processInfo.systemUptime - labelStart) * 1_000)
+        }
+        let coldP95 = cold.sorted()[23]
+        let scrubP95 = scrub.sorted()[237]
+        let tooltipP95 = tooltip.sorted()[237]
+        NSLog("CHART_POLICY_BUDGET samples=%ld p95_ms preparation=%.3f scrub=%.3f tooltip=%.3f",
+              request.daily.count, coldP95, scrubP95, tooltipP95)
+        XCTAssertLessThanOrEqual(coldP95, 100)
+        XCTAssertLessThanOrEqual(scrubP95, 2)
+        XCTAssertLessThanOrEqual(tooltipP95, 4)
+        XCTAssertEqual(cache.preparationCount, 1)
+    }
+
+    private func interactionRequest(count: Int) -> HomeV2ChartIntegrity.Request {
+        let now = interactionCalendar.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
+        let points = (0..<count).map {
+            MetricChartDataPoint(date: now.addingTimeInterval(-Double($0) * 86_400), value: 180 + Double($0 % 10))
+        }
+        return HomeV2ChartIntegrity.Request(
+            daily: points, trend: points, range: .all, now: now, calendar: interactionCalendar,
+            showsDots: true, usesSevenDayAverage: true, anchorsToZero: false
+        )
+    }
+}
+
 /// Scale, gaps, and source copy for the shared Steps, Weight, Body fat, FFMI, and timeline hero.
 final class HomeV2MetricEditorialTests: XCTestCase {
     private let calendar: Calendar = {
