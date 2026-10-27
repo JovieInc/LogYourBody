@@ -1861,5 +1861,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-quality-fixture-shell-isolation",
+    "correction": "PR #1532: Launch Quality stopped before native tests because test_shell_rejects_nonempty_artifact_directory exceeded its 10-second subprocess timeout. Keep shell contract fixtures independent of inherited CI toolchain lookup and startup hooks.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40418914586",
+    "mechanization": "Extend the existing evidence-validator behavior suite with a shared system-Bash launcher using an explicit system PATH and fixture-only environment. Route every shell fixture through it. The stale-artifact regression injects failing bash/dirname/date/ls shims and BASH_ENV/ENV hooks, verifies visible/hidden/dangling proof is refused without mutation, and fails all four subcases with the previous inherited launcher. All 30 cases pass with isolation. The existing Launch Quality and shared-lib coverage wrapper already execute this suite. Preserve the 10-second timeout, reviewed audit digest, native selectors and coverage gates; fresh Mac CI remains required because the failed run did not identify the specific stalled process.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Constructing shell fixture invocations from the system interpreter, system tool path and explicit fixture variables prevents inherited toolchain shims and shell startup hooks from owning contract-test execution."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "def run_shell(arguments, *, env=None):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

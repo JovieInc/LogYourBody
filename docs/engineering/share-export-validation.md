@@ -264,3 +264,54 @@ the older failed run `40154055343` described the already-fixed thumbnail issue.
 GBrain query, write to `lyb-pr1532-conflict-repair`, and readback failed. Sandbox
 requests were refused at `127.0.0.1:7801`; the network-enabled write/readback
 attempts each timed out after 30 seconds. Durable persistence is unverified.
+
+## PR #1532 Launch Quality fixture repair (2026-10-27)
+
+Merged `origin/main` at `1a29635d5` first in `9f5af4055`. The existing
+`node scripts/correction-classifier.mjs --resolve-merge . --stage` resolved the
+only conflict, retaining both correction histories. The detached harness checkout
+uses local branch `fix/pr1532-red-checks-20261027`; the harness owns push and PR edits.
+
+`gh run view 40418914586 --repo JovieInc/LogYourBody --log-failed` showed that
+Launch Quality stopped before native execution: the nonempty-artifact-directory
+contract subprocess exceeded 10 seconds. The log does not identify which process
+stalled. All evidence-validator shell fixtures now use `/bin/bash`, the system
+tool path and explicit fixture variables instead of inheriting toolchain lookup
+and shell startup hooks. The retained real-script regression injects failing
+toolchain shims and startup hooks and checks visible, hidden and dangling prior
+proof. All four subcases fail with the previous inherited launcher and pass with
+isolation. The 10-second timeout, reviewed audit digest, workflow, native selectors
+and coverage gates are preserved.
+
+Machine: built scripts/ios/test_launch_quality_evidence.py
+
+The validator's 30 cases and the routing suite's 44 cases passed. The existing
+required shared-lib wrapper executed the validator at 96% production line
+coverage and passed its failure-propagation regression. Root lint, typecheck and
+tests passed with Node 22.23.2 and pnpm 10.34.1 after the frozen dependency
+bootstrap. Root tests finished all eight Turbo tasks (three cached), including
+186 shared-lib Vitest cases, 122 shared-lib Node cases and 1,398 web Jest cases.
+Correction coverage and all 68 guard references passed; ratchets retained the
+11 existing public-copy warnings. The marketing generator's timestamp-only
+side effect was discarded. Commands included:
+
+```sh
+bash scripts/codex-setup.sh
+bash scripts/codex-setup.sh --run lint
+bash scripts/codex-setup.sh --run typecheck
+bash scripts/codex-setup.sh --run test
+python3 scripts/ios/test_launch_quality_evidence.py
+python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
+node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
+python3 scripts/repository_docs.py
+bash -n scripts/ios/launch-quality-audit.sh
+python3 -m py_compile scripts/ios/test_launch_quality_evidence.py
+git diff --check
+```
+
+Fresh Mac CI, native execution/coverage and device acceptance remain unverified;
+`xcodebuild -version` returned command not found on this Linux host. GBrain search,
+`put lyb-pr1532-shell-fixture-repair` and `get_page` all failed with connection
+refused at `127.0.0.1:7801`, so neither write nor readback persisted.

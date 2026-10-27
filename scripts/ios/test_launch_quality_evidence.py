@@ -16,6 +16,12 @@ evidence = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evidence)
 
 
+def run_shell(arguments, *, env=None):
+    # Contract fixtures need system tools, not CI's cold SDK/toolchain shims or BASH_ENV.
+    return subprocess.run(['/bin/bash', *arguments], env={'PATH': os.defpath, **(env or {})},
+                          capture_output=True, text=True, timeout=10)
+
+
 class EvidenceTests(unittest.TestCase):
     def test_fixed_diagnostic_selectors_have_native_test_implementations(self):
         root = Path(__file__).resolve().parents[2]
@@ -197,7 +203,9 @@ class EvidenceTests(unittest.TestCase):
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
         selectors = source[source.index('LAUNCH_QUALITY_UI_TESTS=('):source.index('UI_RESULT_BUNDLE=')]
         command = 'set -euo pipefail\n' + selectors + '\nprintf "%s\\n" "${UI_SELECTORS[@]}" "${UI_EVIDENCE_ARGS[@]}"'
-        output = subprocess.check_output(['bash', '-c', command], text=True).splitlines()
+        result = run_shell(['-c', command])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = result.stdout.splitlines()
         # Preserve each inherited case, while allowing newly merged regressions.
         inherited_cases = (
             'LogYourBodyUITests/testLaunchQualityGateCapturesCriticalSurfaces',
@@ -404,15 +412,39 @@ class EvidenceTests(unittest.TestCase):
 
     def test_shell_rejects_nonempty_artifact_directory(self):
         script = Path(__file__).with_name('launch-quality-audit.sh')
-        artifact = self.root / 'previous-proof'
-        artifact.mkdir()
-        prior = artifact / 'summary.md'
-        prior.write_text('prior proof must survive')
-        result = subprocess.run(['bash', str(script)], env={**os.environ, 'ARTIFACT_DIR': str(artifact)},
-                                capture_output=True, text=True, timeout=10)
-        self.assertEqual(result.returncode, 65)
-        self.assertIn('Refusing to reuse', result.stderr)
-        self.assertEqual(prior.read_text(), 'prior proof must survive')
+        tools = self.root / 'tools'
+        tools.mkdir()
+        calls = self.root / 'tool-calls'
+        # Model a cold toolchain shim and inherited shell startup hooks.
+        poison = 'printf "unexpected toolchain startup\\n" >> "$TOOL_CALLS"\nexit 86\n'
+        for name in ('bash', 'dirname', 'date', 'ls'):
+            tool = tools / name
+            tool.write_text('#!/bin/bash\n' + poison)
+            tool.chmod(0o755)
+        startup = self.root / 'startup.sh'
+        startup.write_text(poison)
+        for name in ('summary.md', '.prior-proof', '..prior-proof', 'dangling-link'):
+            with self.subTest(name=name):
+                artifact = self.root / name
+                artifact.mkdir()
+                prior = artifact / name
+                if name == 'dangling-link':
+                    prior.symlink_to('absent-target')
+                else:
+                    prior.write_text('prior proof must survive')
+                with patch.dict(os.environ, {
+                    'PATH': str(tools), 'BASH_ENV': str(startup), 'ENV': str(startup),
+                    'TOOL_CALLS': str(calls),
+                }):
+                    result = run_shell([str(script)], env={'ARTIFACT_DIR': str(artifact)})
+                self.assertEqual(result.returncode, 65, result.stderr)
+                self.assertIn('Refusing to reuse', result.stderr)
+                self.assertFalse(calls.exists())
+                self.assertEqual(list(artifact.iterdir()), [prior])
+                if name == 'dangling-link':
+                    self.assertEqual(os.readlink(prior), 'absent-target')
+                else:
+                    self.assertEqual(prior.read_text(), 'prior proof must survive')
 
     def test_shell_cold_build_budget_preserves_build_failures_and_timeout(self):
         source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
@@ -452,9 +484,8 @@ echo 'ready for native tests'
             with self.subTest(name=name):
                 artifact = self.root / name
                 artifact.mkdir()
-                result = subprocess.run(
-                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                    env={**os.environ, 'ARTIFACT_DIR': str(artifact),
+                result = run_shell(
+                    ['-c', command], env={'ARTIFACT_DIR': str(artifact),
                          'BUILD_FOR_TESTING_TIMEOUT_SECONDS': override,
                          'BUILD_DURATION': str(duration), 'COMPILER_STATUS': str(compiler_status)})
                 self.assertEqual(result.returncode, expected, result.stderr)
@@ -498,8 +529,8 @@ start_launch_probe() { :; }
 stop_launch_probe() { :; }
 run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
 """
-        result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                                env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
+        result = run_shell(['-c', command],
+                           env={'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log)})
         self.assertEqual(result.returncode, 65, result.stderr)
         self.assertTrue(result_bundle.with_name('retry.attempt-1.xcresult').is_dir())
         self.assertTrue(result_bundle.is_dir())
@@ -545,9 +576,8 @@ run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
                 directory.mkdir()
                 result_bundle = directory / 'timeout.xcresult'
                 log = directory / 'timeout.log'
-                result = subprocess.run(
-                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
-                    env={**os.environ, 'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log),
+                result = run_shell(
+                    ['-c', command], env={'RESULT_BUNDLE': str(result_bundle), 'RESULT_LOG': str(log),
                          'FAILURE_STATUS': str(status), 'FAILURE_LOG': failure_log})
                 self.assertEqual(result.returncode, status, result.stderr)
                 self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
