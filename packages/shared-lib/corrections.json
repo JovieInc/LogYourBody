@@ -1313,7 +1313,7 @@
     "fingerprint": "training-split-weekly-dose",
     "correction": "LYB-111: Support four through six weekly sessions with engine-built splits, bounded fractional weekly volume and at least two exposures per muscle; keep enrollment, stored setup validation and the iOS picker aligned.",
     "source": "https://linear.app/jovie/issue/LYB-111",
-    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4–6 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2–6 days.",
+    "mechanization": "One supported-frequency tuple drives API/revision schemas and stored setup validation. Engine-owned templates partition existing exercises and retain four fractional weekly sets per muscle across 4\u20136 days. The required web suite checks both equipment options through every block week, frequency, volume accounting, recovery/pain overrides, API completion of every slot and review/apply readback. Native transport and picker regressions cover 2\u20136 days.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1652,6 +1652,24 @@
     "guard": {
       "path": "scripts/correction-classifier.mjs",
       "anchor": "staged retry refuses unstaged ledger edits; review and stage them explicitly"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "swiftui-menu-container-identifiers-shadow-controls",
+    "correction": "PR #1585 native Launch Quality run40421926840 failed the timeline Settings navigation: the Settings lookup resolved to a Button identified as photo_timeline_menu, then the profile destination did not appear. The menu applied its marker to the parent ZStack, shadowing child control identifiers.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40421926840/job/121918385751",
+    "mechanization": "Move the menu marker onto its existing noninteractive title Text so independent controls retain their concrete identities. In the already-required timeline surface helper, assert no button inherits the menu marker and require exactly one Settings control with its own identifier and label before tapping and checking the unchanged destination deadline. The observed failing native log supplies the pre-fix witness; native execution of the updated helper remains required hosted qualification. Do not add sleeps, retries or larger deadlines.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Owning the menu marker on a leaf prevents identifier propagation through the container by construction, while the required UI regression verifies actual accessible control ownership and navigation."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/LogYourBodyUITests.swift",
+      "anchor": "\"The menu marker must never replace its independent button identifiers.\""
     },
     "level": "codebase",
     "ruleId": "code-prevention"

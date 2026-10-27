@@ -2265,13 +2265,21 @@ final class LogYourBodyUITests: XCTestCase {
         let menu = app.buttons["Open Menu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         menu.tap()
-        XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_menu"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["photo_timeline_menu"].waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            app.buttons.matching(identifier: "photo_timeline_menu").count, 0,
+            "The menu marker must never replace its independent button identifiers."
+        )
     }
 
     private func openSettingsFromPhotoTimelineMenu(in app: XCUIApplication) {
         openPhotoTimelineMenu(in: app)
-        let settings = app.buttons["Settings"]
+        let settingsButtons = app.buttons.matching(identifier: "photo_timeline_menu_settings")
+        let settings = settingsButtons.firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        XCTAssertEqual(settingsButtons.count, 1, "Settings must have one distinct control owner.")
+        XCTAssertEqual(settings.identifier, "photo_timeline_menu_settings")
+        XCTAssertEqual(settings.label, "Settings")
         XCTAssertTrue(settings.isHittable)
         settings.tap()
         XCTAssertTrue(app.buttons["settings_profile_link"].waitForExistence(timeout: 8))
