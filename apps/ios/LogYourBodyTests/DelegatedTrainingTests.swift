@@ -17,6 +17,46 @@ final class DelegatedTrainingTests: XCTestCase {
         XCTAssertEqual(service.decisions.first?.proposalId, "proposal")
     }
 
+    func testApprovedCardApplyUsesCanonicalDecisionAndCommittedReadback() async throws {
+        let service = try PlanningServiceFixture(proposalId: "11111111-1111-4111-8111-000000000001")
+        let model = DelegatedTrainingModel(service: service, accessToken: { "token" }, isCurrent: { true })
+        await model.refresh()
+        await model.propose()
+        let reference = try XCTUnwrap(model.proposal?.cardReference)
+        let applied = await model.decideCard(TrainingCardAction(reference: reference, name: .apply))
+        XCTAssertTrue(applied)
+        XCTAssertEqual(service.decisions.count, 1)
+        XCTAssertEqual(service.decisions.first?.proposalId, reference.objectId)
+        XCTAssertEqual(model.context?.currentSetup?.programRevisionId, "committed-revision")
+    }
+
+    func testCardRejectsNoOpProgramReadbackEvenWithMatchingRevisionReceipt() async throws {
+        let service = try PlanningServiceFixture(proposalId: "11111111-1111-4111-8111-000000000001")
+        service.noOpPlanReadback = true
+        let model = DelegatedTrainingModel(service: service, accessToken: { "token" }, isCurrent: { true })
+        await model.refresh()
+        await model.propose()
+        let reference = try XCTUnwrap(model.proposal?.cardReference)
+        let applied = await model.decideCard(TrainingCardAction(reference: reference, name: .apply))
+        XCTAssertFalse(applied)
+        XCTAssertEqual(service.decisions.count, 1)
+        XCTAssertEqual(model.message, "The saved program does not match the reviewed draft. Refresh before starting.")
+    }
+
+    func testStaleCardAndWrongActionCannotWrite() async throws {
+        let service = try PlanningServiceFixture(proposalId: "11111111-1111-4111-8111-000000000001")
+        let model = DelegatedTrainingModel(service: service, accessToken: { "token" }, isCurrent: { true })
+        await model.refresh()
+        await model.propose()
+        let reference = try XCTUnwrap(model.proposal?.cardReference)
+        let stale = TrainingCardReference(component: .planChange, objectId: reference.objectId, revision: 99)
+        let staleApplied = await model.decideCard(TrainingCardAction(reference: stale, name: .apply))
+        XCTAssertFalse(staleApplied)
+        let wrongApplied = await model.decideCard(TrainingCardAction(reference: reference, name: .logSet))
+        XCTAssertFalse(wrongApplied)
+        XCTAssertTrue(service.decisions.isEmpty)
+    }
+
     func testMissingInputQuestionDoesNotFabricateOrApplyAPlan() async throws {
         let service = try PlanningServiceFixture()
         service.proposalResponse = try JSONDecoder().decode(
@@ -73,22 +113,29 @@ private final class PlanningServiceFixture: DelegatedTrainingServicing {
     var decisions: [TrainingPlanDecisionRequest] = []
     var failNextProposal = false
     var commitReadback = true
+    var noOpPlanReadback = false
     var onPropose: (() -> Void)?
     var proposalResponse: TrainingPlanProposalResponse
     private var committed = false
 
-    init() throws {
+    init(proposalId: String = "proposal") throws {
         proposalResponse = try JSONDecoder().decode(TrainingPlanProposalResponse.self, from: Data(#"""
         {"stored":{"status":"proposed","proposal":{"id":"proposal","reason":"Start training",
         "actor":{"kind":"coach","subject":"lyb-coach"},"summary":["Two days each week"],
         "assumptions":["Conservative baseline"],"plan":{"revision":1,"sessions":[{"id":"monday",
         "day":"monday","slot":"single","title":"Monday","exercises":[{"instanceId":"curl",
         "variantId":"cable_curl","name":"Cable curl","sets":2,"targetReps":10,"priority":"standard"}]}]}}}}
-        """#.utf8))
+        """#.replacingOccurrences(of: "\"id\":\"proposal\"", with: "\"id\":\"\(proposalId)\"").utf8))
     }
 
     func planningContext(accessToken: String) async throws -> TrainingPlanContext {
-        let setup = committed && commitReadback ? #"{"programRevisionId":"committed-revision"}"# : "null"
+        let plan = try proposalResponse.stored.map { try JSONEncoder().encode($0.proposal.plan) } ?? Data("{}".utf8)
+        var program = try JSONSerialization.jsonObject(with: plan) as! [String: Any]
+        if noOpPlanReadback { program["sessions"] = [] }
+        let planJSON = String(data: try JSONSerialization.data(withJSONObject: program), encoding: .utf8)!
+        let setup = committed && commitReadback
+            ? "{\"programRevisionId\":\"committed-revision\",\"delegated\":{\"plan\":\(planJSON)}}"
+            : "null"
         return try JSONDecoder().decode(TrainingPlanContext.self, from: Data("""
         {"generation":0,"delegatedProgramming":true,"knownInputs":{"goal":"Build muscle"},"currentSetup":\(setup)}
         """.utf8))
