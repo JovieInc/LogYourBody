@@ -91,6 +91,24 @@
   },
   {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1614: The Radix Aspect Ratio 1.2.0 manifest update retained a 1.1.15 workspace lockfile and stale source projection, failing frozen installation, Detect Changes, parity and CI Summary. Repair the dependency artifacts together and extend the existing repair machine.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1614",
+    "mechanization": "Extend the existing explicit lockfile/source-map repair helper to reject untracked dependency inputs before invoking pnpm. Three real Git fixture cases for an untracked workspace manifest, workspace configuration and npmrc failed before the extension and pass afterward; all 50 required change-detection/helper cases pass. The guard preserves local input bytes, the lockfile, projection and index. Use the extended helper to regenerate this PR's lockfile, verify frozen offline resolution and stage source parity while retaining the existing CI gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1609: The web Zod 4.6.7 manifest update retained a 4.6.6 workspace lockfile and stale source projection, failing Vercel frozen installation, Detect Changes, parity and CI Summary. Repair dependency artifacts together with a reusable helper.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1609",
     "mechanization": "Extend the existing repository source resolver with an explicit lockfile refresh. It refuses unstaged dependency edits and pinned drift, regenerates through pinned Corepack pnpm with lifecycle scripts disabled, verifies frozen offline installation, and stages the lockfile with the projection only after success. The existing required Detect Changes suite exercises command execution, dirty inputs, idempotence, resolver and frozen-check failures. Six initial cases fail before the extension and pass afterward. Use the extended helper on this PR and retain all frozen install and source parity gates.",
@@ -1583,9 +1601,9 @@
   },
   {
     "fingerprint": "fix-red-e3b0c44298",
-    "correction": "PR #1540: Recurring conflict repairs must merge origin/main, preserve both feature branches and correction receipts, and reject conflict markers accidentally staged as resolved.",
+    "correction": "PR #1540: Recurring conflict repairs must merge origin/main, preserve both feature branches and correction receipts, and reject conflict markers accidentally staged as resolved. The next origin/main repair also must prevent forced Git color output from hiding those markers.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1540",
-    "mechanization": "Extend the existing ledger merge readiness check to reject newly staged conflict markers before resolving, staging, retrying or verifying a merge. The existing pre-commit merge check and required shared-lib Git-fixture tests exercise the same check. The staged-marker regression fails before this extension and passes after it, including a clean worktree hiding a broken index, all four marker forms, index and ledger preservation on refusal, and a clean retry. Use the resolver with --resolve-merge . --stage for this merge; the lanes harness retains push and PR ownership.",
+    "mechanization": "Extend the existing ledger merge readiness check to reject newly staged conflict markers before resolving, staging, retrying or verifying a merge. The existing pre-commit merge check and required shared-lib Git-fixture tests exercise the same check. The staged-marker regression fails before this extension and passes after it, including a clean worktree hiding a broken index, all four marker forms, index and ledger preservation on refusal, and a clean retry. Use the resolver with --resolve-merge . --stage for this merge; the lanes harness retains push and PR ownership. Extend the same readiness guard with --no-color. Real Git fixtures with color.ui=always reproduce an accepted staged marker before the fix, then require initial resolution, staging, verification and staged retries to refuse while preserving the ledger and index; clean colored retries pass. Reuse this guard and resolver for the current merge, preserving main's unstaged-receipt checks.",
     "classification": {
       "codebase": {
         "feasible": true,
@@ -1652,6 +1670,212 @@
     "guard": {
       "path": "scripts/correction-classifier.mjs",
       "anchor": "staged retry refuses unstaged ledger edits; review and stage them explicitly"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "diagnostic-audit-pin-matches-reviewed-runner",
+    "correction": "PR #1554: The bounded cold-build repair changed the launch-quality audit bytes without refreshing the trusted diagnostic SHA-256 pin, failing Mac Runner Routing Tests and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40392549503/job/121817018662",
+    "mechanization": "Review the five-line cold-build diff and refresh the exact audit pin and its test expectations. Extend the existing required runner-routing trusted CLI regression to reject the previously approved audit bytes before candidate execution, retaining all seven dependency pins and existing admission/refusal cases. The suite reproduces two failures with the old pin and passes with the reviewed pin. Harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot synchronize a separately reviewed trusted workflow pin; deriving an accepted digest from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing suite compares the fixed reviewed audit digest with actual bytes and executes the trusted CLI against accepted current tooling and rejected previous, modified, dirty, missing or symlinked tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "launch-quality-cold-build-budget",
+    "correction": "PR #1554 red-check repair: With every Swift package cache missing, Launch Quality killed build-for-testing at 600 seconds while test targets were still compiling, before XCTest execution began.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40388372132/job/121803920594",
+    "mechanization": "Extend the existing launch-quality runner's separate build budget to a bounded 900-second single attempt. Extend its existing required shared-lib and native evidence behavior suite with a virtual elapsed-clock regression: a cold build exceeding the former 600-second cap must proceed, compiler errors and over-budget builds must stop before native tests, overrides remain effective, build arguments and compiler logs survive, and no build retry is permitted. The cold-build case fails with exit 124 before the repair and passes afterward. Preserve all XCTest selectors, per-test and command limits, native coverage/evidence checks, diagnostic-seven bounds and the outer workflow cap. The harness retains push and PR ownership; exact-head native CI remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runner already separates compilation from test execution, so its reusable bounded build budget can admit a cold compile without altering any native assertion or creating a retry loop."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "Bound the one cold build independently of XCTest execution."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-merge-duplicate-environment-binding",
+    "correction": "PR #1554 conflict repair: preserve approved training cards alongside main training review, numeric scrubbing, acknowledgement and undo behavior. Independent SwiftUI changes silently duplicated the dynamicTypeSize environment property during the merge.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1554",
+    "mechanization": "Extend the existing required shared-lib SwiftUI environment guard to reject duplicate Environment property bindings within a lexical scope while permitting independent nested and sibling views and ignoring comments and strings. Run the guard on this merge: it fails for TrainingViews.swift dynamicTypeSize before repair and passes after retaining one declaration. Preserve both training implementations and extend native cache/undo and acknowledged-revision regressions for the combined behavior. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Duplicate SwiftUI declarations arise when Git combines independent source edits, before application execution; an application runtime change cannot prevent the source redeclaration."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing environment source guard runs through the required shared-lib test suite and can reject same-scope duplicate bindings on every merged source snapshot without a native toolchain."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/swiftui-environment-writes.test.ts",
+      "anchor": "Retain one environment binding per scope when merging native views"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "native-chaos-verified-text-entry",
+    "correction": "PR #1554 red-check repair: Launch Quality read only l after typing local chaos draft in the keyboard-dismissal probe, without proving that the full draft existed before dismissal.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40365063632/job/121720772605",
+    "mechanization": "Extend the existing chaos typing harness with typeVerifiedText: pace real keyboard input one character at a time and require exact prefix readback before proceeding. Reuse it for random typing and the failing dismissal probe, preserving the full post-dismissal draft and no-send assertions. The existing required shared-lib launch audit rejects unverified setup and bulk typing in these paths; its new regression fails before the harness change and passes afterward. Add the native harness to Turbo test inputs. Native rerun remains required; this Linux host cannot establish UI acceptance. Harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing executable UI-test harness can construct a complete verified draft before performing dismissal, preventing partial injected input from being mistaken for dismissal data loss and preventing incomplete typing from counting as an executed action."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift",
+      "anchor": "private func typeVerifiedText(_ text: String, into field: XCUIElement, app: XCUIApplication) -> Bool"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-context-edit-sheet-visible-host",
+    "correction": "PR #1554 Launch Quality: testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates reached a hittable Edit entry button but the editor never appeared after the tap.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40373465167/job/121750360725",
+    "mechanization": "Extend the existing sheet-host guard to require exactly one edit presenter on the visible Context navigation destination instead of the covered timeline root. Run the guard against this instance: the production-source regression fails before relocating the presenter and passes afterward; mutations also reject root placement and duplicate presenters. Include the Swift presenter in existing Turbo test inputs. Preserve the native UI assertions and account ownership checks. Move callback diagnostics before ownership admission and record rejection so the next native receipt distinguishes a rejected callback from failed presentation. The failed artifact shows Context remaining visible but does not establish callback admission or prove the root cause. Native execution and coverage remain required in CI; this Linux host has no Xcode. Harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching the existing edit sheet to the navigation destination that contains its initiating control keeps its presenter in the visible view lifetime by construction. The existing required static sheet-host guard prevents moving it back or adding competing presenters."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/daily-reminder-sheet-host.test.ts",
+      "anchor": "keeps the edit-entry presenter on the visible Context destination"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-ledger-staged-merge-conflicts",
+    "correction": "PR #1554 repeated conflict repair: a classified staged ledger must not let merge verification or a staged resolver retry report success while another Git path is unresolved.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1554",
+    "mechanization": "Extend the existing correction classifier resolver so the shared unresolved-path preflight runs before both merge verification and staged retries. The existing required shared-lib classifier suite creates a real ledger and unrelated-file conflict, stages a valid ledger, and requires both modes to refuse without changing the ledger, unrelated file or index. This regression fails with the previous early return and passes with the repair. Use --resolve-merge . --stage for this instance, retaining both immutable parents and every guard. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge resolver can reject every unresolved non-ledger path before any success return, preventing a partial conflict repair from being reported as verified by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "Verify the whole merge is conflict-free, including staged retries."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1554 recurring conflict repair: merge origin/main without losing approved training cards, the gated rest timer or correction receipts, and prevent Git text conversion from hiding staged conflict markers.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1554",
+    "mechanization": "Extend the existing ledger merge readiness guard to disable text conversion as well as external diff drivers when inspecting the staged merge. The required shared-lib classifier Git-fixture suite configures a real text conversion driver that hides a staged marker and requires both resolver modes to refuse while preserving the ledger and index. The regression fails before --no-textconv and passes after it. Use --resolve-merge . --stage and --check-merge . on this instance; the lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "canvas-replay-original-test-deadline-restoration",
+    "correction": "PR #1591 remained in the merge queue after conversion to draft and landed a 30-second canvas replay test override. Restore the original five-second Jest deadline without changing the scenario or its assertions.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1591",
+    "mechanization": "Remove only the scenario-specific timeout argument so the existing Jest runner again enforces its original five-second default. Retain every replay, account, persistence and per-action assertion. An isolated six-second delay in the unchanged real replay passes under the expanded 30-second allowance but is rejected with Exceeded timeout of 5000ms under the restored default. After removing that injected delay, all 24 canvas, analytics and real-SDK Sentry tests pass on fresh main 1a29635d5. Product source is unchanged. Draft withdrawal from the native queue is handled by the separate queue-controller mechanism included in this PR; this receipt records deadline restoration.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Jest timeout owner enforces the original execution limit once the per-scenario expansion is removed; a slow or hung replay must fail under that limit rather than receiving a longer allowance."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/components/training/MesocycleCanvasBoard.test.tsx",
+      "anchor": "it('replays draft, review, split, swap, drag, reload, and undo on the board', async () => {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "draft-conversion-does-not-withdraw-native-queue-entry",
+    "correction": "PR #1591 merged at2026-10-27T01:15:12Z while marked draft: a readiness transition did not revoke its already-qualified native merge-queue entry. A draft hold is not proven until current queue membership is absent.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1591",
+    "mechanization": "Subscribe the existing checkout-free native queue controller to converted_to_draft. Read current exact-head/open-draft/main/same-repository queue state before the normal dequeue mutation, then require explicit-null fresh same-draft queue-absence readback before recording WITHDRAWN. Preserve the existing concurrency group and one running job with GitHub queue:max so later CI events cannot replace a pending withdrawal; GitHub bounds admission at100pending and failures remain visible. Keep ordinary enrollment and its CI proof unchanged. Stale events, changed readiness, merged/closed PRs and foreign heads cannot withdraw an entry. Permission errors, unknown membership and unverified removal fail explicitly. The production inline-script regressions initially failed11of61before the fix. Independent review fault injection removing queue retention and restoring falsey membership checks fails3of74cases; restored candidate passes the existing required queue-policy suite74of74. GitHub scheduling is asynchronous and dequeue has no atomic expected-head condition: operational holds still require live membership readback and cannot claim instantaneous or absolute safety.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing native controller can explicitly withdraw an already-enqueued draft through its normal repository-scoped GitHub operation and verify the resulting membership, instead of relying on draft eligibility checks that only prevent future enrollment."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/merge-queue-enrollment.test.mjs",
+      "anchor": "converting an already queued exact head to draft withdraws it and proves absence without CI"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "classifier-fixtures-do-not-repeat-global-cli-probes",
+    "correction": "PR #1551 CI times out the correction-classifier regression process at30seconds while all native checks pass. The suite repeats scenario-independent CLI probes inside13 realGit scenarios, and unrestricted parallel shared-lib workers contend while launching their own child processes.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40415085533/job/121896099093",
+    "mechanization": "Execute scenario-independent CLI probes once while retaining all13 realGit merge variants, parent/index/worktree integrity assertions, marker and receipt mutations, and100percent line/branch/function coverage. Bound each child CLI and Git command to5seconds with explicit spawn errors. Bound shared-lib Vitest to2workers so nested processes do not overwhelm the runner. Isolated covered-suite time falls from25.8seconds to14.0seconds. With all dependencies available, unrestricted suite load reproduces classifier30second and coverage5second timeouts;2workers passes both at14.5seconds and2.5seconds. All179 tests still run:163pass and16Ruby-dependent tests remain unverified because Ruby is absent locally. Existing outer deadlines remain unchanged. After ordinary integration with main b836060e, retain all18 current realGit variants including textconv/color and unrelated-conflict controls. Fresh frozen dependencies with available Ruby pass all186 shared-lib tests plus122 Node tests and the full8-task root test graph. The unchanged covered classifier runs in17.722seconds with100percent line/branch/function coverage; root lint and typecheck each pass4tasks. Earlier179-test/Ruby-gap measurements describe the original candidate, not current qualification.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The fixture structure can avoid redundant child processes by construction while process deadlines make a hung command fail explicitly. No production guard or outer qualification deadline needs weakening."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "These argument and repository failures do not depend on a merge scenario."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "staged-source-projection-refresh",
+    "correction": "PR #1600: The @radix-ui/react-context-menu 2.3.8 manifest bump left the generated source projection stale, failing Detect Changes, documentation parity and CI Summary. Repeated dependency repairs must refresh the projection automatically.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300944443/job/121498388010",
+    "mechanization": "Extend the existing source-map merge resolver with an indexed-source mode and invoke it after formatting in pre-commit. It regenerates and stages only the configured projection, preserves unstaged source edits, and refuses unresolved files, pinned drift or unstaged projection edits. The existing required Detect Changes tests execute real Git fixtures for these paths and enforce hook wiring.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct the projection automatically from indexed sources before a commit, preventing repeated manual regeneration while retaining the required parity gate for bot-created commits."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "commit source-map repair uses staged dependencies and preserves unstaged source edits"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
