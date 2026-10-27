@@ -92,7 +92,10 @@ branch-only receipts, allowing later main-side prepends to merge without
 repeating the same conflict. It preserves independent additions and
 one-sided edits, rejects deletions, duplicate identities and divergent concurrent
 edits, and validates retained guards before writing the classified result.
-Missing conflict stages fail without writing.
+Missing conflict stages fail without writing. If Git refuses to stage the
+resolved ledger (for example, because another writer holds `index.lock`), the
+resolver restores the original ledger bytes and reports the staging error.
+Remove the external obstruction and retry the same command.
 Both resolver entrypoints share a preflight that refuses other unresolved Git
 paths before reading guard evidence or writing the ledger. Resolve and stage
 those source conflicts first, even when their files still contain guard anchors.

@@ -1779,6 +1779,24 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "classifier-fixtures-do-not-repeat-global-cli-probes",
+    "correction": "PR #1551 CI times out the correction-classifier regression process at30seconds while all native checks pass. The suite repeats scenario-independent CLI probes inside13 realGit scenarios, and unrestricted parallel shared-lib workers contend while launching their own child processes.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40415085533/job/121896099093",
+    "mechanization": "Execute scenario-independent CLI probes once while retaining all13 realGit merge variants, parent/index/worktree integrity assertions, marker and receipt mutations, and100percent line/branch/function coverage. Bound each child CLI and Git command to5seconds with explicit spawn errors. Bound shared-lib Vitest to2workers so nested processes do not overwhelm the runner. Isolated covered-suite time falls from25.8seconds to14.0seconds. With all dependencies available, unrestricted suite load reproduces classifier30second and coverage5second timeouts;2workers passes both at14.5seconds and2.5seconds. All179 tests still run:163pass and16Ruby-dependent tests remain unverified because Ruby is absent locally. Existing outer deadlines remain unchanged. After ordinary integration with main b836060e, retain all18 current realGit variants including textconv/color and unrelated-conflict controls. Fresh frozen dependencies with available Ruby pass all186 shared-lib tests plus122 Node tests and the full8-task root test graph. The unchanged covered classifier runs in17.722seconds with100percent line/branch/function coverage; root lint and typecheck each pass4tasks. Earlier179-test/Ruby-gap measurements describe the original candidate, not current qualification.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The fixture structure can avoid redundant child processes by construction while process deadlines make a hung command fail explicitly. No production guard or outer qualification deadline needs weakening."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "These argument and repository failures do not depend on a merge scenario."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "fix-red-5df69c1e5f",
     "correction": "PR #1556 / LYB-241: Repeated red-check repairs must preserve merged feature work and fix the actual Launch Quality failure. Run 40398373660 killed a cold build-for-testing at 600 seconds while app sources were still compiling, before XCTest began.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40398373660/job/121837659685",
@@ -1890,6 +1908,24 @@
     "guard": {
       "path": "packages/shared-lib/scripts/correction-coverage.mjs",
       "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "ledger-staging-failure-preserves-conflict",
+    "correction": "PR #1556 / LYB-241 recurring conflict repair: a failed Git staging write must preserve the original correction ledger and index so an unattended retry cannot lose the unresolved conflict state.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1556#staging-retry",
+    "mechanization": "Extend the existing classified ledger resolver to restore the original ledger bytes when Git refuses staging and propagate the staging error. The existing required shared-lib real-Git fixture holds index.lock, proves both ledger and index preservation, removes the lock and retries the same command successfully. The regression fails before the extension and passes afterward without changing any process deadlines, scenario coverage or CI gates. Use the extended --resolve-merge . --stage command for this main merge, preserving all 96 parent receipts. The lanes harness owns push and PR edits; its machine body line is Machine: built scripts/correction-classifier.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver owns the working-ledger write and Git staging operation, so it can restore its original bytes on staging failure by construction while leaving Git to preserve the locked index."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "Failed staging must preserve the original ledger for an unattended retry."
     },
     "level": "codebase",
     "ruleId": "code-prevention"

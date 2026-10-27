@@ -251,7 +251,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     ) {
       writeFileSync(path, formatted);
     }
-    stageResolution?.();
+    try {
+      stageResolution?.();
+    } catch (error) {
+      // Failed staging must preserve the original ledger for an unattended retry.
+      writeFileSync(path, original);
+      throw error;
+    }
     console.log(`correction-classifier: classified ${result.length} receipts`);
   } catch (error) {
     console.error(`correction-classifier: ${error.message}`);
