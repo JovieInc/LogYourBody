@@ -1795,5 +1795,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "staged-source-projection-refresh",
+    "correction": "PR #1600: The @radix-ui/react-context-menu 2.3.8 manifest bump left the generated source projection stale, failing Detect Changes, documentation parity and CI Summary. Repeated dependency repairs must refresh the projection automatically.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300944443/job/121498388010",
+    "mechanization": "Extend the existing source-map merge resolver with an indexed-source mode and invoke it after formatting in pre-commit. It regenerates and stages only the configured projection, preserves unstaged source edits, and refuses unresolved files, pinned drift or unstaged projection edits. The existing required Detect Changes tests execute real Git fixtures for these paths and enforce hook wiring.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct the projection automatically from indexed sources before a commit, preventing repeated manual regeneration while retaining the required parity gate for bot-created commits."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "commit source-map repair uses staged dependencies and preserves unstaged source edits"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
