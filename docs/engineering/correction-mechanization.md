@@ -76,6 +76,9 @@ node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
 
+Merge readiness inspects staged changes without external diff or text conversion
+drivers, so a presentation filter cannot hide unresolved conflict markers.
+
 Baselines have schema `lyb.correction-ratchet/v1` and a `findings` array. Seeding
 requires a readable immutable base: findings introduced by the PR cannot be
 grandfathered. For an existing rule, CI compares the head baseline with the

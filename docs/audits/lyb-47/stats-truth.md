@@ -120,3 +120,57 @@ The existing share Date switch also removes comparison endpoint dates. Its
 undated trend still states first-to-last observation and the observation mean;
 it does not leave hidden dates in the Trend field. A native PNG truth regression
 covers Date off with Trend on.
+
+## PR #1535 merge repair (2026-10-27)
+
+Merged `origin/main` at `1a29635d5` without rebasing. The composed launch audit
+retains main's bounded 900-second cold build and Stats truth's native UI selector.
+Its fixed diagnostic digest is
+`47d6ee6b7d56796527fa0154082f89a46c8a30be0ecfd5ce7e13866a600b633a`.
+The trusted CLI regression admits these composed bytes and rejects both former
+parent audits, all historical fixtures and every existing invalid-tooling case.
+
+Extended the existing correction-ledger merge readiness guard with `--text`.
+Real Git fixtures reproduce binary attributes hiding staged conflict markers
+before the change, then verify refusal in initial resolution, staged resolution,
+merge verification and staged retries. Clean retries pass. Used the same resolver
+to retain both parents' classified correction receipts on this instance.
+
+The harness owns pushes and PR updates. Add this single machine line to the PR body:
+
+Machine: built packages/shared-lib/scripts/correction-coverage.mjs
+
+Repair validation (Node 22.23.2, pinned pnpm 10.34.1 via Corepack):
+
+- `corepack pnpm lint` and `corepack pnpm typecheck` passed (four Turbo tasks each).
+- `corepack pnpm test` passed all eight Turbo tasks, including the real web
+  production build, 186 shared-lib cases and 1,398 web Jest cases.
+- `node --test --experimental-test-coverage
+--test-coverage-include=scripts/correction-classifier.mjs
+--test-coverage-lines=100 --test-coverage-branches=100
+--test-coverage-functions=100 scripts/correction-classifier.test.mjs` passed
+  all 11 cases with 100% line, branch and function coverage. Before the fix,
+  `node --test --test-name-pattern='CLI resolves Git ledger conflicts'
+scripts/correction-classifier.test.mjs` failed at `binary-marker: 0 !== 1`.
+- `python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q`
+  passed all 44 cases. Bashcov is unavailable here; the separate routing shell
+  coverage check needs its CI receipt.
+- `python3 scripts/ios/test_launch_ui_regression_audit.py` passed 12 cases;
+  `python3 scripts/ios/launch-ui-regression-audit.py --artifact-dir
+/tmp/pr1535-launch-ui` and `bash -n scripts/ios/launch-quality-audit.sh` passed.
+- `node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main`,
+  the matching `correction-ratchet.mjs` and `guard-reference.mjs` commands passed:
+  64 mechanized rules, no missing guards and the unchanged 11 public-copy findings.
+- From `apps/ios`, `XDG_CACHE_HOME=/tmp/pr1535-swiftlint-cache swiftlint lint
+--strict --config .swiftlint.yml --cache-path /tmp/pr1535-swiftlint-cache/lint`
+  passed with zero violations in 486 files. SourceKit-only rules remain unavailable
+  on Linux. `xcodebuild` is absent; native execution remains required in CI.
+
+The standalone routing coverage reader cannot run without Bashcov's result file.
+Initial sandboxed Git-fixture checks needed an unsandboxed retry; the successful
+checks above retain all thresholds. The system pnpm is 9.15.4, so root validation
+used Corepack's pinned version; SwiftLint ran directly with its writable cache.
+GBrain write `put lyb-47-stats-truth-merge-repair` and readback
+`get_page lyb-47-stats-truth-merge-repair` both failed with curl error 7 at
+localhost:7801. The unsandboxed query also timed out after 30 seconds; neither
+write persistence nor readback was established. This document retains the findings.

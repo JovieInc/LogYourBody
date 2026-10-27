@@ -29,7 +29,10 @@ MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE="${MAXIMUM_TEST_EXECUTION_TIME_ALLOWANCE:-
 # killed healthy runs. 1020s still stops a hung simulator well inside the step
 # budget. A command timeout is not retried; see is_simulator_infra_failure.
 XCODEBUILD_COMMAND_TIMEOUT_SECONDS="${XCODEBUILD_COMMAND_TIMEOUT_SECONDS:-1020}"
-BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"
+# Bound the one cold build independently of XCTest execution. Run 40388372132
+# missed every Swift package cache and was still compiling test targets at 600s.
+# Allow 15m for compilation; keep test timeouts, retries and the outer step cap.
+BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"
 TIMEOUT_BIN="${TIMEOUT_BIN:-}"
 
 if [[ "$AUDIT_MODE" == diagnostic-seven ]]; then
