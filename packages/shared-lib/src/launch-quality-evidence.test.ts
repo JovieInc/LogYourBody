@@ -44,7 +44,7 @@ it('rejects incomplete XCTest proof through the launch gate validator with execu
         .filter((line) => /launch-quality-evidence|behavior tests executed/.test(line))
         .join('\n'),
     );
-    expect(output).toContain('Evidence validator behavior tests executed: 29');
+    expect(output).toContain('Evidence validator behavior tests executed: 30');
     expect(output).toContain('launch-quality-evidence');
   } finally {
     rmSync(coverage, { recursive: true, force: true });
@@ -62,7 +62,7 @@ it('propagates evidence assertion failures and nonzero exits despite passing sui
         '    def test_missing_canvas_execution(self):\n' +
         '        self.assertEqual(0, 1)\n' +
         'result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(Failure))\n' +
-        'print("Evidence validator behavior tests executed: 29")\n' +
+        'print("Evidence validator behavior tests executed: 30")\n' +
         'sys.exit(0 if result.wasSuccessful() else 1)\n',
     );
     expect(() => checkedTrace(test, directory, directory)).toThrow(/AssertionError: 0 != 1/);
