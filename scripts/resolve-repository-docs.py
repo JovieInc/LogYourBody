@@ -85,13 +85,21 @@ def resolve(root, refresh_lockfile=False, verify_lockfile=False):
     if unresolved:
         raise ValueError("resolve source conflicts first: " + ", ".join(unresolved))
     if refresh_lockfile or verify_lockfile:
+        inputs = ["package.json", "**/package.json", "pnpm-workspace.yaml",
+                  "pnpm-lock.yaml", ".npmrc", output]
         dirty = subprocess.run(
-            ["git", "diff", "--name-only", "--", "package.json", "**/package.json",
-             "pnpm-workspace.yaml", "pnpm-lock.yaml", ".npmrc", output],
+            ["git", "diff", "--name-only", "--", *inputs],
             cwd=root, check=True, capture_output=True, text=True,
         ).stdout.strip()
         if dirty:
             raise ValueError("unstaged dependency edits: " + dirty.replace("\n", ", "))
+        # Local-only manifests must not enter a lockfile destined for CI.
+        untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", *inputs],
+            cwd=root, check=True, capture_output=True, text=True,
+        ).stdout.strip("\0")
+        if untracked:
+            raise ValueError("untracked dependency inputs: " + untracked.replace("\0", ", "))
         # Refuse pinned-source drift before invoking the dependency resolver.
         errors = repository_docs.run(root)
         if errors and errors != ["source projection stale: " + output]:

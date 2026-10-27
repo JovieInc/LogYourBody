@@ -99,6 +99,9 @@ those source conflicts first, even when their files still contain guard anchors.
 The preflight reads raw staged changes with binary hiding and text conversions
 disabled, so diff attributes cannot conceal unresolved conflict markers. Both
 resolution and pre-commit merge verification refuse those markers without writes.
+The Git fixtures combine forced color with binary/textconv attributes and cover
+all four CRLF marker forms and wider markers, so composing protections during
+a main merge cannot silently discard either parent's guard.
 If the generated repository source map also conflicts, run
 `python3 scripts/resolve-repository-docs.py --staged` before the ledger resolver.
 It reconstructs only the generated output from staged inputs, leaving unrelated
@@ -113,6 +116,10 @@ to staging only the resolved ledger after validating its classification, staged
 guard sources and receipt retention against both merge parents. A failed
 validation preserves the ledger and index. Retrying after staging runs the
 read-only merge check; it does not restage files or overwrite unrelated edits.
+Both the merge check and staged retry refuse any other unresolved Git path,
+even when the staged ledger and all of its guard sources are valid.
+Conflict-marker scanning disables Git color output as well as text conversion
+and external diff drivers so presentation settings cannot conceal staged markers.
 A staged retry refuses any unstaged ledger edits rather than reporting success
 while ignoring new receipts. Review and stage those edits explicitly before
 retrying; refusal preserves both the index and working file.

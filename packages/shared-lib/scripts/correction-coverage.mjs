@@ -274,6 +274,7 @@ export function assertLedgerMergeReady(root) {
       '--cached',
       '--no-ext-diff',
       '--no-textconv',
+      '--no-color',
       '--text',
       '--unified=0',
       '--',
