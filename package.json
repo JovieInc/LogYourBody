@@ -13,6 +13,8 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:mutation": "turbo run test:mutation --filter=@logyourbody/shared-lib",
+    "test:launch-e2e": "pnpm --filter logyourbody exec playwright test tests/e2e/launch-funnel.spec.ts --project=desktop --project=mobile-portrait --workers=1",
     "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
     "lint:knowledge": "node scripts/lint-no-specifics.mjs && node scripts/lint-claims.mjs",
     "growth:report": "node packages/shared-lib/scripts/growth-report.mjs",

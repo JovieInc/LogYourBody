@@ -2,8 +2,12 @@
   "extends": ["//"],
   "tasks": {
     "test": {
+      "outputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/coverage/mutation/**"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/mutation/**",
+        "$TURBO_ROOT$/.github/scripts/validate-release-checks.mjs",
+        "$TURBO_ROOT$/.github/scripts/validate-release-source.test.mjs",
         "$TURBO_ROOT$/scripts/correction-classifier*.mjs",
         "$TURBO_ROOT$/scripts/fixtures/correction-classifier.json",
         "$TURBO_ROOT$/scripts/lyb-launch-manifest*.mjs",
@@ -63,6 +67,9 @@
         "$TURBO_ROOT$/apps/web/db/tests/verify-training-mutations.py",
         "$TURBO_ROOT$/apps/web/db/tests/test_verify_training_mutations.py"
       ]
+    },
+    "test:mutation": {
+      "cache": false
     }
   }
 }

@@ -1128,7 +1128,7 @@
     },
     "guard": {
       "path": "apps/web/src/app/sitemap.ts",
-      "anchor": "return PUBLIC_MARKETING_ROUTES.map((path) => ({"
+      "anchor": "url: new URL(path, endpoints.hosts.marketing.url).href"
     },
     "level": "codebase",
     "ruleId": "code-prevention"
@@ -1589,5 +1589,171 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "purchase-success-requires-active-entitlement",
+    "correction": "The launch audit found purchase success was emitted after SDK completion without an active entitlement, and cancellation outcomes were discarded.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/ios/LogYourBody/Services/RevenueCatManager+Part01.swift",
+    "mechanization": "Normalize cancellation at the adapter, capture the rollout policy once per attempt, and require an active entitlement before reporting success. Eight native regressions cover missing/inactive entitlements, restore recovery, cancellation and a policy change during purchase. Static audits pass; native red/green execution remains unverified until the real macOS runner executes this source. The billing verification gate remains default-off.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/RevenueCatPurchaseRestoreFlowTests.swift",
+      "anchor": "func testPurchaseWithoutEntitlementDoesNotReportSuccessAndCanRecoverByRestore()"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "analytics-sdk-failure-blocks-conversion",
+    "correction": "The launch audit found optional telemetry SDK failures could interrupt signup and prevent the other analytics adapter from receiving events.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/web/src/lib/statsigAnalyticsAdapter.ts",
+    "mechanization": "Catch synchronous SDK construction, initialization and method failures at the existing adapter boundary. Three failing-before regressions now pass, including fallback delivery through the real two-adapter composition. Retain existing payload allowlists.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/lib/__tests__/statsigAnalyticsAdapter.test.ts",
+      "anchor": "keeps conversion usable and permits retry when SDK construction throws"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "waitlist-funnel-outcome-attribution",
+    "correction": "The editorial landing omitted attempted/outcome funnel stages and exposed obsolete duplicate-status copy; normal result events lacked attribution.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/web/src/app/ExperimentWaitlistLanding.tsx",
+    "mechanization": "Both existing form paths now emit bounded attribution on request outcomes. Editorial success uses the same non-enumerating acceptance response. Eight editorial/schema regressions and five normal-form assertions failed before the fixes and pass afterward. Accepted requests remain distinct from durable registrations.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/experiment-waitlist-landing.test.tsx",
+      "anchor": "records bounded funnel outcomes"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "growth-evidence-actionable-repair-plan",
+    "correction": "The private growth report identified missing evidence without giving an actionable repair plan for closed-loop iteration.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/packages/shared-lib/scripts/growth-report.mjs",
+    "mechanization": "Emit deterministic source commissioning/reconciliation/refresh actions and not-before dates for immature cohorts. Three new behavioral regressions failed before implementation; all 14 report tests then passed with 100% source line, branch and function coverage. No provider commissioning or customer-outcome evidence is fabricated.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/growth-report.behavior.mjs",
+      "anchor": "turns missing evidence into bounded source actions instead of an experiment verdict"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-storefront-subscription-truth-and-search",
+    "correction": "The launch audit found incomplete subscription disclosures, no weight keyword, and unsupported claims in obsolete marketing code.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/packages/product-registry/src/storefronts/logyourbody.mjs",
+    "mechanization": "Generate truthful trial eligibility, renewal, cancellation and legal links from canonical product information, include weight search intent, and remove unused misleading copy. The existing storefront and brand guards failed before the repair and pass afterward. Final native screenshots and live ASC readback remain unverified.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "packages/product-registry/scripts/storefront.test.mjs",
+      "anchor": "${locale.id} description needs the canonical Terms of Use link"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "lyb-published-article-discovery",
+    "correction": "Published blog posts were absent from the sitemap and article shares inherited homepage metadata.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/web/src/app/sitemap.ts",
+    "mechanization": "Reuse the existing publication boundary for sitemap entries and generate article-specific sharing metadata. Two new SEO regressions failed before repair; all 11 relevant cases passed afterward, including draft exclusion. Preserve the earlier public-route invariant and update its source anchor to the same canonical URL construction after adding posts.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/app/__tests__/marketing-discovery.test.tsx",
+      "anchor": "includes published article URLs with safely encoded slugs"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-policy-mutation-evidence",
+    "correction": "The launch goal requires deliberate code mutation testing; existing database mutation tests did not supply it.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/packages/shared-lib/package.json",
+    "mechanization": "Run isolated semantic mutants against actual growth/release policies through the required shared-lib suite. Reject survivors, invalid syntax, missing source coverage, timeouts and incomplete execution. Independent review reproduced empty-coverage and orphan-process bugs; both regression fixtures now pass after repair. All 14 curated mutants are killed by assertions; this is bounded policy evidence, not whole-app or native mutation coverage.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/mutation-quality.test.ts",
+      "anchor": "requires every curated launch mutant to be killed by actual assertions"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "launch-browser-server-port-alignment",
+    "correction": "The launch browser harness expected port 5173 while Next.js started on 3000, leaving local end-to-end verification unable to connect.",
+    "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/apps/web/playwright.config.ts",
+    "mechanization": "Derive server and browser URLs from one validated port and pin prelaunch flags in a dedicated test server. New browser cases exercise six real public surfaces, canonical metadata, keyboard activation and signup failure/retry/acceptance. The first complete run passed 18 desktop/mobile cases after narrowing the alert selector. Intercepted signup responses do not prove database commissioning.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing runtime boundary or required behavior test can enforce this invariant deterministically while retaining its verification limits."
+      }
+    },
+    "guard": {
+      "path": "apps/web/tests/e2e/launch-funnel.spec.ts",
+      "anchor": "waitlist validates, recovers after failure, and accepts once"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "public-feature-flag-secret-scanner-false-positive",
+    "correction": "PR #1618: Required Gitleaks scanning identified a public billing feature flag assigned to a key-named constant as a generic API secret.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1618",
+    "mechanization": "Reproduced the exact Git-range finding with checksum-verified Gitleaks 8.30.1. Rename the constant and reference to gateName, retain the flag value and purchase behavior, and keep the existing required scanner unmodified. An independent temporary-file scan and the corrected source scan both report zero findings. Replace the task-owned single feature commit so the false positive is absent from the PR scan range; no credentials or scanner allowances are changed.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The flag identifier is intentionally public; entitlement behavior is unchanged and cannot prevent a scanner naming heuristic."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The unchanged required Gitleaks workflow detects flagged source additions. Use accurate constant naming instead of an exception or weaker scanner."
+      }
+    },
+    "guard": {
+      "path": ".github/workflows/security-scan.yml",
+      "anchor": "uses: JovieInc/ci/.github/workflows/secret-scan.yml@44105468cc7c271e5f117baec9effca295ebd13c"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

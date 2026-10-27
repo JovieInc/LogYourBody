@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
-import { analytics } from '@/lib/analytics';
+import { analytics, type AnalyticsProperties } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import {
   buildLandingSource,
@@ -14,7 +14,7 @@ import {
 } from '@/lib/marketing/landing-registry';
 import { waitlistLandingCopy } from './waitlist-copy';
 
-type SubmitState = 'idle' | 'submitting' | 'success' | 'duplicate' | 'error';
+type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
 
 export interface ExperimentWaitlistLandingProps {
   variant: LandingVariant;
@@ -29,6 +29,7 @@ export function ExperimentWaitlistLanding({
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
+  const started = useRef(false);
   const reduceMotion = useReducedMotion();
   const source = buildLandingSource({
     audience: variant.audience,
@@ -52,11 +53,26 @@ export function ExperimentWaitlistLanding({
   const statusMessage =
     submitState === 'success'
       ? waitlistLandingCopy.successMessage
-      : submitState === 'duplicate'
-        ? waitlistLandingCopy.duplicateMessage
-        : submitState === 'error'
-          ? waitlistLandingCopy.errorMessage
-          : null;
+      : submitState === 'error'
+        ? waitlistLandingCopy.errorMessage
+        : null;
+
+  const funnelProperties = {
+    variant: 'waitlist_editorial_v2' as const,
+    audience: variant.audience,
+    goal: variant.goal,
+    assignment_source: assignmentSource,
+  };
+
+  function trackResult(outcome: NonNullable<AnalyticsProperties['outcome']>) {
+    analytics.track('web_waitlist_submit_result', { ...funnelProperties, outcome });
+  }
+
+  function trackStart() {
+    if (started.current) return;
+    started.current = true;
+    analytics.track('web_waitlist_started', funnelProperties);
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,10 +81,12 @@ export function ExperimentWaitlistLanding({
     const trimmed = email.trim();
     if (!trimmed || !emailInputRef.current?.checkValidity()) {
       setFieldError(waitlistLandingCopy.invalidEmailMessage);
+      trackResult('invalid');
       return;
     }
 
     setSubmitState('submitting');
+    analytics.track('web_waitlist_submit_attempted', funnelProperties);
 
     try {
       const response = await fetch('/api/waitlist', {
@@ -78,28 +96,28 @@ export function ExperimentWaitlistLanding({
       });
       const payload = (await response.json()) as {
         success?: boolean;
-        status?: 'created' | 'existing';
       };
 
       if (!response.ok || !payload.success) {
         if (response.status === 400) {
           setFieldError(waitlistLandingCopy.invalidEmailMessage);
           setSubmitState('idle');
+          trackResult('invalid');
           return;
         }
         setSubmitState('error');
+        trackResult(response.status === 429 ? 'rate_limited' : 'server_error');
         return;
       }
 
-      analytics.track('web_waitlist_submitted', {
-        variant: 'waitlist_editorial_v2',
-        audience: variant.audience,
-        goal: variant.goal,
-        assignment_source: assignmentSource,
-      });
-      setSubmitState(payload.status === 'existing' ? 'duplicate' : 'success');
+      // Browser acceptance includes duplicate/honeypot requests. Only the
+      // first-party store can establish a durable new registration.
+      analytics.track('web_waitlist_submitted', funnelProperties);
+      trackResult('accepted');
+      setSubmitState('success');
     } catch {
       setSubmitState('error');
+      trackResult('server_error');
     }
   }
 
@@ -184,6 +202,7 @@ export function ExperimentWaitlistLanding({
                 inputMode="email"
                 placeholder="Email address"
                 value={email}
+                onFocus={trackStart}
                 onChange={(event) => {
                   setEmail(event.target.value);
                   if (fieldError) setFieldError(null);

@@ -1,1 +1,1 @@
-progress,photos,composition,fat,lean,mass,private,timeline,ffmi,tracker,measurements,recomposition
+progress,photos,composition,fat,lean,mass,weight,timeline,ffmi,tracker,measurements,recomposition

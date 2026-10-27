@@ -2,6 +2,11 @@
 
 This directory documents the closed-loop system that keeps the LogYourBody App Store listing truthful, current, and measurable.
 
+The current [production brief](launch-production-2026-10-26.md) records the
+validated listing changes, concrete screenshot composition, capture-state
+requirements, and unresolved release evidence. The existing screenshot files
+are not a complete launch campaign.
+
 ## Source of truth
 
 The canonical storefront definition lives at:

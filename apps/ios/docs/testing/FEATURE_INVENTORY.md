@@ -5,6 +5,32 @@
 > rating, the smallest test layer that proves it, and its current coverage.
 > Update the status columns as batches land.
 
+## Launch verification update (2026-10-26)
+
+The historical runs below do not establish release readiness for the current
+commit. The canonical retained floors are in
+[`native-coverage-baseline.json`](../../../../scripts/ios/native-coverage-baseline.json):
+**25.47%** (26,397 / 103,629) for `quality-unit` and **20.33%**
+(21,069 / 103,629) for `unit-tier`. Keep the selectors separate and preserve
+their denominators and required behavior tests. Whole-app coverage is incomplete.
+
+Purchase outcome verification now has eight additional cases in the existing
+`RevenueCatPurchaseRestoreFlowTests` target. They cover missing/inactive
+entitlements, recovery through restore, SDK cancellation despite an existing
+entitlement, successful SDK responses, gate-on/off compatibility, and a gate
+change during a purchase. Each attempt snapshots its policy once for both the
+SDK response and entitlement verification.
+`billing_verified_purchase_outcome_v1` remains off when remote configuration is
+missing. Enable it only after the native tests and sandbox purchase, cancellation,
+and restore flows pass for the release candidate; adding the gate in source does
+not enable it in Statsig.
+
+This change was prepared on Linux without Xcode or Swift. Vendor-boundary and
+static launch-UI audits passed; the new XCTest cases, patch coverage, StoreKit,
+device performance, accessibility, and TestFlight acceptance remain **unverified**.
+Required evidence is a passing native run and coverage for the same candidate
+commit plus sandbox/device receipts. Do not count static audits as native tests.
+
 ## Standards (from Jovie company docs via gbrain)
 
 - `sources/jovie-product/docs/testing_guidelines` — risk-based effort;
