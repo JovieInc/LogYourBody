@@ -1741,5 +1741,41 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "canvas-replay-original-test-deadline-restoration",
+    "correction": "PR #1591 remained in the merge queue after conversion to draft and landed a 30-second canvas replay test override. Restore the original five-second Jest deadline without changing the scenario or its assertions.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1591",
+    "mechanization": "Remove only the scenario-specific timeout argument so the existing Jest runner again enforces its original five-second default. Retain every replay, account, persistence and per-action assertion. An isolated six-second delay in the unchanged real replay passes under the expanded 30-second allowance but is rejected with Exceeded timeout of 5000ms under the restored default. After removing that injected delay, all 24 canvas, analytics and real-SDK Sentry tests pass on fresh main 1a29635d5. Product source is unchanged. Draft withdrawal from the native queue is handled by the separate queue-controller mechanism included in this PR; this receipt records deadline restoration.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Jest timeout owner enforces the original execution limit once the per-scenario expansion is removed; a slow or hung replay must fail under that limit rather than receiving a longer allowance."
+      }
+    },
+    "guard": {
+      "path": "apps/web/src/components/training/MesocycleCanvasBoard.test.tsx",
+      "anchor": "it('replays draft, review, split, swap, drag, reload, and undo on the board', async () => {"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "draft-conversion-does-not-withdraw-native-queue-entry",
+    "correction": "PR #1591 merged at2026-10-27T01:15:12Z while marked draft: a readiness transition did not revoke its already-qualified native merge-queue entry. A draft hold is not proven until current queue membership is absent.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1591",
+    "mechanization": "Subscribe the existing checkout-free native queue controller to converted_to_draft. Read current exact-head/open-draft/main/same-repository queue state before the normal dequeue mutation, then require explicit-null fresh same-draft queue-absence readback before recording WITHDRAWN. Preserve the existing concurrency group and one running job with GitHub queue:max so later CI events cannot replace a pending withdrawal; GitHub bounds admission at100pending and failures remain visible. Keep ordinary enrollment and its CI proof unchanged. Stale events, changed readiness, merged/closed PRs and foreign heads cannot withdraw an entry. Permission errors, unknown membership and unverified removal fail explicitly. The production inline-script regressions initially failed11of61before the fix. Independent review fault injection removing queue retention and restoring falsey membership checks fails3of74cases; restored candidate passes the existing required queue-policy suite74of74. GitHub scheduling is asynchronous and dequeue has no atomic expected-head condition: operational holds still require live membership readback and cannot claim instantaneous or absolute safety.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing native controller can explicitly withdraw an already-enqueued draft through its normal repository-scoped GitHub operation and verify the resulting membership, instead of relying on draft eligibility checks that only prevent future enrollment."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/merge-queue-enrollment.test.mjs",
+      "anchor": "converting an already queued exact head to draft withdraws it and proves absence without CI"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
