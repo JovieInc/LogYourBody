@@ -414,6 +414,62 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('Refusing to reuse', result.stderr)
         self.assertEqual(prior.read_text(), 'prior proof must survive')
 
+    def test_shell_cold_build_budget_preserves_build_failures_and_timeout(self):
+        source = Path(__file__).with_name('launch-quality-audit.sh').read_text()
+        default = next(line for line in source.splitlines()
+                       if line.startswith('BUILD_FOR_TESTING_TIMEOUT_SECONDS='))
+        functions = source[source.index('build_for_testing_once() {'):
+                           source.index('# A diagnostic subset never emits')]
+        command = r"""
+set -euo pipefail
+COMMON_XCODEBUILD_ARGS=(-project fixture.xcodeproj -enableCodeCoverage YES)
+XCODEBUILD_SETTINGS_ARRAY=(CODE_SIGNING_REQUIRED=NO)
+cleanup_booted_simulator_apps() { :; }
+xcodebuild() {
+  printf '%s\n' "$@" > "$ARTIFACT_DIR/build-arguments"
+  echo 'compiler output'
+  return "$COMPILER_STATUS"
+}
+run_with_timeout() {
+  echo "$1" >> "$ARTIFACT_DIR/build-attempts"
+  # A virtual elapsed clock exercises the real budget without a 15-minute sleep.
+  if (( BUILD_DURATION > $1 )); then return 124; fi
+  shift
+  "$@"
+}
+""" + default + '\n' + functions + r"""
+build_for_testing_once
+echo 'ready for native tests'
+"""
+        cases = [
+            ('cold', '', 650, 0, 0),
+            ('hung', '', 901, 0, 124),
+            ('compiler-error', '', 100, 65, 65),
+            ('override-timeout', '20', 21, 0, 124),
+            ('override-success', '20', 19, 0, 0),
+        ]
+        for name, override, duration, compiler_status, expected in cases:
+            with self.subTest(name=name):
+                artifact = self.root / name
+                artifact.mkdir()
+                result = subprocess.run(
+                    ['bash', '-c', command], capture_output=True, text=True, timeout=10,
+                    env={**os.environ, 'ARTIFACT_DIR': str(artifact),
+                         'BUILD_FOR_TESTING_TIMEOUT_SECONDS': override,
+                         'BUILD_DURATION': str(duration), 'COMPILER_STATUS': str(compiler_status)})
+                self.assertEqual(result.returncode, expected, result.stderr)
+                self.assertEqual(len((artifact / 'build-attempts').read_text().splitlines()), 1)
+                self.assertEqual('ready for native tests' in result.stdout, expected == 0)
+                log = (artifact / 'launch-quality-build-for-testing.log').read_text()
+                if expected == 124:
+                    self.assertIn('build-for-testing timed out after', log)
+                else:
+                    self.assertIn('compiler output', log)
+                    self.assertEqual((artifact / 'build-arguments').read_text().splitlines(), [
+                        '-project', 'fixture.xcodeproj', '-enableCodeCoverage', 'YES',
+                        'CODE_SIGNING_REQUIRED=NO', 'build-for-testing',
+                    ])
+
     def test_shell_preserves_failed_attempt_and_stops_after_two(self):
         # Execute the real function definitions without running the product build.
         # The extracted range includes the diagnostic launch probe. Its simctl
