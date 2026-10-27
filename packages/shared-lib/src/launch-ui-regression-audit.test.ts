@@ -15,9 +15,7 @@ it('requires verified native text entry before testing draft preservation', () =
   expect(typing).toContain('guard XCTWaiter.wait(for: [entered], timeout: 2) == .completed else');
   expect(typing).not.toMatch(/XCUIKeyboardKey.delete|UIPasteboard/);
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
-  expect(turbo.tasks.test.inputs).toContain(
-    '$TURBO_ROOT$/apps/ios/LogYourBodyUITests/ChaosMonkeyUITests.swift',
-  );
+  expect(turbo.tasks.test.inputs).toContain('$TURBO_ROOT$/apps/ios/LogYourBodyUITests/**/*.swift');
 
   const probe = source
     .split('func testKeyboardDismissalPreservesDraftWithoutSending()')[1]

@@ -29,6 +29,40 @@ function checkedTrace(test: string, coverage: string, root: string) {
   });
 }
 
+it('invalidates native source guards for every app and native test source', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const sources = execFileSync(
+    'git',
+    [
+      'ls-files',
+      '-z',
+      '--',
+      'apps/ios/LogYourBody',
+      'apps/ios/LogYourBodyTests',
+      'apps/ios/LogYourBodyUITests',
+    ],
+    { cwd: root, encoding: 'utf8' },
+  )
+    .split('\0')
+    .filter((path) => path.endsWith('.swift'));
+  const plan = JSON.parse(
+    execFileSync(
+      'pnpm',
+      ['exec', 'turbo', 'run', 'test', '--filter=@logyourbody/shared-lib', '--dry=json'],
+      { cwd: root, encoding: 'utf8', timeout: 20_000, maxBuffer: 8 * 1024 * 1024 },
+    ),
+  );
+  const task = plan.tasks.find(
+    (item: { taskId: string }) => item.taskId === '@logyourbody/shared-lib#test',
+  );
+  expect(sources.length).toBeGreaterThan(0);
+  expect(task).toBeDefined();
+  const missing = sources.filter((path) => !Object.hasOwn(task.inputs, `../../${path}`));
+  expect(missing.slice(0, 5), `${missing.length} Swift sources missing from Turbo inputs`).toEqual(
+    [],
+  );
+}, 30_000);
+
 it('keeps replay and onboarding state fixtures free of UIKit and SwiftUI animation waits in DEBUG only', () => {
   const source = readFileSync(
     new URL('../../../apps/ios/LogYourBody/LogYourBodyApp.swift', import.meta.url),

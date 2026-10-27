@@ -157,7 +157,5 @@ it('keeps the edit-entry presenter on the visible Context destination', () => {
   );
   expect(contextEditSheetHostProblem(source)).toBeNull();
   const turbo = JSON.parse(readFileSync(new URL('../turbo.json', import.meta.url), 'utf8'));
-  expect(turbo.tasks.test.inputs).toContain(
-    '$TURBO_ROOT$/apps/ios/LogYourBody/Views/DashboardViewLiquid+PhotoTimelineHUD.swift',
-  );
+  expect(turbo.tasks.test.inputs).toContain('$TURBO_ROOT$/apps/ios/LogYourBody/**/*.swift');
 });

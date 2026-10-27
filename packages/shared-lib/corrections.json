@@ -1803,5 +1803,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1574 / LYB-249 recurring conflict and red-check repair: preserve both branches native source guards and their Turbo cache inputs when merging main. The failed launch-quality run tapped Edit entry without presenting its sheet; main already supplies the visible Context presenter repair.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40418206171",
+    "mechanization": "Extend the existing shared-lib Turbo inputs from individual native files to app, unit-test and UI-test Swift directory globs, so future source guards and merged files invalidate cached results automatically. Extend the required launch-quality evidence suite to inspect a real Turbo dry-run and reject any tracked native Swift source missing from its resolved inputs. It failed with 482 missing sources before the configuration change and passes afterward. Retain the merged visible Context sheet-host guard and all native assertions. Use the existing classifier merge resolver to retain both correction ledgers and regenerate the source projection. Native execution and coverage still require exact-head macOS CI. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Turbo cache configuration can include native source directories by construction instead of relying on repeated per-file edits during every merge repair. The real task-plan regression prevents cached guards from silently omitting tracked native sources."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "it('invalidates native source guards for every app and native test source'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
