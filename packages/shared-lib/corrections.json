@@ -1875,7 +1875,25 @@
     },
     "guard": {
       "path": "scripts/ios/test_launch_quality_evidence.py",
-      "anchor": "def run_shell(arguments, *, env=None):"
+      "anchor": "def run_shell(arguments, *, env=None, timeout=30):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1532: the isolated retry shell fixture still exceeded ten seconds on hosted macOS in run 40433475651, aborting Launch Quality before native tests without reporting the stalled command.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40433475651/job/121956669370",
+    "mechanization": "Extend the existing shared shell-fixture launcher with a bounded 30-second host allowance, fixture command traces, and an owned process group killed on timeout before capture pipes are drained. The existing required shared-lib wrapper allows 90 seconds for the full traced suite and still rejects every nonzero suite exit. A real background-child regression requires timeout output and traces and fails when cleanup kills only Bash; all 31 validator cases pass with group cleanup. Native build/test deadlines, selectors, reviewed audit bytes, workflows and coverage floors are unchanged. Linux cannot confirm that the host allowance resolves the macOS scheduling stall; fresh Mac CI remains required.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
     },
     "level": "codebase",
     "ruleId": "code-prevention"

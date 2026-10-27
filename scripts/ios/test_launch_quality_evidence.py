@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 import re
+import select
+import signal
 import subprocess
 import sys
 import tempfile
@@ -16,13 +18,54 @@ evidence = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evidence)
 
 
-def run_shell(arguments, *, env=None):
+def run_shell(arguments, *, env=None, timeout=30):
     # Contract fixtures need system tools, not CI's cold SDK/toolchain shims or BASH_ENV.
-    return subprocess.run(['/bin/bash', *arguments], env={'PATH': os.defpath, **(env or {})},
-                          capture_output=True, text=True, timeout=10)
+    # Hosted macOS exceeded the old 10s cap even with isolation (run 40433475651).
+    # Trace fixture-only commands so another stall identifies the last operation.
+    command = ['/bin/bash', '-x', *arguments]
+    with subprocess.Popen(command, env={'PATH': os.defpath, 'PS4': '+ fixture:${LINENO}: ', **(env or {})},
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                          start_new_session=True) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Killing only Bash leaves pipeline children holding the capture pipes open.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            stdout, stderr = process.communicate(timeout=5)
+            raise AssertionError(f'Shell fixture exceeded {timeout}s\nstdout:\n{stdout}\nstderr:\n{stderr}') from None
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_shell_fixture_timeout_reports_trace_and_closes_descendant_pipes(self):
+        # The background child retains both pipes after Bash exits. A parent-only
+        # kill cannot drain them; the helper must terminate its whole process group.
+        # Inject expiry after startup instead of racing the hosted scheduler.
+        communicate = subprocess.Popen.communicate
+        expired = False
+        startup = None
+
+        def expire_after_start(process, *args, **kwargs):
+            nonlocal expired, startup
+            if not expired:
+                expired = True
+                if select.select([process.stdout], [], [], 30)[0]:
+                    startup = process.stdout.readline()
+                raise subprocess.TimeoutExpired(process.args, kwargs['timeout'])
+            return communicate(process, *args, **kwargs)
+
+        with patch.object(subprocess.Popen, 'communicate', expire_after_start), \
+             self.assertRaisesRegex(AssertionError, r'(?s)Shell fixture exceeded 30s.*fixture:.*fixture-child'):
+            run_shell(['-c', "/bin/sleep 120 & echo fixture-child; wait"])
+        self.assertEqual(startup, 'fixture-child\n')
+        result = run_shell(['-c', "echo fixture-output; echo fixture-error >&2; exit 65"])
+        self.assertEqual(result.returncode, 65)
+        self.assertEqual(result.stdout, 'fixture-output\n')
+        self.assertIn('fixture-error', result.stderr)
+
     def test_fixed_diagnostic_selectors_have_native_test_implementations(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / 'scripts/ios/launch-quality-audit.sh').read_text()

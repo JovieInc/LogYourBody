@@ -315,3 +315,61 @@ Fresh Mac CI, native execution/coverage and device acceptance remain unverified;
 `xcodebuild -version` returned command not found on this Linux host. GBrain search,
 `put lyb-pr1532-shell-fixture-repair` and `get_page` all failed with connection
 refused at `127.0.0.1:7801`, so neither write nor readback persisted.
+
+## PR #1532 repeated fixture timeout repair (2026-10-27)
+
+The harness started at `68bf768a4`. The required `git merge --no-edit origin/main`
+reported "Already up to date" against `1a29635d5`; no rebase was used. The local
+repair branch is `fix/pr1532-launch-quality-fixtures`. Push and PR edits remain
+owned by the harness.
+
+`gh run view 40433475651 --repo JovieInc/LogYourBody --log-failed` identified a
+ten-second timeout in `test_shell_preserves_failed_attempt_and_stops_after_two`.
+The full 30-case suite took 39 seconds on macOS, versus 0.13 seconds on Linux.
+No native test had run. The failed log did not identify the stalled command;
+host scheduling contention is a hypothesis, not a confirmed root cause.
+
+Extend the existing isolated shell-fixture launcher to allow 30 seconds, trace
+fixture commands, and kill its owned process group before draining timeout
+output. The existing required shared-lib wrapper allows 90 seconds for the
+complete traced suite and continues to reject nonzero exits. This changes only
+fixture scheduling allowances: the reviewed native audit bytes, build/test
+deadlines, workflows, assertions, selectors and coverage floors are unchanged.
+The new regression injects expiry after a real background child announces
+startup, avoiding a short wall-clock race in the regression itself. It verifies
+that descendant pipes close, traces survive, and ordinary output and exit 65
+propagate. In-memory mutations removing group cleanup or command tracing both
+fail the regression; the complete repaired suite passes all 31 cases.
+
+The harness must include exactly this machine line in the PR body:
+
+```text
+Machine: built scripts/ios/test_launch_quality_evidence.py
+```
+
+Validation uses Node 22.23.2 and pnpm 10.34.1 via `scripts/codex-setup.sh`:
+
+```sh
+bash scripts/codex-setup.sh
+bash scripts/codex-setup.sh --run lint
+bash scripts/codex-setup.sh --run typecheck
+bash scripts/codex-setup.sh --run test
+python3 scripts/ios/test_launch_quality_evidence.py
+python3 -m pytest -p no:cacheprovider scripts/tests/test_runner_routing.py -q
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref origin/main
+node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
+node packages/shared-lib/scripts/guard-reference.mjs --base-ref origin/main
+```
+
+The routing suite passed 44 cases. The required evidence wrapper passed at 96%
+production validator line coverage, including failure propagation. The first
+concurrent root test run failed the correction-coverage wrapper while the ledger
+was being updated; its exact 38-case command and a subsequent root run passed
+without changes to that gate. The successful root run completed eight Turbo
+tasks, including all 186 shared-lib Vitest cases and 122 shared-lib Node cases.
+Native execution, coverage and the macOS scheduling mitigation still require
+fresh Mac CI; this Linux host has no `xcodebuild`.
+
+GBrain query/readback refused connections to `127.0.0.1:7801`. Network-enabled
+write and readback attempts for `lyb-pr1532-fixture-deadlines` each exceeded a
+ten-second bound (exit 124); persistence is unverified.
