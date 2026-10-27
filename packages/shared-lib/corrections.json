@@ -1,5 +1,23 @@
 [
   {
+    "fingerprint": "unit-tier-stale-simulator-testmanagerd-socket",
+    "correction": "PR #1568 (fix-red-e3b0c44298): Merge-group run 40573016311 failed its Mac Unit lane because an already booted persistent simulator advertised a missing testmanagerd socket. Compilation passed; no test cases executed.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40573138074",
+    "mechanization": "Extend the existing ci_test_unit Fastlane lane to restart only the explicit simulator UUID selected by the existing resolver and require boot/readiness success before invoking the unchanged Unit suite once. Extend the existing required Fastlane source integrity controls with stale and stopped simulator recovery, shutdown, boot and readiness failure propagation, native failure without retries, and named-device isolation. The stale-socket regression fails before the lane repair and all 17 controls pass afterward. Native execution and exact-head coverage remain required in merge-group CI; this Linux host cannot establish simulator recovery. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Unit lane owns the selected CI simulator and can recreate its boot session before every test invocation, preventing reuse of stale daemon state without erasing simulator data, retrying tests or changing selectors, assertions, coverage and evidence gates."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/fastlane/Fastfile",
+      "anchor": "# Restart only the selected simulator; never retry a failed Unit suite."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "xctskip-diagnostics-use-public-message",
     "correction": "PR #1618 (fix-red-5df69c1e5f): Launch Quality run 40454867112 failed six assertions in the injected Keychain capability tests because String(describing: error) did not expose XCTSkip's supplied diagnostic message.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40454867112/job/122025900952",
