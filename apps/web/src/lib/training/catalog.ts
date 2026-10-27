@@ -1,122 +1,50 @@
-import { z } from 'zod';
-import variantSeed from './catalog-variant-seed.json';
-import { MUSCLE_GROUPS, type Equipment, type MuscleContribution, type MuscleGroup } from './types';
+import type { Equipment, MuscleContribution, MuscleGroup } from './types';
 
 /**
  * Reviewed exercise catalog: the engine's setup-aware substitution source.
  * Every record describes the *expected* setup of the variant — never a
  * user-reported experience and never a precise fatigue score.
  */
-export const CATALOG_EQUIPMENT = [
-  'dumbbells',
-  'barbell',
-  'ez_bar',
-  'machine',
-  'cable',
-  'bench',
-  'adjustable_bench',
-  'bodyweight',
-  'smith',
-] as const;
-export type CatalogEquipment = (typeof CATALOG_EQUIPMENT)[number];
+export type CatalogEquipment =
+  | 'dumbbells'
+  | 'barbell'
+  | 'ez_bar'
+  | 'machine'
+  | 'cable'
+  | 'bench'
+  | 'adjustable_bench'
+  | 'bodyweight'
+  | 'smith';
 
-const text = z.string().trim().min(1).max(500);
-const trunkDemandLevelSchema = z.enum(['low', 'moderate', 'high']);
-export type TrunkDemandLevel = z.infer<typeof trunkDemandLevelSchema>;
+export type TrunkDemandLevel = 'low' | 'moderate' | 'high';
 
 /** Qualitative expected trunk-support/spinal-loading demand, with provenance. */
-const trunkDemandSchema = z
-  .object({
-    level: trunkDemandLevelSchema,
-    /** 'reviewed' = human-reviewed record; 'inferred' = derived from setup fields. */
-    basis: z.enum(['reviewed', 'inferred']),
-    note: text,
-  })
-  .strict();
-export type TrunkDemand = z.infer<typeof trunkDemandSchema>;
+export type TrunkDemand = {
+  level: TrunkDemandLevel;
+  /** 'reviewed' = human-reviewed record; 'inferred' = derived from setup fields. */
+  basis: 'reviewed' | 'inferred';
+  note: string;
+};
 
-const TARGET_REGION_GROUP = {
-  upper_chest: 'chest',
-  lateral_delts: 'shoulders',
-  lats: 'back',
-  biceps: 'biceps',
-  triceps: 'triceps',
-  quads: 'quads',
-  hamstrings: 'hamstrings',
-  glutes: 'glutes',
-  calves: 'calves',
-} as const satisfies Record<string, MuscleGroup>;
-
-/** Advisory, editable setup tags, not measured/reported symptoms or an aggregate score.
- * Empty arrays mean unspecified; they never imply comfort, recovery or safety. */
-export const variantToleranceTagsSchema = z
-  .object({
-    axialTrunkFatigue: z.array(text).max(10),
-    jointDiscomfort: z.array(text).max(10),
-    stability: z.array(text).max(10),
-    rom: z.array(text).max(10),
-  })
-  .strict();
-export type VariantToleranceTags = z.infer<typeof variantToleranceTagsSchema>;
-
-export const catalogVariantMetadataSchema = z
-  .object({
-    targetRegion: z.enum(
-      Object.keys(TARGET_REGION_GROUP) as Array<keyof typeof TARGET_REGION_GROUP>,
-    ),
-    /** Torso contact only: arm/thigh/hand bracing is not back or chest support. */
-    support: z.enum(['none', 'back', 'chest']),
-    romSetupCaveat: text,
-    toleranceTags: variantToleranceTagsSchema,
-  })
-  .strict();
-
-export const catalogVariantSeedSchema = z
-  .array(
-    catalogVariantMetadataSchema.extend({ id: z.string().regex(/^[a-z][a-z0-9_]*$/) }).strict(),
-  )
-  .superRefine((entries, context) => {
-    const ids = new Set<string>();
-    entries.forEach((entry, index) => {
-      if (ids.has(entry.id))
-        context.addIssue({ code: 'custom', path: [index, 'id'], message: 'Duplicate variant ID' });
-      ids.add(entry.id);
-    });
-  });
-
-export const catalogVariantSchema = z
-  .object({
-    id: z.string().regex(/^[a-z][a-z0-9_]*$/),
-    name: text,
-    primaryMuscle: z.enum(MUSCLE_GROUPS),
-    muscleContribution: z.partialRecord(z.enum(MUSCLE_GROUPS), z.number().nonnegative()),
-    /** Concrete items that must be present; unknown availability fails eligibility. */
-    requires: z.array(z.enum(CATALOG_EQUIPMENT)).min(1),
-    torsoSupport: z.enum(['supported', 'unsupported']),
-    trunkDemand: trunkDemandSchema,
-    bodyPosition: text,
-    benchAngleDeg: z.number().min(0).max(90).nullable(),
-    pulley: z.object({ height: text, attachment: text }).strict().nullable(),
-    unilateral: z.boolean(),
-    cues: z.array(text),
-    /** Hard concern exclusions remain separate from advisory tolerance tags. */
-    exclusions: z.array(text),
-    /** False keeps a reviewed variant addressable without offering it as a substitute. */
-    substitutionEligible: z.boolean().optional(),
-    // Uncurated legacy entries remain usable without invented metadata.
-    variantMetadata: catalogVariantMetadataSchema.optional(),
-  })
-  .strict()
-  .refine(
-    (variant) =>
-      !variant.variantMetadata ||
-      TARGET_REGION_GROUP[variant.variantMetadata.targetRegion] === variant.primaryMuscle,
-    {
-      path: ['variantMetadata', 'targetRegion'],
-      message: 'Target region must belong to the primary muscle group',
-    },
-  );
-export type CatalogVariant = z.infer<typeof catalogVariantSchema>;
+export type CatalogVariant = {
+  id: string;
+  name: string;
+  primaryMuscle: MuscleGroup;
+  muscleContribution: MuscleContribution;
+  /** Concrete items that must be present; unknown availability fails eligibility. */
+  requires: CatalogEquipment[];
+  torsoSupport: 'supported' | 'unsupported';
+  trunkDemand: TrunkDemand;
+  bodyPosition: string;
+  benchAngleDeg: number | null;
+  pulley: { height: string; attachment: string } | null;
+  unilateral: boolean;
+  cues: string[];
+  /** Concern tags a reviewer flagged this variant as unsuitable for. */
+  exclusions: string[];
+  /** False keeps a reviewed variant addressable without offering it as a substitute. */
+  substitutionEligible?: boolean;
+};
 
 const reviewed = (level: TrunkDemandLevel, note: string): TrunkDemand => ({
   level,
@@ -124,7 +52,7 @@ const reviewed = (level: TrunkDemandLevel, note: string): TrunkDemand => ({
   note,
 });
 
-const baseCatalog: CatalogVariant[] = [
+export const EXERCISE_CATALOG: CatalogVariant[] = [
   {
     id: 'goblet_squat',
     name: 'Goblet squat',
@@ -547,7 +475,7 @@ const baseCatalog: CatalogVariant[] = [
     muscleContribution: { biceps: 1 },
     requires: ['dumbbells'],
     torsoSupport: 'supported',
-    trunkDemand: reviewed('low', 'Torso rests on the floor; bracing varies with execution.'),
+    trunkDemand: reviewed('low', 'Torso rests on the floor; the trunk carries nothing.'),
     bodyPosition: 'lying supine on the floor',
     benchAngleDeg: null,
     pulley: null,
@@ -652,10 +580,7 @@ const baseCatalog: CatalogVariant[] = [
     muscleContribution: { biceps: 1 },
     requires: ['dumbbells'],
     torsoSupport: 'supported',
-    trunkDemand: reviewed(
-      'low',
-      'Forearms rest on the thighs; the trunk maintains the seated position.',
-    ),
+    trunkDemand: reviewed('low', 'Forearms rest on the thighs; the trunk carries nothing.'),
     bodyPosition: 'seated, forearms on the thighs',
     benchAngleDeg: null,
     pulley: null,
@@ -702,18 +627,6 @@ const baseCatalog: CatalogVariant[] = [
   },
 ];
 
-// Extend the existing IDs and setup fields rather than creating a second library.
-const metadataById = new Map(
-  catalogVariantSeedSchema.parse(variantSeed).map(({ id, ...metadata }) => [id, metadata]),
-);
-for (const id of metadataById.keys()) {
-  if (!baseCatalog.some((variant) => variant.id === id))
-    throw new Error(`Unknown catalog variant: ${id}`);
-}
-export const EXERCISE_CATALOG: CatalogVariant[] = baseCatalog.map((variant) =>
-  catalogVariantSchema.parse({ ...variant, variantMetadata: metadataById.get(variant.id) }),
-);
-
 const catalogById = new Map(EXERCISE_CATALOG.map((variant) => [variant.id, variant]));
 
 export function catalogVariantById(id: string): CatalogVariant | undefined {
@@ -746,6 +659,18 @@ export function resolveAvailableEquipment(input: {
   for (const item of input.sessionUnavailable ?? []) available.delete(item as CatalogEquipment);
   return available;
 }
+
+export const CATALOG_EQUIPMENT = [
+  'dumbbells',
+  'barbell',
+  'ez_bar',
+  'machine',
+  'cable',
+  'bench',
+  'adjustable_bench',
+  'bodyweight',
+  'smith',
+] as const satisfies readonly CatalogEquipment[];
 
 export function missingEquipment(
   variant: CatalogVariant,

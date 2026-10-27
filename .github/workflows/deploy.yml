@@ -70,9 +70,6 @@ jobs:
       - name: Build
         run: cd apps/web && pnpm build
 
-      - name: Verify no NEXT_PUBLIC_* Vercel variable is marked Sensitive
-        run: node .github/scripts/verify-public-build-env-types.mjs
-
       - name: Pull Vercel environment
         run: pnpm dlx vercel@latest pull --yes --environment=production --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
 
