@@ -56,6 +56,18 @@ function getOrInitClient(config: StatsigAnalyticsConfig): StatsigClient | null {
   return client;
 }
 
+// SDK construction, browser storage and SDK methods can fail synchronously too.
+// Keep optional measurement from interrupting signup or auth, and let the next
+// call retry initialization. Never log the SDK error or user payload here.
+function withClient<T>(config: StatsigAnalyticsConfig, action: (client: StatsigClient) => T) {
+  try {
+    const current = getOrInitClient(config);
+    return current ? action(current) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
   const safeConfig: StatsigAnalyticsConfig = {
     clientKey: config.clientKey,
@@ -64,64 +76,46 @@ export function createStatsigAnalytics(config: StatsigAnalyticsConfig) {
 
   return {
     identify(userId: string | null, traits?: object): void {
-      const c = getOrInitClient(safeConfig);
-      if (!c) {
-        return;
-      }
+      withClient(safeConfig, (c) => {
+        const user: { userID?: string; custom?: Record<string, string | number | boolean> } = {};
 
-      const user: { userID?: string; custom?: Record<string, string | number | boolean> } = {};
+        user.userID = sanitizeAnalyticsPrincipal(userId);
 
-      user.userID = sanitizeAnalyticsPrincipal(userId);
+        const safeTraits = sanitizeAnalyticsTraits(traits);
+        if (safeTraits.platform) user.custom = { platform: safeTraits.platform };
 
-      const safeTraits = sanitizeAnalyticsTraits(traits);
-      if (safeTraits.platform) user.custom = { platform: safeTraits.platform };
-
-      void c.updateUserAsync(user).catch(() => {
-        // Ignore user update errors.
+        void c.updateUserAsync(user).catch(() => {
+          // Ignore user update errors.
+        });
       });
     },
 
     track(event: string, properties?: object): void {
       if (!isAnalyticsEvent(event)) return;
-      const c = getOrInitClient(safeConfig);
-      if (!c) {
-        return;
-      }
+      withClient(safeConfig, (c) => {
+        const metadata = sanitizeAnalyticsProperties(event, properties);
+        if (Object.keys(metadata).length === 0) {
+          c.logEvent(String(event));
+          return;
+        }
 
-      const metadata = sanitizeAnalyticsProperties(event, properties);
-      if (Object.keys(metadata).length === 0) {
-        c.logEvent(String(event));
-        return;
-      }
-
-      c.logEvent({
-        eventName: String(event),
-        metadata,
+        c.logEvent({
+          eventName: String(event),
+          metadata,
+        });
       });
     },
 
     reset(): void {
-      const c = getOrInitClient(safeConfig);
-      if (!c) {
-        return;
-      }
-
-      void c.updateUserAsync({ userID: undefined }).catch(() => {
-        // Ignore reset errors.
+      withClient(safeConfig, (c) => {
+        void c.updateUserAsync({ userID: undefined }).catch(() => {
+          // Ignore reset errors.
+        });
       });
     },
 
     isFeatureEnabled(flagKey: string): boolean {
-      const c = getOrInitClient(safeConfig);
-      if (!c) {
-        return false;
-      }
-
-      try {
-        return c.checkGate(flagKey);
-      } catch {
-        return false;
-      }
+      return withClient(safeConfig, (c) => c.checkGate(flagKey)) ?? false;
     },
   };
 }

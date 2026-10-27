@@ -35,7 +35,7 @@ describe('closed analytics schema', () => {
         outcome: 'accepted',
         variant: 'waitlist_minimal',
       }),
-    ).toEqual({ outcome: 'accepted' });
+    ).toEqual({ outcome: 'accepted', variant: 'waitlist_minimal' });
     expect(
       sanitizeAnalyticsProperties('web_waitlist_submit_result', { outcome: 'private error' }),
     ).toEqual({});

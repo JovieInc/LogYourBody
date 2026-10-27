@@ -16,7 +16,7 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `d8bc46afebace5cadf3e5309df94705934de9c463751407802ce57159c818416`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `dd6c9fd614b8e0c59c40ec9182718ff278151f828953e5574358c99a75cea9e9`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `dc723850d2e698cc17d03b2b13227bf3116b6b71da43cf0b2697170255ca8911`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a9865698e8b84fac33f67c5eb1303683a478d356745fd71c6ba4704f64756772`)
 
 ### `apps/web/package.json`: engines
 
@@ -55,8 +55,8 @@ A changed fingerprint requires review of its related documentation; it does not 
   "prepush": "pnpm run check",
   "start": "next start",
   "sync:marketing-assets": "node ../../scripts/marketing/sync-ios-marketing-assets.mjs",
-  "test": "jest && tsx --test scripts/voice-adapters.test.ts",
-  "test:ci": "jest --runInBand && tsx --test scripts/voice-adapters.test.ts",
+  "test": "jest --coverage && tsx --test scripts/voice-adapters.test.ts",
+  "test:ci": "jest --coverage --runInBand && tsx --test scripts/voice-adapters.test.ts",
   "test:coverage": "jest --coverage",
   "test:e2e": "playwright test",
   "test:e2e:ui": "playwright test --ui",
@@ -79,13 +79,13 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@jovie/ui": "workspace:*",
   "@jovieinc/product-registry": "workspace:*",
   "@neondatabase/serverless": "1.0.2",
-  "@radix-ui/react-accordion": "^1.2.21",
-  "@radix-ui/react-alert-dialog": "^1.1.23",
+  "@radix-ui/react-accordion": "^1.3.1",
+  "@radix-ui/react-alert-dialog": "^1.2.1",
   "@radix-ui/react-aspect-ratio": "^1.2.0",
   "@radix-ui/react-avatar": "^1.3.1",
   "@radix-ui/react-checkbox": "^1.3.11",
   "@radix-ui/react-collapsible": "^1.1.20",
-  "@radix-ui/react-context-menu": "^2.3.7",
+  "@radix-ui/react-context-menu": "^2.3.8",
   "@radix-ui/react-dialog": "^1.1.23",
   "@radix-ui/react-dropdown-menu": "^2.1.24",
   "@radix-ui/react-hover-card": "^1.1.23",
@@ -100,7 +100,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-separator": "^1.1.15",
   "@radix-ui/react-slider": "^1.4.7",
   "@radix-ui/react-slot": "^1.3.3",
-  "@radix-ui/react-switch": "^1.3.8",
+  "@radix-ui/react-switch": "^1.4.1",
   "@radix-ui/react-tabs": "^1.1.21",
   "@radix-ui/react-toast": "^1.2.23",
   "@radix-ui/react-toggle": "^1.2.1",
@@ -169,7 +169,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@testing-library/user-event": "^14.6.7",
   "@types/jest": "^30.0.0",
   "@types/js-yaml": "4.0.9",
-  "@types/lodash": "^4.17.25",
+  "@types/lodash": "^4.17.27",
   "@types/node": "^20.19.43",
   "@types/react": "^19.3.0",
   "@types/react-dom": "^19.3.0",
@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a184d78ba6cf4c799260680b6c7c8ddd7d21c59147f871c01328184734818671`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `e43edfe0dbd405c783fcdec0a83a3a8edb66dca8d38d016e576efc624c58cc20`)
 
 ### `package.json`: packageManager
 
@@ -245,6 +245,8 @@ A changed fingerprint requires review of its related documentation; it does not 
   "test": "turbo run test",
   "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
   "test:knowledge-lint": "node --test scripts/lint-no-specifics.test.mjs scripts/lint-claims.test.mjs",
+  "test:launch-e2e": "pnpm --filter logyourbody exec playwright test tests/e2e/launch-funnel.spec.ts --project=desktop --project=mobile-portrait --workers=1",
+  "test:mutation": "turbo run test:mutation --filter=@logyourbody/shared-lib",
   "typecheck": "turbo run typecheck",
   "web": "pnpm --filter logyourbody dev"
 }
@@ -349,7 +351,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1a02cb5943c081cef910b7c77664e20ea48becea75e105104c578db8c6a7408f`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c39ce2c9cad6bc69043562b674c80607520a06972f0bd1019a207e7c82c20315`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -358,6 +360,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "build": "tsc -p tsconfig.json",
   "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
   "test": "vitest run --maxWorkers=2 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs",
+  "test:mutation": "node ../../scripts/mutation/run.mjs",
   "typecheck": "tsc --noEmit -p tsconfig.json"
 }
 ```
@@ -381,12 +384,12 @@ A changed fingerprint requires review of its related documentation; it does not 
 
 - `pnpm-workspace.yaml` — Local manifest or workflow; review related instructions when changed (SHA-256 `20607bbc13e8980c10505ef9a781cac117da83d3d5f3441f5e143562c3d415e9`)
 - `.github/workflows/repository-docs-shadow.yml` — Nonblocking parity qualification (SHA-256 `2b9ccbfcdef4df6d31e17ec1dbad5fffe82c01263af0c08b8b0481b31e7af48e`)
-- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `3dab4173592a772f10588029ad7b552d6e765bc0c86b2ef20039106b09b2c950`)
+- `apps/ios/LogYourBody.xcodeproj/project.pbxproj` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `763a6084e1084b929baf69931e498e89bae5bab92c74b712ceb9850dd59dd299`)
 - `apps/ios/LogYourBody.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `7198660f84e8ba6f4ee8c71d1cc371aad169807672065393d4426b89d5dd1138`)
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `70f8746bd463c45099f16a47e1b64f18fc56000e3331756d06c09cacb5cc77ad`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `c82b649ce9cdc9046245a7eb109bd80b1d8c4e0a2250ccb3dc3c223219e3d6b5`)
 - `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `1e7d727805b3918f54714fbd84407bd30d6441bff56ee89542027b0bc69a0eab`)
 
 ## Pinned shared sources

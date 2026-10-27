@@ -4,6 +4,7 @@ import {
   appendFileSync,
   closeSync,
   mkdtempSync,
+  mkdirSync,
   openSync,
   readFileSync,
   readSync,
@@ -12,7 +13,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, posix, resolve } from 'node:path';
+import { dirname, join, posix, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
@@ -113,11 +114,13 @@ export function coverageReport(
       receipts: [...receipts.values()].sort((a, b) => a.source.localeCompare(b.source)),
       recurrence: { receiptCount: receipts.size, repeatCount: receipts.size - 1 },
     }));
+  const mechanized = entries.filter((rule) => rule.mechanized).length;
   return {
     schema: 'lyb.correction-coverage/v1',
     repository: 'JovieInc/LogYourBody',
     evidence: 'reviewed source anchors; not proof of guard execution',
-    ...fraction(entries.filter((rule) => rule.mechanized).length, entries.length),
+    ...fraction(mechanized, entries.length),
+    mechanizedShare: entries.length ? mechanized / entries.length : 0,
     levels: Object.fromEntries(
       LEVELS.map((level) => {
         const members = entries.filter((rule) => rule.level === level);
@@ -275,7 +278,7 @@ function stagedDiffHasConflictMarker(root) {
     fd = openSync(join(directory, 'staged.diff'), 'w+', 0o600);
     execFileSync(
       'git',
-      ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+      ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--text', '--no-color', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
       { cwd: root, stdio: ['ignore', fd, 'pipe'] },
     );
     const buffer = Buffer.alloc(64 * 1024);
@@ -354,29 +357,53 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     writeFileSync(resolve(root, LEDGER_PATH), `${JSON.stringify(merged, null, 2)}\n`);
     argv = [];
   }
-  assert.ok(
-    argv.length === 0 || (argv.length === 2 && argv[0] === '--base-ref'),
-    'usage: correction-coverage.mjs [--base-ref <sha|origin/main> | --merge-ledger]',
-  );
+  const options = new Map();
+  for (let index = 0; index < argv.length; index += 2) {
+    const option = argv[index];
+    const value = argv[index + 1];
+    assert.ok(
+      ['--base-ref', '--output'].includes(option) &&
+        value?.trim() &&
+        !value.startsWith('--') &&
+        !options.has(option),
+      'usage: correction-coverage.mjs [--base-ref <sha|origin/main>] [--output <path>] | --merge-ledger',
+    );
+    options.set(option, value);
+  }
   const current = guardCoverageReport(
     JSON.parse(readSource(LEDGER_PATH, { root })),
     (path) => readSource(path, { root }),
     { requireClassification: true },
   );
-  if (argv.length) {
-    const ref = argv[1];
+  if (options.has('--base-ref')) {
+    const ref = options.get('--base-ref');
     const baseline = coverageReport(JSON.parse(readSource(LEDGER_PATH, { root, ref })), (path) =>
       readSource(path, { root, ref }),
     );
     assertNoRegression(current, baseline);
   }
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, renderCoverage(current));
+  current.commitSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+  current.timestamp = new Date().toISOString();
+  if (options.has('--output')) {
+    const output = resolve(root, options.get('--output'));
+    mkdirSync(dirname(output), { recursive: true });
+    writeFileSync(output, `${JSON.stringify(current, null, 2)}\n`);
+  }
   return current;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    console.log(JSON.stringify(runCoverage(process.argv.slice(2)), null, 2));
+    const report = runCoverage(process.argv.slice(2));
+    console.log(
+      process.argv.includes('--output')
+        ? `Correction coverage: ${report.mechanized}/${report.total} mechanized (${(100 * report.mechanizedShare).toFixed(2)}%); ${LEVELS.map((level) => `${level}=${report.levels[level].total}`).join(', ')}`
+        : JSON.stringify(report, null, 2),
+    );
   } catch (error) {
     console.error(`Correction coverage failed: ${error.message}`);
     process.exitCode = 1;
