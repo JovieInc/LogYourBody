@@ -57,6 +57,132 @@ final class RevenueCatPurchaseRestoreFlowTests: XCTestCase {
         XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
     }
 
+    func testPurchaseWithoutEntitlementDoesNotReportSuccessAndCanRecoverByRestore() async {
+        let fixture = makeFixture(cachedSubscribed: true)
+        defer { fixture.cleanup() }
+        fixture.client.purchaseResult = .success(Self.customer(isActive: false))
+
+        let didPurchase = await fixture.manager.purchase(package: Self.makeAnnualPackage())
+
+        XCTAssertFalse(didPurchase)
+        XCTAssertFalse(fixture.manager.isPurchasing)
+        XCTAssertFalse(fixture.manager.isSubscribed)
+        XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+        XCTAssertEqual(
+            fixture.manager.errorMessage,
+            "Your subscription is not active yet. Try Restore Purchases, or contact support if you were charged."
+        )
+
+        fixture.client.restoreResult = .success(Self.customer(isActive: true))
+        let didRestore = await fixture.manager.restorePurchases()
+
+        XCTAssertTrue(didRestore)
+        XCTAssertTrue(fixture.manager.isSubscribed)
+        XCTAssertNil(fixture.manager.errorMessage)
+    }
+
+    func testPurchaseWithInactiveEntitlementDoesNotReportSuccess() async {
+        let fixture = makeFixture()
+        defer { fixture.cleanup() }
+        fixture.client.purchaseResult = .success(RevenueCatCustomerSnapshot(
+            originalAppUserId: "unit-test-user",
+            entitlement: RevenueCatEntitlementSnapshot(
+                isActive: false,
+                expirationDate: Date(timeIntervalSince1970: 1),
+                periodType: .normal,
+                willRenew: false,
+                productIdentifier: ProductRegistry.Paywall.annualProductID,
+                unsubscribeDetectedAt: nil
+            )
+        ))
+
+        let didPurchase = await fixture.manager.purchase(package: Self.makeAnnualPackage())
+
+        XCTAssertFalse(didPurchase)
+        XCTAssertFalse(fixture.manager.isPurchasing)
+        XCTAssertFalse(fixture.manager.isSubscribed)
+        XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+        XCTAssertNotNil(fixture.manager.errorMessage)
+    }
+
+    func testPurchaseVerificationGateOffPreservesLegacyOutcomeWithoutGrantingAccess() async {
+        let fixture = makeFixture(verifiesPurchaseOutcome: false)
+        defer { fixture.cleanup() }
+        fixture.client.purchaseResult = .success(Self.customer(isActive: false))
+
+        let didPurchase = await fixture.manager.purchase(package: Self.makeAnnualPackage())
+
+        XCTAssertTrue(didPurchase)
+        XCTAssertFalse(fixture.manager.isSubscribed)
+        XCTAssertFalse(fixture.defaults.bool(forKey: Self.isSubscribedKey))
+        XCTAssertNil(fixture.manager.errorMessage)
+    }
+
+    func testLivePurchaseCancellationCannotReturnAnExistingEntitlementAsSuccess() {
+        XCTAssertThrowsError(try LiveRevenueCatPurchasesClient.purchaseSnapshot(
+            customer: Self.customer(isActive: true), userCancelled: true, verifiesOutcome: true
+        )) { error in
+            XCTAssertEqual(RevenueCatPurchasingError.from(error), .purchaseCancelled)
+        }
+    }
+
+    func testLivePurchaseSnapshotPreservesUncancelledResponse() throws {
+        let customer = Self.customer(isActive: true)
+        let result = try LiveRevenueCatPurchasesClient.purchaseSnapshot(
+            customer: customer, userCancelled: false, verifiesOutcome: true
+        )
+
+        XCTAssertEqual(result.originalAppUserId, customer.originalAppUserId)
+        XCTAssertEqual(result.entitlement, customer.entitlement)
+    }
+
+    func testLivePurchaseVerificationGateOffPreservesLegacyCancellationResponse() throws {
+        let customer = Self.customer(isActive: true)
+        let result = try LiveRevenueCatPurchasesClient.purchaseSnapshot(
+            customer: customer, userCancelled: true, verifiesOutcome: false
+        )
+
+        XCTAssertEqual(result.entitlement, customer.entitlement)
+    }
+
+    func testPurchaseVerificationUsesOnlyItsDedicatedGate() {
+        var requestedGates: [String] = []
+        XCTAssertTrue(RevenueCatPurchaseVerificationPolicy.isEnabled { key in
+            requestedGates.append(key)
+            return true
+        })
+        XCTAssertEqual(requestedGates, ["billing_verified_purchase_outcome_v1"])
+        XCTAssertFalse(RevenueCatPurchaseVerificationPolicy.isEnabled { _ in false })
+    }
+
+    func testGateChangesDuringPurchaseApplyOnlyToTheNextAttempt() async {
+        for initialGate in [true, false] {
+            var gateEnabled = initialGate
+            var gateReads = 0
+            let fixture = makeFixture(purchaseVerificationEnabled: {
+                gateReads += 1
+                return gateEnabled
+            })
+            defer { fixture.cleanup() }
+            fixture.client.purchaseResult = .success(Self.customer(isActive: false))
+            fixture.client.onPurchase = { gateEnabled.toggle() }
+
+            let firstResult = await fixture.manager.purchase(package: Self.makeAnnualPackage())
+
+            XCTAssertEqual(firstResult, !initialGate)
+            XCTAssertEqual(fixture.client.purchaseVerificationRequests, [initialGate])
+            XCTAssertEqual(gateReads, 1)
+            XCTAssertFalse(fixture.manager.isSubscribed)
+
+            let secondResult = await fixture.manager.purchase(package: Self.makeAnnualPackage())
+
+            XCTAssertEqual(secondResult, initialGate)
+            XCTAssertEqual(fixture.client.purchaseVerificationRequests, [initialGate, !initialGate])
+            XCTAssertEqual(gateReads, 2)
+            XCTAssertFalse(fixture.manager.isSubscribed)
+        }
+    }
+
     func testPurchaseStoreProblemSetsFriendlyError() async {
         let fixture = makeFixture()
         defer { fixture.cleanup() }
@@ -581,14 +707,22 @@ final class RevenueCatPurchaseRestoreFlowTests: XCTestCase {
         XCTAssertEqual(fixture.client.customerInfoCallCount, 1)
     }
 
-    private func makeFixture(cachedSubscribed: Bool = false) -> RevenueCatPurchaseFixture {
+    private func makeFixture(
+        cachedSubscribed: Bool = false,
+        verifiesPurchaseOutcome: Bool = true,
+        purchaseVerificationEnabled: (() -> Bool)? = nil
+    ) -> RevenueCatPurchaseFixture {
         let suiteName = "revenuecat-purchase-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.set(cachedSubscribed, forKey: Self.isSubscribedKey)
         defaults.set("unit-test-user", forKey: RevenueCatManager.DefaultsKey.subscriptionOwner)
 
         let client = MockRevenueCatPurchasesClient()
-        let manager = RevenueCatManager(purchasesClient: client, userDefaults: defaults)
+        let manager = RevenueCatManager(
+            purchasesClient: client,
+            userDefaults: defaults,
+            purchaseVerificationEnabled: purchaseVerificationEnabled ?? { verifiesPurchaseOutcome }
+        )
         // Existing flow cases start with a known, reconciled synthetic account.
         let owner = manager.beginBillingSession(subject: "unit-test-user")
         manager.finishBillingSession(owner)
@@ -683,6 +817,7 @@ final class MockRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
     private(set) var configuredAPIKey: String?
     private(set) var delegateWasSet = false
     private(set) var purchaseEntitlementID: String?
+    private(set) var purchaseVerificationRequests: [Bool] = []
     private(set) var purchasedPackageIdentifier: String?
     private(set) var restoreEntitlementID: String?
     private(set) var identifiedUserIDs: [String] = []
@@ -716,9 +851,14 @@ final class MockRevenueCatPurchasesClient: RevenueCatPurchasesProtocol {
         throw MockError.notImplemented
     }
 
-    func purchase(package: Package, entitlementID: String) async throws -> RevenueCatCustomerSnapshot {
+    func purchase(
+        package: Package,
+        entitlementID: String,
+        verifiesOutcome: Bool
+    ) async throws -> RevenueCatCustomerSnapshot {
         purchasedPackageIdentifier = package.identifier
         purchaseEntitlementID = entitlementID
+        purchaseVerificationRequests.append(verifiesOutcome)
         onPurchase?()
         return try purchaseResult.get()
     }

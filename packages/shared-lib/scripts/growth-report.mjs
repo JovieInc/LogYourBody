@@ -120,6 +120,50 @@ function validate(input, now) {
   }
 }
 
+function iterationPlan(rows, snapshotStatus) {
+  const nextActions = [];
+  if (snapshotStatus === 'stale') {
+    nextActions.push({
+      action: 'refresh_report_snapshot',
+      source: null,
+      metrics: [],
+      not_before: null,
+    });
+  }
+  // Only fixed action codes and schema-validated fields leave the tool.
+  // A low or missing count never automatically selects a variant or changes a gate.
+  for (const [issue, action] of [
+    ['unknown', 'collect_missing_aggregate'],
+    ['uncommissioned', 'commission_source'],
+    ['unreconciled', 'reconcile_source'],
+    ['stale', 'refresh_source_coverage'],
+    ['incomplete', 'complete_cohort_coverage'],
+    ['immature', 'wait_for_cohort_maturity'],
+  ]) {
+    for (const source of ['statsig', 'core_data_neon', 'revenuecat']) {
+      const affected = rows.filter((row) => row.source === source && row.issues.includes(issue));
+      if (affected.length === 0) continue;
+      nextActions.push({
+        action,
+        source,
+        metrics: affected.map((row) => row.metric),
+        not_before:
+          issue === 'immature'
+            ? affected
+                .map((row) => row.observation_closes_at)
+                .sort()
+                .at(-1)
+            : null,
+      });
+    }
+  }
+  return {
+    status: nextActions.length ? 'repair_measurement' : 'review_qualified_aggregates',
+    experiment_decision: 'not_evaluated',
+    next_actions: nextActions,
+  };
+}
+
 export function generateReport(input, now = new Date()) {
   validate(input, now);
   const asOf = utc(input.as_of);
@@ -162,6 +206,7 @@ export function generateReport(input, now = new Date()) {
         : null,
     };
   });
+  const snapshotStatus = now.getTime() - asOf > DAY ? 'stale' : 'current_as_of';
   return {
     schema_version: 1,
     visibility: 'private_operator_only',
@@ -171,11 +216,12 @@ export function generateReport(input, now = new Date()) {
     as_of: input.as_of,
     window: input.window,
     exclusions: EXCLUSIONS,
-    snapshot_status: now.getTime() - asOf > DAY ? 'stale' : 'current_as_of',
+    snapshot_status: snapshotStatus,
     evidence_scope:
       'Operator-supplied aggregates; receipt hashes and attestations are not independently verified.',
     provider_commissioning: 'not_independently_verified',
     metrics: rows,
+    iteration: iterationPlan(rows, snapshotStatus),
     qualified_coaching_activation: { status: 'unknown', value: null },
     first_insight_conversion: { status: 'unknown', value: null },
     trial_to_paid_conversion: { status: 'unknown', value: null },

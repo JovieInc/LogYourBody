@@ -73,10 +73,13 @@ node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main -
 # Read-only verification, using the PR's exact base SHA in CI.
 node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
 # After a merge conflict, preserve receipts from both immutable parents.
-node packages/shared-lib/scripts/correction-coverage.mjs --base-ref <prior-head-sha> --base-ref <merged-main-sha>
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref <prior-head-sha> --base-ref <merged-main-sha> --output coverage/corrections/coverage.json
 node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
+
+Merge readiness inspects staged changes without external diff or text conversion
+drivers, so a presentation filter cannot hide unresolved conflict markers.
 
 Baselines have schema `lyb.correction-ratchet/v1` and a `findings` array. Seeding
 requires a readable immutable base: findings introduced by the PR cannot be

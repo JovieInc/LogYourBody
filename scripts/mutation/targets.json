@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "targets": [
+    {
+      "id": "growth-evidence",
+      "source": "packages/shared-lib/scripts/growth-report.mjs",
+      "test": "packages/shared-lib/scripts/growth-report.behavior.mjs",
+      "minimumTests": 11,
+      "timeoutMs": 30000,
+      "coverage": { "lines": 90, "branches": 85, "functions": 100 },
+      "mutations": [
+        {
+          "id": "accept-nonproduction-input",
+          "find": "input.environment === 'production'",
+          "replace": "typeof input.environment === 'string'"
+        },
+        {
+          "id": "accept-reused-receipt",
+          "find": "requireValid(!receipts.has(source.receipt_sha256));",
+          "replace": "requireValid(true);"
+        },
+        {
+          "id": "accept-uncommissioned-source",
+          "find": "if (!source.commissioned)",
+          "replace": "if (false)"
+        },
+        {
+          "id": "accept-unreconciled-source",
+          "find": "if (!source.reconciled)",
+          "replace": "if (false)"
+        },
+        {
+          "id": "publish-immature-retention",
+          "find": "watermark < utc(input.window.to) + definition.days * DAY",
+          "replace": "watermark < utc(input.window.to)"
+        },
+        {
+          "id": "accept-duplicate-json-keys",
+          "find": "requireValid(!keys.has(key));",
+          "replace": "requireValid(true);"
+        },
+        {
+          "id": "reverse-cohort-conversion",
+          "find": "observation.numerator / observation.denominator",
+          "replace": "observation.denominator / observation.numerator"
+        }
+      ]
+    },
+    {
+      "id": "release-evidence",
+      "source": ".github/scripts/validate-release-checks.mjs",
+      "test": ".github/scripts/validate-release-source.test.mjs",
+      "testNamePattern": "^(main run|complete same|newest main|wrong source|malformed run|incomplete same|run failure|all required|missing/ambiguous|unchanged optional)",
+      "minimumTests": 10,
+      "timeoutMs": 30000,
+      "coverage": { "lines": 80, "branches": 95, "functions": 100 },
+      "mutations": [
+        {
+          "id": "accept-different-source",
+          "find": "run.head_sha === sha && run.repository?.full_name === repository",
+          "replace": "run.repository?.full_name === repository"
+        },
+        {
+          "id": "accept-different-repository",
+          "find": "run.repository?.full_name === repository &&",
+          "replace": "true &&"
+        },
+        {
+          "id": "prefer-old-main-run",
+          "find": "Date.parse(b.created_at) - Date.parse(a.created_at)",
+          "replace": "Date.parse(a.created_at) - Date.parse(b.created_at)"
+        },
+        {
+          "id": "reuse-queue-before-main-exists",
+          "find": "pushes.length || releaseEvent === 'push' ? pushes : candidates",
+          "replace": "pushes.length ? pushes : candidates"
+        },
+        {
+          "id": "ignore-job-source-provenance",
+          "find": "job.run_id !== run.id || job.run_attempt !== run.run_attempt || job.head_sha !== run.head_sha",
+          "replace": "false"
+        },
+        {
+          "id": "accept-skipped-summary",
+          "find": "name !== 'CI Summary' && job.conclusion === 'skipped'",
+          "replace": "job.conclusion === 'skipped'"
+        },
+        {
+          "id": "accept-failed-run",
+          "find": "if (run.conclusion !== 'success')",
+          "replace": "if (false)"
+        }
+      ]
+    }
+  ]
+}

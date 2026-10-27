@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { posix, resolve } from 'node:path';
+import { appendFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { planCorrectionIssues } from './correction-recurrence.mjs';
@@ -101,11 +101,13 @@ export function coverageReport(
       receipts: [...receipts.values()].sort((a, b) => a.source.localeCompare(b.source)),
       recurrence: { receiptCount: receipts.size, repeatCount: receipts.size - 1 },
     }));
+  const mechanized = entries.filter((rule) => rule.mechanized).length;
   return {
     schema: 'lyb.correction-coverage/v1',
     repository: 'JovieInc/LogYourBody',
     evidence: 'reviewed source anchors; not proof of guard execution',
-    ...fraction(entries.filter((rule) => rule.mechanized).length, entries.length),
+    ...fraction(mechanized, entries.length),
+    mechanizedShare: entries.length ? mechanized / entries.length : 0,
     levels: Object.fromEntries(
       LEVELS.map((level) => {
         const members = entries.filter((rule) => rule.level === level);
@@ -269,10 +271,22 @@ export function assertLedgerMergeReady(root) {
   );
   const staged = execFileSync(
     'git',
-    ['diff', '--cached', '--no-ext-diff', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+    [
+      'diff',
+      '--cached',
+      '--no-ext-diff',
+      '--no-textconv',
+      '--text',
+      '--no-color',
+      '--unified=0',
+      '--',
+      '.',
+      `:!${LEDGER_PATH}`,
+    ],
     { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   );
   // Staging a file does not prove its conflict markers were resolved.
+  // Inspect raw staged bytes; Git attributes must not hide unresolved markers.
   assert.doesNotMatch(
     staged,
     /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,
@@ -299,32 +313,56 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     writeFileSync(resolve(root, LEDGER_PATH), `${JSON.stringify(merged, null, 2)}\n`);
     argv = [];
   }
-  assert.ok(
-    argv.length % 2 === 0 &&
-      argv.every((argument, index) =>
-        index % 2 === 0 ? argument === '--base-ref' : argument.length > 0,
-      ),
-    'usage: correction-coverage.mjs [--base-ref <sha|origin/main>]... | --merge-ledger',
-  );
+  const usage =
+    'usage: correction-coverage.mjs [--base-ref <sha|origin/main>]... [--output <path>] | --merge-ledger';
+  const baseRefs = [];
+  let output;
+  assert.equal(argv.length % 2, 0, usage);
+  for (let index = 0; index < argv.length; index += 2) {
+    const option = argv[index];
+    const value = argv[index + 1];
+    assert.ok(
+      ['--base-ref', '--output'].includes(option) && value?.trim() && !value.startsWith('--'),
+      usage,
+    );
+    if (option === '--output') {
+      assert.equal(output, undefined, usage);
+      output = value;
+    } else baseRefs.push(value);
+  }
   const current = guardCoverageReport(
     JSON.parse(readSource(LEDGER_PATH, { root })),
     (path) => readSource(path, { root }),
     { requireClassification: true },
   );
-  for (let index = 1; index < argv.length; index += 2) {
-    const ref = argv[index];
+  for (const ref of baseRefs) {
     const baseline = coverageReport(JSON.parse(readSource(LEDGER_PATH, { root, ref })), (path) =>
       readSource(path, { root, ref }),
     );
     assertNoRegression(current, baseline);
   }
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, renderCoverage(current));
+  current.commitSha = execFileSync('git', ['rev-parse', 'HEAD'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+  current.timestamp = new Date().toISOString();
+  if (output) {
+    const outputPath = resolve(root, output);
+    mkdirSync(dirname(outputPath), { recursive: true });
+    writeFileSync(outputPath, `${JSON.stringify(current, null, 2)}\n`);
+  }
   return current;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    console.log(JSON.stringify(runCoverage(process.argv.slice(2)), null, 2));
+    const report = runCoverage(process.argv.slice(2));
+    console.log(
+      process.argv.includes('--output')
+        ? `Correction coverage: ${report.mechanized}/${report.total} mechanized (${(100 * report.mechanizedShare).toFixed(2)}%); ${LEVELS.map((level) => `${level}=${report.levels[level].total}`).join(', ')}`
+        : JSON.stringify(report, null, 2),
+    );
   } catch (error) {
     console.error(`Correction coverage failed: ${error.message}`);
     process.exitCode = 1;
