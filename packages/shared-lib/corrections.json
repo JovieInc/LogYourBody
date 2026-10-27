@@ -1,5 +1,27 @@
 [
   {
+    "fingerprint": "xctskip-diagnostics-use-public-message",
+    "correction": "PR #1618 (fix-red-5df69c1e5f): Launch Quality run 40454867112 failed six assertions in the injected Keychain capability tests because String(describing: error) did not expose XCTSkip's supplied diagnostic message.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40454867112/job/122025900952",
+    "mechanization": "Read the typed XCTSkip.message property and assert the complete operation, symbolic and raw status, and entitled-host qualification text for both allowed add/copy statuses. Extend the existing SwiftLint custom rules with xctskip_message to reject reflection after positive XCTSkip type assertions. The normal shared-lib suite exercises violating and permitted fixtures using the configured expression, scans both native test trees, and verifies their Turbo inputs. The new source regression fails against the original Keychain tests while the other 191 shared-lib cases pass. Native XCTest execution remains required in CI; no test, skip classification, cleanup check or gate is removed. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "XCTest owns XCTSkip's reflected representation. This receipt concerns test diagnostic assertions; no product runtime change can prevent future tests from depending on that representation."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required SwiftLint and shared-lib checks can reject reflection of a positively identified XCTSkip, while allowing its public message and descriptions of unrelated errors."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/.swiftlint.yml",
+      "anchor": "xctskip_message:"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
     "fingerprint": "healthkit-timezone-policy-without-source-identity",
     "correction": "PR #1567: Launch Quality failed the two cross-day timezone assertions in HealthImportIdempotencyTests. Selecting the sample-local day must not depend on having a complete source-scoped identity.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1567",

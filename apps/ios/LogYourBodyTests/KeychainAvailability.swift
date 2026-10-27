@@ -199,8 +199,11 @@ final class KeychainAvailabilityTests: XCTestCase {
             stub.addStatus = status
             XCTAssertThrowsError(try KeychainAvailability.requireAvailable(using: stub.client)) { error in
                 XCTAssertTrue(error is XCTSkip)
-                XCTAssertTrue(String(describing: error).contains("SecItemAdd returned \(name) (\(status))"))
-                XCTAssertTrue(String(describing: error).contains("Non-skipped entitled-host execution remains required"))
+                XCTAssertEqual(
+                    (error as? XCTSkip)?.message,
+                    "Keychain capability unavailable: SecItemAdd returned \(name) (\(status)). "
+                        + "Non-skipped entitled-host execution remains required."
+                )
             }
             XCTAssertEqual(stub.calls, ["add"])
         }
@@ -212,7 +215,11 @@ final class KeychainAvailabilityTests: XCTestCase {
             stub.copyStatus = status
             XCTAssertThrowsError(try KeychainAvailability.requireAvailable(using: stub.client)) { error in
                 XCTAssertTrue(error is XCTSkip)
-                XCTAssertTrue(String(describing: error).contains("SecItemCopyMatching returned \(name) (\(status))"))
+                XCTAssertEqual(
+                    (error as? XCTSkip)?.message,
+                    "Keychain capability unavailable: SecItemCopyMatching returned \(name) (\(status)). "
+                        + "Non-skipped entitled-host execution remains required."
+                )
             }
             XCTAssertEqual(stub.calls, ["add", "copy", "delete"])
         }
