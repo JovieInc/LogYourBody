@@ -141,6 +141,7 @@ One shared scenario list generates both repair modes; each presentation variant
 rejects all four marker forms without repeating scenario-independent CLI probes.
 The same fixture follows a clean main prepend with a conflicting append, then
 repairs and verifies the next union while preserving unrelated worktree edits.
+External diff drivers are also covered in both repair modes.
 
 The existing required CI path checks coverage on **every diff**, including
 changes outside the ledger. It fetches the event's exact base revision (PR base,

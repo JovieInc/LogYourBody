@@ -278,7 +278,13 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
   assert.equal(run('--resolve-merge', directory).status, 1, 'refuse a non-repository');
   const rows = fixture().slice(0, 4);
   rows.push({ ...rows[0], source: `${rows[0].source}#another-receipt` });
-  const markerScenarios = ['staged-marker', 'binary-marker', 'textconv-marker', 'color-marker'];
+  const markerScenarios = [
+    'staged-marker',
+    'binary-marker',
+    'textconv-marker',
+    'external-marker',
+    'color-marker',
+  ];
   const markers = ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming'];
   const scenarios = [
     'additions',
@@ -414,6 +420,10 @@ test('CLI resolves Git ledger conflicts from three stages without staging other 
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} diff=hidden\n`);
       git('config', 'diff.hidden.textconv', 'echo filtered-source');
       git('add', '.gitattributes');
+    }
+    if (scenario === 'external-marker') {
+      // An external diff driver must not hide markers from either repair mode.
+      git('config', 'diff.external', 'echo filtered-source');
     }
     if (scenario === 'color-marker') {
       // User presentation settings cannot hide conflict markers from the resolver.
