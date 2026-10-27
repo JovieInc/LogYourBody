@@ -1867,5 +1867,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1612: The alert-dialog 1.2.1 manifest bump retained a 1.1.23 lockfile and stale source projection, failing Detect Changes, parity and CI Summary. Frozen installation reproduces the lockfile mismatch. Make the existing combined dependency repair retryable after resolver or frozen-verification failure.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1612",
+    "mechanization": "Extend the existing lockfile-and-source-parity repair helper to restore the original lockfile (or remove a newly created one) if pnpm resolution or frozen verification fails. The existing required Detect Changes suite now proves unchanged index and source projection, restored lockfile bytes, and a successful retry after both failure modes. Both original-lockfile regressions failed before the extension. Use the extended helper on this PR and retain all frozen install and source parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
