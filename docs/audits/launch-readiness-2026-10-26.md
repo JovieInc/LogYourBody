@@ -36,8 +36,8 @@ App Store availability, device quality, live conversion, or provider commissioni
 
 | Area                 | Executed evidence                                                                                                             | Limit                                                                                                |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Web behavior         | 141 suites, 1,409 tests passed in the full measured coverage run                                                              | Authenticated providers and production persistence were not commissioned                             |
-| Whole-web coverage   | 54.43% statements, 56.11% branches, 56.74% functions, 55.92% lines                                                            | Baseline, not full coverage; normal test/CI commands now enforce nonregression                       |
+| Web behavior         | 141 suites, 1,411 tests passed in the full measured coverage run                                                              | Authenticated providers and production persistence were not commissioned                             |
+| Whole-web coverage   | 54.50% statements, 56.18% branches, 56.83% functions, 55.99% lines                                                            | Baseline, not full coverage; normal test/CI commands now enforce nonregression                       |
 | Mutation campaign    | 14/14 curated faults detected; growth source 100% line/branch/function; selected release policy 81.32%/98.70%/100%            | Two JavaScript modules, not Swift or whole-app mutation coverage                                     |
 | Mutation runner      | 8 tests; 99.38% lines, 98.39% branches, 100% functions                                                                        | Includes real empty-coverage and timeout regressions                                                 |
 | Browser              | All 18 desktop/mobile Chromium cases passed with deterministic prelaunch flags and normalized canonical URL checks            | Signup acceptance/error responses are intercepted; no durable registration or live analytics receipt |
@@ -50,11 +50,15 @@ has no Swift/Xcode. Full repository validation also initially found missing Ruby
 and an outdated retained sitemap guard anchor; the local Ruby runtime and source
 anchor were repaired without weakening checks. Final root `pnpm lint`,
 `pnpm typecheck` and `pnpm test` passed. The full test command completed all eight
-tasks, including 181 shared-lib cases, 122 workflow script cases and the 1,409 web
+tasks, including 188 shared-lib cases, 122 workflow script cases and the 1,411 web
 cases. The production web build also completed. Some unchanged tasks reused Turbo
 cache; `pnpm test:mutation` was run separately without cache and again killed all
 14 faults. These receipts qualify the source working tree; hosted checks must
-still verify the PR commit.
+still verify the PR commit. These checks were repeated after integrating main
+`1a29635d5`; both parents’ correction records were preserved (96 total). Hosted
+CI on the earlier head `92441f2` passed JavaScript/TypeScript, iOS static audits
+and security. Its native Launch Quality job remained queued, so it supplies no
+XCTest receipt for the integrated candidate.
 
 ## Remaining release gates, in order
 
@@ -92,10 +96,20 @@ still verify the PR commit.
 
 Use `pnpm growth:report` with bounded, private aggregate receipts and act on its
 repair actions before evaluating an experiment. Keep one hypothesis, one primary
-metric, guardrails, a maturity window and an explicit decision receipt. The
-existing Summer capability can consume this stable report contract when its
-owner commissions the sources; this change creates no parallel monitor,
-scheduler, provider connection or autonomous campaign writer.
+metric, guardrails, a maturity window and an explicit decision receipt.
+Summer's existing company reader, signal lifecycle, bet ledger and work-order
+machinery are the intended integration path. A read-only audit at Summer source
+`00a3563b5f3bca91d82c5ba20198c9951a302d20` found that its typed funnel reader only
+accepts Jovie's artist/fan funnel; it cannot consume LYB's report yet. Its CI signal
+ingestion includes LYB, but its independent deployed-outcome verifier is still
+pinned to Jovie. The remaining capability work is an authenticated aggregate
+producer, a strict LYB report projection preserving provenance/unknowns/maturity
+and repair actions, and an LYB native outcome reader. Existing signal routing
+should receive qualified repair actions; cohort waiting should defer review
+without creating repeated incidents. The six existing Summer test files passed
+245 tests; that is source evidence, not a deployed LYB capability. This change
+creates no parallel monitor, scheduler, provider connection or autonomous
+campaign writer.
 
 The existing LYB merge-queue repair cohort retains its incumbent PRs. This branch
 does not rewrite, merge or deploy them. Store publication and account-owner
