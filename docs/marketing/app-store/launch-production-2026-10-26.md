@@ -1,14 +1,43 @@
 # Storefront production brief — 2026-10-26
 
-The en-US listing is generated and locally validated. The screenshot campaign is
-not ready for upload. This brief records the remaining production work against
-the checked-out source; it is not an App Store Connect or conversion receipt.
+The proposed en-US listing is preserved for review and locally validated, with
+publication held. The screenshot campaign is not ready for upload. This brief
+records the remaining production work against the checked-out source; it is not
+an App Store Connect or conversion receipt.
 
 ## Listing changes
 
-The source remains `packages/product-registry/src/storefronts/logyourbody.mjs`.
-Run `pnpm product:generate` and `pnpm product:check` from the repository root;
-Fastlane reads the generated `apps/ios/fastlane/metadata/en-US/` files.
+The exact proposed metadata is in
+[`listing-proposal-2026-10-26.json`](listing-proposal-2026-10-26.json), including
+its source and base revisions. It is a held review artifact, outside generator
+inputs. `pnpm product:check` validates its metadata limits, keyword uniqueness,
+canonical links, and subscription disclosures alongside the unchanged active
+listing. `pnpm product:generate` does not promote this proposal.
+
+The canonical `packages/product-registry/src/storefronts/logyourbody.mjs` and its
+generated Fastlane outputs remain byte-identical to base
+`1a29635d5c02c1a78dafc8319adeed16960c112b`. This separation is required because
+`.github/workflows/app-store-metadata-sync.yml` automatically writes App Store
+Connect metadata when its upload paths change on `main`; a source merge must not
+silently publish this proposal.
+
+The original five-file implementation is retained verbatim in
+[`listing-proposal-2026-10-26.patch`](listing-proposal-2026-10-26.patch). The patch
+is a historical, reviewable delta against the recorded base, not an automatic
+promotion script. Its test hunk predates the separate held-proposal validation
+and must not overwrite the current tests. It uses zero context to avoid storing
+blank context lines as trailing whitespace. In an isolated checkout of the
+recorded base, use `git apply --unidiff-zero --check` before
+`git apply --unidiff-zero`; verify reversal with
+`git apply --unidiff-zero --reverse --check` before
+`git apply --unidiff-zero --reverse`. Supply the patch path to each command.
+Forward and reverse application are verified with exact file-byte comparisons.
+
+For a separately authorized publication change, move the approved metadata into
+the canonical registry, retain both the existing limits and the new disclosure
+checks, regenerate the Fastlane outputs, and review the resulting upload-path
+diff before merging. After publication, verify the actual App Store Connect
+values. The following describes the held candidate, not a live listing change:
 
 - The description opens with the product outcome, then explains progress,
   logging, privacy, and Pro in that order. Weight uses pounds or kilograms;
@@ -16,7 +45,7 @@ Fastlane reads the generated `apps/ios/fastlane/metadata/en-US/` files.
 - Pro copy distinguishes eligible trials from guaranteed access, discloses
   monthly/annual subscriptions and renewal, and links the canonical Privacy
   Policy and Terms of Use. The App Store supplies localized pricing and actual
-  offer eligibility. The metadata validator now requires these disclosures.
+  offer eligibility. The held-proposal validator requires these disclosures.
 - The keyword field replaces `private` with `weight`: the previous app name,
   subtitle, and keywords omitted the core weight-tracker query entirely. The
   field uses 97 UTF-8 bytes of the 100-byte limit, with no repeated indexed
@@ -28,7 +57,8 @@ Fastlane reads the generated `apps/ios/fastlane/metadata/en-US/` files.
   and the unreferenced legacy feature flyout; the brand guard rejects their
   reintroduction.
 
-The keyword and copy changes still need live metadata readback after deployment.
+The keyword and copy changes remain held until publication is authorized and
+still need live metadata readback afterward.
 No locale has been invented and no new subscription price has been set.
 
 ## Screenshot production specification

@@ -1666,7 +1666,7 @@
     "fingerprint": "lyb-storefront-subscription-truth-and-search",
     "correction": "The launch audit found incomplete subscription disclosures, no weight keyword, and unsupported claims in obsolete marketing code.",
     "source": "https://github.com/JovieInc/LogYourBody/blob/40224a09e227af6db41fa2ff60cc8487c8778997/packages/product-registry/src/storefronts/logyourbody.mjs",
-    "mechanization": "Generate truthful trial eligibility, renewal, cancellation and legal links from canonical product information, include weight search intent, and remove unused misleading copy. The existing storefront and brand guards failed before the repair and pass afterward. Final native screenshots and live ASC readback remain unverified.",
+    "mechanization": "Prepare and validate a held listing with truthful trial eligibility, renewal, cancellation, legal links and weight search intent, and remove unused misleading web copy. The disclosure assertions apply to the held proposal outside canonical generator inputs because main-branch Fastlane metadata changes automatically write App Store Connect. Canonical publication files remain unchanged; final native screenshots, publication authorization and live ASC readback remain unverified.",
     "classification": {
       "codebase": {
         "feasible": true,

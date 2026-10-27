@@ -13,6 +13,26 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(packageRoot, '../..');
 const storefront = logYourBodyStorefront;
 const featureById = new Map(logYourBody.features.map((feature) => [feature.id, feature]));
+// Review-only input: the generator never reads this held publication proposal.
+const proposal = JSON.parse(
+  await readFile(
+    resolve(repoRoot, 'docs/marketing/app-store/listing-proposal-2026-10-26.json'),
+    'utf8',
+  ),
+);
+assert.equal(proposal.schema, 'lyb-app-store-listing-proposal/v1');
+assert.equal(proposal.status, 'held-not-published');
+assert.equal(proposal.productId, storefront.productId);
+assert.equal(proposal.platform, storefront.platform);
+assert.equal(proposal.locale, storefront.defaultLocale);
+assert.match(proposal.sourceRevision, /^[a-f0-9]{40}$/u);
+assert.match(proposal.baseRevision, /^[a-f0-9]{40}$/u);
+const heldLocale = { id: proposal.locale, metadata: proposal.metadata };
+const canonicalMetadata = storefront.locales.find(
+  (locale) => locale.id === proposal.locale,
+).metadata;
+assert.deepEqual(Object.keys(heldLocale.metadata).sort(), Object.keys(canonicalMetadata).sort());
+assert(Object.values(heldLocale.metadata).every((value) => typeof value === 'string'));
 
 const unique = (values, message) => {
   assert.equal(new Set(values).size, values.length, message);
@@ -61,7 +81,9 @@ const localeIds = storefront.locales.map((locale) => locale.id);
 unique(localeIds, 'storefront locale IDs must be unique');
 assert(localeIds.includes(storefront.defaultLocale), 'default locale must exist');
 
-for (const locale of storefront.locales) {
+// Both the unchanged upload listing and the held candidate obey Apple limits,
+// keyword uniqueness, canonical links, and the supported product identity.
+for (const locale of [...storefront.locales, heldLocale]) {
   const { metadata } = locale;
   const limits = storefront.metadataLimits;
 
@@ -123,6 +145,10 @@ for (const locale of storefront.locales) {
   assert.equal(metadata.supportUrl, logYourBody.links.support);
   assert.equal(metadata.marketingUrl, logYourBody.links.home);
   assert.equal(metadata.privacyUrl, logYourBody.links.privacy);
+  if (locale !== heldLocale) continue;
+
+  // These new requirements stay enforced on the reviewable proposal without
+  // forcing an unauthorized write to the metadata-sync inputs on main.
   assert(
     metadata.description.includes(logYourBody.links.terms),
     `${locale.id} description needs the canonical Terms of Use link`,
