@@ -53,8 +53,8 @@ extension DashboardViewLiquid {
         }
     }
 
-    /// Context (Pencil N2). Pushed from `photoTimelineRoot`; the viewer and
-    /// sheets it opens are presented from the root as well.
+    /// Context (Pencil N2). Its navigation destination owns the edit sheet so
+    /// the presenter stays visible while Context is pushed over the timeline.
     var homeV2ContextView: some View {
         HomeV2ContextView(
             bodyMetrics: bodyMetrics,
@@ -62,10 +62,15 @@ extension DashboardViewLiquid {
             detail: { homeV2DayDetail(for: $0, preferredMetricID: homeV2ContextMetricID) },
             onClose: { isHomeV2ContextPresented = false },
             onEditEntry: { metric in
-                guard let owner = authManager.captureAccountSession(), owner.subject == metric.userId else { return }
                 #if DEBUG
                 recordHomeEditTransition("callback.begin")
                 #endif
+                guard let owner = authManager.captureAccountSession(), owner.subject == metric.userId else {
+                    #if DEBUG
+                    recordHomeEditTransition("callback.rejected")
+                    #endif
+                    return
+                }
                 homeV2EditingSession = HomeV2EditSession(metric: metric, owner: owner)
                 #if DEBUG
                 recordHomeEditTransition("callback.assigned")
