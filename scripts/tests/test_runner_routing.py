@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _WORKFLOWS = _REPO_ROOT / ".github" / "workflows"
 _QUERY_SCRIPT = _REPO_ROOT / ".github" / "scripts" / "query-runner-heartbeat.sh"
@@ -1322,7 +1324,96 @@ def test_ruby_setup_loads_locked_native_gems_after_bundler_setup(tmp_path: Path)
             assert 'Bundled date loaded\nBundled psych loaded\nBundled json loaded\nBundled ffi loaded\nRuby native dependencies loaded' in result.stdout
 
 
-def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence(tmp_path: Path) -> None:
+@pytest.fixture
+def live_testmanager_socket(tmp_path: Path):
+    import socket
+
+    with socket.socket(socket.AF_UNIX) as live_socket:
+        socket_path = tmp_path / 'testmanager.sock'
+        live_socket.bind(str(socket_path))
+        yield socket_path
+
+
+def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_destination(
+    tmp_path: Path, live_testmanager_socket: Path,
+) -> None:
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    native = binaries / 'native.py'
+    native.write_text(textwrap.dedent('''\
+        #!/usr/bin/python3
+        import json, os, sys
+        from pathlib import Path
+        args = sys.argv[1:]
+        command = Path(sys.argv[0]).name
+        log = Path(os.environ['NATIVE_CALLS'])
+        with log.open('a') as stream:
+            stream.write(json.dumps([command, *args]) + '\\n')
+        scenario = os.environ['NATIVE_SCENARIO']
+        events = [json.loads(line) for line in log.read_text().splitlines()]
+        restarted = any(e[1:3] == ['simctl', 'shutdown'] for e in events)
+        if command == 'xcodebuild':
+            assert '-showdestinations' in args
+            print('{ platform:iOS Simulator, arch:arm64, id:selected, OS:26.2, name:iPhone 16 }')
+        elif args == ['simctl', 'boot', 'selected']:
+            if scenario == 'already-booted' or (scenario == 'restart-boot-failure' and restarted):
+                sys.exit(149)
+        elif args == ['simctl', 'bootstatus', 'selected', '-b']:
+            if scenario == 'bootstatus-failure' or (scenario == 'restart-status-failure' and restarted):
+                sys.exit(71)
+        elif args == ['simctl', 'getenv', 'selected', 'TESTMANAGERD_SIM_SOCK']:
+            if scenario == 'getenv-failure':
+                sys.exit(72)
+            if scenario == 'empty-socket':
+                sys.exit(0)
+            if scenario == 'regular-file':
+                print(os.environ['REGULAR_FILE'])
+            elif scenario in ['healthy', 'already-booted'] or (scenario == 'stale-recovered' and restarted):
+                print(os.environ['LIVE_SOCKET'])
+            else:
+                print(os.environ['LIVE_SOCKET'] + '.missing')
+        elif args == ['simctl', 'shutdown', 'selected']:
+            if scenario == 'shutdown-failure':
+                sys.exit(73)
+        else:
+            sys.exit('Unexpected native invocation: ' + repr(args))
+    '''))
+    native.chmod(0o755)
+    for name in ['xcrun', 'xcodebuild']:
+        (binaries / name).symlink_to(native)
+    regular = tmp_path / 'regular-file'
+    regular.write_text('A regular file is not a testmanagerd socket.')
+    scenarios = {'stale-persistent': 70, 'healthy': 0, 'already-booted': 0,
+                 'stale-recovered': 0, 'empty-socket': 70, 'getenv-failure': 70,
+                 'regular-file': 70, 'bootstatus-failure': 71, 'shutdown-failure': 73,
+                 'restart-boot-failure': 149, 'restart-status-failure': 71}
+    # A real socket distinguishes healthy launchd state from missing paths or regular files.
+    for scenario, expected in scenarios.items():
+        calls = tmp_path / f'{scenario}.calls'
+        result = subprocess.run(
+            ['bash', str(_REPO_ROOT / 'scripts/ios/resolve-simulator-destination.sh')],
+            env={**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}', 'IOS_DIR': str(tmp_path),
+                 'NATIVE_CALLS': str(calls), 'NATIVE_SCENARIO': scenario,
+                 'LIVE_SOCKET': str(live_testmanager_socket), 'REGULAR_FILE': str(regular)},
+            text=True, capture_output=True, check=False, pass_fds=_coverage_fds(), timeout=10)
+        assert result.returncode == expected, (scenario, result.stdout, result.stderr)
+        events = [json.loads(line) for line in calls.read_text().splitlines()]
+        shutdowns = [e for e in events if e[1:3] == ['simctl', 'shutdown']]
+        assert len(shutdowns) == (0 if scenario in ['healthy', 'already-booted', 'bootstatus-failure'] else 1)
+        assert all(e[3] == 'selected' for e in events if e[0] == 'xcrun')
+        assert all(e[0] != 'xcodebuild' or '-showdestinations' in e for e in events)
+        if expected == 0:
+            assert result.stdout == 'platform=iOS Simulator,id=selected\n'
+            assert events[-1] == ['xcrun', 'simctl', 'getenv', 'selected', 'TESTMANAGERD_SIM_SOCK']
+            assert 'ready' in result.stderr
+        else:
+            assert result.stdout == '', 'An unhealthy simulator must never be admitted to native tests'
+            assert 'ready' not in result.stderr
+
+
+def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence(
+    tmp_path: Path, live_testmanager_socket: Path,
+) -> None:
     cases = ['testAnnualTrialPurchaseRestoreExpiration', 'testMonthlyTrialPurchaseRestoreExpiration',
              'testAnnualTrialPurchaseRestoreRefund', 'testMonthlyTrialPurchaseRestoreRefund']
     root = tmp_path / 'repo'
@@ -1365,6 +1456,8 @@ def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence(tmp
                     sys.exit(65)
         elif args[:4] == ['simctl', 'list', 'devices', 'available']:
             print(json.dumps({'devices': {'runtime': [{'udid': 'seed', 'deviceTypeIdentifier': 'iphone'}]}}))
+        elif args[:2] == ['simctl', 'getenv']:
+            print(os.environ['LIVE_SOCKET'])
         elif args[:2] == ['simctl', 'create']:
             count = sum('"create"' in line for line in log.read_text().splitlines())
             print(f'fresh-{count}')
@@ -1391,7 +1484,8 @@ def test_storekit_lifecycles_use_fresh_devices_and_preserve_failure_evidence(tmp
         result = subprocess.run(['bash', str(scripts / 'storekit-purchase-restore.sh')], cwd=root,
                                 env={**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}',
                                      'STOREKIT_RESULTS': str(results), 'NATIVE_CALLS': str(calls),
-                                     'NATIVE_SCENARIO': scenario, 'GITHUB_STEP_SUMMARY': ''},
+                                     'NATIVE_SCENARIO': scenario, 'LIVE_SOCKET': str(live_testmanager_socket),
+                                     'GITHUB_STEP_SUMMARY': ''},
                                 text=True, capture_output=True, check=False, pass_fds=_coverage_fds())
         events = [json.loads(line) for line in calls.read_text().splitlines()]
         invocations = [e for e in events if e[0] == 'xcodebuild' and '-showdestinations' not in e]
@@ -2219,7 +2313,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
 
     fixtures = ['positive', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
-                'dependency-symlink']
+                'dependency-symlink', 'wrong-resolver']
     for scenario in fixtures:
         root = (tmp_path / scenario / 'repo').resolve()
         root.mkdir(parents=True)
@@ -2253,6 +2347,9 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
             audit.symlink_to(helper)
         elif scenario == 'wrong-dependency':
             helper.write_bytes(helper.read_bytes() + b'\n')
+        elif scenario == 'wrong-resolver':
+            resolver = root / 'scripts/ios/resolve-simulator-destination.sh'
+            resolver.write_bytes(resolver.read_bytes() + b'\n')
         elif scenario == 'missing-dependency':
             helper.unlink()
         elif scenario == 'dependency-symlink':

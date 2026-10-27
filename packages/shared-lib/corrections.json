@@ -2339,5 +2339,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "simulator-testmanager-socket-readiness",
+    "correction": "PR #1593 / LYB-295: merge-group run 40597849156 failed in Mac Unit run 40597923369 after compilation because the booted simulator advertised a missing testmanagerd Unix socket. The destination resolver ignored bootstatus failure and admitted the device without checking that socket.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40597923369",
+    "mechanization": "Extend the existing shared simulator resolver to require successful bootstatus and a real TESTMANAGERD_SIM_SOCK socket. Restart only the selected device once before tests when the socket is stale, recheck it, and fail closed without a destination on unresolved readiness or restart errors. The existing required runner-routing suite executes the real resolver across eleven healthy, stale, malformed and command-failure scenarios using a real Unix socket. Its stale-persistent regression rejects the original resolver. Keep StoreKit isolation coverage, refresh only the reviewed resolver digest among the seven trusted dependency pins, and reject modified resolver bytes through the real trusted diagnostic CLI. Native Mac execution remains required; the harness owns publication.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime code cannot repair the simulator test service before XCTest launches the app; this invariant belongs to the native CI destination preflight."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required routing suite executes the actual destination resolver with controlled simctl responses and a real Unix socket, rejecting stale socket admission and verifying bounded recovery and failure propagation before native tests."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_simulator_resolver_recovers_stale_testmanager_socket_before_admitting_destination"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
