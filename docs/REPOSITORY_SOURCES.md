@@ -16,7 +16,7 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `acb8b5c2875c788f8c0068ddf387f75c9b8483a9eb5a80697e643831d23a8cec`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `81f854726143440729324e979d5c1aa8a596eff0d75fc6ef578289c689468213`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `fd0362b4ab79293eab66642df785930d85b6ce1e580277917de9a06834920d67`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `5db80253b112a500bfd69fb48dcff21e0591a648856ec56486cd24cb622607e3`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a9865698e8b84fac33f67c5eb1303683a478d356745fd71c6ba4704f64756772`)
 
 ### `apps/web/package.json`: engines
 
@@ -55,8 +55,8 @@ A changed fingerprint requires review of its related documentation; it does not 
   "prepush": "pnpm run check",
   "start": "next start",
   "sync:marketing-assets": "node ../../scripts/marketing/sync-ios-marketing-assets.mjs",
-  "test": "jest && tsx --test scripts/voice-adapters.test.ts",
-  "test:ci": "jest --runInBand && tsx --test scripts/voice-adapters.test.ts",
+  "test": "jest --coverage && tsx --test scripts/voice-adapters.test.ts",
+  "test:ci": "jest --coverage --runInBand && tsx --test scripts/voice-adapters.test.ts",
   "test:coverage": "jest --coverage",
   "test:e2e": "playwright test",
   "test:e2e:ui": "playwright test --ui",
@@ -189,7 +189,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `a184d78ba6cf4c799260680b6c7c8ddd7d21c59147f871c01328184734818671`)
+- `package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `e43edfe0dbd405c783fcdec0a83a3a8edb66dca8d38d016e576efc624c58cc20`)
 
 ### `package.json`: packageManager
 
@@ -245,6 +245,8 @@ A changed fingerprint requires review of its related documentation; it does not 
   "test": "turbo run test",
   "test:ci": "turbo run test && pnpm eve:build && pnpm eve:smoke",
   "test:knowledge-lint": "node --test scripts/lint-no-specifics.test.mjs scripts/lint-claims.test.mjs",
+  "test:launch-e2e": "pnpm --filter logyourbody exec playwright test tests/e2e/launch-funnel.spec.ts --project=desktop --project=mobile-portrait --workers=1",
+  "test:mutation": "turbo run test:mutation --filter=@logyourbody/shared-lib",
   "typecheck": "turbo run typecheck",
   "web": "pnpm --filter logyourbody dev"
 }
@@ -349,7 +351,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `1a02cb5943c081cef910b7c77664e20ea48becea75e105104c578db8c6a7408f`)
+- `packages/shared-lib/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `c39ce2c9cad6bc69043562b674c80607520a06972f0bd1019a207e7c82c20315`)
 
 ### `packages/shared-lib/package.json`: scripts
 
@@ -358,6 +360,7 @@ A changed fingerprint requires review of its related documentation; it does not 
   "build": "tsc -p tsconfig.json",
   "lint": "eslint --ext .js,.jsx,.ts,.tsx src",
   "test": "vitest run --maxWorkers=2 --passWithNoTests && node --test ../../.github/scripts/ci-remediation.test.mjs ../../.github/scripts/remediation-signal.test.mjs ../../.github/scripts/app-store-whats-new.test.mjs ../../.github/scripts/web-production-smoke.test.mjs ../../.github/scripts/verify-public-build-env.test.mjs ../../.github/scripts/signing-expiry.test.mjs",
+  "test:mutation": "node ../../scripts/mutation/run.mjs",
   "typecheck": "tsc --noEmit -p tsconfig.json"
 }
 ```
@@ -386,35 +389,5 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `apps/ios/Gemfile` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `5a2679a8a7d9d72b1b4c6aaf0d6d5e81b762e36abeea9a9bb1d486a20059c40b`)
 - `apps/ios/Gemfile.lock` — Native iOS build or dependency manifest; review related instructions when changed (SHA-256 `4f686cf305a85825e06ed4de47ad9ea113f9529917432b349eec135a4b31b466`)
 - `apps/ios/Vendor/JovieKit.source.json` — Immutable canonical JovieKit package manifest; review source updates and rollback (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `70f8746bd463c45099f16a47e1b64f18fc56000e3331756d06c09cacb5cc77ad`)
-- `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `1e7d727805b3918f54714fbd84407bd30d6441bff56ee89542027b0bc69a0eab`)
-
-## Pinned shared sources
-
-Updates are independent reviewable consumer changes. Local instructions remain source-owned.
-
-- `docs/company/REPOSITORY_SOURCE_CONTRACT.md` ← `JovieInc/Jovie@b193bc6a360b20df6933d45b4abefe0736c09493:docs/company/REPOSITORY_SOURCE_CONTRACT.md` (SHA-256 `f6bb8cdfdc317ed4ac3b99f8d2fc18a9647124c4fb807b1eef274892447b184f`)
-- `scripts/repository_docs.py` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:scripts/repository_docs.py` (SHA-256 `578f1db8842d50b70bc2ec28bffb23cd8620222c8e9f8b896797f4de88f82d43`)
-- `tests/test_repository_docs.py` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:tests/test_repository_docs.py` (SHA-256 `9cb660d8c2fa145b17cc04e522a9e692ff8131f6126e6a584527ccbc3d3fbe80`)
-- `docs/company/CI_TOOL_LICENSE` ← `JovieInc/ci@285fb2e0e27e9ba8a63566e8ca71b3807479950b:LICENSE` (SHA-256 `c8465c8b9f97966f84ca0ef5f8440f37315a73ef76044b7bdfa74a3fbef4f143`)
-- `apps/ios/Scripts/import-joviekit.mjs` ← `JovieInc/Jovie@1e6c7f11ef1cc4fb64c59c1b1758d823e8c6bc48:apps/ios/scripts/import-joviekit.mjs` (SHA-256 `35555f9ad251a0976a0bd0ee4ebf4293a4b8634ea61e60db254e53b9c196aa4b`)
-- `apps/ios/Vendor/JovieKit.source.json` ← `JovieInc/Jovie@1e6c7f11ef1cc4fb64c59c1b1758d823e8c6bc48:apps/ios/Packages/JovieKit.source.json` (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `apps/ios/Vendor/JovieKit/.jovie-source.json` ← `JovieInc/Jovie@1e6c7f11ef1cc4fb64c59c1b1758d823e8c6bc48:apps/ios/Packages/JovieKit.source.json` (SHA-256 `aeb09f3d323221fb8a1070f27be5f2ab112d924b908ae65856c634d1b4fbaff2`)
-- `apps/ios/Vendor/JovieKit/.gitignore` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/.gitignore` (SHA-256 `acc718146d21aae829cba1761475e05de39d73209d83af2ab8487a74843cead0`)
-- `apps/ios/Vendor/JovieKit/Package.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Package.swift` (SHA-256 `aa88704f7220d98307ea057bc06e052605809218e64b40886c063b429c2521ab`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/AppReviewPolicy.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/AppReviewPolicy.swift` (SHA-256 `1e98c8a910ca08730e5b7ce843cbf22a259b035f6b36abe993b28a70ed379f12`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/EyesFreeCaptureAPI.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/EyesFreeCaptureAPI.swift` (SHA-256 `c2c70a21efa724a313c090fb111c2b4f15aabc957167d4eaf15f5a301bf42feb`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatAuthorizing.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatAuthorizing.swift` (SHA-256 `5580aaf71485ad4b6e88bd7a8ec6433d314b5038768d1fd3e5753081b827e02f`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatNDJSONParser.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatNDJSONParser.swift` (SHA-256 `b4723fff9354d795561020361850fd12a9e917b599581e08206db95f172b3ee8`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatNDJSONReader.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatNDJSONReader.swift` (SHA-256 `3ef2251781c1a7023d20a7d4502d2d83972662132b1e850fcef26f47b4dd1dee`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatStreamCoalescer.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatStreamCoalescer.swift` (SHA-256 `11595b916203e117f721b1eaa8f0253b7957b088d9b45cd1572bcca2071f0ff3`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatStreamEvent.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatStreamEvent.swift` (SHA-256 `6fc3a978e0786fac7abcc9cf979535d4193fce15b5261aeb0c3be054454df58b`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileChatTransport.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileChatTransport.swift` (SHA-256 `0f3829a8811b6020f6c872d66cf3f0d5630312fcb73ddf784165f55aab3246ba`)
-- `apps/ios/Vendor/JovieKit/Sources/JovieKit/MobileConversationModels.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Sources/JovieKit/MobileConversationModels.swift` (SHA-256 `532510cc83b1124af92e0ea027da518a9480c4c52e7723603ccaafd615aa7775`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/AppReviewPolicyTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/AppReviewPolicyTests.swift` (SHA-256 `5a6744fac1c654fd769a0e5ca6504ef3db1f47dffdd802a8b1509a793978a79a`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatNDJSONParserTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatNDJSONParserTests.swift` (SHA-256 `4a3508df5567cbaa3d094d65b32826ef9cb170d8395c278bd50ee096198dfc7f`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatNDJSONReaderTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatNDJSONReaderTests.swift` (SHA-256 `247e989555ecbb27ba61121319126ec71feb969ec7061c6916a3247c71df3225`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatStreamCoalescerTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatStreamCoalescerTests.swift` (SHA-256 `1c5e23c756fe04ab422622d862e4b219fcea78ee75e8851dc374c49e0a085cf8`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileChatTransportTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileChatTransportTests.swift` (SHA-256 `77f477526edfec88f9a42e506f231c3acc2d000450ac21c7aa060d7ddce47380`)
-- `apps/ios/Vendor/JovieKit/Tests/JovieKitTests/MobileConversationModelsTests.swift` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:apps/ios/Packages/JovieKit/Tests/JovieKitTests/MobileConversationModelsTests.swift` (SHA-256 `a2823075a5f0de5f9dd691db4fa5f6bdf53e87ae924c337205d52a8d039cceb3`)
-- `apps/ios/Vendor/JovieKit/LICENSE` ← `JovieInc/Jovie@2fec0fe05f95e454da24cb6a9fd7021501ca414b:LICENSE` (SHA-256 `b6eb8a4e5f2aa94db96d0ec35126fb88561f162ae3383d82330996ead3361526`)
+- `packages/shared-lib/turbo.json` — Test cache inputs include immutable native sources and import tool (SHA-256 `c82b649ce9cdc9046245a7eb109bd80b1d8c4e0a2250ccb3dc3c223219e3d6b5`)
+- `.github/scripts/detect-changes.sh` — CI surface detection must preserve native matches under pipefail (SHA-256 `1e7d72780

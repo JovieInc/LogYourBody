@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { HTMLAttributes, JSX } from 'react';
 import { ExperimentWaitlistLanding } from '../ExperimentWaitlistLanding';
 import { resolveLandingVariant } from '@/lib/marketing/landing-registry';
+import { analytics } from '@/lib/analytics';
 
 jest.mock('@/lib/analytics', () => ({
   analytics: {
@@ -124,5 +125,88 @@ describe('ExperimentWaitlistLanding', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Enter a valid email address.');
     expect(screen.getByRole('textbox', { name: 'Email' })).toHaveFocus();
     expect(global.fetch).not.toHaveBeenCalled();
+    expect(analytics.track).toHaveBeenCalledWith(
+      'web_waitlist_submit_result',
+      expect.objectContaining({ outcome: 'invalid', variant: 'waitlist_editorial_v2' }),
+    );
+  });
+
+  it.each([
+    [200, { success: true }, 'accepted'],
+    [200, { success: true, status: 'existing' }, 'accepted'],
+    [400, { success: false }, 'invalid'],
+    [429, { success: false }, 'rate_limited'],
+    [500, { success: false }, 'server_error'],
+  ])(
+    'records bounded funnel outcomes for HTTP %s without leaking registration status',
+    async (status, payload, outcome) => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: status === 200,
+        status,
+        json: async () => payload,
+      });
+      render(
+        <ExperimentWaitlistLanding
+          variant={resolveLandingVariant({})}
+          assignmentSource="experiment"
+        />,
+      );
+      const input = screen.getByRole('textbox', { name: 'Email' });
+      fireEvent.focus(input);
+      fireEvent.blur(input);
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: 'synthetic@example.com' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Get early access' }));
+      await waitFor(() =>
+        expect(analytics.track).toHaveBeenCalledWith(
+          'web_waitlist_submit_result',
+          expect.objectContaining({
+            outcome,
+            variant: 'waitlist_editorial_v2',
+            assignment_source: 'experiment',
+          }),
+        ),
+      );
+      expect(
+        jest.mocked(analytics.track).mock.calls.filter(([name]) => name === 'web_waitlist_started'),
+      ).toHaveLength(1);
+      expect(analytics.track).toHaveBeenCalledWith(
+        'web_waitlist_submit_attempted',
+        expect.objectContaining({ variant: 'waitlist_editorial_v2' }),
+      );
+      expect(JSON.stringify(jest.mocked(analytics.track).mock.calls)).not.toMatch(
+        /synthetic@example|existing/,
+      );
+      if (outcome === 'accepted') {
+        expect(screen.getByRole('status')).toHaveTextContent(
+          'Your early-access request was received.',
+        );
+        expect(screen.getByRole('button', { name: 'Get early access' })).toBeDisabled();
+      }
+    },
+  );
+
+  it('records a bounded network failure and permits retry', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error('private failure details'));
+    render(
+      <ExperimentWaitlistLanding
+        variant={resolveLandingVariant({})}
+        assignmentSource="experiment"
+      />,
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email' }), {
+      target: { value: 'synthetic@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Get early access' }));
+    await waitFor(() =>
+      expect(analytics.track).toHaveBeenCalledWith(
+        'web_waitlist_submit_result',
+        expect.objectContaining({ outcome: 'server_error' }),
+      ),
+    );
+    expect(screen.getByRole('button', { name: 'Get early access' })).toBeEnabled();
+    expect(JSON.stringify(jest.mocked(analytics.track).mock.calls)).not.toMatch(
+      /private failure|synthetic@example/,
+    );
   });
 });
