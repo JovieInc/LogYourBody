@@ -269,10 +269,11 @@ export function assertLedgerMergeReady(root) {
   );
   const staged = execFileSync(
     'git',
-    ['diff', '--cached', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
+    ['diff', '--cached', '--text', '--no-ext-diff', '--no-textconv', '--no-color', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
     { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
   );
   // Staging a file does not prove its conflict markers were resolved.
+  // Read staged bytes as text so binary attributes cannot conceal conflict markers.
   assert.doesNotMatch(
     staged,
     /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,

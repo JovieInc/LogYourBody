@@ -313,6 +313,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     'manual-invalid',
     'textconv-marker',
     'color-marker',
+    'binary-marker',
     'duplicate-parent',
   ].map((scenario) => [scenario, false]);
   scenarios.push(
@@ -327,6 +328,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     ['manual-invalid', true],
     ['textconv-marker', true],
     ['color-marker', true],
+    ['binary-marker', true],
     ['duplicate-parent', true],
   );
   const runScenario = async ([scenario, stageMerge]) => {
@@ -341,6 +343,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       'manual-invalid',
       'textconv-marker',
       'color-marker',
+      'binary-marker',
     ].includes(scenario);
     const repository = join(directory, `repository with spaces ${scenario} ${stageMerge}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
@@ -479,7 +482,12 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       // User presentation settings cannot hide conflict markers from the resolver.
       git('config', 'color.ui', 'always');
     }
-    if (['staged-marker', 'textconv-marker', 'color-marker'].includes(scenario)) {
+    if (scenario === 'binary-marker') {
+      // Binary attributes must not hide unresolved source in the staged diff.
+      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} binary\n`);
+      git('add', '.gitattributes');
+    }
+    if (['staged-marker', 'textconv-marker', 'color-marker', 'binary-marker'].includes(scenario)) {
       writeFileSync(
         join(repository, rows[0].guard.path),
         `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`,
@@ -576,6 +584,20 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first|staged conflict markers|Expected property name/,
       );
       assert.equal(readFileSync(ledger, 'utf8'), before);
+      if (scenario === 'binary-marker') {
+        git('add', rows[0].guard.path);
+        const repaired = run('--resolve-merge', repository, '--stage');
+        assert.equal(repaired.status, 0, repaired.stderr);
+        assert.deepEqual(
+          JSON.parse(git('show', ':0:packages/shared-lib/corrections.json')),
+          classifyLedger(expectedRows),
+        );
+        assert.equal(
+          run('--check-merge', repository).status,
+          0,
+          'binary attributes alone must not reject resolved source',
+        );
+      }
     } else {
       assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), classifyLedger(expectedRows));
       const resolved = readFileSync(ledger, 'utf8');

@@ -1941,5 +1941,27 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merge-readiness-inspects-staged-source-as-text",
+    "correction": "PR #1551 recurring conflict repair (fix-red-e3b0c44298): preserve both parents and reject staged conflict markers even when Git binary attributes hide the source diff.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1551",
+    "mechanization": "Extend assertLedgerMergeReady in the existing correction-ledger resolver to force staged diffs to text while retaining disabled external drivers, text conversion and color. Both real-Git binary-attribute scenarios accepted unresolved markers before the change; the existing required classifier suite now rejects them without writes in both staging modes and accepts the same source after it is resolved. Use the shared readiness preflight on this repair index; preserve the full fixture matrix, 30-second deadline and 100% classifier coverage gates. The harness owns push and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime types cannot enforce resolution of source files staged directly in a Git index."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing merge-readiness preflight can inspect the actual staged diff as text and reject unresolved markers independently of Git attributes."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Read staged bytes as text so binary attributes cannot conceal conflict markers."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]
