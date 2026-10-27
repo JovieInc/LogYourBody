@@ -99,7 +99,7 @@ jobs:
 
           # Intentionally unavailable until the FINAL composed audit and this
           # exact policy hunk are independently reviewed. Never a caller input.
-          REVIEWED_AUDIT_SHA256 = '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
+          REVIEWED_AUDIT_SHA256 = 'eaf3c492586f1c25dfb8e4d04cc708b3576cef9d3ccb5f1e36ab5962c134f518'
           DEPENDENCIES = {
               'scripts/ios/bootstrap-local-config.sh': 'aad028c0eff7f9d2a043711a8735963dc66b9bd664f11bf98b7ada67a60ab8db',
               'scripts/ios/resolve-simulator-destination.sh': '9e2c125339a1ceee3ce690e50f379ce7bc0a86855cfedd4118e5467ea12ddf64',

@@ -1397,7 +1397,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
+        'eaf3c492586f1c25dfb8e4d04cc708b3576cef9d3ccb5f1e36ab5962c134f518'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1607,7 +1607,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'eaf3c492586f1c25dfb8e4d04cc708b3576cef9d3ccb5f1e36ab5962c134f518'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -1843,7 +1843,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
+    expected = 'eaf3c492586f1c25dfb8e4d04cc708b3576cef9d3ccb5f1e36ab5962c134f518'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7

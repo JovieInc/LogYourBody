@@ -1661,5 +1661,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-d96bbbfa0f",
+    "correction": "PR #1569: The cold-build timeout repair changed launch-quality-audit.sh without refreshing its exact diagnostic trust pin, failing Mac Runner Routing Tests and CI Summary.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40423156200/job/121922264690",
+    "mechanization": "Review the audit diff against origin/main: only the full-audit cold-build default and its explanatory comment changed; diagnostic mode still fixes its build budget at 600 seconds. Synchronize the workflow audit SHA-256 and three exact test expectations. Reuse the existing required routing guard and trusted CLI fixtures, preserving all seven dependency pins and rejection of old, changed, missing, symlinked, dirty and untracked inputs before candidate execution. Both reported regressions fail before the pin repair and pass afterward. The harness owns push and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The audit digest is an intentional reviewed source boundary. Automatically accepting new source bytes would defeat the trust pin; application runtime code cannot synchronize that independent policy safely."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required routing suite compares the explicit audit pin with current bytes and exercises the actual trusted CLI against accepted tooling and rejected source mutations."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
   }
 ]
