@@ -605,6 +605,8 @@ test("daily-step verifier rejects execution without explicit disposable opt-in",
 test('Launch Quality leaves StoreKit lifecycle tests to the dedicated StoreKit job', () => {
   const audit = fs.readFileSync(new URL('../../scripts/ios/launch-quality-audit.sh', import.meta.url), 'utf8');
   assert.match(audit, /-only-testing:LogYourBodyTests \\\n\s+-skip-testing:LogYourBodyTests\/StoreKitPurchaseRestoreTests/);
+  assert.match(audit, /general unit target \(StoreKit lifecycle tests run in the required dedicated job\)/);
+  assert.doesNotMatch(audit, /the complete unit target/);
   // The skip is only safe while the dedicated job still runs the suite in the queue and on main.
   assert.match(jobBlock('ios_storekit'), /storekit-purchase-restore\.sh/);
 });
@@ -1057,3 +1059,29 @@ test('dependency repair refuses pinned-source drift before running pnpm', () => 
     fs.rmSync(fx.root, { recursive: true, force: true });
   }
 });
+
+for (const file of ['apps/local/package.json', 'pnpm-workspace.yaml', '.npmrc']) {
+  test(`dependency repair refuses untracked ${file} before running pnpm`, () => {
+    const fx = dependencyRefreshFixture();
+    try {
+      fs.mkdirSync(path.dirname(path.join(fx.root, file)), { recursive: true });
+      const local = '{}\n';
+      fs.writeFileSync(path.join(fx.root, file), local);
+      const index = git(fx.root, 'ls-files', '--stage');
+      const lockfile = fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8');
+      const projection = fs.readFileSync(path.join(fx.root, fx.output), 'utf8');
+      const result = fx.refresh();
+      assert.notEqual(result.status, 0, result.stdout);
+      assert.match(result.stderr, /untracked dependency inputs/);
+      assert.ok(result.stderr.includes(file), result.stderr);
+      assert.equal(fs.existsSync(fx.calls), false);
+      assert.equal(git(fx.root, 'ls-files', '--stage'), index);
+      assert.equal(fs.readFileSync(path.join(fx.root, 'pnpm-lock.yaml'), 'utf8'), lockfile);
+      assert.equal(fs.readFileSync(path.join(fx.root, fx.output), 'utf8'), projection);
+      assert.equal(fs.readFileSync(path.join(fx.root, file), 'utf8'), local);
+    } finally {
+      fs.rmSync(fx.root, { recursive: true, force: true });
+    }
+  });
+}
+

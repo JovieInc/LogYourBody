@@ -1195,7 +1195,7 @@ def test_chat_corpus_selects_public_turns_and_requires_exact_unit_and_ui_passes(
     import pytest
 
     source = (_REPO_ROOT / "scripts/ios/launch-quality-audit.sh").read_text()
-    unit = "CHAT_QUALIFICATION_UNIT_TESTS=(" + source.split("CHAT_QUALIFICATION_UNIT_TESTS=(", 1)[1].split("# The whole unit target", 1)[0]
+    unit = "CHAT_QUALIFICATION_UNIT_TESTS=(" + source.split("CHAT_QUALIFICATION_UNIT_TESTS=(", 1)[1].split("# Launch Quality gates the general unit target.", 1)[0]
     ui = "LAUNCH_QUALITY_UI_TESTS=(" + source.split("LAUNCH_QUALITY_UI_TESTS=(", 1)[1].split("UI_RESULT_BUNDLE=", 1)[0]
     result = subprocess.run(["bash", "-e", "-u", "-c", unit + ui +
         '\nprintf "selector:%s\\n" "${UI_SELECTORS[@]}"\n' +
@@ -1397,7 +1397,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        'a06ed50d3cab0289642ee29cf6a311ac9c472d4a53583adb1b3011b33cfef695'
+        'ffdea3b6fb517caf8e47ff9ffcc2d348840d59b57c150842b5253dfdb0f16fea'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -1607,7 +1607,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = 'a06ed50d3cab0289642ee29cf6a311ac9c472d4a53583adb1b3011b33cfef695'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'ffdea3b6fb517caf8e47ff9ffcc2d348840d59b57c150842b5253dfdb0f16fea'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -1843,7 +1843,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = 'a06ed50d3cab0289642ee29cf6a311ac9c472d4a53583adb1b3011b33cfef695'
+    expected = 'ffdea3b6fb517caf8e47ff9ffcc2d348840d59b57c150842b5253dfdb0f16fea'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
@@ -1851,6 +1851,30 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert hashlib.sha256(reviewed).hexdigest() == expected
+    # Recover the exact prior main audit as inert bytes; none is an admitted fallback.
+    previous_main = reviewed.replace(
+        b'# StoreKitPurchaseRestoreTests is skipped here: it shares one StoreKit test environment, is gated by the\n'
+        b'# dedicated StoreKit job (ci.yml ios_storekit, test plan StoreKit, merge queue and main) and failed 2 of 13\n'
+        b'# Launch Quality runs on 2026-10-25 with the LYB-231 signature (empty StoreKit state at restore).\n'
+        b'# Launch Quality gates the general unit target. The StoreKit lifecycle suite\n'
+        b'# remains required in the dedicated merge-group and main job.\n',
+        b'# The whole unit target is the gate: every journey test in docs/USER_JOURNEYS.md\n'
+        b'# runs on every PR (all 67 files are registered in the target as of the orphan rescue).\n', 1)
+    previous_main = previous_main.replace(
+        b'  -only-testing:LogYourBodyTests ' + bytes([92, 10]) +
+        b'  -skip-testing:LogYourBodyTests/StoreKitPurchaseRestoreTests\n',
+        b'  -only-testing:LogYourBodyTests\n', 1)
+    previous_main = previous_main.replace(
+        b'the general unit target (StoreKit lifecycle tests run in the required dedicated job), then one UI invocation',
+        b'the complete unit target, then one UI invocation', 1)
+    assert hashlib.sha256(previous_main).hexdigest() == '21f66fca1c8bd7e7a296947f3374c693677bd6cc0e05012419e5f02ec999d459'
+    previous_reviewed = previous_main.replace(
+        b'# Bound the one cold build independently of XCTest execution. Run 40388372132\n'
+        b'# missed every Swift package cache and was still compiling test targets at 600s.\n'
+        b'# Allow 15m for compilation; keep test timeouts, retries and the outer step cap.\n'
+        b'BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-900}"',
+        b'BUILD_FOR_TESTING_TIMEOUT_SECONDS="${BUILD_FOR_TESTING_TIMEOUT_SECONDS:-600}"', 1)
+    assert hashlib.sha256(previous_reviewed).hexdigest() == '83b60c92ca78b43d598e37e0f4db68169644844f244b295bb69d54b4776b2ac3'
     # Recover exact old V16 only as inert bytes, to prove real CLI refusal of it.
     legacy = unlanded.decode()
     start = legacy.index('# An unknown mode must fail')
@@ -1886,7 +1910,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'previous-main-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink']
     for scenario in fixtures:
@@ -1903,7 +1927,11 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'unlanded-candidate':
+        if scenario == 'previous-main-audit':
+            audit.write_bytes(previous_main)
+        elif scenario == 'previous-reviewed-audit':
+            audit.write_bytes(previous_reviewed)
+        elif scenario == 'unlanded-candidate':
             audit.write_bytes(unlanded)
         elif scenario == 'legacy-v16':
             audit.write_bytes(legacy_bytes)
