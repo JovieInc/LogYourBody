@@ -90,8 +90,9 @@ root. This classifies all three immutable Git index stages and reuses the covera
 tool's `mergeCorrectionLedgers` policy. It retains incoming order and appends
 branch-only receipts, allowing later main-side prepends to merge without
 repeating the same conflict. It preserves independent additions and
-one-sided edits, rejects deletions, duplicate identities and divergent concurrent
-edits, and validates retained guards before writing the classified result.
+one-sided edits, consolidates identical parent replays, rejects deletions,
+conflicting duplicate identities and divergent concurrent edits, and validates
+retained guards before writing the classified result.
 After explicit staging, either resolver invocation verifies the staged ledger
 against both merge parents without writing or restaging local edits. Missing
 conflict stages for an unresolved ledger fail without writing.
@@ -107,6 +108,10 @@ to staging only the resolved ledger after validating its classification, staged
 guard sources and receipt retention against both merge parents. A failed
 validation preserves the ledger and index. Retrying after staging runs the
 read-only merge check; it does not restage files or overwrite unrelated edits.
+Both the merge check and staged retry refuse any other unresolved Git path,
+even when the staged ledger and all of its guard sources are valid.
+Conflict-marker scanning disables Git color output as well as text conversion
+and external diff drivers so presentation settings cannot conceal staged markers.
 A staged retry, with or without `--stage`, and `--check-merge` refuse any
 unstaged ledger edits, including formatting changes. Review and stage those
 edits explicitly before retrying; refusal preserves both the index and working

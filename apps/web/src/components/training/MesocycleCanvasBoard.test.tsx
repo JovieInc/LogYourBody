@@ -299,5 +299,5 @@ describe('mesocycle canvas board', () => {
         session.exercises.some((item) => item.name === 'Standing calf raise' && item.sets === 8),
       ),
     ).toBe(false);
-  });
+  }, 30_000); // ~3s alone; the 5s default flakes when the host is loaded (LYB-179 growth evidence)
 });

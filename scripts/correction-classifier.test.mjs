@@ -273,16 +273,23 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     'manual-resolution',
     'manual-missing-receipt',
     'manual-invalid',
+    'textconv-marker',
+    'color-marker',
+    'duplicate-parent',
   ].map((scenario) => [scenario, false]);
   scenarios.push(
     ['additions', true],
     ['concurrent', true],
     ['missing-index-guard', true],
     ['guard-conflict', true],
+    ['unrelated-conflict', true],
     ['staged-marker', true],
     ['manual-resolution', true],
     ['manual-missing-receipt', true],
     ['manual-invalid', true],
+    ['textconv-marker', true],
+    ['color-marker', true],
+    ['duplicate-parent', true],
   );
   const runScenario = async ([scenario, stageMerge]) => {
     const refused = [
@@ -294,6 +301,8 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       'staged-marker',
       'manual-missing-receipt',
       'manual-invalid',
+      'textconv-marker',
+      'color-marker',
     ].includes(scenario);
     const repository = join(directory, `repository with spaces ${scenario} ${stageMerge}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
@@ -325,7 +334,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     for (const { guard } of rows.filter(({ guard }) => guard)) {
       writeFileSync(join(repository, guard.path), guard.anchor);
     }
-    writeLedger([rows[0]]);
+    writeLedger(scenario === 'duplicate-parent' ? [rows[0], rows[0]] : [rows[0]]);
     writeFileSync(join(repository, 'unrelated.txt'), 'committed\n');
     git('add', '.');
     git('commit', '-m', 'test: base ledger');
@@ -339,24 +348,55 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     const ours = ['ours-edit', 'concurrent'].includes(scenario)
       ? { ...rows[0], correction: 'Clarified evidence on the feature branch.' }
       : rows[0];
-    writeLedger(scenario === 'deleted' ? [rows[1]] : [rows[1], ours]);
+    writeLedger(
+      scenario === 'deleted' ? [rows[1]] :
+        scenario === 'duplicate-parent' ? [rows[1], ours, ours] : [rows[1], ours],
+    );
     if (scenario === 'guard-conflict') {
       writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\nleft\n`);
+    }
+    if (scenario === 'unrelated-conflict') {
+      writeFileSync(join(repository, 'unrelated.txt'), 'left\n');
     }
     git('commit', '-am', 'test: left receipt');
     git('switch', 'right');
     const shared = ['theirs-edit', 'concurrent'].includes(scenario)
       ? { ...rows[0], correction: 'Clarified evidence on main.' }
       : rows[0];
-    writeLedger(classifyLedger([...rows.slice(2), shared]));
+    writeLedger(classifyLedger([
+      ...rows.slice(2), shared, ...(scenario === 'duplicate-parent' ? [shared] : []),
+    ]));
     if (scenario === 'guard-conflict') {
       writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\nright\n`);
+    }
+    if (scenario === 'unrelated-conflict') {
+      writeFileSync(join(repository, 'unrelated.txt'), 'right\n');
     }
     git('commit', '-am', 'test: right receipts');
     git('switch', 'left');
     git('merge', '--no-commit', 'right');
     let before = readFileSync(ledger, 'utf8');
     assert.match(before, /<<<<<<< HEAD/);
+    if (scenario === 'unrelated-conflict') {
+      writeLedger(classifyLedger([...rows.slice(2), shared, rows[1]]));
+      git('add', 'packages/shared-lib/corrections.json');
+      const resolved = readFileSync(ledger, 'utf8');
+      const index = git('ls-files', '--stage');
+      const unrelated = readFileSync(join(repository, 'unrelated.txt'), 'utf8');
+      assert.match(unrelated, /<<<<<<< HEAD/);
+      for (const args of [
+        ['--check-merge', repository],
+        ['--resolve-merge', repository, '--stage'],
+      ]) {
+        const result = await run(...args);
+        assert.equal(result.status, 1, 'a staged ledger cannot hide another merge conflict');
+        assert.match(result.stderr, /resolve other conflicts first: unrelated.txt/);
+        assert.equal(git('ls-files', '--stage'), index);
+        assert.equal(readFileSync(ledger, 'utf8'), resolved);
+        assert.equal(readFileSync(join(repository, 'unrelated.txt'), 'utf8'), unrelated);
+      }
+      return;
+    }
     if (scenario === 'guard-conflict') {
       assert.match(readFileSync(join(repository, rows[0].guard.path), 'utf8'), /<<<<<<< HEAD/);
     }
@@ -373,11 +413,18 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
-    if (scenario === 'staged-marker') {
-      writeFileSync(
-        join(repository, rows[0].guard.path),
-        `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`,
-      );
+    if (scenario === 'textconv-marker') {
+      // A diff driver must not conceal the actual staged merge contents.
+      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} diff=hidden\n`);
+      git('config', 'diff.hidden.textconv', 'echo filtered-source');
+      git('add', '.gitattributes');
+    }
+    if (scenario === 'color-marker') {
+      // User presentation settings cannot hide conflict markers from the resolver.
+      git('config', 'color.ui', 'always');
+    }
+    if (['staged-marker', 'textconv-marker', 'color-marker'].includes(scenario)) {
+      writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`);
       git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
@@ -441,6 +488,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       writeFileSync(ledger, resolved);
       assert.equal((await run('--resolve-merge', repository, '--stage')).status, 0);
       // A clean worktree cannot hide conflict markers already staged as resolved.
+      git('config', 'color.ui', 'always');
       for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
         git('add', rows[0].guard.path);

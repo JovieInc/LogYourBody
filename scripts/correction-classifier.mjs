@@ -200,6 +200,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
           assertNoRegression(current, baseline);
         }
       };
+      // Verify the whole merge is conflict-free, including staged retries.
       assertLedgerMergeReady(root);
       // A retry after explicit staging verifies the index without overwriting local edits.
       if (checkingMerge || !git('ls-files', '--unmerged', '--', LEDGER_PATH)) {
@@ -220,8 +221,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       } else {
         // Reuse the coverage tool's three-way policy rather than a second resolver.
         // Classify snapshots first so derived metadata cannot look like concurrent edits.
+        // Normalize identical parent replays with the existing union policy.
         const stages = [1, 2, 3].map((stage) =>
-          classifyLedger(JSON.parse(git('show', `:${stage}:${LEDGER_PATH}`))),
+          mergeLedgers(JSON.parse(git('show', `:${stage}:${LEDGER_PATH}`)), []),
         );
         result = classifyLedger(
           // Keep incoming order, then append branch-only receipts so future main
