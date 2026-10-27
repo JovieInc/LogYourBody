@@ -446,6 +446,8 @@ private struct DailyReminderOfferSheetHost: View {
 
     var body: some View {
         Color.clear
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
             .accessibilityHidden(true)
             .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
                 DailyWeighInReminderPromptView(notificationManager: notificationManager) {

@@ -26,6 +26,12 @@ export function dailyReminderSheetHostProblem(source: string): string | null {
   if (!host.includes('.sheet(isPresented: $isPresented')) {
     return 'DailyReminderOfferSheetHost does not present the sheet';
   }
+  // The anchor must not cover pushed controls. Apply these modifiers before
+  // .sheet so the presented reminder remains visible and interactive.
+  const anchor = host.split('.sheet(isPresented: $isPresented')[0];
+  if (!/Color\.clear\s*\.frame\(width: 0, height: 0\)\s*\.allowsHitTesting\(false\)/.test(anchor)) {
+    return 'daily reminder presentation anchor must be zero-sized and noninteractive';
+  }
 
   const backgroundAt = source.lastIndexOf('.background {', hostStart);
   if (backgroundAt < 0) {
@@ -68,6 +74,8 @@ MainTabView(releaseReviewDestination: $releaseReviewDestination)
 struct DailyReminderOfferSheetHost: View {
     var body: some View {
         Color.clear
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
             .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
                 DailyWeighInReminderPromptView(notificationManager: notificationManager) {}
             }
@@ -83,6 +91,23 @@ it('rejects a daily reminder sheet that wraps Today', () => {
 
 it('accepts a daily reminder sheet hosted beside Today', () => {
   expect(dailyReminderSheetHostProblem(siblingHost)).toBeNull();
+});
+
+it('rejects a full-screen or interactive reminder anchor over pushed controls', () => {
+  for (const modifier of ['.frame(width: 0, height: 0)', '.allowsHitTesting(false)']) {
+    expect(dailyReminderSheetHostProblem(siblingHost.replace(modifier, ''))).toBe(
+      'daily reminder presentation anchor must be zero-sized and noninteractive',
+    );
+  }
+});
+
+it('does not disable hit testing on the presented reminder content', () => {
+  const disabledSheet = siblingHost
+    .replace('            .allowsHitTesting(false)\n', '')
+    .replace('\n    }\n}\n', '\n            .allowsHitTesting(false)\n    }\n}\n');
+  expect(dailyReminderSheetHostProblem(disabledSheet)).toBe(
+    'daily reminder presentation anchor must be zero-sized and noninteractive',
+  );
 });
 
 it('hosts the daily reminder sheet beside Today in ContentView', () => {

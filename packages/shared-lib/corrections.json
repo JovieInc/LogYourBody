@@ -1921,5 +1921,23 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-reminder-sheet-passive-anchor",
+    "correction": "PR #1616 Launch Quality: Edit entry remains visible after a delivered tap, without callback.begin, callback.rejected, item.changed or sheet.appear diagnostics. The existing transparent reminder-sheet background anchor fills the screen and participates in hit testing.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40443055264/job/121987864277",
+    "mechanization": "Extend the existing required sheet-host guard to require a zero-sized noninteractive Color.clear anchor before the sheet modifier, preserving interaction with the presented reminder. Reject missing size or hit-testing modifiers and modifiers attached after the sheet. Apply the guard to ContentView: its production-source regression fails before the anchor repair and passes afterward. Preserve the existing native Edit entry/photo-import regression, account ownership admission, sheet destination and all launch-quality selectors. The artifact establishes a delivered tap without callback admission, not the precise UIKit interceptor; fresh exact-head native execution remains required because this Linux host has no Xcode. The harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Constraining the passive reminder anchor itself to zero size and disabling only its hit testing removes that background surface from the touch path by construction without disabling the sheet content. The existing shared-lib guard runs through the required JavaScript test job and already tracks ContentView as a Turbo input."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/daily-reminder-sheet-host.test.ts",
+      "anchor": "daily reminder presentation anchor must be zero-sized and noninteractive"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]
