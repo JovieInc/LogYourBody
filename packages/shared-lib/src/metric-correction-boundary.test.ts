@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 
@@ -8,6 +9,26 @@ const source = (path: string) =>
     'utf8',
   );
 const code = (path: string) => source(path).replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
+
+it('keeps dated-outcome V5 immutable and adds overlays only in V6', () => {
+  const models = 'Models/LogYourBody.xcdatamodeld/';
+  const v5 = source(models + 'LogYourBodyV5.xcdatamodel/contents');
+  // Independently reviewed dated-outcome schema from PR #1561. A later feature
+  // must not rewrite a model version that can already identify persisted stores.
+  expect(createHash('sha256').update(v5).digest('hex')).toBe(
+    'be742f8f1a0e112072f46bb34ffe385ff3a591861c346bf38078ccaf7728aff7',
+  );
+  let withoutOverlays = source(models + 'LogYourBodyV6.xcdatamodel/contents');
+  for (const attribute of [
+    '        <attribute name="isExcluded" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>\n',
+    '        <attribute name="correctedValueJSON" optional="YES" attributeType="String"/>\n',
+  ]) {
+    expect(withoutOverlays.split(attribute)).toHaveLength(2);
+    withoutOverlays = withoutOverlays.replace(attribute, '');
+  }
+  expect(withoutOverlays).toBe(v5);
+  expect(source(models + '.xccurrentversion')).toContain('LogYourBodyV6.xcdatamodel');
+});
 
 it('quotes Xcode file-reference paths containing OpenStep punctuation (LYB-243)', () => {
   const project = readFileSync(

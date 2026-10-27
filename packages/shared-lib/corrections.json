@@ -1591,6 +1591,116 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "correction-ledger-retains-source-and-recurrence",
+    "correction": "PR #1561 / LYB-268: Merge the backward planner and steering revisions from origin/main while retaining dated-outcome target membership and every correction receipt from both parents.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1561",
+    "mechanization": "Union correction receipts by fingerprint and source, retain the combined Xcode target membership, and refresh only its reviewed diagnostic pin and generated source fingerprint. The existing required correction coverage check rejected the unmerged ledger against the new main for a missing receipt; validate the resolved ledger against both immutable pre-merge parents. The existing runner-routing regression rejects the stale project pin and passes with the merged manifest digest.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot preserve correction evidence edited directly in a Git-tracked repository ledger."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required coverage check can compare every normalized fingerprint and source URL with the immutable Git base and reject lost receipts before merge."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "correction ledger regression: removed receipt for"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "xcode-project-quotes-extension-file-paths",
+    "correction": "PR #1561 / LYB-268: StoreKit exited 74 during simulator destination resolution before running tests. The dated outcome API extension path contained an unquoted plus sign, and the Xcode project parser rejected the manifest.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40197919510/job/121182776221",
+    "mechanization": "Quote the extension path without changing target membership or test selectors. The required shared-lib suite now rejects unquoted plus signs in Xcode file names and paths. The guard and real Xcodeproj parser both fail on the original project and pass after quoting. Refresh the existing reviewed project pin and generated source fingerprint.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime types cannot prevent malformed OpenStep syntax in the separately maintained Xcode project manifest."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required shared-lib test task can reject unquoted plus signs in project file names and paths before native destination resolution."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/testflight-distribution-guard.test.ts",
+      "anchor": "quotes Xcode file names and paths containing plus signs"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "web-dated-outcome-runtime-env-declaration",
+    "correction": "PR #1561 / LYB-268: The dated outcome API consumes LYB_DATED_OUTCOME_ENABLED without declaring it in apps/web/.env.example, failing the existing required product-registry environment surface guard.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1561",
+    "mechanization": "Declare the server rollback gate with a false default and retain the existing required environment surface guard. The guard fails on the undeclared variable before the change and passes afterward.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot ensure that a separately maintained environment example declares every consumed variable."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing product-registry test scans production web source and rejects consumed variables absent from apps/web/.env.example in the required JavaScript/TypeScript check."
+      }
+    },
+    "guard": {
+      "path": "packages/product-registry/scripts/env-surface.test.mjs",
+      "anchor": "Web: process.env keys read in apps/web/src"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1561 / LYB-268: Adding dated outcome models, services, tests and the V5 Core Data model to the Xcode project changed its manifest without refreshing the exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40197096748/job/121180189905",
+    "mechanization": "Retain the existing seven exact dependency pins and refresh only the reviewed project manifest hash. The required Mac Runner Routing Tests compare each pin to current source bytes and exercise the trusted CLI against accepted tooling and rejected changed, missing, symlinked, dirty and untracked inputs. The existing regression failed before the pin update and passes afterward.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1561 / LYB-268: Dated outcome Xcode target membership and the V5 Core Data model left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity. Regenerate the source projection after reviewing the manifest diff.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40197096748/job/121180190223",
+    "mechanization": "The existing required projection checker failed before regeneration and passes afterward. Retain the required Detect Changes and CI Summary gates and their regression rejecting a missing or skippable parity step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
     "fingerprint": "xcode-file-paths-use-valid-openstep-strings",
     "correction": "PR #1564 / LYB-243: Quote the CoreDataManager+Part06.swift project path. Its unquoted plus sign prevents Xcode project loading, so Launch Quality and StoreKit exit with code 74 before tests run.",
     "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40202027853/job/121195099171",
@@ -1611,5 +1721,59 @@
     },
     "level": "static",
     "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "core-data-parallel-model-version-collision",
+    "correction": "Parallel dated-outcome and metric-correction changes each introduced a different Core Data V5, so combining them could discard dated entities or reinterpret an existing store version.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1564",
+    "mechanization": "Preserve the independently reviewed dated-outcome V5 byte for byte and add the two correction overlay attributes only in V6. Both Xcode model groups select V6. The required shared source guard fixes V5 identity and the exact additive V6 delta; populated V4 and V5 native migration fixtures preserve imported values, dated payload/revision/sequence/pending state, and overlay edits after reopening. Three local boundary checks pass; XCTest runtime qualification remains required in hosted native CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Keeping published model versions immutable and expressing later changes as a new additive version makes the composed model lineage unambiguous."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/metric-correction-boundary.test.ts",
+      "anchor": "it('keeps dated-outcome V5 immutable and adds overlays only in V6'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-overlay-sync-replay-fencing",
+    "correction": "Composing metric overlays with the canonical native upsert requires old clients to preserve omitted overlays while stale writes, equal-timestamp changes, foreign ownership and tombstones remain rejected.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1564",
+    "mechanization": "Extend the canonical timestamp-fenced CTE with nullable overlay presence and replay equality. Keep original observations separate; explicit false/null performs undo. Execute the production upsert SQL in the existing disposable PostgreSQL16 verifier for correction, omission, undo, exact replay, stale/equal-timestamp conflict, owner and tombstone cases. This is part of the existing required database gate, not a second SQL implementation.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The production upsert gates overlays with the same timestamp and owner predicates as original observations and distinguishes omission from explicit removal by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/web/db/tests/verify-training-mutations.py",
+      "anchor": "def verify_native_overlay_replays(web, sql, subject):"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "mainactor-injected-callback-isolation",
+    "correction": "MetricCorrectionService injected callbacks invoked MainActor APIs but their stored/default closure types did not retain actor isolation, producing a Swift concurrency compile error.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1564",
+    "mechanization": "Declare the stored and injected admission, rollout and sync closures as MainActor, matching the service and their actual dependencies. The existing native target compiles and exercises MetricCorrectionServiceTests; Linux source inspection does not establish a native compile pass.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Expressing actor isolation in each callback type prevents loss of isolation at the injection boundary."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBody/Services/MetricCorrectionService.swift",
+      "anchor": "private let isEnabled: @MainActor () -> Bool"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
   }
 ]
