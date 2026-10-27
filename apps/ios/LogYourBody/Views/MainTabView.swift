@@ -774,6 +774,7 @@ struct ChatTabView: View {
     @State private var isConversationLoadRetryAvailable = false
     @State private var isDeleteConfirmationPresented = false
     @State private var trainingResponse: TrainingNextResponse?
+    @State private var trainingPlanContext: TrainingPlanContext?
     @State private var trainingOwner: AuthManager.ProfileSessionOwnership?
     @State private var trainingLoadId: UUID?
     @State private var isTrainingLoading = false
@@ -816,6 +817,7 @@ struct ChatTabView: View {
         }
         .task(id: authManager.captureAccountSession()) {
             trainingResponse = nil
+            trainingPlanContext = nil
             trainingOwner = nil
             trainingPresentation = nil
             await loadTrainingNext()
@@ -873,6 +875,7 @@ struct ChatTabView: View {
                 TrainingLiveSessionView(
                     session: session,
                     ownerId: ownership.subject,
+                    cardsEnabled: trainingCardsEnabled,
                     voiceEnabled: voiceCoachEnabled,
                     readinessEnabled: AppServicePorts.analyticsTracker.isFeatureEnabled(
                         flagKey: TrainingReadinessPolicy.featureGate
@@ -960,7 +963,22 @@ struct ChatTabView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            composer
+            VStack(spacing: 0) {
+                if trainingCardsEnabled, let session = trainingResponse?.session,
+                   let ownership = trainingOwner, authManager.ownsAccountSession(ownership) {
+                    Button {
+                        openTrainingSession(session, ownership: ownership)
+                    } label: {
+                        Label("Workout · \(session.title)", systemImage: "figure.strengthtraining.traditional")
+                            .font(.body.weight(.medium))
+                            .frame(maxWidth: .infinity, minHeight: JovieTokens.minimumHitTarget)
+                    }
+                    .accessibilityHint("Open the saved session. Chat is not required to log sets.")
+                    .accessibilityIdentifier("training_persistent_workout")
+                    .background(theme.colors.surface)
+                }
+                composer
+            }
         }
     }
 
@@ -1214,6 +1232,10 @@ struct ChatTabView: View {
         MesocycleCanvasPolicy.isEnabled { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
     }
 
+    private var trainingCardsEnabled: Bool {
+        TrainingNativeCardsPolicy.isEnabled { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+    }
+
     private var delegatedTrainingEnabled: Bool {
         trainingCoachEnabled && AppServicePorts.analyticsTracker.isFeatureEnabled(
             flagKey: DelegatedTrainingPolicy.featureGate
@@ -1223,6 +1245,7 @@ struct ChatTabView: View {
     private func delegatedTrainingView(ownership: AuthManager.ProfileSessionOwnership) -> some View {
         DelegatedTrainingView(
             initialProposal: trainingResponse?.nextBlock,
+            cardsEnabled: trainingCardsEnabled,
             accessToken: { await chatAccessToken() },
             isCurrent: { authManager.ownsAccountSession(ownership) },
             onApplied: { await loadTrainingNext() }
@@ -1240,7 +1263,11 @@ struct ChatTabView: View {
             accessToken: { await chatAccessToken() },
             isCurrent: { authManager.ownsAccountSession(ownership) }
         )
-        _ = await model.decide("apply")
+        if trainingCardsEnabled {
+            _ = await model.decideCard(TrainingCardAction(reference: proposal.cardReference, name: .apply))
+        } else {
+            _ = await model.decide("apply")
+        }
         await loadTrainingNext()
         if authManager.ownsAccountSession(ownership), let message = model.message {
             trainingErrorMessage = message
@@ -1268,14 +1295,11 @@ struct ChatTabView: View {
             TrainingSetupCard { trainingPresentation = .setup }
         } else if let session = trainingResponse?.session, let ownership = trainingOwner,
                   authManager.ownsAccountSession(ownership) {
-            TrainingCoachCard(
-                session: session,
-                onStart: {
-                    guard authManager.ownsAccountSession(ownership) else { return }
-                    trainingPresentation = .session(session, ownership)
-                },
-                onStop: { Task { await revokeTraining(ownership: ownership) } }
-            )
+            if trainingCardsEnabled {
+                ApprovedTrainingCard(reference: TrainingCardAdapter.workout(session)) {
+                    trainingSessionCard(session, ownership: ownership)
+                }
+            } else { trainingSessionCard(session, ownership: ownership) }
         } else if let next = trainingResponse?.nextBlock, delegatedTrainingEnabled {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Your next block is ready").font(.headline)
@@ -1328,7 +1352,28 @@ struct ChatTabView: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .accessibilityIdentifier("training_review_cycle")
         }
-        if delegatedTrainingEnabled {
+        if trainingCardsEnabled && isTrainingLoading && trainingResponse?.session != nil {
+            ProgressView("Refreshing saved session…").font(.footnote)
+        }
+        if trainingCardsEnabled, let message = trainingErrorMessage, trainingResponse?.session != nil {
+            Text("Saved session available. \(message)").font(.footnote)
+            Button("Refresh training") { Task { await loadTrainingNext() } }
+                .frame(minHeight: JovieTokens.minimumHitTarget)
+        }
+        if trainingCardsEnabled, let plan = trainingPlanContext?.currentSetup?.delegated?.plan,
+           let revisionId = trainingPlanContext?.currentSetup?.programRevisionId {
+            MesoPlanCard(plan: plan, reference: TrainingCardReference(
+                component: .mesoPlan, objectId: revisionId, revision: plan.revision
+            )) { action in
+                guard let ownership = trainingOwner, authManager.ownsAccountSession(ownership) else { return }
+                do {
+                    try TrainingCardAdapter.authorize(action, current: TrainingCardReference(
+                        component: .mesoPlan, objectId: revisionId, revision: plan.revision
+                    ), ownsSession: true, canWrite: false)
+                    trainingPresentation = .program(ownership)
+                } catch { trainingErrorMessage = "Refresh the saved plan to open it." }
+            }
+        } else if delegatedTrainingEnabled {
             Button("Review training plan") {
                 guard let ownership = authManager.captureAccountSession() else { return }
                 trainingPresentation = .program(ownership)
@@ -1344,6 +1389,32 @@ struct ChatTabView: View {
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .accessibilityIdentifier("training_open_canvas")
         }
+    }
+
+    private func trainingSessionCard(
+        _ session: TrainingSession, ownership: AuthManager.ProfileSessionOwnership
+    ) -> some View {
+        TrainingCoachCard(
+            session: session,
+            onStart: { openTrainingSession(session, ownership: ownership) },
+            onStop: { Task { await revokeTraining(ownership: ownership) } }
+        )
+    }
+
+    private func openTrainingSession(_ session: TrainingSession, ownership: AuthManager.ProfileSessionOwnership) {
+        guard authManager.ownsAccountSession(ownership) else { return }
+        if trainingCardsEnabled {
+            guard let current = trainingResponse?.session else { return }
+            do {
+                try TrainingCardAdapter.authorize(TrainingCardAction(
+                    reference: TrainingCardAdapter.workout(session), name: .expand
+                ), current: TrainingCardAdapter.workout(current), ownsSession: true, canWrite: false)
+            } catch {
+                trainingErrorMessage = "Refresh the saved session before opening it."
+                return
+            }
+        }
+        trainingPresentation = .session(session, ownership)
     }
 
     private func loadTrainingProgress(
@@ -1364,14 +1435,28 @@ struct ChatTabView: View {
     private func loadTrainingNext() async {
         let loadId = UUID()
         trainingLoadId = loadId
-        guard showsTranscript, trainingCoachEnabled,
+        guard showsTranscript || trainingCardsEnabled, trainingCoachEnabled,
               let ownership = authManager.captureAccountSession() else {
             isTrainingLoading = false
             trainingResponse = nil
+            trainingPlanContext = nil
             trainingOwner = nil
             trainingEnrollmentRequired = false
             trainingErrorMessage = nil
             return
+        }
+        if trainingCardsEnabled, trainingResponse == nil {
+            do {
+                if let cached = try TrainingDraftStore.shared.activeSession(ownerId: ownership.subject) {
+                    trainingResponse = TrainingNextResponse(
+                        version: TrainingAPIContract.version, error: nil,
+                        session: cached, week: cached.week, weekCount: nil, weeklyFractionalVolume: nil
+                    )
+                    trainingOwner = ownership
+                }
+            } catch {
+                trainingErrorMessage = TrainingDraftError.unavailable.localizedDescription
+            }
         }
         isTrainingLoading = true
         defer { if trainingLoadId == loadId { isTrainingLoading = false } }
@@ -1383,15 +1468,30 @@ struct ChatTabView: View {
         }
         do {
             let response = try await trainingService.loadNext(accessToken: accessToken)
+            guard response.version == TrainingAPIContract.version else { throw TrainingServiceError.invalidResponse }
             guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
             trainingResponse = response
             trainingOwner = ownership
+            if trainingCardsEnabled {
+                if let session = response.session {
+                    try TrainingDraftStore.shared.cacheActiveSession(session, ownerId: ownership.subject)
+                } else {
+                    try TrainingDraftStore.shared.clearActiveSession(ownerId: ownership.subject)
+                }
+            }
             trainingEnrollmentRequired = false
             trainingErrorMessage = nil
+            if trainingCardsEnabled && delegatedTrainingEnabled {
+                let context = try await URLSessionTrainingService().planningContext(accessToken: accessToken)
+                guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
+                trainingPlanContext = context
+            }
         } catch let error as TrainingServiceError {
             guard authManager.ownsAccountSession(ownership), trainingLoadId == loadId else { return }
             if error == .server(code: "program_not_enrolled") {
                 trainingResponse = nil
+                trainingPlanContext = nil
+                if trainingCardsEnabled { try? TrainingDraftStore.shared.clearActiveSession(ownerId: ownership.subject) }
                 trainingEnrollmentRequired = true
                 trainingErrorMessage = nil
             } else {
@@ -1522,6 +1622,13 @@ struct ChatTabView: View {
     }
 
     private func replaceTrainingSession(_ updated: TrainingSession) {
+        if trainingCardsEnabled, let ownership = trainingOwner, authManager.ownsAccountSession(ownership) {
+            do {
+                try TrainingDraftStore.shared.updateCachedSession(updated, ownerId: ownership.subject)
+            } catch {
+                trainingErrorMessage = TrainingDraftError.unavailable.localizedDescription
+            }
+        }
         trainingResponse = trainingResponse.map {
             TrainingNextResponse(
                 version: $0.version,
@@ -1592,6 +1699,7 @@ struct ChatTabView: View {
             )
             try TrainingDraftStore.shared.purge(ownerId: ownership.subject)
             trainingResponse = nil
+            trainingPlanContext = nil
             trainingOwner = nil
             trainingPresentation = nil
             trainingEnrollmentRequired = true
