@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { classifyLedger } from './correction-classifier.mjs';
+import { classifyLedger, runClassifier } from './correction-classifier.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const script = fileURLToPath(new URL('./correction-classifier.mjs', import.meta.url));
@@ -194,6 +194,27 @@ test('CLI writes only after validation and preserves bytes on repeat runs and fa
   assert.match(run(join(directory, 'missing.json')).stderr, /ENOENT/);
 });
 
+test('command runner returns status without leaking failure into the next invocation', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'lyb-classifier-command-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const ledger = join(directory, 'ledger.json');
+  const messages = [];
+  const logger = {
+    log: (message) => messages.push(message),
+    error: (message) => messages.push(message),
+  };
+  const exitCode = process.exitCode;
+  writeFileSync(ledger, '{invalid json');
+  assert.equal(runClassifier([ledger], logger), 1);
+  assert.match(messages.pop(), /correction-classifier:/);
+  assert.equal(readFileSync(ledger, 'utf8'), '{invalid json');
+  writeFileSync(ledger, JSON.stringify(fixture()));
+  assert.equal(runClassifier([ledger], logger), 0);
+  assert.match(messages.pop(), /classified 6 receipts/);
+  assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), classifyLedger(fixture()));
+  assert.equal(process.exitCode, exitCode);
+});
+
 test('pre-commit classifies a staged correction ledger', () => {
   const hook = readFileSync(join(root, '.husky/pre-commit'), 'utf8');
   assert.match(hook, /packages\/shared-lib\/corrections\.json/);
@@ -315,7 +336,21 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       assert.equal(result.status, args[0] === 'merge' ? 1 : 0, result.stderr);
       return result.stdout;
     };
-    const run = (...args) =>
+    // Exercise the real CLI once per scenario; reuse its command runner for retries.
+    const run = (...args) => {
+      let stdout = '';
+      let stderr = '';
+      const status = runClassifier(args, {
+        log: (message) => {
+          stdout += `${message}\n`;
+        },
+        error: (message) => {
+          stderr += `${message}\n`;
+        },
+      });
+      return { status, stdout, stderr };
+    };
+    const runCLI = (...args) =>
       new Promise((resolve) => {
         execFile(
           process.execPath,
@@ -388,7 +423,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         ['--check-merge', repository],
         ['--resolve-merge', repository, '--stage'],
       ]) {
-        const result = await run(...args);
+        const result = await runCLI(...args);
         assert.equal(result.status, 1, 'a staged ledger cannot hide another merge conflict');
         assert.match(result.stderr, /resolve other conflicts first: unrelated.txt/);
         assert.equal(git('ls-files', '--stage'), index);
@@ -438,7 +473,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     if (scenario === 'manual-invalid') writeFileSync(ledger, '{invalid json');
     before = readFileSync(ledger, 'utf8');
     const indexBefore = git('ls-files', '--stage');
-    const result = await run('--resolve-merge', repository, ...(stageMerge ? ['--stage'] : []));
+    const result = await runCLI('--resolve-merge', repository, ...(stageMerge ? ['--stage'] : []));
     assert.equal(result.status, refused ? 1 : 0, `${scenario}: ${result.stderr}`);
     if (stageMerge && !refused) {
       const expected = classifyLedger(expectedRows);

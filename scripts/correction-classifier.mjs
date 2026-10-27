@@ -155,9 +155,8 @@ function mergeLedgers(left, right) {
   return [...merged.values()];
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+export function runClassifier(args, logger = console) {
   try {
-    const args = process.argv.slice(2);
     const resolvingMerge = args[0] === '--resolve-merge';
     const checkingMerge = args[0] === '--check-merge';
     const stagingMerge = resolvingMerge && args[2] === '--stage';
@@ -210,8 +209,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
           git('show', `:0:${LEDGER_PATH}`),
           'staged retry refuses unstaged ledger edits; review and stage them explicitly',
         );
-        console.log('correction-classifier: verified staged ledger against both merge parents');
-        process.exit(0);
+        logger.log('correction-classifier: verified staged ledger against both merge parents');
+        return 0;
       }
       const working = readSource(LEDGER_PATH, { root }); // Refuse symlinked output.
       if (!/^(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m.test(working)) {
@@ -257,9 +256,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       writeFileSync(path, formatted);
     }
     stageResolution?.();
-    console.log(`correction-classifier: classified ${result.length} receipts`);
+    logger.log(`correction-classifier: classified ${result.length} receipts`);
+    return 0;
   } catch (error) {
-    console.error(`correction-classifier: ${error.message}`);
-    process.exitCode = 1;
+    logger.error(`correction-classifier: ${error.message}`);
+    return 1;
   }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  process.exitCode = runClassifier(process.argv.slice(2));
 }

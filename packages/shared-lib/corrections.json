@@ -1901,5 +1901,27 @@
     },
     "level": "codebase",
     "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1551 recurrence 4: JavaScript/TypeScript CI still times out at the unchanged 30-second classifier deadline after the Git fixture matrix was made concurrent. Preserve all scenarios, assertions and complete coverage while removing repeated Node startup from command retries.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40434716407/job/121960694946",
+    "mechanization": "Extend the existing classifier with runClassifier, the same status-returning command runner used by the CLI. Every real-Git scenario retains an actual CLI invocation; repeated checks reuse that runner against the same filesystem, index and immutable parents without restarting Node. All prior assertions and 26 scenarios remain, and an added failure-then-success regression rejects an absent runner and verifies status, diagnostics, byte preservation and no leaked exit state. The required shared-lib wrapper retains its 30-second deadline and 100% line, branch and function coverage gates. Resolve and verify this merge with the classifier, then execute the complete retained matrix through its existing required suite. The harness owns pushing and the PR body Machine line.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Application runtime logic cannot control repository test-runner scheduling or Git fixture subprocess execution."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required classifier regression suite executes every isolated Git fixture with bounded concurrency and enforces the original deadline and complete coverage thresholds."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.test.mjs",
+      "anchor": "test('CLI resolves Git ledger conflicts', { concurrency: 2 }"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
   }
 ]

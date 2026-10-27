@@ -84,6 +84,11 @@ then stages the classified bytes so a commit cannot land missing level or ruleId
 feasible level; incidental keywords cannot override a rejected assessment.
 There is no implicit prose or human fallback for missing or malformed assessments.
 
+The CLI delegates to `runClassifier(args, logger)`, which returns status without
+changing process exit state. Git fixtures invoke the CLI for each merge scenario
+and reuse this runner for repeated checks, retaining the complete assertion matrix
+within the existing 30-second deadline and 100% classifier coverage gates.
+
 For additive ledger conflicts during a merge, run
 `node scripts/correction-classifier.mjs --resolve-merge .` from the repository
 root. This classifies all three immutable Git index stages and reuses the coverage
