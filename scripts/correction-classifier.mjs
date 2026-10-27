@@ -179,10 +179,11 @@ export function runClassifier(args, logger = console) {
         });
       const root = git('rev-parse', '--show-toplevel').trim();
       path = resolve(root, LEDGER_PATH);
+      // Require both immutable merge parents before resolving any ledger.
+      const parents = ['HEAD', 'MERGE_HEAD'].map((ref) =>
+        git('rev-parse', '--verify', ref).trim(),
+      );
       const verifyMerge = (receipts) => {
-        const parents = ['HEAD', 'MERGE_HEAD'].map((ref) =>
-          git('rev-parse', '--verify', ref).trim(),
-        );
         assert.deepEqual(
           receipts,
           classifyLedger(receipts),

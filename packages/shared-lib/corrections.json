@@ -73,6 +73,24 @@
   },
   {
     "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1606 (fix-red-1423773703): The Radix Switch 1.4.1 manifest-only bump failed Vercel frozen installation and repository source parity. Repeated dependency repairs need one command that preserves valid bot lockfiles and refreshes only outdated importers.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1606",
+    "mechanization": "Extend the existing --refresh-lockfile helper to run frozen offline verification first. Only ERR_PNPM_OUTDATED_LOCKFILE permits resolution, followed by a second frozen verification before staging the lockfile and source projection. Valid lockfiles stay unchanged; configuration, resolver and final verification failures stop without staging outputs. Six regressions in the existing required Detect Changes suite fail on the previous implementation and pass with the extension. Use the extended helper on this actual manifest-only update; retain all frozen-install and parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
     "correction": "PR #1601: Dependabot's Radix Aspect Ratio 1.2.0 update left the repository source map stale, failing Detect Changes, parity and CI Summary. Repeated dependency repairs must verify valid bot lockfiles without re-resolving unrelated dependencies.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1601",
     "mechanization": "Extend the existing source resolver with --verify-lockfile: retain dirty-input and pinned-source checks, verify the existing lockfile through frozen offline Corepack pnpm with lifecycle scripts disabled, then stage only the regenerated projection. Four behavioral regressions in the existing required Detect Changes suite fail before the extension and pass afterward, proving successful repair and idempotence without re-resolution, frozen-check failure propagation, dirty-source refusal and pinned-drift refusal. Use the mode on this dependency update; retain every existing frozen-install and parity gate.",
@@ -1797,6 +1815,78 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "staged-source-projection-refresh",
+    "correction": "PR #1600: The @radix-ui/react-context-menu 2.3.8 manifest bump left the generated source projection stale, failing Detect Changes, documentation parity and CI Summary. Repeated dependency repairs must refresh the projection automatically.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40300944443/job/121498388010",
+    "mechanization": "Extend the existing source-map merge resolver with an indexed-source mode and invoke it after formatting in pre-commit. It regenerates and stages only the configured projection, preserves unstaged source edits, and refuses unresolved files, pinned drift or unstaged projection edits. The existing required Detect Changes tests execute real Git fixtures for these paths and enforce hook wiring.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct the projection automatically from indexed sources before a commit, preventing repeated manual regeneration while retaining the required parity gate for bot-created commits."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "commit source-map repair uses staged dependencies and preserves unstaged source edits"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-artifact-refresh",
+    "correction": "PR #1607: The @types/lodash manifest bump omitted its lockfile and generated source map, failing Vercel's frozen install, Detect Changes, documentation parity and CI Summary. Repair both derived artifacts together for recurring dependency updates.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40303984325/job/121508439128",
+    "mechanization": "Extend the existing repository documentation resolver with --refresh-lockfile. It refuses unresolved source conflicts and pinned-source drift before invoking source-pinned pnpm, refreshes the lockfile without installing dependencies or running lifecycle scripts, then regenerates and stages only the configured source map. The existing required Detect Changes suite proves combined repair, ordering, idempotence, explicit dependency staging and refusal on source conflicts, pinned drift and pnpm failure. Use the command for this PR; frozen install and CI gates remain unchanged.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can construct both dependency artifacts in order with the pinned package manager and documentation generator, preventing a repair from leaving either derived artifact stale."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "if refresh_lockfile:"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1608: The accordion 1.3.1 manifest update retained a 1.2.21 lockfile and stale source projection, failing Vercel frozen installation, Detect Changes, parity and CI Summary. Repair both artifacts together and keep failed repairs retryable.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1608",
+    "mechanization": "Extend the existing dependency repair helper to restore the previous lockfile when resolution or frozen verification fails. The required Detect Changes suite now simulates a resolver that writes an incomplete lockfile before either failure and proves the index and projection remain unchanged, the lockfile is restored, and a retry succeeds. Both regressions fail before the extension and pass afterward. Use --refresh-lockfile for this PR while retaining frozen install and parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "dependency-update-lockfile-and-source-parity",
+    "correction": "PR #1612: The alert-dialog 1.2.1 manifest bump retained a 1.1.23 lockfile and stale source projection, failing Detect Changes, parity and CI Summary. Frozen installation reproduces the lockfile mismatch. Make the existing combined dependency repair retryable after resolver or frozen-verification failure.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1612",
+    "mechanization": "Extend the existing lockfile-and-source-parity repair helper to restore the original lockfile (or remove a newly created one) if pnpm resolution or frozen verification fails. The existing required Detect Changes suite now proves unchanged index and source projection, restored lockfile bytes, and a successful retry after both failure modes. Both original-lockfile regressions failed before the extension. Use the extended helper on this PR and retain all frozen install and source parity gates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing repair helper can construct and verify both derived dependency artifacts before staging them, preventing a repair that refreshes documentation while leaving frozen installation broken. Explicit opt-in keeps commit hooks offline and preserves the harness as the sole shipper."
+      }
+    },
+    "guard": {
+      "path": "scripts/resolve-repository-docs.py",
+      "anchor": "Explicit repair only: normal commit hooks and CI retain frozen installs."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "correction-ledger-retains-source-and-recurrence",
     "correction": "PR #1552: Resolve the origin/main correction-ledger conflict by retaining the photo-filmstrip receipts and main's backward-planner merge receipts with their original sources and guards.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1552",
@@ -1963,5 +2053,23 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "merge-ledger-requires-active-merge",
+    "correction": "PR #1551 recurring conflict repair (fix-red-e3b0c44298, occurrence 31): merge origin/main while preserving the photo slider and both parents' correction receipts; require the merge resolver to refuse other conflicted Git operations before writing.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1551",
+    "mechanization": "Extend the existing classifier resolver by verifying HEAD and MERGE_HEAD before either staging mode can resolve a ledger. The new real-Git cherry-pick regression failed before the extension because non-staging resolution rewrote the conflicted ledger; both modes now refuse it while retaining the ledger bytes, index, operation heads and unrelated edits. The complete existing Git matrix remains passing, with its original deadline and coverage gates. Use --resolve-merge . followed by --resolve-merge . --stage and --check-merge . on this repair. The harness retains push and PR ownership and must add the Machine line to the PR body.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can require both immutable merge parents before constructing or writing a resolution, preventing mutation of non-merge conflicts by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "Require both immutable merge parents before resolving any ledger."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

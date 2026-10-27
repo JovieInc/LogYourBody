@@ -112,3 +112,5 @@ including diff3 base markers, before writing or staging the ledger. The pre-comm
 `--check-merge` path and staged retries use the same check; cleaning only the working
 file cannot hide an unresolved staged source. Resolve and stage the source, then
 retry the same command. Unrelated unstaged edits remain untouched.
+Both resolver modes require an active merge before writing; conflicted cherry-picks
+are refused without changing the ledger or index.

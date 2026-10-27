@@ -314,6 +314,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     'textconv-marker',
     'color-marker',
     'binary-marker',
+    'cherry-pick',
     'duplicate-parent',
   ].map((scenario) => [scenario, false]);
   scenarios.push(
@@ -329,6 +330,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     ['textconv-marker', true],
     ['color-marker', true],
     ['binary-marker', true],
+    ['cherry-pick', true],
     ['duplicate-parent', true],
   );
   const runScenario = async ([scenario, stageMerge]) => {
@@ -344,6 +346,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       'textconv-marker',
       'color-marker',
       'binary-marker',
+      'cherry-pick',
     ].includes(scenario);
     const repository = join(directory, `repository with spaces ${scenario} ${stageMerge}`);
     const ledger = join(repository, 'packages/shared-lib/corrections.json');
@@ -355,7 +358,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         timeout: 5_000,
       });
       assert.ifError(result.error);
-      assert.equal(result.status, args[0] === 'merge' ? 1 : 0, result.stderr);
+      assert.equal(result.status, ['merge', 'cherry-pick'].includes(args[0]) ? 1 : 0, result.stderr);
       return result.stdout;
     };
     // Exercise the real CLI once per scenario; reuse its command runner for retries.
@@ -433,7 +436,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     }
     git('commit', '-am', 'test: right receipts');
     git('switch', 'left');
-    git('merge', '--no-commit', 'right');
+    git(scenario === 'cherry-pick' ? 'cherry-pick' : 'merge', '--no-commit', 'right');
     let before = readFileSync(ledger, 'utf8');
     assert.match(before, /<<<<<<< HEAD/);
     if (scenario === 'unrelated-conflict') {
@@ -461,7 +464,8 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     }
     const stages = git('ls-files', '-u');
     assert.equal((await run('--check-merge', repository)).status, 1, 'the ledger must be staged');
-    const parents = git('rev-parse', 'HEAD', 'MERGE_HEAD');
+    const operationHead = scenario === 'cherry-pick' ? 'right' : 'MERGE_HEAD';
+    const parents = git('rev-parse', 'HEAD', operationHead);
     const unrelated = join(repository, 'unrelated.txt');
     writeFileSync(unrelated, 'uncommitted user edit\n');
     if (scenario === 'missing-guard') {
@@ -581,7 +585,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       assert.equal(git('ls-files', '--stage'), indexBefore, 'failed repair preserves the index');
       assert.match(
         result.stderr,
-        /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first|staged conflict markers|Expected property name/,
+        /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first|staged conflict markers|Expected property name|MERGE_HEAD/,
       );
       assert.equal(readFileSync(ledger, 'utf8'), before);
       if (scenario === 'binary-marker') {
@@ -663,7 +667,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       assert.equal((await run('--check-merge', repository)).status, 0);
     }
     assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
-    assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
+    assert.equal(git('rev-parse', 'HEAD', operationHead), parents);
     assert.match(git('diff', '--name-only'), /unrelated.txt/);
     if (scenario === 'additions') {
       git('commit', '-m', 'test: resolved ledger');
