@@ -215,7 +215,8 @@ export function runClassifier(args) {
       // Keep incoming order, then append branch-only receipts so future main
       // prepends do not collide with the same branch receipt on every repair.
       mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
-        readSource(guard, { root }),
+        // Explicit staging must validate the index, preserving unrelated working edits.
+        stagingMerge ? git('show', `:0:${guard}`) : readSource(guard, { root }),
       ),
     );
     readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.

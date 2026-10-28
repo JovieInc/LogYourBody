@@ -316,6 +316,7 @@ test('repair command resolves Git ledger conflicts from three stages without sta
   ].map((scenario) => [scenario, false]);
   scenarios.push(
     ['additions', true],
+    ['unstaged-guard', true],
     ['concurrent', true],
     ['missing-index-guard', true],
     ['guard-conflict', true],
@@ -428,7 +429,7 @@ test('repair command resolves Git ledger conflicts from three stages without sta
     const parents = git('rev-parse', 'HEAD', 'MERGE_HEAD');
     const unrelated = join(repository, 'unrelated.txt');
     writeFileSync(unrelated, 'uncommitted user edit\n');
-    if (scenario === 'missing-guard') {
+    if (['missing-guard', 'unstaged-guard'].includes(scenario)) {
       writeFileSync(join(repository, rows[0].guard.path), 'missing guard');
     }
     if (scenario === 'missing-index-guard') {
@@ -487,6 +488,15 @@ test('repair command resolves Git ledger conflicts from three stages without sta
         expected,
       );
       assert.equal(git('ls-files', '-u'), '');
+      if (scenario === 'unstaged-guard') {
+        assert.equal(
+          readFileSync(join(repository, rows[0].guard.path), 'utf8'),
+          'missing guard',
+          'staged resolution preserves unrelated working guard edits',
+        );
+        assert.ok(git('diff', '--name-only').split('\n').includes(rows[0].guard.path));
+        writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
+      }
       assert.equal(git('diff', '--name-only').trim(), 'unrelated.txt');
       assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
       assert.equal(git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);

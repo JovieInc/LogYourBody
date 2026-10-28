@@ -259,6 +259,7 @@ struct MetricHistoryEntry: Identifiable, Sendable {
     let primaryValue: Double
     let secondaryValue: Double?
     let source: MetricEntrySourceType
+    var sourceName: String?
 }
 
 struct MetricEntriesConfiguration {

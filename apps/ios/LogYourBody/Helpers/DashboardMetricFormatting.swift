@@ -1,6 +1,34 @@
 import SwiftUI
 import Charts
 
+enum DashboardMetricFormatting {
+    /// Matches the dashboard's existing 30-day recency window.
+    static let currentWeightWindowDays = 30
+
+    static func readingDateLabel(
+        effectiveDate: Date, now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current
+    ) -> String {
+        if calendar.isDate(effectiveDate, inSameDayAs: now) { return "Today" }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        let sameYear = calendar.isDate(effectiveDate, equalTo: now, toGranularity: .year)
+        formatter.setLocalizedDateFormatFromTemplate(sameYear ? "MMM d" : "MMM d yyyy")
+        return formatter.string(from: effectiveDate)
+    }
+
+    static func currentWeight(
+        in metrics: [BodyMetrics], now: Date = Date(), calendar: Calendar = .current
+    ) -> BodyMetrics? {
+        guard let start = calendar.date(byAdding: .day, value: -currentWeightWindowDays, to: now) else { return nil }
+        return metrics.filter { metric in
+            guard let weight = metric.weight, weight.isFinite, weight > 0 else { return false }
+            return metric.effectiveDate >= start && metric.effectiveDate <= now
+        }.max { $0.effectiveDate < $1.effectiveDate }
+    }
+}
+
 enum MetricStatsTruthPolicy {
     static let gateKey = "metric_stats_truth_v1"
 

@@ -67,7 +67,7 @@ export function coverageReport(
     assert.ok(
       !previous || previous.annotation === annotation,
       // Keep every conflicting source visible; divergent annotations still require review.
-      `conflicting coverage annotations: ${fingerprint}; existing sources: ${previous ? [...previous.receipts.keys()].join(', ') : '(none)'}; incoming source: ${receipt.source}`,
+      `conflicting coverage annotations: ${fingerprint}; existing sources: ${previous ? [...previous.receipts.keys()].join(', ') : '(none)'}; incoming source: ${receipt.source}; existing guard: ${previous?.guard?.path ?? '(none)'}; incoming guard: ${guard?.path ?? '(none)'}`,
     );
     let mechanized = false;
     if (guard) {

@@ -323,7 +323,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 }
 ```
 
-- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `448b9e01989f3921ac984d6a2c7bf04fca3763f4ba0bd756408127c3a51c64e1`)
+- `packages/product-registry/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `9182036b8113abbbb1d1daee07c04dbd79b92e5ef7b7090cdf61da91ef4b7ffb`)
 
 ### `packages/product-registry/package.json`: scripts
 
@@ -332,8 +332,9 @@ A changed fingerprint requires review of its related documentation; it does not 
   "build": "pnpm generate && tsc -p tsconfig.json",
   "generate": "node scripts/generate.mjs && node scripts/generate-storefront.mjs",
   "generate:check": "node scripts/generate.mjs --check && node scripts/generate-storefront.mjs --check",
+  "generate:resolve-merge": "node scripts/generate.mjs --resolve-merge",
   "lint": "eslint src scripts",
-  "test": "node scripts/registry.test.mjs && node scripts/brand-integrity.test.mjs && node scripts/storefront.test.mjs && pnpm generate:check && node scripts/url-drift.test.mjs && node scripts/legal-docs-sync.test.mjs && node scripts/env-surface.test.mjs && node scripts/db-entities.test.mjs",
+  "test": "node --test scripts/generate-merge.test.mjs && node scripts/registry.test.mjs && node scripts/brand-integrity.test.mjs && node scripts/storefront.test.mjs && pnpm generate:check && node scripts/url-drift.test.mjs && node scripts/legal-docs-sync.test.mjs && node scripts/env-surface.test.mjs && node scripts/db-entities.test.mjs",
   "typecheck": "tsc --noEmit -p tsconfig.json"
 }
 ```
