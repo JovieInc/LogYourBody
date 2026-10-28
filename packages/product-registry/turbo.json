@@ -1,0 +1,11 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/docs/marketing/app-store/listing-proposal-2026-10-26.json"
+      ]
+    }
+  }
+}

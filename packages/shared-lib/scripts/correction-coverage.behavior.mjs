@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  assertLedgerMergeReady,
   assertNoRegression,
   coverageReport,
   LEDGER_PATH,
@@ -107,6 +108,34 @@ test('classifier rejects missing assessments, unsupported fallbacks and conflict
   );
 });
 
+test('annotation conflicts identify both source receipts for an explicit merge repair', () => {
+  const existing = receipt('same-rule', undefined, {
+    source: 'https://example.com/corrections/existing',
+    classification: classification('codebase'),
+    guard,
+  });
+  const revised = classification('codebase');
+  revised.codebase.rationale = 'A different reviewed rationale';
+  for (const [assessed, incomingGuard] of [
+    [classification('static'), { ...guard, path: 'incoming-guard.mjs' }],
+    [revised, guard],
+  ]) {
+    const incoming = receipt('same-rule', undefined, {
+      source: 'https://example.com/corrections/incoming',
+      classification: assessed,
+      guard: incomingGuard,
+    });
+    assert.throws(() => report([existing, incoming]), (error) => {
+      assert.match(error.message, /conflicting coverage annotations: same-rule/);
+      assert.ok(error.message.includes(existing.source), error.message);
+      assert.ok(error.message.includes(incoming.source), error.message);
+      assert.ok(error.message.includes(`existing guard: ${guard.path}`), error.message);
+      assert.ok(error.message.includes(`incoming guard: ${incoming.guard.path}`), error.message);
+      return true;
+    });
+  }
+});
+
 test('current ledger requires classification while historical baselines remain readable', (t) => {
   const legacy = receipt('retained', 'static', { guard });
   const { root, ref } = fixtureRepo(t, [legacy]);
@@ -159,6 +188,78 @@ function fixtureRepo(t, receipts) {
   ]);
   return { root, ref: git(['rev-parse', 'HEAD']) };
 }
+
+test('coverage artifacts report empty, mixed and fully mechanized fixture ledgers', (t) => {
+  const code = receipt('code', 'codebase', { guard, classification: classification('codebase') });
+  const lint = receipt('lint', 'static', { guard, classification: classification('static') });
+  const prose = receipt('copy', 'prose', {
+    classification: classification('prose'),
+    proseOnlyReason: 'Copy tone requires editorial judgment.',
+  });
+  const human = receipt('judgment', 'human', {
+    classification: classification('human'),
+    proseOnlyReason: 'Requires account-owner legal attestation.',
+  });
+  for (const { rows, counts, share } of [
+    { rows: [], counts: [0, 0, 0, 0, 0], share: 0 },
+    {
+      rows: [code, lint, prose, human, { ...code, source: 'https://example.com/another-receipt' }],
+      counts: [1, 1, 1, 1, 0],
+      share: 0.5,
+    },
+    { rows: [code, lint], counts: [1, 1, 0, 0, 0], share: 1 },
+  ]) {
+    const { root, ref } = fixtureRepo(t, rows);
+    const output = 'coverage/corrections/coverage.json';
+    const before = Date.now();
+    const value = runCoverage(['--base-ref', ref, '--output', output], { root, env: {} });
+    const artifact = JSON.parse(readFileSync(join(root, output), 'utf8'));
+    assert.deepEqual(artifact, value);
+    assert.deepEqual(
+      Object.values(artifact.levels).map((level) => level.total),
+      counts,
+    );
+    assert.equal(
+      artifact.total,
+      counts.reduce((sum, count) => sum + count, 0),
+    );
+    assert.equal(artifact.mechanized, counts[0] + counts[1]);
+    assert.equal(artifact.mechanizedShare, share);
+    assert.equal(artifact.commitSha, ref);
+    assert.equal(new Date(artifact.timestamp).toISOString(), artifact.timestamp);
+    assert.ok(
+      Date.parse(artifact.timestamp) >= before && Date.parse(artifact.timestamp) <= Date.now(),
+    );
+  }
+});
+
+test('artifact CLI prints one summary line and fails when the output cannot be written', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'lyb-coverage-cli-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const cli = fileURLToPath(new URL('./correction-coverage.mjs', import.meta.url));
+  const output = join(root, 'coverage.json');
+  const options = { encoding: 'utf8', env: { ...process.env, GITHUB_STEP_SUMMARY: '' } };
+  const result = spawnSync(process.execPath, [cli, '--output', output], options);
+  assert.equal(result.status, 0, result.stderr);
+  const artifact = JSON.parse(readFileSync(output, 'utf8'));
+  assert.equal(result.stdout.trim().split('\n').length, 1);
+  assert.match(result.stdout, new RegExp(`${artifact.mechanized}/${artifact.total} mechanized`));
+  assert.ok(result.stdout.includes(`${(100 * artifact.mechanizedShare).toFixed(2)}%`));
+  for (const [level, count] of Object.entries(artifact.levels))
+    assert.ok(result.stdout.includes(`${level}=${count.total}`));
+  assert.equal(
+    artifact.commitSha,
+    execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  );
+  const failure = spawnSync(
+    process.execPath,
+    [cli, '--output', join(output, 'coverage.json')],
+    options,
+  );
+  assert.equal(failure.status, 1);
+  assert.match(failure.stderr, /Correction coverage failed/);
+  assert.equal(failure.stdout, '');
+});
 
 test('ledger merge retains independent receipts and one-sided edits without mutating inputs', () => {
   const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
@@ -241,6 +342,24 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
     row('ours'),
   ]);
   assert.equal(git(['ls-files', '-u']).trim().split('\n').length, 3, 'staging remains explicit');
+  const computed = readFileSync(path, 'utf8');
+  assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
+  assert.equal(readFileSync(path, 'utf8'), computed, 'an unchanged computed result is retryable');
+  for (const manual of [
+    JSON.stringify([...JSON.parse(computed), row('manual-receipt')]),
+    '[]',
+    'null',
+  ]) {
+    writeFileSync(path, manual);
+    const index = git(['ls-files', '--stage']);
+    assert.throws(
+      () => runCoverage(['--merge-ledger'], { root, env: {} }),
+      /refuses to overwrite a manually resolved ledger/,
+    );
+    assert.equal(readFileSync(path, 'utf8'), manual, 'manual resolution must survive refusal');
+    assert.equal(git(['ls-files', '--stage']), index, 'refusal must preserve the conflict stages');
+  }
+  writeFileSync(path, computed);
   const before = readFileSync(path, 'utf8');
   const blob = git(['hash-object', '-w', '--stdin'], anchor).trim();
   git(['update-index', '--force-remove', guard.path]);
@@ -256,6 +375,29 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
   assert.equal(readFileSync(path, 'utf8'), before, 'unresolved guard leaves ledger untouched');
   writeFileSync(join(root, guard.path), anchor);
   git(['add', guard.path]);
+  git(['config', 'color.ui', 'always']);
+  for (const marker of [
+    '<<<<<<< HEAD',
+    '||||||| base',
+    '=======',
+    '>>>>>>> incoming',
+    '<< HEAD',
+    '|| base',
+    '==',
+    '>> incoming',
+  ]) {
+    writeFileSync(join(root, guard.path), `${anchor}\n${marker}\n`);
+    git(['add', guard.path]);
+    writeFileSync(join(root, guard.path), anchor);
+    const index = git(['ls-files', '--stage']);
+    assert.throws(
+      () => runCoverage(['--merge-ledger'], { root, env: {} }),
+      /ledger merge: resolve staged conflict markers first/,
+    );
+    assert.equal(git(['ls-files', '--stage']), index, 'refusal preserves the colored index');
+    assert.equal(readFileSync(path, 'utf8'), before, 'refusal preserves the repaired ledger');
+  }
+  git(['add', guard.path]);
   stages[2] = [];
   stage();
   writeFileSync(path, marker);
@@ -264,6 +406,179 @@ test('ledger merge CLI uses all three Git conflict stages and leaves refused mer
   git(['update-index', '--force-remove', LEDGER_PATH]);
   assert.throws(() => runCoverage(['--merge-ledger'], { root, env: {} }));
   assert.equal(readFileSync(path, 'utf8'), marker);
+});
+
+test('ledger merge readiness checks raw staged bytes despite Git diff attributes', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  git('config', 'diff.masked.textconv', 'head -c 0');
+  for (const attributes of [`${guard.path} -diff\n`, `${guard.path} diff=masked\n`]) {
+    writeFileSync(join(root, '.gitattributes'), attributes);
+    git('add', '.gitattributes');
+    for (const marker of [
+      '<<<<<<< HEAD',
+      '||||||| base',
+      '=======',
+      '>>>>>>> incoming',
+      '<< HEAD',
+      '|| base',
+      '==',
+      '>> incoming',
+    ]) {
+      writeFileSync(join(root, guard.path), `${anchor}\n${marker}\n`);
+      git('add', guard.path);
+      writeFileSync(join(root, guard.path), anchor);
+      const index = git('ls-files', '--stage');
+      assert.throws(
+        () => assertLedgerMergeReady(root),
+        /ledger merge: resolve staged conflict markers first/,
+        attributes,
+      );
+      assert.equal(git('ls-files', '--stage'), index, 'refusal preserves the index');
+      assert.equal(readFileSync(join(root, guard.path), 'utf8'), anchor);
+    }
+    git('add', guard.path);
+    assertLedgerMergeReady(root);
+  }
+});
+
+test('ledger merge readiness rejects Git single-character conflict markers', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  writeFileSync(join(root, '.gitattributes'), `${guard.path} conflict-marker-size=1\n`);
+  git('add', '.gitattributes');
+  for (const marker of ['< HEAD', '| base', '=', '> incoming']) {
+    writeFileSync(join(root, guard.path), `${anchor}\n${marker}\n`);
+    git('add', guard.path);
+    writeFileSync(join(root, guard.path), anchor);
+    const index = git('ls-files', '--stage');
+    assert.throws(
+      () => assertLedgerMergeReady(root),
+      /ledger merge: resolve staged conflict markers first/,
+    );
+    assert.equal(git('ls-files', '--stage'), index, 'refusal preserves the index');
+    assert.equal(readFileSync(join(root, guard.path), 'utf8'), anchor);
+  }
+  git('add', guard.path);
+  assertLedgerMergeReady(root);
+  writeFileSync(join(root, '.gitattributes'), `${guard.path} conflict-marker-size=7\n`);
+  writeFileSync(join(root, guard.path), `${anchor}\n> Ordinary Markdown quote.  \n`);
+  git('config', 'core.whitespace', 'blank-at-eol');
+  git('add', '.gitattributes', guard.path);
+  assertLedgerMergeReady(root);
+});
+
+test('ledger merge rebuilds a conflicted recursive ancestor from both merge bases', (t) => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const { root } = fixtureRepo(t, [row('base')]);
+  const git = (args) =>
+    execFileSync(
+      'git',
+      ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', ...args],
+      { cwd: root, encoding: 'utf8' },
+    );
+  const branch = git(['branch', '--show-current']).trim();
+  const write = (rows) =>
+    writeFileSync(join(root, LEDGER_PATH), `${JSON.stringify([row('base'), ...rows], null, 2)}\n`);
+  const commit = (message) => {
+    git(['add', LEDGER_PATH]);
+    git(['commit', '-qm', message]);
+  };
+  const merge = (revision) => {
+    const result = spawnSync(
+      'git',
+      ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.com', 'merge', '--no-commit', revision],
+      { cwd: root, encoding: 'utf8' },
+    );
+    assert.equal(result.status, 1, result.stderr);
+  };
+  writeFileSync(join(root, '.gitattributes'), `${LEDGER_PATH} conflict-marker-size=1\n`);
+  git(['add', '.gitattributes']);
+  git(['commit', '-qm', 'single-character conflict markers']);
+  git(['branch', 'right']);
+  write([row('left')]);
+  commit('left receipt');
+  const left = git(['rev-parse', 'HEAD']).trim();
+  git(['switch', 'right']);
+  write([row('right')]);
+  commit('right receipt');
+  const right = git(['rev-parse', 'HEAD']).trim();
+  git(['switch', branch]);
+  merge(right);
+  assert.match(readFileSync(join(root, LEDGER_PATH), 'utf8'), /^< /m);
+  write([row('left'), row('right')]);
+  commit('merge right into left');
+  git(['switch', 'right']);
+  merge(left);
+  write([row('right'), row('left')]);
+  commit('merge left into right');
+  git(['switch', branch]);
+  merge('right');
+  const ancestor = git(['show', `:1:${LEDGER_PATH}`]);
+  assert.throws(() => JSON.parse(ancestor));
+  assert.match(ancestor, /^<{3} /m);
+  const report = runCoverage(['--merge-ledger'], { root, env: {} });
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(root, LEDGER_PATH), 'utf8')).map((item) => item.fingerprint),
+    ['base', 'right', 'left'],
+  );
+  assert.equal(report.mechanized, 3);
+});
+
+test('coverage CLI retains reporting and ledger repair modes after concurrent changes', (t) => {
+  const row = (id) => receipt(id, 'static', { guard, classification: classification('static') });
+  const { root, ref } = fixtureRepo(t, [row('kept')]);
+  const git = (args, input) => execFileSync('git', args, { cwd: root, encoding: 'utf8', input });
+  const stages = [[row('kept')], [row('kept'), row('ours')], [row('kept'), row('theirs')]];
+  git(['update-index', '--force-remove', LEDGER_PATH]);
+  git(
+    ['update-index', '--index-info'],
+    stages
+      .map((rows, index) => {
+        const hash = git(['hash-object', '-w', '--stdin'], JSON.stringify(rows)).trim();
+        return `100644 ${hash} ${index + 1}\t${LEDGER_PATH}\n`;
+      })
+      .join(''),
+  );
+  writeFileSync(join(root, LEDGER_PATH), 'unresolved conflict');
+  assert.equal(runCoverage(['--merge-ledger'], { root, env: {} }).mechanized, 3);
+  const merged = readFileSync(join(root, LEDGER_PATH), 'utf8');
+  assert.deepEqual(JSON.parse(merged), [row('kept'), row('theirs'), row('ours')]);
+  git(['add', LEDGER_PATH]);
+  const output = 'coverage/corrections/coverage.json';
+  const value = runCoverage(['--output', output, '--base-ref', ref], { root, env: {} });
+  assert.deepEqual(JSON.parse(readFileSync(join(root, output), 'utf8')), value);
+  assert.equal(value.commitSha, ref);
+  assert.equal(value.mechanizedShare, 1);
+  assert.equal(value.total, 3);
+  for (const args of [[], ['--base-ref', ref]]) {
+    assert.equal(runCoverage(args, { root, env: {} }).mechanized, 3);
+  }
+  assert.equal(readFileSync(join(root, LEDGER_PATH), 'utf8'), merged);
+});
+
+test('invalid coverage options fail before writing artifacts, summaries or ledger repairs', (t) => {
+  const { root } = fixtureRepo(t, []);
+  const before = readFileSync(join(root, LEDGER_PATH), 'utf8');
+  const output = join(root, 'coverage.json');
+  const summary = join(root, 'summary.md');
+  writeFileSync(output, 'retained artifact');
+  writeFileSync(summary, 'retained summary');
+  for (const args of [
+    ['--output'],
+    ['--output', ' '],
+    ['--output', '--base-ref'],
+    ['--output', output, '--output', output],
+    ['--merge-ledger', '--unknown'],
+  ]) {
+    assert.throws(
+      () => runCoverage(args, { root, env: { GITHUB_STEP_SUMMARY: summary } }),
+      /usage/,
+    );
+    assert.equal(readFileSync(join(root, LEDGER_PATH), 'utf8'), before);
+    assert.equal(readFileSync(output, 'utf8'), 'retained artifact');
+    assert.equal(readFileSync(summary, 'utf8'), 'retained summary');
+  }
 });
 
 test('counts distinct rules, all four pyramid levels and unclassified receipts honestly', () => {
@@ -352,6 +667,54 @@ test('ledger CI retains each source against Git even when rule coverage and rece
   writeFileSync(join(root, LEDGER_PATH), JSON.stringify(revised));
   const value = runCoverage(['--base-ref', ref], { root, env: {} });
   assert.deepEqual(value.rules[0].recurrence, { receiptCount: 3, repeatCount: 2 });
+});
+
+test('merge verification retains receipts from every supplied parent', (t) => {
+  const first = receipt('retained', 'static', {
+    guard,
+    classification: classification('static'),
+  });
+  const second = { ...first, source: 'https://example.com/incoming-receipt' };
+  const { root, ref } = fixtureRepo(t, [first]);
+  const ledger = join(root, LEDGER_PATH);
+  const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  writeFileSync(ledger, JSON.stringify([second]));
+  git(['add', '.']);
+  git([
+    '-c',
+    'user.name=Fixture',
+    '-c',
+    'user.email=fixture@example.com',
+    'commit',
+    '-qm',
+    'incoming',
+  ]);
+  const incoming = git(['rev-parse', 'HEAD']);
+  const args = ['--base-ref', ref, '--base-ref', incoming];
+  writeFileSync(ledger, JSON.stringify([first, second]));
+  const output = 'coverage/corrections/parents.json';
+  const value = runCoverage(['--output', output, ...args], { root, env: {} });
+  assert.deepEqual(JSON.parse(readFileSync(join(root, output), 'utf8')), value);
+  assert.deepEqual(value.rules[0].recurrence, { receiptCount: 2, repeatCount: 1 });
+
+  for (const [kept, parent] of [
+    [first, ref],
+    [second, incoming],
+  ]) {
+    writeFileSync(ledger, JSON.stringify([kept]));
+    // Checking only one parent permits silently losing the other's receipt.
+    assert.equal(runCoverage(['--base-ref', parent], { root, env: {} }).percent, 100);
+    assert.throws(() => runCoverage(args, { root, env: {} }), /removed receipt/);
+  }
+  for (const invalid of [
+    [...args, '--base-ref'],
+    [...args, '--unknown', ref],
+    [...args, '--base-ref', ''],
+  ]) {
+    assert.throws(() => runCoverage(invalid, { root, env: {} }), /usage/);
+  }
+  writeFileSync(ledger, JSON.stringify([first, second]));
+  assert.throws(() => runCoverage([...args, '--base-ref', 'f'.repeat(40)], { root, env: {} }));
 });
 
 test('empty ledger is N/A and proposed or absent guards earn no credit', () => {
@@ -693,6 +1056,14 @@ test('real CI and intake entrypoints retain coverage checking and publication wi
   );
   assert.match(workflow, /git fetch --no-tags --depth=1 origin "\$BASE_SHA"/);
   assert.match(workflow, /correction-coverage.mjs --base-ref "\$BASE_SHA"/);
+  assert.match(
+    workflow,
+    /correction-coverage.mjs --base-ref "\$BASE_SHA" --output coverage\/corrections\/coverage.json/,
+  );
+  assert.match(
+    workflow,
+    /uses: actions\/upload-artifact@v4\s+with:\s+name: correction-coverage-\$\{\{ github.sha \}\}\s+path: coverage\/corrections\/coverage.json\s+if-no-files-found: error/,
+  );
   assert.match(
     workflow,
     /node --test packages\/shared-lib\/scripts\/correction-ratchet.behavior.mjs/,

@@ -92,9 +92,13 @@ branch-only receipts, allowing later main-side prepends to merge without
 repeating the same conflict. It preserves independent additions and
 one-sided edits, rejects deletions, duplicate identities and divergent concurrent
 edits, and validates retained guards before writing the classified result.
-Missing conflict stages fail without writing.
+Missing conflict stages fail without writing. Annotation conflicts identify the
+existing and incoming source receipts; review their classifications and retained
+guards explicitly before retrying. Conflicting annotations are never selected
+automatically.
 If the working ledger is already valid JSON and differs from the computed merge,
-the resolver refuses to overwrite it. Review and stage that manual resolution,
+both resolver entrypoints refuse to overwrite it through the same shared guard.
+Review and stage that manual resolution,
 then use `--check-merge` to verify retention against both parents. Repeating an
 unstaged resolver run with its unchanged computed result remains safe.
 Both resolver entrypoints share a preflight that refuses other unresolved Git
@@ -114,6 +118,7 @@ even when the staged ledger and all of its guard sources are valid.
 Conflict-marker scanning disables Git color output as well as text conversion
 and external diff drivers, and forces text output so binary attributes or NUL bytes
 cannot conceal staged markers.
+It also rejects markers shorter than seven characters.
 A staged retry refuses any unstaged ledger edits rather than reporting success
 while ignoring new receipts. Review and stage those edits explicitly before
 retrying; refusal preserves both the index and working file.

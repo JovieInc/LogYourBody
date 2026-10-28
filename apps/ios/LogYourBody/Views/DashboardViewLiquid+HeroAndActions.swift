@@ -149,8 +149,15 @@ extension DashboardViewLiquid {
         )
     }
 
+    private var heroWeightMetric: BodyMetrics? {
+        // A deliberate timeline selection remains historical. The default hero
+        // uses the newest eligible measurement, regardless of import order.
+        if selectedIndex > 0 || (HomeV2Policy.isEnabled() && !isHomeV2CheckIn) { return currentMetric }
+        return DashboardMetricFormatting.currentWeight(in: bodyMetrics)
+    }
+
     func heroWeightValue() -> String {
-        let base = currentMetric.map {
+        let base = heroWeightMetric.map {
             formatTrendWeightHeadline($0, usesTrend: weightUsesTrend)
         } ?? "–"
         guard base != "–" else { return base }
@@ -158,9 +165,12 @@ extension DashboardViewLiquid {
     }
 
     func heroWeightCaption() -> String {
-        PhotoTimelineHUDPolicy.metricCaption(
+        guard let metric = heroWeightMetric else { return "Weight" }
+        let date = DashboardMetricFormatting.readingDateLabel(effectiveDate: metric.effectiveDate)
+        let trend = PhotoTimelineHUDPolicy.metricCaption(
             trend: heroWeightDelta30d().map { heroTrendCaption(delta: $0, unit: currentMeasurementSystem.weightUnit) }
         )
+        return "\(date) · \(trend)"
     }
 
     func latestBodyScoreResult() -> BodyScoreResult? {

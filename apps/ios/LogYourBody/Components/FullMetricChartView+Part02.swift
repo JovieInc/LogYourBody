@@ -108,14 +108,14 @@ func historyRow(for entry: MetricHistoryEntry, config: MetricEntriesConfiguratio
 
         return HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(entry.date.formatted(.dateTime.month().day().year()))
+                Text(DashboardMetricFormatting.readingDateLabel(effectiveDate: entry.date))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
 
                 HStack(spacing: 8) {
                     historySourceIcon(for: entry.source)
 
-                    Text(sourceLabel(for: entry.source))
+                    Text(entry.sourceName ?? sourceLabel(for: entry.source))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(Color.metricTextTertiary)
                 }
@@ -260,7 +260,33 @@ func historyScrubber(proxy: ScrollViewProxy) -> some View {
 
 // MARK: - Computed Data
 
+    var usesStatsTruth: Bool {
+        statsTruthEnabled && ContextualMetricKind.from(title: title).map { $0 != .bodyScore } == true
+    }
+
+    var plottedGoalValue: Double? {
+        guard usesStatsTruth else { return goalValue }
+        guard let goalValue, goalValue.isFinite, goalValue > 0 else { return nil }
+        return goalValue
+    }
+
+    var observationSummary: MetricObservationSummary {
+        MetricObservationSummary(points: chartData, range: selectedTimeRange,
+                                 selectedDate: isStepsMetric ? nil : selectedTimelineDate, now: referenceDate)
+    }
+
+    var observationSnapshot: ContextualMetricSnapshot? {
+        guard let kind = ContextualMetricKind.from(title: title) else { return nil }
+        let point = validatedActivePoint ?? observationSummary.point
+        let summary = MetricObservationSummary(points: chartData, range: selectedTimeRange,
+                                               selectedDate: point?.date, now: observationSummary.now)
+        let source = kind == .ffmi ? "Derived from smoothed weight, body fat and height"
+            : ContextualMetricSourcePolicy.source(for: point, entries: metricEntries?.entries ?? [], fallback: nil)
+        return .observationSummary(summary, kind: kind, unit: unit, provenance: source ?? "Source unavailable or mixed")
+    }
+
     var displayedSeries: [MetricChartDataPoint] {
+        if usesStatsTruth { return observationSummary.points }
         if let cached = cachedSeries[selectedTimeRange], !cached.isEmpty {
             return cached
         }
@@ -283,7 +309,8 @@ var smoothedSeries: [MetricChartDataPoint] {
     }
 
 var activeSeries: [MetricChartDataPoint] {
-        chartMode == .trend ? smoothedSeries : displayedSeries
+        if usesStatsTruth { return displayedSeries }
+        return chartMode == .trend ? smoothedSeries : displayedSeries
     }
 
 var visiblePresenceLegendItems: [ChartPresenceLegendItem] {
@@ -303,7 +330,7 @@ var visiblePresenceLegendItems: [ChartPresenceLegendItem] {
     }
 
 var chartPresenceCounts: [MetricPresence: Int] {
-        chartData.reduce(into: [:]) { counts, point in
+        (usesStatsTruth ? displayedSeries : chartData).reduce(into: [:]) { counts, point in
             counts[point.presence, default: 0] += 1
         }
     }
@@ -324,6 +351,7 @@ var validatedActivePoint: MetricChartDataPoint? {
     }
 
 var headlineValueText: String {
+        if usesStatsTruth { return observationSnapshot?.value ?? "—" }
         // Only replace the card's latest/trend headline when the user is
         // actively inspecting a chart point. The stats card and this screen
         // must stay on the same number when metric detail opens at rest.
@@ -334,6 +362,7 @@ var headlineValueText: String {
     }
 
 var headlineDateText: String {
+        if usesStatsTruth { return observationSnapshot?.observation ?? "No observation" }
         if let point = validatedActivePoint {
             return point.date.formatted(date: .abbreviated, time: isStepsMetric ? .omitted : .shortened)
         }
@@ -344,6 +373,10 @@ var headlineDateText: String {
         guard lastFingerprint == chartDataFingerprint else { return nil }
         if let point = validatedActivePoint {
             return point
+        }
+
+        if usesStatsTruth {
+            return observationSummary.point.flatMap { selected in activeSeries.first { $0.id == selected.id } }
         }
 
         guard let selectedTimelineDate else { return nil }
@@ -366,7 +399,7 @@ var headlineDateText: String {
             "current selection \(latestValue) on \(latest.date.formatted(.dateTime.month().day().year()))"
         ]
 
-        if let goalValue {
+        if let goalValue = plottedGoalValue {
             parts.append("goal \(formattedChartValue(goalValue))")
         }
 
@@ -380,7 +413,14 @@ var headlineDateText: String {
     }
 
 var chartDataFingerprint: String {
-        ContextualMetricDetailPolicy.fingerprint(points: chartData, trend: trendChartData)
+        "\(usesStatsTruth);" + ContextualMetricDetailPolicy.fingerprint(points: chartData, trend: trendChartData)
+    }
+
+    var chartDisplayInterval: ClosedRange<Date> {
+        if usesStatsTruth { return observationSummary.displayInterval }
+        let dates = activeSeries.map(\.date)
+        let end = dates.max() ?? Date()
+        return min(dates.min() ?? end, end.addingTimeInterval(-1))...end
     }
 
 // MARK: - Helpers
@@ -389,6 +429,8 @@ var chartDataFingerprint: String {
         if isStepsMetric {
             return FormatterCache.formattedSteps(value) ?? "—"
         }
+
+        if usesStatsTruth { return String(format: "%.1f", value) }
 
         if unit == "%" {
             return String(format: "%.1f", value)
@@ -473,32 +515,6 @@ func movingAverage(
         return smoothed
     }
 
-func computeSeriesStats(
-        for series: [MetricChartDataPoint]
-    ) -> MetricSeriesStats? {
-        guard series.count >= 2 else { return nil }
-
-        let values = series.map(\.value)
-        guard let first = values.first, let last = values.last else { return nil }
-
-        let total = values.reduce(0, +)
-        let average = total / Double(values.count)
-        let delta = last - first
-
-        let percentageChange: Double
-        if abs(first) < .leastNormalMagnitude {
-            percentageChange = 0
-        } else {
-            percentageChange = (delta / first) * 100
-        }
-
-        return MetricSeriesStats(
-            average: average,
-            delta: delta,
-            percentageChange: percentageChange
-        )
-    }
-
 func combinedPresence(for presences: [MetricPresence]) -> MetricPresence {
     if presences.contains(.interpolated) {
         return .interpolated
@@ -520,6 +536,9 @@ func combinedPresence(for presences: [MetricPresence]) -> MetricPresence {
     }
 
 func presenceLabel(for presence: MetricPresence) -> String {
+        if usesStatsTruth && presence == .present && ContextualMetricKind.from(title: title) == .ffmi {
+            return "Derived estimate"
+        }
         switch presence {
         case .present:
             return "Measured"
@@ -588,6 +607,9 @@ func formatDeltaValue(_ delta: Double) -> String {
     }
 
 func deltaColor(for delta: Double) -> Color {
+        if usesStatsTruth {
+            return Color.metricTextSecondary
+        }
         let threshold: Double = 0.0001
         guard abs(delta) > threshold else {
             return Color.metricTextPrimary
@@ -722,4 +744,10 @@ var isStepsMetric: Bool {
             localHistorySections = sections
         }
     }
+}
+
+/// Shared by the chart and its deterministic calculation fixtures.
+func computeSeriesStats(for series: [MetricChartDataPoint]) -> MetricSeriesStats? {
+    guard series.count >= 2 else { return nil }
+    return computeRangeStats(points: series, requiresComparison: false, includesInferredValues: true)
 }

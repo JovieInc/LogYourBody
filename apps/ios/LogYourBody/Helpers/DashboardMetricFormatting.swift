@@ -1,6 +1,64 @@
 import SwiftUI
 import Charts
 
+enum DashboardMetricFormatting {
+    /// Matches the dashboard's existing 30-day recency window.
+    static let currentWeightWindowDays = 30
+
+    static func readingDateLabel(
+        effectiveDate: Date, now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current
+    ) -> String {
+        if calendar.isDate(effectiveDate, inSameDayAs: now) { return "Today" }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        let sameYear = calendar.isDate(effectiveDate, equalTo: now, toGranularity: .year)
+        formatter.setLocalizedDateFormatFromTemplate(sameYear ? "MMM d" : "MMM d yyyy")
+        return formatter.string(from: effectiveDate)
+    }
+
+    static func currentWeight(
+        in metrics: [BodyMetrics], now: Date = Date(), calendar: Calendar = .current
+    ) -> BodyMetrics? {
+        guard let start = calendar.date(byAdding: .day, value: -currentWeightWindowDays, to: now) else { return nil }
+        return metrics.filter { metric in
+            guard let weight = metric.weight, weight.isFinite, weight > 0 else { return false }
+            return metric.effectiveDate >= start && metric.effectiveDate <= now
+        }.max { $0.effectiveDate < $1.effectiveDate }
+    }
+}
+
+enum MetricStatsTruthPolicy {
+    static let gateKey = "metric_stats_truth_v1"
+
+    @MainActor
+    static func isEnabled(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isGateEnabled: ((String) -> Bool)? = nil
+    ) -> Bool {
+        #if DEBUG
+        if arguments.contains("-lybUITestMetricStatsTruth"),
+           arguments.contains("-lybUITestPhotoTimelineHUDFixture"),
+           UUID(uuidString: environment["XCTestSessionIdentifier"] ?? "") != nil,
+           environment["XCTestBundlePath"]?.hasSuffix("/LogYourBodyUITests.xctest") == true {
+            return true
+        }
+        #endif
+        let check = isGateEnabled ?? { AppServicePorts.analyticsTracker.isFeatureEnabled(flagKey: $0) }
+        return check(gateKey)
+    }
+
+    static func synchronizationText(status: String, lastCloudSync: Date?, healthAccessStatus: String) -> String {
+        let synced = lastCloudSync.map {
+            "Last cloud sync \($0.formatted(date: .abbreviated, time: .shortened))"
+        } ?? "Cloud sync not yet recorded"
+        return ["\(status) · \(synced)", healthAccessStatus.isEmpty ? nil : "Apple Health: \(healthAccessStatus)"]
+            .compactMap { $0 }.joined(separator: "\n")
+    }
+}
+
 struct CircleSymbol: ChartSymbolShape {
     var perceptualUnitRect: CGRect { CGRect(x: -0.5, y: -0.5, width: 1, height: 1) }
 
@@ -33,21 +91,33 @@ struct MetricRangeStats {
     let delta: Double
     let average: Double
     let percentageChange: Double
+    var startDate: Date?
+    var endDate: Date?
+    var sampleCount = 0
 }
 
 func computeRangeStats(
     metrics: [BodyMetrics],
     valueProvider: (BodyMetrics) -> Double?
 ) -> MetricRangeStats? {
-    let sortedMetrics = metrics.sorted { $0.date < $1.date }
-    let dataPoints: [(date: Date, value: Double)] = sortedMetrics.compactMap { metric in
-        guard let value = valueProvider(metric) else { return nil }
-        return (metric.date, value)
+    let points = metrics.compactMap { metric -> MetricChartDataPoint? in
+        guard let value = valueProvider(metric), value.isFinite else { return nil }
+        return MetricChartDataPoint(date: metric.date, value: value)
     }
+    return computeRangeStats(points: points, requiresComparison: false, includesInferredValues: true)
+}
 
-    guard let first = dataPoints.first, let last = dataPoints.last, !dataPoints.isEmpty else {
-        return nil
+/// LYB-47 / JOV-3331: one endpoint delta and arithmetic observation mean.
+/// No carried values, missing samples, synthetic days or time weighting.
+func computeRangeStats(
+    points: [MetricChartDataPoint], requiresComparison: Bool = true, includesInferredValues: Bool = false
+) -> MetricRangeStats? {
+    let eligible = includesInferredValues ? points.filter { $0.value.isFinite } : HomeV2MetricEditorial.observedPoints(points)
+    let dataPoints = eligible.sorted {
+        $0.date == $1.date ? $0.value < $1.value : $0.date < $1.date
     }
+    guard let first = dataPoints.first, let last = dataPoints.last else { return nil }
+    if requiresComparison && first.date == last.date { return nil }
 
     let total = dataPoints.reduce(0) { partialResult, point in
         partialResult + point.value
@@ -68,14 +138,94 @@ func computeRangeStats(
         endValue: last.value,
         delta: delta,
         average: average,
-        percentageChange: percentageChange
+        percentageChange: percentageChange,
+        startDate: first.date, endDate: last.date, sampleCount: dataPoints.count
     )
 }
 
-struct MetricSeriesStats {
-    let average: Double
-    let delta: Double
-    let percentageChange: Double
+typealias MetricSeriesStats = MetricRangeStats
+
+/// Presentation uses the unthinned observation series; plotting never changes the calculation.
+struct MetricObservationSummary {
+    let point: MetricChartDataPoint?
+    let points: [MetricChartDataPoint]
+    let stats: MetricRangeStats?
+    let range: TimeRange
+    let now: Date
+    let calendar: Calendar
+
+    init(points: [MetricChartDataPoint], range: TimeRange, selectedDate: Date? = nil,
+         now: Date = Date(), calendar: Calendar = .current) {
+        let history = HomeV2MetricEditorial.observedPoints(points).filter { $0.date <= now }
+        self.point = history.filter { $0.date <= (selectedDate ?? now) }.max { $0.date < $1.date }
+        self.points = Self.window(history, range: range, now: now, calendar: calendar)
+        self.stats = computeRangeStats(points: self.points)
+        self.range = range
+        self.now = now
+        self.calendar = calendar
+    }
+
+    static func window(_ points: [MetricChartDataPoint], range: TimeRange, now: Date,
+                       calendar: Calendar = .current) -> [MetricChartDataPoint] {
+        let cutoff = range.days.flatMap { calendar.date(byAdding: .day, value: -$0, to: now) }
+        return points.filter { point in
+            guard point.date <= now else { return false }
+            return cutoff.map { point.date >= $0 } ?? true
+        }
+            .sorted { $0.date < $1.date }
+    }
+
+    var displayInterval: ClosedRange<Date> {
+        let start = range.days.flatMap { calendar.date(byAdding: .day, value: -$0, to: now) }
+            ?? points.first?.date ?? now.addingTimeInterval(-1)
+        return min(start, now.addingTimeInterval(-1))...now
+    }
+
+    var periodLabel: String {
+        range.days.map { "Past \($0) days" } ?? "All recorded history"
+    }
+
+    var comparisonLabel: String {
+        guard let stats, let start = stats.startDate, let end = stats.endDate else {
+            return points.isEmpty ? "No observations in displayed period" : "Need 2 observations at different times"
+        }
+        return "First → last · \(dateText(start)) – \(dateText(end))"
+    }
+
+    var observationLabel: String {
+        guard let point else { return "No observation" }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: point.date),
+                                           to: calendar.startOfDay(for: now)).day ?? 0
+        let age = days > 0 ? " · \(days) day\(days == 1 ? "" : "s") ago" : ""
+        let outside = points.contains { $0.id == point.id } ? "" : " · Outside displayed period"
+        return "Observed \(dateText(point.date))\(age)\(outside)"
+    }
+
+    func changeText(unit: String, includesDates: Bool = true) -> String {
+        guard let stats else { return comparisonLabel }
+        let comparison = includesDates ? comparisonLabel : "First → last observation"
+        return "\(Self.deltaText(stats.delta, unit: unit)) · \(comparison)"
+    }
+
+    var averageLabel: String? {
+        stats.map { "Mean of \($0.sampleCount) observations" }
+    }
+
+    static func deltaText(_ delta: Double, unit: String) -> String {
+        guard delta.isFinite else { return "Change unavailable" }
+        let rounded = (delta * 10).rounded() / 10
+        guard rounded != 0 else { return "Unchanged at displayed precision" }
+        return formatDelta(delta: rounded, unit: unit == "%" ? "percentage points" : unit)
+    }
+
+    func dateText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return "\(formatter.string(from: date)) \(calendar.timeZone.abbreviation(for: date) ?? calendar.timeZone.identifier)"
+    }
 }
 
 func makeTrend(delta: Double, unit: String, range: TimeRange) -> MetricSummaryCard.Trend? {

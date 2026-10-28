@@ -72,12 +72,15 @@ node packages/shared-lib/scripts/correction-coverage.mjs --merge-ledger
 node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main --update-baselines
 # Read-only verification, using the PR's exact base SHA in CI.
 node packages/shared-lib/scripts/correction-ratchet.mjs --base-ref origin/main
+# After a merge conflict, preserve receipts from both immutable parents.
+node packages/shared-lib/scripts/correction-coverage.mjs --base-ref <prior-head-sha> --base-ref <merged-main-sha> --output coverage/corrections/coverage.json
 node --test packages/shared-lib/scripts/correction-ratchet.behavior.mjs
 pnpm test --filter=@logyourbody/shared-lib
 ```
 
-Merge readiness inspects staged changes without external diff or text conversion
-drivers, so a presentation filter cannot hide unresolved conflict markers.
+Merge readiness inspects staged changes as text without external diff or text
+conversion drivers, so binary attributes and presentation filters cannot hide
+unresolved conflict markers.
 
 Baselines have schema `lyb.correction-ratchet/v1` and a `findings` array. Seeding
 requires a readable immutable base: findings introduced by the PR cannot be
@@ -107,7 +110,11 @@ start a second PR owner.
 For merge repairs, `node scripts/correction-classifier.mjs --resolve-merge . --stage`
 merges and classifies the correction ledger after other conflicts are resolved.
 The shared readiness check also rejects newly added conflict markers in the index,
-including diff3 base markers, before writing or staging the ledger. The pre-commit
+including diff3 base markers, markers shorter than seven characters, and files
+marked binary by Git attributes, before
+writing or staging the ledger. When that ancestor stage contains conflict markers
+from a recursive merge, both resolver entrypoints rebuild it from the two real
+merge bases and their shared parent before applying the same union. The pre-commit
 `--check-merge` path and staged retries use the same check; cleaning only the working
 file cannot hide an unresolved staged source. Resolve and stage the source, then
 retry the same command. Unrelated unstaged edits remain untouched.
