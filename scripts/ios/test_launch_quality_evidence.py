@@ -18,9 +18,9 @@ evidence = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evidence)
 
 
-def run_shell(arguments, *, env=None, timeout=30):
+def run_shell(arguments, *, env=None, timeout=60):
     # Contract fixtures need system tools, not CI's cold SDK/toolchain shims or BASH_ENV.
-    # Hosted macOS exceeded the old 10s cap even with isolation (run 40433475651).
+    # Hosted macOS exhausted shorter fixture caps (runs 40433475651, 40589668494).
     # Trace fixture-only commands so another stall identifies the last operation.
     command = ['/bin/bash', '-x', *arguments]
     with subprocess.Popen(command, env={'PATH': os.defpath, 'PS4': '+ fixture:${LINENO}: ', **(env or {})},
@@ -58,7 +58,7 @@ class EvidenceTests(unittest.TestCase):
             return communicate(process, *args, **kwargs)
 
         with patch.object(subprocess.Popen, 'communicate', expire_after_start), \
-             self.assertRaisesRegex(AssertionError, r'(?s)Shell fixture exceeded 30s.*fixture:.*fixture-child'):
+             self.assertRaisesRegex(AssertionError, r'(?s)Shell fixture exceeded 60s.*fixture:.*fixture-child'):
             run_shell(['-c', "/bin/sleep 120 & echo fixture-child; wait"])
         self.assertEqual(startup, 'fixture-child\n')
         result = run_shell(['-c', "echo fixture-output; echo fixture-error >&2; exit 65"])
@@ -626,6 +626,33 @@ run_xcodebuild_test fixture "$RESULT_BUNDLE" "$RESULT_LOG"
                 self.assertFalse(result_bundle.with_name('timeout.attempt-1.xcresult').exists())
                 self.assertEqual(log.read_text().count('Running fixture (attempt '), 1)
                 self.assertNotIn('Retrying fixture', log.read_text())
+
+    def test_shell_fixture_allows_host_delay_but_preserves_failures_and_bounds_hangs(self):
+        # Advance subprocess's monotonic clock after it establishes the deadline.
+        # This models scheduling delay without sleeping on every CI invocation.
+        real_clock = subprocess._time
+        for delay, status in ((11, 0), (11, 65), (11, 124), (31, 0), (31, 65), (31, 124), (61, None)):
+            with self.subTest(delay=delay, status=status):
+                first_tick = True
+
+                def delayed_clock():
+                    nonlocal first_tick
+                    if first_tick:
+                        first_tick = False
+                        return real_clock()
+                    return real_clock() + delay
+
+                with patch.object(subprocess, '_time', side_effect=delayed_clock):
+                    if status is None:
+                        with self.assertRaisesRegex(AssertionError, 'Shell fixture exceeded 60s'):
+                            run_shell(['-c', 'while :; do :; done'])
+                    else:
+                        result = run_shell(
+                            ['-c', 'printf fixture-output; printf fixture-error >&2; exit "$STATUS"'],
+                            env={'STATUS': str(status)})
+                        self.assertEqual(result.returncode, status)
+                        self.assertEqual(result.stdout, 'fixture-output')
+                        self.assertIn('fixture-error', result.stderr)
 
 
 if __name__ == '__main__':

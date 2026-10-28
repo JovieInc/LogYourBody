@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
-import { analytics } from '@/lib/analytics';
+import { analytics, type AnalyticsProperties } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import {
   buildLandingSource,
@@ -14,7 +14,7 @@ import {
 } from '@/lib/marketing/landing-registry';
 import { waitlistLandingCopy } from './waitlist-copy';
 
-type SubmitState = 'idle' | 'submitting' | 'success' | 'duplicate' | 'error';
+type SubmitState = 'idle' | 'submitting' | 'success' | 'error';
 
 export interface ExperimentWaitlistLandingProps {
   variant: LandingVariant;
@@ -29,6 +29,7 @@ export function ExperimentWaitlistLanding({
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
+  const started = useRef(false);
   const reduceMotion = useReducedMotion();
   const source = buildLandingSource({
     audience: variant.audience,
@@ -52,11 +53,26 @@ export function ExperimentWaitlistLanding({
   const statusMessage =
     submitState === 'success'
       ? waitlistLandingCopy.successMessage
-      : submitState === 'duplicate'
-        ? waitlistLandingCopy.duplicateMessage
-        : submitState === 'error'
-          ? waitlistLandingCopy.errorMessage
-          : null;
+      : submitState === 'error'
+        ? waitlistLandingCopy.errorMessage
+        : null;
+
+  const funnelProperties = {
+    variant: 'waitlist_editorial_v2' as const,
+    audience: variant.audience,
+    goal: variant.goal,
+    assignment_source: assignmentSource,
+  };
+
+  function trackResult(outcome: NonNullable<AnalyticsProperties['outcome']>) {
+    analytics.track('web_waitlist_submit_result', { ...funnelProperties, outcome });
+  }
+
+  function trackStart() {
+    if (started.current) return;
+    started.current = true;
+    analytics.track('web_waitlist_started', funnelProperties);
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,10 +81,12 @@ export function ExperimentWaitlistLanding({
     const trimmed = email.trim();
     if (!trimmed || !emailInputRef.current?.checkValidity()) {
       setFieldError(waitlistLandingCopy.invalidEmailMessage);
+      trackResult('invalid');
       return;
     }
 
     setSubmitState('submitting');
+    analytics.track('web_waitlist_submit_attempted', funnelProperties);
 
     try {
       const response = await fetch('/api/waitlist', {
@@ -78,28 +96,28 @@ export function ExperimentWaitlistLanding({
       });
       const payload = (await response.json()) as {
         success?: boolean;
-        status?: 'created' | 'existing';
       };
 
       if (!response.ok || !payload.success) {
         if (response.status === 400) {
           setFieldError(waitlistLandingCopy.invalidEmailMessage);
           setSubmitState('idle');
+          trackResult('invalid');
           return;
         }
         setSubmitState('error');
+        trackResult(response.status === 429 ? 'rate_limited' : 'server_error');
         return;
       }
 
-      analytics.track('web_waitlist_submitted', {
-        variant: 'waitlist_editorial_v2',
-        audience: variant.audience,
-        goal: variant.goal,
-        assignment_source: assignmentSource,
-      });
-      setSubmitState(payload.status === 'existing' ? 'duplicate' : 'success');
+      // Browser acceptance includes duplicate/honeypot requests. Only the
+      // first-party store can establish a durable new registration.
+      analytics.track('web_waitlist_submitted', funnelProperties);
+      trackResult('accepted');
+      setSubmitState('success');
     } catch {
       setSubmitState('error');
+      trackResult('server_error');
     }
   }
 
@@ -130,7 +148,7 @@ export function ExperimentWaitlistLanding({
         </motion.div>
         <div className="absolute inset-0 z-[1] hidden bg-[linear-gradient(90deg,#000_0%,#000_43%,rgba(0,0,0,0.94)_54%,rgba(0,0,0,0.08)_78%)] lg:block" />
 
-        <header className="relative z-10 mx-auto flex w-full max-w-[1440px] items-center px-6 pb-5 pt-7 sm:px-8 lg:px-16 lg:pb-0 lg:pt-12">
+        <header className="relative z-10 mx-auto flex w-full max-w-[1440px] items-center px-6 pt-7 pb-5 sm:px-8 lg:px-16 lg:pt-12 lg:pb-0">
           <div className="flex items-center gap-3" aria-label="LogYourBody">
             <Image
               src={LANDING_BRAND_ASSET.src}
@@ -150,7 +168,7 @@ export function ExperimentWaitlistLanding({
           tabIndex={-1}
         >
           <motion.section
-            className="min-w-0 max-w-[650px] pt-5 lg:pb-16 lg:pt-0"
+            className="max-w-[650px] min-w-0 pt-5 lg:pt-0 lg:pb-16"
             aria-labelledby="landing-heading"
             initial={reduceMotion ? false : { opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -158,7 +176,7 @@ export function ExperimentWaitlistLanding({
           >
             <h1
               id="landing-heading"
-              className="max-w-[12ch] text-balance text-[clamp(2.85rem,12vw,4rem)] font-semibold leading-[0.98] tracking-[-0.055em] lg:max-w-[10ch] lg:text-[clamp(4.5rem,5.6vw,5.8rem)]"
+              className="max-w-[12ch] text-[clamp(2.85rem,12vw,4rem)] leading-[0.98] font-semibold tracking-[-0.055em] text-balance lg:max-w-[10ch] lg:text-[clamp(4.5rem,5.6vw,5.8rem)]"
             >
               {variant.headline}
             </h1>
@@ -184,6 +202,7 @@ export function ExperimentWaitlistLanding({
                 inputMode="email"
                 placeholder="Email address"
                 value={email}
+                onFocus={trackStart}
                 onChange={(event) => {
                   setEmail(event.target.value);
                   if (fieldError) setFieldError(null);
@@ -192,12 +211,12 @@ export function ExperimentWaitlistLanding({
                 disabled={submitState === 'submitting' || submitState === 'success'}
                 aria-invalid={Boolean(fieldError)}
                 aria-describedby="waitlist-status-v2"
-                className="min-h-[54px] w-full rounded-full border border-[#2A2C30] bg-black/65 px-6 text-base text-white outline-none backdrop-blur-xl transition-colors placeholder:text-[#6E7178] hover:border-[#45484F] focus:border-[#F7F8F8]/65 focus:ring-2 focus:ring-[#2563FF]/35 disabled:opacity-60 lg:min-h-[58px]"
+                className="min-h-[54px] w-full rounded-full border border-[#2A2C30] bg-black/65 px-6 text-base text-white backdrop-blur-xl transition-colors outline-none placeholder:text-[#6E7178] hover:border-[#45484F] focus:border-[#F7F8F8]/65 focus:ring-2 focus:ring-[#2563FF]/35 disabled:opacity-60 lg:min-h-[58px]"
               />
               <button
                 type="submit"
                 disabled={submitState === 'submitting' || submitState === 'success'}
-                className="inline-flex min-h-[54px] w-full items-center justify-center rounded-full bg-[#F7F8F8] px-8 text-base font-semibold text-black transition-[background-color,transform] hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#2563FF] focus:ring-offset-2 focus:ring-offset-black active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-[58px] lg:w-auto lg:min-w-[230px]"
+                className="inline-flex min-h-[54px] w-full items-center justify-center rounded-full bg-[#F7F8F8] px-8 text-base font-semibold text-black transition-[background-color,transform] hover:bg-white focus:ring-2 focus:ring-[#2563FF] focus:ring-offset-2 focus:ring-offset-black focus:outline-none active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-[58px] lg:w-auto lg:min-w-[230px]"
               >
                 {submitState === 'submitting' ? 'Joining…' : 'Get early access'}
               </button>
@@ -229,7 +248,7 @@ export function ExperimentWaitlistLanding({
           </motion.section>
 
           <motion.section
-            className="relative mt-6 h-[390px] min-w-0 overflow-hidden rounded-t-[22px] border border-b-0 border-[#2A2C30] bg-[#0B0B0B] shadow-[0_-24px_80px_rgba(0,0,0,0.5)] lg:mb-[-10rem] lg:ml-auto lg:mt-auto lg:h-[520px] lg:w-[400px] lg:rounded-[22px] lg:border-b"
+            className="relative mt-6 h-[390px] min-w-0 overflow-hidden rounded-t-[22px] border border-b-0 border-[#2A2C30] bg-[#0B0B0B] shadow-[0_-24px_80px_rgba(0,0,0,0.5)] lg:mt-auto lg:mb-[-10rem] lg:ml-auto lg:h-[520px] lg:w-[400px] lg:rounded-[22px] lg:border-b"
             aria-label="Current LogYourBody iPhone product capture"
             initial={reduceMotion ? false : { opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
