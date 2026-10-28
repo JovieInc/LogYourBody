@@ -67,11 +67,13 @@ public struct MetricSummaryCard: View {
     public struct DataPoint: Identifiable {
         public let index: Int
         public let value: Double
+        public let date: Date?
         public var id: Int { index }
 
-        public init(index: Int, value: Double) {
+        public init(index: Int, value: Double, date: Date? = nil) {
             self.index = index
             self.value = value
+            self.date = date
         }
     }
 
@@ -119,6 +121,8 @@ public struct MetricSummaryCard: View {
         public let chartAccessibilityValue: String?
         public let trend: Trend?
         public let footnote: String?
+        public let chartPeriod: String?
+        public let chartInterval: ClosedRange<Date>?
 
         public init(
             title: String,
@@ -129,7 +133,9 @@ public struct MetricSummaryCard: View {
             chartAccessibilityLabel: String?,
             chartAccessibilityValue: String?,
             trend: Trend?,
-            footnote: String?
+            footnote: String?,
+            chartPeriod: String? = nil,
+            chartInterval: ClosedRange<Date>? = nil
         ) {
             self.title = title
             self.value = value
@@ -140,6 +146,8 @@ public struct MetricSummaryCard: View {
             self.chartAccessibilityValue = chartAccessibilityValue
             self.trend = trend
             self.footnote = footnote
+            self.chartPeriod = chartPeriod
+            self.chartInterval = chartInterval
         }
     }
 
@@ -377,6 +385,13 @@ public struct MetricSummaryCard: View {
             // so its label is never squeezed by the value/chart column. At standard
             // text sizes it stays one coherent line; at accessibility sizes the
             // caption may wrap inside the chip rather than clip.
+            if let chartPeriod = content.chartPeriod {
+                Text(chartPeriod)
+                    .font(.footnote)
+                    .foregroundStyle(secondaryTextColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if let trend = content.trend {
                 trendView(trend)
             }
@@ -385,7 +400,7 @@ public struct MetricSummaryCard: View {
                 Text(footnote)
                     .font(.system(.footnote, design: .rounded))
                     .foregroundStyle(secondaryTextColor)
-                    .lineLimit(2)
+                    .lineLimit(content.chartPeriod == nil ? 2 : nil)
                     .minimumScaleFactor(0.85)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -442,7 +457,36 @@ public struct MetricSummaryCard: View {
         content.unit.lowercased() == "steps"
     }
 
+    @ViewBuilder
     private func chart(for content: Content) -> some View {
+        if content.chartPeriod != nil {
+            observationChart(for: content)
+        } else {
+            legacyChart(for: content)
+        }
+    }
+
+    /// Dated observations only. No line claims continuous measurement between sparse samples.
+    private func observationChart(for content: Content) -> some View {
+        Chart(content.dataPoints) { point in
+            if let date = point.date {
+                if isStepsContent(content) {
+                    BarMark(x: .value("Observation date", date), y: .value("Value", point.value))
+                        .foregroundStyle(accentColor)
+                } else {
+                    PointMark(x: .value("Observation date", date), y: .value("Value", point.value))
+                        .foregroundStyle(accentColor)
+                }
+            }
+        }
+        .chartXScale(domain: content.chartInterval ?? Date.distantPast...Date())
+        .chartYScale(domain: .automatic(includesZero: isStepsContent(content)))
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .accessibilityHidden(true)
+    }
+
+    private func legacyChart(for content: Content) -> some View {
         let lineColor = accentColor
         let isSteps = isStepsContent(content)
         let minPoint = content.dataPoints.min(by: { $0.value < $1.value })
@@ -619,6 +663,9 @@ public struct MetricSummaryCard: View {
     }
 
     private func trendBackground(for direction: Trend.Direction) -> Color {
+        if MetricStatsTruthPolicy.isEnabled() {
+            return secondaryTextColor.opacity(0.15)
+        }
         switch direction {
         case .up:
             return theme.colors.success.opacity(0.15)
@@ -630,6 +677,9 @@ public struct MetricSummaryCard: View {
     }
 
     private func trendForeground(for direction: Trend.Direction) -> Color {
+        if MetricStatsTruthPolicy.isEnabled() {
+            return secondaryTextColor
+        }
         switch direction {
         case .up:
             return theme.colors.success
@@ -667,7 +717,7 @@ public struct MetricSummaryCard: View {
             if let timestamp = content.timestamp {
                 components.append("Updated \(timestamp)")
             }
-            if identityEnabled {
+            if identityEnabled || content.chartPeriod != nil {
                 for detail in [content.chartAccessibilityLabel, content.chartAccessibilityValue, content.footnote] {
                     if let detail, !detail.isEmpty, !components.contains(detail) { components.append(detail) }
                 }

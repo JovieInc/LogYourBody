@@ -195,6 +195,7 @@ struct HomeV2ProgressView: View {
     }()
 
     var body: some View {
+        let truthEnabled = MetricStatsTruthPolicy.isEnabled()
         let current = series(metric)
         let visible = HomeV2MetricEditorial.observedPoints(
             HomeV2TrendPolicy.points(current.daily, in: range, now: now)
@@ -202,6 +203,8 @@ struct HomeV2ProgressView: View {
         let hasEnoughData = HomeV2TrendPolicy.hasEnoughData(visible)
         let selected = shareSelection(for: metric, data: current)
         let activeFocus = selected.flatMap { $0.isFocused ? $0.point : nil }
+        let observation = truthEnabled ? MetricObservationSummary(
+            points: current.daily, range: range, selectedDate: activeFocus?.date, now: now) : nil
         let presented = HomeV2MetricEditorial.canvas(
             HomeV2MetricCanvasRequest(
                 metric: metric,
@@ -209,11 +212,12 @@ struct HomeV2ProgressView: View {
                 unit: current.unit,
                 deltaUnit: current.deltaUnit,
                 range: range,
-                provenance: current.provenance,
+                provenance: truthEnabled ? nil : current.provenance,
                 target: current.target,
                 hasEnoughData: hasEnoughData,
                 formatValue: { formatValue(metric, $0) },
-                dateText: { Self.contextDateFormatter.string(from: $0) }
+                dateText: { Self.contextDateFormatter.string(from: $0) },
+                observationSummary: observation
             )
         )
 
@@ -225,7 +229,7 @@ struct HomeV2ProgressView: View {
                     HomeV2MetricHero(
                         value: activeFocus.map { formatValue(metric, $0.value) } ?? presented.value,
                         unit: presented.unit,
-                        comparison: activeFocus.map {
+                        comparison: observation?.changeText(unit: metric == .steps ? "steps" : current.unit) ?? activeFocus.map {
                             $0.date.formatted(date: .abbreviated, time: .omitted)
                         } ?? presented.comparison,
                         provenance: activeFocus == nil ? presented.provenance : nil,
@@ -233,6 +237,18 @@ struct HomeV2ProgressView: View {
                     )
                     .padding(.horizontal, HomeV2Tokens.Space.inset)
                     .padding(.vertical, HomeV2Tokens.Space.margin)
+
+                    if let observation {
+                        let snapshot = truthSnapshot(for: metric, data: current, summary: observation)
+                        Text([snapshot?.observation, snapshot?.evidence, snapshot?.provenanceLabel,
+                              snapshot.map { "\($0.range) · Daily observations; gaps unfilled" },
+                              snapshot?.trend].compactMap { $0 }.joined(separator: "\n"))
+                            .font(.footnote)
+                            .foregroundStyle(HomeV2Tokens.Colors.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, HomeV2Tokens.Space.inset)
+                            .accessibilityIdentifier("home_v2_progress_observation_context")
+                    }
 
                     if contextualSharePayload != nil, !showsProvenance {
                         Button { showsMetricShare = true } label: {
@@ -248,14 +264,14 @@ struct HomeV2ProgressView: View {
                     if hasEnoughData {
                         HomeV2TrendChart(
                             daily: current.daily,
-                            trend: current.trend.isEmpty ? current.daily : current.trend,
+                            trend: truthEnabled || current.trend.isEmpty ? current.daily : current.trend,
                             accent: metric.accent,
                             range: $range,
-                            showsDots: !current.trend.isEmpty,
+                            showsDots: !truthEnabled && !current.trend.isEmpty,
                             chartHeight: HomeV2Tokens.progressChartHeight,
                             axis: .months,
                             metricTitle: metric.title,
-                            usesSevenDayAverage: !current.trend.isEmpty,
+                            usesSevenDayAverage: !truthEnabled && !current.trend.isEmpty,
                             anchorsToZero: metric.anchorsChartToZero,
                             formatValue: { formatValue(metric, $0) },
                             onSelection: { focusedSample = $0 },
@@ -295,7 +311,13 @@ struct HomeV2ProgressView: View {
     private func shareSelection(
         for candidate: HomeV2ProgressMetric, data: HomeV2ProgressSeries
     ) -> ContextualMetricProgressPolicy.Selection? {
-        ContextualMetricProgressPolicy.presentationSelection(
+        if MetricStatsTruthPolicy.isEnabled() {
+            return ContextualMetricProgressPolicy.presentationSelection(
+                points: HomeV2TrendPolicy.points(data.daily, in: range, now: now), averages: [],
+                focus: candidate == metric && focusedSample?.kind == .daily ? focusedSample : nil,
+                usesCalendarDayDomain: true)
+        }
+        return ContextualMetricProgressPolicy.presentationSelection(
             points: HomeV2TrendPolicy.points(data.daily, in: range, now: now),
             averages: HomeV2TrendPolicy.points(data.trend, in: range, now: now),
             focus: candidate == metric ? focusedSample : nil
@@ -310,6 +332,11 @@ struct HomeV2ProgressView: View {
                 points: HomeV2MetricEditorial.observedPoints(points), prefersHigh: candidate.prefersHigh)
             guard let selected = shareSelection(for: candidate, data: data),
                   let kind = ContextualMetricKind(rawValue: candidate.rawValue) else { return nil }
+            if MetricStatsTruthPolicy.isEnabled() {
+                let summary = MetricObservationSummary(points: data.daily, range: range,
+                                                       selectedDate: selected.point.date, now: now)
+                return truthSnapshot(for: candidate, data: data, summary: summary)
+            }
             let trend = candidate == .steps
                 ? HomeV2ProgressCopy.stepsComparison(latest: selected.point.value, average: stats.average, range: range)
                 : HomeV2ProgressCopy.deltaSentence(delta: stats.delta, unit: data.deltaUnit, range: range)
@@ -327,6 +354,15 @@ struct HomeV2ProgressView: View {
         }
         guard let kind = ContextualMetricKind(rawValue: metric.rawValue) else { return nil }
         return .contextual(snapshots, selected: kind)
+    }
+
+    private func truthSnapshot(for candidate: HomeV2ProgressMetric, data: HomeV2ProgressSeries,
+                               summary: MetricObservationSummary) -> ContextualMetricSnapshot? {
+        guard let kind = ContextualMetricKind(rawValue: candidate.rawValue) else { return nil }
+        let source = kind == .ffmi ? "Derived from smoothed weight, body fat and height"
+            : ContextualMetricSourcePolicy.source(for: summary.point, entries: data.shareEntries, fallback: nil)
+        return .observationSummary(summary, kind: kind, unit: kind == .steps ? "steps" : data.unit,
+                                   provenance: source ?? "Source unavailable or mixed")
     }
 
     private var switcher: some View {

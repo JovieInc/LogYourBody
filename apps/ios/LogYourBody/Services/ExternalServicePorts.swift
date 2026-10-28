@@ -268,6 +268,43 @@ protocol PhotoLibraryManaging {
 struct LivePhotoLibraryAdapter: PhotoLibraryManaging {
     static let shared = LivePhotoLibraryAdapter()
 
+    /// Share exports use add-only authorization and await the actual Photos transaction.
+    /// This adapter does not present alerts; the export coordinator owns feedback.
+    @MainActor
+    func saveShareCard(_ url: URL, whileOwned isCurrent: @escaping @MainActor () -> Bool) async -> SharePhotoSaveResult {
+        await Self.saveShareCard(whileOwned: isCurrent, authorize: {
+            var status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+            if status == .notDetermined { status = await PHPhotoLibrary.requestAuthorization(for: .addOnly) }
+            switch status {
+            case .authorized, .limited: return .authorized
+            case .restricted: return .restricted
+            default: return .denied
+            }
+        }, write: {
+            await withCheckedContinuation { continuation in
+                PHPhotoLibrary.shared().performChanges {
+                    PHAssetCreationRequest.forAsset().addResource(with: .photo, fileURL: url, options: nil)
+                } completionHandler: { success, _ in
+                    continuation.resume(returning: success)
+                }
+            }
+        })
+    }
+
+    @MainActor
+    static func saveShareCard(
+        whileOwned isCurrent: () -> Bool, authorize: () async -> AppAuthorizationState, write: () async -> Bool
+    ) async -> SharePhotoSaveResult {
+        guard isCurrent(), !Task.isCancelled else { return .cancelled }
+        let authorization = await authorize()
+        guard isCurrent(), !Task.isCancelled else { return .cancelled }
+        switch authorization {
+        case .authorized: return await write() ? .saved : .failed
+        case .restricted: return .restricted
+        default: return .denied
+        }
+    }
+
     func authorizationStatus() -> AppAuthorizationState {
         switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
         case .authorized, .limited:

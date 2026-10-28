@@ -82,6 +82,58 @@ class StatsCardCompositionTests(unittest.TestCase):
         path.write_text(path.read_text() + "\nlet legacyColor = Color.white\n")
         self.assert_rejected("dashboard.system_b_theme_tokens")
 
+    def test_card_cannot_assign_success_to_direction_alone(self):
+        self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
+                     "return secondaryTextColor\n        }\n        switch direction",
+                     "return theme.colors.success\n        }\n        switch direction")
+        self.assert_rejected("dashboard.neutral_trend_direction")
+
+    def test_detail_cannot_assign_success_to_direction_alone(self):
+        self.replace("Components/FullMetricChartView+Part02.swift",
+                     "return Color.metricTextSecondary\n        }",
+                     "return Color.metricDeltaPositive\n        }")
+        self.assert_rejected("dashboard.neutral_trend_direction")
+
+    def test_observation_plot_cannot_erase_elapsed_time(self):
+        self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
+                     'PointMark(x: .value("Observation date", date)',
+                     'PointMark(x: .value("Observation index", point.index)')
+        self.assert_rejected("dashboard.observation_plot")
+
+    def test_observation_plot_cannot_claim_continuous_measured_history(self):
+        self.replace("DesignSystem/Organisms/MetricSummaryCard.swift",
+                     'PointMark(x: .value("Observation date", date)',
+                     'LineMark(x: .value("Observation date", date)')
+        self.assert_rejected("dashboard.observation_plot")
+
+    def test_single_timestamp_cannot_establish_no_change(self):
+        self.replace("Helpers/DashboardMetricFormatting.swift",
+                     "if requiresComparison && first.date == last.date { return nil }", "")
+        self.assert_rejected("dashboard.minimum_comparison_samples")
+
+    def test_chart_container_cannot_overwrite_plot_identity(self):
+        self.replace("Components/FullMetricChartView+Part01.swift",
+                     '.accessibilityElement(children: .contain)\n        .accessibilityIdentifier("metric_detail_chart")',
+                     '.accessibilityIdentifier("metric_detail_chart")')
+        self.assert_rejected("dashboard.chart_accessibility_containment")
+
+    def test_chart_container_cannot_flatten_interactive_children(self):
+        for behavior in ("ignore", "combine"):
+            with self.subTest(behavior=behavior):
+                path = self.app / "Components/FullMetricChartView+Part01.swift"
+                source = path.read_text()
+                self.replace("Components/FullMetricChartView+Part01.swift",
+                             '.accessibilityElement(children: .contain)\n        .accessibilityIdentifier("metric_detail_chart")',
+                             f'.accessibilityElement(children: .{behavior})\n        .accessibilityIdentifier("metric_detail_chart")')
+                self.assert_rejected("dashboard.chart_accessibility_containment")
+                path.write_text(source)
+
+    def test_chart_containment_must_precede_identifier(self):
+        self.replace("Components/FullMetricChartView+Part01.swift",
+                     '.accessibilityElement(children: .contain)\n        .accessibilityIdentifier("metric_detail_chart")',
+                     '.accessibilityIdentifier("metric_detail_chart")\n        .accessibilityElement(children: .contain)')
+        self.assert_rejected("dashboard.chart_accessibility_containment")
+
 
 if __name__ == "__main__":
     result = unittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromTestCase(StatsCardCompositionTests))
