@@ -174,3 +174,27 @@ GBrain write `put lyb-47-stats-truth-merge-repair` and readback
 `get_page lyb-47-stats-truth-merge-repair` both failed with curl error 7 at
 localhost:7801. The unsandboxed query also timed out after 30 seconds; neither
 write persistence nor readback was established. This document retains the findings.
+
+## PR #1535 launch-quality repair (2026-10-28)
+
+Merged `origin/main` at `e3fffe422` without rebasing. The composed launch audit
+keeps main's early evidence preflight and this branch's Stats truth UI selector.
+Its fixed diagnostic digest is
+`ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa`.
+Parent reconstructions stay rejected fixtures.
+
+Launch Quality run 40434998769 failed
+`testStatsTruthFFMIUsesCanonicalJOV3331ValueAndExportsDerivedEvidence` because
+the date-free PNG included `Past 30 days` and treated
+`Derived from smoothed weight, body fat and height` as an observation source.
+The share provenance label now omits that derivation sentence. Evidence stays
+`Derived estimate`. The date-free PNG truth leaves Range off, so a numeric
+window is not exported while the Range switch still works for other shares.
+In-app footnotes that use the same observation-source label drop that sentence
+too. Weight, body fat and steps sources are unchanged.
+
+The existing launch UI regression audit requires the omission. Its behavior
+suite rejects the unguarded label and accepts the guarded source. The lanes
+harness owns pushes and PR updates. Add this single machine line to the PR body:
+
+Machine: built scripts/ios/launch-ui-regression-audit.py

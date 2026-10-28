@@ -88,7 +88,13 @@ final class BodyScoreShareCardTests: XCTestCase {
         XCTAssertEqual(snapshot.evidence, "Derived estimate")
         XCTAssertEqual(snapshot.trend, "Need 2 observations at different times")
         var options = BodyScoreShareOptions(selectedMetric: .ffmi)
+        // A date-free PNG truth treats the numeric window as a leak, so leave Range off.
+        options.includeRange = false
         options.includeProvenance = true
+        let detail = snapshot.detail(options: options)
+        XCTAssertTrue(detail.contains("Derived estimate"))
+        XCTAssertFalse(detail.localizedCaseInsensitiveContains("weight, body fat"))
+        XCTAssertFalse(detail.contains("30"))
         let text = try renderPNGText(snapshot, aspect: .square, options: options, name: "lyb47-ffmi-truth.png")
         XCTAssertEqual(pngTruthMismatches(text, expected: SharePNGTruth(
             kind: .ffmi, value: snapshot.value, unit: "", date: nil, evidence: "Derived estimate")), [])
