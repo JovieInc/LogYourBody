@@ -2677,5 +2677,121 @@
     },
     "level": "static",
     "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "LYB-249 / PR #1574: Adding workout reconciliation sources, tests and Core Data V5 target membership changed the Xcode project without refreshing its exact diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40206046308/job/121207084701",
+    "mechanization": "Retain the existing seven exact dependency pins and refresh only the reviewed project manifest hash. The required Mac Runner Routing Tests compare each pin to current source bytes and exercise the trusted CLI against accepted tooling and rejected changed, missing, symlinked, dirty and untracked inputs. The existing regression failed before the pin update and passes afterward.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "LYB-249 / PR #1574: Adding workout reconciliation Xcode target membership left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity. Regenerate the source projection after reviewing the manifest diff.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40206046308/job/121207084518",
+    "mechanization": "The existing required projection checker failed before regeneration and passes afterward. Retain the required Detect Changes and CI Summary gates and their regression rejecting a missing or skippable parity step.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "launch-quality-state-fixture-animation-quiescence",
+    "correction": "PR #1574 / LYB-249: Launch Quality passed the reconciliation unit tests but chat replay and onboarding state tests stalled on repeated 60-second animation idle waits and exceeded the unchanged 180-second execution allowance.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40215994807/job/121237251632",
+    "mechanization": "Merge main to retain its bounded simulator-startup retry policy and chat replay stabilization. Extend the existing DEBUG animation suppression into one exact-argument policy shared by UIKit and SwiftUI for replay and onboarding state fixtures. Add native positive and negative policy cases, plus a guard in the existing required shared-lib evidence suite that rejects missing fixture coverage, either disconnected animation sink, or release-build exposure. Include the app source in the Turbo task inputs. The source guard failed before the policy change and passes afterward; native execution and coverage remain required CI evidence on this Linux host. Preserve UI assertions, timeouts, retry bounds and the harness as sole shipper.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing DEBUG fixture startup can route both state fixtures through the same UIKit and SwiftUI animation policy, preventing repeated quiescence waits without changing production launches or weakening the behavior assertions."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "it('keeps replay and onboarding state fixtures free of UIKit and SwiftUI animation waits in DEBUG only'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-5df69c1e5f",
+    "correction": "PR #1574 / LYB-249 recurring conflict and red-check repair: preserve both branches native source guards and their Turbo cache inputs when merging main. The failed launch-quality run tapped Edit entry without presenting its sheet; main already supplies the visible Context presenter repair.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40418206171",
+    "mechanization": "Extend the existing shared-lib Turbo inputs from individual native files to app, unit-test and UI-test Swift directory globs, so future source guards and merged files invalidate cached results automatically. Extend the required launch-quality evidence suite to inspect a real Turbo dry-run and reject any tracked native Swift source missing from its resolved inputs. It failed with 482 missing sources before the configuration change and passes afterward. Retain the merged visible Context sheet-host guard and all native assertions. Use the existing classifier merge resolver to retain both correction ledgers and regenerate the source projection. Native execution and coverage still require exact-head macOS CI. The harness retains push and PR ownership. On this merge the generic red-check category retains main's shell evidence guard; the native cache prevention is preserved separately under native-source-guard-cache-inputs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing fixture launcher owns deadlines, diagnostics and descendant lifetime for every shell contract case, preventing opaque timeouts and orphan pipelines by construction without changing product behavior or native qualification gates."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/test_launch_quality_evidence.py",
+      "anchor": "os.killpg(process.pid, signal.SIGKILL)"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-context-edit-sheet-visible-host",
+    "correction": "PR #1574 / LYB-249: Launch Quality passed workout reconciliation cases but failed testWeightEntryPhotoImportControlsAreExcludedFromMonkeyCandidates because the Edit entry sheet never appeared after tapping its hittable Context button.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40418206171/job/121905931074",
+    "mechanization": "Merge origin/main first to retain its visible Context sheet presenter repair and every native assertion. Extend the same required shared-lib sheet-host guard to count competing presenters independently of whitespace, multiline arguments or onDismiss. Three regression mutations reproduce false acceptance before the extension and pass afterward; run the extended guard against the merged production source. Retain the existing Turbo source input, selectors, timeouts, account ownership and photo-import exclusions. The failed native run proves the sheet did not appear, not the callback admission or root cause; exact-head native execution remains required on macOS. The lanes harness owns pushing and PR updates, including the Machine line supplied in the handoff.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Attaching the existing edit sheet to the navigation destination that contains its initiating control keeps its presenter in the visible view lifetime by construction. The existing required static sheet-host guard prevents moving it back or adding competing presenters."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/daily-reminder-sheet-host.test.ts",
+      "anchor": "keeps the edit-entry presenter on the visible Context destination"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-source-guard-cache-inputs",
+    "correction": "PR #1574 recurring conflict repair (fix-red-e3b0c44298): preserve every native source guard and build-policy dependency in the shared-lib Turbo cache after merging origin/main.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1574",
+    "mechanization": "Extend the existing real Turbo dry-run regression to cover the SwiftLint policy, Xcode project, Info.plist and entitlements alongside every tracked native Swift source. Extend the existing Turbo inputs for the metadata guards so independent target and security policy edits cannot reuse stale results. The regression rejects the previous inputs and passes after adding them. Preserve both parents' receipts using the existing merge policy and verify the staged result against both immutable parents. Retain main's reviewed diagnostic tooling pin rather than authorizing the merged project implicitly. Native execution and coverage remain unverified on Linux. The lanes harness owns pushing and PR updates, including the Machine line supplied in the handoff.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing Turbo cache configuration can include native source directories by construction instead of relying on repeated per-file edits during every merge repair. The real task-plan regression prevents cached guards from silently omitting tracked native sources."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/src/launch-quality-evidence.test.ts",
+      "anchor": "it('invalidates native source guards for every app and native test source and build policy'"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
   }
 ]

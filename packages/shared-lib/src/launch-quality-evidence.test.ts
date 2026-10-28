@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
@@ -28,6 +28,77 @@ function checkedTrace(test: string, coverage: string, root: string) {
     timeout: 90_000,
   });
 }
+
+it('invalidates native source guards for every app and native test source and build policy', () => {
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const sources = execFileSync(
+    'git',
+    [
+      'ls-files',
+      '-z',
+      '--',
+      'apps/ios/LogYourBody',
+      'apps/ios/LogYourBodyTests',
+      'apps/ios/LogYourBodyUITests',
+    ],
+    { cwd: root, encoding: 'utf8' },
+  )
+    .split('\0')
+    .filter((path) => path.endsWith('.swift'));
+  const plan = JSON.parse(
+    execFileSync(
+      'pnpm',
+      ['exec', 'turbo', 'run', 'test', '--filter=@logyourbody/shared-lib', '--dry=json'],
+      { cwd: root, encoding: 'utf8', timeout: 20_000, maxBuffer: 8 * 1024 * 1024 },
+    ),
+  );
+  const task = plan.tasks.find(
+    (item: { taskId: string }) => item.taskId === '@logyourbody/shared-lib#test',
+  );
+  expect(sources.length).toBeGreaterThan(0);
+  expect(task).toBeDefined();
+  const guardedInputs = [
+    ...sources,
+    'apps/ios/.swiftlint.yml',
+    'apps/ios/LogYourBody.xcodeproj/project.pbxproj',
+    'apps/ios/LogYourBody/Info.plist',
+    'apps/ios/LogYourBody/LogYourBody.entitlements',
+  ];
+  const missing = guardedInputs.filter((path) => !Object.hasOwn(task.inputs, `../../${path}`));
+  expect(
+    missing.slice(0, 5),
+    `${missing.length} native guard inputs missing from Turbo inputs`,
+  ).toEqual([]);
+}, 30_000);
+
+it('keeps replay and onboarding state fixtures free of UIKit and SwiftUI animation waits in DEBUG only', () => {
+  const source = readFileSync(
+    new URL('../../../apps/ios/LogYourBody/LogYourBodyApp.swift', import.meta.url),
+    'utf8',
+  );
+  const debugBlocks = [...source.matchAll(/^[ \t]*#if DEBUG\n(.*?)^[ \t]*#endif/gms)]
+    .map((match) => match[1])
+    .join('\n');
+  const policy = debugBlocks.match(
+    /static func usesDeterministicUITestAnimations\(arguments: \[String\]\) -> Bool \{(.*?)\n {4}\}/s,
+  )?.[1];
+  expect(policy, 'a single DEBUG policy must cover both state fixtures').toBeDefined();
+  for (const flag of ['-lybUITestChatReplayFixture', '-lybUITestBodyScoreOnboardingFixture']) {
+    expect(policy).toContain(`arguments.contains("${flag}")`);
+  }
+  const condition = String.raw`if Self\.usesDeterministicUITestAnimations\(arguments: ProcessInfo\.processInfo\.arguments\) \{`;
+  expect(debugBlocks).toMatch(
+    new RegExp(`${condition}\\s*UIView\\.setAnimationsEnabled\\(false\\)`),
+  );
+  expect(debugBlocks).toMatch(
+    new RegExp(
+      `${condition}\\s*transaction\\.animation = nil\\s*transaction\\.disablesAnimations = true`,
+    ),
+  );
+  expect(source.replace(/^[ \t]*#if DEBUG\n.*?^[ \t]*#endif/gms, '')).not.toContain(
+    'usesDeterministicUITestAnimations',
+  );
+});
 
 it('rejects incomplete XCTest proof through the launch gate validator with executed line coverage', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
