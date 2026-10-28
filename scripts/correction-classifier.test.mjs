@@ -378,7 +378,6 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       'symlink-index-guard',
       'symlink-index-blob',
       'guard-conflict',
-      'manual-resolution',
       ...markerScenarios,
       'manual-missing-receipt',
       'manual-invalid',
@@ -522,6 +521,12 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     await git(scenario === 'cherry-pick' ? 'cherry-pick' : 'merge', '--no-commit', 'right');
     let before = readFileSync(ledger, 'utf8');
     assert.match(before, /^<+ HEAD/m);
+    if (scenario === 'additions' && !stageMerge) {
+      const resolved = runCli(['--resolve-merge', repository], tmpdir());
+      assert.equal(resolved.status, 0, resolved.stderr);
+      // Restore the actual conflict before running the same case in-process.
+      writeFileSync(ledger, before);
+    }
     if (scenario === 'unrelated-conflict') {
       writeLedger(classifyLedger([...rows.slice(2), shared, rows[1]]));
       await git('add', 'packages/shared-lib/corrections.json');
@@ -631,7 +636,35 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     const expectedRows = [...rows.slice(2), scenario === 'ours-edit' ? ours : shared, rows[1]];
     if (scenario === 'manual-resolution') {
       expectedRows.push(manualReceipt);
-      writeLedger(classifyLedger(expectedRows));
+      const index = await git('ls-files', '--stage');
+      for (const receipts of [expectedRows, classifyLedger(expectedRows)]) {
+        writeLedger(receipts);
+        const manual = readFileSync(ledger, 'utf8');
+        const refused = await runCLI(
+          '--resolve-merge',
+          repository,
+          ...(stageMerge ? ['--stage'] : []),
+        );
+        assert.equal(refused.status, 1, 'manual receipts require explicit staging');
+        assert.match(refused.stderr, /manually resolved ledger/);
+        assert.equal(readFileSync(ledger, 'utf8'), manual, 'manual receipts remain untouched');
+        assert.equal(await git('ls-files', '--stage'), index);
+      }
+      await git('add', 'packages/shared-lib/corrections.json');
+      const staged = await git('ls-files', '--stage');
+      for (const args of [
+        ['--resolve-merge', repository],
+        ['--resolve-merge', repository, '--stage'],
+        ['--check-merge', repository],
+      ]) {
+        const verified = run(...args);
+        assert.equal(verified.status, 0, verified.stderr);
+        assert.deepEqual(JSON.parse(readFileSync(ledger, 'utf8')), classifyLedger(expectedRows));
+        assert.equal(await git('ls-files', '--stage'), staged);
+        assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
+        assert.equal(await git('rev-parse', 'HEAD', 'MERGE_HEAD'), parents);
+      }
+      return;
     }
     if (scenario === 'manual-missing-receipt') writeLedger(rows.slice(0, -1));
     if (scenario === 'manual-invalid') writeFileSync(ledger, '{invalid json');
@@ -818,29 +851,24 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         await git('add', rows[0].guard.path);
         assert.equal(run('--check-merge', repository).status, 0);
       }
+      const ledgerPath = 'packages/shared-lib/corrections.json';
+      const ledgerBlob = (await git('rev-parse', `:0:${ledgerPath}`)).trim();
+      await git('update-index', '--cacheinfo', `120000,${ledgerBlob},${ledgerPath}`);
+      const symlinkLedgerIndex = await git('ls-files', '--stage');
+      for (const args of [
+        ['--check-merge', repository],
+        ['--resolve-merge', repository],
+        ['--resolve-merge', repository, '--stage'],
+      ]) {
+        const rejected = run(...args);
+        assert.equal(rejected.status, 1, 'a staged ledger must be a regular file');
+        assert.match(rejected.stderr, /staged source must be a regular file/);
+        assert.equal(await git('ls-files', '--stage'), symlinkLedgerIndex);
+        assert.equal(readFileSync(ledger, 'utf8'), resolved);
+      }
+      await git('add', ledgerPath);
+      assert.equal(run('--check-merge', repository).status, 0);
       if (scenario === 'additions') {
-        // Every retry mode must check the ledger's index type, independently of its blob text.
-        const ledgerPath = 'packages/shared-lib/corrections.json';
-        const ledgerBlob = (await git('rev-parse', `:0:${ledgerPath}`)).trim();
-        await git('update-index', '--cacheinfo', `120000,${ledgerBlob},${ledgerPath}`);
-        const symlinkLedgerIndex = await git('ls-files', '--stage');
-        for (const args of [
-          ['--resolve-merge', repository],
-          ['--check-merge', repository],
-          ['--resolve-merge', repository, '--stage'],
-        ]) {
-          const rejected = run(...args);
-          assert.equal(
-            rejected.status,
-            1,
-            `${args[0]} ${args[2] ?? ''}: a staged ledger must be a regular file`,
-          );
-          assert.match(rejected.stderr, /staged source must be a regular file/);
-          assert.equal(await git('ls-files', '--stage'), symlinkLedgerIndex);
-          assert.equal(readFileSync(ledger, 'utf8'), resolved);
-        }
-        await git('add', ledgerPath);
-        assert.equal(run('--check-merge', repository).status, 0);
         await git('update-index', '--chmod=+x', ledgerPath);
         assert.equal(
           run('--resolve-merge', repository).status,
@@ -885,19 +913,6 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
         /concurrent receipt edits|removed receipt|missing guard anchor|resolve other conflicts first|staged conflict markers|Expected property name|MERGE_HEAD|manually resolved ledger/,
       );
       assert.equal(readFileSync(ledger, 'utf8'), before);
-      if (scenario === 'manual-resolution') {
-        await git('add', 'packages/shared-lib/corrections.json');
-        const staged = await git('ls-files', '--stage');
-        for (const args of [
-          ['--check-merge', repository],
-          ['--resolve-merge', repository],
-          ['--resolve-merge', repository, '--stage'],
-        ]) {
-          assert.equal(run(...args).status, 0, 'explicit staging retains manual receipts');
-          assert.equal(await git('ls-files', '--stage'), staged);
-          assert.equal(readFileSync(ledger, 'utf8'), before);
-        }
-      }
       if (scenario === 'binary-marker') {
         await git('add', rows[0].guard.path);
         const repaired = run('--resolve-merge', repository, '--stage');

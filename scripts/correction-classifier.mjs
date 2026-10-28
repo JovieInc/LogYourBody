@@ -312,6 +312,11 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
           stagingMerge ? sources.get(`:0:${guard}`) : readSource(guard, { root }),
         ),
       );
+      assertLedgerResolutionUnchanged(
+        working,
+        result,
+        'resolve-merge refuses to overwrite a manually resolved ledger; review and stage it explicitly',
+      );
       if (stagingMerge) {
         // Validate staged guards and both parents before writing or staging anything.
         verifyMerge(result);
@@ -327,13 +332,6 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
     }
     const original = readFileSync(path, 'utf8');
     const formatted = `${JSON.stringify(result, null, 2)}\n`;
-    if (resolvingMerge) {
-      assertLedgerResolutionUnchanged(
-        original,
-        result,
-        'resolve-merge refuses to overwrite a manually resolved ledger; review and stage it explicitly',
-      );
-    }
     // Validate the entire ledger before writing; a repeat run preserves bytes.
     if (
       resolvingMerge
