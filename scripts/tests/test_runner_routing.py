@@ -771,6 +771,25 @@ def test_hosted_ios_jobs_retain_existing_test_quality_and_summary_gates() -> Non
     assert 'heartbeat' not in summary
 
 
+def test_unit_reuses_package_cache_without_archiving_test_builds() -> None:
+    # Run 40648671494 passed Unit and coverage, then hit the 40m job cap
+    # uploading 4.2 GB of DerivedData. Setup already owns the package cache.
+    unit = _job_block('ios-unit.yml', 'unit')
+    assert 'uses: ./.github/actions/setup-ios-build' in unit
+    assert 'working-directory: apps/ios' in unit
+    assert 'actions/cache' not in unit, 'reuse setup package cache; do not archive Unit build outputs'
+    assert 'timeout-minutes: 40' in unit
+    setup = (_REPO_ROOT / '.github/actions/setup-ios-build/action.yml').read_text()
+    cache = setup.split('    - name: Cache Swift Package Manager\n', 1)[1].split('\n    - name:', 1)[0]
+    assert "if: runner.environment == 'github-hosted'" in cache
+    assert 'uses: actions/cache@' in cache
+    paths = cache.split('        path: |\n', 1)[1].split('        key:', 1)[0]
+    assert [line.strip() for line in paths.splitlines() if line.strip()] == [
+        '${{ inputs.working-directory }}/SourcePackages',
+        '~/Library/Developer/Xcode/DerivedData/**/SourcePackages',
+    ]
+
+
 def _run_manual_quality_guard(tmp_path: Path, **overrides: str) -> subprocess.CompletedProcess[str]:
     quality = _job_block("ios-quality.yml", "quality")
     guard_step = quality.split("      - name: Validate manual qualification source\n", 1)[1]
@@ -1787,7 +1806,7 @@ def test_focused_diagnostic_actual_trusted_guard_rejects_old_wrong_dirty_or_unre
     guard = module['validate_tooling']
     live_audit = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert module['REVIEWED_AUDIT_SHA256'] == hashlib.sha256(live_audit).hexdigest() == (
-        'd77acce04a7d6eff69ddadcf28e869a703ed3ae98b50921b3625878490c481a8'
+        'ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa'
     )
     root, head = _diagnostic_repository(tmp_path)
     script = root / 'scripts/ios/launch-quality-audit.sh'
@@ -2016,7 +2035,7 @@ def test_focused_diagnostic_workflow_has_fixed_nonqualifying_trust_order_and_pre
     assert "  schedule:\n    - cron: '0 16 * * *'\n" in source
     assert source.count("github.event_name == 'workflow_dispatch' && inputs.checkout-ref || github.sha") == 1
     assert 'push and schedule refuse a caller checkout ref.' in source
-    assert "REVIEWED_AUDIT_SHA256 = 'd77acce04a7d6eff69ddadcf28e869a703ed3ae98b50921b3625878490c481a8'" in source
+    assert "REVIEWED_AUDIT_SHA256 = 'ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa'" in source
     assert source.index('Validate manual diagnostic source') < source.index('- uses: actions/checkout@')
     assert source.index('Validate reviewed composed tooling') < source.index('Select hosted Xcode') < source.index('Run fixed seven-case diagnostic')
     assert 'persist-credentials: false' in source and 'python3 -I -' in source
@@ -2253,7 +2272,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     import hashlib
     body = _diagnostic_step('Validate reviewed composed tooling before candidate execution')
     module = _diagnostic_python('DIAGNOSTIC_TOOLING_PY', body)
-    expected = 'd77acce04a7d6eff69ddadcf28e869a703ed3ae98b50921b3625878490c481a8'
+    expected = 'ad4098afa11c60dededb52592a74de1c3374d84f87da891f754b4b47f6aba2aa'
     assert module['REVIEWED_AUDIT_SHA256'] == expected
     dependencies = module['DEPENDENCIES']
     assert len(dependencies) == 7
@@ -2268,8 +2287,20 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
     unlanded = _reviewed_diagnostic_candidate_bytes()
     reviewed = (_REPO_ROOT / 'scripts/ios/launch-quality-audit.sh').read_bytes()
     assert hashlib.sha256(reviewed).hexdigest() == expected
-    # Previously approved audits are inert evidence, never admitted fallbacks.
-    previous_preflight = reviewed.replace(
+    # Both merge parents and previously approved audits remain rejected inert evidence.
+    previous_main = reviewed.replace(
+        b'  "LogYourBodyUITests/testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance"\n',
+        b'', 1)
+    assert hashlib.sha256(previous_main).hexdigest() == 'd77acce04a7d6eff69ddadcf28e869a703ed3ae98b50921b3625878490c481a8'
+    previous_branch = reviewed.replace(
+        b'  # Finish validator shell fixtures before simulator boot competes for host resources.\n'
+        b'  python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n', b'', 1)
+    previous_branch = previous_branch.replace(
+        b'\nbuild_for_testing_once\n\nCHAT_QUALIFICATION_UNIT_TESTS=(',
+        b'\npython3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n'
+        b'build_for_testing_once\n\nCHAT_QUALIFICATION_UNIT_TESTS=(', 1)
+    assert hashlib.sha256(previous_branch).hexdigest() == '47d6ee6b7d56796527fa0154082f89a46c8a30be0ecfd5ce7e13866a600b633a'
+    previous_preflight = previous_main.replace(
         b'  # Finish validator shell fixtures before simulator boot competes for host resources.\n'
         b'  python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"\n', b'', 1)
     previous_preflight = previous_preflight.replace(
@@ -2319,7 +2350,7 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         executable.write_text('#!/bin/bash\nprintf "%s\\n" "$0" >> "$FORBIDDEN_DIAGNOSTIC_EXECUTION"\nexit 99\n')
         executable.chmod(0o700)
 
-    fixtures = ['positive', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
+    fixtures = ['positive', 'previous-main-audit', 'previous-branch-audit', 'previous-preflight-audit', 'previous-reviewed-audit', 'unlanded-candidate', 'legacy-v16', 'marker-only', 'missing-audit', 'wrong-audit',
                 'dirty', 'untracked', 'audit-symlink', 'wrong-dependency', 'missing-dependency',
                 'dependency-symlink', 'changed-project', 'wrong-resolver']
     for scenario in fixtures:
@@ -2336,7 +2367,11 @@ def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candi
         audit = root / 'scripts/ios/launch-quality-audit.sh'
         audit.write_bytes(reviewed)
         helper = root / 'scripts/ios/bootstrap-local-config.sh'
-        if scenario == 'previous-preflight-audit':
+        if scenario == 'previous-main-audit':
+            audit.write_bytes(previous_main)
+        elif scenario == 'previous-branch-audit':
+            audit.write_bytes(previous_branch)
+        elif scenario == 'previous-preflight-audit':
             audit.write_bytes(previous_preflight)
         elif scenario == 'previous-reviewed-audit':
             audit.write_bytes(previous_reviewed)

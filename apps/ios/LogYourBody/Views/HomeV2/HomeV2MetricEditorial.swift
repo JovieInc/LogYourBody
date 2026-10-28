@@ -390,6 +390,7 @@ struct HomeV2MetricCanvasRequest {
     let formatValue: (Double) -> String
     let dateText: (Date) -> String
     var calendar = Calendar.current
+    var observationSummary: MetricObservationSummary?
 }
 
 /// Hero copy for Steps, Weight, Body fat, FFMI, and the home timeline.
@@ -424,7 +425,9 @@ enum HomeV2MetricEditorial {
             prefersHigh: request.metric.prefersHigh,
             calendar: request.calendar
         )
-        let comparison = comparisonText(
+        let comparison = request.observationSummary?.changeText(
+            unit: request.metric == .steps ? "steps" : request.unit
+        ) ?? comparisonText(
             metric: request.metric,
             stats: stats,
             deltaUnit: request.deltaUnit,
@@ -438,7 +441,7 @@ enum HomeV2MetricEditorial {
             formatValue: request.formatValue,
             dateText: request.dateText
         )
-        let value = stats.latest.map(request.formatValue) ?? "—"
+        let value = (request.observationSummary?.point?.value ?? stats.latest).map(request.formatValue) ?? "—"
         let resolvedUnit = request.metric == .steps ? stepsDisplayUnit : request.unit
         var lines = [value, comparison]
         if !resolvedUnit.isEmpty { lines.append(resolvedUnit) }
