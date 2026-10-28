@@ -1677,6 +1677,40 @@ final class LogYourBodyUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["photo_timeline_root_page_timeline"].exists)
     }
 
+    func testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance() throws {
+        let app = XCUIApplication()
+        app.forwardActualXCTestContext()
+        launch(app, with: [
+            "-lybUITestHomeRollbackFixture", "-lybUITestPhotoTimelineHUDFixture",
+            "-lybUITestPhaseInsightFixture", "-lybUITestMetricStatsTruth", "-dashboard_selected_time_range", "1M"
+        ])
+        XCTAssertTrue(waitForTimelineRoot(in: app, timeout: 12))
+        openStatsPage(in: app)
+        let card = app.descendants(matching: .any)["photo_timeline_stats_metric_card_weight"]
+        scrollUntilHittable(card, in: app)
+        XCTAssertTrue(card.label.contains("Observed"))
+        XCTAssertTrue(card.label.contains("Past 30 days"))
+        let value = try XCTUnwrap(card.label.split(separator: ",").dropFirst().first?.split(separator: " ").first)
+        card.tap()
+        let headline = app.descendants(matching: .any)["metric_detail_headline"]
+        XCTAssertTrue(headline.waitForExistence(timeout: 8))
+        XCTAssertEqual(headline.label, String(value))
+        let context = app.staticTexts["metric_detail_observation_context"]
+        XCTAssertTrue(context.waitForExistence(timeout: 5))
+        XCTAssertTrue(context.label.contains("Mean of"))
+        let chart = app.descendants(matching: .any)["metric_detail_chart_plot"]
+        scrollUntilHittable(chart, in: app)
+        let start = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)))
+        let selectedValue = headline.label
+        let selectedContext = context.label
+        XCTAssertFalse(selectedContext.isEmpty)
+        XCTAssertFalse(selectedContext.contains("Updated"))
+        // Read the chart after release; selection must continue to match the headline.
+        XCTAssertTrue((chart.value as? String)?.contains("current selection \(selectedValue)") == true)
+        attachScreenshot(named: "lyb47-observation-drilldown", from: app)
+    }
+
     func testMetricDetailOpensFromStatsAndShowsSharedTimelineContext() throws {
         let app = XCUIApplication()
         launch(app, with: [

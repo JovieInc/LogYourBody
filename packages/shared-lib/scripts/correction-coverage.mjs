@@ -359,6 +359,40 @@ export function assertLedgerMergeReady(root) {
     /^\+(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |$)/m,
     'ledger merge: resolve staged conflict markers first',
   );
+  // Git honors per-path conflict-marker-size, including size 1. A global
+  // single-character regex would also reject ordinary Markdown blockquotes.
+  let checked;
+  try {
+    checked = execFileSync(
+      'git',
+      [
+        'diff',
+        '--cached',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--text',
+        '--no-color',
+        '--check',
+        '--',
+        '.',
+        `:!${LEDGER_PATH}`,
+      ],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, LC_ALL: 'C' },
+      },
+    );
+  } catch (error) {
+    if (error.status !== 2) throw error;
+    checked = error.stdout;
+  }
+  assert.doesNotMatch(
+    checked,
+    /: leftover conflict marker$/m,
+    'ledger merge: resolve staged conflict markers first',
+  );
 }
 
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {

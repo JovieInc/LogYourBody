@@ -348,16 +348,16 @@ extension DashboardViewLiquid {
     #endif
 }
 
-private func buildFullScreenStepsChartData(from recentDailyMetrics: [DailyMetrics]) -> [MetricChartDataPoint] {
+func buildFullScreenStepsChartData(from recentDailyMetrics: [DailyMetrics]) -> [MetricChartDataPoint] {
     guard !recentDailyMetrics.isEmpty else { return [] }
 
     return recentDailyMetrics
         .sorted { $0.date < $1.date }
         .compactMap { metric in
-            guard let steps = metric.steps else { return nil }
+            guard let steps = metric.steps, steps >= 0 else { return nil }
             return MetricChartDataPoint(
                 date: metric.date,
-                value: Double(max(steps, 0)),
+                value: Double(steps),
                 isEstimated: false
             )
         }

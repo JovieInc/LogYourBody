@@ -156,99 +156,99 @@ function mergeLedgers(left, right) {
   return [...merged.values()];
 }
 
+// Keep the repair command reusable without starting Node or exiting its caller.
+export function runClassifier(args) {
+  const resolvingMerge = args[0] === '--resolve-merge';
+  const checkingMerge = args[0] === '--check-merge';
+  const stagingMerge = resolvingMerge && args[2] === '--stage';
+  assert.ok(
+    resolvingMerge || checkingMerge
+      ? (args.length === 2 || (args.length === 3 && stagingMerge)) && !args[1].startsWith('-')
+      : (args.length <= 1 ||
+          (args.length === 3 && args[1] === '--merge' && !args[2].startsWith('-'))) &&
+          !args[0]?.startsWith('-'),
+    'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository [--stage] | --check-merge repository',
+  );
+  let path;
+  let result;
+  let stageResolution;
+  if (resolvingMerge || checkingMerge) {
+    const git = (...gitArgs) =>
+      execFileSync('git', ['-C', args[1], ...gitArgs], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    const root = git('rev-parse', '--show-toplevel').trim();
+    path = resolve(root, LEDGER_PATH);
+    const verifyMerge = (receipts) => {
+      const parents = ['HEAD', 'MERGE_HEAD'].map((ref) => git('rev-parse', '--verify', ref).trim());
+      assert.deepEqual(
+        receipts,
+        classifyLedger(receipts),
+        'staged merge ledger must be classified',
+      );
+      const current = guardCoverageReport(receipts, (guard) => git('show', `:0:${guard}`), {
+        requireClassification: true,
+      });
+      for (const ref of parents) {
+        const baseline = coverageReport(JSON.parse(git('show', `${ref}:${LEDGER_PATH}`)), (guard) =>
+          git('show', `${ref}:${guard}`),
+        );
+        assertNoRegression(current, baseline);
+      }
+    };
+    // Verify the whole merge is conflict-free, including staged retries.
+    assertLedgerMergeReady(root);
+    if (checkingMerge || (stagingMerge && !git('ls-files', '--unmerged', '--', LEDGER_PATH))) {
+      verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
+      assert.equal(
+        readSource(LEDGER_PATH, { root }),
+        git('show', `:0:${LEDGER_PATH}`),
+        'staged retry refuses unstaged ledger edits; review and stage them explicitly',
+      );
+      return 'correction-classifier: verified staged ledger against both merge parents';
+    }
+    // Reuse the coverage tool's three-way policy rather than a second resolver.
+    // Classify snapshots first so derived metadata cannot look like concurrent edits.
+    const stages = readGitMergeLedgers(root).map((rows) => classifyLedger(rows));
+    result = classifyLedger(
+      // Keep incoming order, then append branch-only receipts so future main
+      // prepends do not collide with the same branch receipt on every repair.
+      mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
+        readSource(guard, { root }),
+      ),
+    );
+    readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
+    if (stagingMerge) {
+      // Validate staged guards and both parents before writing or staging anything.
+      verifyMerge(result);
+      stageResolution = () => git('add', '--', LEDGER_PATH);
+    }
+  } else {
+    path = args[0] ?? resolve(ROOT, LEDGER_PATH);
+    const receipts = JSON.parse(readFileSync(path, 'utf8'));
+    result =
+      args.length === 3
+        ? mergeLedgers(receipts, JSON.parse(readFileSync(args[2], 'utf8')))
+        : classifyLedger(receipts);
+  }
+  const original = readFileSync(path, 'utf8');
+  const formatted = `${JSON.stringify(result, null, 2)}\n`;
+  // Validate the entire ledger before writing; a repeat run preserves bytes.
+  if (
+    resolvingMerge
+      ? original !== formatted
+      : JSON.stringify(JSON.parse(original)) !== JSON.stringify(result)
+  ) {
+    writeFileSync(path, formatted);
+  }
+  stageResolution?.();
+  return `correction-classifier: classified ${result.length} receipts`;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
-    const args = process.argv.slice(2);
-    const resolvingMerge = args[0] === '--resolve-merge';
-    const checkingMerge = args[0] === '--check-merge';
-    const stagingMerge = resolvingMerge && args[2] === '--stage';
-    assert.ok(
-      resolvingMerge || checkingMerge
-        ? (args.length === 2 || (args.length === 3 && stagingMerge)) && !args[1].startsWith('-')
-        : (args.length <= 1 ||
-            (args.length === 3 && args[1] === '--merge' && !args[2].startsWith('-'))) &&
-            !args[0]?.startsWith('-'),
-      'usage: node scripts/correction-classifier.mjs [ledger.json [--merge other.json]] | --resolve-merge repository [--stage] | --check-merge repository',
-    );
-    let path;
-    let result;
-    let stageResolution;
-    if (resolvingMerge || checkingMerge) {
-      const git = (...gitArgs) =>
-        execFileSync('git', ['-C', args[1], ...gitArgs], {
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
-      const root = git('rev-parse', '--show-toplevel').trim();
-      path = resolve(root, LEDGER_PATH);
-      const verifyMerge = (receipts) => {
-        const parents = ['HEAD', 'MERGE_HEAD'].map((ref) =>
-          git('rev-parse', '--verify', ref).trim(),
-        );
-        assert.deepEqual(
-          receipts,
-          classifyLedger(receipts),
-          'staged merge ledger must be classified',
-        );
-        const current = guardCoverageReport(receipts, (guard) => git('show', `:0:${guard}`), {
-          requireClassification: true,
-        });
-        for (const ref of parents) {
-          const baseline = coverageReport(
-            JSON.parse(git('show', `${ref}:${LEDGER_PATH}`)),
-            (guard) => git('show', `${ref}:${guard}`),
-          );
-          assertNoRegression(current, baseline);
-        }
-      };
-      // Verify the whole merge is conflict-free, including staged retries.
-      assertLedgerMergeReady(root);
-      if (checkingMerge || (stagingMerge && !git('ls-files', '--unmerged', '--', LEDGER_PATH))) {
-        verifyMerge(JSON.parse(git('show', `:0:${LEDGER_PATH}`)));
-        assert.equal(
-          readSource(LEDGER_PATH, { root }),
-          git('show', `:0:${LEDGER_PATH}`),
-          'staged retry refuses unstaged ledger edits; review and stage them explicitly',
-        );
-        console.log('correction-classifier: verified staged ledger against both merge parents');
-        process.exit(0);
-      }
-      // Reuse the coverage tool's three-way policy rather than a second resolver.
-      // Classify snapshots first so derived metadata cannot look like concurrent edits.
-      const stages = readGitMergeLedgers(root).map((rows) => classifyLedger(rows));
-      result = classifyLedger(
-        // Keep incoming order, then append branch-only receipts so future main
-        // prepends do not collide with the same branch receipt on every repair.
-        mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
-          readSource(guard, { root }),
-        ),
-      );
-      readSource(LEDGER_PATH, { root }); // Refuse symlinked output before writing.
-      if (stagingMerge) {
-        // Validate staged guards and both parents before writing or staging anything.
-        verifyMerge(result);
-        stageResolution = () => git('add', '--', LEDGER_PATH);
-      }
-    } else {
-      path = args[0] ?? resolve(ROOT, LEDGER_PATH);
-      const receipts = JSON.parse(readFileSync(path, 'utf8'));
-      result =
-        args.length === 3
-          ? mergeLedgers(receipts, JSON.parse(readFileSync(args[2], 'utf8')))
-          : classifyLedger(receipts);
-    }
-    const original = readFileSync(path, 'utf8');
-    const formatted = `${JSON.stringify(result, null, 2)}\n`;
-    // Validate the entire ledger before writing; a repeat run preserves bytes.
-    if (
-      resolvingMerge
-        ? original !== formatted
-        : JSON.stringify(JSON.parse(original)) !== JSON.stringify(result)
-    ) {
-      writeFileSync(path, formatted);
-    }
-    stageResolution?.();
-    console.log(`correction-classifier: classified ${result.length} receipts`);
+    console.log(runClassifier(process.argv.slice(2)));
   } catch (error) {
     console.error(`correction-classifier: ${error.message}`);
     process.exitCode = 1;

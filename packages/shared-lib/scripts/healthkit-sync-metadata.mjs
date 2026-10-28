@@ -106,8 +106,7 @@ export function analyze(path, source) {
   return findings;
 }
 
-function sourceAssertionFindings(path, source) {
-  if (!source.includes('sourceRevision') || !source.includes('XCTAssertEqual')) return [];
+function swiftCode(source) {
   // Ignore examples in comments/strings while retaining Swift member expressions.
   let code = '';
   let index = 0;
@@ -127,6 +126,30 @@ function sourceAssertionFindings(path, source) {
       code += source[index++];
     }
   }
+  return code;
+}
+
+function historySourceFindings(path, source) {
+  if (!source.includes('EntriesPayload') || !source.includes('dataSource')) return [];
+  return swiftCode(source)
+    .split(/\bfunc\s+/u)
+    .flatMap((body) => {
+      const field = /^(weight|bodyFat)EntriesPayload\s*\(/u.exec(body)?.[1];
+      if (!field) return [];
+      return [
+        ...body.matchAll(
+          /\bmetricEntrySourceType\s*\(\s*from\s*:\s*(\w+)\s*\.\s*dataSource\s*\)/gu,
+        ),
+      ].map((match) => ({
+        path,
+        key: `per-field provenance required for ${field} history: ${match[1]}.dataSource`,
+      }));
+    });
+}
+
+function sourceAssertionFindings(path, source) {
+  if (!source.includes('sourceRevision') || !source.includes('XCTAssertEqual')) return [];
+  const code = swiftCode(source);
   const member = String.raw`[A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)+`;
   const equality = new RegExp(
     String.raw`\bXCTAssertEqual\s*\(\s*(${member})\s*,\s*(${member})\s*(?=[,)])`,
@@ -165,6 +188,7 @@ export function scan({ files, readSource }) {
       return [
         ...analyze(path, source).map(({ path: findingPath, key }) => ({ path: findingPath, key })),
         ...sourceAssertionFindings(path, source),
+        ...historySourceFindings(path, source),
       ];
     });
 }

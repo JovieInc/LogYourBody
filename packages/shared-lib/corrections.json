@@ -2795,6 +2795,157 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "stats-truth-neutral-direction-and-observation-windows",
+    "correction": "LYB-47: Stats must distinguish observation, sync, display and comparison dates; insufficient samples and direction alone cannot imply unchanged health or goal progress.",
+    "source": "https://linear.app/jovie/issue/LYB-47",
+    "mechanization": "The existing metric helpers own the shared Stats truth contract behind metric_stats_truth_v1. Existing native formatting, chart and share truth tests cover fixtures. The required launch-quality audit rejects reintroduced success/error direction styling; mutation tests prove rejection.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Keep direction neutral by construction and share a dated observation summary across Stats, detail, timeline and share rather than adding a competing calculator."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "# LYB-47: direction alone cannot establish safe goal progress."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "stats-truth-state-belongs-to-chart-view",
+    "correction": "PR #1535 failed native compilation because synchronizationText was placed on ChartSeriesPreprocessor instead of FullMetricChartView, and pure computeSeriesStats was scoped to a view extension while calculation tests call it directly.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Place synchronization display state on its owning chart view so preprocessing remains independent of presentation metadata. Keep the pure series calculation at file scope for both chart and existing deterministic fixtures. The existing required native build compiles the real view initializer and DashboardMetricFormattingTests; the endpoint/mean case verifies the same calculation in production and fixtures. Native compilation and execution remain unverified locally and required in CI.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Swift stored-property ownership and a shared pure function express the boundary in types instead of maintaining duplicate calculations or supplying display state to preprocessing."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/DashboardMetricFormattingTests.swift",
+      "anchor": "func testObservationSummaryUsesEndpointsAndObservationMeanAcrossUnequalDates() throws"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "metric-state-actions-have-one-native-control-owner",
+    "correction": "PR #1535 Detect Changes rejected the Stats truth card because it wrapped MetricSummaryCard in an external Button and passed the removed isButtonContext argument. Pass navigation through the card-owned detailAction API, preserving the selected metric and Stats observation context.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Reuse the existing metric-card-control-owner ratchet and required shared-lib production-caller regression. The actual Stats truth wrapper fails the existing correction-ratchet CLI test before the fix and passes afterward; the same guard rejects external owners across all native callers with its unchanged empty baseline. Keep the card as the single touch and accessibility action owner. Native build, UI execution and coverage remain required on the real runner. The lanes harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Own the native Button in the metric primitive and pass explicit executable actions from callers so a wrapper flag cannot invent interactivity or hide a nested state control."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/metric-card-control-owner.mjs",
+      "anchor": "LYB-43: keep metric controls inside the card, never inside an external Button.",
+      "ratchet": {
+        "baseline": "packages/shared-lib/metric-card-control-owner-baseline.json"
+      }
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1535 recurring conflict repair: merge origin/main without losing Stats truth, the bounded cold-build budget or correction receipts, and prevent Git binary attributes from hiding staged conflict markers.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Extend the existing ledger merge readiness guard with --text so binary diff attributes cannot conceal unresolved staged source. Its required classifier Git-fixture suite now exercises -diff attributes during initial resolution, staging, verification and staged retries, retaining index and ledger bytes on refusal and accepting clean retries. The new binary-marker case fails before the guard change with exit 0 instead of refusal and passes afterward. Use --resolve-merge . --stage and --check-merge . on this merge. Review the composed audit delta, retain both parents' test selectors and build limits, and pin only the final bytes; the trusted CLI rejects both superseded parent audits. The lanes harness retains push and PR ownership. On occurrence 32, extend the same readiness machine with Git --check so per-path conflict-marker-size=1 is honored without treating ordinary Markdown quotes as conflicts. The new real-Git regression fails before the extension and passes afterward; the existing generated classifier scenarios cover initial resolution and staging for all four single-character markers. Preserve the index and working files on refusal, retain the minimum-marker recursive-ancestor fixture, and accept ordinary quotes and whitespace-only findings. Use the extended resolver to merge and classify all 141 parent receipts, then verify both immutable parents.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "share-png-truth-independent-visibility",
+    "correction": "PR #1535 (fix-red-5df69c1e5f) Launch Quality failed testStatsTruthFFMIUsesCanonicalJOV3331ValueAndExportsDerivedEvidence: the fixture enabled date, range and provenance but its PNG truth expectation treated range and source as hidden. The oracle also coupled range visibility to date visibility.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Extend the existing SharePNGTruth template with required independent range and source fields, then use it for every existing PNG expectation and the failing Stats FFMI fixture. The validator checks the explicit range independently of the observation date. A new eight-combination calibration exercises date/range/source visibility and rejects missing or leaked fields plus missing mandatory evidence. The existing required launch-quality runner executes the complete native unit target, including this suite. Run 40434998769 supplies the original native failure (privacy and source); the updated Swift regression and PNG/OCR execution remain unverified on this Linux host without Swift or Xcode. Preserve all privacy, unrelated-data, evidence and nonfinite checks. The lanes harness owns pushes and PR edits.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing typed PNG expectation schema can require separate optional date, range and source arguments for every fixture, preventing implicit source defaults and date-driven range expectations by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/BodyScoreShareCardTests.swift",
+      "anchor": "// Require each privacy control explicitly; date visibility does not own range or source."
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "metric-chart-container-preserves-adjustable-plot-identity",
+    "correction": "PR #1535 (fix-red-5df69c1e5f) Launch Quality run 40633922695 failed testStatsTruthDrilldownKeepsHeadlineAndFocusWithObservationProvenance: the chart rendered, but its parent accessibility identifier replaced metric_detail_chart_plot in the native hierarchy.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40633922695/job/122636571085",
+    "mechanization": "Give the existing chart container explicit accessibility containment before assigning its identifier, preserving its adjustable plot and separate header by construction. Extend the existing launch UI regression audit and its required shared-lib mutation suite to reject missing containment, ignored or combined children, and containment applied after the identifier. The extended audit fails against the unchanged parent and passes after the one-line fix; all 15 mutation cases pass. Include the audit, mutation suite and chart source in the existing Turbo test inputs so source-only changes invalidate cached guard results. Keep the existing native drilldown drag, selection and provenance assertions and all required CI gates. Native execution and exact-head coverage remain unverified on this Linux host without Xcode. The lanes harness retains push and PR ownership.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "An explicit containing accessibility element on the existing parent isolates its identifier from the interactive chart children, matching the adjacent headline and related-metrics containers without changing the chart data or interaction model."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-ui-regression-audit.py",
+      "anchor": "# Identified chart containers must not overwrite their interactive plot's identity."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "native-unit-cache-saves-only-package-inputs",
+    "correction": "PR #1535 (fix-red-e3b0c44298): merge-group run 40648671494 passed all 1712 Unit cases (49 skipped), native coverage and receipt upload, then exceeded the 40-minute job cap while saving a 4.2 GB DerivedData cache.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1535",
+    "mechanization": "Reuse setup-ios-build's existing hosted-only SourcePackages cache instead of adding a second Unit cache over complete build outputs. Extend the existing required runner-routing suite to reject a direct Unit cache, broader setup cache paths, loss of shared setup or a changed 40-minute cap. The new regression fails on the original workflow and passes after removing the redundant cache. Keep every build, native selector, assertion, coverage ratchet, evidence upload and summary gate. The earlier classifier timeout in run 40647895974 passed on the next same-head queue run; local validation retains its 30-second wrapper and 100% coverage thresholds. No native or hosted cache-save execution is available on this Linux host. The harness owns pushes and PR edits.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The failure is in GitHub Actions post-job cache archival after successful native validation. Product types and runtime logic do not control those cache paths or the hosted job lifecycle."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Mac Runner Routing Tests can enforce shared package-only cache ownership and retain the existing native job cap before scheduling any macOS work."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_unit_reuses_package_cache_without_archiving_test_builds()"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "fix-red-1a39536f40",
+    "correction": "PR #1535 recurring merge/check repair: JavaScript/TypeScript job 122704605647 timed out after 30 seconds in the correction-classifier real-Git scenario matrix while other shared-lib cases passed.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40655183735/job/122704605647",
+    "mechanization": "Extend the existing classifier command with a reusable runClassifier entrypoint that returns diagnostics and throws errors without exiting its caller. Run every existing generated merge, staged retry, marker, presentation filter and receipt-preservation scenario through that same entrypoint in-process, retaining real CLI smoke checks for default classification, errors, union, resolution, staging and verification. This removes repeated Node startups without increasing the existing 30-second wrapper deadline or lowering any 100% coverage threshold. The exact covered command passed 11 cases in 17.4 seconds before and 6.1 seconds after on this host. Use the same command to classify this repair receipt; use the existing ledger resolver and documentation generator to preserve both parents of the required main merge. The lanes harness owns pushes and PR edits.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "A single reusable command implementation removes process exit and repeated Node startup from the generated scenario runner by construction while keeping the CLI and programmatic repair path identical."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "// Keep the repair command reusable without starting Node or exiting its caller."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "generated-product-registry-conflict-repair",
     "correction": "PR #1565: Recurring main merges conflict in generated endpoints alongside independent registry receipts. Preserve both source additions and regenerate the projection instead of selecting a parent output.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1565",
@@ -2927,6 +3078,28 @@
     "guard": {
       "path": "packages/shared-lib/scripts/healthkit-sync-metadata.mjs",
       "anchor": "HealthKit's unsaved source can be empty; metadata normalizes blanks to nil."
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "metric-history-merge-retains-field-provenance",
+    "correction": "PR #1565 recurring conflict repair: merging LYB-240 provenance with LYB-47 Stats truth must retain per-field weight/body-fat source selection as well as source names, effective-date helpers and both native test suites.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1565",
+    "mechanization": "Extend the existing healthkit-sync-metadata scanner, strict empty-baseline correction ratchet and required shared-lib test wrapper to reject row-level dataSource in weight/body-fat history source conversion. The new regression fails before the scanner extension and passes afterward. The scanner rejects both calls in the prior branch source and accepts the combined merge resolution; derived FFMI sources and comment/string examples remain allowed. Use the existing ledger resolver to retain all 156 parent receipts. Native execution remains required in CI; the lanes harness owns pushing and PR updates.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The generic Git merge cannot compose these independent source edits safely by construction; a parent-only resolution can restore row-level source selection while retaining valid Swift types."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing source scanner can reject metricEntrySourceType calls that use row-level dataSource inside weight/body-fat history providers on every required correction-ratchet run."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/healthkit-sync-metadata.mjs",
+      "anchor": "per-field provenance required for"
     },
     "level": "static",
     "ruleId": "ci-invariant"

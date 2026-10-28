@@ -105,7 +105,37 @@ test('normalized HealthKit assertions, literal values and source extraction are 
   assert.deepEqual(findings(source), []);
 });
 
-test('checked-in Swift pairs every sync identifier with a sync version', () => {
+test('metric history rejects row-level sources for weight and body fat after a merge', () => {
+  for (const field of ['weight', 'bodyFat']) {
+    const source = `func ${field}EntriesPayload() -> MetricEntriesPayload? {
+      MetricHistoryEntry(source: metricEntrySourceType(from: metric.dataSource))
+    }`;
+    assert.equal(findings(source).length, 1);
+    assert.match(findings(source)[0].key, /per-field provenance/u);
+    assert.deepEqual(
+      findings(
+        source.replace('metric.dataSource', `metric.measurementSource(for: .${field}).rawValue`),
+      ),
+      [],
+    );
+  }
+});
+
+test('derived history and examples can still name row-level sources', () => {
+  const source = `func ffmiEntriesPayload() -> MetricEntriesPayload? {
+    MetricHistoryEntry(source: metricEntrySourceType(from: metric.dataSource))
+  }
+  func weightEntriesPayload() -> MetricEntriesPayload? {
+    // metricEntrySourceType(from: metric.dataSource)
+    let example = "metricEntrySourceType(from: metric.dataSource)"
+    return MetricHistoryEntry(source: metricEntrySourceType(
+      from: metric.measurementSource(for: .weight).rawValue
+    ))
+  }`;
+  assert.deepEqual(findings(source), []);
+});
+
+test('checked-in Swift preserves HealthKit metadata and per-field history sources', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const files = execFileSync('git', ['ls-files', '-z', '--', '*.swift'], {
     cwd: root,
