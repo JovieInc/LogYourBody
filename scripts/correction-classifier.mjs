@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   assertLedgerMergeReady,
+  assertLedgerResolutionUnchanged,
   assertNoRegression,
   coverageReport,
   guardCoverageReport,
@@ -264,6 +265,11 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       assertLedgerMergeReady(root);
       // A retry after explicit staging verifies the index without overwriting local edits.
       if (checkingMerge || !git('ls-files', '--unmerged', '--', LEDGER_PATH)) {
+        assert.match(
+          git('--literal-pathspecs', 'ls-files', '--stage', '--', LEDGER_PATH),
+          /^100(?:644|755) /,
+          'staged source must be a regular file: correction ledger',
+        );
         const staged = git('show', `:0:${LEDGER_PATH}`);
         verifyMerge(JSON.parse(staged));
         assert.equal(
@@ -276,37 +282,40 @@ export function runClassifier(args, logger = console, execute = execFileSync) {
       }
       const working = readSource(LEDGER_PATH, { root }); // Refuse symlinked output.
       if (!/^(?:<+|\|+|=+|>+)(?: |$)/m.test(working)) {
-        // Preserve manually resolved receipts instead of rebuilding from the parents.
-        result = classifyLedger(JSON.parse(working));
-        if (!stagingMerge) verifyMerge(result);
-      } else {
-        // Reuse the coverage tool's three-way policy rather than a second resolver.
-        // Classify snapshots first so derived metadata cannot look like concurrent edits.
-        // Normalize identical parent replays with the existing union policy.
-        const stages = readGitMergeLedgers(root).map((rows) => mergeLedgers(rows, []));
-        // Batch the staged union's guards too; repeated receipts must not spawn Git.
-        const sources = stagingMerge
-          ? readGitSources(
-              root,
-              [
-                ...new Set(
-                  stages
-                    .flat()
-                    .filter(({ guard }) => guard)
-                    .map(({ guard }) => `:0:${guard.path}`),
-                ),
-              ],
-              execute,
-            )
-          : null;
-        result = classifyLedger(
-          // Keep incoming order, then append branch-only receipts so future main
-          // prepends do not collide with the same branch receipt on every repair.
-          mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
-            stagingMerge ? sources.get(`:0:${guard}`) : readSource(guard, { root }),
-          ),
-        );
+        // Invalid manual JSON must not be replaced with the generated parent union.
+        JSON.parse(working);
       }
+      // Reuse the coverage tool's three-way policy rather than a second resolver.
+      // Classify snapshots first so derived metadata cannot look like concurrent edits.
+      // Normalize identical parent replays with the existing union policy.
+      const stages = readGitMergeLedgers(root).map((rows) => mergeLedgers(rows, []));
+      // Batch the staged union's guards too; repeated receipts must not spawn Git.
+      const sources = stagingMerge
+        ? readGitSources(
+            root,
+            [
+              ...new Set(
+                stages
+                  .flat()
+                  .filter(({ guard }) => guard)
+                  .map(({ guard }) => `:0:${guard.path}`),
+              ),
+            ],
+            execute,
+          )
+        : null;
+      result = classifyLedger(
+        // Keep incoming order, then append branch-only receipts so future main
+        // prepends do not collide with the same branch receipt on every repair.
+        mergeCorrectionLedgers(stages[0], stages[2], stages[1], (guard) =>
+          stagingMerge ? sources.get(`:0:${guard}`) : readSource(guard, { root }),
+        ),
+      );
+      assertLedgerResolutionUnchanged(
+        working,
+        result,
+        'resolve-merge refuses to overwrite a manually resolved ledger; review and stage it explicitly',
+      );
       if (stagingMerge) {
         // Validate staged guards and both parents before writing or staging anything.
         verifyMerge(result);

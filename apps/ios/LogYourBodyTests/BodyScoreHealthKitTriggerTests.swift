@@ -176,6 +176,7 @@ final class BodyScoreHealthKitTriggerTests: XCTestCase {
             syncTrigger: {}
         )
         manager.isAuthorized = true
+        defaults.set(true, forKey: HealthKitDefaultsKey.fullSyncCompleted.scoped(with: userA))
         defer { manager.syncDebounceTimer?.invalidate() }
 
         manager.scheduleObservedBodyMetricSync(for: userA, debounce: 0.05)
