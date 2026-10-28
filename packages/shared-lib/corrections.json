@@ -3243,6 +3243,144 @@
     "ruleId": "code-prevention"
   },
   {
+    "fingerprint": "healthkit-anchored-sync-preserves-completion-contract",
+    "correction": "PR #1566 / LYB-238 repair: Merge persisted per-type anchors with main's source identity admission and metric-source completion contract. Anchored writes must propagate failure, keep cursors and prior completion unchanged on failure, and stamp successful syncs.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1566",
+    "mechanization": "Reuse the canonical batch importer and its onFailure callback for anchored pages, throw syncFailed before advancing cursors after a failed commit, and record metric-source completion only after success. Extend the registered HealthSyncPipelineAnchoredFetchTests with successful completion and failed-write cursor/completion assertions. XCTest execution, failing/passing regression receipts and native coverage remain unverified on this Linux host without Xcode; required native CI must provide them.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "Reusing the canonical importer and rejecting failed commits before cursor advancement prevents the merge from treating failed anchored persistence as a successful sync by construction."
+      }
+    },
+    "guard": {
+      "path": "apps/ios/LogYourBodyTests/HealthSyncPipelineTests.swift",
+      "anchor": "func testFailedCommitDoesNotAdvanceTheStoredAnchor()"
+    },
+    "level": "codebase",
+    "ruleId": "type-or-schema"
+  },
+  {
+    "fingerprint": "xctest-await-outside-assertion-autoclosures",
+    "correction": "PR #1566 / LYB-238: Launch Quality could not compile HealthSyncPipelineTests because three XCTAssertEqual autoclosures contained async Core Data reads. Await the results before asserting, preserving all regression assertions.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40202309384/job/121195979947",
+    "mechanization": "Await each fetch into a local value before passing it to XCTest. Retain the required Launch Quality build-for-testing of the entire test target, whose Swift compiler rejected all three original expressions. The failed CI log is the regression receipt; corrected native compilation and execution remain for CI because the repair host has no Xcode.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "Changing application runtime logic cannot prevent test authors from passing async expressions to XCTest assertion autoclosures."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required Launch Quality build-for-testing compiles the whole unit test target and the Swift compiler rejects async calls inside synchronous assertion autoclosures."
+      }
+    },
+    "guard": {
+      "path": "scripts/ios/launch-quality-audit.sh",
+      "anchor": "build_for_testing_once() {"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "diagnostic-project-pin-matches-reviewed-targets",
+    "correction": "PR #1566 / LYB-238: Adding HealthAnchorStore, the anchored HealthKit extension and anchor-store tests to their Xcode targets changed the project manifest without refreshing its diagnostic dependency pin, failing Mac Runner Routing Tests.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40201461595/job/121193328303",
+    "mechanization": "Refresh only the exact project manifest pin after reviewing its three target additions. Retain all seven dependency pins and the existing required runner-routing regression, which fails before this update and passes afterward while rejecting changed, missing, symlinked, dirty and untracked tooling.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "A runtime application change cannot keep a separately reviewed workflow dependency pin synchronized; deriving the pin from candidate bytes would remove the trust boundary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The existing required runner-routing regression compares the seven pinned digests to actual source bytes and verifies trusted CLI admission and refusal without executing candidate tooling."
+      }
+    },
+    "guard": {
+      "path": "scripts/tests/test_runner_routing.py",
+      "anchor": "def test_focused_diagnostic_bound_actual_trusted_cli_accepts_only_reviewed_candidate_and_seven_pins"
+    },
+    "level": "static",
+    "ruleId": "ci-invariant"
+  },
+  {
+    "fingerprint": "repository-source-projection-blocks-merge",
+    "correction": "PR #1566 / LYB-238: HealthKit anchor target additions left docs/REPOSITORY_SOURCES.md stale, failing Detect Changes, CI Summary and documentation parity. Regenerate the existing source projection after reviewing the manifest diff.",
+    "source": "https://github.com/JovieInc/LogYourBody/actions/runs/40201461595/job/121193328018",
+    "mechanization": "The existing required projection checker fails before regeneration and passes afterward. Retain Detect Changes, CI Summary and their regression rejecting a missing or skippable projection check.",
+    "classification": {
+      "codebase": {
+        "feasible": false,
+        "rationale": "The projection is derived documentation. No application runtime path can stop a pull request from merging a stale fingerprint; the merge gate is CI Summary."
+      },
+      "static": {
+        "feasible": true,
+        "rationale": "The required Detect Changes job runs the existing projection checker on every pull request, merge group, and main push, and CI Summary fails when that job fails."
+      }
+    },
+    "guard": {
+      "path": ".github/scripts/detect-changes.test.mjs",
+      "anchor": "required CI rejects a stale repository source projection"
+    },
+    "level": "static",
+    "ruleId": "file-pattern-or-string"
+  },
+  {
+    "fingerprint": "correction-merge-overwrites-manual-resolution",
+    "correction": "PR #1566 / LYB-238: Repeated merge repairs must retain both parents and manual receipts. Both index-stage ledger repair entrypoints must refuse to overwrite a valid, unstaged manual resolution that differs from their computed merge.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1566",
+    "mechanization": "Extend the existing correction-classifier resolver to compare a valid working ledger with its computed result before writing or staging. The existing required shared-lib classifier suite exercises real Git merges in both staging modes, proves refusal preserves the ledger and index, and verifies an explicitly staged manual receipt passes both read-only checks. The new fixture fails against the previous resolver and passes after this extension. Use the extended --resolve-merge . --stage path for this conflict, preserving all 83 parent receipts before adding this receipt. The harness retains push and PR-body ownership; its required line is Machine: built scripts/correction-classifier.mjs. On occurrence 33, share the manual-resolution comparison with correction-coverage --merge-ledger so neither documented repair command can discard manual receipts. The existing required coverage Git fixture fails before this extension with Missing expected exception and passes afterward, preserving a manual addition, an empty array and null along with all index stages. An unchanged computed union remains retryable. Retain main's in-process classifier runner and every parent marker scenario, including NUL-containing source. Use the extended classifier resolver to retain all 164 parent receipts, then verify the staged union against both immutable merge parents. The harness owns PR updates; its single current Machine line is Machine: built packages/shared-lib/scripts/correction-coverage.mjs.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver can refuse a differing completed working resolution before any write or stage, preventing loss of manual receipts by construction while retaining both-parent coverage verification."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "resolve-merge refuses to overwrite a manually resolved ledger; review and stage it explicitly"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "fix-red-e3b0c44298",
+    "correction": "PR #1566 recurring conflict repair: merge origin/main while preserving persisted HealthKit anchors, all correction receipts and both parents' merge-tool regressions; binary diff handling must not hide staged conflict markers.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1566",
+    "mechanization": "Extend the existing ledger merge readiness guard with forced text output. Real Git fixtures cover -diff attributes and NUL-containing staged source in both resolver modes, while the existing staged-retry tests exercise the same preflight. The binary-marker regression accepted a staged conflict before --text and refuses it afterward without changing the ledger or index. Retain every manual-resolution, text-conversion and color regression while resolving the test conflict. Use --resolve-merge . --stage and --check-merge . for this instance. The harness retains push and PR-body ownership; required native execution and coverage remain CI evidence on this Linux host. On occurrence 33, extend the same merge machine so the coverage entrypoint shares the classifier's manual-resolution guard. Prove refusal before and after the fix in its required real-Git behavior test, retain both parents' classifier scenarios, and use --resolve-merge . --stage and --check-merge . on the complete 164-receipt union. Preserve the trusted-main diagnostic pins rather than granting new tooling approval to merged target additions.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing resolver and pre-commit verifier can refuse staged conflict markers before writing, staging or accepting the classified union, preventing accidental acceptance by construction without another repair workflow."
+      }
+    },
+    "guard": {
+      "path": "packages/shared-lib/scripts/correction-coverage.mjs",
+      "anchor": "Staging a file does not prove its conflict markers were resolved."
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
+    "fingerprint": "correction-merge-staged-ledger-file-mode",
+    "correction": "PR #1566 recurring conflict repair (fix-red-e3b0c44298 occurrence 33): preserve both parents and persisted HealthKit anchors; merge verification and staged retries must reject a symlink ledger even when its blob contains valid classified JSON.",
+    "source": "https://github.com/JovieInc/LogYourBody/pull/1566",
+    "mechanization": "Extend the existing classifier merge verifier to require a regular staged ledger before reading its JSON. The existing required real-Git matrix fails before the extension because both retry modes accept the symlink blob, then passes with unchanged 100% line, branch and function coverage. Refusal preserves the index and working ledger; restoring the regular file permits retry. Retain all 170 parent-union receipts and every existing marker, manual-resolution and staged-guard case. Use the extended --resolve-merge . --stage and --check-merge . on this merge. The lanes harness retains push and PR-body ownership; supply its Machine line in the handoff. Native execution and coverage remain required macOS CI evidence.",
+    "classification": {
+      "codebase": {
+        "feasible": true,
+        "rationale": "The existing merge verifier can reject a nonregular indexed ledger before parsing or returning success, preventing a symlink blob from masquerading as the retained correction ledger by construction."
+      }
+    },
+    "guard": {
+      "path": "scripts/correction-classifier.mjs",
+      "anchor": "staged source must be a regular file: correction ledger"
+    },
+    "level": "codebase",
+    "ruleId": "code-prevention"
+  },
+  {
     "fingerprint": "ui-background-transition-waits-for-state",
     "correction": "PR #1583: Merging the current reduced-motion fixture makes the existing fixed-sleep ratchet fail. Chaos background transitions must wait for application state instead of assuming a fixed delay is sufficient.",
     "source": "https://github.com/JovieInc/LogYourBody/pull/1583",

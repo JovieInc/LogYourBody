@@ -152,3 +152,26 @@ final class MockHealthKitSyncManager: HealthKitSyncManaging {
         return forceFullHealthKitSyncResult
     }
 }
+
+/// Records anchored HealthKit fetches for weight, body fat, and steps.
+final class AnchoredSampleFetchProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var requests: [(HealthAnchorSampleKind, Data?)] = []
+    var page = HealthAnchoredSamplePage(added: [], deleted: [], newAnchor: Data([9]))
+
+    func callAsFunction(
+        _ kind: HealthAnchorSampleKind, _ anchor: Data?
+    ) async throws -> HealthAnchoredSamplePage {
+        lock.lock()
+        requests.append((kind, anchor))
+        let response = page
+        lock.unlock()
+        return response
+    }
+
+    func recorded() -> [(HealthAnchorSampleKind, Data?)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return requests
+    }
+}

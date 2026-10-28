@@ -96,6 +96,11 @@ Missing conflict stages fail without writing. Annotation conflicts identify the
 existing and incoming source receipts; review their classifications and retained
 guards explicitly before retrying. Conflicting annotations are never selected
 automatically.
+If the working ledger is already valid JSON and differs from the computed merge,
+both resolver entrypoints refuse to overwrite it through the same shared guard.
+Review and stage that manual resolution,
+then use `--check-merge` to verify retention against both parents. Repeating an
+unstaged resolver run with its unchanged computed result remains safe.
 Both resolver entrypoints share a preflight that refuses other unresolved Git
 paths before reading guard evidence or writing the ledger. Resolve and stage
 those source conflicts first, even when their files still contain guard anchors.
@@ -111,7 +116,8 @@ read-only merge check; it does not restage files or overwrite unrelated edits.
 Both the merge check and staged retry refuse any other unresolved Git path,
 even when the staged ledger and all of its guard sources are valid.
 Conflict-marker scanning disables Git color output as well as text conversion
-and external diff drivers so presentation settings cannot conceal staged markers.
+and external diff drivers, and forces text output so binary attributes or NUL bytes
+cannot conceal staged markers.
 It also rejects markers shorter than seven characters.
 A staged retry refuses any unstaged ledger edits rather than reporting success
 while ignoring new receipts. Review and stage those edits explicitly before
@@ -125,6 +131,8 @@ policy. It rejects a lost rule or source, a missing guard, or unclassified
 metadata even when the working tree is correct. Pre-commit runs this check for
 every merge, including merges whose staged ledger has no diff against `HEAD`.
 An absent merge or an unstaged ledger conflict fails without writing files.
+The staged ledger must be a regular file; a symlink blob containing valid JSON
+cannot pass verification or a staged resolver retry.
 
 For exported parent snapshots, `node scripts/correction-classifier.mjs left.json
 --merge right.json` writes the validated union to `left.json` without changing
