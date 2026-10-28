@@ -131,6 +131,8 @@ policy. It rejects a lost rule or source, a missing guard, or unclassified
 metadata even when the working tree is correct. Pre-commit runs this check for
 every merge, including merges whose staged ledger has no diff against `HEAD`.
 An absent merge or an unstaged ledger conflict fails without writing files.
+The staged ledger must be a regular file; a symlink blob containing valid JSON
+cannot pass verification or a staged resolver retry.
 
 For exported parent snapshots, `node scripts/correction-classifier.mjs left.json
 --merge right.json` writes the validated union to `left.json` without changing
