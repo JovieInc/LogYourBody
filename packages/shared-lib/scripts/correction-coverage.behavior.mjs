@@ -116,16 +116,21 @@ test('annotation conflicts identify both source receipts for an explicit merge r
   });
   const revised = classification('codebase');
   revised.codebase.rationale = 'A different reviewed rationale';
-  for (const assessed of [classification('static'), revised]) {
+  for (const [assessed, incomingGuard] of [
+    [classification('static'), { ...guard, path: 'incoming-guard.mjs' }],
+    [revised, guard],
+  ]) {
     const incoming = receipt('same-rule', undefined, {
       source: 'https://example.com/corrections/incoming',
       classification: assessed,
-      guard,
+      guard: incomingGuard,
     });
     assert.throws(() => report([existing, incoming]), (error) => {
       assert.match(error.message, /conflicting coverage annotations: same-rule/);
       assert.ok(error.message.includes(existing.source), error.message);
       assert.ok(error.message.includes(incoming.source), error.message);
+      assert.ok(error.message.includes(`existing guard: ${guard.path}`), error.message);
+      assert.ok(error.message.includes(`incoming guard: ${incoming.guard.path}`), error.message);
       return true;
     });
   }

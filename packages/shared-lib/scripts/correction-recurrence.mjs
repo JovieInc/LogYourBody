@@ -58,7 +58,7 @@ function groupCorrections(receipts) {
     const group = groups.get(fingerprint);
     if (group.annotation !== annotation)
       // Conflicting source receipts require explicit resolution.
-      throw new Error(`conflicting coverage annotations: ${fingerprint}; existing sources: ${[...group.sources.keys()].join(', ')}; incoming source: ${source.href}`);
+      throw new Error(`conflicting coverage annotations: ${fingerprint}; existing sources: ${[...group.sources.keys()].join(', ')}; incoming source: ${source.href}; existing guard: ${group.guard?.path ?? '(none)'}; incoming guard: ${receipt.guard?.path ?? '(none)'}`);
     group.declaredRepeats = Math.max(group.declaredRepeats, receipt.recurrence ?? 0);
     group.sources.set(source.href, {
       correction: receipt.correction.trim(),
