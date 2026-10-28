@@ -484,8 +484,6 @@ export const neonNativeProductRecords: NativeProductRecordsPort = {
       ),
   },
   trainingMutations: {
-    commitRecoveryTrial: (input) =>
-      createNeonTrainingMutations(getDatabase()).commitRecoveryTrial!(input),
     captureAdmission: (subject) =>
       createNeonTrainingMutations(getDatabase()).captureAdmission(subject),
     commit: (input) => createNeonTrainingMutations(getDatabase()).commit(input),

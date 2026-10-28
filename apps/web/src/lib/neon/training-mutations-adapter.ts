@@ -28,25 +28,6 @@ export function createNeonTrainingMutations(
   sql: NeonQueryFunction<false, false>,
 ): TrainingMutationsPort {
   return {
-    async commitRecoveryTrial(input) {
-      const rows = (await sql.query(
-        'select public.training_recovery_trial_command($1,$2::jsonb,$3::jsonb,$4::integer,$5::jsonb) as result',
-        [
-          input.subject,
-          JSON.stringify(input.admission),
-          JSON.stringify(input.expectedRecords),
-          input.expectedRevision,
-          JSON.stringify(input.record),
-        ],
-      )) as Array<{ result: Record<string, unknown> }>;
-      const result = rows[0]?.result;
-      if (!result) throw new Error('training_mutation_unavailable');
-      if (result.kind !== 'saved') return { kind: conflictSchema.parse(result.kind) };
-      const record = recordSchema.parse(result.record);
-      if (record.user_id !== input.subject || record.id !== input.record.id)
-        throw new Error('training_mutation_record_mismatch');
-      return { kind: 'saved', record };
-    },
     async captureAdmission(subject) {
       const rows = (await sql.query('select public.training_revision_context($1) as context', [
         subject,

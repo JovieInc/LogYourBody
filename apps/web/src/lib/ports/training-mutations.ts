@@ -20,15 +20,6 @@ export type TrainingMutationResult =
 
 /** Canonical training writes serialize with consent revocation and account deletion. */
 export interface TrainingMutationsPort {
-  /** Atomic recovery-trial CAS, serialized with consent/account mutation and
-   * checked against the exact training rows used to construct the proposal. */
-  commitRecoveryTrial?(input: {
-    subject: string;
-    admission: TrainingMutationAdmission;
-    expectedRecords: Record<string, unknown>;
-    expectedRevision: number | null;
-    record: Record<string, unknown>;
-  }): Promise<TrainingMutationResult>;
   captureAdmission(subject: string): Promise<TrainingMutationAdmission | null>;
   commit(input: {
     subject: string;

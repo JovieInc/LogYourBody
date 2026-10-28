@@ -128,9 +128,6 @@ jobs:
       - name: Verify Vercel and Actions ignore bot-only refs
         run: node --test .github/scripts/verify-vercel-branch-exclusions.test.mjs
 
-      - name: Test the Vercel public-env type guard
-        run: node --test .github/scripts/verify-public-build-env-types.test.mjs
-
       - name: Test change detection and the CI Summary gate
         run: node --test .github/scripts/detect-changes.test.mjs
 

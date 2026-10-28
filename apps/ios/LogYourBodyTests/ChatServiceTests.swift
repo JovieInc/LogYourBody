@@ -653,13 +653,6 @@ final class ChatServiceTests: XCTestCase {
         XCTAssertTrue(TrainingCoachPolicy.isEnabled { $0 == "hypertrophy_coach_v1" })
     }
 
-    func testAppliedRecoveryNextActionStaysHiddenUntilTheReviewedPrefix() {
-        XCTAssertNil(TrainingRecoveryCopy.appliedNextAction(nil))
-        XCTAssertNil(TrainingRecoveryCopy.appliedNextAction("Keep the current dose steady."))
-        let action = "Applied recovery trial: use the reviewed reduced work."
-        XCTAssertEqual(TrainingRecoveryCopy.appliedNextAction(action), action)
-    }
-
     func testVoiceCoachVisibilityRequiresItsStatsigGate() {
         var checkedKey: String?
         XCTAssertFalse(VoiceCoachPolicy.isEnabled { checkedKey = $0; return false })

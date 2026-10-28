@@ -16,11 +16,11 @@ Repository: `JovieInc/LogYourBody`
 A changed fingerprint requires review of its related documentation; it does not prove prose is accurate.
 
 - `.github/workflows/advisory-ai-review.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e92850748e44b4e1b7b8f966dad0ee036ecf455c453a2c4837329bbf104e0f97`)
-- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f7ebae5153112306add0c06410c9049e6755900e5488f5f65f49d9b17ab09f45`)
+- `.github/workflows/ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `dae3f6ba1a6ea56919c8ad5bc3451bd8ca8ab1d07e00a8f81e60dad8134a7277`)
 - `.github/workflows/codeql-analysis.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `e37420a26b4176ca77a7f67e4b67223b1bfa104727a9fb1af5c0ffc0dde76b73`)
 - `.github/workflows/codex-auto-fix-ci.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `3e943ed690246c6dd743d840f05a79e219103e6c4fac9e9495db2985b412c48d`)
 - `.github/workflows/dependabot-auto-merge.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `86c9b97d1058a55f4e972f97dbeb88fe579a904b1f763df28b2a8af948e67022`)
-- `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `5a96cbfc2cbfad98715428422323ddf1dc82665fff746fda3331d93422b823d1`)
+- `.github/workflows/deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `2c5f8893acaa5957cdbc2389ec3f2149c992bc9a0d60f2ceb07606f5fb04fdac`)
 - `.github/workflows/ios-app-store-approved-release.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `b43be4748356308f2098e4cf6e44f935a66d842588cb822752f27a4fcff636cb`)
 - `.github/workflows/ios-release-loop.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `c6aa764b33d363cedcca0934e6c9c238294b77c86b4ba2412a8511da51340c79`)
 - `.github/workflows/ios-testflight-deploy.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `bf3cd24d39d6ff980d4bbc77b5ac72c1aa00aaeb7e92065e7bd467397ac1ac51`)
@@ -28,7 +28,7 @@ A changed fingerprint requires review of its related documentation; it does not 
 - `.github/workflows/regenerate-certificates.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `f57d135a6836754df72baa54086987533fe1cf6abf70ac2127be28f2befbf033`)
 - `.github/workflows/security-scan.yml` — Local manifest or workflow; review related instructions when changed (SHA-256 `afbf8b8234c49008d8728e16f03748be33037d2537fd530d38fff01ae80a443a`)
 - `.nvmrc` — Local manifest or workflow; review related instructions when changed (SHA-256 `08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a`)
-- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `dd323f3ea0204109819f935290edeb15d73ccb20d8c04ca3ad234cbbee51aad7`)
+- `apps/web/package.json` — Local manifest or workflow; review related instructions when changed (SHA-256 `45da91743d6d4d6db4d9ab5bd4d5ad9676a4e768e1c24bd372a4416f52be5b8c`)
 
 ### `apps/web/package.json`: engines
 
@@ -107,7 +107,6 @@ A changed fingerprint requires review of its related documentation; it does not 
   "@radix-ui/react-toggle-group": "^1.1.19",
   "@radix-ui/react-tooltip": "^1.3.0",
   "@radix-ui/react-visually-hidden": "^1.2.11",
-  "@sentry/nextjs": "^11.9.0",
   "@statsig/js-client": "^3.33.5",
   "@statsig/statsig-node-core": "0.23.1",
   "@tailwindcss/postcss": "^4.3.3",

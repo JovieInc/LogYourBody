@@ -88,7 +88,6 @@ def main():
             run(client + ['-f', str(web / 'db/migrations/20261014103000_training_execution_cas.sql')])
 
             run(client + ['-f', str(args.canvas_migration or web / 'db/migrations/20261014180000_training_canvas_ledger.sql')])
-            run(client + ['-f', str(web / 'db/migrations/20261025030000_adaptive_recovery_trials.sql')])
 
             def owner():
                 subject = 'synthetic-' + str(uuid.uuid4())
@@ -178,16 +177,7 @@ def main():
                 return setup
 
             def mutation_sql(subject, admission, action, record):
-                if action == 'recovery_trial':
-                    return recovery_sql(subject, admission, record)
                 return f'select training_mutation_command({quote(subject)},{quote(action)},{quote(json.dumps(admission))}::jsonb,{quote(json.dumps(record))}::jsonb);'
-
-            def recovery_basis(subject):
-                return json.loads(sql(f"select coalesce(jsonb_object_agg(collection || '/' || id::text, payload || jsonb_build_object('id',id)), '{{}}'::jsonb) from native_records where user_subject={quote(subject)} and deleted_at is null and collection in ('training_sessions','logged_sets','training_feedback');"))
-
-            def recovery_sql(subject, admission, record, revision=None, basis=None):
-                expected = recovery_basis(subject) if basis is None else basis
-                return f"select training_recovery_trial_command({quote(subject)},{quote(json.dumps(admission))}::jsonb,{quote(json.dumps(expected))}::jsonb,{'null' if revision is None else revision},{quote(json.dumps(record))}::jsonb);"
 
             def mutate(subject, admission, action, record):
                 return json.loads(sql(mutation_sql(subject,admission,action,record)))
@@ -200,12 +190,6 @@ def main():
                 return subject,setup,admission,session
 
             def record_for(action, session):
-                if action == 'recovery_trial':
-                    return dict(id=str(uuid.uuid4()), record_type='recovery_trial', version=1, revision=0,
-                        programSetupId=session['programSetupId'], programRevisionId=None, policyVersion='adaptive-recovery-v1',
-                        blockId='block-1', exerciseId='exercise', state='proposed',
-                        inference=dict(action='reduce', change=dict(kind='sets', to=1, **{'from': 2})),
-                        history=[dict(revision=0, state='proposed')])
                 if action in ['session_insert','session_update','completion']:
                     return dict(session,id=str(uuid.uuid4()) if action=='session_insert' else session['id'],
                         status='completed' if action=='completion' else 'in_progress')
@@ -220,32 +204,6 @@ def main():
 
             def live_count(subject):
                 return int(sql(f'select count(*) from native_records where user_subject={quote(subject)} and deleted_at is null;'))
-
-            # Recovery source CAS and retained history use the real database function.
-            subject, setup, admission, session = fixture()
-            trial = record_for('recovery_trial', session)
-            assert mutate(subject, admission, 'recovery_trial', trial)['kind'] == 'saved'
-            proposed_basis = recovery_basis(subject)
-            applied = dict(trial, revision=1, state='applied', appliedAt='2026-10-13T10:00:00Z',
-                history=trial['history'] + [dict(revision=1, state='applied')])
-            assert json.loads(sql(recovery_sql(subject, admission, applied, 0)))['kind'] == 'saved'
-            # Stale source snapshots and stale decision revisions cannot overwrite the result.
-            rejected = dict(applied, state='rejected')
-            assert json.loads(sql(recovery_sql(subject, admission, rejected, 0, proposed_basis)))['kind'] == 'record_conflict'
-            assert json.loads(sql(recovery_sql(subject, admission, rejected, 0)))['kind'] == 'record_conflict'
-            reviewed = dict(applied, revision=2, outcome=dict(decision='inconclusive'),
-                history=applied['history'] + [dict(revision=2, state='applied')])
-            assert json.loads(sql(recovery_sql(subject, admission, dict(reviewed, inference={}), 1)))['kind'] == 'record_conflict'
-            assert json.loads(sql(recovery_sql(subject, admission, dict(reviewed, history=[]), 1)))['kind'] == 'record_conflict'
-            assert json.loads(sql(recovery_sql(subject, admission, reviewed, 1)))['kind'] == 'saved'
-            other = record_for('recovery_trial', session)
-            assert mutate(subject, admission, 'recovery_trial', other)['kind'] == 'saved'
-            other_applied = dict(other, revision=1, state='applied', history=other['history'] + [dict(revision=1, state='applied')])
-            assert json.loads(sql(recovery_sql(subject, admission, other_applied, 0)))['kind'] == 'record_conflict'
-            reverted = dict(reviewed, revision=3, state='reverted', history=reviewed['history'] + [dict(revision=3, state='reverted')])
-            assert json.loads(sql(recovery_sql(subject, admission, reverted, 2)))['kind'] == 'saved'
-            assert json.loads(sql(recovery_sql(subject, admission, other_applied, 0)))['kind'] == 'saved'
-            checks.append('recovery_source_cas_immutable_proposal_history_review_revert_single_active')
 
             import re
             adapter=(web/'src/lib/neon/user-directory-adapter.ts').read_text().split('async deleteUser(admission)')[1]
@@ -262,7 +220,7 @@ def main():
                 return guard+';'+ ';'.join(s.replace('${subject}',quote(subject)) for s in statements)+';'
 
             for boundary in ['revoke','delete']:
-                for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert','set_correct','recovery_trial']:
+                for action in ['session_insert','session_update','completion','set_insert','feedback_insert','swap_insert','set_correct']:
                     for first in ['boundary','mutation']:
                         subject,setup,admission,session=fixture()
                         if action=='set_correct':
@@ -427,11 +385,6 @@ def main():
                 str(web / 'node_modules/tsx/dist/loader.mjs'),
                 str(web / 'db/tests/verify-training-canvas.ts'), json.dumps(client)], canvas_env), flush=True)
             check('canvas actual adapter/handler and SQL qualification')
-
-            print(run_command(['node', '--conditions=react-server', '--import',
-                str(web / 'node_modules/tsx/dist/loader.mjs'),
-                str(web / 'db/tests/verify-training-recovery.ts'), json.dumps(client)], canvas_env), flush=True)
-            check('recovery actual adapter/engine apply review revert and prescription replay')
 
             print(json.dumps({'passed':len(checks),'checks':checks,'postgresTools':versions,'scope':'disposable PostgreSQL16; actual migrations, observed owner locks, synthetic rows only'}))
         finally:

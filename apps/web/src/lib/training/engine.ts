@@ -385,7 +385,7 @@ export function sameTrainingFeedbackObservation(
   return JSON.stringify(observationPayload(left)) === JSON.stringify(observationPayload(right));
 }
 
-export function effectiveTrainingFeedback(feedback: TrainingFeedback[]): TrainingFeedback[] {
+function effectiveTrainingFeedback(feedback: TrainingFeedback[]): TrainingFeedback[] {
   const corrected = new Set(
     feedback
       .map((item) => item.correctsObservationId)
