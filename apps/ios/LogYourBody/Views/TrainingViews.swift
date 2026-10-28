@@ -346,8 +346,6 @@ enum TrainingCompletionMotionPolicy {
 }
 
 struct TrainingLiveSessionView: View {
-    let cardsEnabled: Bool
-    let ownsSession: () -> Bool
     let voiceEnabled: Bool
     let readinessEnabled: Bool
     let numericScrubEnabled: Bool
@@ -363,9 +361,8 @@ struct TrainingLiveSessionView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .title2) private var exerciseTitleSize: CGFloat = 25
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(Constants.preferredMeasurementSystemKey)
     private var measurementSystemRaw = MeasurementSystem.localeDefault.rawValue
     @StateObject private var draft: TrainingSessionDraft
@@ -389,13 +386,10 @@ struct TrainingLiveSessionView: View {
     @State private var correctionPosition: TrainingSetPosition?
     @State private var completionReceipt: TrainingSetSaveReceipt?
     @State private var showEndConfirmation = false
-    @State private var showsSwap = false
-    @State private var selectedPositionId: String?
 
     init(
         session: TrainingSession,
         ownerId: String,
-        cardsEnabled: Bool = false,
         voiceEnabled: Bool,
         readinessEnabled: Bool = false,
         restTimerEnabled: Bool = false,
@@ -415,8 +409,6 @@ struct TrainingLiveSessionView: View {
         onFeedback: @escaping (TrainingFeedbackRequest) async throws -> TrainingFeedbackResponse,
         onLoadProgress: (() async throws -> TrainingProgressResponse)? = nil
     ) {
-        self.cardsEnabled = cardsEnabled
-        self.ownsSession = isCurrent
         self.voiceEnabled = voiceEnabled
         self.readinessEnabled = readinessEnabled
         self.numericScrubEnabled = numericScrubEnabled
@@ -441,18 +433,13 @@ struct TrainingLiveSessionView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: JovieTokens.screenInset) {
-                    if cardsEnabled {
-                        ApprovedTrainingCard(reference: TrainingCardAdapter.workout(draft.session)) {
-                            sessionHeader
-                            workoutNavigation
-                        }
-                    } else { sessionHeader }
+                    sessionHeader
                     if draft.restTimerEnabled { restState }
                     if hasSafetyStop {
                         safetyCard
                     } else if draft.session.executionPaused == true {
                         pausedCard
-                    } else if let current = displayedPosition {
+                    } else if let current = draft.currentPosition {
                         currentCard(current)
                         if progressEnabled {
                             TrainingExerciseHistoryRow(exerciseId: current.exercise.id, model: progress)
@@ -480,24 +467,11 @@ struct TrainingLiveSessionView: View {
                         sessionControls
                         commandControl
                     }
-                    if cardsEnabled {
-                        ApprovedTrainingCard(reference: TrainingCardAdapter.workout(
-                            draft.session, component: .trainingFeedback
-                        )) {
-                            feedbackCard
-                            if let receipt = draft.feedback?.response {
-                                Text("Recorded check-in: \(receipt.feedback.id)").font(.footnote)
-                            }
-                        }
-                    } else { feedbackCard }
+                    feedbackCard
                     if progressEnabled {
-                        if cardsEnabled {
-                            ApprovedTrainingCard(reference: TrainingCardAdapter.workout(
-                                draft.session, component: .progressReview
-                            )) {
-                                progressReview
-                            }
-                        } else { progressReview }
+                        TrainingProgressReviewSection(model: progress, decision: progressDecision) {
+                            Task { await refreshProgress() }
+                        }
                     }
                     if let message = errorMessage ?? draft.errorMessage {
                         Text(message)
@@ -525,13 +499,13 @@ struct TrainingLiveSessionView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
-                .disabled(!cardsEnabled && (isSaving || draft.isSaving))
+                .disabled(isSaving || draft.isSaving)
                 .accessibilityIdentifier("training_live_session_close_button")
                 .padding(.horizontal, JovieTokens.screenInset)
                 .padding(.vertical, JovieTokens.itemGap)
             }
         }
-        .interactiveDismissDisabled(!cardsEnabled && (isSaving || draft.isSaving))
+        .interactiveDismissDisabled(isSaving || draft.isSaving)
         .task(id: progressRefreshKey) { await refreshProgress() }
         .onDisappear {
             voiceCapture.cancel()
@@ -542,7 +516,6 @@ struct TrainingLiveSessionView: View {
         }
         .onChange(of: draft.lastSaveReceipt) { _, receipt in
             guard let receipt else { return }
-            selectedPositionId = nil
             if !TrainingCompletionMotionPolicy.shouldAnimate(reduceMotion: effectiveReduceMotion) {
                 completionReceipt = receipt
             } else {
@@ -568,94 +541,6 @@ struct TrainingLiveSessionView: View {
         .sheet(item: $correctionPosition, onDismiss: cancelOpenCorrection) { position in
             correctionSheet(position)
         }
-        .sheet(isPresented: $showsSwap) {
-            NavigationStack {
-                ScrollView {
-                    if let current = draft.currentPosition {
-                        ExerciseSwapCard(
-                            session: draft.session, exercise: current.exercise,
-                            canSwap: !draft.rows.values.contains { $0.exerciseId == current.exercise.id } &&
-                                !draft.loggedSets.values.contains { $0.exerciseId == current.exercise.id },
-                            select: selectSwap
-                        )
-                            .padding(JovieTokens.screenInset)
-                    }
-                }
-                .navigationTitle("Swap movement")
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { showsSwap = false } } }
-            }
-        }
-    }
-
-    private var progressReview: some View {
-        TrainingProgressReviewSection(model: progress, decision: progressDecision) {
-            if authorizeCard(.review, component: .progressReview) { Task { await refreshProgress() } }
-        }
-    }
-
-    private var trainingControlsLayout: AnyLayout {
-        cardsEnabled && dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: JovieTokens.itemGap))
-            : AnyLayout(HStackLayout(spacing: JovieTokens.itemGap))
-    }
-
-    private var displayedPosition: TrainingSetPosition? {
-        draft.allPositions.first { $0.id == selectedPositionId } ?? draft.currentPosition
-    }
-
-    private var workoutNavigation: some View {
-        DisclosureGroup("Workout sets") {
-            ForEach(draft.allPositions) { position in
-                Button {
-                    if draft.loggedSets[position.id] != nil {
-                        openCorrection(position)
-                    } else { selectedPositionId = position.id }
-                } label: {
-                    VStack(alignment: .leading) {
-                        Text("\(position.exercise.name), set \(position.setNumber)")
-                        Text(draft.loggedSets[position.id] != nil ? "Recorded · tap to correct" :
-                            draft.rows[position.id]?.pendingRequest != nil ? "Pending sync" : "Not recorded")
-                            .font(.footnote)
-                    }
-                    .frame(minHeight: JovieTokens.minimumHitTarget)
-                }
-                .accessibilityIdentifier("training_navigate_\(position.id)")
-            }
-        }
-        .accessibilityIdentifier("training_workout_navigation")
-    }
-
-    private func authorizeCard(_ name: TrainingCardActionName, component: TrainingCardComponent = .workoutSession) -> Bool {
-        guard cardsEnabled else { return true }
-        let reference = TrainingCardAdapter.workout(draft.session, component: component)
-        do {
-            try TrainingCardAdapter.authorize(
-                TrainingCardAction(reference: reference, name: name),
-                current: reference, ownsSession: ownsSession(), canWrite: !isSaving
-            )
-            return true
-        } catch {
-            errorMessage = "This session changed or is unavailable. Reopen it before trying again."
-            return false
-        }
-    }
-
-    private func selectSwap(_ action: TrainingCardAction) {
-        guard let current = draft.currentPosition else { return }
-        let reference = TrainingCardReference(
-            component: .exerciseSwap, objectId: draft.session.id,
-            revision: draft.session.executionRevision ?? 0, exerciseId: current.exercise.id
-        )
-        do {
-            try TrainingCardAdapter.authorize(
-                action, current: reference, ownsSession: ownsSession(),
-                canWrite: !isSaving && !draft.isSaving,
-                eligibleAlternativeIds: Set((current.exercise.substitutions ?? []).map(\.id))
-            )
-            guard let alternativeId = action.alternativeId else { return }
-            showsSwap = false
-            performAction(.swap(current.exercise.id, with: alternativeId))
-        } catch { errorMessage = "That alternative is no longer available. Reopen swaps to review it." }
     }
 
     private var progressRefreshKey: String {
@@ -699,7 +584,7 @@ struct TrainingLiveSessionView: View {
                         .tracking(0.8)
                         .foregroundStyle(theme.colors.accentTeal)
                     Text(exercise.name)
-                        .font(.system(size: cardsEnabled ? exerciseTitleSize : 25, weight: .semibold, design: .rounded))
+                        .font(.system(size: 25, weight: .semibold, design: .rounded))
                         .foregroundStyle(theme.colors.text)
                     Text("Set \(position.setNumber) of \(exercise.sets) · \(exercise.repRange.min)–\(exercise.repRange.max) reps · \(exercise.targetRir) RIR")
                         .font(.system(size: 13, weight: .medium))
@@ -714,9 +599,6 @@ struct TrainingLiveSessionView: View {
                         .accessibilityIdentifier("training_set_completion_receipt")
                 }
             }
-            if cardsEnabled {
-                TrainingVariantSetupView(variantId: exercise.id, setup: exercise.setup)
-            }
             if let instruction = exercise.loadInstruction {
                 Text(instruction)
                     .font(.footnote)
@@ -727,7 +609,7 @@ struct TrainingLiveSessionView: View {
                     .id(position.id)
                     .disabled(draft.isSaving || row.pendingRequest != nil)
             } else {
-                trainingControlsLayout {
+                HStack(spacing: JovieTokens.itemGap) {
                     labeledField(
                         "REPS",
                         placeholder: "Reps",
@@ -765,8 +647,6 @@ struct TrainingLiveSessionView: View {
                 Task { await log(exercise, setNumber: position.setNumber) }
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(cardsEnabled ? .large : .regular)
-            .frame(minHeight: cardsEnabled ? JovieTokens.minimumHitTarget : nil)
             .tint(theme.colors.text)
             .disabled(
                 draft.isSaving || !(1...50).contains(Int(row.repsText) ?? 0) ||
@@ -887,11 +767,7 @@ struct TrainingLiveSessionView: View {
 
     private var sessionControls: some View {
         VStack(spacing: JovieTokens.itemGap) {
-            trainingControlsLayout {
-                if cardsEnabled {
-                    Button("Review swaps", systemImage: "arrow.triangle.swap") { showsSwap = true }
-                        .accessibilityIdentifier("training_review_swaps")
-                }
+            HStack(spacing: JovieTokens.itemGap) {
                 Button("Equipment occupied", systemImage: "arrow.triangle.swap") {
                     guard let current = draft.currentPosition else { return }
                     performAction(.equipmentUnavailable(current.exercise.id))
@@ -910,7 +786,8 @@ struct TrainingLiveSessionView: View {
                 }
                 Button("Correct", systemImage: "pencil") {
                     guard let last = draft.lastCompletedPosition else { return }
-                    openCorrection(last)
+                    draft.beginCorrection(last)
+                    correctionPosition = last
                 }
                 .accessibilityIdentifier("training_set_correct")
                 .disabled(draft.lastCompletedPosition == nil)
@@ -1070,7 +947,6 @@ struct TrainingLiveSessionView: View {
             TextField(placeholder, text: text)
                 .keyboardType(keyboard)
                 .textFieldStyle(.roundedBorder)
-                .accessibilityLabel(label == "REPS" ? "Repetitions" : "Load in kilograms")
                 .accessibilityIdentifier(id)
         }
     }
@@ -1201,7 +1077,7 @@ struct TrainingLiveSessionView: View {
     }
 
     private func log(_ exercise: TrainingExercisePrescription, setNumber: Int) async {
-        guard !isSaving, authorizeCard(.logSet) else { return }
+        guard !isSaving else { return }
         errorMessage = nil
         await draft.saveAcknowledged(exercise, setNumber: setNumber) { request in
             try await onLogSet(
@@ -1210,19 +1086,11 @@ struct TrainingLiveSessionView: View {
         }
     }
 
-    private func openCorrection(_ position: TrainingSetPosition) {
-        guard authorizeCard(.correctSet) else { return }
-        draft.beginCorrection(position)
-        if draft.rows[position.id]?.correctionBase != nil { correctionPosition = position }
-    }
-
     private func undoLastCorrection() async {
-        guard authorizeCard(.correctSet) else { return }
         await draft.undo(send: onUndoSet)
     }
 
     private func saveCorrection(_ position: TrainingSetPosition) async {
-        guard authorizeCard(.correctSet) else { return }
         await draft.correct(position, send: onCorrectSet)
         if draft.rows[position.id] == nil { correctionPosition = nil }
     }
@@ -1442,8 +1310,7 @@ struct TrainingLiveSessionView: View {
     }
 
     private func saveFeedback() async {
-        guard !isSaving, !draft.isSaving, !feedbackSaved,
-              authorizeCard(.feedback, component: .trainingFeedback) else { return }
+        guard !isSaving, !draft.isSaving, !feedbackSaved else { return }
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
@@ -1465,7 +1332,7 @@ struct TrainingLiveSessionView: View {
                 jointPain: jointPain,
                 muscles: muscles
             )
-            if readinessEnabled || cardsEnabled {
+            if readinessEnabled {
                 feedbackSaved = await draft.recordFeedback(request, send: onFeedback)
             } else {
                 _ = try await onFeedback(request)
@@ -1620,14 +1487,6 @@ struct TrainingLiveSessionFixtureView: View {
     @State private var offline = false
     @State private var submissionCount = 0
 
-    private static var cardsEnabled: Bool {
-        ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingCards")
-    }
-
-    private static var fixtureSessionId: String {
-        cardsEnabled ? "11111111-1111-4111-8111-000000000001" : "fixture-training-session"
-    }
-
     init() {
         if ProcessInfo.processInfo.arguments.contains("-lybUITestResetTrainingFixture") {
             Self.defaults.removeObject(forKey: "savedSets")
@@ -1642,7 +1501,7 @@ struct TrainingLiveSessionFixtureView: View {
         if ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingExpiredRest"),
            Self.defaults.data(forKey: "savedSets") == nil {
             let seed = TrainingSavedSet(
-                sessionId: Self.fixtureSessionId, exerciseId: "fixture_press", setNumber: 1,
+                sessionId: "fixture-training-session", exerciseId: "fixture_press", setNumber: 1,
                 reps: 9, loadKg: 60, rir: 1,
                 completedAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-120))
             )
@@ -1655,7 +1514,7 @@ struct TrainingLiveSessionFixtureView: View {
 
     private var session: TrainingSession {
         TrainingSession(
-            id: Self.fixtureSessionId, week: 2, slot: 0, pattern: "A", title: "Fixture training",
+            id: "fixture-training-session", week: 2, slot: 0, pattern: "A", title: "Fixture training",
             exercises: [
                 TrainingExercisePrescription(
                     id: "fixture_press", name: "Fixture press", primaryMuscle: "chest",
@@ -1687,10 +1546,7 @@ struct TrainingLiveSessionFixtureView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Button("Open fixture session") {
-                if Self.cardsEnabled { try? Self.draftStore.cacheActiveSession(session, ownerId: "fixture-training-owner") }
-                presented = true
-            }
+            Button("Open fixture session") { presented = true }
                 .accessibilityIdentifier("training_fixture_open")
             Button("Open enrollment") { showEnrollment = true }
                 .accessibilityIdentifier("training_fixture_enroll")
@@ -1721,7 +1577,7 @@ struct TrainingLiveSessionFixtureView: View {
         .padding(20)
         .sheet(isPresented: $presented) {
             TrainingLiveSessionView(
-                session: session, ownerId: "fixture-training-owner", cardsEnabled: Self.cardsEnabled, voiceEnabled: true,
+                session: session, ownerId: "fixture-training-owner", voiceEnabled: true,
                 readinessEnabled: true,
                 restTimerEnabled: ProcessInfo.processInfo.arguments.contains("-lybUITestTrainingRestTimer"),
                 restAlertClient: TrainingFixtureRestAlerts(),

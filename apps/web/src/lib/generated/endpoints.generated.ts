@@ -373,10 +373,6 @@ export const endpoints = {
       reason: 'Linear GraphQL API used by CI remediation intake.',
     },
     {
-      value: 'https://linear.app/jovie/issue/LYB-43',
-      reason: 'LYB-43 source evidence for metric identity and accessible action ownership.',
-    },
-    {
       value: 'https://linear.app/jovie/issue/LYB-44',
       reason: 'LYB-44 source evidence for chart responsiveness and playhead label mapping.',
     },

@@ -192,7 +192,6 @@ final class TrainingSessionDraft: ObservableObject {
             try finishLogAcknowledgement(
                 row: row, request: request, acknowledged: acknowledged, exercise: exercise, setNumber: setNumber
             )
-            persistCachedReceipt()
         } catch let error as LocalizedError {
             if isCurrent() { errorMessage = error.errorDescription ?? "The set could not be saved." }
         } catch {
@@ -354,7 +353,6 @@ final class TrainingSessionDraft: ObservableObject {
         }
         reconcileSavedSets()
         restoreRestTimer()
-        persistCachedReceipt()
     }
 
     func beginCorrection(_ position: TrainingSetPosition) {
@@ -432,7 +430,6 @@ final class TrainingSessionDraft: ObservableObject {
             rows.removeValue(forKey: row.key)
             persistedRows.removeValue(forKey: row.key)
             loggedSets[row.key] = corrected
-            persistCachedReceipt()
             issueUndoReceipt(for: corrected)
             lastSaveReceipt = TrainingSetSaveReceipt(
                 id: request.correctionId,
@@ -443,16 +440,6 @@ final class TrainingSessionDraft: ObservableObject {
             if isCurrent() { errorMessage = error.errorDescription ?? "The correction could not be saved." }
         } catch {
             if isCurrent() { errorMessage = "The correction could not be saved." }
-        }
-    }
-
-    private func persistCachedReceipt() {
-        var snapshot = session
-        snapshot.loggedSets = loggedSets.values.sorted { "\($0.exerciseId)-\($0.setNumber)" < "\($1.exerciseId)-\($1.setNumber)" }
-        do {
-            try store.updateCachedSession(snapshot, ownerId: ownerId)
-        } catch {
-            errorMessage = TrainingDraftError.unavailable.localizedDescription
         }
     }
 
@@ -531,7 +518,6 @@ final class TrainingSessionDraft: ObservableObject {
             }
             undoReceipt = nil
             loggedSets[key] = undone
-            persistCachedReceipt()
             lastSaveReceipt = TrainingSetSaveReceipt(id: receipt.id, position: position, corrected: true)
         } catch let error as LocalizedError {
             if isCurrent() { errorMessage = error.errorDescription ?? "The correction could not be undone." }

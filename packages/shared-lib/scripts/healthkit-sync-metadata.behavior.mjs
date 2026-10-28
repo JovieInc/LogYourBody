@@ -16,13 +16,6 @@ function findings(source, path = 'Fixture.swift') {
   return scan({ files: [path], readSource: () => source });
 }
 
-test('a source that never names a sync identifier has no findings', () => {
-  const bulky = `[${'"["'.repeat(4000)}]`;
-  assert.equal(bulky.includes('HKMetadataKeySyncIdentifier'), false);
-  assert.deepEqual(findings(bulky), []);
-  assert.equal(repairSource(bulky), bulky);
-});
-
 test('the launch-quality fixture fails before repair and passes after it', () => {
   const before = findings(launchQualityFixture);
   assert.equal(before.length, 1);
@@ -69,40 +62,6 @@ let good = [HKMetadataKeySyncIdentifier: "kept", HKMetadataKeySyncVersion: "1"]`
   );
   assert.match(repaired, /"kept", HKMetadataKeySyncVersion: "1"\]/u);
   assert.deepEqual(findings(repaired), []);
-});
-
-test('raw HealthKit source assertions fail in either operand order', () => {
-  for (const [field, raw] of [
-    ['sourceBundleId', 'bundleIdentifier'],
-    ['sourceName', 'name'],
-  ]) {
-    const normalized = `metadata.${field}`;
-    const unnormalized = `sample.sourceRevision.source.${raw}`;
-    for (const [left, right] of [
-      [normalized, unnormalized],
-      [unnormalized, normalized],
-    ]) {
-      const source = `XCTAssertEqual(\n    ${left},\n    ${right}, "source provenance")`;
-      const found = findings(source);
-      assert.equal(found.length, 1);
-      assert.match(found[0].key, /normalize empty HealthKit/u);
-      assert.equal(found[0].path, 'Fixture.swift');
-    }
-  }
-});
-
-test('normalized HealthKit assertions, literal values and source extraction are allowed', () => {
-  const source = `
-    let bundle = sample.sourceRevision.source.bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
-    XCTAssertEqual(metadata.sourceBundleId, bundle.isEmpty ? nil : bundle)
-    XCTAssertEqual(metadata.sourceBundleId, "com.example.scale")
-    XCTAssertEqual(sample.sourceRevision.source.bundleIdentifier, "com.example.scale")
-    let metadata = BodyMetricSourceMetadata(sourceBundleId: sample.sourceRevision.source.bundleIdentifier)
-    // XCTAssertEqual(metadata.sourceBundleId, sample.sourceRevision.source.bundleIdentifier)
-    /* XCTAssertEqual(metadata.sourceName, sample.sourceRevision.source.name) */
-    let example = "XCTAssertEqual(metadata.sourceBundleId, sample.sourceRevision.source.bundleIdentifier)"
-  `;
-  assert.deepEqual(findings(source), []);
 });
 
 test('checked-in Swift pairs every sync identifier with a sync version', () => {

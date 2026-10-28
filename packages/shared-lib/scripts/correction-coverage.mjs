@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { dirname, posix, resolve } from 'node:path';
+import { appendFileSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { posix, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { planCorrectionIssues } from './correction-recurrence.mjs';
@@ -101,13 +101,11 @@ export function coverageReport(
       receipts: [...receipts.values()].sort((a, b) => a.source.localeCompare(b.source)),
       recurrence: { receiptCount: receipts.size, repeatCount: receipts.size - 1 },
     }));
-  const mechanized = entries.filter((rule) => rule.mechanized).length;
   return {
     schema: 'lyb.correction-coverage/v1',
     repository: 'JovieInc/LogYourBody',
     evidence: 'reviewed source anchors; not proof of guard execution',
-    ...fraction(mechanized, entries.length),
-    mechanizedShare: entries.length ? mechanized / entries.length : 0,
+    ...fraction(entries.filter((rule) => rule.mechanized).length, entries.length),
     levels: Object.fromEntries(
       LEVELS.map((level) => {
         const members = entries.filter((rule) => rule.level === level);
@@ -269,38 +267,17 @@ export function assertLedgerMergeReady(root) {
     0,
     `ledger merge: resolve other conflicts first: ${otherConflicts.join(', ')}`,
   );
-  // Staging a file does not prove its conflict markers were resolved.
-  // Read index blobs directly. Diff flags and attributes cannot hide markers,
-  // and future repairs do not keep a growing flag list in source order.
-  const stagedPaths = execFileSync(
+  const staged = execFileSync(
     'git',
-    [
-      'diff',
-      '--cached',
-      '--name-only',
-      '--diff-filter=ACMRT',
-      '-z',
-      '--',
-      '.',
-      `:!${LEDGER_PATH}`,
-    ],
+    ['diff', '--cached', '--no-ext-diff', '--unified=0', '--', '.', `:!${LEDGER_PATH}`],
     { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-  )
-    .split('\0')
-    .filter(Boolean);
-  const marker = /^(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m;
-  for (const path of stagedPaths) {
-    const blob = execFileSync('git', ['cat-file', 'blob', `:${path}`], {
-      cwd: root,
-      encoding: 'buffer',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    assert.doesNotMatch(
-      blob.toString('latin1'),
-      marker,
-      'ledger merge: resolve staged conflict markers first',
-    );
-  }
+  );
+  // Staging a file does not prove its conflict markers were resolved.
+  assert.doesNotMatch(
+    staged,
+    /^\+(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m,
+    'ledger merge: resolve staged conflict markers first',
+  );
 }
 
 export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
@@ -322,53 +299,29 @@ export function runCoverage(argv, { root = ROOT, env = process.env } = {}) {
     writeFileSync(resolve(root, LEDGER_PATH), `${JSON.stringify(merged, null, 2)}\n`);
     argv = [];
   }
-  const options = new Map();
-  for (let index = 0; index < argv.length; index += 2) {
-    const option = argv[index];
-    const value = argv[index + 1];
-    assert.ok(
-      ['--base-ref', '--output'].includes(option) &&
-        value?.trim() &&
-        !value.startsWith('--') &&
-        !options.has(option),
-      'usage: correction-coverage.mjs [--base-ref <sha|origin/main>] [--output <path>] | --merge-ledger',
-    );
-    options.set(option, value);
-  }
+  assert.ok(
+    argv.length === 0 || (argv.length === 2 && argv[0] === '--base-ref'),
+    'usage: correction-coverage.mjs [--base-ref <sha|origin/main> | --merge-ledger]',
+  );
   const current = guardCoverageReport(
     JSON.parse(readSource(LEDGER_PATH, { root })),
     (path) => readSource(path, { root }),
     { requireClassification: true },
   );
-  if (options.has('--base-ref')) {
-    const ref = options.get('--base-ref');
+  if (argv.length) {
+    const ref = argv[1];
     const baseline = coverageReport(JSON.parse(readSource(LEDGER_PATH, { root, ref })), (path) =>
       readSource(path, { root, ref }),
     );
     assertNoRegression(current, baseline);
   }
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, renderCoverage(current));
-  current.commitSha = execFileSync('git', ['rev-parse', 'HEAD'], {
-    cwd: root,
-    encoding: 'utf8',
-  }).trim();
-  current.timestamp = new Date().toISOString();
-  if (options.has('--output')) {
-    const output = resolve(root, options.get('--output'));
-    mkdirSync(dirname(output), { recursive: true });
-    writeFileSync(output, `${JSON.stringify(current, null, 2)}\n`);
-  }
   return current;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const report = runCoverage(process.argv.slice(2));
-    console.log(
-      process.argv.includes('--output')
-        ? `Correction coverage: ${report.mechanized}/${report.total} mechanized (${(100 * report.mechanizedShare).toFixed(2)}%); ${LEVELS.map((level) => `${level}=${report.levels[level].total}`).join(', ')}`
-        : JSON.stringify(report, null, 2),
-    );
+    console.log(JSON.stringify(runCoverage(process.argv.slice(2)), null, 2));
   } catch (error) {
     console.error(`Correction coverage failed: ${error.message}`);
     process.exitCode = 1;

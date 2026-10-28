@@ -73,21 +73,6 @@ final class BodyMetricSourceContractTests: XCTestCase {
         XCTAssertEqual(decoded.jsonObject["vendor"] as? String, "BodySpec")
     }
 
-    func testSourceBundleIdentifierNormalizationAndRoundTrip() throws {
-        let cases: [(String?, String?)] = [
-            (nil, nil), ("", nil), (" \t\n ", nil),
-            ("com.example.scale", "com.example.scale"),
-            (" com.example.scale\n", "com.example.scale")
-        ]
-        for (raw, expected) in cases {
-            let metadata = BodyMetricSourceMetadata(vendor: "apple_health", sourceBundleId: raw)
-            XCTAssertEqual(metadata.sourceBundleId, expected)
-            XCTAssertEqual(metadata.jsonObject["source_bundle_id"] as? String, expected)
-            let decoded = try XCTUnwrap(BodyMetricSourceMetadata(jsonString: metadata.jsonString))
-            XCTAssertEqual(decoded.sourceBundleId, expected)
-        }
-    }
-
     @MainActor
     func testHistoryMetadataConversionServicesMainQueueBeforeFinishing() async throws {
         let (context, cached) = try cachedHistory(count: 151)

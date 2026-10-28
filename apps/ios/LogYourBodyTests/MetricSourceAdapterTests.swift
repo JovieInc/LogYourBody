@@ -244,9 +244,7 @@ final class MetricSourceAdapterTests: XCTestCase {
         XCTAssertEqual(adapter.idempotencyKey(for: sample), sample.uuid.uuidString)
         let metadata = adapter.sourceMetadata(from: sample)
         XCTAssertEqual(metadata.sampleId, adapter.idempotencyKey(for: sample))
-        // Unsaved HealthKit samples can have an empty source bundle identifier.
-        let bundleId = sample.sourceRevision.source.bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
-        XCTAssertEqual(metadata.sourceBundleId, bundleId.isEmpty ? nil : bundleId)
+        XCTAssertEqual(metadata.sourceBundleId, sample.sourceRevision.source.bundleIdentifier)
         XCTAssertEqual(metadata.healthKitContext["sync_identifier"], "weight-edit")
         XCTAssertEqual(metadata.healthKitContext["sync_version"], "1")
         XCTAssertEqual(metadata.healthKitContext["time_zone"], "America/Los_Angeles")

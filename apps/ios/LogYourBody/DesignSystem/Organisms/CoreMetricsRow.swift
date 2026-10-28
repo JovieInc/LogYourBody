@@ -20,15 +20,14 @@ struct CoreMetricsRow: View {
     var body: some View {
         HStack(spacing: 16) {
             // Body Fat Card - Tappable
-            Group {
-                let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        displayMode = .bodyFatChart
-                    }
-                    // Haptic feedback
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    displayMode = .bodyFatChart
                 }
+                // Haptic feedback
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
+            } label: {
                 if let bf = bodyFatPercentage {
                     MetricSummaryCard(
                         icon: "percent",
@@ -49,7 +48,7 @@ struct CoreMetricsRow: View {
                             },
                             footnote: nil
                         )),
-                        detailAction: detailAction
+                        isButtonContext: true
                     )
                     .scaleEffect(displayMode == .bodyFatChart ? 1.05 : 1.0)
                     .overlay(
@@ -60,23 +59,21 @@ struct CoreMetricsRow: View {
                     MetricSummaryCard(
                         icon: "percent",
                         accentColor: Color.metricAccentBodyFat,
-                        state: .empty(title: "Body fat", message: "No body fat data", action: nil),
-                        detailAction: detailAction
+                        state: .empty(title: "Body fat", message: "No body fat data", action: nil)
                     )
                 }
             }
             .buttonStyle(MetricCardButtonStyle())
 
             // Weight Card - Tappable
-            Group {
-                let detailAction = MetricSummaryCard.CardAction(title: "Show details") {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        displayMode = .weightChart
-                    }
-                    // Haptic feedback
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    displayMode = .weightChart
                 }
+                // Haptic feedback
+                let impact = UIImpactFeedbackGenerator(style: .medium)
+                impact.impactOccurred()
+            } label: {
                 if let w = weight {
                     MetricSummaryCard(
                         icon: "figure.stand",
@@ -97,7 +94,7 @@ struct CoreMetricsRow: View {
                             },
                             footnote: nil
                         )),
-                        detailAction: detailAction
+                        isButtonContext: true
                     )
                     .scaleEffect(displayMode == .weightChart ? 1.05 : 1.0)
                     .overlay(
@@ -108,8 +105,7 @@ struct CoreMetricsRow: View {
                     MetricSummaryCard(
                         icon: "figure.stand",
                         accentColor: Color.metricAccentWeight,
-                        state: .empty(title: "Weight", message: "No weight data", action: nil),
-                        detailAction: detailAction
+                        state: .empty(title: "Weight", message: "No weight data", action: nil)
                     )
                 }
             }
