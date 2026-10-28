@@ -149,6 +149,79 @@ test('freshness and coverage boundaries are explicit', () => {
   assert.equal(generateReport(input, now).snapshot_status, 'stale');
 });
 
+test('turns missing evidence into bounded source actions instead of an experiment verdict', () => {
+  const input = fixture();
+  input.sources = [];
+  const iteration = generateReport(input, now).iteration;
+  assert.equal(iteration.status, 'repair_measurement');
+  assert.equal(iteration.experiment_decision, 'not_evaluated');
+  assert.deepEqual(
+    iteration.next_actions.map(({ action, source }) => ({ action, source })),
+    [
+      { action: 'collect_missing_aggregate', source: 'statsig' },
+      { action: 'collect_missing_aggregate', source: 'core_data_neon' },
+      { action: 'collect_missing_aggregate', source: 'revenuecat' },
+    ],
+  );
+  assert.deepEqual(iteration.next_actions[0].metrics, [
+    'onboarding_started',
+    'first_insight_rendered',
+  ]);
+  assert.ok(iteration.next_actions.every((action) => action.not_before === null));
+});
+
+test('actions retain every qualification failure and wait for the full cohort window', () => {
+  const input = fixture();
+  input.as_of = '2026-09-02T00:00:00Z';
+  for (const source of input.sources) source.watermark = input.as_of;
+  input.sources[1].commissioned = false;
+  input.sources[1].reconciled = false;
+  input.sources[1].metrics.activation_v1.missing = 1;
+  input.sources[0].watermark = '2026-09-01T23:59:59Z';
+  const iteration = generateReport(input, now).iteration;
+  assert.equal(iteration.next_actions[0].action, 'refresh_report_snapshot');
+  const actions = iteration.next_actions.filter((action) => action.source === 'core_data_neon');
+  assert.deepEqual(
+    actions.map(({ action }) => action),
+    [
+      'commission_source',
+      'reconcile_source',
+      'complete_cohort_coverage',
+      'wait_for_cohort_maturity',
+    ],
+  );
+  assert.equal(actions.at(-1).not_before, '2026-10-04T00:00:00.000Z');
+  assert.ok(
+    iteration.next_actions.some(
+      (action) => action.action === 'refresh_source_coverage' && action.source === 'statsig',
+    ),
+  );
+});
+
+test('qualified aggregates require review and do not select a winner or certify commissioning', () => {
+  const report = generateReport(fixture(), now);
+  assert.deepEqual(report.iteration, {
+    status: 'review_qualified_aggregates',
+    experiment_decision: 'not_evaluated',
+    next_actions: [],
+  });
+  assert.equal(report.provider_commissioning, 'not_independently_verified');
+  const stale = generateReport(fixture(), new Date(now.getTime() + 86_400_001));
+  assert.equal(stale.iteration.status, 'repair_measurement');
+  assert.deepEqual(stale.iteration.next_actions, [
+    {
+      action: 'refresh_report_snapshot',
+      source: null,
+      metrics: [],
+      not_before: null,
+    },
+  ]);
+  assert.equal(
+    generateReport(fixture(), new Date(now.getTime() + 86_400_000)).iteration.status,
+    'review_qualified_aggregates',
+  );
+});
+
 test('rejects sensitive and unknown fields at every nesting level without echoing them', () => {
   const sensitive = [
     'email',

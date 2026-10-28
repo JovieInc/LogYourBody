@@ -97,7 +97,10 @@ branch-only receipts, allowing later main-side prepends to merge without
 repeating the same conflict. It preserves independent additions and
 one-sided edits, consolidates identical parent replays, rejects deletions,
 conflicting duplicate identities and divergent concurrent edits, and validates
-retained guards before writing the classified result.
+retained guards before writing the classified result. Annotation conflicts
+identify the existing and incoming source receipts; review their classifications
+and retained guards explicitly before retrying. Conflicting annotations are never
+selected automatically.
 After explicit staging, either resolver invocation verifies the staged ledger
 against both merge parents without writing or restaging local edits. Missing
 conflict stages for an unresolved ledger fail without writing.
@@ -117,6 +120,7 @@ Both the merge check and staged retry refuse any other unresolved Git path,
 even when the staged ledger and all of its guard sources are valid.
 Conflict-marker scanning disables Git color output as well as text conversion
 and external diff drivers so presentation settings cannot conceal staged markers.
+It also rejects markers shorter than seven characters.
 A staged retry, with or without `--stage`, and `--check-merge` refuse any
 unstaged ledger edits, including formatting changes. Review and stage those
 edits explicitly before retrying; refusal preserves both the index and working
@@ -125,7 +129,9 @@ If the working ledger is already resolved JSON while the index is still
 unmerged, the resolver classifies that resolution and validates it against both
 parents, preserving newly added receipts. Invalid JSON or missing parent
 receipts fail without writing or staging; the parent union is generated only
-while conflict markers remain.
+while conflict markers remain, including a custom Git conflict-marker-size.
+The classifier shares the coverage resolver's recursive-ancestor reader and
+normalizes identical parent replays before applying the three-way merge policy.
 
 After staging the resolution, run
 `node scripts/correction-classifier.mjs --check-merge .`. This read-only mode

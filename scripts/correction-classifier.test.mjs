@@ -299,6 +299,23 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
   assert.equal(run('--resolve-merge', directory).status, 1, 'refuse a non-repository');
   const rows = fixture().slice(0, 4);
   rows.push({ ...rows[0], source: `${rows[0].source}#another-receipt` });
+  const markerScenarios = [
+    'staged-marker',
+    'binary-marker',
+    'textconv-marker',
+    'external-marker',
+    'color-marker',
+  ];
+  const markers = [
+    '<<<<<<< HEAD',
+    '||||||| base',
+    '=======',
+    '>>>>>>> incoming',
+    '<< HEAD',
+    '|| base',
+    '==',
+    '>> incoming',
+  ];
   const scenarios = [
     'additions',
     'ours-edit',
@@ -307,15 +324,13 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     'deleted',
     'missing-guard',
     'guard-conflict',
-    'staged-marker',
+    ...markerScenarios,
     'manual-resolution',
     'manual-missing-receipt',
     'manual-invalid',
-    'textconv-marker',
-    'color-marker',
-    'binary-marker',
     'cherry-pick',
     'duplicate-parent',
+    'short-ledger-markers',
   ].map((scenario) => [scenario, false]);
   scenarios.push(
     ['additions', true],
@@ -323,15 +338,9 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     ['missing-index-guard', true],
     ['guard-conflict', true],
     ['unrelated-conflict', true],
-    ['staged-marker', true],
-    ['manual-resolution', true],
-    ['manual-missing-receipt', true],
-    ['manual-invalid', true],
-    ['textconv-marker', true],
-    ['color-marker', true],
-    ['binary-marker', true],
-    ['cherry-pick', true],
-    ['duplicate-parent', true],
+    ...markerScenarios.map((scenario) => [scenario, true]),
+    ...['manual-resolution', 'manual-missing-receipt', 'manual-invalid',
+      'cherry-pick', 'duplicate-parent', 'short-ledger-markers'].map((scenario) => [scenario, true]),
   );
   const runScenario = async ([scenario, stageMerge]) => {
     const refused = [
@@ -340,12 +349,9 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       'missing-guard',
       'missing-index-guard',
       'guard-conflict',
-      'staged-marker',
+      ...markerScenarios,
       'manual-missing-receipt',
       'manual-invalid',
-      'textconv-marker',
-      'color-marker',
-      'binary-marker',
       'cherry-pick',
     ].includes(scenario);
     const repository = join(directory, `repository with spaces ${scenario} ${stageMerge}`);
@@ -391,6 +397,10 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     git('init', '--initial-branch=left');
     git('config', 'user.name', 'Ledger fixture');
     git('config', 'user.email', 'fixture@example.test');
+    if (scenario === 'short-ledger-markers') {
+      writeFileSync(join(repository, '.gitattributes'),
+        'packages/shared-lib/corrections.json conflict-marker-size=2\n');
+    }
     for (const { guard } of rows.filter(({ guard }) => guard)) {
       writeFileSync(join(repository, guard.path), guard.anchor);
     }
@@ -438,7 +448,7 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     git('switch', 'left');
     git(scenario === 'cherry-pick' ? 'cherry-pick' : 'merge', '--no-commit', 'right');
     let before = readFileSync(ledger, 'utf8');
-    assert.match(before, /<<<<<<< HEAD/);
+    assert.match(before, /^<{2,} HEAD/m);
     if (scenario === 'unrelated-conflict') {
       writeLedger(classifyLedger([...rows.slice(2), shared, rows[1]]));
       git('add', 'packages/shared-lib/corrections.json');
@@ -476,28 +486,38 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       git('add', rows[0].guard.path);
       writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
     }
+    if (scenario === 'binary-marker') {
+      // Binary attributes must not hide markers from either resolver mode.
+      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
+      git('add', '.gitattributes');
+    }
     if (scenario === 'textconv-marker') {
       // A diff driver must not conceal the actual staged merge contents.
       writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} diff=hidden\n`);
       git('config', 'diff.hidden.textconv', 'echo filtered-source');
       git('add', '.gitattributes');
     }
+    if (scenario === 'external-marker') {
+      // An external diff driver must not hide markers from either repair mode.
+      git('config', 'diff.external', 'echo filtered-source');
+    }
     if (scenario === 'color-marker') {
       // User presentation settings cannot hide conflict markers from the resolver.
       git('config', 'color.ui', 'always');
     }
-    if (scenario === 'binary-marker') {
-      // Binary attributes must not hide unresolved source in the staged diff.
-      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} binary\n`);
-      git('add', '.gitattributes');
-    }
-    if (['staged-marker', 'textconv-marker', 'color-marker', 'binary-marker'].includes(scenario)) {
-      writeFileSync(
-        join(repository, rows[0].guard.path),
-        `${rows[0].guard.anchor}\n<<<<<<< HEAD\n`,
-      );
-      git('add', rows[0].guard.path);
-      writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
+    if (markerScenarios.includes(scenario)) {
+      // Every presentation variant must reject every marker in both repair modes.
+      for (const marker of markers) {
+        writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
+        git('add', rows[0].guard.path);
+        writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
+        const index = git('ls-files', '--stage');
+        const rejected = run('--resolve-merge', repository, ...(stageMerge ? ['--stage'] : []));
+        assert.equal(rejected.status, 1, `${scenario} ${marker}: ${rejected.stderr}`);
+        assert.match(rejected.stderr, /staged conflict markers/);
+        assert.equal(git('ls-files', '--stage'), index, 'refused repair preserves the index');
+        assert.equal(readFileSync(ledger, 'utf8'), before, 'refused repair preserves the ledger');
+      }
     }
     const manualReceipt = { ...rows[1], source: `${rows[1].source}#manual-resolution` };
     const expectedRows = [...rows.slice(2), scenario === 'ours-edit' ? ours : shared, rows[1]];
@@ -560,7 +580,9 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
       assert.equal((await run('--resolve-merge', repository, '--stage')).status, 0);
       // A clean worktree cannot hide conflict markers already staged as resolved.
       git('config', 'color.ui', 'always');
-      for (const marker of ['<<<<<<< HEAD', '||||||| base', '=======', '>>>>>>> incoming']) {
+      writeFileSync(join(repository, '.gitattributes'), `${rows[0].guard.path} -diff\n`);
+      git('add', '.gitattributes');
+      for (const marker of markers) {
         writeFileSync(join(repository, rows[0].guard.path), `${rows[0].guard.anchor}\n${marker}\n`);
         git('add', rows[0].guard.path);
         writeFileSync(join(repository, rows[0].guard.path), rows[0].guard.anchor);
@@ -670,34 +692,41 @@ test('CLI resolves Git ledger conflicts', { concurrency: 2 }, async (t) => {
     assert.equal(git('rev-parse', 'HEAD', operationHead), parents);
     assert.match(git('diff', '--name-only'), /unrelated.txt/);
     if (scenario === 'additions') {
-      git('commit', '-m', 'test: resolved ledger');
-      git('switch', 'right');
-      const nextReceipt = {
-        ...rows[2],
-        fingerprint: 'next-main-receipt',
-        source: `${rows[2].source}#next-main`,
-      };
-      writeLedger(classifyLedger([nextReceipt, ...rows.slice(2), shared]));
-      git('commit', '-am', 'test: next main receipt');
-      git('switch', 'left');
-      const nextMerge = spawnSync('git', ['merge', '--no-commit', 'right'], {
-        cwd: repository,
-        encoding: 'utf8',
-        timeout: 5_000,
-      });
-      assert.ifError(nextMerge.error);
-      assert.equal(
-        nextMerge.status,
-        0,
-        `next main prepend must merge cleanly: ${nextMerge.stderr}`,
-      );
-      assert.deepEqual(
-        JSON.parse(readFileSync(ledger, 'utf8')),
-        classifyLedger([nextReceipt, ...rows.slice(2), shared, rows[1]]),
-      );
-      const checked = await run('--check-merge', repository);
-      assert.equal(checked.status, 0, checked.stderr);
-      assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
+      // Future main receipts may arrive at either end of the ledger.
+      for (const placement of ['prepend', 'append']) {
+        git('commit', '-m', 'test: resolved ledger');
+        git('switch', 'right');
+        const incoming = JSON.parse(readFileSync(ledger, 'utf8'));
+        const nextReceipt = {
+          ...rows[2],
+          fingerprint: `next-main-${placement}`,
+          source: `${rows[2].source}#next-main-${placement}`,
+        };
+        const next =
+          placement === 'prepend' ? [nextReceipt, ...incoming] : [...incoming, nextReceipt];
+        writeLedger(classifyLedger(next));
+        git('commit', '-am', 'test: next main receipt');
+        git('switch', 'left');
+        const nextMerge = spawnSync('git', ['merge', '--no-commit', 'right'], {
+          cwd: repository,
+          encoding: 'utf8',
+          timeout: 5_000,
+        });
+        assert.ifError(nextMerge.error);
+        assert.equal(nextMerge.status, placement === 'prepend' ? 0 : 1, nextMerge.stderr);
+        if (placement === 'append') {
+          assert.match(readFileSync(ledger, 'utf8'), /<<<<<<< HEAD/);
+          const repaired = run('--resolve-merge', repository, '--stage');
+          assert.equal(repaired.status, 0, repaired.stderr);
+        }
+        assert.deepEqual(
+          JSON.parse(readFileSync(ledger, 'utf8')),
+          classifyLedger([...next, rows[1]]),
+        );
+        const checked = run('--check-merge', repository);
+        assert.equal(checked.status, 0, checked.stderr);
+        assert.equal(readFileSync(unrelated, 'utf8'), 'uncommitted user edit\n');
+      }
     }
   };
   // Each scenario owns a separate repository; overlap CLI waits within the existing deadline.

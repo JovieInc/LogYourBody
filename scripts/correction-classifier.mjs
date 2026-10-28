@@ -11,6 +11,7 @@ import {
   LEDGER_PATH,
   LEVELS,
   mergeCorrectionLedgers,
+  readGitMergeLedgers,
   readSource,
   ROOT,
 } from '../packages/shared-lib/scripts/correction-coverage.mjs';
@@ -214,7 +215,7 @@ export function runClassifier(args, logger = console) {
         return 0;
       }
       const working = readSource(LEDGER_PATH, { root }); // Refuse symlinked output.
-      if (!/^(?:<{7,}|\|{7,}|={7,}|>{7,})(?: |$)/m.test(working)) {
+      if (!/^(?:<{2,}|\|{2,}|={2,}|>{2,})(?: |$)/m.test(working)) {
         // Preserve manually resolved receipts instead of rebuilding from the parents.
         result = classifyLedger(JSON.parse(working));
         verifyMerge(result);
@@ -222,9 +223,7 @@ export function runClassifier(args, logger = console) {
         // Reuse the coverage tool's three-way policy rather than a second resolver.
         // Classify snapshots first so derived metadata cannot look like concurrent edits.
         // Normalize identical parent replays with the existing union policy.
-        const stages = [1, 2, 3].map((stage) =>
-          mergeLedgers(JSON.parse(git('show', `:${stage}:${LEDGER_PATH}`)), []),
-        );
+        const stages = readGitMergeLedgers(root).map((rows) => mergeLedgers(rows, []));
         result = classifyLedger(
           // Keep incoming order, then append branch-only receipts so future main
           // prepends do not collide with the same branch receipt on every repair.

@@ -63,7 +63,7 @@ git -C "$ROOT_DIR" rev-parse HEAD > "$ARTIFACT_DIR/source-revision.txt"
 git -C "$ROOT_DIR" diff HEAD --binary > "$ARTIFACT_DIR/source-working-tree.patch"
 
 if [[ "$AUDIT_MODE" == full ]]; then
-  # Run shell fixtures before simulator boot competes for host resources.
+  # Finish validator shell fixtures before simulator boot competes for host resources.
   python3 "$ROOT_DIR/scripts/ios/test_launch_quality_evidence.py"
   bash "$ROOT_DIR/scripts/ios/bootstrap-local-config.sh"
 fi
